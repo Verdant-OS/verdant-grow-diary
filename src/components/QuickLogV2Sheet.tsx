@@ -60,7 +60,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
   buildQuickLogTimelineNavTarget,
@@ -148,8 +148,14 @@ import QuickLogMaturityEvidenceFields from "@/components/QuickLogMaturityEvidenc
 import {
   buildFeedingDefaults,
   applyFeedingDefaultsToForm,
+  feedingDefaultsPrefillSettled,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
+import {
+  feedingDefaultsSaveCutoffQueryKey,
+  readFeedingDefaultsSaveCutoff,
+  recordFeedingDefaultsSaveCutoff,
+} from "@/lib/feedingDefaultsSaveCutoff";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
   applyWateringVolumeDefaultsToForm,
@@ -527,6 +533,9 @@ function QuickLogV2SheetForOwner({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [feedingDefaultsRefetchAfterByPlant, setFeedingDefaultsRefetchAfterByPlant] = useState<
+    Record<string, number>
+  >({});
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
@@ -813,9 +822,24 @@ function QuickLogV2SheetForOwner({
       }
     : { plantId: null, tentId: null, growId: null };
 
+  const feedingDefaultsSaveCutoffQ = useQuery({
+    queryKey: feedingDefaultsSaveCutoffQueryKey(resolvedContext.plantId ?? ""),
+    enabled: false,
+    staleTime: Infinity,
+    queryFn: () => 0,
+  });
+  const recordedFeedingDefaultsSaveCutoff =
+    typeof feedingDefaultsSaveCutoffQ.data === "number" ? feedingDefaultsSaveCutoffQ.data : 0;
+
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
-  }) as { data?: unknown[] };
+  }) as {
+    data?: unknown[];
+    isFetching?: boolean;
+    isPending?: boolean;
+    isError?: boolean;
+    dataUpdatedAt?: number;
+  };
   const feedingDefaults = useMemo(
     () =>
       buildFeedingDefaults({
@@ -1089,6 +1113,19 @@ function QuickLogV2SheetForOwner({
     if (!open || submissionLockedRef.current) return;
     if (form.action !== "feed") return;
     if (feedingDefaultsApplied) return;
+    if (
+      !feedingDefaultsPrefillSettled({
+        isFetching: Boolean(recentFeedingsQ.isFetching),
+        isPending: Boolean(recentFeedingsQ.isPending),
+        isError: Boolean(recentFeedingsQ.isError),
+        dataUpdatedAt: recentFeedingsQ.dataUpdatedAt ?? 0,
+        refetchRequiredAfter: 0,
+        plantId: resolvedContext.plantId,
+        refetchRequiredAfterByPlant: feedingDefaultsRefetchAfterByPlant,
+        recordedSaveCutoff: recordedFeedingDefaultsSaveCutoff,
+      })
+    )
+      return;
     if (!feedingDefaults.defaults) return;
     // Defaults affect only the recipe. A note handed off from Note/Water (for
     // example a selected Better/Same/Worse response) must neither block those
@@ -1099,7 +1136,20 @@ function QuickLogV2SheetForOwner({
       note: previous.note,
     }));
     setFeedingDefaultsApplied(true);
-  }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
+  }, [
+    open,
+    form.action,
+    feedingDefaults,
+    feedingDefaultsApplied,
+    feedingDefaultsRefetchAfterByPlant,
+    recordedFeedingDefaultsSaveCutoff,
+    resolvedContext.plantId,
+    feedingForm,
+    recentFeedingsQ.isFetching,
+    recentFeedingsQ.isPending,
+    recentFeedingsQ.isError,
+    recentFeedingsQ.dataUpdatedAt,
+  ]);
 
   // One-shot prefill of Water volume from the plant's most recent watering
   // that recorded a positive volume. Fail closed: never invent 200/500/pot
@@ -1716,6 +1766,18 @@ function QuickLogV2SheetForOwner({
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      const savedPlantId = resolved.plantId ?? null;
+      if (savedPlantId) {
+        const refetchAfter = Date.now();
+        recordFeedingDefaultsSaveCutoff(queryClient, savedPlantId, refetchAfter);
+        setFeedingDefaultsRefetchAfterByPlant((previous) => ({
+          ...previous,
+          [savedPlantId]: refetchAfter,
+        }));
+        void queryClient.invalidateQueries({
+          queryKey: ["quicklog_v2_feed_defaults", savedPlantId],
+        });
+      }
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
         // Feed uses the same canonical grow-scoped Timeline as note/water.

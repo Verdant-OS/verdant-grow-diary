@@ -21,6 +21,27 @@ import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterComp
 
 export const RECENT_FEEDINGS_DEFAULTS_LIMIT = 20;
 
+export function recentFeedingsDefaultsQueryKey(plantId: string | null) {
+  return ["quicklog_v2_feed_defaults", plantId] as const;
+}
+
+export interface RecentFeedingsDefaultsQueryClient {
+  invalidateQueries: (opts: { queryKey: readonly unknown[] }) => Promise<unknown> | unknown;
+}
+
+/**
+ * Drop the 30-second feed-defaults cache. `invalidateQueries` already refetches
+ * active observers, so this does not issue a second read and does not wait.
+ */
+export function refetchRecentFeedingsForDefaults(
+  client: RecentFeedingsDefaultsQueryClient,
+  plantId: string | null | undefined,
+): boolean {
+  if (!plantId) return false;
+  void client.invalidateQueries({ queryKey: recentFeedingsDefaultsQueryKey(plantId) });
+  return true;
+}
+
 export interface RecentFeedingsForDefaultsInput {
   plantId?: string | null;
 }
@@ -30,7 +51,7 @@ export function useRecentFeedingsForDefaults(input: RecentFeedingsForDefaultsInp
   const enabled = Boolean(plantId);
 
   return useQuery({
-    queryKey: ["quicklog_v2_feed_defaults", plantId],
+    queryKey: recentFeedingsDefaultsQueryKey(plantId),
     enabled,
     staleTime: 30_000,
     queryFn: async () => {

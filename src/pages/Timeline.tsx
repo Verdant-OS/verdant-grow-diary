@@ -265,6 +265,8 @@ interface Entry {
   id: string;
   note: string;
   photo_url: string | null;
+  /** Private object path kept after `photo_url` is replaced by a signed display URL. */
+  photo_object_path?: string | null;
   stage: string | null;
   details: Record<string, unknown>;
   entry_at: string;
@@ -296,6 +298,7 @@ function buildTimelineDiaryPhotoDisplayRows(
     }
     if (reference.kind === "storage") {
       privatePhotoPathById.set(row.id, reference.path);
+      return { ...row, photo_url: null, photo_object_path: reference.path };
     }
 
     return { ...row, photo_url: null };
@@ -713,7 +716,9 @@ export default function Timeline() {
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
-      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const rows = dropBlankQuickLogPlaceholderRows(
+        (entriesResult.data as Entry[]).map((row) => ({ ...row })),
+      );
       const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rows,
         user,
@@ -1025,7 +1030,9 @@ export default function Timeline() {
       });
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
-      const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const rawOlder = dropBlankQuickLogPlaceholderRows(
+        ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row })),
+      );
       const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rawOlder,
         user,

@@ -7,6 +7,8 @@ export type TimelineQuickLogPlaceholderRow = {
   id: string;
   note?: string | null;
   photo_url?: string | null;
+  /** Storage object path captured before Timeline replaces `photo_url` with a signed URL. */
+  photo_object_path?: string | null;
   plant_id?: string | null;
   tent_id?: string | null;
   entry_at: string;
@@ -47,7 +49,11 @@ function readLinkedGrowEventId(row: TimelineQuickLogPlaceholderRow): string | nu
  * and leaves the column empty, so the column alone is not the photo's link.
  */
 function readPhotoObjectPath(row: TimelineQuickLogPlaceholderRow): string | null {
-  return readNonBlankString(row.photo_url) ?? readNonBlankString(row.details?.photo_url);
+  return (
+    readNonBlankString(row.photo_object_path) ??
+    readNonBlankString(row.photo_url) ??
+    readNonBlankString(row.details?.photo_url)
+  );
 }
 
 /**

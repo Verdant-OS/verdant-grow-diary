@@ -237,7 +237,7 @@ export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDelete
     return {
       canDelete: false,
       canArchive: false,
-      reason: "Tent has plants assigned. Move or remove them first.",
+      reason: "Tent has plants assigned. Move, merge, or remove them first.",
       recommendedAction: "move_plants_first",
     };
   }

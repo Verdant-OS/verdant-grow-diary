@@ -14,6 +14,71 @@ export const TENT = Object.freeze({
   doorSide: "front",
 });
 
+/**
+ * Tent footprints the prototype can draw, in inches (width = left→right, depth = back→door).
+ * A profile carries no pot size; combine one with a pot size through `tentFor`.
+ */
+export const TENT_PROFILES = Object.freeze({
+  "2x4": Object.freeze({ id: "2x4", label: "2 × 4 ft", widthIn: 48, depthIn: 24 }),
+  "4x4": Object.freeze({ id: "4x4", label: "4 × 4 ft", widthIn: 48, depthIn: 48 }),
+  "5x5": Object.freeze({ id: "5x5", label: "5 × 5 ft", widthIn: 60, depthIn: 60 }),
+});
+
+/**
+ * Common fabric-pot sizes and the footprint the diorama draws for each (radius = half the
+ * approximate top diameter). Makers vary; this is a drawing footprint, not a measurement.
+ */
+export const POT_SIZES = Object.freeze([
+  Object.freeze({ gal: 1, radiusIn: 3.5 }),
+  Object.freeze({ gal: 3, radiusIn: 5 }),
+  Object.freeze({ gal: 5, radiusIn: 6 }),
+  Object.freeze({ gal: 7, radiusIn: 7 }),
+  Object.freeze({ gal: 10, radiusIn: 8 }),
+  Object.freeze({ gal: 15, radiusIn: 9 }),
+]);
+
+/** A full tent (the shape every layout rule takes) from a profile id and a pot size. */
+export function tentFor(profileId, potGal) {
+  const profile = TENT_PROFILES[profileId];
+  const pot = POT_SIZES.find((s) => s.gal === potGal);
+  if (!profile || !pot) return null;
+  return Object.freeze({
+    profileId: profile.id,
+    label: profile.label,
+    widthIn: profile.widthIn,
+    depthIn: profile.depthIn,
+    snapIn: TENT.snapIn,
+    potRadiusIn: pot.radiusIn,
+    potGal: pot.gal,
+    doorSide: TENT.doorSide,
+  });
+}
+
+/**
+ * Which pot sizes every given layout still fits in this tent (no overlap, nothing past a wall).
+ * Pass every recorded layout (history included) plus any draft, so a size is never offered
+ * that would draw a recorded arrangement as impossible. Deterministic; null-safe.
+ * @returns {{ gal:number, radiusIn:number, ok:boolean, reason:string|null }[]}
+ */
+export function potSizeOptions(layouts, profileId) {
+  const list = Array.isArray(layouts) ? layouts.filter(Boolean) : [];
+  return POT_SIZES.map((size) => {
+    const tent = tentFor(profileId, size.gal);
+    if (!tent) return { ...size, ok: false, reason: "Unknown tent size." };
+    for (const layout of list) {
+      const v = validateLayout(layout, tent);
+      if (v.ok) continue;
+      const p = v.problems[0];
+      const reason =
+        p.problem === "overlaps"
+          ? `${size.gal} gal pots would overlap (${p.plantId} and ${p.withId}).`
+          : `${size.gal} gal pot for ${p.plantId} would cross the tent wall (out of bounds).`;
+      return { ...size, ok: false, reason };
+    }
+    return { ...size, ok: true, reason: null };
+  });
+}
+
 /** Round a value to the snap grid. Deterministic for identical inputs. */
 export function snapToGrid(value, snap = TENT.snapIn) {
   if (!Number.isFinite(value) || !Number.isFinite(snap) || snap <= 0) return 0;

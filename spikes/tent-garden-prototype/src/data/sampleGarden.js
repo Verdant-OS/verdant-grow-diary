@@ -4,6 +4,10 @@
 
 export const SAMPLE_TODAY_DATE = "2026-10-16";
 
+/** Tent footprint and default pot for this fictional garden (see layoutRules TENT_PROFILES). */
+export const TENT_PROFILE_ID = "4x4";
+export const DEFAULT_POT_GAL = 5;
+
 export const PLANTS = Object.freeze([
   {
     id: "P-101",

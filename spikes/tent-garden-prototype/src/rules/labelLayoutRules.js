@@ -58,6 +58,32 @@ function candidates(it, w, h) {
  * @returns {{ id:string, x:number, y:number, w:number, h:number, leader:boolean, ax:number, ay:number }[]}
  */
 export function layoutLabels(items, opts) {
+  // Labels are clickable, so a label resting on another plant's pot captures that pot's tap.
+  // If a plant ended up with no label AND a shown label covers its pot, it has been stranded:
+  // re-run treating its pot as covered so it claims a label (or chip) first. Bounded passes.
+  let input = Array.isArray(items) ? items : [];
+  let out = placeOnce(input, opts);
+  for (let pass = 0; pass < 2; pass++) {
+    const shown = out.filter((l) => !l.hidden);
+    const stranded = new Set(
+      out
+        .filter(
+          (l) =>
+            l.hidden &&
+            Number.isFinite(l.bx) &&
+            Number.isFinite(l.by) &&
+            shown.some((s) => l.bx >= s.x && l.bx <= s.x + s.w && l.by >= s.y && l.by <= s.y + s.h),
+        )
+        .map((l) => l.id),
+    );
+    if (stranded.size === 0) break;
+    input = input.map((it) => (it && stranded.has(it.id) ? { ...it, occluded: true } : it));
+    out = placeOnce(input, opts);
+  }
+  return out;
+}
+
+function placeOnce(items, opts) {
   const width = Number(opts?.width) || 0;
   const height = Number(opts?.height) || 0;
   const avoid = Array.isArray(opts?.avoid) ? opts.avoid : [];
@@ -72,9 +98,12 @@ export function layoutLabels(items, opts) {
       h: Number.isFinite(it.h) ? it.h : 0,
       by: Number.isFinite(it.by) ? it.by : it.ay,
     }));
-  // stable order: selected first, then nearer (larger by) first, id as tie-breaker
+  // stable order: selected, then covered pots, then nearer (larger by) first; id breaks ties
   list.sort((p, q) => {
     if ((p.id === selectedId) !== (q.id === selectedId)) return p.id === selectedId ? -1 : 1;
+    // A plant whose pot is covered by another plant can only be reached by its label, so it
+    // claims space before plants that can be tapped directly.
+    if (!!p.occluded !== !!q.occluded) return p.occluded ? -1 : 1;
     if (p.by !== q.by) return q.by - p.by;
     return p.id < q.id ? -1 : p.id > q.id ? 1 : 0;
   });
@@ -91,8 +120,34 @@ export function layoutLabels(items, opts) {
       chosen = r;
       break;
     }
+    if (!chosen && it.id !== selectedId && it.cw > 0 && it.ch > 0) {
+      // No room for the full label: try a compact ID chip (same text size, shorter content)
+      // so the plant keeps a visible, tappable handle even when its pot is behind leaves.
+      for (const c of candidates(it, it.cw, it.ch)) {
+        const r = { x: c.x, y: c.y, w: it.cw, h: it.ch };
+        if (!inBounds(r, width, height)) continue;
+        if (avoid.some((a) => overlaps(r, a, PAD))) continue;
+        if (placed.some((p) => overlaps(r, p))) continue;
+        placed.push(r);
+        const pref = candidates(it, it.cw, it.ch)[0];
+        out.push({
+          id: it.id,
+          ...r,
+          leader: Math.abs(r.x - pref.x) > 1 || Math.abs(r.y - pref.y) > 1,
+          hidden: false,
+          compact: true,
+          ax: it.ax,
+          ay: it.ay,
+          bx: Number.isFinite(it.bx) ? it.bx : it.ax,
+          by: it.by,
+        });
+        chosen = r;
+        break;
+      }
+      if (chosen) continue;
+    }
     if (!chosen && it.id !== selectedId) {
-      // Nothing fits without covering another label: hide this one rather than overlap.
+      // Nothing fits, not even a chip: hide this one rather than overlap.
       // The plant stays selectable and its full name is in details and List view.
       out.push({
         id: it.id,
@@ -143,6 +198,7 @@ export function layoutLabels(items, opts) {
       h,
       leader,
       hidden: false,
+      compact: false,
       ax: it.ax,
       ay: it.ay,
       bx: Number.isFinite(it.bx) ? it.bx : it.ax,

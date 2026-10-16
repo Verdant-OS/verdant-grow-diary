@@ -131,3 +131,57 @@ test("default view (az −30°) fades the front-left pole and front rail, keeps 
   assert.ok(o["rail:zD"] < 1);
   assert.equal(o["pole:xW:z0"], 1);
 });
+
+test("crowded labels fall back to a compact ID chip (same text size) before being hidden", () => {
+  const tiny = { width: 200, height: 120, avoid: [] };
+  const items = ["A", "B", "C", "D", "E"].map((id, i) => ({
+    ...item(id, 60 + i * 20, 70, 110, 30),
+    cw: 40,
+    ch: 22,
+  }));
+  const out = layoutLabels(items, tiny);
+  const compact = out.filter((l) => l.compact && !l.hidden);
+  assert.ok(compact.length > 0, "at least one label degrades to a chip");
+  for (const c of compact) {
+    assert.equal(c.w, 40);
+    assert.equal(c.h, 22);
+  }
+  const shown = out.filter((l) => !l.hidden);
+  for (let i = 0; i < shown.length; i++)
+    for (let j = i + 1; j < shown.length; j++) {
+      const a = shown[i];
+      const b = shown[j];
+      assert.ok(
+        a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y,
+        `${a.id}/${b.id}`,
+      );
+    }
+});
+
+test("a plant whose pot is covered gets label priority over a nearer, directly tappable plant", () => {
+  // Same anchor, room for exactly one label: the occluded (farther) plant must keep it.
+  const box1 = { width: 120, height: 80, avoid: [] };
+  const near = { ...item("NEAR", 60, 60, 100, 30, 200), cw: 0, ch: 0 };
+  const far = { ...item("FAR", 60, 60, 100, 30, 100), cw: 0, ch: 0, occluded: true };
+  const out = layoutLabels([near, far], box1);
+  assert.equal(out.find((l) => l.id === "FAR").hidden, false);
+  assert.equal(out.find((l) => l.id === "NEAR").hidden, true);
+});
+
+test("regression: a label never strands a plant by covering its pot while that plant has no label", () => {
+  // B's label (placed first: nearer) lands on A's pot; only one label fits, so A must win it.
+  const box1 = { width: 140, height: 90, avoid: [] };
+  const a = { id: "A", ax: 70, ay: 52, bx: 70, by: 40, w: 100, h: 30, cw: 0, ch: 0 };
+  const b = { id: "B", ax: 70, ay: 78, bx: 70, by: 200, w: 100, h: 30, cw: 0, ch: 0 };
+  const out = layoutLabels([a, b], box1);
+  const shown = out.filter((l) => !l.hidden);
+  const stranded = out.filter(
+    (l) =>
+      l.hidden &&
+      shown.some((s) => l.bx >= s.x && l.bx <= s.x + s.w && l.by >= s.y && l.by <= s.y + s.h),
+  );
+  assert.deepEqual(
+    stranded.map((l) => l.id),
+    [],
+  );
+});

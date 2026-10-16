@@ -6,8 +6,11 @@ import {
   swapPositions,
   netChanges,
   describePosition,
-  TENT,
+  TENT_PROFILES,
+  tentFor,
+  potSizeOptions,
 } from "../rules/layoutRules.js";
+import { GARDEN_IDS, resolveGardenId } from "../rules/gardenRules.js";
 import {
   buildSavePreview,
   batchIdFor,
@@ -24,7 +27,15 @@ import {
 import { timelinePoints, pointAt, evidenceFor } from "../rules/historyRules.js";
 import { resolveModeChange, cameraLocked } from "../rules/modeRules.js";
 import { visualForStage, sexLabel } from "../rules/plantVisualRules.js";
-import {
+// Which fictional garden to load. The query value only ever selects from a fixed map, so no
+// user-supplied text reaches an import path.
+const GARDEN_ID = resolveGardenId(new URLSearchParams(location.search).get("garden"));
+const GARDEN_LOADERS = {
+  "4x4": () => import("../data/sampleGarden.js"),
+  "5x5": () => import("../data/sampleGarden5x5.js"),
+};
+const GARDEN = await GARDEN_LOADERS[GARDEN_ID]();
+const {
   PLANTS_BY_ID,
   TODAY_LAYOUT,
   TODAY_STAGES,
@@ -32,7 +43,7 @@ import {
   SNAPSHOTS,
   SAMPLE_TODAY_DATE,
   plantById,
-} from "../data/sampleGarden.js";
+} = GARDEN;
 
 const $ = (id) => document.getElementById(id);
 const ANIM_KEY = "tent-garden.animations";
@@ -40,6 +51,18 @@ const TOAST_MS = 3000;
 
 const points = timelinePoints(SNAPSHOTS, `Today (${SAMPLE_TODAY_DATE})`);
 const TODAY_INDEX = points.length - 1;
+
+/** The tent every layout rule and the scene use: this garden's footprint + the chosen pot. */
+function activeTent() {
+  return tentFor(GARDEN.TENT_PROFILE_ID, state.potGal);
+}
+/** Pot sizes that every recorded layout (history included) and the current draft still fit. */
+function currentPotOptions() {
+  return potSizeOptions(
+    [state.saved.savedLayout, draft(), ...SNAPSHOTS.map((s) => s.layout)],
+    GARDEN.TENT_PROFILE_ID,
+  );
+}
 
 const state = {
   mode: "view", // "view" | "edit"
@@ -58,6 +81,7 @@ const state = {
   saveStatus: "idle", // idle | failed | saved
   selectedId: null,
   animations: readAnimPref(),
+  potGal: GARDEN.DEFAULT_POT_GAL, // drawn footprint for every pot in this tent (prototype setting)
   listVisible: false,
 };
 let scene = null;
@@ -105,14 +129,7 @@ async function boot() {
   buildHistoryTicks();
   $("animToggle").checked = state.animations;
   try {
-    const mod = await import("../scene/tentScene.js");
-    if (!mod.isWebGLAvailable()) throw new Error("WebGL is not available in this browser.");
-    scene = mod.createTentScene($("sceneHost"), {
-      onSelect: (id) => select(id),
-      onDragMove: onDragMove,
-      onDrop: onDrop,
-    });
-    scene.setAnimations(state.animations);
+    await mountScene();
   } catch (err) {
     showFallback(err?.message ?? String(err));
   }
@@ -123,6 +140,9 @@ async function boot() {
     screenPositionOf: (id) => scene?.screenPositionOf(id) ?? null,
     isCameraAnimating: () => !!scene?.isCameraAnimating(),
     snapshot: () => ({
+      gardenId: GARDEN_ID,
+      potGal: state.potGal,
+      tent: activeTent(),
       mode: state.mode,
       selectedId: state.selectedId,
       saveStatus: state.saveStatus,
@@ -134,6 +154,19 @@ async function boot() {
       appliedBatchIds: [...state.saved.appliedBatchIds],
     }),
   };
+}
+
+/** (Re)build the 3D scene for the active tent. Pot-size changes call this; state is untouched. */
+async function mountScene() {
+  const mod = await import("../scene/tentScene.js");
+  if (!mod.isWebGLAvailable()) throw new Error("WebGL is not available in this browser.");
+  scene?.dispose();
+  scene = mod.createTentScene(
+    $("sceneHost"),
+    { onSelect: (id) => select(id), onDragMove: onDragMove, onDrop: onDrop },
+    { tent: activeTent() },
+  );
+  scene.setAnimations(state.animations);
 }
 
 function showFallback(reason) {
@@ -179,6 +212,7 @@ function plantsByIdForView(layout) {
 
 function render({ transition = false } = {}) {
   const view = currentView();
+  renderTentControls();
   if (scene) {
     scene.setView({
       layout: view.layout,
@@ -253,6 +287,39 @@ function renderSaveBar() {
   $("undoDraft").disabled = state.draftHistory.length <= 1;
 }
 
+function renderTentControls() {
+  const garden = $("gardenSelect");
+  if (!garden.options.length) {
+    for (const id of GARDEN_IDS) garden.add(new Option(`${TENT_PROFILES[id].label} (sample)`, id));
+  }
+  garden.value = GARDEN_ID;
+  garden.disabled = hasUnsaved();
+  garden.title = garden.disabled
+    ? "Save or cancel the layout draft before switching tents."
+    : "Switch to another fictional sample tent (reloads the prototype).";
+
+  const pot = $("potSize");
+  const opts = currentPotOptions();
+  pot.innerHTML = "";
+  for (const o of opts) {
+    const opt = new Option(`${o.gal} gal pots`, String(o.gal));
+    opt.disabled = !o.ok;
+    if (!o.ok) opt.title = o.reason;
+    pot.add(opt);
+  }
+  pot.value = String(state.potGal);
+  pot.disabled = state.mode === "edit" || !isToday();
+  pot.title =
+    state.mode === "edit"
+      ? "Finish or cancel the layout edit before changing pot size."
+      : "Drawn pot footprint for this tent. Sizes that would make a recorded layout overlap or cross a wall are disabled. Prototype setting — nothing is recorded.";
+  $("potSizeNote").textContent = opts
+    .filter((o) => !o.ok)
+    .map((o) => o.reason)
+    .slice(0, 1)
+    .join("");
+}
+
 function renderList(view) {
   $("listView").hidden = !state.listVisible;
   $("showList").setAttribute("aria-pressed", String(state.listVisible));
@@ -322,7 +389,7 @@ function renderDetails(view) {
              <button class="btn btn--small" data-nudge="-1,0">← left</button>
              <button class="btn btn--small" data-nudge="1,0">→ right</button>
              <button class="btn btn--small" data-nudge="0,1">↓ door</button>
-             <span class="muted small">moves ${TENT.snapIn} in per step</span>
+             <span class="muted small">moves ${activeTent().snapIn} in per step</span>
            </div>`
         : ""
     }
@@ -388,7 +455,7 @@ function discardDraft() {
 function onDragMove(id, pos) {
   if (state.mode !== "edit") return;
   scene.setPlantPositionLive(id, pos);
-  const r = resolveDrop(draft(), id, pos);
+  const r = resolveDrop(draft(), id, pos, activeTent());
   const ok = r.kind !== "rejected";
   const target = r.kind === "swap-needed" ? r.target : (r.layout?.[id] ?? pos);
   scene.showGhost(target, ok);
@@ -402,7 +469,7 @@ function onDrop(id, pos) {
 /** Shared by drag drop and keyboard nudges: route through resolveDrop, never mutate directly. */
 function commitDrop(id, pos) {
   const current = draft();
-  const r = resolveDrop(current, id, pos);
+  const r = resolveDrop(current, id, pos, activeTent());
   if (r.kind === "move") {
     state.draftHistory = pushDraft(state.draftHistory, { ...draftEntry(), layout: r.layout });
     state.pendingBatch = null;
@@ -460,7 +527,8 @@ function nudgeSelected(dx, dz) {
   if (state.mode !== "edit" || !state.selectedId) return;
   const cur = draft()[state.selectedId];
   if (!cur) return;
-  commitDrop(state.selectedId, { x: cur.x + dx * TENT.snapIn, z: cur.z + dz * TENT.snapIn });
+  const step = activeTent().snapIn;
+  commitDrop(state.selectedId, { x: cur.x + dx * step, z: cur.z + dz * step });
 }
 
 function pendingContext() {
@@ -645,6 +713,32 @@ function buildHistoryTicks() {
 }
 
 function wireControls() {
+  $("gardenSelect").onchange = (e) => {
+    const id = resolveGardenId(e.target.value);
+    if (hasUnsaved()) {
+      e.target.value = GARDEN_ID;
+      toast("Save or cancel the layout draft before switching tents.");
+      return;
+    }
+    if (id !== GARDEN_ID) location.search = `?garden=${encodeURIComponent(id)}`;
+  };
+  $("potSize").onchange = async (e) => {
+    const gal = Number(e.target.value);
+    const opt = currentPotOptions().find((o) => o.gal === gal);
+    if (!opt?.ok || state.mode === "edit") {
+      e.target.value = String(state.potGal);
+      toast(opt?.reason ?? "That pot size is not available here.");
+      return;
+    }
+    state.potGal = gal;
+    try {
+      await mountScene();
+    } catch (err) {
+      showFallback(err?.message ?? String(err));
+    }
+    render({ transition: false });
+    toast(`${gal} gal pots — drawn footprint for this tent. Prototype setting; nothing recorded.`);
+  };
   $("modeView").onclick = () => setMode("view");
   $("modeEdit").onclick = () => setMode("edit");
   $("rotateLeft").onclick = () => scene?.rotateBy(-90);

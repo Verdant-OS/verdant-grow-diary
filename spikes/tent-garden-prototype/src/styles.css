@@ -215,7 +215,8 @@ button {
   position: absolute;
   left: 0;
   top: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   background: #fbf3df;
   border: 1.5px solid #3f3327;
   color: #3a2e22;
@@ -563,4 +564,39 @@ button {
   input[type="range"] {
     min-height: 44px;
   }
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.field select {
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+.pot-note {
+  max-width: 26ch;
+}
+@media (pointer: coarse) {
+  .field select {
+    min-height: 44px;
+  }
+}
+
+.plant-label:focus-visible {
+  outline: 3px solid #ff5c8a;
+  outline-offset: 2px;
+}
+
+/* Compact fallback when a full label cannot fit: the stable id only, same text size. */
+.plant-chip {
+  padding: 3px 8px;
 }

@@ -42,6 +42,19 @@
           <button id="rotateLeft" class="btn" title="Rotate view 90° left (key: [)">⟲ 90°</button>
           <button id="rotateRight" class="btn" title="Rotate view 90° right (key: ])">⟳ 90°</button>
           <button id="resetView" class="btn" title="Reset view (key: R)">Reset View</button>
+          <label class="field">
+            <span>Tent</span>
+            <select id="gardenSelect" aria-label="Sample tent"></select>
+          </label>
+          <label class="field">
+            <span>Pots</span>
+            <select
+              id="potSize"
+              aria-label="Pot size for this tent"
+              aria-describedby="potSizeNote"
+            ></select>
+          </label>
+          <span id="potSizeNote" class="muted small pot-note" aria-live="polite"></span>
           <label class="toggle" title="Device-local setting. Reduced-motion users default to off.">
             <input type="checkbox" id="animToggle" />
             <span>Animation</span>

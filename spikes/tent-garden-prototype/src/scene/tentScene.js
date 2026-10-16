@@ -53,7 +53,14 @@ export function isWebGLAvailable() {
  * @param {HTMLElement} host
  * @param {{ onSelect:(id:string|null)=>void, onDragMove:(id:string,pos:{x,z})=>void, onDrop:(id:string,pos:{x,z})=>void }} handlers
  */
-export function createTentScene(host, handlers) {
+export function createTentScene(host, handlers, opts = {}) {
+  // The tent (footprint + pot size) is data: every size the grower picks redraws from it.
+  const tent = opts.tent ?? TENT;
+  // Default camera distance scales with the footprint so a 5×5 frames like a 4×4.
+  const DEFAULT_CAM = {
+    ...DEFAULT_CAMERA,
+    distance: DEFAULT_CAMERA.distance * (Math.max(tent.widthIn, tent.depthIn) / 48),
+  };
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
     alpha: true,
@@ -82,7 +89,7 @@ export function createTentScene(host, handlers) {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(34, 1, 1, 600);
-  const target = new THREE.Vector3(TENT.widthIn / 2, 6, TENT.depthIn / 2);
+  const target = new THREE.Vector3(tent.widthIn / 2, 6, tent.depthIn / 2);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.copy(target);
@@ -96,11 +103,11 @@ export function createTentScene(host, handlers) {
   controls.touches.ONE = THREE.TOUCH.ROTATE;
   controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
 
-  buildTent(scene, hardware);
+  buildTent(scene, hardware, tent);
   buildLights(scene);
 
   const plants = new Map(); // id -> { group, pot, plant, labelObj, labelEl, ring, from, to, t0 }
-  const ghost = buildGhost();
+  const ghost = buildGhost(tent);
   scene.add(ghost);
   ghost.visible = false;
 
@@ -128,12 +135,12 @@ export function createTentScene(host, handlers) {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     // Keep the fitted default until the grower moves the camera themselves.
-    if (!userMovedCamera) setCamera(DEFAULT_CAMERA, false);
+    if (!userMovedCamera) setCamera(DEFAULT_CAM, false);
   }
   const ro = new ResizeObserver(resize);
   ro.observe(host);
   resize();
-  setCamera(DEFAULT_CAMERA, false);
+  setCamera(DEFAULT_CAM, false);
 
   // ---- pointer handling ---------------------------------------------------------------
   function toPointer(ev) {
@@ -143,6 +150,10 @@ export function createTentScene(host, handlers) {
   }
   function pickPlant(ev) {
     toPointer(ev);
+    return pickAtPointer();
+  }
+  /** Plant id under `pointer` (NDC). Pot columns and foliage both count; nearest wins. */
+  function pickAtPointer() {
     raycaster.setFromCamera(pointer, camera);
     const meshes = [];
     for (const [id, p] of plants) {
@@ -198,7 +209,7 @@ export function createTentScene(host, handlers) {
     const fp = floorPoint(ev);
     if (!fp) return;
     const raw = { x: fp.x + drag.offset.x, z: fp.z + drag.offset.z };
-    const pos = clampToTent(raw);
+    const pos = clampToTent(raw, tent);
     drag.moved = true;
     handlers.onDragMove(drag.id, pos);
   });
@@ -211,7 +222,7 @@ export function createTentScene(host, handlers) {
     if (!d.moved) return;
     const fp = ev ? floorPoint(ev) : null;
     const raw = fp ? { x: fp.x + d.offset.x, z: fp.z + d.offset.z } : currentView.layout[d.id];
-    handlers.onDrop(d.id, clampToTent(raw));
+    handlers.onDrop(d.id, clampToTent(raw, tent));
   }
   renderer.domElement.addEventListener("pointerup", endDrag);
   renderer.domElement.addEventListener("pointercancel", () => endDrag(null));
@@ -225,7 +236,7 @@ export function createTentScene(host, handlers) {
     return aspect < 1 ? base / Math.max(aspect, 0.45) : base;
   }
   function setCamera({ azimuthDeg, polarDeg, distance }, animate) {
-    if (distance === DEFAULT_CAMERA.distance) distance = fittedDistance(distance);
+    if (distance === DEFAULT_CAM.distance) distance = fittedDistance(distance);
     const az = THREE.MathUtils.degToRad(azimuthDeg);
     const po = THREE.MathUtils.degToRad(polarDeg);
     const dest = new THREE.Vector3(
@@ -256,10 +267,10 @@ export function createTentScene(host, handlers) {
     let p = plants.get(id);
     if (p) return p;
     const group = new THREE.Group();
-    const pot = buildPot();
+    const pot = buildPot(tent);
     group.add(pot);
     const pickMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(TENT.potRadiusIn + 1, TENT.potRadiusIn + 1, POT_H + 4, 10),
+      new THREE.CylinderGeometry(tent.potRadiusIn + 1, tent.potRadiusIn + 1, POT_H + 4, 10),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     pickMesh.position.y = (POT_H + 4) / 2;
@@ -267,7 +278,7 @@ export function createTentScene(host, handlers) {
     // Selection halo at pot-rim height so it reads from every angle (a floor disc hides
     // behind neighbouring pots). Drawn on top so leaves never cover it.
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(TENT.potRadiusIn + 0.9, 0.5, 8, 48),
+      new THREE.TorusGeometry(tent.potRadiusIn + 0.9, 0.5, 8, 48),
       new THREE.MeshBasicMaterial({
         color: COLORS.selectRing,
         transparent: true,
@@ -280,9 +291,36 @@ export function createTentScene(host, handlers) {
     ring.position.y = POT_H + 0.2;
     ring.visible = false;
     group.add(ring);
+    // The name label is also a selection target: in a crowded tent a back-row pot can sit
+    // behind a front plant's leaves, and the label is the one handle that is always visible.
     const labelEl = document.createElement("div");
     labelEl.className = "plant-label";
+    labelEl.setAttribute("role", "button");
+    labelEl.tabIndex = 0;
+    labelEl.setAttribute("aria-label", `Select ${plantRecord?.shortName ?? id} (${id})`);
+    const pick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      handlers.onSelect(id);
+    };
+    labelEl.addEventListener("click", pick);
+    labelEl.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") pick(ev);
+    });
     labelLayer.appendChild(labelEl);
+    // Compact fallback: the stable id only, same font size, used when the full label cannot fit.
+    const chipEl = document.createElement("div");
+    chipEl.className = "plant-label plant-chip";
+    chipEl.setAttribute("role", "button");
+    chipEl.tabIndex = 0;
+    chipEl.setAttribute("aria-label", `Select ${plantRecord?.shortName ?? id} (${id})`);
+    chipEl.textContent = id;
+    chipEl.style.display = "none";
+    chipEl.addEventListener("click", pick);
+    chipEl.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") pick(ev);
+    });
+    labelLayer.appendChild(chipEl);
     scene.add(group);
     p = {
       group,
@@ -290,6 +328,8 @@ export function createTentScene(host, handlers) {
       pickMesh,
       ring,
       labelEl,
+      chipEl,
+      chipSize: null,
       labelAnchorY: POT_H + 2,
       labelSize: null,
       plantMesh: null,
@@ -373,6 +413,7 @@ export function createTentScene(host, handlers) {
         p.group.visible = false;
         p.ring.visible = false;
         p.labelEl.style.display = "none";
+        p.chipEl.style.display = "none";
       }
     }
     applySelection();
@@ -399,6 +440,7 @@ export function createTentScene(host, handlers) {
       const sel = id === selectedId && p.group.visible;
       p.ring.visible = sel;
       p.labelEl.classList.toggle("is-selected", sel);
+      p.chipEl.classList.toggle("is-selected", sel);
     }
   }
   function setSelected(id) {
@@ -449,9 +491,26 @@ export function createTentScene(host, handlers) {
     const h = host.clientHeight || 1;
     return { x: (tmpV.x * 0.5 + 0.5) * w, y: (-tmpV.y * 0.5 + 0.5) * h, behind: tmpV.z > 1 };
   }
+  // Which pots are covered by another plant from the current camera: a tap at the pot's
+  // screen position would pick someone else. Re-checked at most every 300 ms (raycasts).
+  let occlusionAt = 0;
+  const occlusionV = new THREE.Vector3();
+  function refreshOcclusion(now) {
+    if (now - occlusionAt < 300) return;
+    occlusionAt = now;
+    for (const [id, p] of plants) {
+      if (!p.group.visible) continue;
+      const g = p.group.position;
+      occlusionV.set(g.x, 10, g.z).project(camera);
+      pointer.set(occlusionV.x, occlusionV.y);
+      p.occluded = pickAtPointer() !== id;
+    }
+  }
+
   function updateLabels() {
     const w = host.clientWidth || 1;
     const h = host.clientHeight || 1;
+    refreshOcclusion(performance.now());
     const items = [];
     for (const [id, p] of plants) {
       if (!p.group.visible) continue;
@@ -460,11 +519,29 @@ export function createTentScene(host, handlers) {
       const b = project(g.x, POT_H + 0.2, g.z); // pot rim: where a leader should point
       if (a.behind) {
         p.labelEl.style.display = "none";
+        p.chipEl.style.display = "none";
         continue;
       }
-      p.labelEl.style.display = "";
-      if (!p.labelSize) p.labelSize = { w: p.labelEl.offsetWidth, h: p.labelEl.offsetHeight };
-      items.push({ id, ax: a.x, ay: a.y, bx: b.x, by: b.y, w: p.labelSize.w, h: p.labelSize.h });
+      if (!p.labelSize) {
+        p.labelEl.style.display = "";
+        p.labelSize = { w: p.labelEl.offsetWidth, h: p.labelEl.offsetHeight };
+      }
+      if (!p.chipSize) {
+        p.chipEl.style.display = "";
+        p.chipSize = { w: p.chipEl.offsetWidth, h: p.chipEl.offsetHeight };
+      }
+      items.push({
+        id,
+        ax: a.x,
+        ay: a.y,
+        bx: b.x,
+        by: b.y,
+        w: p.labelSize.w,
+        h: p.labelSize.h,
+        cw: p.chipSize.w,
+        ch: p.chipSize.h,
+        occluded: !!p.occluded,
+      });
     }
     // Overlays are measured every frame: a banner can re-wrap after the app rendered it.
     const hostRect = host.getBoundingClientRect();
@@ -486,9 +563,11 @@ export function createTentScene(host, handlers) {
     while (leaderSvg.firstChild) leaderSvg.removeChild(leaderSvg.firstChild);
     for (const l of placed) {
       const p = plants.get(l.id);
-      p.labelEl.style.display = l.hidden ? "none" : "";
+      const el = l.compact ? p.chipEl : p.labelEl;
+      p.labelEl.style.display = !l.hidden && !l.compact ? "" : "none";
+      p.chipEl.style.display = !l.hidden && l.compact ? "" : "none";
       if (l.hidden) continue;
-      p.labelEl.style.transform = `translate(${l.x.toFixed(1)}px, ${l.y.toFixed(1)}px) rotate(-1.2deg)`;
+      el.style.transform = `translate(${l.x.toFixed(1)}px, ${l.y.toFixed(1)}px) rotate(-1.2deg)`;
       if (l.leader) {
         // A leader points at the pot rim, never the canopy top, so a small plant beside a
         // tall neighbour cannot be mistaken for the tall one.
@@ -556,7 +635,7 @@ export function createTentScene(host, handlers) {
     resetView: () => {
       if (cameraLockedFlag) return;
       userMovedCamera = false;
-      setCamera(DEFAULT_CAMERA, true);
+      setCamera(DEFAULT_CAM, true);
     },
     rotateBy(deg) {
       if (cameraLockedFlag) return;
@@ -591,9 +670,9 @@ export function createTentScene(host, handlers) {
 
 // ---- geometry builders ------------------------------------------------------------------
 
-function buildTent(scene, hardware) {
-  const w = TENT.widthIn * UNIT;
-  const d = TENT.depthIn * UNIT;
+function buildTent(scene, hardware, tent) {
+  const w = tent.widthIn * UNIT;
+  const d = tent.depthIn * UNIT;
   scene.background = new THREE.Color(COLORS.sky);
 
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), toon(COLORS.floor));
@@ -602,10 +681,18 @@ function buildTent(scene, hardware) {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  const grid = new THREE.GridHelper(w, TENT.widthIn / TENT.snapIn, COLORS.grid, COLORS.grid);
-  grid.material.transparent = true;
-  grid.material.opacity = 0.3;
-  grid.position.set(w / 2, FLOOR_Y + 0.02, d / 2);
+  // Rectangular snap grid (GridHelper is square and would spill past a 2×4 floor).
+  const pts = [];
+  const step = tent.snapIn * UNIT;
+  for (let x = 0; x <= w + 1e-6; x += step) pts.push(x, 0, 0, x, 0, d);
+  for (let z = 0; z <= d + 1e-6; z += step) pts.push(0, 0, z, w, 0, z);
+  const gridGeo = new THREE.BufferGeometry();
+  gridGeo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  const grid = new THREE.LineSegments(
+    gridGeo,
+    new THREE.LineBasicMaterial({ color: COLORS.grid, transparent: true, opacity: 0.3 }),
+  );
+  grid.position.y = FLOOR_Y + 0.02;
   scene.add(grid);
 
   const wallMat = toon(COLORS.wall, { side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
@@ -704,13 +791,13 @@ function buildLights(scene) {
   scene.add(key.target);
 }
 
-function buildPot() {
-  return buildStorybookPot(TENT.potRadiusIn, POT_H);
+function buildPot(tent) {
+  return buildStorybookPot(tent.potRadiusIn, POT_H);
 }
 
-function buildGhost() {
+function buildGhost(tent) {
   const m = new THREE.Mesh(
-    new THREE.RingGeometry(TENT.potRadiusIn - 0.6, TENT.potRadiusIn + 0.6, 40),
+    new THREE.RingGeometry(tent.potRadiusIn - 0.6, tent.potRadiusIn + 0.6, 40),
     new THREE.MeshBasicMaterial({
       color: COLORS.ghost,
       transparent: true,

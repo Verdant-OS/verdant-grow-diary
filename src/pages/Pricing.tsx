@@ -227,14 +227,7 @@ export default function Pricing() {
   const recoveryRef = useRef<HTMLElement>(null);
   const creditPacksRef = useRef<HTMLElement>(null);
   const handledCreditPacksHashRef = useRef<string | null>(null);
-  const [openFaqItem, setOpenFaqItem] = useState<string>(() => {
-    const fromRouter = resolvePricingFaqValueForHash(location.hash);
-    if (fromRouter) return fromRouter;
-    if (typeof window !== "undefined") {
-      return resolvePricingFaqValueForHash(window.location.hash) ?? "";
-    }
-    return "";
-  });
+  const [openFaqItem, setOpenFaqItem] = useState<string>("");
   const {
     openCheckout,
     loading: checkoutLoading,
@@ -471,24 +464,43 @@ export default function Pricing() {
   }, [location.hash, preselectedCreditPack]);
 
   useEffect(() => {
-    const faqValue =
-      resolvePricingFaqValueForHash(location.hash) ??
-      (typeof window !== "undefined" ? resolvePricingFaqValueForHash(window.location.hash) : null);
-    if (!faqValue) return;
-    setOpenFaqItem(faqValue);
-  }, [location.hash]);
+    const scrollToCheckoutLiveFaq = () => {
+      if (typeof document === "undefined") return;
+      const target = document.getElementById(CHECKOUT_LIVE_FAQ_ID);
+      if (!target || typeof target.scrollIntoView !== "function") return;
+      try {
+        target.scrollIntoView({
+          behavior: isReducedMotionPreferred() ? "auto" : "smooth",
+          block: "start",
+        });
+      } catch {
+        try {
+          target.scrollIntoView();
+        } catch {
+          // Presentation-only fallback; ignore in non-browser/jsdom environments.
+        }
+      }
+    };
 
-  useEffect(() => {
+    const faqValue =
+      (typeof window !== "undefined"
+        ? resolvePricingFaqValueForHash(window.location.hash)
+        : null) ?? resolvePricingFaqValueForHash(location.hash);
+    if (faqValue) {
+      setOpenFaqItem(faqValue);
+      scrollToCheckoutLiveFaq();
+    }
+
     if (typeof window === "undefined") return;
     const handleHashChange = () => {
-      const faqValue = resolvePricingFaqValueForHash(window.location.hash);
-      if (faqValue) {
-        setOpenFaqItem(faqValue);
-      }
+      const nextFaqValue = resolvePricingFaqValueForHash(window.location.hash);
+      if (!nextFaqValue) return;
+      setOpenFaqItem(nextFaqValue);
+      scrollToCheckoutLiveFaq();
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
+  }, [location.hash]);
 
   useEffect(() => {
     if (!blockedReason) {

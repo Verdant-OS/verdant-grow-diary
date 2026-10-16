@@ -328,8 +328,18 @@ export function presentTimelineDiaryEntryDetails(
   for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
     detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
   }
-  const hasWaterVolumeLine = detailLines.some((line) => line.key === "watering.volume_ml");
-  if (!hasWaterVolumeLine) {
+  const rawEventType =
+    typeof record.event_type === "string"
+      ? record.event_type.trim().toLowerCase()
+      : typeof record.entry_type === "string"
+        ? record.entry_type.trim().toLowerCase()
+        : "";
+  const flatVolumeEnvelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number] =
+    rawEventType === "feeding" ? "feeding" : "watering";
+  const hasVolumeLine = detailLines.some(
+    (line) => line.key === "watering.volume_ml" || line.key === "feeding.volume_ml",
+  );
+  if (!hasVolumeLine) {
     for (const flatVolKey of [
       "watering_amount_ml",
       "wateringAmountMl",
@@ -340,7 +350,11 @@ export function presentTimelineDiaryEntryDetails(
       if (!(flatVolKey in record)) continue;
       const text = typedActivityScalar(flatVolKey, record[flatVolKey], tempUnit);
       if (text) {
-        detailLines.push({ key: "watering.volume_ml", label: "Water Volume", value: text });
+        detailLines.push({
+          key: `${flatVolumeEnvelope}.volume_ml`,
+          label: typedVolumeLabel(flatVolumeEnvelope),
+          value: text,
+        });
         break;
       }
     }

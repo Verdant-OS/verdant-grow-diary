@@ -49,6 +49,23 @@ describe("Timeline Watering card shows amount (#2180)", () => {
     expect(result.extra).toEqual([]);
   });
 
+  it("labels flat feeding row volume as Feed Volume instead of Water Volume", () => {
+    const result = presentTimelineDiaryEntryDetails(
+      {
+        event_type: "feeding",
+        volume_ml: 750,
+      },
+      "celsius",
+    );
+    expect(result.detailLines).toContainEqual({
+      key: "feeding.volume_ml",
+      label: "Feed Volume",
+      value: "750 ml",
+    });
+    expect(result.detailLines.find((line) => line.label === "Water Volume")).toBeUndefined();
+    expect(result.extra).toEqual([]);
+  });
+
   it("renders 500 ml on the Timeline Recent Quick Logs Watering card from a grow_events spine", () => {
     const rawEntries = mapGrowEventsToRecentRawEntries([
       {

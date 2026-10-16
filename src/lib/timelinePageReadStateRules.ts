@@ -285,3 +285,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function freshView(view: TimelinePageReadView): TimelinePageReadView {
   return { ...view, partialSources: [...view.partialSources] };
 }
+
+export interface TimelineFetchScopeInput {
+  urlGrowId: string | null | undefined;
+  storeGrowId: string | null | undefined;
+  growsLoading: boolean;
+  growsError: unknown;
+  isValidScopedGrow: boolean;
+}
+
+/**
+ * Which grow id the Timeline core read may use.
+ * A URL grow is invalid only after the grow list has settled without that id.
+ * While the list is still loading, the URL id is enough to start the diary read.
+ */
+export function resolveTimelineFetchScope(input: TimelineFetchScopeInput): {
+  activeGrowId: string | null;
+  hasInvalidScope: boolean;
+} {
+  const urlGrowId = typeof input?.urlGrowId === "string" ? input.urlGrowId.trim() || null : null;
+  const storeGrowId =
+    typeof input?.storeGrowId === "string" ? input.storeGrowId.trim() || null : null;
+  // A URL id is invalid only after the grow list has settled without it.
+  // While that list is loading, or after it errors, the URL id can start the
+  // core diary read. The page view still waits on growsLoading.
+  const growsSettled = input?.growsLoading !== true && !hasErrorSignal(input?.growsError);
+  const hasInvalidScope = Boolean(urlGrowId) && growsSettled && !input?.isValidScopedGrow;
+  const preferredGrowId = urlGrowId ?? storeGrowId;
+  return {
+    hasInvalidScope,
+    activeGrowId: hasInvalidScope ? null : preferredGrowId,
+  };
+}

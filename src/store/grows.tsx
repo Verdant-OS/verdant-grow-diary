@@ -20,6 +20,7 @@ import {
   HierarchyCreateOutcomeRecoveryCoordinator,
   type HierarchyCreateVisibleListReceipt,
 } from "@/hooks/useHierarchyCreateOutcomeRecoveryCoordinator";
+import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
 
 export type Grow = GrowRow;
 
@@ -103,10 +104,9 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
 
       setLoading(true);
       try {
-        const { data, error: qErr } = await supabase
-          .from("grows")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const { data, error: qErr } = await withCriticalReadDeadline(
+          supabase.from("grows").select("*").order("created_at", { ascending: false }),
+        );
         if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
           return { status: "stale" };
         }

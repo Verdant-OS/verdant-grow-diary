@@ -4,7 +4,9 @@
  *
  * The database write helper already reconciles the exact preallocated diary
  * id before returning an ambiguous result. This module owns only the client
- * retry fence after that reconciliation cannot prove the outcome. It never
+ * retry fence: claimed before the insert is awaited, kept while it is pending
+ * or after reconciliation cannot prove the outcome, and released only for a
+ * confirmed or definitively non-committed attempt. It never
  * writes to Supabase, deletes an uploaded object, or exposes stored identity
  * values to the UI.
  */
@@ -171,6 +173,54 @@ export function recordQuickLogPhotoAttachmentRecoveryLock(
   if (!locks.has(key)) locks.set(key, normalizeDiaryEntryId(diaryEntryId));
   writeStoredLocks(locks);
   return key;
+}
+
+export type QuickLogPhotoAttachmentClaimResult =
+  /** The exact scope now durably holds this entry id (new or already held). */
+  | "claimed"
+  /** Another unresolved attempt already holds this scope; do not insert. */
+  | "held_by_other"
+  /** Browser storage could not persist the claim; only in-memory guards apply. */
+  | "unavailable";
+
+/**
+ * Claims the exact owner/target scope for one preallocated diary id BEFORE the
+ * insert is awaited, so an unmount + remount of the same target cannot start a
+ * second attempt while the first response is pending. An existing claim for a
+ * different (or unknown) id is never replaced.
+ */
+export function claimQuickLogPhotoAttachmentRecoveryLock(
+  scope: QuickLogPhotoAttachmentRecoveryScope,
+  diaryEntryId: string,
+): QuickLogPhotoAttachmentClaimResult {
+  const key = buildQuickLogPhotoAttachmentRecoveryKey(scope);
+  const entryId = normalizeDiaryEntryId(diaryEntryId);
+  if (!key || !entryId) return "unavailable";
+  const locks = readStoredLocks();
+  if (locks.has(key)) return locks.get(key) === entryId ? "claimed" : "held_by_other";
+  locks.set(key, entryId);
+  writeStoredLocks(locks);
+  return readStoredLocks().get(key) === entryId ? "claimed" : "unavailable";
+}
+
+/**
+ * Releases the claim only when it still holds this exact diary id, after the
+ * insert is confirmed or definitively not committed. Returns whether this call
+ * released it; false means another path (for example an exact reconciliation
+ * on reopen) already released it, or a different attempt holds the scope.
+ */
+export function releaseQuickLogPhotoAttachmentRecoveryLockForEntry(
+  scope: QuickLogPhotoAttachmentRecoveryScope,
+  diaryEntryId: string,
+): boolean {
+  const key = buildQuickLogPhotoAttachmentRecoveryKey(scope);
+  const entryId = normalizeDiaryEntryId(diaryEntryId);
+  if (!key || !entryId) return false;
+  const locks = readStoredLocks();
+  if (locks.get(key) !== entryId) return false;
+  locks.delete(key);
+  writeStoredLocks(locks);
+  return true;
 }
 
 /**

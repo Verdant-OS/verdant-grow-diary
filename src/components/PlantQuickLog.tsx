@@ -70,10 +70,12 @@ import {
   validateQuickLogPngClaim,
 } from "@/lib/quickLogPhotoContentRules";
 import {
+  claimQuickLogPhotoAttachmentRecoveryLock,
   clearQuickLogPhotoAttachmentRecoveryLock,
   getQuickLogPhotoAttachmentRecoveryRecord,
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
+  releaseQuickLogPhotoAttachmentRecoveryLockForEntry,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
@@ -117,6 +119,8 @@ interface PhotoOnlyAttempt {
   path: string;
   file: File;
   note: string;
+  /** True when `path` was uploaded by this attempt and no insert references it yet. */
+  freshUpload: boolean;
 }
 const SAVE_DETAIL_HELPER = "You can add more detail later from the timeline.";
 
@@ -519,6 +523,7 @@ export default function PlantQuickLog({
       }
 
       if (uploadedPath && user && photoFile && photoOnly && photoOnlyEntryId) {
+        const freshUpload = cleanupAllowed;
         cleanupAllowed = false;
         await persistPhotoOnlyEntry(
           {
@@ -527,6 +532,7 @@ export default function PlantQuickLog({
             path: uploadedPath,
             file: photoFile,
             note: timelineNote,
+            freshUpload,
           },
           canContinue,
         );
@@ -701,6 +707,25 @@ export default function PlantQuickLog({
       setPhotoAttachmentUnconfirmed(true);
       setError(message);
     };
+    // Claim the exact scope and id BEFORE awaiting the insert. A sheet that
+    // unmounts and remounts for the same plant while this insert is pending
+    // then finds the fence and cannot upload or insert a second id.
+    const claim = claimQuickLogPhotoAttachmentRecoveryLock(scope, entryId);
+    if (claim === "held_by_other") {
+      // Another attempt for this exact target is pending or unconfirmed.
+      // Never insert a second id; an object this attempt just uploaded is
+      // referenced by nothing, so it alone may be removed.
+      if (attempt.freshUpload) {
+        await supabase.storage
+          .from("diary-photos")
+          .remove([path])
+          .catch(() => {});
+      }
+      if (!canContinue()) return;
+      setPhotoAttachmentUnconfirmed(true);
+      setError("Could not confirm the photo attachment; it may still appear in history.");
+      return;
+    }
     let entryResult: Awaited<ReturnType<typeof createQuickLogPhotoDiaryEntry>>;
     try {
       entryResult = await createQuickLogPhotoDiaryEntry({
@@ -724,6 +749,8 @@ export default function PlantQuickLog({
         retainUnconfirmed(failure.message);
         return;
       }
+      // Definitive non-commit: no row exists for this id, so release its claim.
+      releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
       await supabase.storage
         .from("diary-photos")
         .remove([path])
@@ -736,8 +763,13 @@ export default function PlantQuickLog({
     // plant. Telemetry, the recent target, the Timeline refresh and the single
     // entry-created signal therefore run for the captured plant even after an
     // unmount or target switch; only the sheet's own UI completion is gated.
+    // If a remounted sheet's exact reconciliation already released this claim,
+    // it already sent the success telemetry and entry-created signal; do not
+    // send them a second time for the same row.
+    const releasedHere = releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
+    const alreadyAnnounced = claim === "claimed" && !releasedHere;
     try {
-      trackQuickLogSuccess("photo", { reused: false });
+      if (!alreadyAnnounced) trackQuickLogSuccess("photo", { reused: false });
       rememberRecentQuickLogTarget(
         {
           plantId: scope.plantId,
@@ -752,11 +784,13 @@ export default function PlantQuickLog({
         targetId: scope.plantId,
         tentId: scope.tentId,
       });
-      window.dispatchEvent(
-        new CustomEvent("verdant:entry-created", {
-          detail: { plantId: scope.plantId, createdAt: new Date().toISOString() },
-        }),
-      );
+      if (!alreadyAnnounced) {
+        window.dispatchEvent(
+          new CustomEvent("verdant:entry-created", {
+            detail: { plantId: scope.plantId, createdAt: new Date().toISOString() },
+          }),
+        );
+      }
     } catch (err) {
       console.warn("PlantQuickLog post-save refresh failed", err);
     }

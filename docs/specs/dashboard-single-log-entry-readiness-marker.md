@@ -147,10 +147,10 @@ That matches `Log`, `Quick Log` and `Open Quick Log`, but not `Log out` or `Star
 the exact set GDP's D1 answer allows (§7), named by test ID where one exists, so a new
 duplicate fails:
 
-| Viewport                                                     | Spec | Visible Log controls today, after removing the header link                                        | Under D1.1-A + D1.2-A (recommended)                                                |
-| ------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Desktop (`chromium-mocked` uses `devices["Desktop Chrome"]`) | E2   | card `Log`, page `QuickLogV2Fab` (`Quick Log`), AppShell `header-quick-log-trigger` (`Quick Log`) | 2: card `Log` + `header-quick-log-trigger`, the second as a named chrome exemption |
-| Mobile 390 / 320 px                                          | E4   | card `Log`, AppShell `mobile-quick-log-fab` (`Open Quick Log`)                                    | 2: card `Log` + `mobile-quick-log-fab`, the second as a named chrome exemption     |
+| Viewport                                                     | Spec | Visible Log controls today, after removing the header link                                        | Under D1.1-A + D1.2-A (recommended)                                                                                                         |
+| ------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop (`chromium-mocked` uses `devices["Desktop Chrome"]`) | E2   | card `Log`, page `QuickLogV2Fab` (`Quick Log`), AppShell `header-quick-log-trigger` (`Quick Log`) | 2: card `Log` + `header-quick-log-trigger`, the second as a named chrome exemption                                                          |
+| Mobile 390 / 320 px                                          | E4   | card `Log`, AppShell `mobile-quick-log-fab` (`Open Quick Log`)                                    | 3: card `Log` + `mobile-quick-log-fab` + MobileNav `Log` tab (`Primary navigation > /daily-check`), the last two as named chrome exemptions |
 
 **Implementation finding (2026-10-06, `established fact` from the E4 run):** on mobile a third
 visible Log control exists: `MobileNav`'s primary-bar `Log` tab (→ `/daily-check`, added by #1826

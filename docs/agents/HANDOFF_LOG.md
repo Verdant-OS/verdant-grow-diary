@@ -85,6 +85,37 @@ claimed_by: bc-9958d146, 2026-10-14 13:18 CT
 last_updated: 2026-10-14 13:18 CT, by bc-9958d146
 ```
 
+### DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES
+
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES  priority: other  status: OPEN
+goal: land CodeRabbit's findings on #1844's merged head 2df60a64 (#1844 was in the merge queue and
+  could not take the push): spec §7 records the D1.1-A/D1.2-A outcome; spec §6/§9 name the
+  merge-queue owner role; visibleLogControls moves to e2e/lib with no behavior change. Docs and
+  e2e helper only; no product code, supabase/, lockfile or governance file.
+branch: claude/dashboard-single-log-entry-coderabbit-fixes
+base: verdant-grow-diary
+checkout: git switch claude/dashboard-single-log-entry-coderabbit-fixes && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1934 (open, not draft)
+head_sha: parent of the commit that records this line. Observed remote head before this update:
+  a0157543409e9a515c2daa87ad805182e788a0bd (2026-10-16 18:40 UTC), 35/35 required SUCCESS there.
+  This update adds a base-merge commit (aff3a19b6, merging e136fa44f) and this fix commit; read
+  the PR for the current head and re-measure CI there.
+state: pushed. Codex outside review at a01575434: BLOCKED (two existing e2e specs are locked
+  scorers; editing them needs Matthew's per-item approval). This update fixes Codex's P2 (full
+  head SHA) and CodeRabbit's minors at a01575434 (block order, stale head, spec §5.2 mobile count).
+  Closing CLAUDE-CODE-ACTION-002 is left to #1933 so the two PRs do not both edit it.
+next_action: Matthew's per-item scorer approval for e2e/core-link-form-census.spec.ts and
+  e2e/dashboard-mobile-overflow.spec.ts; then Critical Mass exact-head review at the current head.
+files: docs/specs/dashboard-single-log-entry-readiness-marker.md; e2e/lib/visibleLogControls.ts (new);
+  e2e/core-link-form-census.spec.ts; e2e/dashboard-mobile-overflow.spec.ts; docs/agents/HANDOFF_LOG.md
+blockers: scorer approval (Matthew); independent exact-head PASS (Critical Mass). #1924 has merged.
+artifacts: PR #1934 body and comments
+reviewer_seat: Critical Mass (docs and e2e)
+claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:39 UTC (PR #1934 issuecomment-6222276433; Matthew's 2026-10-16 transfer)
+last_updated: 2026-10-16 13:45 CT, by Claude (close-out session)
+```
+
 ### FIX-2004-APP-DOCUMENT-TITLES
 
 ```text
@@ -123,31 +154,6 @@ artifacts: PR #1927 body and the commit messages of 6209b316 and ad1a6177 (P2 ma
 reviewer_seat: Codex, by Matthew's override for #1927 (2026-10-07, issuecomment-6042253781); Durban Poison unavailable. Claude authored and cannot PASS.
 claimed_by: Claude, session_019KztxwgLfeEaNDYyGfkbfS, holds #1927 and its branch (Matthew, 2026-10-06 18:36 CT). Claude session_01VsMEJU3e1qoicFgNKiJL3y maintains this log block in PR #1932 and does not push to #1927. No claimed_by PR comment, by Matthew's instruction.
 last_updated: 2026-10-07 11:32 CT, by Claude (session_01VsMEJU, log-block maintainer)
-```
-
-### DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES
-
-```text
-TASK DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES  priority: other  status: OPEN
-goal: land CodeRabbit's findings on #1844's merged head 2df60a64 (#1844 was in the merge queue and
-  could not take the push): spec §7 records the D1.1-A/D1.2-A outcome; spec §6/§9 name the
-  merge-queue owner role; visibleLogControls moves to e2e/lib with no behavior change. Docs and
-  e2e helper only; no product code, supabase/, lockfile or governance file.
-branch: claude/dashboard-single-log-entry-coderabbit-fixes
-base: verdant-grow-diary
-checkout: git switch claude/dashboard-single-log-entry-coderabbit-fixes && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1934 (draft)
-head_sha: read from the PR (a commit cannot contain its own SHA). Last measured head e2f73961 had
-  35/35 required checks SUCCESS at 2026-10-06 23:32 UTC; this block's commit moves the head.
-state: pushed draft; required CI green on the prior head; Codex review P2 (this block) addressed
-next_action: Critical Mass independent review at the exact current head; merge base after #1924 lands
-files: docs/specs/dashboard-single-log-entry-readiness-marker.md; e2e/lib/visibleLogControls.ts (new);
-  e2e/core-link-form-census.spec.ts; e2e/dashboard-mobile-overflow.spec.ts; docs/agents/HANDOFF_LOG.md
-blockers: independent PASS (Critical Mass). Non-required dependency-audit checks stay red until #1924 merges.
-artifacts: PR #1934 body and comments
-reviewer_seat: Critical Mass (docs and e2e)
-claimed_by: Claude, 2026-10-06 22:39 UTC (PR #1934 opened by this session)
-last_updated: 2026-10-07 02:10 UTC, by Claude
 ```
 
 ## Closed

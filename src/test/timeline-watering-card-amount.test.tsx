@@ -66,6 +66,31 @@ describe("Timeline Watering card shows amount (#2180)", () => {
     expect(result.extra).toEqual([]);
   });
 
+  it("keeps feeding volume in the subtitle without adding a watering tag to feeding entries", () => {
+    const items = buildGrowDiaryTimeline({
+      rawEntries: [
+        {
+          id: "de-feed-750",
+          grow_id: "g1",
+          plant_id: "p1",
+          tent_id: "t1",
+          entry_at: "2026-10-15T12:00:00.000Z",
+          note: "Bloom feed",
+          details: {
+            event_type: "feeding",
+            quick_log_version: 2,
+            feeding: { volume_ml: 750, products: ["Bloom"] },
+          },
+        },
+      ],
+      filter: { includeInvalid: true },
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.subtitle).toContain("750 ml");
+    expect(items[0]?.tags).toContain("feeding");
+    expect(items[0]?.tags).not.toContain("watering");
+  });
+
   it("renders 500 ml on the Timeline Recent Quick Logs Watering card from a grow_events spine", () => {
     const rawEntries = mapGrowEventsToRecentRawEntries([
       {

@@ -325,7 +325,10 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
     testState.calibrationOrderHandler = null;
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    cleanup();
+  });
 
   it("hides Free-plan copy and balance while entitlement is still loading (Codex P2 #1)", () => {
     testState.entitlementLoading = true;
@@ -413,6 +416,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
   });
 
   it("computes authoritative environment-scoped pack balance and omits pack suffix when pack is spent, clawed back, or in another environment (P2 L481 & L194)", async () => {
+    vi.stubEnv("PAYMENTS_ENVIRONMENT", "live");
     testState.spendsData = [
       { weight: 3, funded_by: "allowance" },
       { weight: 10, funded_by: "pack", billing_environment: "live" },
@@ -575,6 +579,125 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
     await waitFor(() =>
       expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
         "98 of 100 AI Doctor credits left this month",
+      ),
+    );
+    expect(screen.queryByTestId("ai-doctor-start-free-credit-note")).toBeNull();
+  });
+
+  it("honors PAYMENTS_ENVIRONMENT=sandbox for pack balances and omits pack balance when PAYMENTS_ENVIRONMENT is unresolved (P2 useAiDoctorGrowCreditUsage L60)", async () => {
+    vi.stubEnv("PAYMENTS_ENVIRONMENT", "sandbox");
+    testState.spendsData = [
+      { weight: 3, funded_by: "allowance" },
+      { weight: 15, funded_by: "pack", billing_environment: "sandbox" },
+    ];
+    testState.grantsData = [
+      { credits: 50, environment: "sandbox", expires_at: null },
+      { credits: 100, environment: "live", expires_at: null },
+    ];
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "0 of 3 AI Doctor credits left for this grow · 35 pack credits available",
+      ),
+    );
+    cleanup();
+
+    rtlRender(
+      <MemoryRouter initialEntries={["/doctor"]}>
+        <Routes>
+          <Route path="/doctor" element={<AiDoctorStart />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
+        "0 of 3 AI Doctor credits left for this grow · 35 pack credits available",
+      ),
+    );
+    cleanup();
+
+    // When PAYMENTS_ENVIRONMENT is unset/unresolved, omit pack balance rather than assuming live
+    vi.stubEnv("PAYMENTS_ENVIRONMENT", "");
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "0 of 3 AI Doctor credits left for this grow",
+      ),
+    );
+    expect(
+      screen.getByTestId("plant-ai-doctor-live-review-credit-remaining").textContent,
+    ).not.toContain("pack");
+  });
+
+  it("uses the 10,000 monthly credit ceiling for verified staff viewers (P2 aiDoctorSurfaceCreditViewModel L220)", async () => {
+    const now = new Date();
+    const currentPeriodKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    testState.entitlement = {
+      displayPlanId: "pro_monthly",
+      effectivePlanId: "pro_monthly",
+      status: "active",
+      isActive: true,
+      capabilities: {
+        ...FREE_CAPABILITIES,
+        aiCreditsPerGrow: null,
+        aiMonthlyCredits: 100,
+      },
+      degraded: false,
+      degradedReason: null,
+      isStaff: true,
+      source: "free",
+    };
+    testState.spendsData = [{ weight: 120, funded_by: "allowance", period_key: currentPeriodKey }];
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "9880 of 10000 AI Doctor credits left this month",
+      ),
+    );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-free-credit-note")).toBeNull();
+    cleanup();
+
+    rtlRender(
+      <MemoryRouter initialEntries={["/doctor"]}>
+        <Routes>
+          <Route path="/doctor" element={<AiDoctorStart />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
+        "9880 of 10000 AI Doctor credits left this month",
       ),
     );
     expect(screen.queryByTestId("ai-doctor-start-free-credit-note")).toBeNull();

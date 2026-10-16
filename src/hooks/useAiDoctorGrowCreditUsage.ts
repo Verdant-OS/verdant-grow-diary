@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   computeAiCreditPackBalance,
   formatAiCreditUtcPeriodKey,
+  resolveAuthoritativeBillingEnvironment,
   sumAiDoctorAllowanceSpends,
   sumAiDoctorMonthlyAllowanceSpends,
   type AiDoctorGrantRowLike,
@@ -57,11 +58,11 @@ export function useAiDoctorGrowCreditUsage(
   const canLoadPerGrow = options.perGrowEnabled === true && validGrowId !== null;
   const canLoadMonthly = options.monthlyEnabled === true;
   const enabled = !authLoading && Boolean(userId) && (canLoadPerGrow || canLoadMonthly);
-  const billingEnvironment = options.billingEnvironment ?? "live";
+  const billingEnvironment = resolveAuthoritativeBillingEnvironment(options.billingEnvironment);
   const [refreshTick, setRefreshTick] = useState(0);
 
   const activeScopeKey = enabled
-    ? `${userId}:${canLoadPerGrow ? validGrowId : "monthly"}:${billingEnvironment}`
+    ? `${userId}:${canLoadPerGrow ? validGrowId : "monthly"}:${billingEnvironment ?? "unresolved"}`
     : null;
 
   const [state, setState] = useState<ScopedCreditUsageState>({
@@ -90,10 +91,12 @@ export function useAiDoctorGrowCreditUsage(
           canLoadPerGrow && validGrowId && !canLoadMonthly
             ? spendsQuery.eq("grow_id", validGrowId)
             : spendsQuery,
-          supabase
-            .from("ai_credit_grants")
-            .select("credits, environment, expires_at")
-            .eq("user_id", userId),
+          billingEnvironment
+            ? supabase
+                .from("ai_credit_grants")
+                .select("credits, environment, expires_at")
+                .eq("user_id", userId)
+            : Promise.resolve({ data: null, error: null }),
         ]);
 
         if (cancelled) return;
@@ -116,12 +119,14 @@ export function useAiDoctorGrowCreditUsage(
         const usedMonthly = canLoadMonthly
           ? sumAiDoctorMonthlyAllowanceSpends(spendRows, formatAiCreditUtcPeriodKey(now))
           : null;
-        const packBalance = computeAiCreditPackBalance({
-          grantRows,
-          spendRows,
-          billingEnvironment,
-          nowMs: now.getTime(),
-        });
+        const packBalance = billingEnvironment
+          ? computeAiCreditPackBalance({
+              grantRows,
+              spendRows,
+              billingEnvironment,
+              nowMs: now.getTime(),
+            })
+          : null;
         setState({
           scopeKey: activeScopeKey,
           allowanceUsed: usedPerGrow,

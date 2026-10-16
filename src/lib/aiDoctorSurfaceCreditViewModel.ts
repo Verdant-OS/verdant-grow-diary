@@ -12,9 +12,28 @@ import { PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
 import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 export const AI_DOCTOR_FREE_PLAN_CREDIT_ALLOWANCE = FREE_CAPABILITIES.aiCreditsPerGrow ?? 3;
+export const AI_DOCTOR_STAFF_MONTHLY_CREDIT_ALLOWANCE = 10000;
 
 export const AI_DOCTOR_FREE_PLAN_CREDIT_COPY =
   `Free plan includes ${AI_DOCTOR_FREE_PLAN_CREDIT_ALLOWANCE} AI Doctor credits per grow.` as const;
+
+/**
+ * Resolves the authoritative billing environment (`"live"` | `"sandbox"`) from
+ * an explicit override or configured `PAYMENTS_ENVIRONMENT` /
+ * `VITE_PAYMENTS_ENVIRONMENT` setting, or `null` when unresolved.
+ */
+export function resolveAuthoritativeBillingEnvironment(
+  explicit?: string | null,
+): "live" | "sandbox" | null {
+  const candidate =
+    explicit ??
+    (typeof process !== "undefined" ? process.env?.PAYMENTS_ENVIRONMENT : undefined) ??
+    (import.meta.env?.VITE_PAYMENTS_ENVIRONMENT as string | undefined);
+  if (candidate === "live" || candidate === "sandbox") {
+    return candidate;
+  }
+  return null;
+}
 
 export interface AiDoctorSpendRowLike {
   id?: string | null;
@@ -199,7 +218,9 @@ export function buildAiDoctorSurfaceCreditViewModel(
       ? Math.floor(input.packBalance)
       : 0;
 
-  if (viewer.bypassesUpsell) {
+  const isStaff = input.entitlement?.isStaff === true;
+
+  if (viewer.bypassesUpsell || isStaff) {
     if (input.postSpendCredit) {
       return {
         creditRemaining: input.postSpendCredit,
@@ -215,8 +236,9 @@ export function buildAiDoctorSurfaceCreditViewModel(
     }
     const capMonthly = input.entitlement?.capabilities?.aiMonthlyCredits;
     const catalogMonthly = viewer.paidPlanId ? PLAN_CATALOG[viewer.paidPlanId].aiMonthlyCredits : 0;
-    const monthlyLimit =
-      typeof capMonthly === "number" && Number.isFinite(capMonthly) && capMonthly > 0
+    const monthlyLimit = isStaff
+      ? AI_DOCTOR_STAFF_MONTHLY_CREDIT_ALLOWANCE
+      : typeof capMonthly === "number" && Number.isFinite(capMonthly) && capMonthly > 0
         ? Math.floor(capMonthly)
         : catalogMonthly;
     if (

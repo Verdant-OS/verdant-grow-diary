@@ -463,6 +463,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     lookupFailed: entitlementLookupFailed,
   } = useMyEntitlements();
   const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
+  const isStaff = entitlement?.isStaff === true;
   const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
   const monthlyAiCredits = entitlement?.capabilities?.aiMonthlyCredits ?? null;
   const {
@@ -474,9 +475,10 @@ function PlantDetailAiDoctorLiveReviewScope({
   } = useAiDoctorGrowCreditUsage({
     growId: growId ?? null,
     perGrowEnabled:
-      entitlementReady && typeof perGrowAiCredits === "number" && perGrowAiCredits > 0,
+      entitlementReady && !isStaff && typeof perGrowAiCredits === "number" && perGrowAiCredits > 0,
     monthlyEnabled:
-      entitlementReady && typeof monthlyAiCredits === "number" && monthlyAiCredits > 0,
+      entitlementReady &&
+      (isStaff || (typeof monthlyAiCredits === "number" && monthlyAiCredits > 0)),
   });
   const surfaceCredit = useMemo(
     () =>

@@ -194,6 +194,71 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
     expect(savedPayload.reason).not.toContain("65%–75%");
   });
 
+  it("treats initial idle grow_targets state as pending so stage-default alerts cannot persist before targets transition to loading and ok (#2179)", async () => {
+    alertsIo.targetsState = {
+      status: "idle",
+      targets: null,
+      reload: vi.fn(),
+    };
+
+    const view = render(
+      <AlertsAutoPersistForGrow
+        growId="grow-1"
+        stage="seedling"
+        plants={[{ grow_id: "grow-1", tent_id: "tent-1", stage: "seedling" }]}
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(alertsIo.list).not.toHaveBeenCalled();
+    expect(alertsIo.save).not.toHaveBeenCalled();
+    expect(alertsIo.log).not.toHaveBeenCalled();
+
+    alertsIo.targetsState = {
+      status: "loading",
+      targets: null,
+      reload: vi.fn(),
+    };
+    view.rerender(
+      <AlertsAutoPersistForGrow
+        growId="grow-1"
+        stage="seedling"
+        plants={[{ grow_id: "grow-1", tent_id: "tent-1", stage: "seedling" }]}
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(alertsIo.list).not.toHaveBeenCalled();
+    expect(alertsIo.save).not.toHaveBeenCalled();
+
+    alertsIo.targetsState = {
+      status: "ok",
+      targets: { rh: { min: 50, max: 70 }, temp: { min: 20, max: 35 } },
+      reload: vi.fn(),
+    };
+    view.rerender(
+      <AlertsAutoPersistForGrow
+        growId="grow-1"
+        stage="seedling"
+        plants={[{ grow_id: "grow-1", tent_id: "tent-1", stage: "seedling" }]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(alertsIo.save).toHaveBeenCalledTimes(1);
+      expect(alertsIo.log).toHaveBeenCalledTimes(1);
+    });
+    const savedPayload = alertsIo.save.mock.calls[0][0];
+    expect(savedPayload.metric).toBe("rh");
+    expect(savedPayload.title).toBe("Humidity above target");
+    expect(savedPayload.reason).toContain("50–70%");
+    expect(savedPayload.reason).not.toContain("65%–75%");
+  });
+
   it("includes the configured target range in target-comparison alert reasons and derives Why-this-alert context instead of 'Target context unavailable' (#2179)", () => {
     const snap = {
       ...EMPTY_SNAPSHOT,

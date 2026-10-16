@@ -71,7 +71,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
     plantStages: plantStages ?? null,
   }).stage;
   const plantsSettled = plants !== null;
-  const targetsPending = targetsState.status === "loading" || targetsState.status === "unavailable";
+  const targetsPending = targetsState.status !== "ok";
 
   usePersistEnvironmentAlerts({
     growId: safeGrowId,

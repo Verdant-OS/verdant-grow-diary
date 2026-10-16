@@ -53,17 +53,17 @@ goal: Normalize verified raw Paddle payload fields for payments-webhook, with si
 branch: codex/paddle-wire-001-normalization
 base: verdant-grow-diary
 checkout: git switch codex/paddle-wire-001-normalization && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
-pr: NOT_MEASURED (open draft before implementation)
-head_sha: NOT_MEASURED (initial claim commit pending); base e136fa44f377cdbfa98c68289c2f05f7007a9a06
-state: Claimed, pre-implementation. Fresh collision audit checked all 124 open PR file lists immediately before branch creation; no payments-webhook, _shared/paddle.ts or lovable-paddle-webhook overlap. #2028 Founder/Pricing writer scope remains separate.
-next_action: Push this claim and open a draft before adding regression tests, then prove raw-wire failure before changing normalization.
-files: supabase/functions/payments-webhook/index.ts (normalization only); new src/test/payments-webhook-raw-wire.test.ts; docs/agents/HANDOFF_LOG.md (this block)
-blockers: Toolchain setup pending. No existing locked scorer edits authorized. Shared fleet registry unavailable; other-chat activity NOT_MEASURED.
-artifacts: Signed raw-wire regression and red/green validation receipts to follow on this draft.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2221 (draft)
+head_sha: 6dcc0aedf20119c247091df45c17a348320debf9 (initial pushed claim, observed 2026-10-16 17:50 UTC); this implementation commit follows it. Re-read PR head before resuming; current exact SHA and check snapshot are in the PR body.
+state: Normalization implemented only in index.ts; the real signed HTTP handler/shared verifier/orchestrator/email helper execute in isolated runtime tests. Final stable suite: RED against original e136fa44f = 30 FAIL / 16 PASS, GREEN = 46 PASS / 0 FAIL / 0 SKIP. The original tests-first RED was 22 FAIL / 13 PASS before any production edit. Related final set: 10 files / 202 PASS / 0 FAIL / 0 SKIP (includes the 46). Typecheck previously passed; final rerun and full 3389-file unit suite still running. Scoped lint, format, docs safety, edge mirror/import checks and strict scorer report PASS. Codex peer review has no remaining findings and is not independent acceptance.
+next_action: Finish the running full-suite/typecheck receipt, verify the normal push and exact remote SHA, then Grok 91 routes P1/Edge acceptance to Blue Dream (or assigned Durban Poison). Stay draft; no merge/ready/enqueue.
+files: supabase/functions/payments-webhook/index.ts (explicit provider aliases only); new supabase/functions/payments-webhook/rawWire.test.ts; new src/test/payments-webhook-raw-wire.test.ts (discovery import); docs/agents/HANDOFF_LOG.md (this block). Server fixture names stay outside src to preserve the unchanged frontend secret-boundary scanner.
+blockers: Final-head hosted CI and eligible outside acceptance remain NOT_MEASURED. Direct review delivery is unavailable: shared reviewer box/registry and a Grok/Blue Dream transport are absent. No GitHub comment permission was supplied. No existing locked scorer edits. Other-chat activity NOT_MEASURED. No production behavior measured.
+artifacts: /tmp/paddle-peer-raw-5s_rgmsu/{red,green}.{log,json} and manifest.json hold final baseline/fixed receipts and unchanged source hashes. /tmp/paddle-focused-green.log; /tmp/paddle-typecheck.log; /tmp/paddle-full-suite.{log,json} (JSON pending until completion). Final PR body and exact-SHA review packet will carry the remote receipt.
 reviewer_seat: Blue Dream (P1/Edge); Durban Poison eligible if assigned. Independent exact-head acceptance NOT_MEASURED; Codex authored work cannot self-approve.
 claimed_by: Codex, 2026-10-16 17:43 UTC (Matthew's direct task assignment; no GitHub comment posted because CURRENT_STATE requires separate approval)
-last_updated: 2026-10-16 17:43 UTC, by Codex
-limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Lifecycle ordering risk is a later slice. No replay, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
+last_updated: 2026-10-16 17:54 UTC, by Codex
+limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Deferred ordering risk: cancellation updates acknowledge zero matched rows; stale subscription upserts have no occurred_at guard. No ordering/replay changes, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
 ```
 
 ### PR2072-M7-SERVED-REVISION

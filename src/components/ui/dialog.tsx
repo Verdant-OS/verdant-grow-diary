@@ -2,7 +2,10 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
+import { installSameRealmEventDispatch } from "@/lib/sameRealmEventDispatch";
 import { cn } from "@/lib/utils";
+
+installSameRealmEventDispatch();
 
 const Dialog = DialogPrimitive.Root;
 

@@ -132,23 +132,24 @@ state: Migration renumbered to 20261013190000 at the owner's instruction (2026-1
   and diff-check all pass. Hosted CI at 45cdac32: NOT_MEASURED (running).
   "native save/retrieve (local backend)" failed once at b7481653d on a retraction-reason chip
   click (manual path, outside this change) and passed on re-run.
-next_action: Matthew: per-item approval for the scorer-workflow edits (Codex BLOCKED at
-  45cdac32, 2026-10-14 22:15 UTC), or remove them. Then a deep exact-head review by the DB seat.
-  Do not merge: migration PRs are held for Matthew.
+next_action: Substantive exact-head review at 45cdac32 by the DB seat (Codex, Blue Dream or
+  Durban Poison). The scorer-workflow prerequisite behind Codex's 2026-10-14 22:15 UTC BLOCKED is
+  satisfied: Matthew approved it 2026-10-16 19:23 UTC (PR #1846 issuecomment-6223030165). Do not
+  merge: the migration merge/ship decision stays held for Matthew.
 files: supabase/migrations/20261013190000_quicklog_event_request_hash_utc.sql;
   scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs;
   src/test/quicklog-event-request-hash-utc-pg15-harness.test.ts;
   .github/workflows/quicklog-event-replay-lock-pg15.yml;
   docs/specs/quicklog-event-request-hash-timezone.md
-blockers: Matthew: scorer-workflow approval and ship/merge decision. Hosted CI at 45cdac32:
+blockers: Independent exact-head review; Matthew's separate migration merge/ship decision. CI at 45cdac32:
   35/35 required SUCCESS (re-read 2026-10-16). Deep migration review not performed. #1841 merged
   2026-10-13 as feb94d9ad.
 artifacts: PR #1846 body (RED/GREEN, local and hosted evidence); earlier hosted PG15 run
   36894367680; shard-11 failure before the fix: run 38294348060
 reviewer_seat: Blue Dream or Durban Poison (DB), or Codex (Codex did not author or repair)
-claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:56 UTC (PR #1846
+claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:57 UTC (PR #1846
   issuecomment-6222597481; Matthew's 2026-10-16 transfer)
-last_updated: 2026-10-16 13:58 CT, by Claude (close-out session)
+last_updated: 2026-10-16 14:33 CT, by Claude (close-out session)
 ```
 
 ### CLAUDE-CODE-ACTION-002

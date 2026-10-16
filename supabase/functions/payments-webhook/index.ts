@@ -271,6 +271,26 @@ function buildDeps(): Deps {
       if (failures.length > 0) return { ok: false, error: failures.join("; ") };
       return { ok: true, canceled };
     },
+    async clawbackCreditPack({ paddle_transaction_id, environment }) {
+      // Grant-path audit (2026-10-03): reverse a credit-pack grant on an
+      // approved refund/chargeback. Service-role-only, idempotent, and a
+      // no-op ('no_grant') for transactions that were not a pack purchase.
+      const { data, error } = await sb.rpc("clawback_lovable_credit_pack", {
+        p_paddle_transaction_id: paddle_transaction_id,
+        p_environment: environment,
+      });
+      if (error) return { ok: false, error: `rpc_error:${error.message}` };
+      const payload = (data ?? {}) as { ok?: boolean; reason?: string };
+      if (
+        payload.ok === true &&
+        (payload.reason === "clawed_back" ||
+          payload.reason === "idempotent" ||
+          payload.reason === "no_grant")
+      ) {
+        return { ok: true, reason: payload.reason };
+      }
+      return { ok: false, error: `rpc_rejected:${payload.reason ?? "unknown"}` };
+    },
     async revokeFounderLifetime({ paddle_transaction_id, environment, now }) {
       // Turn B refund-retire: single atomic RPC call that flips both the
       // subscription (revokes Pro) and the founders row (retires the seat).

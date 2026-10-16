@@ -58,6 +58,7 @@ interface Props {
    * always agrees with what the write seam will actually save.
    */
   entryTemperatureUnit?: TemperatureUnitPreference;
+  volumeError?: string | null;
 }
 
 interface ObservationOption {
@@ -71,6 +72,7 @@ export default function QuickLogWateringForm({
   context,
   disabled,
   entryTemperatureUnit,
+  volumeError,
 }: Props) {
   const temperatureUnit = useTemperatureUnitPreference();
   // Display-side canonicalization only: the write seam converts from the
@@ -117,10 +119,25 @@ export default function QuickLogWateringForm({
           inputMode="decimal"
           value={value.volumeMl}
           disabled={disabled}
-          aria-describedby="qlv2-volume-help qlv2-volume-presets-help"
+          aria-invalid={Boolean(volumeError) || undefined}
+          aria-describedby={
+            volumeError
+              ? "qlv2-volume-help qlv2-volume-presets-help qlv2-volume-error"
+              : "qlv2-volume-help qlv2-volume-presets-help"
+          }
           onChange={(event) => setField("volumeMl", event.target.value)}
           placeholder="e.g. 500"
         />
+        {volumeError ? (
+          <p
+            id="qlv2-volume-error"
+            data-testid="qlv2-volume-error"
+            className="mt-1 text-sm text-destructive"
+            role="alert"
+          >
+            {volumeError}
+          </p>
+        ) : null}
         <div
           className="mt-2 flex flex-wrap gap-2"
           role="group"
@@ -138,7 +155,9 @@ export default function QuickLogWateringForm({
                 aria-pressed={selected}
                 disabled={disabled}
                 data-testid={`qlv2-volume-preset-${preset.ml}`}
-                onClick={() => setField("volumeMl", applyWateringVolumePreset(value.volumeMl, preset))}
+                onClick={() =>
+                  setField("volumeMl", applyWateringVolumePreset(value.volumeMl, preset))
+                }
               >
                 {preset.label}
               </Button>

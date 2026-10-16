@@ -500,7 +500,7 @@ export default function Dashboard() {
   // Non-landmark container: AppShell already owns the <main> landmark around
   // the route Outlet, so the page root must not nest another.
   return (
-    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+    <div className="min-w-0 max-w-full space-y-4 md:space-y-6" data-testid="dashboard-root">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}

@@ -45,6 +45,27 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PADDLE-WIRE-001-NORMALIZATION
+
+```text
+TASK PADDLE-WIRE-001-NORMALIZATION  priority: P1  status: OPEN
+goal: Normalize verified raw Paddle payload fields for payments-webhook, with signed raw-wire regression RED before GREEN. Matthew approved this bounded draft-only repair on 2026-10-16.
+branch: codex/paddle-wire-001-normalization
+base: verdant-grow-diary
+checkout: git switch codex/paddle-wire-001-normalization && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: NOT_MEASURED (open draft before implementation)
+head_sha: NOT_MEASURED (initial claim commit pending); base e136fa44f377cdbfa98c68289c2f05f7007a9a06
+state: Claimed, pre-implementation. Fresh collision audit checked all 124 open PR file lists immediately before branch creation; no payments-webhook, _shared/paddle.ts or lovable-paddle-webhook overlap. #2028 Founder/Pricing writer scope remains separate.
+next_action: Push this claim and open a draft before adding regression tests, then prove raw-wire failure before changing normalization.
+files: supabase/functions/payments-webhook/index.ts (normalization only); new src/test/payments-webhook-raw-wire.test.ts; docs/agents/HANDOFF_LOG.md (this block)
+blockers: Toolchain setup pending. No existing locked scorer edits authorized. Shared fleet registry unavailable; other-chat activity NOT_MEASURED.
+artifacts: Signed raw-wire regression and red/green validation receipts to follow on this draft.
+reviewer_seat: Blue Dream (P1/Edge); Durban Poison eligible if assigned. Independent exact-head acceptance NOT_MEASURED; Codex authored work cannot self-approve.
+claimed_by: Codex, 2026-10-16 17:43 UTC (Matthew's direct task assignment; no GitHub comment posted because CURRENT_STATE requires separate approval)
+last_updated: 2026-10-16 17:43 UTC, by Codex
+limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Lifecycle ordering risk is a later slice. No replay, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
+```
+
 ### PR2072-M7-SERVED-REVISION
 
 ```text

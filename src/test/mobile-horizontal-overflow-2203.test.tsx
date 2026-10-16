@@ -26,6 +26,8 @@
  *    - TonightTentHomeCard metric tiles use `min-w-0` and `truncate` so 3-column metrics
  *      do not overflow at 375px.
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -202,6 +204,15 @@ vi.mock("@/hooks/useDailyGrowCheckReads", () => ({
   }),
 }));
 
+const relativeTimelineHarness = vi.hoisted(() => ({ read: vi.fn() }));
+
+vi.mock("@/hooks/usePlantRelativeTimelineHistory", () => ({
+  usePlantRelativeTimelineHistory: () => {
+    const read = relativeTimelineHarness.read();
+    return { ...read, totalCount: read?.data?.length ?? null };
+  },
+}));
+
 import Timeline from "@/pages/Timeline";
 import CultivationCalendarMonthGrid from "@/components/CultivationCalendarMonthGrid";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
@@ -211,6 +222,7 @@ import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCar
 import PlantDailyGrowCheckConsistencyCard from "@/components/PlantDailyGrowCheckConsistencyCard";
 import SensorChart from "@/components/SensorChart";
 import TonightTentHomeCard from "@/components/TonightTentHomeCard";
+import PlantRelativeTimelineSection from "@/components/PlantRelativeTimelineSection";
 
 function renderWithProviders(ui: React.ReactNode) {
   const queryClient = new QueryClient({
@@ -260,6 +272,15 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
     renderWithProviders(<Timeline />);
 
     const scroller = await screen.findByTestId("timeline-stage-progression-scroll");
+
+    let timelineRoot: Element | null = scroller;
+    while (timelineRoot && !timelineRoot.className.includes("overflow-x-clip")) {
+      timelineRoot = timelineRoot.parentElement;
+    }
+    expect(timelineRoot?.className).toContain("min-w-0");
+    expect(timelineRoot?.className).toContain("max-w-full");
+    expect(timelineRoot?.className).toContain("overflow-x-clip");
+
     expect(scroller.className).toContain("min-w-0");
     expect(scroller.className).toContain("max-w-full");
 
@@ -490,6 +511,50 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
     expect(legendGroup?.className).toContain("flex-wrap");
   });
 
+  it("wraps PlantRelativeTimelineSection plant-day metadata row with flex-wrap at 375px", () => {
+    relativeTimelineHarness.read.mockReturnValue({
+      data: [
+        {
+          id: "relative-2203-1",
+          plant_id: "plant-2203-1",
+          entry_at: "2026-10-10T08:00:00.000Z",
+          entry_type: "note",
+          note: "Routine check",
+          photo_url: null,
+          details: null,
+          stage: "veg",
+        },
+      ],
+      isLoading: false,
+    });
+
+    renderWithProviders(
+      <PlantRelativeTimelineSection
+        plantId="plant-2203-1"
+        plantStartedAt="2026-09-01T00:00:00.000Z"
+        currentStage="vegetation"
+      />,
+    );
+
+    const plantDay = screen.getByTestId("relative-timeline-plant-day");
+    const metaRow = plantDay.parentElement;
+    expect(metaRow?.className).toContain("flex-wrap");
+  });
+
+  it("pins Dashboard, PlantDetail, and Timeline page shells to min-w-0 max-w-full (#2203)", () => {
+    const root = resolve(__dirname, "..");
+    const dashboard = readFileSync(resolve(root, "pages/Dashboard.tsx"), "utf8");
+    const plantDetail = readFileSync(resolve(root, "pages/PlantDetail.tsx"), "utf8");
+    const timeline = readFileSync(resolve(root, "pages/Timeline.tsx"), "utf8");
+
+    expect(dashboard).toContain('data-testid="dashboard-root"');
+    expect(dashboard).toContain('className="min-w-0 max-w-full space-y-4 md:space-y-6"');
+
+    expect(plantDetail).toContain('className="min-w-0 max-w-full"');
+
+    expect(timeline).toContain('className="min-w-0 max-w-full overflow-x-clip"');
+  });
+
   it("constrains TonightTentHomeCard 3-column metric tiles with min-w-0 and truncate at 375px", () => {
     renderWithProviders(
       <TonightTentHomeCard
@@ -538,6 +603,16 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
         logHref="/daily-check"
       />,
     );
+
+    const card = screen.getByTestId("tonight-tent-home");
+    const headerRow = card.querySelector("#tonight-tent-home-heading")?.parentElement;
+    expect(headerRow?.className).toContain("flex-wrap");
+
+    const heading = screen.getByRole("heading", { name: /Main 4x4 Tent/i });
+    expect(heading.className).toContain("min-w-0");
+    const tentLink = within(heading).getByRole("link", { name: "Main 4x4 Tent" });
+    expect(tentLink.className).toContain("break-words");
+    expect(tentLink.className).toContain("min-w-0");
 
     for (const key of ["temp", "rh", "vpd"] as const) {
       const tile = screen.getByTestId(`tonight-tent-home-metric-${key}`);

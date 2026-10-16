@@ -15,6 +15,14 @@ is now `5ea8f1f74209c3576afea0317a471370222fbae3`, and `cf929cf7..5ea8f1f7` touc
 `NOT_MEASURED`. Applying migrations and publishing edge functions remain Matthew's
 decisions under the existing locks (production database knk, HOLD #1250).
 
+**Re-check, 2026-10-16 (tip `e136fa44f377cdbfa98c68289c2f05f7007a9a06`).** `CURRENT_STATE.md`
+and `CURRENT_STATE_ARCHIVE.md` still have no entry for `20260925090000`, so its applied
+state stays **NOT_MEASURED**. `CURRENT_STATE.md` still records #1460 and #1545 as parked.
+Since `a980489a`, five migrations were added under `supabase/migrations/`
+(`20261001160000`, `20261003010000`, `20261003020000`, `20261010120000`,
+`20261013180000`). All sort after every version named here, so the order below is
+unchanged. This doc does not cover them.
+
 Handoff item 3. Owner: Grok. Reviewer seat: Critical Mass.
 
 ## How this list was derived
@@ -194,6 +202,16 @@ still stand.
 `c380a439`) restates #1894's order without `20260925090000` or the parked
 `20260916111000`/`20260917183000`, and says `20260924120000` "runs first". Whichever of
 #1895 and this amendment merges second adds them there.
+
+**Correction, 2026-10-16.** The paragraph above was written while #1895 was open. #1895
+merged on 2026-10-06 19:05:48 UTC as `be1d3c56c27c926136b3bccbb00ab1a1de530ab2` (from head
+`c380a4397507b7cfb755af1df9a596232f245f36`), before this amendment. So "whichever merges
+second" no longer applies, and this amendment does not edit the checklist. At tip
+`e136fa44`, the merged checklist's "Restated from #1894" migration list still opens with
+#1703 `20260924120000` as sorting "ahead of every migration below" and running first. It
+still omits `20260925090000` and the parked `20260916111000`/`20260917183000`; the parked
+pair sorts ahead of `20260924120000`. Until the checklist itself is corrected in a separate
+change, use the order in this doc. That correction is not assigned yet.
 
 ## Migrations in dependency order
 

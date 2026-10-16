@@ -1,4 +1,9 @@
-import { useQuery, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { SoilMoistureCalibrationRow } from "@/lib/db";
@@ -46,15 +51,47 @@ const SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY = [
   "schema_unavailable",
 ] as const;
 
+const SCHEMA_UNAVAILABLE_RESULT: SoilMoistureCalibrationReadResult = {
+  availability: "schema_unavailable",
+  calibrations: [],
+};
+
+const schemaUnavailableClients = new WeakSet<QueryClient>();
+const inflightSchemaCheckByClient = new WeakMap<QueryClient, Promise<boolean>>();
+
+/**
+ * Checks whether a QueryClient has already recorded that
+ * `soil_moisture_calibrations` is missing on this deployment.
+ */
 function soilMoistureCalibrationSchemaUnavailableCached(client: QueryClient): boolean {
-  return client.getQueryData(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY) === true;
+  if (schemaUnavailableClients.has(client)) return true;
+  if (client.getQueryData(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY) === true) {
+    schemaUnavailableClients.add(client);
+    return true;
+  }
+  return false;
 }
 
+/**
+ * Records a confirmed missing `soil_moisture_calibrations` table on the
+ * QueryClient and propagates `SCHEMA_UNAVAILABLE_RESULT` to any existing
+ * calibration query keys on that client.
+ */
 function rememberSoilMoistureCalibrationSchemaUnavailable(client: QueryClient): void {
+  schemaUnavailableClients.add(client);
   client.setQueryDefaults(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY, {
     gcTime: Number.POSITIVE_INFINITY,
   });
   client.setQueryData(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY, true);
+  client.setQueriesData<SoilMoistureCalibrationReadResult>(
+    {
+      queryKey: ["soil_moisture_calibrations"],
+      predicate: (query) =>
+        query.queryKey[0] === "soil_moisture_calibrations" &&
+        query.queryKey[1] !== "schema_unavailable",
+    },
+    SCHEMA_UNAVAILABLE_RESULT,
+  );
 }
 
 export function mapSoilMoistureCalibrationRow(
@@ -95,49 +132,83 @@ export function useSoilMoistureCalibrations(args: {
   growId: string | null | undefined;
   tentId: string | null | undefined;
 }): UseSoilMoistureCalibrationsResult {
+  const activeQueryClient = useQueryClient();
   const growId = isUuid(args.growId) ? args.growId : null;
   const tentId = isUuid(args.tentId) ? args.tentId : null;
   const enabled = Boolean(growId && tentId);
+  const schemaUnavailableCached =
+    enabled && soilMoistureCalibrationSchemaUnavailableCached(activeQueryClient);
 
   const query = useQuery<SoilMoistureCalibrationReadResult>({
     queryKey: ["soil_moisture_calibrations", growId ?? "none", tentId ?? "none"],
     enabled,
+    initialData: schemaUnavailableCached ? SCHEMA_UNAVAILABLE_RESULT : undefined,
     queryFn: async ({ client: queryClient }) => {
       if (soilMoistureCalibrationSchemaUnavailableCached(queryClient)) {
-        return { availability: "schema_unavailable", calibrations: [] };
+        return SCHEMA_UNAVAILABLE_RESULT;
       }
       if (!growId || !tentId) return { availability: "available", calibrations: [] };
-      // The calibration migration exists, but the checked-in generated
-      // Supabase types do not include this table yet. Keep this narrow cast
-      // until production schema parity is confirmed and types are regenerated.
-      const client = supabase as unknown as {
-        from: (table: string) => {
-          select: (cols: string) => {
-            eq: (col: string, val: unknown) => any;
+
+      const existingInflight = inflightSchemaCheckByClient.get(queryClient);
+      if (existingInflight) {
+        const missingSchema = await existingInflight;
+        if (missingSchema || soilMoistureCalibrationSchemaUnavailableCached(queryClient)) {
+          return SCHEMA_UNAVAILABLE_RESULT;
+        }
+      }
+
+      let resolveInflight!: (missingSchema: boolean) => void;
+      const inflightPromise = new Promise<boolean>((resolve) => {
+        resolveInflight = resolve;
+      });
+      inflightSchemaCheckByClient.set(queryClient, inflightPromise);
+
+      try {
+        // The calibration migration exists, but the checked-in generated
+        // Supabase types do not include this table yet. Keep this narrow cast
+        // until production schema parity is confirmed and types are regenerated.
+        const client = supabase as unknown as {
+          from: (table: string) => {
+            select: (cols: string) => {
+              eq: (col: string, val: unknown) => any;
+            };
           };
         };
-      };
-      const { data, error } = await client
-        .from("soil_moisture_calibrations")
-        .select(
-          "id,grow_id,tent_id,plant_id,device_id,dry_raw,wet_raw,source,is_active,created_at,updated_at",
-        )
-        .eq("grow_id", growId)
-        .eq("tent_id", tentId)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
+        const { data, error } = await client
+          .from("soil_moisture_calibrations")
+          .select(
+            "id,grow_id,tent_id,plant_id,device_id,dry_raw,wet_raw,source,is_active,created_at,updated_at",
+          )
+          .eq("grow_id", growId)
+          .eq("tent_id", tentId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false });
 
-      const result = resolveSoilMoistureCalibrationRead(
-        data as SoilMoistureCalibrationRow[] | null,
-        error,
-      );
-      if (result.availability === "schema_unavailable") {
-        rememberSoilMoistureCalibrationSchemaUnavailable(queryClient);
+        const result = resolveSoilMoistureCalibrationRead(
+          data as SoilMoistureCalibrationRow[] | null,
+          error,
+        );
+        if (
+          result.availability === "schema_unavailable" ||
+          soilMoistureCalibrationSchemaUnavailableCached(queryClient)
+        ) {
+          rememberSoilMoistureCalibrationSchemaUnavailable(queryClient);
+          resolveInflight(true);
+          return SCHEMA_UNAVAILABLE_RESULT;
+        }
+        resolveInflight(false);
+        return result;
+      } catch (err) {
+        resolveInflight(false);
+        throw err;
+      } finally {
+        if (inflightSchemaCheckByClient.get(queryClient) === inflightPromise) {
+          inflightSchemaCheckByClient.delete(queryClient);
+        }
       }
-      return result;
     },
-    staleTime: 1000 * 60,
-    gcTime: 1000 * 60 * 5,
+    staleTime: schemaUnavailableCached ? Number.POSITIVE_INFINITY : 1000 * 60,
+    gcTime: schemaUnavailableCached ? Number.POSITIVE_INFINITY : 1000 * 60 * 5,
     refetchOnWindowFocus: false,
     // Missing schema resolves to an explicit tagged state above. Every other
     // failed read remains a first-class query error; do not retry it into an

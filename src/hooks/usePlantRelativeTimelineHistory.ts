@@ -11,6 +11,7 @@ import {
   plantHistoryCursorFilter,
   type PlantHistoryCursor,
 } from "@/lib/plantRelativeTimelineHistoryRules";
+import { enrichPlantFeedingDiaryRows } from "@/lib/plantFeedingDisplayRules";
 
 export function plantRelativeHistoryQueryKey(
   plantId: string | null | undefined,
@@ -65,7 +66,10 @@ export function usePlantRelativeTimelineHistory(plantId: string | null | undefin
   });
   return {
     ...query,
-    data: ownerId && plantId && query.data ? collectPlantHistoryRows(query.data.pages) : undefined,
+    data:
+      ownerId && plantId && query.data
+        ? enrichPlantFeedingDiaryRows(collectPlantHistoryRows(query.data.pages))
+        : undefined,
     totalCount: ownerId && plantId ? (query.data?.pages[0]?.totalCount ?? null) : null,
     boundaryUnavailable: query.data?.pages.at(-1)?.boundaryUnavailable ?? false,
   };

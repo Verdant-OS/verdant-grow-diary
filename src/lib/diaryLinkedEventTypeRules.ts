@@ -84,7 +84,7 @@ export function collectLinkedEventIdsNeedingType(rows: readonly unknown[]): stri
   return out;
 }
 
-/** Stamp the spine's event type into each untyped linked row's details. */
+/** Stamp the spine's event type (and optional feeding line_id) into each untyped linked row's details. */
 export function applyLinkedEventTypes<T>(
   rows: readonly T[],
   spineTypes: ReadonlyMap<string, unknown>,
@@ -93,9 +93,21 @@ export function applyLinkedEventTypes<T>(
     const id = untypedLinkedId(row);
     if (!id) return row;
     const raw = spineTypes.get(id);
-    const type = typeof raw === "string" ? raw.toLowerCase().trim() : "";
+    const rawObj = isPlainObject(raw) ? raw : null;
+    const rawType = rawObj ? rawObj.event_type : raw;
+    const type = typeof rawType === "string" ? rawType.toLowerCase().trim() : "";
     if (!LINKED_SPINE_EVENT_TYPES.has(type)) return row;
     const r = row as unknown as Row;
-    return { ...r, details: { ...(r.details as Row), event_type: type } } as unknown as T;
+    const details: Row = { ...(r.details as Row), event_type: type };
+    if (type === "feeding" && rawObj) {
+      const lineId =
+        typeof rawObj.line_id === "string" && rawObj.line_id.trim() !== ""
+          ? rawObj.line_id.trim()
+          : null;
+      if (lineId && details.line_id == null && details.nutrient_line_id == null) {
+        details.line_id = lineId;
+      }
+    }
+    return { ...r, details } as unknown as T;
   });
 }

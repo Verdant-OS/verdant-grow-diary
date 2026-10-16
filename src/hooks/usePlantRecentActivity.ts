@@ -45,12 +45,31 @@ async function withLinkedEventTypes<T>(rows: T[]): Promise<T[]> {
   try {
     const { data, error } = await supabase
       .from("grow_events")
-      .select("id,event_type")
+      .select("id,event_type,feeding_events(line_id,nutrient_brand)")
       .in("id", ids);
     if (error || !Array.isArray(data)) return rows;
     const types = new Map<string, unknown>();
-    for (const e of data as Array<{ id?: unknown; event_type?: unknown }>) {
-      if (typeof e?.id === "string") types.set(e.id.toLowerCase(), e.event_type);
+    for (const e of data as Array<{
+      id?: unknown;
+      event_type?: unknown;
+      feeding_events?: unknown;
+    }>) {
+      if (typeof e?.id !== "string") continue;
+      const feedRel = Array.isArray(e.feeding_events) ? e.feeding_events[0] : e.feeding_events;
+      const feedObj =
+        feedRel && typeof feedRel === "object" && !Array.isArray(feedRel)
+          ? (feedRel as Record<string, unknown>)
+          : null;
+      const lineId =
+        typeof feedObj?.line_id === "string" && feedObj.line_id.trim() !== ""
+          ? feedObj.line_id.trim()
+          : typeof feedObj?.nutrient_brand === "string" && feedObj.nutrient_brand.trim() !== ""
+            ? feedObj.nutrient_brand.trim()
+            : null;
+      types.set(
+        e.id.toLowerCase(),
+        lineId ? { event_type: e.event_type, line_id: lineId } : e.event_type,
+      );
     }
     return applyLinkedEventTypes(rows, types);
   } catch {

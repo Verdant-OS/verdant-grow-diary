@@ -110,6 +110,7 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { useAuth } from "@/store/auth";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
 import {
@@ -453,10 +454,12 @@ export default function DailyCheck() {
   // Pull the latest manual readings for the current tent so we can show a
   // compact "Changed since last snapshot" panel after a sensor save.
   // Read-only — no writes, no ingestion changes.
+  const temperatureUnit = useTemperatureUnitPreference();
   const { data: tentReadings = [] } = useSensorReadings(effectiveTentId || null, 50);
   const changeContext = useMemo(
-    () => deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId }),
-    [effectiveTentId, tentReadings],
+    () =>
+      deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId, temperatureUnit }),
+    [effectiveTentId, tentReadings, temperatureUnit],
   );
 
   const progress = stepProgress(renderedStep);

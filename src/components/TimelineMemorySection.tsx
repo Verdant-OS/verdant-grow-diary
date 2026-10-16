@@ -29,6 +29,7 @@ import {
 } from "@/lib/timelineFilterViewModel";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewViewModel";
 import { buildTimelineDayGroups } from "@/lib/timelineDayGroupingViewModel";
 import {
@@ -54,9 +55,13 @@ function toScope(props: Props): TimelineMemoryScope | null {
 }
 
 function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "diary" }> }) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const sensorVm = useMemo(
-    () => buildTimelineSensorSnapshotViewModel(item.sensorSnapshot),
-    [item.sensorSnapshot],
+    () =>
+      buildTimelineSensorSnapshotViewModel(item.sensorSnapshot, {
+        preferUnit: temperatureUnit === "celsius" ? "C" : "F",
+      }),
+    [item.sensorSnapshot, temperatureUnit],
   );
   const photoVm = useMemo(
     () =>

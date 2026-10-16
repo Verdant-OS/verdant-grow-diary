@@ -53,7 +53,7 @@ describe("catch-all route reports HTTP 404 (no soft 404)", () => {
     async (path) => {
       const router = buildRouter(path);
       await router.load();
-      expect((router as { _serverResult?: { status?: number } })._serverResult?.status).toBe(404);
+      expect((await import("@tanstack/react-router/ssr/server")).getSsrStatus(router)).toBe(404);
       expect(router.state.matches.some((m) => m.status === "notFound")).toBe(true);
     },
   );
@@ -80,7 +80,7 @@ describe("catch-all route reports HTTP 404 (no soft 404)", () => {
   it("a matched route still loads with statusCode 200", async () => {
     const router = buildRouter("/");
     await router.load();
-    expect((router as { _serverResult?: { status?: number } })._serverResult?.status).toBe(200);
+    expect((await import("@tanstack/react-router/ssr/server")).getSsrStatus(router)).toBe(200);
     expect(router.state.matches.some((m) => m.status === "notFound")).toBe(false);
   });
 

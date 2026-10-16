@@ -64,6 +64,7 @@ vi.mock("@/components/RewardedReferralCard", () => ({
 }));
 
 import Settings from "@/pages/Settings";
+import { deleteAccountDisclosesBilling } from "@/lib/settingsTilesRules";
 
 function renderSettings() {
   return render(
@@ -149,6 +150,27 @@ describe("Delete account dialog billing copy", () => {
     expect(within(dialog).getByTestId("settings-delete-account-confirm")).toHaveTextContent(
       "Cancel billing and delete",
     );
+  });
+
+  // Codex P2-1 at 9fafebb3: with loading and lookup settled, a missing plan
+  // (no entitlement row, null or undefined displayPlanId) is not a confirmed
+  // Free plan, so the billing disclosure must stay.
+  it("missing plan: keeps the billing disclosure when no entitlement is returned", () => {
+    ent.displayPlanId = null;
+    renderSettings();
+    const dialog = openDeleteDialog();
+    expect(within(dialog).getByTestId("settings-delete-account-confirm")).toHaveTextContent(
+      "Cancel billing and delete",
+    );
+  });
+
+  it.each([null, undefined])("rule: settled lookup with plan %s still discloses billing", (id) => {
+    expect(
+      deleteAccountDisclosesBilling({ loading: false, lookupFailed: false, displayPlanId: id }),
+    ).toBe(true);
+    expect(
+      deleteAccountDisclosesBilling({ loading: false, lookupFailed: false, displayPlanId: "free" }),
+    ).toBe(false);
   });
 
   it("keeps type-DELETE gating on the Free plan", () => {

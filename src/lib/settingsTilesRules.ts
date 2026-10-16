@@ -57,5 +57,5 @@ export function deleteAccountDisclosesBilling(input: {
   displayPlanId: string | null | undefined;
 }): boolean {
   if (input.loading || input.lookupFailed) return true;
-  return input.displayPlanId != null && input.displayPlanId !== "free";
+  return input.displayPlanId !== "free";
 }

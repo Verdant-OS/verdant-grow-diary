@@ -61,10 +61,11 @@ import {
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import {
-  quickLogPngClaimCanBeInspected,
-  validateQuickLogPngClaim,
-} from "@/lib/quickLogPhotoContentRules";
+  hasQuickLogPhotoAttachmentRecoveryLock,
+  recordQuickLogPhotoAttachmentRecoveryLock,
+} from "@/lib/quickLogPhotoAttachmentRecovery";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
@@ -176,7 +177,16 @@ export default function PlantQuickLog({
     setError(null);
     setBusy(false);
     setPhotoChecking(false);
-    setPhotoAttachmentUnconfirmed(false);
+    const recoveryLocked = hasQuickLogPhotoAttachmentRecoveryLock({
+      ownerId: user?.id ?? null,
+      growId,
+      tentId: tentId ?? null,
+      plantId,
+    });
+    setPhotoAttachmentUnconfirmed(recoveryLocked);
+    if (recoveryLocked) {
+      setError("Could not confirm the photo attachment; it may still appear in history.");
+    }
     if (fileRef.current) fileRef.current.value = "";
     if (libraryFileRef.current) libraryFileRef.current.value = "";
     return () => {
@@ -292,7 +302,7 @@ export default function PlantQuickLog({
     const file = e.currentTarget.files?.[0] ?? null;
     e.currentTarget.value = "";
     if (!file) return;
-    if (!quickLogPngClaimCanBeInspected(file)) {
+    if (!fileClaimsPng(file)) {
       photoValidationGenerationRef.current += 1;
       setPhotoChecking(false);
       handleFileSelected(file);
@@ -343,7 +353,19 @@ export default function PlantQuickLog({
   }
 
   async function handleSave() {
-    if (busy || saveInFlightRef.current || photoAttachmentUnconfirmed) return;
+    if (
+      busy ||
+      saveInFlightRef.current ||
+      photoAttachmentUnconfirmed ||
+      hasQuickLogPhotoAttachmentRecoveryLock({
+        ownerId: user?.id ?? null,
+        growId,
+        tentId: tentId ?? null,
+        plantId,
+      })
+    ) {
+      return;
+    }
     blurActiveElement();
     setError(null);
 
@@ -444,6 +466,15 @@ export default function PlantQuickLog({
               path: uploadedPath,
               file: photoFile,
             };
+            recordQuickLogPhotoAttachmentRecoveryLock(
+              {
+                ownerId: user.id,
+                growId,
+                tentId: tentId ?? null,
+                plantId,
+              },
+              photoOnlyEntryId,
+            );
             setPhotoAttachmentUnconfirmed(true);
             setError(failure.message);
             return;

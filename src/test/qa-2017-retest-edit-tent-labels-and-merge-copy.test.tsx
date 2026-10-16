@@ -9,18 +9,22 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import EditTentDialog from "@/components/EditTentDialog";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import { evaluateTentDeleteGuard } from "@/lib/tentManagementRules";
 
+const supabaseFromMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    update: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+    delete: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+  })),
+);
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: () => ({
-      update: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-      delete: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-    }),
+    from: supabaseFromMock,
   },
 }));
 
@@ -51,6 +55,10 @@ function renderWithProviders(ui: React.ReactNode) {
 }
 
 describe("QA #2017 retest — Edit tent accessible field names and tent merge guard copy", () => {
+  beforeEach(() => {
+    supabaseFromMock.mockClear();
+  });
+
   afterEach(cleanup);
 
   it("exposes accessible label names for Name, Stage, Size, Brand, Light schedule, and Wattage in EditTentDialog", () => {
@@ -90,14 +98,15 @@ describe("QA #2017 retest — Edit tent accessible field names and tent merge gu
     expect(screen.getByLabelText("Wattage")).toBe(screen.getByTestId("edit-tent-light-wattage"));
   });
 
-  it("includes merge-oriented copy in evaluateTentDeleteGuard when a tent has plants assigned", () => {
+  it("includes merge-oriented copy and move_plants_first in evaluateTentDeleteGuard when a tent has plants assigned", () => {
     const guard = evaluateTentDeleteGuard({ tentId: FIXTURE_TENT.id, assignedPlantCount: 2 });
     expect(guard.canDelete).toBe(false);
     expect(guard.canArchive).toBe(false);
     expect(guard.reason).toBe("Tent has plants assigned. Move, merge, or remove them first.");
+    expect(guard.recommendedAction).toBe("move_plants_first");
   });
 
-  it("renders merge-oriented guard copy on the Tent page row and Tents Actions menu", async () => {
+  it("renders merge-oriented guard copy on the Tent page row and Tents Actions menu while blocking writes", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <>
@@ -106,9 +115,14 @@ describe("QA #2017 retest — Edit tent accessible field names and tent merge gu
       </>,
     );
 
+    expect(screen.getByTestId("tent-detail-archive-tent")).toBeDisabled();
+    expect(screen.getByTestId("tent-detail-delete-tent")).toBeDisabled();
     expect(screen.getByTestId("tent-management-guard-reason")).toHaveTextContent(
       "Tent has plants assigned. Move, merge, or remove them first.",
     );
+    fireEvent.click(screen.getByTestId("tent-detail-archive-tent"));
+    fireEvent.click(screen.getByTestId("tent-detail-delete-tent"));
+    expect(supabaseFromMock).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: `Actions for ${FIXTURE_TENT.name}` }));
     expect(screen.getByTestId("tent-card-management-guard-reason")).toHaveTextContent(

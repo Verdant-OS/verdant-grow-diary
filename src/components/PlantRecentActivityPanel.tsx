@@ -24,6 +24,10 @@ import {
   describeQuickLogDetailsFromExtras,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
+import {
+  enrichPlantFeedingDiaryRows,
+  resolveFeedingNutrientLineName,
+} from "@/lib/plantFeedingDisplayRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
@@ -193,7 +197,7 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   const temperatureUnit = useTemperatureUnitPreference();
   const { data, isLoading, isError, isFetching, refetch, isPending, fetchStatus } =
     usePlantRecentActivity(plantId);
-  const rawRows = enabled ? (data ?? []) : [];
+  const rawRows = enabled ? enrichPlantFeedingDiaryRows(data ?? []) : [];
   const rows = buildPlantRecentActivity(rawRows, {
     plantId: plantId ?? null,
   });
@@ -204,7 +208,12 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   const detailLinesById = new Map<string, readonly QuickLogDetailDisplayLine[]>();
   for (const raw of rawRows as Array<{ id?: unknown; details?: unknown }>) {
     if (typeof raw?.id !== "string") continue;
-    const lines = describeQuickLogDetailsFromExtras(raw.details, temperatureUnit);
+    const baseLines = describeQuickLogDetailsFromExtras(raw.details, temperatureUnit);
+    const lineName = resolveFeedingNutrientLineName(raw.details);
+    const lines =
+      lineName && !baseLines.some((l) => l.key === "nutrient_line")
+        ? [{ key: "nutrient_line", label: "Nutrient line", value: lineName }, ...baseLines]
+        : baseLines;
     if (lines.length > 0) detailLinesById.set(raw.id, lines);
   }
 

@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
+import { validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
   readPendingQuickLogNote,
@@ -356,6 +358,7 @@ function QuickLogV2SheetForOwner({
   defaultTargetKey,
   defaultAction = "note",
 }: Props) {
+  const onCloseAutoFocus = useDialogOpenerRestore(open);
   const { user } = useAuth();
   const [initialRecovery] = useState(() => readPendingQuickLogNote(user?.id ?? null));
   const initialNote = initialRecovery.status === "pending" ? initialRecovery.record : null;
@@ -1225,11 +1228,20 @@ function QuickLogV2SheetForOwner({
     setSaveStatus(file ? "Photo selected. Add a note if helpful, then save." : "");
   }
 
-  function handlePhotoInputChange(e: ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoInputChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0] ?? null;
-    if (!file) return;
-    handlePhotoSelected(file);
     e.currentTarget.value = "";
+    if (!file) return;
+    const pngClaim = await validateQuickLogPngClaim(file);
+    if (!pngClaim.ok) {
+      if (submissionLockedRef.current) return;
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setLocalError(pngClaim.message);
+      setSaveStatus("");
+      return;
+    }
+    handlePhotoSelected(file);
   }
 
   async function handleVideoInputChange(e: ChangeEvent<HTMLInputElement>) {
@@ -2608,6 +2620,7 @@ function QuickLogV2SheetForOwner({
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"
         aria-describedby="qlv2-sheet-description"
+        onCloseAutoFocus={onCloseAutoFocus}
       >
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>

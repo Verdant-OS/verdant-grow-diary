@@ -9,6 +9,7 @@ import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
+import { SearchShortcutHint } from "@/components/SearchShortcutHint";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { usePublishedCultivars } from "@/hooks/usePublishedCultivars";
 import { cultivarReferenceSourceNotice } from "@/constants/cultivarReferenceSourceCopy";
@@ -169,9 +170,7 @@ export default function CultivarsIndex() {
             <span className="flex-1 truncate">
               Search cultivars, your grows, tents, and plants…
             </span>
-            <kbd className="hidden shrink-0 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-              ⌘K
-            </kbd>
+            <SearchShortcutHint className="hidden shrink-0 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline" />
           </button>
           {query ? (
             <p className="mt-2 text-xs text-muted-foreground">

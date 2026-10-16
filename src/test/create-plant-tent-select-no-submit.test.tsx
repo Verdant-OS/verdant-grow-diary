@@ -254,5 +254,9 @@ describe("CreatePlantDialog tent selection and submit safety", () => {
     // Dialog close after submit must not leave focus on the New plant trigger where a trailing key/click reopens it empty.
     expect(newPlantTrigger).not.toHaveFocus();
     expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+
+    await user.click(newPlantTrigger);
+    await screen.findByTestId("create-plant-form");
+    expect(screen.getByTestId("create-plant-name")).toHaveValue("");
   });
 });

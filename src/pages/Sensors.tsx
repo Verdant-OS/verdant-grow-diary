@@ -64,6 +64,7 @@ import { EcowittIngestAuditProofPanel } from "@/components/EcowittIngestAuditPro
 import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
 import { isUsableGrowSensorReading } from "@/lib/growSensorEvidenceRules";
 import { useHasRole } from "@/hooks/useHasRole";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canShowSensorOperatorDiagnostics } from "@/lib/sensorOperatorAccessRules";
 import {
   buildSensorsRequiredTentGate,
@@ -166,6 +167,10 @@ export default function Sensors() {
     [quickLogManualQuery.data, clockedTentReadings],
   );
   const operatorRole = useHasRole("operator");
+  // Live-sensor setup surface: shown only when the plan carries liveSensors,
+  // the same capability the ingest Edge functions and token mint enforce.
+  const { entitlement } = useMyEntitlements();
+  const canShowTestbench = entitlement?.capabilities?.liveSensors === true;
 
   // Reconcile only after the authenticated tent query succeeds. A failed
   // first attempt must not consume the URL intent: its retry can still prove
@@ -925,7 +930,7 @@ export default function Sensors() {
           sensorReadingsStatus={defaultManualTentId ? trendReadingsStatus : "success"}
         />
       </div>
-      {selectedTent && activeTentId && (
+      {canShowTestbench && selectedTent && activeTentId && (
         <div className="mt-4 max-w-2xl">
           <SensorsTestbenchPanel tentId={activeTentId} tentName={selectedTent.name ?? null} />
         </div>

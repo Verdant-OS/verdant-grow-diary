@@ -1353,6 +1353,7 @@ export default function DailyCheck() {
                   className="h-11"
                   onClick={() => {
                     setState(INITIAL_DAILY_GROW_CHECK_STATE);
+                    setLastSubmittedSource(null);
                     setEmptyManualWarning(false);
                     setStep("select");
                   }}

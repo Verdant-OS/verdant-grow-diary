@@ -214,7 +214,7 @@ export default function Alerts() {
     [grouped.open, linkedActionCounts, locallyQueuedByAlertId],
   );
   const singleUnlinkedOpenAlert = unlinkedOpenAlerts.length === 1 ? unlinkedOpenAlerts[0] : null;
-  const loopCardGrowId = urlGrowId ?? singleUnlinkedOpenAlert?.grow_id ?? null;
+  const loopCardGrowId = singleUnlinkedOpenAlert?.grow_id ?? scopedGrowId ?? null;
 
   const handleLoopCardBeforeNavigate = async () => {
     // Only auto-queue from the generic loop CTA when the target alert is
@@ -230,7 +230,7 @@ export default function Alerts() {
         [singleUnlinkedOpenAlert.id]: res.actionQueueId!,
       }));
     }
-    return actionsPath(urlGrowId ?? singleUnlinkedOpenAlert.grow_id ?? null);
+    return actionsPath(singleUnlinkedOpenAlert.grow_id ?? scopedGrowId ?? null);
   };
 
   /**

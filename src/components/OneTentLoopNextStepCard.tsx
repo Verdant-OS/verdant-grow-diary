@@ -137,14 +137,17 @@ export default function OneTentLoopNextStepCard({
                     if (navigating) return;
                     const dest = step.href!;
                     setNavigating(true);
-                    void Promise.resolve(onBeforeNavigate())
-                      .then((outcome) => {
+                    void (async () => {
+                      try {
+                        const outcome = await onBeforeNavigate();
                         if (outcome === false) return;
                         navigate(typeof outcome === "string" && outcome ? outcome : dest);
-                      })
-                      .finally(() => {
+                      } catch {
+                        // Keep current route when onBeforeNavigate throws/rejects.
+                      } finally {
                         setNavigating(false);
-                      });
+                      }
+                    })();
                   }
                 : undefined
             }

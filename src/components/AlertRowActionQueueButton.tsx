@@ -36,20 +36,26 @@ export async function queueOpenAlertToActionQueue(
   const draftResult = buildActionQueueDraftFromAlert(alert);
   if (!draftResult.ok) return { ok: false };
   const { draft } = draftResult;
-  const result = await createActionQueueItem({
-    grow_id: draft.grow_id,
-    tent_id: draft.tent_id,
-    plant_id: draft.plant_id,
-    action_type: draft.action_type,
-    target_metric: draft.target_metric,
-    suggested_change: draft.suggested_change,
-    reason: draft.reason,
-    risk_level: draft.risk_level,
-    source: draft.source,
-    dedupe_key: buildEnvironmentAlertDedupeKey(alert.id),
-    audit_note: draft.audit_note,
-    originating_timeline_events: forwardAlertRefsToActionQueue(alert),
-  });
+  let result: Awaited<ReturnType<typeof createActionQueueItem>>;
+  try {
+    result = await createActionQueueItem({
+      grow_id: draft.grow_id,
+      tent_id: draft.tent_id,
+      plant_id: draft.plant_id,
+      action_type: draft.action_type,
+      target_metric: draft.target_metric,
+      suggested_change: draft.suggested_change,
+      reason: draft.reason,
+      risk_level: draft.risk_level,
+      source: draft.source,
+      dedupe_key: buildEnvironmentAlertDedupeKey(alert.id),
+      audit_note: draft.audit_note,
+      originating_timeline_events: forwardAlertRefsToActionQueue(alert),
+    });
+  } catch {
+    toast.error(actionQueueCreateFailureCopy(null));
+    return { ok: false };
+  }
   if (!result.ok) {
     if (result.reason === "plant_not_in_grow" || result.reason === "tent_not_in_grow") {
       toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {

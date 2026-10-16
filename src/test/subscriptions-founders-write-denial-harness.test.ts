@@ -174,6 +174,23 @@ describe("harness wires the strict predicates into the checks", () => {
     expect(source).toMatch(/environmentFlipBlocked\(flipUpsert,/);
     expect(source).toContain('environment: "sandbox"');
   });
+
+  // Codex P2-1 at 1e641eab: S4b and S4c shared one read taken after both
+  // writes, so a later UPSERT could decide the UPDATE check, and the UPSERT
+  // need not start from the active sandbox seed. Each attack now has its own
+  // immediate read-back, and the seed is restored between them if needed.
+  it("reads back after each environment-flip write and reseeds before the UPSERT", () => {
+    expect(source).toContain("environmentFlipBlocked(flip, afterUpdate)");
+    expect(source).toContain("environmentFlipBlocked(flipUpsert, afterUpsert)");
+    const afterUpdateRead = source.indexOf('const afterUpdate = await readSandboxRow("UPDATE")');
+    const reseed = source.indexOf("restoreSandboxSeed(");
+    const upsertWrite = source.indexOf("const flipUpsert = await a");
+    const afterUpsertRead = source.indexOf('const afterUpsert = await readSandboxRow("UPSERT")');
+    expect(afterUpdateRead).toBeGreaterThan(-1);
+    expect(reseed).toBeGreaterThan(afterUpdateRead);
+    expect(upsertWrite).toBeGreaterThan(reseed);
+    expect(afterUpsertRead).toBeGreaterThan(upsertWrite);
+  });
 });
 
 describe("security-db-local runs the write-denial harness", () => {

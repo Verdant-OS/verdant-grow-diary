@@ -302,11 +302,38 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
         denied(update),
         describe(update),
       );
+      // Each environment-flip attack gets its own service_role read-back, so the
+      // UPDATE verdict cannot be decided by the later UPSERT, and the UPSERT
+      // always starts from the active sandbox seed.
+      const readSandboxRow = async (step: string): Promise<Row | undefined> => {
+        const { data, error } = await admin
+          .from("subscriptions")
+          .select(SUBSCRIPTION_COLUMNS)
+          .eq("paddle_subscription_id", sandboxSubscriptionId)
+          .maybeSingle();
+        if (error) throw new Error(`read-back sandbox row after ${step}: ${error.message}`);
+        return (data ?? undefined) as Row | undefined;
+      };
+      const restoreSandboxSeed = async (row: Row | undefined) => {
+        if (row?.environment === "sandbox" && row?.status === "active") return;
+        const { error } = await admin
+          .from("subscriptions")
+          .update({ environment: "sandbox", status: "active" })
+          .eq("paddle_subscription_id", sandboxSubscriptionId);
+        if (error) throw new Error(`restore sandbox seed: ${error.message}`);
+      };
       const flip = await a
         .from("subscriptions")
         .update({ environment: "live" })
         .eq("paddle_subscription_id", sandboxSubscriptionId)
         .select();
+      const afterUpdate = await readSandboxRow("UPDATE");
+      check(
+        "S4b. A UPDATE own active sandbox row environment → live → rejected, row still sandbox",
+        environmentFlipBlocked(flip, afterUpdate),
+        `${describe(flip)} after=${JSON.stringify(afterUpdate)}`,
+      );
+      await restoreSandboxSeed(afterUpdate);
       const flipUpsert = await a
         .from("subscriptions")
         .upsert(
@@ -323,21 +350,11 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
           { onConflict: "paddle_subscription_id" },
         )
         .select();
-      const { data: flipped, error: flipReadError } = await admin
-        .from("subscriptions")
-        .select(SUBSCRIPTION_COLUMNS)
-        .eq("paddle_subscription_id", sandboxSubscriptionId)
-        .maybeSingle();
-      if (flipReadError) throw new Error(`read-back sandbox row: ${flipReadError.message}`);
-      check(
-        "S4b. A UPDATE own active sandbox row environment → live → rejected, row still sandbox",
-        environmentFlipBlocked(flip, (flipped ?? undefined) as Row | undefined),
-        `${describe(flip)} after=${JSON.stringify(flipped)}`,
-      );
+      const afterUpsert = await readSandboxRow("UPSERT");
       check(
         "S4c. A UPSERT own active sandbox row as environment=live → rejected, row still sandbox",
-        environmentFlipBlocked(flipUpsert, (flipped ?? undefined) as Row | undefined),
-        `${describe(flipUpsert)} after=${JSON.stringify(flipped)}`,
+        environmentFlipBlocked(flipUpsert, afterUpsert),
+        `${describe(flipUpsert)} after=${JSON.stringify(afterUpsert)}`,
       );
       const updateOther = await a
         .from("subscriptions")

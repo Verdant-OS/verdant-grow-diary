@@ -54,15 +54,15 @@ branch: claude/founders-harness-env-flip-42501
 base: verdant-grow-diary at cfe09322e (#1839)
 checkout: git switch claude/founders-harness-env-flip-42501 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1925
-head_sha: parent of the commit that records this line. Observed remote head before this update: b6c9deb3c44c4990f55c8a5233dfdc78ca954064 (2026-10-16 18:58 UTC, 35/35 required SUCCESS there). This update is a base merge of e136fa44f; read the PR for the current head and re-measure CI there.
+head_sha: parent of the commit that records this line. Observed remote head before this update: 1e641eabf2f572479303453cff9a5964f8ad5cd5 (2026-10-16 21:08 UTC; 35/35 required SUCCESS there; Codex PASS-with-P2 at that head, 0 P1 / 2 P2). This update fixes both P2s; read the PR for the current head and re-measure CI there.
 state: pushed draft. Supersedes #1922 (closed at owner's request). Spec 18 PASS / 0 FAIL; four mutations (loose predicate, F3 rewired, flip verdict ignoring read-back, S4c rewired) each go RED and were restored byte-identical. tsc 0, eslint 0/0, prettier PASS. Database-level RED in a disposable replay NOT_MEASURED (no Docker locally).
-next_action: Matthew's per-item scorer approval for scripts/run-subscriptions-founders-write-denial-harness.ts and src/test/subscriptions-founders-write-denial-harness.test.ts (Codex exact-head BLOCKED at b6c9deb3c); then CI at the new head and an exact-head review by Codex, Blue Dream, Critical Mass or Durban Poison (security/billing harness, so not Graft). No ready/merge by Claude.
+next_action: CI at the new head (security-db-local runs the harness, including the separated S4b/S4c read-backs); then a full exact-head re-review by Codex, Blue Dream, Critical Mass or Durban Poison (security/billing harness, so not Graft). No ready/merge by Claude.
 files: scripts/run-subscriptions-founders-write-denial-harness.ts; src/test/subscriptions-founders-write-denial-harness.test.ts; docs/agents/HANDOFF_LOG.md (this block)
-blockers: Matthew's scorer approval (above). Known security-db-local Quick Log null-RPC flake is unrelated.
+blockers: Independent exact-head PASS at the new head. Matthew's per-item scorer approval for the harness script and its test is recorded (2026-10-16 19:23 UTC, PR #1925 issuecomment-6223030735). Known security-db-local Quick Log null-RPC flake is unrelated.
 artifacts: PR #1925 body (mutation table and validation)
 reviewer_seat: Critical Mass
 claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:58 UTC (PR #1925 issuecomment-6222437268; Matthew's 2026-10-16 transfer). Canopy's 2026-10-10 06:42 UTC claim had lapsed.
-last_updated: 2026-10-16 13:58 CT, by Claude (close-out session)
+last_updated: 2026-10-16 16:08 CT, by Claude (close-out session)
 ```
 
 ### PR2072-M7-SERVED-REVISION

@@ -127,9 +127,17 @@ export function createTentScene(host, handlers, opts = {}) {
   let currentView = null;
   let lastRenderedTick = 0;
 
+  // Size the renderer was last fitted to. The browser runs animation frames before it delivers
+  // ResizeObserver callbacks, so a frame can see a host that has already changed size (the phone
+  // details panel opening or closing) while the camera still has the old aspect. frame() checks
+  // this and resizes first, so labels are never laid out against a stale camera.
+  let sizedW = 0;
+  let sizedH = 0;
   function resize() {
     const w = host.clientWidth || 1;
     const h = host.clientHeight || 1;
+    sizedW = w;
+    sizedH = h;
     renderer.setSize(w, h);
     labelRenderer.setSize(w, h);
     camera.aspect = w / h;
@@ -593,6 +601,7 @@ export function createTentScene(host, handlers, opts = {}) {
   let raf = 0;
   function frame() {
     raf = requestAnimationFrame(frame);
+    if ((host.clientWidth || 1) !== sizedW || (host.clientHeight || 1) !== sizedH) resize();
     const now = performance.now();
     if (camAnim) {
       const k = easeInOut(Math.min(1, (now - camAnim.t0) / camAnim.ms));

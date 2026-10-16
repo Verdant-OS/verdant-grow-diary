@@ -143,7 +143,7 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
           )}
           {item.earlyStage.note && (
             <p
-              className="basis-full text-xs text-muted-foreground"
+              className="basis-full min-w-0 max-w-full text-xs text-muted-foreground [overflow-wrap:anywhere]"
               data-testid="timeline-diary-early-stage-note"
             >
               What changed: {item.earlyStage.note}

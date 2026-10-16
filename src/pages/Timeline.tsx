@@ -883,99 +883,6 @@ export default function Timeline() {
         })(),
       );
 
-      if (directoryGrowId) {
-        supplementalTasks.push(
-          (async () => {
-            try {
-              const tentsResult = await supabase
-                .from("tents")
-                .select("id")
-                .eq("grow_id", directoryGrowId);
-              if (!isCurrentRequest()) return;
-              if (tentsResult.error || !Array.isArray(tentsResult.data)) {
-                markPartial("manual_sensor_readings");
-                setManualSensorMeasurementEntries([]);
-                setManualSensorHistoryLimited(false);
-                return;
-              }
-              const tentIds = tentsResult.data
-                .map((row) => (typeof row.id === "string" ? row.id : null))
-                .filter((id): id is string => Boolean(id));
-              if (tentIds.length === 0) {
-                setManualSensorMeasurementEntries([]);
-                setManualSensorHistoryLimited(false);
-                return;
-              }
-              // Captured rows and legacy rows need separate bounded reads:
-              // filtering or ordering everything by ts would hide a backdated
-              // capture in the correct observation-date window, while sorting
-              // null captured_at last can hide a newer legacy reading.
-              let capturedQuery = effectiveSensorReadingsQuery()
-                .select("*")
-                .in("tent_id", tentIds)
-                .eq("source", "manual")
-                .not("captured_at", "is", null)
-                .order("captured_at", { ascending: false, nullsFirst: false })
-                .order("ts", { ascending: false })
-                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
-              let legacyQuery = effectiveSensorReadingsQuery()
-                .select("*")
-                .in("tent_id", tentIds)
-                .eq("source", "manual")
-                .is("captured_at", null)
-                .order("ts", { ascending: false })
-                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
-              if (timelineDateRangeBounds.startIso) {
-                capturedQuery = capturedQuery.gte("captured_at", timelineDateRangeBounds.startIso);
-                legacyQuery = legacyQuery.gte("ts", timelineDateRangeBounds.startIso);
-              }
-              if (timelineDateRangeBounds.endIso) {
-                capturedQuery = capturedQuery.lte("captured_at", timelineDateRangeBounds.endIso);
-                legacyQuery = legacyQuery.lte("ts", timelineDateRangeBounds.endIso);
-              }
-              const [capturedResult, legacyResult] = await Promise.all([
-                capturedQuery,
-                legacyQuery,
-              ]);
-              if (!isCurrentRequest()) return;
-              if (
-                capturedResult.error ||
-                !Array.isArray(capturedResult.data) ||
-                legacyResult.error ||
-                !Array.isArray(legacyResult.data)
-              ) {
-                markPartial("manual_sensor_readings");
-                setManualSensorMeasurementEntries([]);
-                setManualSensorHistoryLimited(false);
-                return;
-              }
-              const manualPage = completeManualSensorTimelineRows([
-                ...requireEffectiveSensorReadings(capturedResult.data),
-                ...requireEffectiveSensorReadings(legacyResult.data),
-              ]);
-              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
-              if (timelineDateRangeBounds.startIso) {
-                receipts = receipts.filter(
-                  (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
-                );
-              }
-              if (timelineDateRangeBounds.endIso) {
-                receipts = receipts.filter(
-                  (row) => row.entry_at <= timelineDateRangeBounds.endIso!,
-                );
-              }
-              setManualSensorMeasurementEntries(receipts as Entry[]);
-              setManualSensorHistoryLimited(manualPage.hasOlderRows);
-            } catch {
-              if (!isCurrentRequest()) return;
-              markPartial("manual_sensor_readings");
-              setManualSensorMeasurementEntries([]);
-              setManualSensorHistoryLimited(false);
-            }
-          })(),
-        );
-      }
-
       await Promise.all(supplementalTasks);
       if (isCurrentRequest()) setSupplementalLoading(false);
     } catch {
@@ -984,6 +891,102 @@ export default function Timeline() {
       setSupplementalLoading(false);
       setCoreRead({ status: "error", readKey: requestedReadKey });
       setLoading(false);
+    }
+  }, [activeGrowId, activeReadKey, timelineDateRangeBounds, user]);
+
+  // Directory scope only unlocks tents and manual sensor receipts. It must not
+  // rebuild `load`: that would cancel the early core read and start another
+  // 8s deadline when the grow list settles.
+  const loadDirectorySensors = useCallback(async () => {
+    if (directoryGrowId) {
+      if (!activeGrowId || !user) return;
+      const requestId = readRequestIdRef.current;
+      const requestedReadKey = activeReadKey;
+      const isCurrentRequest = () =>
+        requestId === readRequestIdRef.current && activeReadKeyRef.current === requestedReadKey;
+      const markPartial = (source: TimelineSupplementalReadSource) => {
+        if (!isCurrentRequest()) return;
+        setPartialReadSources((current) => mergeTimelinePartialSources(current, [source]));
+      };
+      try {
+        const tentsResult = await supabase
+          .from("tents")
+          .select("id")
+          .eq("grow_id", directoryGrowId);
+        if (!isCurrentRequest()) return;
+        if (tentsResult.error || !Array.isArray(tentsResult.data)) {
+          markPartial("manual_sensor_readings");
+          setManualSensorMeasurementEntries([]);
+          setManualSensorHistoryLimited(false);
+          return;
+        }
+        const tentIds = tentsResult.data
+          .map((row) => (typeof row.id === "string" ? row.id : null))
+          .filter((id): id is string => Boolean(id));
+        if (tentIds.length === 0) {
+          setManualSensorMeasurementEntries([]);
+          setManualSensorHistoryLimited(false);
+          return;
+        }
+        // Captured rows and legacy rows need separate bounded reads:
+        // filtering or ordering everything by ts would hide a backdated
+        // capture in the correct observation-date window, while sorting
+        // null captured_at last can hide a newer legacy reading.
+        let capturedQuery = effectiveSensorReadingsQuery()
+          .select("*")
+          .in("tent_id", tentIds)
+          .eq("source", "manual")
+          .not("captured_at", "is", null)
+          .order("captured_at", { ascending: false, nullsFirst: false })
+          .order("ts", { ascending: false })
+          .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
+        let legacyQuery = effectiveSensorReadingsQuery()
+          .select("*")
+          .in("tent_id", tentIds)
+          .eq("source", "manual")
+          .is("captured_at", null)
+          .order("ts", { ascending: false })
+          .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
+        if (timelineDateRangeBounds.startIso) {
+          capturedQuery = capturedQuery.gte("captured_at", timelineDateRangeBounds.startIso);
+          legacyQuery = legacyQuery.gte("ts", timelineDateRangeBounds.startIso);
+        }
+        if (timelineDateRangeBounds.endIso) {
+          capturedQuery = capturedQuery.lte("captured_at", timelineDateRangeBounds.endIso);
+          legacyQuery = legacyQuery.lte("ts", timelineDateRangeBounds.endIso);
+        }
+        const [capturedResult, legacyResult] = await Promise.all([capturedQuery, legacyQuery]);
+        if (!isCurrentRequest()) return;
+        if (
+          capturedResult.error ||
+          !Array.isArray(capturedResult.data) ||
+          legacyResult.error ||
+          !Array.isArray(legacyResult.data)
+        ) {
+          markPartial("manual_sensor_readings");
+          setManualSensorMeasurementEntries([]);
+          setManualSensorHistoryLimited(false);
+          return;
+        }
+        const manualPage = completeManualSensorTimelineRows([
+          ...requireEffectiveSensorReadings(capturedResult.data),
+          ...requireEffectiveSensorReadings(legacyResult.data),
+        ]);
+        let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
+        if (timelineDateRangeBounds.startIso) {
+          receipts = receipts.filter((row) => row.entry_at >= timelineDateRangeBounds.startIso!);
+        }
+        if (timelineDateRangeBounds.endIso) {
+          receipts = receipts.filter((row) => row.entry_at <= timelineDateRangeBounds.endIso!);
+        }
+        setManualSensorMeasurementEntries(receipts as Entry[]);
+        setManualSensorHistoryLimited(manualPage.hasOlderRows);
+      } catch {
+        if (!isCurrentRequest()) return;
+        markPartial("manual_sensor_readings");
+        setManualSensorMeasurementEntries([]);
+        setManualSensorHistoryLimited(false);
+      }
     }
   }, [activeGrowId, activeReadKey, directoryGrowId, timelineDateRangeBounds, user]);
 
@@ -1103,6 +1106,9 @@ export default function Timeline() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    void loadDirectorySensors();
+  }, [loadDirectorySensors]);
   useEffect(
     () =>
       subscribeManualSensorCorrections(ownerId, () => {

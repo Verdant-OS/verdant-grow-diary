@@ -15,7 +15,7 @@
  * When growId is falsy the hook idles in `prompt` state — the Dashboard
  * itself decides whether to render a "Select a grow" hint.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { type RecentItem, mergeRecent } from "@/lib/growStatus";
@@ -190,8 +190,11 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
   const [pending, setPending] = useState<PendingState>(
     user && growId ? { status: "loading" } : { status: "idle" },
   );
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestId === requestIdRef.current;
     if (!user || !growId) {
       setRecent({ status: "idle" });
       setPending({ status: "idle" });
@@ -201,19 +204,22 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
     setPending({ status: "loading" });
 
     // Recent activity and pending actions start together. A hung diary read
-    // must not keep the approval queue on loading.
+    // must not keep the approval queue on loading. A later scope invalidates
+    // both writes, including the deadline rejection.
     const recentWork = (async () => {
       try {
-        setRecent(await withCriticalReadDeadline(readDashboardRecent(growId)));
+        const next = await withCriticalReadDeadline(readDashboardRecent(growId));
+        if (isCurrent()) setRecent(next);
       } catch {
-        setRecent({ status: "unavailable" });
+        if (isCurrent()) setRecent({ status: "unavailable" });
       }
     })();
     const pendingWork = (async () => {
       try {
-        setPending(await withCriticalReadDeadline(readDashboardPending(growId)));
+        const next = await withCriticalReadDeadline(readDashboardPending(growId));
+        if (isCurrent()) setPending(next);
       } catch {
-        setPending({ status: "unavailable" });
+        if (isCurrent()) setPending({ status: "unavailable" });
       }
     })();
     await Promise.all([recentWork, pendingWork]);

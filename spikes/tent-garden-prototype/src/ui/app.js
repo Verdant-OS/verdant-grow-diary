@@ -16,13 +16,17 @@ import {
   undoLastSave,
   pushDraft,
   popDraft,
+  noteChanges,
+  normalizeNote,
 } from "../rules/saveRules.js";
 import { timelinePoints, pointAt, evidenceFor } from "../rules/historyRules.js";
+import { resolveModeChange, cameraLocked } from "../rules/modeRules.js";
 import { visualForStage, sexLabel } from "../rules/plantVisualRules.js";
 import {
   PLANTS_BY_ID,
   TODAY_LAYOUT,
   TODAY_STAGES,
+  TODAY_NOTES,
   SNAPSHOTS,
   SAMPLE_TODAY_DATE,
   plantById,
@@ -38,8 +42,15 @@ const TODAY_INDEX = points.length - 1;
 const state = {
   mode: "view", // "view" | "edit"
   viewIndex: TODAY_INDEX,
-  saved: { savedLayout: { ...TODAY_LAYOUT }, events: [], appliedBatchIds: [], lastBatch: null },
-  draftHistory: [{ ...TODAY_LAYOUT }],
+  saved: {
+    savedLayout: { ...TODAY_LAYOUT },
+    savedNotes: { ...TODAY_NOTES },
+    events: [],
+    appliedBatchIds: [],
+    lastBatch: null,
+  },
+  // Each draft entry is { layout, notes }; the first entry mirrors the saved state.
+  draftHistory: [{ layout: { ...TODAY_LAYOUT }, notes: { ...TODAY_NOTES } }],
   saveSeq: 1,
   pendingBatch: null, // a failed save kept for Retry
   saveStatus: "idle", // idle | failed | saved
@@ -50,14 +61,29 @@ const state = {
 let scene = null;
 let toastTimer = 0;
 
-function draft() {
+function draftEntry() {
   return state.draftHistory[state.draftHistory.length - 1];
+}
+function draft() {
+  return draftEntry().layout;
+}
+function draftNotes() {
+  return draftEntry().notes;
+}
+function freshDraft() {
+  return { layout: { ...state.saved.savedLayout }, notes: { ...state.saved.savedNotes } };
 }
 function isToday() {
   return state.viewIndex === TODAY_INDEX;
 }
 function dirtyChanges() {
   return netChanges(state.saved.savedLayout, draft());
+}
+function dirtyNotes() {
+  return noteChanges(state.saved.savedNotes, draftNotes());
+}
+function hasUnsaved() {
+  return dirtyChanges().length > 0 || dirtyNotes().length > 0 || !!state.pendingBatch;
 }
 function readAnimPref() {
   try {
@@ -104,11 +130,25 @@ function showFallback(reason) {
 function currentView() {
   const point = pointAt(points, state.viewIndex);
   if (point.isToday) {
-    const layout = state.mode === "edit" ? draft() : state.saved.savedLayout;
-    return { point, layout, stages: TODAY_STAGES, snapshot: null, editable: state.mode === "edit" };
+    const editing = state.mode === "edit";
+    return {
+      point,
+      layout: editing ? draft() : state.saved.savedLayout,
+      notes: editing ? draftNotes() : state.saved.savedNotes,
+      stages: TODAY_STAGES,
+      snapshot: null,
+      editable: editing,
+    };
   }
   const snapshot = SNAPSHOTS.find((s) => s.id === point.id);
-  return { point, layout: snapshot.layout, stages: snapshot.stages, snapshot, editable: false };
+  return {
+    point,
+    layout: snapshot.layout,
+    notes: snapshot.notes,
+    stages: snapshot.stages,
+    snapshot,
+    editable: false,
+  };
 }
 
 function plantsByIdForView(layout) {
@@ -147,6 +187,10 @@ function render({ transition = false } = {}) {
   }
   $("editHint").hidden = !(state.mode === "edit" && view.point.isToday);
   $("modeEdit").disabled = !view.point.isToday;
+  // Camera is locked for the whole of Edit mode so gestures never fight a drag.
+  const locked = cameraLocked(state.mode) || !scene;
+  $("rotateLeft").disabled = $("rotateRight").disabled = $("resetView").disabled = locked;
+  scene?.setCameraLocked(cameraLocked(state.mode));
   $("modeView").classList.toggle("is-active", state.mode === "view");
   $("modeEdit").classList.toggle("is-active", state.mode === "edit");
   $("modeView").setAttribute("aria-pressed", String(state.mode === "view"));
@@ -167,6 +211,8 @@ function renderSaveBar() {
   bar.hidden = state.mode !== "edit";
   if (bar.hidden) return;
   const changes = dirtyChanges();
+  const notes = dirtyNotes();
+  const total = changes.length + notes.length;
   const summary = $("draftSummary");
   if (state.saveStatus === "failed" && state.pendingBatch) {
     summary.innerHTML = `<span class="is-failed">Save failed (simulated). Draft kept locally — unsaved.</span>`;
@@ -174,11 +220,11 @@ function renderSaveBar() {
     $("saveBtn").disabled = false;
   } else {
     summary.textContent =
-      changes.length === 0
-        ? "No changes (draft equals saved layout)"
-        : `${changes.length} net change${changes.length === 1 ? "" : "s"} · draft, unsaved`;
+      total === 0
+        ? "No changes (draft equals saved layout and notes)"
+        : `${total} net change${total === 1 ? "" : "s"} (${changes.length} layout, ${notes.length} note) · draft, unsaved`;
     $("saveBtn").textContent = "Save…";
-    $("saveBtn").disabled = changes.length === 0;
+    $("saveBtn").disabled = total === 0;
   }
   $("undoDraft").disabled = state.draftHistory.length <= 1;
 }
@@ -215,7 +261,10 @@ function renderDetails(view) {
   const stageRec = view.stages?.[id];
   const v = visualForStage(stageRec);
   const ev = view.snapshot ? evidenceFor(view.snapshot, id) : null;
-  const note = view.snapshot ? ev.note : { value: null, missing: true };
+  const noteText = normalizeNote(view.notes?.[id]);
+  const note = { value: noteText, missing: noteText === "" };
+  const savedNote = normalizeNote(state.saved.savedNotes?.[id]);
+  const noteDirty = state.mode === "edit" && savedNote !== noteText;
   const photo = view.snapshot ? ev.photo : { value: null, missing: true };
   const when = view.point.isToday ? `Today (${SAMPLE_TODAY_DATE})` : `Recorded ${view.point.date}`;
   const missing = (txt) => `<span class="badge badge--missing">${esc(txt)}</span>`;
@@ -227,7 +276,14 @@ function renderDetails(view) {
       <dt>Recorded stage</dt><dd>${esc(v.label)}${v.neutral ? " " + missing("not recorded") : ""}</dd>
       <dt>Sex</dt><dd>${esc(sexLabel(stageRec?.sex))}</dd>
       <dt>Position</dt><dd>${esc(describePosition(view.layout[id]))}</dd>
-      <dt>Note</dt><dd>${note.missing ? missing("no note recorded") : esc(note.value)}</dd>
+      <dt>Note</dt><dd>${
+        state.mode === "edit" && view.point.isToday
+          ? `<textarea id="noteDraft" rows="3" maxlength="280" aria-label="Draft note for ${esc(p.shortName)}" placeholder="Draft note (saved only when you Save)">${esc(noteText)}</textarea>
+             <span class="muted small">${noteDirty ? "Changed in this draft — unsaved" : "Matches saved note"}</span>`
+          : note.missing
+            ? missing("no note recorded")
+            : esc(note.value)
+      }</dd>
     </dl>
     ${
       photo.missing
@@ -249,7 +305,7 @@ function renderDetails(view) {
     <h3>Actions</h3>
     <p class="muted small">
       <button class="btn btn--small" disabled>Open diary — Preview Only</button>
-      <button class="btn btn--small" disabled>Add note — Preview Only</button>
+      <button class="btn btn--small" disabled>Attach photo — Preview Only</button>
     </p>`;
 }
 
@@ -258,7 +314,7 @@ function renderEvents() {
   list.innerHTML = "";
   const events = [...state.saved.events].reverse();
   if (events.length === 0) {
-    list.innerHTML = `<li class="muted">No simulated events yet. Only an "actual physical move" that you Save produces one.</li>`;
+    list.innerHTML = `<li class="muted">No simulated events yet. A saved note, or a move you mark "actual physical move", produces one.</li>`;
   }
   for (const e of events) {
     const li = document.createElement("li");
@@ -279,25 +335,26 @@ function select(id) {
 }
 
 function setMode(mode) {
-  if (mode === "edit" && !isToday()) return;
-  if (mode === "view" && state.mode === "edit") {
-    const changes = dirtyChanges();
-    if (changes.length > 0 || state.pendingBatch) {
-      $("dlgCancelText").textContent = `${changes.length} unsaved change${
-        changes.length === 1 ? "" : "s"
-      } will be discarded. Nothing has been recorded.`;
-      $("dlgCancel").returnValue = "keep";
-      $("dlgCancel").showModal();
-      return;
-    }
+  const r = resolveModeChange(
+    { mode: state.mode, hasUnsaved: hasUnsaved(), isToday: isToday() },
+    mode,
+  );
+  if (r.action === "noop") return;
+  if (r.action === "confirm-discard") {
+    const n = dirtyChanges().length + dirtyNotes().length;
+    $("dlgCancelText").textContent =
+      `${n} unsaved change${n === 1 ? "" : "s"} will be discarded. Nothing has been recorded.`;
+    $("dlgCancel").returnValue = "keep";
+    $("dlgCancel").showModal();
+    return;
   }
-  state.mode = mode;
-  if (mode === "edit") state.draftHistory = [{ ...state.saved.savedLayout }];
+  if (r.action === "start-draft") state.draftHistory = [freshDraft()];
+  state.mode = r.mode;
   render();
 }
 
 function discardDraft() {
-  state.draftHistory = [{ ...state.saved.savedLayout }];
+  state.draftHistory = [freshDraft()];
   state.pendingBatch = null;
   state.saveStatus = "idle";
   state.mode = "view";
@@ -323,7 +380,7 @@ function commitDrop(id, pos) {
   const current = draft();
   const r = resolveDrop(current, id, pos);
   if (r.kind === "move") {
-    state.draftHistory = pushDraft(state.draftHistory, r.layout);
+    state.draftHistory = pushDraft(state.draftHistory, { ...draftEntry(), layout: r.layout });
     state.pendingBatch = null;
     state.saveStatus = "idle";
     render();
@@ -343,7 +400,10 @@ function commitDrop(id, pos) {
     dlg.returnValue = "cancel";
     dlg.onclose = () => {
       if (dlg.returnValue === "swap") {
-        state.draftHistory = pushDraft(state.draftHistory, swapPositions(draft(), id, r.withId));
+        state.draftHistory = pushDraft(state.draftHistory, {
+          ...draftEntry(),
+          layout: swapPositions(draft(), id, r.withId),
+        });
         state.pendingBatch = null;
         state.saveStatus = "idle";
       }
@@ -358,6 +418,20 @@ function commitDrop(id, pos) {
   );
 }
 
+/** Commit the note textarea into the draft as one undoable step. No-op when unchanged. */
+function commitNoteDraft(id, text) {
+  if (state.mode !== "edit" || !id) return;
+  const next = normalizeNote(text);
+  if (normalizeNote(draftNotes()[id]) === next) return;
+  state.draftHistory = pushDraft(state.draftHistory, {
+    ...draftEntry(),
+    notes: { ...draftNotes(), [id]: next },
+  });
+  state.pendingBatch = null;
+  state.saveStatus = "idle";
+  render();
+}
+
 function nudgeSelected(dx, dz) {
   if (state.mode !== "edit" || !state.selectedId) return;
   const cur = draft()[state.selectedId];
@@ -370,14 +444,23 @@ function openSave() {
     retrySave();
     return;
   }
-  const preview = buildSavePreview(state.saved.savedLayout, draft(), PLANTS_BY_ID);
+  const preview = buildSavePreview(
+    state.saved.savedLayout,
+    draft(),
+    PLANTS_BY_ID,
+    state.saved.savedNotes,
+    draftNotes(),
+  );
   if (preview.isEmpty) return;
   const ul = $("saveItems");
   ul.innerHTML = "";
   for (const item of preview.items) {
     const li = document.createElement("li");
     const k = esc(item.key);
-    li.innerHTML = `<div>${esc(item.label)}</div>
+    li.innerHTML =
+      item.kind === "note"
+        ? `<div>${esc(item.label)}</div><div class="intent"><span>Saving a note logs one simulated event.</span></div>`
+        : `<div>${esc(item.label)}</div>
       <div class="intent">
         <label><input type="radio" name="intent:${k}" value="map-only" checked /> Correct Map Only (no event)</label>
         <label><input type="radio" name="intent:${k}" value="physical" /> Actual Physical Move (simulated event)</label>
@@ -393,7 +476,7 @@ function openSave() {
     for (const item of preview.items) {
       intents[item.key] = form.elements[`intent:${item.key}`]?.value ?? "map-only";
     }
-    const batchId = batchIdFor(state.saveSeq, preview.changes);
+    const batchId = batchIdFor(state.saveSeq, preview.changes, preview.notes);
     const events = eventsForSave({
       preview,
       intents,
@@ -401,7 +484,7 @@ function openSave() {
       now: new Date().toISOString(),
       plantsById: PLANTS_BY_ID,
     });
-    state.pendingBatch = { batchId, draft: { ...draft() }, events };
+    state.pendingBatch = { batchId, draft: { ...draft() }, notes: { ...draftNotes() }, events };
     if ($("simulateFail").checked) {
       state.saveStatus = "failed";
       render();
@@ -427,7 +510,7 @@ function commitPending() {
   state.saveStatus = "saved";
   state.saveSeq += 1;
   state.mode = "view";
-  state.draftHistory = [{ ...state.saved.savedLayout }];
+  state.draftHistory = [freshDraft()];
   render();
   if (duplicate) {
     toast("That save was already applied — no duplicate events created.");
@@ -444,15 +527,15 @@ function undoSaved() {
   const { state: next, undone } = undoLastSave(state.saved);
   if (!undone) return;
   state.saved = next;
-  if (state.mode === "edit") state.draftHistory = [{ ...state.saved.savedLayout }];
+  if (state.mode === "edit") state.draftHistory = [freshDraft()];
   render();
-  toast("Last saved move undone. Its simulated event is marked Undone, not deleted.");
+  toast("Last saved batch undone. Its simulated event is marked Undone, not deleted.");
 }
 
 function goToIndex(index) {
   const point = pointAt(points, index);
   if (!point) return;
-  if (state.mode === "edit" && (dirtyChanges().length > 0 || state.pendingBatch)) {
+  if (state.mode === "edit" && hasUnsaved()) {
     toast("Save or cancel your draft before time-travelling.");
     $("histRange").value = String(state.viewIndex);
     return;
@@ -538,6 +621,9 @@ function wireControls() {
   $("histNext").onclick = () => goToIndex(state.viewIndex + 1);
   $("dlgCancel").addEventListener("close", () => {
     if ($("dlgCancel").returnValue === "discard") discardDraft();
+  });
+  document.addEventListener("change", (e) => {
+    if (e.target?.id === "noteDraft") commitNoteDraft(state.selectedId, e.target.value);
   });
   document.addEventListener("click", (e) => {
     const sel = e.target.closest?.("[data-select]");

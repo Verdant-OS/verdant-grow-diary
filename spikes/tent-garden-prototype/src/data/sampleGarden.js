@@ -60,6 +60,12 @@ export const TODAY_STAGES = Object.freeze(
   Object.fromEntries(PLANTS.map((p) => [p.id, { ...p.stage }])),
 );
 
+/** Present-day saved notes (editable as drafts in the prototype). Fictional. */
+export const TODAY_NOTES = Object.freeze({
+  "P-101": "Sample note: stretch finished; first pistils everywhere.",
+  "P-104": "Sample note: confirmed male on Oct 2 — kept for pollen (sample).",
+});
+
 const PHOTO = (caption) => ({
   placeholder: true,
   caption: `Sample photo placeholder — ${caption}`,

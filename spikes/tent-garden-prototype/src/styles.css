@@ -168,7 +168,7 @@ button {
   position: relative;
   flex: 1 1 auto;
   min-height: 260px;
-  background: radial-gradient(120% 90% at 50% 20%, #1b2620 0%, #0f1512 70%);
+  background: #dff0e6;
 }
 .scene-host {
   position: absolute;
@@ -183,37 +183,43 @@ button {
 }
 .plant-label {
   pointer-events: none;
-  background: rgba(10, 16, 12, 0.82);
-  border: 1px solid var(--line);
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.2;
-  padding: 3px 7px;
-  border-radius: 6px;
+  background: #ffffff;
+  border: 2px solid #1f2a24;
+  color: #1f2a24;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
+  padding: 4px 9px;
+  border-radius: 10px;
   white-space: nowrap;
-  transform: translateY(-6px);
+  transform: translateY(-8px);
+  box-shadow: 0 3px 0 #1f2a24;
 }
 .plant-label small {
   display: block;
-  color: var(--muted);
+  color: #4b5a52;
   font-size: 11px;
+  font-weight: 600;
 }
 .plant-label.is-selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  background: #fff1b8;
+  border-color: #ff5c8a;
+  box-shadow: 0 3px 0 #ff5c8a;
 }
 .plant-label.is-neutral {
   border-style: dashed;
 }
 .door-label {
   pointer-events: none;
-  color: var(--warn);
+  color: #1f2a24;
   font-size: 11px;
+  font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
-  background: rgba(10, 16, 12, 0.7);
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: #ffd23f;
+  border: 2px solid #1f2a24;
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 .history-banner {
   position: absolute;
@@ -354,6 +360,17 @@ button {
 }
 .details dd {
   margin: 0;
+}
+.details textarea {
+  width: 100%;
+  resize: vertical;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
 }
 .muted {
   color: var(--muted);

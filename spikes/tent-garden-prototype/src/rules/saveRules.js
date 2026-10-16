@@ -14,11 +14,24 @@ import { netChanges, pairSwaps, describePosition } from "./layoutRules.js";
  * Build the Save preview from a baseline and a draft.
  * Returns the final net changes, grouped into swaps and single moves, with no events yet.
  */
-export function buildSavePreview(baseline, draft, plantsById) {
+export function buildSavePreview(baseline, draft, plantsById, baselineNotes, draftNotes) {
   const changes = netChanges(baseline, draft);
+  const notes = noteChanges(baselineNotes, draftNotes);
   const { swaps, singles } = pairSwaps(changes);
   const name = (id) => plantsById?.[id]?.shortName ?? id;
   const items = [];
+  for (const n of notes) {
+    items.push({
+      key: `note:${n.plantId}`,
+      kind: "note",
+      plantIds: [n.plantId],
+      label: n.to
+        ? `Note for ${name(n.plantId)} (${n.plantId}): "${n.to}"`
+        : `Clear note for ${name(n.plantId)} (${n.plantId})`,
+      from: n.from,
+      to: n.to,
+    });
+  }
   for (const s of swaps) {
     items.push({
       key: `swap:${[s.aId, s.bId].sort().join("+")}`,
@@ -38,7 +51,27 @@ export function buildSavePreview(baseline, draft, plantsById) {
     });
   }
   items.sort((a, b) => a.key.localeCompare(b.key));
-  return { changes, items, isEmpty: items.length === 0 };
+  return { changes, notes, items, isEmpty: items.length === 0 };
+}
+
+/** Normalise a draft note: trimmed string, or "" when empty/missing. */
+export function normalizeNote(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Net note changes between saved notes and draft notes, sorted by plant id. A note typed and
+ * then restored to its saved text is not a change. Returns [{ plantId, from, to }].
+ */
+export function noteChanges(baselineNotes, draftNotes) {
+  const out = [];
+  const ids = new Set([...Object.keys(baselineNotes ?? {}), ...Object.keys(draftNotes ?? {})]);
+  for (const id of [...ids].sort()) {
+    const from = normalizeNote(baselineNotes?.[id]);
+    const to = normalizeNote(draftNotes?.[id]);
+    if (from !== to) out.push({ plantId: id, from, to });
+  }
+  return out;
 }
 
 /**
@@ -46,10 +79,11 @@ export function buildSavePreview(baseline, draft, plantsById) {
  * always produce the same id, so a retry of a failed save reuses the batch and cannot
  * duplicate events.
  */
-export function batchIdFor(saveSeq, changes) {
-  const body = changes
-    .map((c) => `${c.plantId}:${c.from.x},${c.from.z}>${c.to.x},${c.to.z}`)
-    .join("|");
+export function batchIdFor(saveSeq, changes, notes = []) {
+  const body = [
+    ...changes.map((c) => `${c.plantId}:${c.from.x},${c.from.z}>${c.to.x},${c.to.z}`),
+    ...notes.map((n) => `note:${n.plantId}:${hashString(n.to)}`),
+  ].join("|");
   return `batch-${saveSeq}-${hashString(body)}`;
 }
 
@@ -72,9 +106,24 @@ export function hashString(input) {
 export function eventsForSave({ preview, intents, batchId, now, plantsById }) {
   const events = [];
   for (const item of preview.items) {
+    const names = item.plantIds.map((id) => plantsById?.[id]?.shortName ?? id);
+    if (item.kind === "note") {
+      // A note is itself a record, so saving one always logs exactly one simulated event.
+      events.push({
+        id: `${batchId}:${item.key}`,
+        batchId,
+        kind: item.to ? "note.update" : "note.clear",
+        plantIds: [...item.plantIds],
+        title: item.to ? `Note on ${names[0]}: ${item.to}` : `Cleared note on ${names[0]}`,
+        detail: item.label,
+        recordedAt: now,
+        source: "simulated",
+        undone: false,
+      });
+      continue;
+    }
     const intent = intents?.[item.key] ?? "map-only";
     if (intent !== "physical") continue;
-    const names = item.plantIds.map((id) => plantsById?.[id]?.shortName ?? id);
     events.push({
       id: `${batchId}:${item.key}`,
       batchId,
@@ -99,17 +148,19 @@ export function eventsForSave({ preview, intents, batchId, now, plantsById }) {
  *
  * @param state { savedLayout, events, appliedBatchIds, lastBatch }
  */
-export function applySave(state, { batchId, draft, events }) {
+export function applySave(state, { batchId, draft, notes, events }) {
   if (state.appliedBatchIds.includes(batchId)) {
     return { state, duplicate: true };
   }
   const next = {
     savedLayout: { ...draft },
+    savedNotes: { ...(notes ?? state.savedNotes ?? {}) },
     events: [...state.events, ...events],
     appliedBatchIds: [...state.appliedBatchIds, batchId],
     lastBatch: {
       batchId,
       previousLayout: { ...state.savedLayout },
+      previousNotes: { ...(state.savedNotes ?? {}) },
       eventIds: events.map((e) => e.id),
     },
   };
@@ -130,6 +181,7 @@ export function undoLastSave(state) {
     state: {
       ...state,
       savedLayout: { ...last.previousLayout },
+      savedNotes: { ...(last.previousNotes ?? {}) },
       events: state.events.map((e) => (ids.has(e.id) ? { ...e, undone: true } : e)),
       lastBatch: null,
     },

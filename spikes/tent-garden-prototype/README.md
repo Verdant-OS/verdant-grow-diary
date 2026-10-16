@@ -7,6 +7,8 @@ Supabase access, no real diary writes, no sensors, no billing, no Action Queue.
 - **Scene:** Three.js diorama (tent floor with a 2 in snap grid, walls, light bar, door strip
   and an upright "Door (front)" label), six stylised pots/plants, CSS2D labels that keep the
   plant id visible when long names truncate.
+- **Look:** cartoon diorama — `MeshToonMaterial` with a three-step gradient, ink outlines
+  (scaled back-face copies), flat saturated palette, fan-leaf silhouettes, chunky pots.
 - **Rules:** `src/rules/*` are pure, deterministic, null-safe modules with `node --test`
   coverage. Nothing in the scene or UI decides whether a drop, save, undo or history
   selection is valid; the rules do.
@@ -19,7 +21,7 @@ Supabase access, no real diary writes, no sensors, no billing, no Action Queue.
 No install step. From the repository root:
 
 ```bash
-node --test spikes/tent-garden-prototype/test/*.check.mjs   # 27 checks
+node --test spikes/tent-garden-prototype/test/*.check.mjs   # 33 checks
 cd spikes/tent-garden-prototype && python3 -m http.server 8081
 # open http://127.0.0.1:8081/
 ```
@@ -50,7 +52,11 @@ Proposal for the next slice, if the prototype is worth integrating:
 | Bounded orbit (no below-floor, no straight-down, zoom clamp)  | `tentScene.js` OrbitControls limits               |
 | Reset View, 90° rotate steps (`[`, `]`, `R` keys)             | `tentScene.js` `setCamera`, `rotateBy`            |
 | Rotation changes the camera only, never recorded positions    | camera code never touches layout state            |
-| View mode: no drag; Edit Layout enables drag                  | `app.js` `setMode`, `tentScene.js` pointerdown    |
+| View mode: no drag; Edit Layout enables drag                  | `modeRules.resolveModeChange`, `app.js` `setMode` |
+| Repeated Edit Layout clicks never restart the draft           | `modeRules` noop on edit→edit (regression test)   |
+| Camera locked for all of Edit mode (orbit, rotate, reset)     | `modeRules.cameraLocked`, `scene.setCameraLocked` |
+| Draft notes: same Save / Cancel / Retry / Undo rules          | `saveRules.noteChanges`, `commitNoteDraft`        |
+| A saved note logs exactly one simulated `note.update` event   | `eventsForSave` (intent applies to moves only)    |
 | Orbit disabled while dragging                                 | `controls.enabled = false` for the drag           |
 | Snap grid, bounds, overlap → named swap confirmation          | `layoutRules.resolveDrop`, `app.js` `commitDrop`  |
 | Dragging across a plant does nothing (only the drop counts)   | `resolveDrop` is called on drop; drag only ghosts |
@@ -79,6 +85,7 @@ Proposal for the next slice, if the prototype is worth integrating:
 - Refresh resets all state; there is no persistence by design.
 - Phone performance and the portrait layout were **NOT_MEASURED** on a real device in
   this slice; only desktop Chrome was exercised.
+- Draft notes are per plant, plain text, 280 chars, no photo attach (Preview Only).
 - The swap confirmation currently snaps the dragged pot back to its origin while the
   question is open, then applies the swap; a ghost preview of the post-swap layout would
   be nicer.

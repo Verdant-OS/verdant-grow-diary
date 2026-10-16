@@ -17,6 +17,7 @@ export const PRICING = {
     description: "Start free. Build your grow diary and see if Verdant fits your workflow.",
     features: [
       "1 active grow",
+      "1 tent",
       "Historical logs kept forever",
       "3 AI Doctor credits per grow",
       "Manual sensor entries",

@@ -23,6 +23,12 @@ Since `a980489a`, five migrations were added under `supabase/migrations/`
 `20261013180000`). All sort after every version named here, so the order below is
 unchanged. This doc does not cover them.
 
+**Production receipt, 2026-10-16 (supersedes the `NOT_MEASURED` labels below for the
+versions it names).** See "Production measurement and apply, 2026-10-16" at the end. In
+short: production was measured directly, the approved files were applied, the migration
+history table records none of it, and **`supabase db push` must not be run** against
+production.
+
 Handoff item 3. Owner: Grok. Reviewer seat: Critical Mass.
 
 ## How this list was derived
@@ -301,6 +307,136 @@ These merged inside the window and change no `supabase/` file
 None of their `src/` diffs adds a new `.rpc(` call. They ship with the frontend
 build, not with a migration apply or edge deploy.
 
+## Production measurement and apply, 2026-10-16
+
+Everything above this section was written from repository records only. This section is a
+production receipt. Matthew authorized applying migrations to the knk production database
+on 2026-10-16 (the knk lock was lifted for this) and approved the exact file list below.
+Deploy tip throughout: `bfd2a85c48bf55c958757fe15793f8c90e5774c4` (#2221). Every
+time is UTC.
+
+**Path and identity.** The Lovable connector `query_database` on Lovable project
+`66255e7b-892c-4be5-8686-ab1cfc3666db`, which runs as `postgres`. The database names
+itself as Supabase project `knkwiiywfkbqznbxwqfh` (`edge_function_metric_events.supabase_env`
+and the hard-coded `process-email-queue` URL in `public.email_queue_dispatch`), matching
+`supabase/config.toml`. `bzatgtgjvuojpoxcknaa` is not production and was not touched.
+
+**Method.** Applied state was measured per migration from the catalog, not from migration
+history: `md5(replace(prosrc, E'\r', ''))` of each function compared with the body between
+the file's dollar-quote delimiters, plus the policies, grants, columns, triggers and
+relations each file creates. Read-only measurement ran 22:55–23:10. The method reproduces
+the delivery contract's fingerprints (`ccd841f1`, `1875cf01`, `f587dc46`).
+
+**Migration history is not usable on this database.**
+`supabase_migrations.schema_migrations` has 196 rows, maximum version `20260824233603`,
+re-read at 23:42:50. It records none of the versions below, including ones that were
+already applied before today. A version-ordered `supabase db push` would therefore try to
+re-run applied files (for example #1545's plain `CREATE TABLE`) and must not be used.
+Recording the versions below in history is the owner's call; nothing here ran
+`supabase migration repair`.
+
+### State before today's applies (measured 22:55–23:10)
+
+| Version          | PR             | State                     | Evidence                                                                                                                                                     |
+| ---------------- | -------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `20260914212330` | #1374          | APPLIED, superseded       | Replaced by `20260915193000`; its `paddle_subscription_ref` logic is present                                                                                 |
+| `20260915193000` | #1398          | APPLIED (body-equivalent) | Allocator md5 `c9c89539` equals the file. Revoker md5 `42bc7920` vs file `a8962dee`: one collapsed space (`int  :=` → `int :=`); whitespace-normalized match |
+| `20260916111000` | #1460 (parked) | NOT_APPLIED               | No `quicklog_revision_idempotency` table or `quicklog_revision_apply_once`                                                                                   |
+| `20260917183000` | #1545 (parked) | Objects present           | Table, sequence, policies, index, trigger and all four function bodies match. View ACL does not (below)                                                      |
+| `20260924120000` | #1703          | APPLIED                   | `validate_plant_row` md5 equals the file; `plants.health` default and comment match                                                                          |
+| `20260925090000` | #1704          | NOT_APPLIED               | `anon` and `authenticated` each held every table privilege on `user_roles`                                                                                   |
+| `20260927002000` | #1831          | NOT_APPLIED               | Wrapper md5 `0d3098b8` (predecessor)                                                                                                                         |
+| `20260927012000` | #1834          | NOT_APPLIED               | Event wrapper md5 `0043154b`                                                                                                                                 |
+| `20260927094000` | #1741          | NOT_APPLIED               | No restrictive policies, guard function or trigger                                                                                                           |
+| `20260927160000` | #1831          | NOT_APPLIED               | Delegate md5 `7ec296e4`                                                                                                                                      |
+| `20260928183000` | #1831          | NOT_APPLIED               | Wrapper not `1875cf01`                                                                                                                                       |
+| `20261001140000` | #1836          | NOT_APPLIED               | Event wrapper not `959d2add`                                                                                                                                 |
+
+Both open P2s on this PR are answered by this table. `20260915193000` is applied
+(body-equivalent, no history row), so it does not run "first" in a correct apply; it only
+re-runs if someone uses `db push`. `20260924120000` is applied with no history row, which
+confirms the 2026-10-15 owner receipt: the schema effect is measured and the history row is
+missing.
+
+### Applied today, in this order (23:10–23:23, each checked by readback before the next)
+
+The four Quick Log manual files went only through the guarded chain in
+`docs/quicklog-manual-delivery-order-contract.md`. Each step ran the contract's
+`manual_delivery_gate` (predecessor wrapper and delegate hashes, owners, ACLs, runner role)
+in the same transaction, with a readback of the expected hash before `COMMIT`.
+
+| Order | Version          | PR    | Readback after apply                                                                                       |
+| ----- | ---------------- | ----- | ---------------------------------------------------------------------------------------------------------- |
+| 1     | `20260825233000` | #1134 | `pheno_hunts` INSERT/UPDATE policies include the grow/tent ownership check                                 |
+| 2     | `20260826100000` | #1149 | `pheno_candidate_diary_entries_top_n(uuid[],integer)` exists; only `authenticated` executes it             |
+| 3     | `20260827010000` | #1162 | "Users insert own readings" policy carries the operator-attestation exclusions                             |
+| 4     | `20260925090000` | #1704 | Own pre/postconditions passed. `anon`: nothing on `user_roles`; `authenticated`: `SELECT` only             |
+| 5     | `20260927002000` | #1831 | Guarded step 1. Wrapper `85e40fcd47d1e38dca8f057fee2d905a`                                                 |
+| 6     | `20260927094000` | #1741 | 2 RESTRICTIVE policies on `diary_entries`, guard function and trigger present                              |
+| 7     | `20260927160000` | #1831 | Guarded step 2. Delegate `ccd841f1af11a03bfca191cf9989c3fd`                                                |
+| 8     | `20260928183000` | #1831 | Guarded step 3. Wrapper `1875cf01f7d1aa843d4b8ad080f9bcb2`                                                 |
+| 9     | `20261003010000` | #1871 | `clawback_lovable_credit_pack` added; both pack functions `service_role`-only. Ran inside `BEGIN`/`COMMIT` |
+| 10    | `20261003020000` | #1872 | `convert_referral` carries the monthly cap; `service_role`-only. Ran inside `BEGIN`/`COMMIT`               |
+| 11    | `20261010120000` | #1961 | Two columns, two CHECKs, view gains `notes`, `unit_unconfirmed`. Ran with `SET LOCAL lock_timeout = '5s'`  |
+| 12    | `20261013180000` | #1841 | Guarded step 4. Wrapper `f587dc4669f65580eed2d5097caac806`                                                 |
+
+Every file's own preflight and postcondition passed; nothing was retried or edited. Rows 9–11
+were wrapped in a transaction because the files have none; the SQL itself is the committed
+bytes. Readbacks at 23:42:50 (rows 2 and 4–12) and 23:43:38 (rows 1 and 3) confirmed the
+end state of every row.
+
+### Not applied, and why
+
+- **`20260927012000` (#1834) and `20261001140000` (#1836): BLOCKED.** Production's
+  `quicklog_save_event_pre_logged_at` md5 is `ef7bdf19` (the `20260721193923` body). Both
+  preflights require `674f6b27` (the `20260723210000`/`20260725023000` body, which stamps
+  `event_type` into the companion's details), so each would fail closed with no change.
+  Open #1846 and #1885 require the same hash. This needs a new forward-repair migration;
+  it is not an apply-time workaround. Skipping them also needs an owner record, or a later
+  `db push --include-all` fails on them.
+- **`20261001160000` (#1827): BLOCKED.** No `cultivars`, `cultivar_aliases` or `breeders`
+  relation exists, so its prerequisite `20260722203000_strain_reference_library_v1.sql` is
+  also unapplied. That foundation carries a replay-only compatibility patch in
+  `config/local-supabase-replay-compatibility.json`, which is not authority to apply a
+  patched copy to production.
+- **`20260916111000` (#1460): parked, not applied.** Inference, not measured live: the
+  frontend calls `quicklog_correct_entry` / `quicklog_retract_entry` with
+  `p_idempotency_key`, an overload production lacks, so those calls likely fail today.
+- **`20260917183000` (#1545): parked; objects present, not fully conformant.** The four
+  function bodies, table, sequence, policies, index and trigger match the file. But
+  `sensor_readings_effective` grants `authenticated` every privilege (`arwdDxtm`), the
+  default-ACL shape, where the file does `REVOKE ALL` then `GRANT SELECT`. So the view was
+  created or re-created outside the file's grant sequence. The view joins and computes
+  columns, so it is not auto-updatable and those write privileges cannot change rows
+  (inference). The hold stays; presence is not a release.
+  `20261010120000`'s `CREATE OR REPLACE VIEW` keeps existing privileges and did not create
+  this ACL.
+
+### Edge functions
+
+**Not deployed under this receipt.** Deployed Edge versions are **NOT_MEASURED**: the
+functions expose no build identifier, `deploy_version` telemetry stops at 2026-07-27, and
+there is no read-only path to production's function list or secrets from these tools.
+From the import graph at the tip (inference), 23 functions changed since 2026-09-26:
+`payments-webhook`; `ai-coach`, `ai-doctor-review`; `mcp`; the other #1869 consumers
+listed above; `auth-email-hook`, `delete-account`, `ecowitt-real-ingest`,
+`edge-metrics-alert-check`, `paddle-portal-session`, `paddle-webhook`,
+`preview-transactional-email`, `send-transactional-email` (#1848); and
+`operator-ggs-real-payload-commit` (#1683). Preconditions before any deploy:
+`PAYMENTS_ENVIRONMENT=live` (#1869) and `GEMINI_API_KEY` present (#1982; AI Doctor and
+Coach fail closed without it). The `payments-webhook` ordering precondition is now met,
+because `20261003010000` is applied.
+
+### Other production facts recorded for the access review (not changed)
+
+`sandbox_exec` is a LOGIN role with `BYPASSRLS`. It holds SELECT on the `auth.*` tables,
+INSERT and SELECT on every `public` table, and default ACLs extending that to future
+tables. Its `auth` schema USAGE is **NOT_MEASURED**. The repo treats it as a trusted
+platform grantee (`20260820235900`), while the local harness creates it `NOLOGIN`. That
+gap is an owner access-review question, with Lovable's documentation as the first source.
+No change was made or proposed here.
+
 ## Rollback
 
-Docs only. Revert this file. Nothing operational was changed.
+Docs only. Revert this file. Nothing operational was changed by this file; the production
+applies it records are permanent and are not rolled back by reverting it.

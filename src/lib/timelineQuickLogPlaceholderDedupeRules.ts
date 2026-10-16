@@ -122,3 +122,29 @@ export function dropBlankQuickLogPlaceholderRows<T extends TimelineQuickLogPlace
     return !hasCompanion;
   });
 }
+
+export type TimelineDiaryPageProjection<T> = {
+  /** Fetched rows with the linked blank Quick Log mirror removed. */
+  rows: T[];
+  /** Fetched rows the projection hid; the server's exact count still includes them. */
+  hiddenCount: number;
+  /** `entry_at` of the oldest fetched row, hidden or not; the next keyset cursor. */
+  oldestFetchedEntryAt: string | null;
+};
+
+/**
+ * Projects one newest-first diary page for display while keeping what keyset
+ * pagination needs from the raw page. Pagination must page from the oldest
+ * fetched row and discount hidden rows from the server count, or a hidden
+ * mirror leaves "Load older entries" on screen with nothing left to load.
+ */
+export function projectTimelineDiaryPage<T extends TimelineQuickLogPlaceholderRow>(
+  fetched: readonly T[],
+): TimelineDiaryPageProjection<T> {
+  const rows = dropBlankQuickLogPlaceholderRows(fetched);
+  return {
+    rows,
+    hiddenCount: fetched.length - rows.length,
+    oldestFetchedEntryAt: fetched.length > 0 ? fetched[fetched.length - 1].entry_at : null,
+  };
+}

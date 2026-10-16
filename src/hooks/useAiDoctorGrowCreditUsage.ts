@@ -1,73 +1,99 @@
 /**
- * useAiDoctorGrowCreditUsage — presentation-only read of per-grow AI credit
- * allowance usage and credit-pack presence for AI Doctor surfaces that may
- * mount outside a QueryClient (such as AiDoctorStart).
+ * useAiDoctorGrowCreditUsage — presentation-only read of per-grow and monthly
+ * AI credit allowance usage plus environment-scoped credit-pack balance for AI
+ * Doctor surfaces (#2161).
  *
- * Mirrors useAlertDoctorCreditGateReads: counts own `ai_credit_spends` rows
- * for the grow whose `meta->>'funded_by'` is distinct from `'pack'` and checks
- * whether any unexpired `ai_credit_grants` row exists. Read-only; RLS enforces
- * ownership.
+ * Works with or without a QueryClientProvider so standalone route tests (such
+ * as AiDoctorStart) and QueryClient-backed views share the same calculation.
+ * Read-only; RLS enforces ownership (`ai_credit_spends_select_own`,
+ * `ai_credit_grants_select_own`).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  hasUnexpiredAiCreditGrants,
+  computeAiCreditPackBalance,
+  formatAiCreditUtcPeriodKey,
   sumAiDoctorAllowanceSpends,
+  sumAiDoctorMonthlyAllowanceSpends,
   type AiDoctorGrantRowLike,
   type AiDoctorSpendRowLike,
 } from "@/lib/aiDoctorSurfaceCreditViewModel";
 import { isUuid } from "@/lib/isUuid";
 import { useAuth } from "@/store/auth";
 
+export interface AiDoctorGrowCreditUsageOptions {
+  growId?: string | null;
+  perGrowEnabled?: boolean;
+  monthlyEnabled?: boolean;
+  billingEnvironment?: "live" | "sandbox";
+}
+
 export interface AiDoctorGrowCreditUsageResult {
   allowanceUsed: number | null;
-  hasPackCredits: boolean | null;
+  monthlyUsed: number | null;
+  packBalance: number | null;
   isError: boolean;
+  refresh: () => void;
 }
 
 interface ScopedCreditUsageState {
   scopeKey: string | null;
   allowanceUsed: number | null;
-  hasPackCredits: boolean | null;
+  monthlyUsed: number | null;
+  packBalance: number | null;
   isError: boolean;
 }
 
 /**
- * Loads per-grow AI Doctor allowance usage and credit-pack grant presence for
- * the authenticated user and target grow UUID.
+ * Loads per-grow and monthly AI Doctor allowance usage and environment-scoped
+ * pack balance for the authenticated user.
  */
 export function useAiDoctorGrowCreditUsage(
-  growId: string | null | undefined,
-  enabled = true,
+  options: AiDoctorGrowCreditUsageOptions,
 ): AiDoctorGrowCreditUsageResult {
   const { user, loading: authLoading } = useAuth();
   const userId = user?.id ?? null;
-  const validGrowId = isUuid(growId) ? growId : null;
-  const activeScopeKey =
-    enabled && !authLoading && userId && validGrowId ? `${userId}:${validGrowId}` : null;
+  const validGrowId = isUuid(options.growId) ? options.growId : null;
+  const canLoadPerGrow = options.perGrowEnabled === true && validGrowId !== null;
+  const canLoadMonthly = options.monthlyEnabled === true;
+  const enabled = !authLoading && Boolean(userId) && (canLoadPerGrow || canLoadMonthly);
+  const billingEnvironment = options.billingEnvironment ?? "live";
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const activeScopeKey = enabled
+    ? `${userId}:${canLoadPerGrow ? validGrowId : "monthly"}:${billingEnvironment}`
+    : null;
 
   const [state, setState] = useState<ScopedCreditUsageState>({
     scopeKey: null,
     allowanceUsed: null,
-    hasPackCredits: null,
+    monthlyUsed: null,
+    packBalance: null,
     isError: false,
   });
 
   useEffect(() => {
-    if (!activeScopeKey || !userId || !validGrowId) {
+    if (!activeScopeKey || !userId) {
       return;
     }
 
     let cancelled = false;
     void (async () => {
       try {
+        const spendsQuery = supabase
+          .from("ai_credit_spends")
+          .select(
+            "id, grow_id, period_key, refund_of, weight, funded_by:meta->>funded_by, billing_environment:meta->>server_billing_environment",
+          )
+          .eq("user_id", userId);
         const [spendsRes, grantsRes] = await Promise.all([
+          canLoadPerGrow && validGrowId && !canLoadMonthly
+            ? spendsQuery.eq("grow_id", validGrowId)
+            : spendsQuery,
           supabase
-            .from("ai_credit_spends")
-            .select("weight, funded_by:meta->>funded_by")
-            .eq("user_id", userId)
-            .eq("grow_id", validGrowId),
-          supabase.from("ai_credit_grants").select("credits, expires_at").eq("user_id", userId),
+            .from("ai_credit_grants")
+            .select("credits, environment, expires_at")
+            .eq("user_id", userId),
         ]);
 
         if (cancelled) return;
@@ -75,22 +101,32 @@ export function useAiDoctorGrowCreditUsage(
           setState({
             scopeKey: activeScopeKey,
             allowanceUsed: null,
-            hasPackCredits: null,
+            monthlyUsed: null,
+            packBalance: null,
             isError: true,
           });
           return;
         }
-        const used = sumAiDoctorAllowanceSpends(
-          (spendsRes.data ?? []) as ReadonlyArray<AiDoctorSpendRowLike>,
-        );
-        const hasPacks = hasUnexpiredAiCreditGrants(
-          (grantsRes.data ?? []) as ReadonlyArray<AiDoctorGrantRowLike>,
-          Date.now(),
-        );
+        const now = new Date();
+        const spendRows = (spendsRes.data ?? []) as ReadonlyArray<AiDoctorSpendRowLike>;
+        const grantRows = (grantsRes.data ?? []) as ReadonlyArray<AiDoctorGrantRowLike>;
+        const usedPerGrow = canLoadPerGrow
+          ? sumAiDoctorAllowanceSpends(spendRows, validGrowId)
+          : null;
+        const usedMonthly = canLoadMonthly
+          ? sumAiDoctorMonthlyAllowanceSpends(spendRows, formatAiCreditUtcPeriodKey(now))
+          : null;
+        const packBalance = computeAiCreditPackBalance({
+          grantRows,
+          spendRows,
+          billingEnvironment,
+          nowMs: now.getTime(),
+        });
         setState({
           scopeKey: activeScopeKey,
-          allowanceUsed: used,
-          hasPackCredits: hasPacks,
+          allowanceUsed: usedPerGrow,
+          monthlyUsed: usedMonthly,
+          packBalance,
           isError: false,
         });
       } catch {
@@ -98,7 +134,8 @@ export function useAiDoctorGrowCreditUsage(
           setState({
             scopeKey: activeScopeKey,
             allowanceUsed: null,
-            hasPackCredits: null,
+            monthlyUsed: null,
+            packBalance: null,
             isError: true,
           });
         }
@@ -108,15 +145,35 @@ export function useAiDoctorGrowCreditUsage(
     return () => {
       cancelled = true;
     };
-  }, [activeScopeKey, userId, validGrowId]);
+  }, [
+    activeScopeKey,
+    billingEnvironment,
+    canLoadMonthly,
+    canLoadPerGrow,
+    refreshTick,
+    userId,
+    validGrowId,
+  ]);
+
+  const refresh = useCallback(() => {
+    setRefreshTick((tick) => tick + 1);
+  }, []);
 
   if (!activeScopeKey || state.scopeKey !== activeScopeKey) {
-    return { allowanceUsed: null, hasPackCredits: null, isError: false };
+    return {
+      allowanceUsed: null,
+      monthlyUsed: null,
+      packBalance: null,
+      isError: false,
+      refresh,
+    };
   }
 
   return {
     allowanceUsed: state.allowanceUsed,
-    hasPackCredits: state.hasPackCredits,
+    monthlyUsed: state.monthlyUsed,
+    packBalance: state.packBalance,
     isError: state.isError,
+    refresh,
   };
 }

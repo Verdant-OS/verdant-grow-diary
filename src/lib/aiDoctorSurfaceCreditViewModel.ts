@@ -8,6 +8,7 @@
 import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
 import { resolveAiDoctorEntitlementView } from "@/lib/aiDoctorEntitlementRules";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
+import { PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
 import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 export const AI_DOCTOR_FREE_PLAN_CREDIT_ALLOWANCE = FREE_CAPABILITIES.aiCreditsPerGrow ?? 3;
@@ -16,41 +17,107 @@ export const AI_DOCTOR_FREE_PLAN_CREDIT_COPY =
   `Free plan includes ${AI_DOCTOR_FREE_PLAN_CREDIT_ALLOWANCE} AI Doctor credits per grow.` as const;
 
 export interface AiDoctorSpendRowLike {
+  id?: string | null;
+  grow_id?: string | null;
+  period_key?: string | null;
+  refund_of?: string | null;
   weight: number | null;
   funded_by: string | null;
+  billing_environment?: string | null;
 }
 
 export interface AiDoctorGrantRowLike {
   credits: number | null;
+  environment?: string | null;
   expires_at: string | null;
 }
 
 /**
+ * Formats a UTC Date as a `YYYY-MM` period key matching `ai_credit_spend`'s
+ * `to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM')`.
+ */
+export function formatAiCreditUtcPeriodKey(now: Date): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
  * Sums allowance-funded spend weights for a grow, excluding pack-funded rows
- * (`funded_by === "pack"`) to mirror the server's allowance arm.
+ * (`funded_by === "pack"`) to mirror the server's per-grow allowance arm.
  */
 export function sumAiDoctorAllowanceSpends(
   rows: ReadonlyArray<AiDoctorSpendRowLike> | null | undefined,
+  growId?: string | null,
 ): number {
   return (rows ?? []).reduce((sum, row) => {
-    return row.funded_by === "pack" ? sum : sum + (row.weight ?? 0);
+    if (row.funded_by === "pack") return sum;
+    if (growId && row.grow_id !== undefined && row.grow_id !== growId) return sum;
+    return sum + (row.weight ?? 0);
   }, 0);
 }
 
 /**
- * Returns true when any grant row has positive credits and has not expired as
- * of `nowMs`.
+ * Sums allowance-funded spend weights for a UTC `YYYY-MM` period key,
+ * excluding pack-funded rows to mirror the server's monthly allowance arm.
  */
-export function hasUnexpiredAiCreditGrants(
-  rows: ReadonlyArray<AiDoctorGrantRowLike> | null | undefined,
-  nowMs: number,
-): boolean {
-  return (rows ?? []).some((row) => {
-    if (!row.credits || row.credits <= 0) return false;
-    if (!row.expires_at) return true;
-    const expiresAtMs = Date.parse(row.expires_at);
-    return !Number.isFinite(expiresAtMs) || expiresAtMs > nowMs;
-  });
+export function sumAiDoctorMonthlyAllowanceSpends(
+  rows: ReadonlyArray<AiDoctorSpendRowLike> | null | undefined,
+  periodKey: string,
+): number {
+  return (rows ?? []).reduce((sum, row) => {
+    if (row.funded_by === "pack") return sum;
+    if (row.period_key !== undefined && row.period_key !== periodKey) return sum;
+    return sum + (row.weight ?? 0);
+  }, 0);
+}
+
+/**
+ * Computes the authoritative environment-scoped pack balance (`v_pack_granted -
+ * v_pack_used`) matching `ai_credit_spend` in
+ * `20260728090736_ai_credit_pack_portability.sql`.
+ */
+export function computeAiCreditPackBalance(args: {
+  grantRows: ReadonlyArray<AiDoctorGrantRowLike> | null | undefined;
+  spendRows: ReadonlyArray<AiDoctorSpendRowLike> | null | undefined;
+  billingEnvironment: "live" | "sandbox";
+  nowMs: number;
+}): number {
+  const { grantRows, spendRows, billingEnvironment, nowMs } = args;
+
+  const packGranted = (grantRows ?? []).reduce((sum, row) => {
+    const env =
+      typeof row.environment === "string" && row.environment.length > 0 ? row.environment : "live";
+    if (env !== billingEnvironment) return sum;
+    if (row.expires_at != null) {
+      const expiresAtMs = Date.parse(row.expires_at);
+      if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return sum;
+    }
+    if (typeof row.credits !== "number" || !Number.isFinite(row.credits)) return sum;
+    return sum + row.credits;
+  }, 0);
+
+  const spendById = new Map<string, AiDoctorSpendRowLike>();
+  for (const row of spendRows ?? []) {
+    if (typeof row.id === "string" && row.id.length > 0) {
+      spendById.set(row.id, row);
+    }
+  }
+
+  const packUsed = (spendRows ?? []).reduce((sum, row) => {
+    if (row.funded_by !== "pack") return sum;
+    const parentEnv =
+      typeof row.refund_of === "string" ? spendById.get(row.refund_of)?.billing_environment : null;
+    const resolvedEnv =
+      typeof row.billing_environment === "string" && row.billing_environment.length > 0
+        ? row.billing_environment
+        : typeof parentEnv === "string" && parentEnv.length > 0
+          ? parentEnv
+          : "live";
+    if (resolvedEnv !== billingEnvironment) return sum;
+    if (typeof row.weight !== "number" || !Number.isFinite(row.weight)) return sum;
+    return sum + row.weight;
+  }, 0);
+
+  return Math.max(Math.floor(packGranted - packUsed), 0);
 }
 
 export interface AiDoctorSurfaceCreditInput {
@@ -59,8 +126,10 @@ export interface AiDoctorSurfaceCreditInput {
   entitlementLookupFailed?: boolean;
   /** Allowance-funded credits used on the current grow, when resolved. */
   allowanceUsed?: number | null;
-  /** True when the user owns any unexpired credit-pack grant row. */
-  hasPackCredits?: boolean | null;
+  /** Allowance-funded credits used in the current UTC month, when resolved. */
+  monthlyUsed?: number | null;
+  /** Authoritative environment-scoped remaining pack credits, when resolved. */
+  packBalance?: number | null;
   /** True when the client allowance-used read failed. */
   allowanceReadFailed?: boolean;
   /** Fresh post-spend credit envelope returned by `ai-doctor-review`. */
@@ -77,6 +146,32 @@ export interface AiDoctorSurfaceCreditInput {
 export interface AiDoctorSurfaceCreditViewModel {
   creditRemaining: AiCreditRemainingInput | null;
   freePlanCreditCopy: string | null;
+}
+
+function resolveValidDeniedCredit(
+  deniedCredit: AiDoctorSurfaceCreditInput["deniedCredit"],
+): AiCreditRemainingInput | null {
+  if (!deniedCredit) return null;
+  if (deniedCredit.scope !== "per_grow" && deniedCredit.scope !== "per_month") return null;
+  if (
+    typeof deniedCredit.remaining !== "number" ||
+    !Number.isFinite(deniedCredit.remaining) ||
+    deniedCredit.remaining < 0
+  ) {
+    return null;
+  }
+  if (
+    typeof deniedCredit.scope_limit !== "number" ||
+    !Number.isFinite(deniedCredit.scope_limit) ||
+    deniedCredit.scope_limit <= 0
+  ) {
+    return null;
+  }
+  return {
+    remaining: Math.floor(deniedCredit.remaining),
+    scope: deniedCredit.scope,
+    scope_limit: Math.floor(deniedCredit.scope_limit),
+  };
 }
 
 /**
@@ -97,6 +192,13 @@ export function buildAiDoctorSurfaceCreditViewModel(
     entitlement: input.entitlement ?? null,
   });
 
+  const resolvedPackBalance =
+    typeof input.packBalance === "number" &&
+    Number.isFinite(input.packBalance) &&
+    input.packBalance > 0
+      ? Math.floor(input.packBalance)
+      : 0;
+
   if (viewer.bypassesUpsell) {
     if (input.postSpendCredit) {
       return {
@@ -104,17 +206,33 @@ export function buildAiDoctorSurfaceCreditViewModel(
         freePlanCreditCopy: null,
       };
     }
+    if (input.deniedCredit) {
+      const denied = resolveValidDeniedCredit(input.deniedCredit);
+      return {
+        creditRemaining: denied && denied.scope === "per_month" ? denied : null,
+        freePlanCreditCopy: null,
+      };
+    }
+    const capMonthly = input.entitlement?.capabilities?.aiMonthlyCredits;
+    const catalogMonthly = viewer.paidPlanId ? PLAN_CATALOG[viewer.paidPlanId].aiMonthlyCredits : 0;
+    const monthlyLimit =
+      typeof capMonthly === "number" && Number.isFinite(capMonthly) && capMonthly > 0
+        ? Math.floor(capMonthly)
+        : catalogMonthly;
     if (
-      input.deniedCredit &&
-      input.deniedCredit.scope === "per_month" &&
-      typeof input.deniedCredit.remaining === "number" &&
-      typeof input.deniedCredit.scope_limit === "number"
+      input.allowanceReadFailed !== true &&
+      monthlyLimit > 0 &&
+      typeof input.monthlyUsed === "number" &&
+      Number.isFinite(input.monthlyUsed) &&
+      input.monthlyUsed >= 0
     ) {
+      const used = Math.floor(input.monthlyUsed);
       return {
         creditRemaining: {
-          remaining: input.deniedCredit.remaining,
+          remaining: Math.max(monthlyLimit - used, 0),
           scope: "per_month",
-          scope_limit: input.deniedCredit.scope_limit,
+          scope_limit: monthlyLimit,
+          ...(resolvedPackBalance > 0 ? { pack_balance: resolvedPackBalance } : {}),
         },
         freePlanCreditCopy: null,
       };
@@ -154,20 +272,9 @@ export function buildAiDoctorSurfaceCreditViewModel(
     };
   }
 
-  if (
-    input.deniedCredit &&
-    (input.deniedCredit.scope === "per_grow" || input.deniedCredit.scope === "per_month")
-  ) {
+  if (input.deniedCredit) {
     return {
-      creditRemaining: {
-        remaining:
-          typeof input.deniedCredit.remaining === "number" ? input.deniedCredit.remaining : 0,
-        scope: input.deniedCredit.scope,
-        scope_limit:
-          typeof input.deniedCredit.scope_limit === "number" && input.deniedCredit.scope_limit > 0
-            ? input.deniedCredit.scope_limit
-            : perGrowLimit,
-      },
+      creditRemaining: resolveValidDeniedCredit(input.deniedCredit),
       freePlanCreditCopy,
     };
   }
@@ -191,7 +298,7 @@ export function buildAiDoctorSurfaceCreditViewModel(
       remaining: Math.max(perGrowLimit - used, 0),
       scope: "per_grow",
       scope_limit: perGrowLimit,
-      ...(input.hasPackCredits === true ? { has_pack_credits: true } : {}),
+      ...(resolvedPackBalance > 0 ? { pack_balance: resolvedPackBalance } : {}),
     },
     freePlanCreditCopy,
   };

@@ -54,7 +54,7 @@ import { isUuid } from "@/lib/isUuid";
 import { aiDoctorSessionDetailPath, plantDetailPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import { useAlertDoctorCreditGateReads } from "@/hooks/useAlertDoctorCreditGateReads";
+import { useAiDoctorGrowCreditUsage } from "@/hooks/useAiDoctorGrowCreditUsage";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { buildAiDoctorSurfaceCreditViewModel } from "@/lib/aiDoctorSurfaceCreditViewModel";
 import {
@@ -464,29 +464,39 @@ function PlantDetailAiDoctorLiveReviewScope({
   } = useMyEntitlements();
   const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
   const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
-  const { data: doctorCreditReads, isError: doctorCreditReadsFailed } =
-    useAlertDoctorCreditGateReads(
-      entitlementReady && typeof perGrowAiCredits === "number" && isUuid(growId) ? growId : null,
-    );
+  const monthlyAiCredits = entitlement?.capabilities?.aiMonthlyCredits ?? null;
+  const {
+    allowanceUsed: doctorAllowanceUsed,
+    monthlyUsed: doctorMonthlyUsed,
+    packBalance: doctorPackBalance,
+    isError: doctorCreditReadsFailed,
+    refresh: refreshDoctorCreditUsage,
+  } = useAiDoctorGrowCreditUsage({
+    growId: growId ?? null,
+    perGrowEnabled:
+      entitlementReady && typeof perGrowAiCredits === "number" && perGrowAiCredits > 0,
+    monthlyEnabled:
+      entitlementReady && typeof monthlyAiCredits === "number" && monthlyAiCredits > 0,
+  });
   const surfaceCredit = useMemo(
     () =>
       buildAiDoctorSurfaceCreditViewModel({
         entitlement,
         entitlementLoading,
         entitlementLookupFailed,
-        allowanceUsed: doctorCreditReadsFailed ? null : (doctorCreditReads?.allowanceUsed ?? null),
-        hasPackCredits: doctorCreditReadsFailed
-          ? null
-          : (doctorCreditReads?.hasPackCredits ?? null),
+        allowanceUsed: doctorCreditReadsFailed ? null : doctorAllowanceUsed,
+        monthlyUsed: doctorCreditReadsFailed ? null : doctorMonthlyUsed,
+        packBalance: doctorCreditReadsFailed ? null : doctorPackBalance,
         allowanceReadFailed: doctorCreditReadsFailed,
         postSpendCredit: review.creditRemaining,
         deniedCredit:
           review.status === "error" && review.reason === "credit_denied" ? review.credit : null,
       }),
     [
-      doctorCreditReads?.allowanceUsed,
-      doctorCreditReads?.hasPackCredits,
+      doctorAllowanceUsed,
       doctorCreditReadsFailed,
+      doctorMonthlyUsed,
+      doctorPackBalance,
       entitlement,
       entitlementLoading,
       entitlementLookupFailed,
@@ -769,7 +779,8 @@ function PlantDetailAiDoctorLiveReviewScope({
     if (review.status === prev) return;
     if (review.status !== "result" && review.status !== "error") return;
     void queryClient.invalidateQueries({ queryKey: ["ai_credit_gate_reads"] });
-  }, [queryClient, review.status]);
+    refreshDoctorCreditUsage();
+  }, [queryClient, refreshDoctorCreditUsage, review.status]);
 
   const showHistoryOmission = historyRecovery.state === "omitted_by_choice";
   const showHistoryRecovery = historyRecovery.state === "decision_required" || showHistoryOmission;

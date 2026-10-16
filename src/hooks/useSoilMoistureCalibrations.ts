@@ -188,12 +188,15 @@ export function useSoilMoistureCalibrations(args: {
           data as SoilMoistureCalibrationRow[] | null,
           error,
         );
-        if (result.availability === "schema_unavailable") {
+        if (
+          result.availability === "schema_unavailable" ||
+          soilMoistureCalibrationSchemaUnavailableCached(queryClient)
+        ) {
           rememberSoilMoistureCalibrationSchemaUnavailable(queryClient);
           resolveInflight(true);
-        } else {
-          resolveInflight(false);
+          return SCHEMA_UNAVAILABLE_RESULT;
         }
+        resolveInflight(false);
         return result;
       } catch (err) {
         resolveInflight(false);

@@ -133,15 +133,19 @@ export default function AiDoctorStart() {
   } = useMyEntitlements();
   const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
   const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
+  const monthlyAiCredits = entitlement?.capabilities?.aiMonthlyCredits ?? null;
   const singleGrowId =
     !growsLoading && !growsError && grows.length === 1 && typeof grows[0]?.id === "string"
       ? grows[0].id
       : null;
   const creditGrowId = resolvedScope.growId ?? singleGrowId;
-  const creditUsage = useAiDoctorGrowCreditUsage(
-    creditGrowId,
-    entitlementReady && typeof perGrowAiCredits === "number",
-  );
+  const creditUsage = useAiDoctorGrowCreditUsage({
+    growId: creditGrowId,
+    perGrowEnabled:
+      entitlementReady && typeof perGrowAiCredits === "number" && perGrowAiCredits > 0,
+    monthlyEnabled:
+      entitlementReady && typeof monthlyAiCredits === "number" && monthlyAiCredits > 0,
+  });
   const surfaceCredit = useMemo(
     () =>
       buildAiDoctorSurfaceCreditViewModel({
@@ -149,13 +153,15 @@ export default function AiDoctorStart() {
         entitlementLoading,
         entitlementLookupFailed,
         allowanceUsed: creditUsage.isError ? null : creditUsage.allowanceUsed,
-        hasPackCredits: creditUsage.isError ? null : creditUsage.hasPackCredits,
+        monthlyUsed: creditUsage.isError ? null : creditUsage.monthlyUsed,
+        packBalance: creditUsage.isError ? null : creditUsage.packBalance,
         allowanceReadFailed: creditUsage.isError,
       }),
     [
       creditUsage.allowanceUsed,
-      creditUsage.hasPackCredits,
       creditUsage.isError,
+      creditUsage.monthlyUsed,
+      creditUsage.packBalance,
       entitlement,
       entitlementLoading,
       entitlementLookupFailed,

@@ -34,11 +34,6 @@ export interface AiCreditRemainingInput {
    * under either per-grow or per-month scope.
    */
   pack_balance?: number | null;
-  /**
-   * True when client reads detected unexpired grant rows before a server spend
-   * resolves the exact environment-scoped pack_balance.
-   */
-  has_pack_credits?: boolean | null;
   /** Whether the authoritative spend was funded by included allowance or a pack. */
   funded_by?: "allowance" | "pack" | string | null;
   /** True when the edge function returned a cached same-key result. */
@@ -101,13 +96,10 @@ export function buildAiCreditRemainingBadgeViewModel(
   const limitClamped = clampNonNegative(scopeLimit);
   const noun = nounFor(options?.surface ?? "doctor");
   const packBalance = isFiniteInt(input.pack_balance) ? clampNonNegative(input.pack_balance) : 0;
-  const hasUnresolvedPackCredits = packBalance === 0 && input.has_pack_credits === true;
   const packSuffix =
     packBalance > 0
       ? ` · ${packBalance} pack ${packBalance === 1 ? "credit" : "credits"} available`
-      : hasUnresolvedPackCredits
-        ? " · pack credits on account"
-        : "";
+      : "";
 
   if (scope === "per_grow") {
     return {

@@ -1,4 +1,4 @@
-import { cleanup, render as rtlRender, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
@@ -12,6 +12,7 @@ const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const GROW_B = "55555555-5555-4555-8555-555555555555";
 const TENT_A = "22222222-2222-4222-8222-222222222222";
 const TENT_B = "66666666-6666-4666-8666-666666666666";
+const TENT_C = "77777777-7777-4777-8777-777777777777";
 const PLANT_ID = "33333333-3333-4333-8333-333333333333";
 
 const testState = vi.hoisted(() => ({
@@ -40,13 +41,25 @@ const testState = vi.hoisted(() => ({
     isStaff: false,
     source: "free",
   },
-  spendsData: [] as Array<{ weight: number | null; funded_by: string | null }>,
+  spendsData: [] as Array<{
+    id?: string | null;
+    grow_id?: string | null;
+    period_key?: string | null;
+    refund_of?: string | null;
+    weight: number | null;
+    funded_by: string | null;
+    billing_environment?: string | null;
+  }>,
   spendsError: null as Record<string, unknown> | null,
   spendsPendingPromise: null as Promise<{
     data: Array<{ weight: number | null; funded_by: string | null }>;
     error: Record<string, unknown> | null;
   }> | null,
-  grantsData: [] as Array<{ credits: number | null; expires_at: string | null }>,
+  grantsData: [] as Array<{
+    credits: number | null;
+    environment?: string | null;
+    expires_at: string | null;
+  }>,
   grantsError: null as Record<string, unknown> | null,
   plants: [] as Array<Record<string, unknown>>,
   tents: [] as Array<Record<string, unknown>>,
@@ -55,6 +68,12 @@ const testState = vi.hoisted(() => ({
   calibrationRequests: 0,
   calibrationData: [] as unknown[],
   calibrationError: null as Record<string, unknown> | null,
+  calibrationOrderHandler: null as
+    | ((requestIndex: number) => Promise<{
+        data: unknown[];
+        error: Record<string, unknown> | null;
+      }>)
+    | null,
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -147,14 +166,17 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (table: string) => {
       if (table === "soil_moisture_calibrations") {
         testState.calibrationRequests += 1;
+        const reqIdx = testState.calibrationRequests;
         const query = {
           select: () => query,
           eq: () => query,
           order: () =>
-            Promise.resolve({
-              data: testState.calibrationData,
-              error: testState.calibrationError,
-            }),
+            testState.calibrationOrderHandler
+              ? testState.calibrationOrderHandler(reqIdx)
+              : Promise.resolve({
+                  data: testState.calibrationData,
+                  error: testState.calibrationError,
+                }),
         };
         return query;
       }
@@ -300,6 +322,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
     testState.calibrationRequests = 0;
     testState.calibrationData = [];
     testState.calibrationError = null;
+    testState.calibrationOrderHandler = null;
   });
 
   afterEach(() => cleanup());
@@ -389,9 +412,12 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
     expect(screen.queryByTestId("ai-doctor-start-credit-remaining")).toBeNull();
   });
 
-  it("includes an honest pack-credit indicator when a Free grower owns unexpired pack credits on both surfaces (Codex P2 #2)", async () => {
-    testState.spendsData = [{ weight: 3, funded_by: "allowance" }];
-    testState.grantsData = [{ credits: 50, expires_at: null }];
+  it("computes authoritative environment-scoped pack balance and omits pack suffix when pack is spent, clawed back, or in another environment (P2 L481 & L194)", async () => {
+    testState.spendsData = [
+      { weight: 3, funded_by: "allowance" },
+      { weight: 10, funded_by: "pack", billing_environment: "live" },
+    ];
+    testState.grantsData = [{ credits: 50, environment: "live", expires_at: null }];
 
     renderWithQueryClient(
       <PlantDetailAiDoctorLiveReview
@@ -405,7 +431,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-        "0 of 3 AI Doctor credits left for this grow · pack credits on account",
+        "0 of 3 AI Doctor credits left for this grow · 40 pack credits available",
       ),
     );
     cleanup();
@@ -420,9 +446,138 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
-        "0 of 3 AI Doctor credits left for this grow · pack credits on account",
+        "0 of 3 AI Doctor credits left for this grow · 40 pack credits available",
       ),
     );
+    cleanup();
+
+    // Exhausted pack, clawed-back pack, and sandbox-only grant must not show a pack suffix
+    testState.spendsData = [
+      { weight: 3, funded_by: "allowance" },
+      { weight: 50, funded_by: "pack", billing_environment: "live" },
+    ];
+    testState.grantsData = [
+      { credits: 50, environment: "live", expires_at: null },
+      { credits: 50, environment: "live", expires_at: null },
+      { credits: -50, environment: "live", expires_at: null },
+      { credits: 100, environment: "sandbox", expires_at: null },
+    ];
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "0 of 3 AI Doctor credits left for this grow",
+      ),
+    );
+    expect(
+      screen.getByTestId("plant-ai-doctor-live-review-credit-remaining").textContent,
+    ).not.toContain("pack");
+  });
+
+  it("hides malformed credit_denied balances instead of inventing 0 of 3 (P2 L169)", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        ok: false,
+        reason: "credit_denied",
+        credit: {
+          ok: false,
+          status: "denied",
+          reason: "limit_reached",
+          scope: "per_grow",
+          plan_id: "free",
+        },
+      },
+      error: null,
+    });
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={invoke}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "3 of 3 AI Doctor credits left for this grow",
+      ),
+    );
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-credit-remaining")).toBeNull();
+  });
+
+  it("loads and displays monthly credit balances for paid viewers on both /doctor and plant live review (P2 AiDoctorStart L143)", async () => {
+    const now = new Date();
+    const currentPeriodKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    testState.entitlement = {
+      displayPlanId: "pro_monthly",
+      effectivePlanId: "pro_monthly",
+      status: "active",
+      isActive: true,
+      capabilities: {
+        ...FREE_CAPABILITIES,
+        aiCreditsPerGrow: null,
+        aiMonthlyCredits: 100,
+      },
+      degraded: false,
+      degradedReason: null,
+      isStaff: false,
+      source: "lovable_paddle_subscription",
+    };
+    testState.spendsData = [
+      { weight: 2, funded_by: "allowance", period_key: currentPeriodKey },
+      { weight: 5, funded_by: "allowance", period_key: "2020-01" },
+    ];
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "98 of 100 AI Doctor credits left this month",
+      ),
+    );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-free-credit-note")).toBeNull();
+    cleanup();
+
+    rtlRender(
+      <MemoryRouter initialEntries={["/doctor"]}>
+        <Routes>
+          <Route path="/doctor" element={<AiDoctorStart />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
+        "98 of 100 AI Doctor credits left this month",
+      ),
+    );
+    expect(screen.queryByTestId("ai-doctor-start-free-credit-note")).toBeNull();
   });
 
   it("propagates schema_unavailable to existing cached tent queries when a later tent reports PGRST205 (CodeRabbit Major #1)", async () => {
@@ -465,5 +620,84 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
     expect(remountedTentA.result.current.availability).toBe("schema_unavailable");
     expect(remountedTentA.result.current.data).toEqual([]);
     expect(testState.calibrationRequests).toBe(2);
+  });
+
+  it("keeps schema_unavailable authoritative when an earlier overlapping read resolves with rows after a PGRST205 response (soil cache Major L86)", async () => {
+    let resolveTentB!: (value: { data: unknown[]; error: null }) => void;
+    let resolveTentC!: (value: { data: unknown[]; error: Record<string, unknown> }) => void;
+
+    testState.calibrationOrderHandler = (reqIdx) => {
+      if (reqIdx === 1) {
+        return Promise.resolve({
+          data: [
+            {
+              id: "cal-a",
+              grow_id: GROW_ID,
+              tent_id: TENT_A,
+              plant_id: null,
+              device_id: "probe-1",
+              dry_raw: 20,
+              wet_raw: 80,
+              source: "manual",
+              is_active: true,
+              created_at: "2026-08-15T00:00:00.000Z",
+              updated_at: "2026-08-15T00:00:00.000Z",
+            },
+          ],
+          error: null,
+        });
+      }
+      if (reqIdx === 2) {
+        return new Promise((resolve) => {
+          resolveTentB = resolve;
+        });
+      }
+      return new Promise((resolve) => {
+        resolveTentC = resolve;
+      });
+    };
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tentA = renderCalibrationHook(queryClient, TENT_A);
+    const tentB = renderCalibrationHook(queryClient, TENT_B);
+    const tentC = renderCalibrationHook(queryClient, TENT_C);
+
+    await waitFor(() => expect(tentA.result.current.availability).toBe("available"));
+    await waitFor(() => expect(testState.calibrationRequests).toBeGreaterThanOrEqual(2));
+
+    // Tent C (or second wave) resolves with PGRST205 first while Tent B is still in flight
+    if (resolveTentC) {
+      resolveTentC({
+        data: [],
+        error: {
+          code: "PGRST205",
+          message:
+            "Could not find the table 'public.soil_moisture_calibrations' in the schema cache",
+        },
+      });
+    }
+    resolveTentB({
+      data: [
+        {
+          id: "cal-b",
+          grow_id: GROW_ID,
+          tent_id: TENT_B,
+          plant_id: null,
+          device_id: "probe-2",
+          dry_raw: 25,
+          wet_raw: 85,
+          source: "manual",
+          is_active: true,
+          created_at: "2026-08-15T00:00:00.000Z",
+          updated_at: "2026-08-15T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    await waitFor(() => expect(tentC.result.current.availability).toBe("schema_unavailable"));
+    await waitFor(() => expect(tentB.result.current.availability).toBe("schema_unavailable"));
+    expect(tentB.result.current.data).toEqual([]);
+    expect(tentA.result.current.availability).toBe("schema_unavailable");
   });
 });

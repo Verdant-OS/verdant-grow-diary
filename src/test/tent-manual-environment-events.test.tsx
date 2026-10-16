@@ -16,6 +16,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const db = vi.hoisted(() => ({
   byTable: {} as Record<string, unknown[]>,
   reads: [] as string[],
+  failTables: new Set<string>(),
+  holdTables: new Set<string>(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -26,6 +28,10 @@ vi.mock("@/integrations/supabase/client", () => {
     }
     q.limit = () => {
       db.reads.push(table);
+      if (db.holdTables.has(table)) return new Promise(() => {});
+      if (db.failTables.has(table)) {
+        return Promise.resolve({ data: null, error: { message: "read failed" } });
+      }
       return Promise.resolve({ data: db.byTable[table] ?? [], error: null });
     };
     q.maybeSingle = () => Promise.resolve({ data: null, error: null });
@@ -52,17 +58,23 @@ function eventRow(occurredAt: string, id = "ev-1") {
 }
 
 import {
+  buildTentManualHistoryRead,
   manualEnvironmentEventsToChangeContextRows,
   manualEnvironmentEventsToSnapshotRecords,
   parseTentManualEnvironmentEvents,
 } from "@/lib/tentManualEnvironmentEventRules";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
+import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
+import { useTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+import { fireEvent, waitFor } from "@testing-library/react";
 import type { ManualSnapshotTimelineCard as CardModel } from "@/lib/manualSensorSnapshotViewModel";
 
 beforeEach(() => {
   db.byTable = {};
   db.reads = [];
+  db.failTables = new Set();
+  db.holdTables = new Set();
 });
 afterEach(() => cleanup());
 
@@ -188,5 +200,103 @@ describe("manual snapshot timeline card freshness", () => {
     withProviders(<ManualSnapshotTimelineCard card={card(threeDaysAgo)} />);
     expect(screen.getByText("Historical review reading")).toBeInTheDocument();
     expect(screen.getByText(/Historical reading —/)).toBeInTheDocument();
+  });
+});
+
+// Codex FAIL on #2114 at 1a3cf7ed (P1-1): the history list took readStatus,
+// isFetching and Retry from the sensor_readings query alone, so a pending or
+// failed grow_events read still let the list declare "No manual snapshots".
+describe("tent manual snapshot history — both sources gate the read state", () => {
+  const settled = { status: "success" as const, isFetching: false };
+  type Read = { status: "pending" | "error" | "success"; isFetching: boolean };
+
+  it("is success only when both reads succeed, and fetching if either fetches", () => {
+    const pending: Read = { status: "pending", isFetching: true };
+    const failed: Read = { status: "error", isFetching: false };
+    const refreshing: Read = { status: "success", isFetching: true };
+    const view = (sensor: Read, manual: Read) =>
+      buildTentManualHistoryRead({
+        sensor: { ...sensor, data: [], refetch: () => {} },
+        manual: { ...manual, data: [], refetch: () => {} },
+      });
+    expect(view(settled, settled)).toMatchObject({ readStatus: "success", isFetching: false });
+    expect(view(settled, pending)).toMatchObject({ readStatus: "pending", isFetching: true });
+    expect(view(settled, failed)).toMatchObject({ readStatus: "error" });
+    expect(view(failed, settled)).toMatchObject({ readStatus: "error" });
+    expect(view(failed, pending)).toMatchObject({ readStatus: "error", isFetching: true });
+    expect(view(settled, refreshing)).toMatchObject({ readStatus: "success", isFetching: true });
+    // A paused first read is pending with no fetch in flight: still not settled.
+    expect(view(settled, { status: "pending", isFetching: false })).toMatchObject({
+      readStatus: "pending",
+    });
+  });
+
+  it("merges manual rows only from data, keeping the sensor rows first", () => {
+    const ev = parseTentManualEnvironmentEvents([eventRow("2026-10-14T10:00:00.000Z")] as never);
+    const sensorRow = {
+      ts: "2026-10-13T10:00:00.000Z",
+      metric: "temperature_c",
+      value: 24,
+      source: "manual",
+      tent_id: TENT_ID,
+    };
+    const read = buildTentManualHistoryRead({
+      sensor: { ...settled, data: [sensorRow], refetch: () => {} },
+      manual: { ...settled, data: ev, refetch: () => {} },
+    });
+    expect(read.readings[0]).toEqual(sensorRow);
+    expect(read.readings).toHaveLength(1 + manualEnvironmentEventsToChangeContextRows(ev).length);
+  });
+
+  it("retries both sources", () => {
+    const sensorRefetch = vi.fn();
+    const manualRefetch = vi.fn();
+    buildTentManualHistoryRead({
+      sensor: { status: "error", isFetching: false, data: [], refetch: sensorRefetch },
+      manual: { status: "error", isFetching: false, data: [], refetch: manualRefetch },
+    }).onRetry();
+    expect(sensorRefetch).toHaveBeenCalledTimes(1);
+    expect(manualRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  function HistoryWithRealManualRead({ sensorRefetch }: { sensorRefetch: () => void }) {
+    const manual = useTentManualEnvironmentEvents(TENT_ID);
+    const read = buildTentManualHistoryRead({
+      sensor: { ...settled, data: [], refetch: sensorRefetch },
+      manual,
+    });
+    return (
+      <TentManualSnapshotHistoryList
+        tentId={TENT_ID}
+        readings={read.readings}
+        readStatus={read.readStatus}
+        isFetching={read.isFetching}
+        onRetry={read.onRetry}
+      />
+    );
+  }
+
+  it("shows loading, not an empty history, while only the events read is pending", async () => {
+    db.holdTables.add("grow_events");
+    withProviders(<HistoryWithRealManualRead sensorRefetch={() => {}} />);
+    expect(await screen.findByTestId("tent-manual-snapshot-history-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-manual-snapshot-history-empty")).toBeNull();
+  });
+
+  it("shows the error and recovers both sources on Retry when only the events read failed", async () => {
+    db.failTables.add("grow_events");
+    const sensorRefetch = vi.fn();
+    withProviders(<HistoryWithRealManualRead sensorRefetch={sensorRefetch} />);
+    expect(await screen.findByTestId("tent-manual-snapshot-history-error")).toBeInTheDocument();
+    expect(screen.queryByTestId("tent-manual-snapshot-history-empty")).toBeNull();
+
+    db.failTables.delete("grow_events");
+    db.byTable = { grow_events: [eventRow("2026-10-14T10:00:00.000Z")] };
+    fireEvent.click(screen.getByTestId("tent-manual-snapshot-history-retry"));
+    expect(sensorRefetch).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.queryByTestId("tent-manual-snapshot-history-error")).toBeNull(),
+    );
+    expect(screen.queryByTestId("tent-manual-snapshot-history-empty")).toBeNull();
   });
 });

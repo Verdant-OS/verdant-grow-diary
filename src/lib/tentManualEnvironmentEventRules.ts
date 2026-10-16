@@ -147,3 +147,50 @@ export function manualEnvironmentEventsToSnapshotRecords(
   }
   return out;
 }
+
+/** The part of a React Query result the tent history read needs. */
+export interface TentHistorySourceRead<T> {
+  status: "pending" | "error" | "success";
+  isFetching: boolean;
+  data: ReadonlyArray<T> | undefined;
+  refetch: () => unknown;
+}
+
+export interface TentManualHistoryReadView<S> {
+  readings: Array<S | TentManualEnvChangeContextRow>;
+  readStatus: "pending" | "error" | "success";
+  isFetching: boolean;
+  onRetry: () => void;
+}
+
+/**
+ * The tent page's manual snapshot history merges sensor_readings rows with
+ * Quick Log V2 grow_events rows, so its read state must cover both reads.
+ * Either failed read is an error; otherwise either unsettled read (including a
+ * paused first read) is pending; only two successful reads may establish an
+ * empty or complete history. Retry refetches both sources.
+ */
+export function buildTentManualHistoryRead<S>(input: {
+  sensor: TentHistorySourceRead<S>;
+  manual: TentHistorySourceRead<TentManualEnvironmentEvent>;
+}): TentManualHistoryReadView<S> {
+  const { sensor, manual } = input;
+  const readStatus =
+    sensor.status === "error" || manual.status === "error"
+      ? "error"
+      : sensor.status === "pending" || manual.status === "pending"
+        ? "pending"
+        : "success";
+  return {
+    readings: [
+      ...(sensor.data ?? []),
+      ...manualEnvironmentEventsToChangeContextRows(manual.data ?? []),
+    ],
+    readStatus,
+    isFetching: sensor.isFetching || manual.isFetching,
+    onRetry: () => {
+      void sensor.refetch();
+      void manual.refetch();
+    },
+  };
+}

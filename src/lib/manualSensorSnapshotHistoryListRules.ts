@@ -28,10 +28,7 @@ import {
 } from "@/lib/manualSensorSnapshotChangeContextRules";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
-import {
-  loadTemperatureUnitPreference,
-  type TemperatureUnitPreference,
-} from "@/lib/temperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 /** Deterministic display order for the per-snapshot metric chips. */
 export const HISTORY_METRIC_DISPLAY_ORDER: ChangeContextMetric[] = [
@@ -179,7 +176,7 @@ export function buildManualSnapshotHistoryList(
 ): ManualSnapshotHistoryEntry[] {
   if (!opts.tentId) return [];
   const limit = clampLimit(opts.limit);
-  const temperatureUnit = opts.temperatureUnit ?? loadTemperatureUnitPreference();
+  const temperatureUnit = opts.temperatureUnit ?? "fahrenheit";
   const snapshots = groupManualReadingsToSnapshots(rows, { tentId: opts.tentId });
   if (snapshots.length === 0) return [];
 

@@ -17,10 +17,7 @@
  */
 
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
-import {
-  loadTemperatureUnitPreference,
-  type TemperatureUnitPreference,
-} from "@/lib/temperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 export type ChangeContextMetric =
   | "temperature_c"
@@ -224,7 +221,7 @@ export function buildManualSnapshotChangeContext(input: {
   temperatureUnit?: TemperatureUnitPreference;
 }): ChangeContextResult {
   const { latest, previous } = input;
-  const temperatureUnit = input.temperatureUnit ?? loadTemperatureUnitPreference();
+  const temperatureUnit = input.temperatureUnit ?? "fahrenheit";
   if (!latest) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
   if (!previous) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
 

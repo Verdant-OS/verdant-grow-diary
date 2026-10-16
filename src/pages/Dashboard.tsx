@@ -207,9 +207,14 @@ export default function Dashboard() {
     chartQuickLogManualQuery.isPending ||
     chartQuickLogManualQuery.isError ||
     chartQuickLogManualQuery.fetchStatus === "fetching";
-  const quickLogManualReadings = quickLogManualsIncomplete
-    ? []
-    : (chartQuickLogManualQuery.data ?? []);
+  const sensorReadingsIncomplete =
+    Boolean(dashboardReadingsQuery.isLoading) ||
+    Boolean((dashboardReadingsQuery as { isPending?: boolean }).isPending) ||
+    Boolean(dashboardReadingsQuery.isError) ||
+    Boolean((dashboardReadingsQuery as { isFetching?: boolean }).isFetching) ||
+    (dashboardReadingsQuery as { fetchStatus?: string }).fetchStatus === "fetching";
+  const exportIncomplete = quickLogManualsIncomplete || sensorReadingsIncomplete;
+  const quickLogManualReadings = chartQuickLogManualQuery.data ?? [];
   const dashboardExportReadings = mergeDashboardChartReadingsWithQuickLogManuals(
     readings as unknown as SensorReading[],
     quickLogManualReadings,
@@ -879,11 +884,12 @@ export default function Dashboard() {
                                   data={chartReadings}
                                   exportData={dashboardExportReadings}
                                   tentNamesById={tentNamesById}
-                                  exportDisabled={quickLogManualsIncomplete}
+                                  exportDisabled={exportIncomplete}
                                   exportDisabledReason={
-                                    chartQuickLogManualQuery.isError
-                                      ? "Quick Log manual history could not be checked — CSV export is disabled until all sources load."
-                                      : "Checking Quick Log manual history…"
+                                    chartQuickLogManualQuery.isError ||
+                                    dashboardReadingsQuery.isError
+                                      ? "Sensor or Quick Log history could not be checked — CSV export is disabled until all sources load."
+                                      : "Refreshing sensor and Quick Log history…"
                                   }
                                   metric="temp"
                                   height={200}

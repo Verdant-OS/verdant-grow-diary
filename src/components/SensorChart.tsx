@@ -105,7 +105,9 @@ export default function SensorChart({
       filteredExportData,
       Date.now(),
       temperatureUnit,
-      tentNamesById ? { tentNamesById } : undefined,
+      tentNamesById !== undefined || exportData !== undefined
+        ? { tentNamesById, includeTentColumn: true }
+        : undefined,
     );
     const filename = `sensor-readings-${metric}-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadTextFile(csv, filename);

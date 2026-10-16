@@ -123,6 +123,17 @@ export interface BuildSensorReadingsCsvOptions {
   includeTentColumn?: boolean;
 }
 
+function resolveReadingTentId(reading: SensorReading): string {
+  if (typeof reading.tentId === "string" && reading.tentId.trim()) {
+    return reading.tentId.trim();
+  }
+  const snake = (reading as { tent_id?: unknown }).tent_id;
+  if (typeof snake === "string" && snake.trim()) {
+    return snake.trim();
+  }
+  return "";
+}
+
 export function buildSensorReadingsCsv(
   readings: ReadonlyArray<SensorReading>,
   nowMs?: number,
@@ -130,9 +141,7 @@ export function buildSensorReadingsCsv(
   options?: BuildSensorReadingsCsvOptions,
 ): string {
   const resolvedUnit = resolveExportTemperatureUnit(temperatureUnit);
-  const distinctTents = new Set(
-    readings.map((r) => (typeof r.tentId === "string" ? r.tentId.trim() : "")).filter(Boolean),
-  );
+  const distinctTents = new Set(readings.map(resolveReadingTentId).filter(Boolean));
   const includeTent =
     options?.includeTentColumn === true ||
     options?.tentNamesById !== undefined ||
@@ -177,13 +186,14 @@ export function buildSensorReadingsCsv(
       formatUtcTimestamp(r.capturedAt),
     ];
     if (includeTent) {
-      const rawName = options?.tentNamesById?.[r.tentId] || "";
-      const trimmedName = rawName.trim();
-      const tentLabel = rawName
-        ? duplicateTentNames.has(trimmedName) && r.tentId
-          ? `${rawName} (${r.tentId})`
-          : rawName
-        : r.tentId || "";
+      const tentId = resolveReadingTentId(r);
+      const rawName = tentId ? options?.tentNamesById?.[tentId] : undefined;
+      const trimmedName = typeof rawName === "string" ? rawName.trim() : "";
+      const tentLabel = trimmedName
+        ? duplicateTentNames.has(trimmedName) && tentId
+          ? `${rawName} (${tentId})`
+          : (rawName as string)
+        : tentId;
       cells.push(tentLabel);
     }
     return cells.map(csvEscape).join(",");

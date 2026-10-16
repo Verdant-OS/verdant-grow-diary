@@ -44,3 +44,18 @@ export function describeSettingsTile(state: SettingsTileState): SettingsTileBadg
 export function settingsTileAriaLabel(name: string, state: SettingsTileState): string {
   return `${name} — ${describeSettingsTile(state).label}`;
 }
+
+/**
+ * Whether the delete-account dialog must disclose billing cancellation and
+ * refund terms. Hidden only when the plan is confirmed Free; a loading, failed
+ * or unrecognised plan keeps the disclosure so a paying grower is never told
+ * less than the truth.
+ */
+export function deleteAccountDisclosesBilling(input: {
+  loading: boolean;
+  lookupFailed: boolean;
+  displayPlanId: string | null | undefined;
+}): boolean {
+  if (input.loading || input.lookupFailed) return true;
+  return input.displayPlanId !== "free";
+}

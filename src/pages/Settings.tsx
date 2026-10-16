@@ -26,10 +26,10 @@ import {
 import { createAccountDeletionContinuation } from "@/lib/accountDeletionContinuationRules";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import AccountPlanBadge from "@/components/AccountPlanBadge";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
 import { PRICING_TIERS } from "@/config/pricing";
 import {
+  deleteAccountDisclosesBilling,
   describeSettingsTile,
   settingsTileAriaLabel,
   type SettingsTileState,
@@ -54,7 +54,8 @@ import { alertsPath } from "@/lib/routes";
 
 interface TileProps {
   name: string;
-  state: SettingsTileState;
+  /** Omit for tiles whose content states its own status (destructive or not-ready). */
+  state?: SettingsTileState;
   children: React.ReactNode;
 }
 
@@ -64,28 +65,32 @@ interface PreferenceFeedback {
 }
 
 function Tile({ name, state, children }: TileProps) {
-  const badge = describeSettingsTile(state);
+  const badge = state ? describeSettingsTile(state) : null;
   return (
     <div
       className="glass rounded-2xl p-5"
       data-testid="settings-tile"
       data-tile-state={state}
-      aria-label={settingsTileAriaLabel(name, state)}
+      aria-label={state ? settingsTileAriaLabel(name, state) : name}
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
         <h2 className="font-display font-semibold">{name}</h2>
-        <Badge
-          variant={badge.variant}
-          data-testid="settings-tile-badge"
-          className="self-start sm:self-auto shrink-0"
-        >
-          {badge.label}
-        </Badge>
+        {badge ? (
+          <Badge
+            variant={badge.variant}
+            data-testid="settings-tile-badge"
+            className="self-start sm:self-auto shrink-0"
+          >
+            {badge.label}
+          </Badge>
+        ) : null}
       </div>
       {children}
-      <p className="text-xs text-muted-foreground mt-3" data-testid="settings-tile-helper">
-        {badge.helper}
-      </p>
+      {badge ? (
+        <p className="text-xs text-muted-foreground mt-3" data-testid="settings-tile-helper">
+          {badge.helper}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -338,7 +343,6 @@ function SubscriptionTile() {
             <span className="font-medium text-foreground" data-testid="settings-subscription-plan">
               {label}
             </span>
-            {!lookupFailed && <AccountPlanBadge entitlement={entitlement} loading={loading} />}
           </p>
           {isStaff && (
             <p
@@ -473,6 +477,12 @@ function DeleteAccountTile() {
   const confirmationOwner = useRef<string | null>(null);
   const previousOwner = useRef(user?.id);
   const activeRequest = useRef<ReturnType<typeof createAccountDeletionContinuation> | null>(null);
+  const plan = useMyEntitlements();
+  const disclosesBilling = deleteAccountDisclosesBilling({
+    loading: plan.loading,
+    lookupFailed: plan.lookupFailed,
+    displayPlanId: plan.entitlement?.displayPlanId,
+  });
   const canConfirm = confirmation === DELETE_ACCOUNT_CONFIRMATION && !busy;
 
   useEffect(() => {
@@ -543,7 +553,7 @@ function DeleteAccountTile() {
   }
 
   return (
-    <Tile name="Delete account" state="available">
+    <Tile name="Delete account">
       <p className="text-sm text-muted-foreground mb-3">
         Permanently delete your Verdant account and all associated grow data. This cannot be undone.
       </p>
@@ -572,8 +582,14 @@ function DeleteAccountTile() {
             <DialogTitle>Delete your Verdant account?</DialogTitle>
             <DialogDescription>
               This permanently deletes your account, grows, tents, plants, diary entries, photos,
-              and sensor snapshots. This cannot be undone. Any recurring Paddle subscription is
-              canceled immediately before deletion. Deletion does not automatically issue a refund.
+              and sensor snapshots. This cannot be undone.
+              {disclosesBilling ? (
+                <>
+                  {" "}
+                  Any recurring Paddle subscription is canceled immediately before deletion.
+                  Deletion does not automatically issue a refund.
+                </>
+              ) : null}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-2">
@@ -611,7 +627,13 @@ function DeleteAccountTile() {
               aria-busy={busy}
               data-testid="settings-delete-account-confirm"
             >
-              {busy ? "Canceling billing and deleting…" : "Cancel billing and delete"}
+              {disclosesBilling
+                ? busy
+                  ? "Canceling billing and deleting…"
+                  : "Cancel billing and delete"
+                : busy
+                  ? "Deleting…"
+                  : "Delete account"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -652,7 +674,7 @@ export default function Settings() {
 
         <SubscriptionTile />
 
-        <Tile name="Refer a friend" state="available">
+        <Tile name="Refer a friend">
           <RewardedReferralCard />
         </Tile>
 

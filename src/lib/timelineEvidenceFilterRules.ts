@@ -537,8 +537,20 @@ export function deriveTimelineEventTypeOptions(
     if (!t) continue;
     m.set(t, (m.get(t) ?? 0) + 1);
   }
-  return Array.from(m.entries())
-    .map(([id, count]) => ({ id, label: timelineEventTypeOptionLabel(id), count }))
+  const options = Array.from(m.entries()).map(([id, count]) => ({
+    id,
+    label: timelineEventTypeOptionLabel(id),
+    count,
+  }));
+  const labelCounts = new Map<string, number>();
+  for (const option of options) {
+    labelCounts.set(option.label, (labelCounts.get(option.label) ?? 0) + 1);
+  }
+  return options
+    .map((option) => {
+      if ((labelCounts.get(option.label) ?? 0) < 2 || option.label === option.id) return option;
+      return { ...option, label: `${option.label} (${option.id})` };
+    })
     .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
 }
 

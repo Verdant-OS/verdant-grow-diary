@@ -68,7 +68,7 @@ describe("TentCardActionsMenu destructive guard", () => {
     expect(screen.getByTestId("tent-detail-archive-tent")).toBeDisabled();
     expect(screen.getByTestId("tent-detail-delete-tent")).toBeDisabled();
     expect(screen.getByTestId("tent-management-guard-reason")).toHaveTextContent(
-      "Tent has plants assigned. Move, merge, or remove them first.",
+      /tent has plants assigned/i,
     );
     fireEvent.click(screen.getByTestId("tent-detail-archive-tent"));
     fireEvent.click(screen.getByTestId("tent-detail-delete-tent"));

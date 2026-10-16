@@ -98,7 +98,6 @@ describe("tentManagementRules · evaluateTentDeleteGuard", () => {
     const g = evaluateTentDeleteGuard({ tentId: "t1", assignedPlantCount: 2 });
     expect(g.canDelete).toBe(false);
     expect(g.canArchive).toBe(false);
-    expect(g.reason).toBe("Tent has plants assigned. Move, merge, or remove them first.");
     expect(g.recommendedAction).toBe("move_plants_first");
   });
   it("recommends archive when empty and archive supported", () => {

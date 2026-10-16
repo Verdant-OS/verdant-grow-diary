@@ -1,8 +1,8 @@
 -- Quick Log correction: editable volume, dose, and sensor values.
 --
--- The original entry stays in quicklog_entry_revisions.previous_state.
--- This migration does not update that ledger. It adds measured-value keys to
--- quicklog_correct_entry and writes the new value only on the live row.
+-- The original measured values are copied into quicklog_entry_revisions.previous_state
+-- before the live row changes. quicklog_correct_entry merges the helper's previous
+-- object into that ledger and writes the new value on the live row.
 -- Cheeko approved this migration at 4:54 PM CT on 2026-10-14. No table, column, policy, or grant change.
 --
 -- Bounds match the merged writers: volume > 0 and <= 1000000 ml; dose >= 0 and
@@ -114,7 +114,7 @@ BEGIN
          SET volume_ml = p_volume
        WHERE w.event_id = p_grow_event_id AND w.user_id = p_uid;
       GET DIAGNOSTICS v_updated = ROW_COUNT;
-      IF v_updated = 0 THEN
+      IF v_updated = 0 AND COALESCE(cardinality(p_diary_ids), 0) = 0 THEN
         RETURN jsonb_build_object('reason', 'unsupported_change');
       END IF;
     ELSIF p_grow_event_id IS NOT NULL THEN
@@ -122,7 +122,7 @@ BEGIN
          SET volume_ml = p_volume
        WHERE f.event_id = p_grow_event_id AND f.user_id = p_uid;
       GET DIAGNOSTICS v_updated = ROW_COUNT;
-      IF v_updated = 0 THEN
+      IF v_updated = 0 AND COALESCE(cardinality(p_diary_ids), 0) = 0 THEN
         RETURN jsonb_build_object('reason', 'unsupported_change');
       END IF;
     END IF;
@@ -246,6 +246,22 @@ BEGIN
               ELSE COALESCE(d.details #> '{sensor_snapshot,metrics,vpd_kpa}', 'null'::jsonb) END,
          true)
      WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid;
+    UPDATE public.diary_entries d
+       SET details = jsonb_set(
+         jsonb_set(
+           d.details,
+           '{manual_sensor_snapshot,temp_f}',
+           CASE WHEN p_sensor ? 'temperature_c'
+             THEN to_jsonb(((p_sensor ->> 'temperature_c')::numeric * 9.0 / 5.0) + 32)
+             ELSE COALESCE(d.details #> '{manual_sensor_snapshot,temp_f}', 'null'::jsonb) END,
+           true),
+         '{manual_sensor_snapshot,humidity_percent}',
+         CASE WHEN p_sensor ? 'humidity_pct'
+           THEN to_jsonb((p_sensor ->> 'humidity_pct')::numeric)
+           ELSE COALESCE(d.details #> '{manual_sensor_snapshot,humidity_percent}', 'null'::jsonb) END,
+         true)
+     WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+       AND jsonb_typeof(d.details -> 'manual_sensor_snapshot') = 'object';
   END IF;
 
   RETURN jsonb_build_object('previous', v_previous, 'next', v_next);
@@ -254,7 +270,7 @@ $$;
 
 REVOKE ALL ON FUNCTION public.quicklog_correction_apply_measured_values(
   UUID, TEXT, UUID, UUID[], UUID[], BOOLEAN, NUMERIC, BOOLEAN, NUMERIC, BOOLEAN, JSONB
-) FROM PUBLIC, anon, authenticated;
+) FROM PUBLIC, anon, authenticated, service_role;
 
 
 CREATE OR REPLACE FUNCTION public.quicklog_correct_entry(

@@ -159,12 +159,12 @@ begin
   if coalesce(v_water ->> 'ok', '') <> 'true' then
     raise exception 'watering correction failed: %', v_water;
   end if;
-  if (select volume_ml from public.watering_events where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') <> 750 then
+  if (select volume_ml from public.watering_events where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') is distinct from 750 then
     raise exception 'watering volume was not updated';
   end if;
   select previous_state into v_prev from public.quicklog_entry_revisions
    where grow_event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
-  if (v_prev ->> 'volume_ml')::numeric <> 500 then
+  if (v_prev ->> 'volume_ml')::numeric is distinct from 500 then
     raise exception 'watering history lost the original volume: %', v_prev;
   end if;
 
@@ -175,7 +175,7 @@ begin
     raise exception 'feeding correction failed: %', v_feed;
   end if;
   select details into v_feed_details from public.diary_entries where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
-  if (v_feed_details #>> '{feeding,volume_ml}')::numeric <> 300 then
+  if (v_feed_details #>> '{feeding,volume_ml}')::numeric is distinct from 300 then
     raise exception 'feeding volume missing from feeding details: %', v_feed_details;
   end if;
   if (v_feed_details ->> 'watering_amount_ml')::numeric is distinct from 300 then
@@ -184,12 +184,12 @@ begin
   if v_feed_details #> '{watering,volume_ml}' is not null then
     raise exception 'feeding volume wrote watering details: %', v_feed_details;
   end if;
-  if (v_feed_details #>> '{feeding,products,0,amount}')::numeric <> 4 then
+  if (v_feed_details #>> '{feeding,products,0,amount}')::numeric is distinct from 4 then
     raise exception 'feeding dose was not updated: %', v_feed_details;
   end if;
   select previous_state into v_prev from public.quicklog_entry_revisions
    where grow_event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
-  if (v_prev ->> 'volume_ml')::numeric <> 200 or (v_prev ->> 'dose_amount')::numeric <> 2 then
+  if (v_prev ->> 'volume_ml')::numeric is distinct from 200 or (v_prev ->> 'dose_amount')::numeric is distinct from 2 then
     raise exception 'feeding history lost the original values: %', v_prev;
   end if;
 
@@ -220,12 +220,12 @@ begin
   if coalesce(v_sensor ->> 'ok', '') <> 'true' then
     raise exception 'sensor correction failed: %', v_sensor;
   end if;
-  if (select temperature_c from public.environment_events where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3') <> 26 then
+  if (select temperature_c from public.environment_events where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3') is distinct from 26 then
     raise exception 'sensor temperature was not updated';
   end if;
   select previous_state into v_prev from public.quicklog_entry_revisions
    where grow_event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
-  if (v_prev #>> '{environment_events,0,temperature_c}')::numeric <> 24 then
+  if (v_prev #>> '{environment_events,0,temperature_c}')::numeric is distinct from 24 then
     raise exception 'sensor history lost the original temperature: %', v_prev;
   end if;
 end
@@ -242,7 +242,7 @@ values
 insert into public.diary_entries(id, user_id, note, details)
 values (
   'dddddddd-dddd-4ddd-8ddd-ddddddddddd1', '${OWNER}', 'Network-inspection retest',
-  '{"event_type":"observation","source":"manual","feeding":null,"watering":null,"photo_url":null,"quick_log_version":2,"linked_grow_event_id":"cccccccc-cccc-4ccc-8ccc-ccccccccccc1"}'
+  '{"event_type":"observation","source":"manual","feeding":null,"watering":null,"photo_url":null,"quick_log_version":2,"linked_grow_event_id":"cccccccc-cccc-4ccc-8ccc-ccccccccccc1","manual_sensor_snapshot":{"source":"manual","temp_f":75.2,"humidity_percent":55}}'
 );
 insert into public.environment_events(event_id, user_id, temperature_c, humidity_pct, vpd_kpa)
 values ('cccccccc-cccc-4ccc-8ccc-ccccccccccc2', '${OWNER}', 24, 55, 1.1);
@@ -258,13 +258,18 @@ begin
     raise exception 'observation companion correction failed: %', v_result;
   end if;
   if (select temperature_c from public.environment_events
-       where event_id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2') <> 26 then
+       where event_id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2') is distinct from 26 then
     raise exception 'observation companion temperature was not updated';
   end if;
   select previous_state into v_prev from public.quicklog_entry_revisions
    where grow_event_id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
-  if (v_prev #>> '{environment_events,0,temperature_c}')::numeric <> 24 then
+  if (v_prev #>> '{environment_events,0,temperature_c}')::numeric is distinct from 24 then
     raise exception 'observation companion history lost the original temperature: %', v_prev;
+  end if;
+  if (select (details #>> '{manual_sensor_snapshot,temp_f}')::numeric
+        from public.diary_entries
+       where id = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1') is distinct from 78.8 then
+    raise exception 'manual sensor snapshot mirror kept the old Fahrenheit temperature';
   end if;
 end
 $obs$;

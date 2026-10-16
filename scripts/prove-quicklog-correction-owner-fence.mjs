@@ -98,7 +98,7 @@ begin
   end if;
   select volume_ml into v_volume from public.watering_events
    where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
-  if v_volume <> 500 then
+  if v_volume is distinct from 500 then
     raise exception 'non-owner changed the volume to %', v_volume;
   end if;
 

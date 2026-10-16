@@ -105,9 +105,14 @@ test("visualForStage is deterministic and null-safe on week", () => {
   assert.equal(normalizeWeek("3"), null);
 });
 
-test("labelFor keeps the id when the long name truncates; sexLabel is explicit", () => {
-  assert.equal(labelFor(PLANTS_BY_ID["P-102"]), "Juniper Valle… · P-102");
-  assert.equal(labelFor(PLANTS_BY_ID["P-105"], 40), "Unnamed seedling (sample) · P-105");
+test("labelFor shows the short name with the stable id; long name is for details/List", () => {
+  assert.equal(labelFor(PLANTS_BY_ID["P-102"]), "Juniper · P-102");
+  assert.equal(labelFor(PLANTS_BY_ID["P-105"]), `${PLANTS_BY_ID["P-105"].shortName} · P-105`);
+  // no short name: fall back to the long name, truncated with the id kept
+  assert.equal(
+    labelFor({ id: "P-8", longName: "A very long cultivar name here" }),
+    "A very long c… · P-8",
+  );
   assert.equal(labelFor({ id: "P-9" }), "P-9");
   assert.equal(labelFor(null), "?");
   assert.equal(sexLabel("male"), "Male (recorded)");

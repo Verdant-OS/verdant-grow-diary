@@ -106,9 +106,13 @@ export function sexLabel(sex) {
 }
 
 /** Truncate a long name for a label while keeping the id visible. */
+/**
+ * Diorama label: the short name plus the stable id. The long name stays in details and List
+ * view; a short label keeps six labels legible on a phone without shrinking text.
+ */
 export function labelFor(plant, maxNameChars = 14) {
   const id = plant?.id ?? "?";
-  const name = String(plant?.longName ?? plant?.shortName ?? "").trim();
+  const name = String(plant?.shortName ?? plant?.longName ?? "").trim();
   if (!name) return `${id}`;
   const shown = name.length > maxNameChars ? `${name.slice(0, maxNameChars - 1)}…` : name;
   return `${shown} · ${id}`;

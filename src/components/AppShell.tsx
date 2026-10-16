@@ -33,6 +33,7 @@ import {
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
+import { QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS } from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { TentQuickLogTargetScope } from "@/components/TentQuickLogTargetScope";
@@ -437,7 +438,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           <main
             id="main-content"
             tabIndex={-1}
-            className="mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pb-9 md:pt-7 lg:px-10"
+            className={`mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pt-7 lg:px-10 ${QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS}`}
+            // pb-28 stays for the layout pin. This inline value is larger, so it
+            // wins and the last line clears the Quick Log button (including at 200% zoom).
+            style={{ paddingBottom: "calc(9.5rem + env(safe-area-inset-bottom))" }}
           >
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />

@@ -65,10 +65,6 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // clawback_lovable_credit_pack on every approved refund, so production
   // must carry this before that function ships.
   "20261003010000_credit_pack_refund_clawback.sql",
-  // Referrer reward cap: 10 rewarded conversions per UTC month per
-  // environment (grant-path audit 2026-10-03). Absence silently restores
-  // unbounded referral credit farming.
-  "20261003020000_referral_referrer_monthly_cap.sql",
 ];
 
 /**
@@ -105,6 +101,12 @@ export const KNOWN_MONEY_MIGRATIONS = new Set([
   "20260717193000_entitlement_status_parity.sql",
   // Client UPDATE hardening merged in #1373; preferences remain edge-only.
   "20260914190600_founders_client_updates_fail_closed.sql",
+  // Referrer monthly cap and the deletion-safe recount. Known because the
+  // filenames are money-adjacent. Not in REQUIRED_MONEY_MIGRATIONS: that
+  // list is what the push-triggered sandbox applied-check probes, and
+  // Verdant has no supported sandbox (Codex P1 4263480448).
+  "20261003020000_referral_referrer_monthly_cap.sql",
+  "20261014010000_referral_cap_counts_deleted_referees.sql",
   // everything in REQUIRED is by definition known
   ...REQUIRED_MONEY_MIGRATIONS,
 ]);

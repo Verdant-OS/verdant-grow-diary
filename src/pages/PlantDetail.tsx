@@ -98,6 +98,7 @@ import type {
   PhotoDiagnosisPhotoInput,
 } from "@/lib/photoDiagnosisNoteRules";
 
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { logsPath, plantDetailPath, plantsPath, tentDetailPath } from "@/lib/routes";
 import {
   PLANT_DETAIL_LOAD_TIMEOUT_MS,
@@ -823,7 +824,20 @@ export default function PlantDetail() {
         >
           <PlantManualSensorFreshnessCard
             plantId={plant.id}
-            onUpdate={() => setQuickLogOpen(true)}
+            onUpdate={() =>
+              window.dispatchEvent(
+                new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+                  detail: {
+                    plantId: plant.id,
+                    plantName: plant.name,
+                    growId: plant.growId ?? null,
+                    tentId: plant.tentId ?? null,
+                    tentName: tent?.name ?? null,
+                    activityId: "manual_sensor_snapshot",
+                  },
+                }),
+              )
+            }
           />
           <PlantSensorSourceBreakdownCard plantId={plant.id} className="mt-1" />
           <PlantTentEnvironmentPanel

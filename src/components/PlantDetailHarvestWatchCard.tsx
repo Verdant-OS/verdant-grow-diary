@@ -561,7 +561,7 @@ export default function PlantDetailHarvestWatchCard({
             onClick={onNextInspection}
             data-testid="plant-detail-harvest-watch-next-inspection-cta"
             data-inspection-kind={vm.nextInspection.kind}
-            className="gap-1.5"
+            className="h-auto min-h-9 min-w-0 max-w-full gap-1.5 whitespace-normal text-left"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Next inspection: {vm.nextInspection.label}

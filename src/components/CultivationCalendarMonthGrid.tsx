@@ -261,7 +261,7 @@ export default function CultivationCalendarMonthGrid({
       </p>
 
       <div
-        className="mt-4 overflow-x-auto overscroll-x-contain focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+        className="relative mt-4 min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
         data-testid="cultivation-calendar-horizontal-scroll"
         role="region"
         tabIndex={0}
@@ -302,7 +302,7 @@ export default function CultivationCalendarMonthGrid({
                     hasStageBand: day.hasStageBand,
                   })}
                   className={cn(
-                    "min-h-28 bg-card/80 p-1.5 sm:min-h-32 sm:p-2",
+                    "relative min-h-28 min-w-0 bg-card/80 p-1.5 sm:min-h-32 sm:p-2",
                     !day.isInMonth && "bg-muted/20 text-muted-foreground",
                     day.hasStageBand && flowerBandPalette.blockClassName,
                     day.isToday && "ring-1 ring-inset ring-primary/70",

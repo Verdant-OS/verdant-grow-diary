@@ -229,20 +229,20 @@ export default function PublicOneTentTour({
               <Button size="lg">Start your real grow free</Button>
             </Link>
           )}
-          <Link
-            to={pricingPath}
-            data-testid="public-one-tent-tour-pricing-cta"
-            onClick={() =>
-              trackPricingEvent("landing_loop_pricing_clicked", {
-                source: "one_tent_tour",
-                item: acquisitionSource,
-              })
-            }
-          >
-            <Button size="lg" variant="outline">
+          <Button asChild size="lg" variant="outline">
+            <Link
+              to={pricingPath}
+              data-testid="public-one-tent-tour-pricing-cta"
+              onClick={() =>
+                trackPricingEvent("landing_loop_pricing_clicked", {
+                  source: "one_tent_tour",
+                  item: acquisitionSource,
+                })
+              }
+            >
               See plans
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
         <p className="mt-4 text-center text-xs text-muted-foreground">
           The walkthrough is illustrative. Your account uses your own grow records and preserves

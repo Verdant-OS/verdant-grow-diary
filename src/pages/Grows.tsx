@@ -24,7 +24,11 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateGrowCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
-import { growRestoreFailureCopy, planGrowRestore } from "@/lib/archivedGrowQuickLogRules";
+import {
+  growRestoreFailureCopy,
+  nextActiveGrowIdAfterArchive,
+  planGrowRestore,
+} from "@/lib/archivedGrowQuickLogRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import {
   buildConnectedActivationRoutes,
@@ -147,13 +151,29 @@ export default function Grows() {
 
   async function archive(id: string) {
     if (!confirm("Archive this grow? Entries stay saved.")) return;
-    const { error: archiveError } = await supabase
+    const archiveWrite = await supabase
       .from("grows")
       .update({ is_archived: true })
-      .eq("id", id);
+      .eq("id", id)
+      .select();
+    const { error: archiveError } = archiveWrite;
     if (archiveError) {
       toast.error("Unable to archive this grow. Please try again.");
       return;
+    }
+    const archivedRows = archiveWrite.data;
+    if (!Array.isArray(archivedRows) || archivedRows.length === 0) {
+      toast.error("Unable to archive this grow. Please try again.");
+      return;
+    }
+    if (activeGrowId === id) {
+      setActiveGrowId(
+        nextActiveGrowIdAfterArchive({
+          archivedGrowId: id,
+          activeGrowId,
+          activeGrows: grows,
+        }),
+      );
     }
     await refresh();
     toast.success("Archived");
@@ -234,7 +254,7 @@ export default function Grows() {
           <p className="font-semibold">Unable to load grows.</p>
           <p className="text-xs text-muted-foreground mt-1">Please try again later.</p>
         </div>
-      ) : grows.length === 0 ? (
+      ) : grows.length === 0 && archivedGrowList.length === 0 ? (
         <div className="py-16 text-center" data-testid="grows-empty">
           <div className="mx-auto h-16 w-16 rounded-2xl glass flex items-center justify-center mb-4">
             <Sprout className="h-7 w-7 text-primary" />
@@ -242,6 +262,23 @@ export default function Grows() {
           <h2 className="font-display text-lg font-semibold">No grows yet.</h2>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
             Create your first grow to start logging.
+          </p>
+          <Button
+            onClick={() => handleOpenChange(true)}
+            className="gradient-leaf text-primary-foreground"
+            disabled={createOutcomeUnknown}
+          >
+            Create grow
+          </Button>
+        </div>
+      ) : grows.length === 0 ? (
+        <div
+          className="rounded-3xl border border-border/60 bg-card/65 p-8 text-center shadow-card"
+          data-testid="grows-no-active"
+        >
+          <h2 className="font-display text-lg font-semibold">No active grows.</h2>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
+            Start a new grow or restore an archived grow below.
           </p>
           <Button
             onClick={() => handleOpenChange(true)}
@@ -306,16 +343,15 @@ export default function Grows() {
                     Set active
                   </button>
                 )}
-                {g.id !== activeGrowId && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => archive(g.id)}
-                    aria-label="Archive grow"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => archive(g.id)}
+                  aria-label="Archive grow"
+                  data-testid="archive-grow"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </li>
           ))}
@@ -341,12 +377,16 @@ export default function Grows() {
                 className="rounded-3xl border border-border/60 bg-card/65 p-5 shadow-card"
                 data-testid="archived-grow-row"
               >
-                <div className="flex items-center gap-2 flex-wrap mb-3">
+                <Link
+                  to={`/grows/${g.id}`}
+                  className="mb-3 flex items-center gap-2 flex-wrap hover:underline"
+                  data-testid="archived-grow-card-link"
+                >
                   <span className="font-semibold">{g.name}</span>
                   <Badge variant="outline" className="text-[10px]">
                     archived
                   </Badge>
-                </div>
+                </Link>
                 <Button
                   type="button"
                   size="sm"

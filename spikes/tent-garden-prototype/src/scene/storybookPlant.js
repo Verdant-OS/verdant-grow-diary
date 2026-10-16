@@ -6,6 +6,7 @@
 // health or yield, and they must never be read as one.
 
 import * as THREE from "three";
+import { outlineShaderPatch } from "../rules/outlineShaderRules.js";
 
 export const STORYBOOK = Object.freeze({
   paper: 0xf3e7cf,
@@ -56,13 +57,12 @@ export const OUTLINE = 0.05; // world units (inches); clean line, no jitter
  */
 export function outlined(mesh, width = OUTLINE, seed = 0.5) {
   const ink = new THREE.MeshBasicMaterial({ color: STORYBOOK.ink, side: THREE.BackSide });
+  const patch = outlineShaderPatch(width, seed);
   ink.onBeforeCompile = (s) => {
-    s.vertexShader = s.vertexShader.replace(
-      "#include <begin_vertex>",
-      `#include <begin_vertex>
-      float jit = 1.0 + 0.0 * fract(sin(dot(position.xy, vec2(12.9898, 78.233)) + ${seed.toFixed(3)}) * 43758.5453);
-      transformed += normal * ${width.toFixed(4)} * jit;`,
-    );
+    for (const [search, replacement] of patch.replacements) {
+      s.vertexShader = s.vertexShader.replace(search, replacement);
+    }
+    Object.assign(s.uniforms, patch.uniforms);
   };
   const shell = new THREE.Mesh(mesh.geometry, ink);
   shell.renderOrder = -1;

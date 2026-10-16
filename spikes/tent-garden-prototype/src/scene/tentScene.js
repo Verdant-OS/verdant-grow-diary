@@ -7,6 +7,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { TENT, clampToTent } from "../rules/layoutRules.js";
 import { visualForStage, labelFor } from "../rules/plantVisualRules.js";
+import { layoutLabels } from "../rules/labelLayoutRules.js";
+import { hardwareOpacity, HARDWARE_KEYS } from "../rules/hardwareVisibilityRules.js";
 import {
   STORYBOOK,
   toon,
@@ -68,6 +70,15 @@ export function createTentScene(host, handlers) {
   labelRenderer.domElement.style.inset = "0";
   labelRenderer.domElement.style.pointerEvents = "none";
   host.appendChild(labelRenderer.domElement);
+  // Plant labels live in a self-managed layer so a pure rule can place them without overlap.
+  const labelLayer = document.createElement("div");
+  labelLayer.className = "label-layer";
+  host.appendChild(labelLayer);
+  const leaderSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  leaderSvg.setAttribute("class", "leader-layer");
+  host.appendChild(leaderSvg);
+  let labelAvoid = [];
+  const hardware = new Map(); // key -> mesh with its own material
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(34, 1, 1, 600);
@@ -85,7 +96,7 @@ export function createTentScene(host, handlers) {
   controls.touches.ONE = THREE.TOUCH.ROTATE;
   controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
 
-  buildTent(scene);
+  buildTent(scene, hardware);
   buildLights(scene);
 
   const plants = new Map(); // id -> { group, pot, plant, labelObj, labelEl, ring, from, to, t0 }
@@ -139,8 +150,23 @@ export function createTentScene(host, handlers) {
       p.pickMesh.userData.plantId = id;
       meshes.push(p.pickMesh);
     }
-    const hit = raycaster.intersectObjects(meshes, false)[0];
-    return hit ? hit.object.userData.plantId : null;
+    // Pot-height pick cylinders first; then the foliage itself, so clicking the leaves of a
+    // back-row plant selects that plant instead of the tall invisible column of a front one.
+    const hits = raycaster.intersectObjects(meshes, false);
+    const foliage = [];
+    for (const [id, p] of plants) {
+      if (p.group.visible && p.plantMesh) {
+        p.plantMesh.userData.plantId = id;
+        foliage.push(p.plantMesh);
+      }
+    }
+    for (const h of raycaster.intersectObjects(foliage, true)) {
+      let o = h.object;
+      while (o && !o.userData.plantId) o = o.parent;
+      if (o) hits.push({ distance: h.distance, object: o });
+    }
+    hits.sort((a, b) => a.distance - b.distance);
+    return hits[0] ? hits[0].object.userData.plantId : null;
   }
   function floorPoint(ev) {
     toPointer(ev);
@@ -233,10 +259,10 @@ export function createTentScene(host, handlers) {
     const pot = buildPot();
     group.add(pot);
     const pickMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(TENT.potRadiusIn + 1.5, TENT.potRadiusIn + 1.5, 26, 10),
+      new THREE.CylinderGeometry(TENT.potRadiusIn + 1, TENT.potRadiusIn + 1, POT_H + 4, 10),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    pickMesh.position.y = 13;
+    pickMesh.position.y = (POT_H + 4) / 2;
     group.add(pickMesh);
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(TENT.potRadiusIn + 0.8, TENT.potRadiusIn + 2.2, 40),
@@ -253,9 +279,7 @@ export function createTentScene(host, handlers) {
     group.add(ring);
     const labelEl = document.createElement("div");
     labelEl.className = "plant-label";
-    const labelObj = new CSS2DObject(labelEl);
-    labelObj.position.set(0, POT_H + 2, 0);
-    group.add(labelObj);
+    labelLayer.appendChild(labelEl);
     scene.add(group);
     p = {
       group,
@@ -263,7 +287,8 @@ export function createTentScene(host, handlers) {
       pickMesh,
       ring,
       labelEl,
-      labelObj,
+      labelAnchorY: POT_H + 2,
+      labelSize: null,
       plantMesh: null,
       visualKey: null,
       from: null,
@@ -289,7 +314,8 @@ export function createTentScene(host, handlers) {
       p.plantMesh.position.y = POT_H - 0.5;
       p.group.add(p.plantMesh);
       p.visualKey = key;
-      p.labelObj.position.y = POT_H + v.heightIn + (v.clusterCount > 0 ? 6 : 3);
+      p.labelAnchorY =
+        POT_H + v.heightIn * (v.clusterCount > 0 ? 1.1 : 1) + (v.clusterCount > 0 ? 6 : 3);
       // brief grow-in on first build when animations are on
       if (animations) {
         p.scaleFrom = 0.6;
@@ -297,7 +323,11 @@ export function createTentScene(host, handlers) {
         p.scaleT0 = performance.now();
       }
     }
-    p.labelEl.innerHTML = `${escapeHtml(labelFor(plantRecord))}<small>${escapeHtml(v.label)}</small>`;
+    const html = `${escapeHtml(labelFor(plantRecord))}<small>${escapeHtml(v.label)}</small>`;
+    if (p.labelEl.innerHTML !== html) {
+      p.labelEl.innerHTML = html;
+      p.labelSize = null; // re-measure on next frame
+    }
     p.labelEl.classList.toggle("is-neutral", v.neutral);
   }
 
@@ -339,6 +369,7 @@ export function createTentScene(host, handlers) {
       if (!ids.has(id)) {
         p.group.visible = false;
         p.ring.visible = false;
+        p.labelEl.style.display = "none";
       }
     }
     applySelection();
@@ -387,6 +418,83 @@ export function createTentScene(host, handlers) {
     }
   }
 
+  // ---- hardware fading: whatever is camera-side fades, in every orientation ----------------
+  function updateHardware() {
+    if (hardware.size === 0) return;
+    const target = hardwareOpacity(currentSpherical().azimuthDeg);
+    for (const key of HARDWARE_KEYS) {
+      const mesh = hardware.get(key);
+      if (!mesh) continue;
+      const want = target[key];
+      const m = mesh.material;
+      m.opacity += (want - m.opacity) * 0.25; // short ease so rotation does not pop
+      if (Math.abs(m.opacity - want) < 0.01) m.opacity = want;
+      const ink = mesh.children[0];
+      if (ink?.material) ink.material.opacity = m.opacity;
+      ink?.material && (ink.material.transparent = true);
+      ink && (ink.visible = m.opacity > 0.9);
+    }
+  }
+
+  // ---- labels: project anchors, let the pure rule place them, draw leaders ----------------
+  const tmpV = new THREE.Vector3();
+  function project(x, y, z) {
+    tmpV.set(x, y, z).project(camera);
+    const w = host.clientWidth || 1;
+    const h = host.clientHeight || 1;
+    return { x: (tmpV.x * 0.5 + 0.5) * w, y: (-tmpV.y * 0.5 + 0.5) * h, behind: tmpV.z > 1 };
+  }
+  function updateLabels() {
+    const w = host.clientWidth || 1;
+    const h = host.clientHeight || 1;
+    const items = [];
+    for (const [id, p] of plants) {
+      if (!p.group.visible) continue;
+      const g = p.group.position;
+      const a = project(g.x, p.labelAnchorY, g.z);
+      const b = project(g.x, 0, g.z);
+      if (a.behind) {
+        p.labelEl.style.display = "none";
+        continue;
+      }
+      p.labelEl.style.display = "";
+      if (!p.labelSize) p.labelSize = { w: p.labelEl.offsetWidth, h: p.labelEl.offsetHeight };
+      items.push({ id, ax: a.x, ay: a.y, bx: b.x, by: b.y, w: p.labelSize.w, h: p.labelSize.h });
+    }
+    // Overlays are measured every frame: a banner can re-wrap after the app rendered it.
+    const hostRect = host.getBoundingClientRect();
+    const avoid = [];
+    for (const a of labelAvoid) {
+      if (a && typeof a.getBoundingClientRect === "function") {
+        if (a.hidden) continue;
+        const r = a.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0)
+          avoid.push({
+            x: r.left - hostRect.left,
+            y: r.top - hostRect.top,
+            w: r.width,
+            h: r.height,
+          });
+      } else if (a && Number.isFinite(a.w)) avoid.push(a);
+    }
+    const placed = layoutLabels(items, { width: w, height: h, avoid, selectedId });
+    while (leaderSvg.firstChild) leaderSvg.removeChild(leaderSvg.firstChild);
+    for (const l of placed) {
+      const p = plants.get(l.id);
+      p.labelEl.style.display = l.hidden ? "none" : "";
+      if (l.hidden) continue;
+      p.labelEl.style.transform = `translate(${l.x.toFixed(1)}px, ${l.y.toFixed(1)}px) rotate(-1.2deg)`;
+      if (l.leader) {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", (l.x + l.w / 2).toFixed(1));
+        line.setAttribute("y1", (l.y + l.h).toFixed(1));
+        line.setAttribute("x2", l.ax.toFixed(1));
+        line.setAttribute("y2", l.ay.toFixed(1));
+        leaderSvg.appendChild(line);
+      }
+    }
+  }
+
   // ---- render loop --------------------------------------------------------------------
   let raf = 0;
   function frame() {
@@ -414,8 +522,10 @@ export function createTentScene(host, handlers) {
     }
     // While locked, skip controls.update() so orbit damping cannot drift the camera.
     if (!cameraLockedFlag) controls.update();
+    updateHardware();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
+    updateLabels();
     lastRenderedTick = now;
   }
   frame();
@@ -439,6 +549,18 @@ export function createTentScene(host, handlers) {
       const s = currentSpherical();
       setCamera({ ...s, azimuthDeg: s.azimuthDeg + deg }, true);
     },
+    /** Overlay elements (or host-px rects) labels must keep clear of: banner, edit hint. */
+    setLabelAvoid(items) {
+      labelAvoid = Array.isArray(items) ? items : [];
+    },
+    /** Screen position (host px) of a plant's pot — for tests and keyboard focus aids. */
+    screenPositionOf(id) {
+      const p = plants.get(id);
+      if (!p || !p.group.visible) return null;
+      const g = p.group.position;
+      const s = project(g.x, 10, g.z);
+      return { x: s.x, y: s.y };
+    },
     isDragging: () => !!drag,
     isCameraAnimating: () => !!camAnim,
     lastRenderedTick: () => lastRenderedTick,
@@ -454,7 +576,7 @@ export function createTentScene(host, handlers) {
 
 // ---- geometry builders ------------------------------------------------------------------
 
-function buildTent(scene) {
+function buildTent(scene, hardware) {
   const w = TENT.widthIn * UNIT;
   const d = TENT.depthIn * UNIT;
   scene.background = new THREE.Color(COLORS.sky);
@@ -484,31 +606,42 @@ function buildTent(scene) {
   right.position.set(w, WALL_H / 2, d / 2);
   scene.add(right);
 
-  // slim frame poles and a thin light bar; front stays open at the door. The front-right
-  // pole and the bar are translucent so hardware never hides a plant from the default view.
-  const poleMat = toon(COLORS.frame);
-  for (const [x, z] of [
-    [0, 0],
-    [w, 0],
-    [0, d],
-    [w, d],
+  // slim frame poles and rails. Each piece carries its own material so the camera-side set
+  // can fade (hardwareVisibilityRules); which set that is changes with every rotation.
+  const hwMesh = (geometry) => {
+    const mesh = new THREE.Mesh(geometry, toon(COLORS.frame, { transparent: true, opacity: 1 }));
+    outlined(mesh, 0.06);
+    mesh.children[0].material.transparent = true;
+    return mesh;
+  };
+  for (const [key, x, z] of [
+    ["pole:x0:z0", 0, 0],
+    ["pole:xW:z0", w, 0],
+    ["pole:x0:zD", 0, d],
+    ["pole:xW:zD", w, d],
   ]) {
-    const mat =
-      x === w && z === d ? toon(COLORS.frame, { transparent: true, opacity: 0.3 }) : poleMat;
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, WALL_H + 6, 10), mat);
-    if (mat === poleMat) outlined(pole, 0.06);
+    const pole = hwMesh(new THREE.CylinderGeometry(0.65, 0.65, WALL_H + 6, 10));
     pole.position.set(x, (WALL_H + 6) / 2, z);
     scene.add(pole);
+    hardware.set(key, pole);
   }
-  for (const z of [0, d]) {
-    const rail = outlined(new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, 1.0), poleMat), 0.06);
+  for (const [key, z] of [
+    ["rail:z0", 0],
+    ["rail:zD", d],
+  ]) {
+    const rail = hwMesh(new THREE.BoxGeometry(w, 1.0, 1.0));
     rail.position.set(w / 2, WALL_H + 5.2, z);
     scene.add(rail);
+    hardware.set(key, rail);
   }
-  for (const x of [0, w]) {
-    const rail = outlined(new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, d), poleMat), 0.06);
+  for (const [key, x] of [
+    ["rail:x0", 0],
+    ["rail:xW", w],
+  ]) {
+    const rail = hwMesh(new THREE.BoxGeometry(1.0, 1.0, d));
     rail.position.set(x, WALL_H + 5.2, d / 2);
     scene.add(rail);
+    hardware.set(key, rail);
   }
   const bar = new THREE.Mesh(
     new THREE.BoxGeometry(w * 0.7, 1.0, 6),

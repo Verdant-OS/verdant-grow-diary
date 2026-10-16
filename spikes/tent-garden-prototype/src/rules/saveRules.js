@@ -213,3 +213,15 @@ export function popDraft(history) {
   const next = history.slice(0, -1);
   return { history: next, draft: next[next.length - 1], undone: true };
 }
+
+/**
+ * Whether the Save control should be enabled. A note that is still being typed (no blur, so
+ * not yet committed to the draft) must count: the grower may click Save straight from the
+ * field, and openSave commits the live text first.
+ */
+export function canSave(input) {
+  if (!input) return false;
+  if (input.pendingFailed) return true;
+  const n = (Number(input.changeCount) || 0) + (Number(input.noteChangeCount) || 0);
+  return n > 0 || !!input.liveNoteDirty;
+}

@@ -1,4 +1,4 @@
-// Storybook plant artwork (style B, approved 2026-10-16). Pure geometry builders: given the
+// Storybook plant artwork (style B, direction approved 2026-10-16). Pure geometry builders: given the
 // silhouette parameters from plantVisualRules and a seed, return Three.js groups. No scene
 // state, no clock, no Math.random — the same inputs always draw the same plant.
 //
@@ -23,9 +23,10 @@ export const STORYBOOK = Object.freeze({
   veg: 0x7cb45a,
   flower: 0x6aa353,
   sugar: 0x8fbe68,
-  calyx: 0xa8c977,
-  calyxDeep: 0x7ea85b,
-  pistil: 0xf0924e,
+  calyx: 0xc3d96c, // soft lime, fictional artwork — not a maturity or health claim
+  calyxDeep: 0xa3bf58,
+  pistil: 0xe0893a, // warm amber hair
+  pistilTip: 0xf6c98a, // lighter hair tip
   neutral: 0xb7bbab,
   neutralStem: 0x9aa49c,
   ink: 0x3f3327,
@@ -34,8 +35,8 @@ export const STORYBOOK = Object.freeze({
 
 /** Two-step gradient: the hand-drawn look shades in one shadow band. */
 const GRADIENT = (() => {
-  const data = new Uint8Array([110, 110, 110, 255, 255, 255, 255, 255]);
-  const tex = new THREE.DataTexture(data, 2, 1, THREE.RGBAFormat);
+  const data = new Uint8Array([128, 128, 128, 255, 200, 200, 200, 255, 255, 255, 255, 255]);
+  const tex = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
   tex.minFilter = THREE.NearestFilter;
   tex.magFilter = THREE.NearestFilter;
   tex.needsUpdate = true;
@@ -46,7 +47,7 @@ export function toon(color, extra = {}) {
   return new THREE.MeshToonMaterial({ color, gradientMap: GRADIENT, ...extra });
 }
 
-export const OUTLINE = 0.075; // world units (inches); thin enough not to feel heavy
+export const OUTLINE = 0.05; // world units (inches); clean line, no jitter
 
 /**
  * Ink outline: a back-face shell pushed out along vertex normals, with a little per-vertex
@@ -59,7 +60,7 @@ export function outlined(mesh, width = OUTLINE, seed = 0.5) {
     s.vertexShader = s.vertexShader.replace(
       "#include <begin_vertex>",
       `#include <begin_vertex>
-      float jit = 0.85 + 0.3 * fract(sin(dot(position.xy, vec2(12.9898, 78.233)) + ${seed.toFixed(3)}) * 43758.5453);
+      float jit = 1.0 + 0.0 * fract(sin(dot(position.xy, vec2(12.9898, 78.233)) + ${seed.toFixed(3)}) * 43758.5453);
       transformed += normal * ${width.toFixed(4)} * jit;`,
     );
   };
@@ -97,8 +98,10 @@ function leafletGeo(len, maxW, teeth, rand) {
   const right = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N;
-    let w = Math.sin(Math.PI * Math.pow(t, 0.72)) * maxW * (1 - 0.18 * Math.pow(t, 6));
-    if (i % 2 === 1 && t > 0.1 && t < 0.92) w *= 1 - teeth;
+    // blunter tip: the width curve is raised to <1 so it stays wide longer and rounds off
+    let w =
+      Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.8) * maxW * (1 - 0.1 * Math.pow(t, 8));
+    if (i % 2 === 1 && t > 0.15 && t < 0.88) w *= 1 - teeth;
     right.push(new THREE.Vector2(w, t * len));
   }
   const left = right
@@ -107,17 +110,24 @@ function leafletGeo(len, maxW, teeth, rand) {
     .map((p) => new THREE.Vector2(-p.x, p.y));
   const shape = new THREE.Shape([...right, ...left]);
   const g = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.06,
-    bevelEnabled: false,
-    curveSegments: 2,
+    depth: 0.14,
+    bevelEnabled: true,
+    bevelThickness: 0.05,
+    bevelSize: 0.04,
+    bevelSegments: 2,
+    curveSegments: 3,
   });
   g.rotateX(Math.PI / 2); // length along +z
   const pos = g.attributes.position;
-  const droop = 0.12 + rand() * 0.1;
+  const bow = 0.1 + rand() * 0.06;
+  const droop = 0.1 + rand() * 0.08;
   for (let i = 0; i < pos.count; i++) {
     const z = pos.getZ(i);
     const x = pos.getX(i);
-    pos.setY(i, pos.getY(i) - (droop * z * z) / len - Math.abs(x) * 0.25);
+    const t = Math.max(0, Math.min(1, z / len));
+    const arch = bow * len * Math.sin(Math.PI * t) * 0.35; // gentle upward bow mid-blade
+    const roll = (Math.abs(x) / Math.max(maxW, 0.01)) ** 2 * maxW * 0.45; // edges roll down
+    pos.setY(i, pos.getY(i) + arch - (droop * z * z * 0.9) / len - roll);
   }
   pos.needsUpdate = true;
   g.computeVertexNormals();
@@ -135,14 +145,15 @@ function fingeredLeaf(fingers, size, color, rand, sugar = false) {
     const len = size * (1 - ((0.28 * Math.abs(k)) / (half + 0.0001)) * 1.2);
     const w = len * (sugar ? 0.11 : 0.16);
     const lf = outlined(
-      new THREE.Mesh(leafletGeo(len, w, sugar ? 0.05 : 0.1, rand), m),
+      new THREE.Mesh(leafletGeo(len, w, sugar ? 0.04 : 0.06, rand), m),
       OUTLINE * 0.8,
       rand(),
     );
     lf.rotation.order = "YXZ";
     lf.rotation.y = -k * spread;
     lf.rotation.x = -0.12 - Math.abs(k) * 0.05;
-    lf.castShadow = true;
+    lf.rotation.z = k * 0.07; // outer fingers roll outward a touch
+    lf.castShadow = false; // soft grounding shadows come from pot and stems only
     g.add(lf);
   }
   return g;
@@ -152,11 +163,11 @@ function fingeredLeaf(fingers, size, color, rand, sugar = false) {
 function tube(a, b, r0, r1, color, bendDir, bendAmt) {
   const mid = a.clone().lerp(b, 0.5).add(bendDir.clone().multiplyScalar(bendAmt));
   const curve = new THREE.CatmullRomCurve3([a, mid, b]);
-  const geo = new THREE.TubeGeometry(curve, 8, r0, 7, false);
+  const geo = new THREE.TubeGeometry(curve, 8, r0, 10, false);
   const pos = geo.attributes.position;
   const pts = curve.getPoints(8);
   for (let i = 0; i < pos.count; i++) {
-    const seg = Math.floor(i / 8);
+    const seg = Math.floor(i / 11);
     const t = Math.min(seg / 8, 1);
     const c = pts[Math.min(seg, 8)];
     const v = V(pos.getX(i), pos.getY(i), pos.getZ(i))
@@ -168,8 +179,29 @@ function tube(a, b, r0, r1, color, bendDir, bendAmt) {
   pos.needsUpdate = true;
   geo.computeVertexNormals();
   const m = outlined(new THREE.Mesh(geo, toon(color)), OUTLINE * 0.9, 0.3);
-  m.castShadow = true;
+  m.castShadow = false; // stems do not cast: keeps the ground shadow a soft pot blob
   return m;
+}
+
+/** Tapered hair: a short curved tube whose radius falls to a point. Never outlined. */
+function hair(a, c, b, r0, material) {
+  const curve = new THREE.QuadraticBezierCurve3(a, c, b);
+  const geo = new THREE.TubeGeometry(curve, 5, r0, 4, false);
+  const pos = geo.attributes.position;
+  const pts = curve.getPoints(5);
+  for (let i = 0; i < pos.count; i++) {
+    const seg = Math.floor(i / 5);
+    const t = Math.min(seg / 5, 1);
+    const ctr = pts[Math.min(seg, 5)];
+    const v = V(pos.getX(i), pos.getY(i), pos.getZ(i))
+      .sub(ctr)
+      .multiplyScalar(1 - 0.85 * t)
+      .add(ctr);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, material);
 }
 
 /** Flower cluster: stacked calyx bumps in two greens, orange pistils, one sugar leaf. */
@@ -187,7 +219,7 @@ function flowerCluster(len, girth, rand) {
     for (let j = 0; j < k; j++) {
       const a = (j / k) * Math.PI * 2 + i * 0.9;
       const b = outlined(
-        new THREE.Mesh(new THREE.SphereGeometry(r * 0.55, 8, 6), (i + j) % 3 === 0 ? dm : cm),
+        new THREE.Mesh(new THREE.SphereGeometry(r * 0.55, 10, 8), (i + j) % 3 === 0 ? dm : cm),
         OUTLINE * 0.6,
         rand(),
       );
@@ -195,13 +227,16 @@ function flowerCluster(len, girth, rand) {
       b.position.set(Math.cos(a) * r * 0.6, y, Math.sin(a) * r * 0.6);
       b.castShadow = true;
       g.add(b);
-      if (rand() < 0.55) {
-        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, r * 0.9, 4), pm);
-        p.position.set(Math.cos(a) * r * 0.95, y + r * 0.3, Math.sin(a) * r * 0.95);
-        p.rotation.order = "YXZ";
-        p.rotation.y = -a;
-        p.rotation.z = -0.9;
-        g.add(p);
+      if (rand() < 0.3) {
+        // sparse, thin, gently curved, tapered amber hair — no outline, no bead
+        const base = V(Math.cos(a) * r * 0.95, y + r * 0.3, Math.sin(a) * r * 0.95);
+        const out = V(Math.cos(a), 0.55 + rand() * 0.3, Math.sin(a)).normalize();
+        const hl = r * 1.25;
+        const tipPt = base.clone().add(out.clone().multiplyScalar(hl));
+        tipPt.y -= hl * 0.22; // droops a touch at the end
+        const ctrl = base.clone().add(out.clone().multiplyScalar(hl * 0.55));
+        ctrl.y += hl * 0.12;
+        g.add(hair(base, ctrl, tipPt, 0.075, pm));
       }
     }
   }
@@ -235,7 +270,7 @@ export function buildStorybookPot(radius, potH) {
     [0.99, potH],
   ].map(([a, b]) => new THREE.Vector2(a * radius, b));
   const body = outlined(
-    new THREE.Mesh(new THREE.LatheGeometry(prof, 22), toon(STORYBOOK.pot)),
+    new THREE.Mesh(new THREE.LatheGeometry(prof, 36), toon(STORYBOOK.pot)),
     OUTLINE,
     0.2,
   );
@@ -243,7 +278,7 @@ export function buildStorybookPot(radius, potH) {
   body.receiveShadow = true;
   g.add(body);
   const rim = outlined(
-    new THREE.Mesh(new THREE.TorusGeometry(radius * 0.97, 1.05, 10, 24), toon(STORYBOOK.potRim)),
+    new THREE.Mesh(new THREE.TorusGeometry(radius * 0.97, 1.05, 14, 40), toon(STORYBOOK.potRim)),
     OUTLINE,
     0.4,
   );
@@ -282,7 +317,8 @@ export function buildStorybookPlant(v, seed = 7) {
     lf.position.copy(end);
     lf.rotation.order = "YXZ";
     lf.rotation.y = Math.PI / 2 - yaw;
-    lf.rotation.x = -pitch - 0.15;
+    lf.rotation.x = -pitch - 0.15 + (rand() - 0.5) * 0.5; // vary pitch per leaf
+    lf.rotation.z = (rand() - 0.5) * 0.4; // and roll, so blades are not one flat shelf
     P.add(lf);
   };
 
@@ -307,7 +343,9 @@ export function buildStorybookPlant(v, seed = 7) {
   }
 
   const flowering = v.stage === "flower" && v.clusterCount > 0;
-  const h = v.heightIn;
+  // Artwork proportion only: flowering draws 10% taller than its rule height. The rule value is a
+  // constant per stage (20 in), so this does not grow with later recorded weeks.
+  const h = v.heightIn * (flowering ? 1.1 : 1);
   const leafColor = neutral ? STORYBOOK.neutral : flowering ? STORYBOOK.flower : STORYBOOK.veg;
   const nodes = neutral ? 2 : Math.max(2, Math.min(v.leafTiers, 5));
   const reach = v.canopyRadiusIn * 0.68; // branch length scale
@@ -337,6 +375,9 @@ export function buildStorybookPlant(v, seed = 7) {
       const tip = base.clone().add(dir.multiplyScalar(len));
       P.add(tube(base, tip, 0.3, 0.16, stemColor, V(0, 1, 0), -len * 0.14));
       tips.push({ tip, yaw, i });
+      // one mid-branch leaf per node, alternating sides, so the canopy stays open
+      // (flowering keeps both so the branches under the clusters do not read as bare)
+      if (!flowering && s !== i % 2) continue;
       const mid = base.clone().lerp(tip, 0.55);
       mid.y -= len * 0.14 * 0.6;
       leafAt(
@@ -375,7 +416,7 @@ export function buildStorybookPlant(v, seed = 7) {
         leafColor,
         1.1,
       );
-      if (!neutral) leafAt(tip, yaw + (i % 2 ? 1.6 : -1.6), 0.5, 5, reach * 0.54, leafColor, 0.7);
+      if (!neutral && i === nodes - 1) leafAt(tip, yaw + 1.6, 0.5, 5, reach * 0.54, leafColor, 0.7);
     }
   });
 

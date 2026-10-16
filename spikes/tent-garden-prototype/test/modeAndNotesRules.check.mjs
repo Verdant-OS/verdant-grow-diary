@@ -164,3 +164,12 @@ test("regression: a failed save is invalidated when Undo (or any edit) changes w
   assert.equal(pendingIsCurrent(null, ctx), false);
   assert.equal(pendingIsCurrent(pending, { ...ctx, draft: saved.savedLayout }), false);
 });
+
+test("regression: Save is enabled while a note is still being typed (no blur yet)", async () => {
+  const { canSave } = await import("../src/rules/saveRules.js");
+  assert.equal(canSave({ changeCount: 0, noteChangeCount: 0, liveNoteDirty: true }), true);
+  assert.equal(canSave({ changeCount: 0, noteChangeCount: 0, liveNoteDirty: false }), false);
+  assert.equal(canSave({ changeCount: 1, noteChangeCount: 0, liveNoteDirty: false }), true);
+  assert.equal(canSave({ changeCount: 0, noteChangeCount: 0, pendingFailed: true }), true);
+  assert.equal(canSave(null), false);
+});

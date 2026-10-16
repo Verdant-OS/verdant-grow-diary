@@ -19,6 +19,7 @@ import {
   noteChanges,
   normalizeNote,
   pendingIsCurrent,
+  canSave,
 } from "../rules/saveRules.js";
 import { timelinePoints, pointAt, evidenceFor } from "../rules/historyRules.js";
 import { resolveModeChange, cameraLocked } from "../rules/modeRules.js";
@@ -116,6 +117,23 @@ async function boot() {
     showFallback(err?.message ?? String(err));
   }
   render({ transition: false });
+  // Test hook (prototype only, fictional data): lets scripted browser checks find plants on
+  // screen and read state without poking private closures.
+  window.__tentGarden = {
+    screenPositionOf: (id) => scene?.screenPositionOf(id) ?? null,
+    isCameraAnimating: () => !!scene?.isCameraAnimating(),
+    snapshot: () => ({
+      mode: state.mode,
+      selectedId: state.selectedId,
+      saveStatus: state.saveStatus,
+      pendingBatch: state.pendingBatch ? { batchId: state.pendingBatch.batchId } : null,
+      savedLayout: { ...state.saved.savedLayout },
+      savedNotes: { ...state.saved.savedNotes },
+      draft: { ...draft() },
+      events: state.saved.events.map((e) => ({ id: e.id, kind: e.kind, undone: e.undone })),
+      appliedBatchIds: [...state.saved.appliedBatchIds],
+    }),
+  };
 }
 
 function showFallback(reason) {
@@ -192,6 +210,8 @@ function render({ transition = false } = {}) {
   const locked = cameraLocked(state.mode) || !scene;
   $("rotateLeft").disabled = $("rotateRight").disabled = $("resetView").disabled = locked;
   scene?.setCameraLocked(cameraLocked(state.mode));
+  // Labels keep clear of overlays that sit on the canvas; the scene measures them per frame.
+  scene?.setLabelAvoid([$("historyBanner"), $("editHint")]);
   $("modeView").classList.toggle("is-active", state.mode === "view");
   $("modeEdit").classList.toggle("is-active", state.mode === "edit");
   $("modeView").setAttribute("aria-pressed", String(state.mode === "view"));
@@ -225,7 +245,10 @@ function renderSaveBar() {
         ? "No changes (draft equals saved layout and notes)"
         : `${total} net change${total === 1 ? "" : "s"} (${changes.length} layout, ${notes.length} note) · draft, unsaved`;
     $("saveBtn").textContent = "Save…";
-    $("saveBtn").disabled = total === 0;
+    $("saveBtn").disabled = !canSave({
+      changeCount: changes.length,
+      noteChangeCount: notes.length,
+    });
   }
   $("undoDraft").disabled = state.draftHistory.length <= 1;
 }
@@ -660,6 +683,24 @@ function wireControls() {
   });
   document.addEventListener("change", (e) => {
     if (e.target?.id === "noteDraft") commitNoteDraft(state.selectedId, e.target.value);
+  });
+  // While a note is being typed it is not yet in the draft (that happens on change/blur or
+  // when Save opens), but Save must already be clickable straight from the field.
+  document.addEventListener("input", (e) => {
+    if (e.target?.id !== "noteDraft" || state.mode !== "edit" || !state.selectedId) return;
+    const liveNoteDirty =
+      normalizeNote(e.target.value) !== normalizeNote(draftNotes()[state.selectedId]);
+    const changes = dirtyChanges().length;
+    const notes = dirtyNotes().length;
+    if (state.saveStatus === "failed" && state.pendingBatch) return;
+    $("saveBtn").disabled = !canSave({
+      changeCount: changes,
+      noteChangeCount: notes,
+      liveNoteDirty,
+    });
+    if (liveNoteDirty && changes + notes === 0) {
+      $("draftSummary").textContent = "1 note change (typing) · draft, unsaved";
+    }
   });
   document.addEventListener("click", (e) => {
     const sel = e.target.closest?.("[data-select]");

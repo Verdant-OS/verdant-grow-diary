@@ -16,6 +16,10 @@
 * {
   box-sizing: border-box;
 }
+/* The hidden attribute must beat author display rules (.fallback, .history-banner, panels). */
+[hidden] {
+  display: none !important;
+}
 html,
 body {
   margin: 0;
@@ -181,7 +185,26 @@ button {
 .scene-host canvas {
   display: block;
 }
+.label-layer,
+.leader-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.leader-layer {
+  width: 100%;
+  height: 100%;
+}
+.leader-layer line {
+  stroke: #3f3327;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
 .plant-label {
+  position: absolute;
+  left: 0;
+  top: 0;
   pointer-events: none;
   background: #fbf3df;
   border: 1.5px solid #3f3327;
@@ -193,7 +216,7 @@ button {
   padding: 4px 10px;
   border-radius: 6px 14px 8px 12px;
   white-space: nowrap;
-  transform: translateY(-8px) rotate(-1.2deg);
+  transform: rotate(-1.2deg);
   box-shadow: 2px 2px 0 #3f3327;
 }
 .plant-label small {
@@ -516,5 +539,18 @@ button {
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+  }
+}
+
+/* Touch: every control is at least 44px tall on coarse pointers (phones, tablets). */
+@media (pointer: coarse) {
+  button,
+  .btn,
+  .btn--small,
+  .seg__btn {
+    min-height: 44px;
+  }
+  input[type="range"] {
+    min-height: 44px;
   }
 }

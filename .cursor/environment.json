@@ -1,3 +1,4 @@
 {
-  "install": "bun install --frozen-lockfile\nnpx --yes playwright install chromium"
+  "install": "command -v bun >/dev/null 2>&1 || curl -fsSL https://bun.sh/install | bash\nsudo ln -sfn \"$HOME/.bun/bin/bun\" /usr/local/bin/bun\nsudo ln -sfn \"$HOME/.bun/bin/bunx\" /usr/local/bin/bunx\ncommand -v rg >/dev/null 2>&1 || sudo apt-get update\ncommand -v rg >/dev/null 2>&1 || sudo apt-get install -y --no-install-recommends ripgrep\nbun install --frozen-lockfile\nbunx playwright install chromium",
+  "start": "exec bun run dev -- --host 127.0.0.1 --port 8080"
 }

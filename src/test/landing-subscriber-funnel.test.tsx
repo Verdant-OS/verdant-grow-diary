@@ -74,7 +74,7 @@ describe("landing subscriber funnel", () => {
         <Landing />
       </MemoryRouter>,
     );
-    expect(mocks.seo).toHaveBeenLastCalledWith(expect.objectContaining({ path: "/welcome" }));
+    expect(mocks.seo).toHaveBeenLastCalledWith(expect.objectContaining({ path: "/" }));
   });
 
   it("puts a paid-plan path in the header, hero, and final CTA", () => {

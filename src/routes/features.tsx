@@ -6,5 +6,5 @@ export const Route = createFileRoute("/features")({
 });
 
 function RouteComponent() {
-  return <RouteAliasRedirect to="/welcome" />;
+  return <RouteAliasRedirect to="/" />;
 }

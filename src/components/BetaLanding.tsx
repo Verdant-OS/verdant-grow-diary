@@ -134,13 +134,13 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
     >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <Link
-          to="/welcome"
+          to="/"
           className="flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           aria-label="Verdant home"
         >
           <BrandLogo size="md" showText />
         </Link>
-        <Link to="/welcome" aria-label="Back to Verdant home">
+        <Link to="/" aria-label="Back to Verdant home">
           <Button variant="outline" size="sm">
             Back to home
           </Button>

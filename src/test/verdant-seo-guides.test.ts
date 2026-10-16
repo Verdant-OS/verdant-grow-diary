@@ -183,7 +183,7 @@ describe("Verdant SEO guide pages (28)", () => {
     } as never);
     expect(routeHead).toEqual(staticRouteHead("/guides/grow-diary-app"));
     // Verdant positioning + required internal links.
-    expect(GUIDE_PAGE).toMatch(/to="\/welcome"/);
+    expect(GUIDE_PAGE).toMatch(/to="\/"/);
     expect(GUIDE_PAGE).toMatch(/to="\/pricing"/);
     expect(GUIDE_PAGE).toMatch(/to="\/guides"/);
   });
@@ -192,7 +192,7 @@ describe("Verdant SEO guide pages (28)", () => {
     expect(GUIDES_INDEX).toMatch(/Plant memory/i);
     expect(GUIDES_INDEX).toMatch(/Sensor truth/i);
     expect(GUIDES_INDEX).toMatch(/Grower-approved/i);
-    expect(GUIDES_INDEX).toMatch(/to="\/welcome"/);
+    expect(GUIDES_INDEX).toMatch(/to="\/"/);
     expect(GUIDES_INDEX).toMatch(/to="\/pricing"/);
   });
 
@@ -233,8 +233,9 @@ describe("Verdant SEO guide pages (28)", () => {
 });
 
 describe("Sitemap and robots discoverability", () => {
-  it("sitemap includes /welcome, /pricing, /guides, and every guide URL", () => {
-    expect(SITEMAP).toContain("https://verdantgrowdiary.com/welcome");
+  it("sitemap includes /, /pricing, /guides, and every guide URL", () => {
+    expect(SITEMAP).toContain("https://verdantgrowdiary.com/");
+    expect(SITEMAP).not.toContain("https://verdantgrowdiary.com/welcome");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/pricing");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/guides");
     for (const slug of EXPECTED_SLUGS) {
@@ -269,8 +270,8 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
     expect(LANDING).toContain("usePageSeo({");
     expect(LANDING).toMatch(/title:\s*"[^"]+"/);
     expect(LANDING).toMatch(/description:\s*"[^"]+"/);
-    expect(LANDING).toMatch(/canonicalPath\?:\s*"\/"\s*\|\s*"\/welcome"/);
-    expect(LANDING).toMatch(/canonicalPath\s*=\s*"\/welcome"/);
+    expect(LANDING).toMatch(/canonicalPath\?:\s*"\/"/);
+    expect(LANDING).toMatch(/canonicalPath\s*=\s*"\/"/);
     expect(LANDING).toMatch(/path:\s*canonicalPath/);
   });
 
@@ -376,7 +377,7 @@ describe("BreadcrumbList JSON-LD for guides", () => {
     expect(doc.itemListElement[0]).toMatchObject({
       position: 1,
       name: "Home",
-      item: `${VERDANT_SITE_ORIGIN}/welcome`,
+      item: `${VERDANT_SITE_ORIGIN}/`,
     });
     expect(doc.itemListElement[1]).toMatchObject({
       position: 2,

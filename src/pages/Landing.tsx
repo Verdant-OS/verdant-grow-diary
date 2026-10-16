@@ -44,7 +44,7 @@ import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
  * presenter only.
  */
 export interface LandingProps {
-  canonicalPath?: "/" | "/welcome";
+  canonicalPath?: "/";
   /**
    * Defers the automatic acquisition page-view until an auth-gated caller has
    * conclusively resolved to signed out. Direct public routes track by default.
@@ -52,10 +52,7 @@ export interface LandingProps {
   trackPageView?: boolean;
 }
 
-export default function Landing({
-  canonicalPath = "/welcome",
-  trackPageView = true,
-}: LandingProps) {
+export default function Landing({ canonicalPath = "/", trackPageView = true }: LandingProps) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const acquisitionSource = resolvePaidAcquisitionSource(searchParams) ?? "landing_page";

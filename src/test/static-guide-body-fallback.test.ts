@@ -70,7 +70,7 @@ describe("static guide body fallback", () => {
     expect(stageGuide).toContain("<h2>Vegetative</h2>");
     expect(stageGuide).toContain("<h2>Flower</h2>");
     expect(stageGuide).toContain("Common questions");
-    expect(stageGuide).toContain('href="/welcome"');
+    expect(stageGuide).toContain('href="/"');
     expect(stageGuide).toContain('href="/pricing"');
     expect(stageGuide).toContain("Explore the public demo");
     expect(stageGuide).not.toContain("<script");
@@ -145,7 +145,7 @@ describe("static guide body fallback", () => {
     for (const guide of VERDANT_SEO_GUIDES) {
       const fallback = documentAt(`/guides/${guide.slug}`).metadata.bodyFallbackHtml ?? "";
       expect(fallback).toContain('href="/guides"');
-      expect(fallback).toContain('href="/welcome"');
+      expect(fallback).toContain('href="/"');
       expect(fallback).toContain('href="/pricing"');
       expect(fallback).toContain(`href="${escapeHtml(buildGuideQuickLogStarterHref(guide.slug))}"`);
     }

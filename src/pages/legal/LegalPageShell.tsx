@@ -48,7 +48,7 @@ export function LegalPageShell({
       <main className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border/40 px-6 py-4">
           <div className="mx-auto max-w-3xl flex items-center justify-between text-sm">
-            <Link to="/welcome" className="font-semibold hover:text-primary">
+            <Link to="/" className="font-semibold hover:text-primary">
               Verdant Grow Diary
             </Link>
             <nav className="flex gap-4 text-muted-foreground">

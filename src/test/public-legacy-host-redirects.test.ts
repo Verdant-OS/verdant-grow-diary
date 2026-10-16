@@ -1,23 +1,11 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
-
-const ROOT = resolve(__dirname, "../..");
-
-interface VercelRedirect {
-  source?: unknown;
-  destination?: unknown;
-  permanent?: unknown;
-}
-
-const vercelConfig = JSON.parse(readFileSync(resolve(ROOT, "vercel.json"), "utf8")) as {
-  redirects?: VercelRedirect[];
-};
+import { resolveHostRouting } from "@/lib/cloudflareHostRoutingRules";
 
 const SAFE_PUBLIC_LEGACY_REDIRECTS = [
-  { source: "/features", destination: "/welcome" },
-  { source: "/demo", destination: "/welcome" },
+  { source: "/welcome", destination: "/" },
+  { source: "/features", destination: "/" },
+  { source: "/demo", destination: "/" },
   { source: "/refunds", destination: "/refund" },
   { source: "/refund-policy", destination: "/refund" },
   { source: "/terms-of-service", destination: "/terms" },
@@ -28,14 +16,15 @@ describe("public legacy host redirects", () => {
   it.each(SAFE_PUBLIC_LEGACY_REDIRECTS)(
     "permanently redirects $source to the canonical public $destination route",
     ({ source, destination }) => {
-      const matchingRedirects = (vercelConfig.redirects ?? []).filter(
-        (redirect) => redirect.source === source,
+      expect(resolveHostRouting({ pathname: source, search: "" })).toEqual(
+        expect.objectContaining({ kind: "redirect", status: 308, location: destination }),
       );
 
-      expect(matchingRedirects).toEqual([{ source, destination, permanent: true }]);
-
       expect(APP_ROUTES).toContainEqual(
-        expect.objectContaining({ path: destination, access: "public" }),
+        expect.objectContaining({
+          path: destination === "/" ? "/" : destination,
+          access: "public",
+        }),
       );
     },
   );

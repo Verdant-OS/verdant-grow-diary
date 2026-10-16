@@ -309,12 +309,39 @@ export function resolveTimelineDiaryEntryStage(
   return normalizeQuickLogStage(readDetail("observation_stage"));
 }
 
+function resolveEntryWateringAmountMl(entry: NormalizedDiaryEntry): number | null {
+  if (entry.details.wateringAmountMl != null) return entry.details.wateringAmountMl;
+  const extras = asRecord(entry.details.extras);
+  const wObj = asRecord(extras?.watering);
+  const fObj = asRecord(extras?.feeding);
+  const raw = wObj?.volume_ml ?? fObj?.volume_ml ?? extras?.volume_ml;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 1_000_000) return raw;
+  return null;
+}
+
+function hasWateringVolumeEvidence(entry: NormalizedDiaryEntry): boolean {
+  if (entry.details.wateringAmountMl != null) return true;
+  const extras = asRecord(entry.details.extras);
+  const wObj = asRecord(extras?.watering);
+  const wVol = wObj?.volume_ml;
+  if (typeof wVol === "number" && Number.isFinite(wVol) && wVol >= 0 && wVol <= 1_000_000) {
+    return true;
+  }
+  const ev = (entry.eventType || "").toLowerCase();
+  if (ev === "feeding") return false;
+  const flatVol = extras?.volume_ml;
+  return (
+    typeof flatVol === "number" && Number.isFinite(flatVol) && flatVol >= 0 && flatVol <= 1_000_000
+  );
+}
+
 function buildSubtitle(entry: NormalizedDiaryEntry, stage: CanonicalQuickLogStage | null): string {
   const parts: string[] = [];
   if (entry.dayOfGrow != null) parts.push(`Day ${entry.dayOfGrow}`);
   if (stage) parts.push(stage);
-  if (entry.details.wateringAmountMl != null) {
-    parts.push(`${entry.details.wateringAmountMl} ml`);
+  const wateringAmountMl = resolveEntryWateringAmountMl(entry);
+  if (wateringAmountMl != null) {
+    parts.push(`${wateringAmountMl} ml`);
   }
   if (entry.details.ph != null) parts.push(`pH ${entry.details.ph}`);
   if (entry.details.ec != null) parts.push(`EC ${entry.details.ec}`);
@@ -327,7 +354,7 @@ function buildTags(entry: NormalizedDiaryEntry): string[] {
   if (ev) tags.push(ev);
   if (entry.photoUrl) tags.push("photo");
   if (entry.details.sensorSnapshot) tags.push("sensor-snapshot");
-  if (entry.details.wateringAmountMl != null) tags.push("watering");
+  if (hasWateringVolumeEvidence(entry)) tags.push("watering");
   if (entry.details.nutrients && entry.details.nutrients.length > 0) {
     tags.push("feeding");
   }

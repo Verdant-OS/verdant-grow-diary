@@ -80,6 +80,7 @@ export type WateringFormFailureReason =
   | "idempotency_key:invalid"
   | "volume_ml:missing"
   | "volume_ml:invalid"
+  | "volume_ml:too_large"
   | "numeric:invalid"
   | "numeric:out_of_range"
   | "ec_ppm:mismatch"
@@ -138,6 +139,11 @@ export function isWateringFormPristine(form: QuickLogWateringFormState): boolean
   return Object.values(form).every((value) => value === "");
 }
 
+/** Ceiling for one logged watering (owner decision 2026-10-14). */
+export const QUICK_LOG_WATER_VOLUME_MAX_ML = 50_000;
+export const QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE =
+  "Applied volume is too large (max 50,000 ml). Check the number and save again." as const;
+
 export function buildWateringFormPayload(
   input: BuildWateringFormPayloadInput,
 ): BuildWateringFormPayloadResult {
@@ -152,8 +158,9 @@ export function buildWateringFormPayload(
   const parsedVolume = parseOptionalNumber(input.form.volumeMl);
   if (!parsedVolume.ok) return { ok: false, reason: "volume_ml:invalid" };
   if (parsedVolume.value === null) return { ok: false, reason: "volume_ml:missing" };
-  if (parsedVolume.value <= 0 || parsedVolume.value > 1_000_000) {
-    return { ok: false, reason: "volume_ml:invalid" };
+  if (parsedVolume.value <= 0) return { ok: false, reason: "volume_ml:invalid" };
+  if (parsedVolume.value > QUICK_LOG_WATER_VOLUME_MAX_ML) {
+    return { ok: false, reason: "volume_ml:too_large" };
   }
 
   const optionalFields = [
@@ -274,6 +281,8 @@ export function wateringFormReasonToHelper(reason: WateringFormFailureReason | s
       return "Enter the total water applied before saving.";
     case "volume_ml:invalid":
       return "Applied volume must be a positive number of milliliters.";
+    case "volume_ml:too_large":
+      return QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE;
     case "ec_ppm:mismatch":
       return "EC and PPM must match the 500 scale. Re-enter either value.";
     case "numeric:invalid":

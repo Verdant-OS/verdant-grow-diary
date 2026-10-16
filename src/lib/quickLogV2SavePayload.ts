@@ -11,6 +11,7 @@ import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import { hasQuickLogMaturityEvidence } from "./quickLogMaturityEvidenceRules";
 import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEvidenceRules";
 import { buildManualSensorProvenance } from "./manualSensorProvenanceRules";
+import { QUICK_LOG_WATER_VOLUME_MAX_ML } from "./quickLogWateringFormViewModel";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -97,6 +98,7 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
     if (v === "invalid" || v === null || v <= 0) {
       return { ok: false, reason: "invalid_volume" };
     }
+    if (v > QUICK_LOG_WATER_VOLUME_MAX_ML) return { ok: false, reason: "volume_too_large" };
     volume = v;
   }
 

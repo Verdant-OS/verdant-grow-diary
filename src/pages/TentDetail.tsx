@@ -46,8 +46,10 @@ import { groupSensorReadingRows } from "@/lib/growAdapters";
 import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import {
   resolveDisplayedVpdObservation,
+  resolveManualHistoryReadState,
   vpdStabilityInputsFromWideReadings,
 } from "@/lib/vpdStabilityInputRules";
+import QuickLogManualHistoryNotice from "@/components/QuickLogManualHistoryNotice";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import {
   useImportedSensorHistory,
@@ -180,7 +182,10 @@ export default function TentDetail() {
   const { data: readings = [] } = sensorReadings;
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
-  const quickLogManuals = useSensorsQuickLogManualReadings(id);
+  // Manual history is read only for a tent the owner-scoped tent read
+  // returned, never for a bare route id (Codex security review on #2148).
+  const quickLogManuals = useSensorsQuickLogManualReadings(tent?.id ?? null);
+  const manualHistoryReadState = resolveManualHistoryReadState(quickLogManuals);
   const sharedVpdSeries = useMemo(
     () =>
       vpdStabilityInputsFromWideReadings(
@@ -196,6 +201,7 @@ export default function TentDetail() {
   const snap = header.snapshot;
   const headerVpdObservation = resolveDisplayedVpdObservation({
     snapshotVpd: snap?.vpd,
+    snapshotVpdRejected: header.truth?.invalidFields.includes("vpd") ?? false,
     snapshotCapturedAt: header.capturedAt,
     snapshotSource: snap?.source ?? null,
     snapshotStale: header.stale,
@@ -203,15 +209,14 @@ export default function TentDetail() {
     nowMs,
   });
   const headerVpd = headerVpdObservation.value;
+  // A fallback VPD carries its own provenance on a VPD-specific element. The
+  // shared Environment header keeps the stored snapshot's source, time and
+  // staleness, because its temperature and RH come from that snapshot.
   const vpdFromFallback =
     headerVpdObservation.value !== null && (snap?.vpd === null || snap?.vpd === undefined);
-  const provenanceCapturedAt = vpdFromFallback
-    ? headerVpdObservation.capturedAt
-    : header.capturedAt;
-  const provenanceSourceLabel = vpdFromFallback
+  const fallbackVpdSourceLabel = vpdFromFallback
     ? formatSensorSourceLabel({ source: headerVpdObservation.source })
-    : header.sourceLabel;
-  const provenanceStale = vpdFromFallback ? headerVpdObservation.stale : header.stale;
+    : null;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
   // The one safe plant target this tent can prove. Null for zero or several
@@ -489,12 +494,47 @@ export default function TentDetail() {
             </p>
           );
         })()}
+      {vpdFromFallback && (
+        <p
+          className="text-[11px] text-muted-foreground -mt-3 mb-4 flex flex-wrap items-center gap-2"
+          data-testid="tent-detail-vpd-provenance"
+        >
+          <span>VPD reading</span>
+          {fallbackVpdSourceLabel && (
+            <span className="rounded-md border px-1.5 py-0.5" data-testid="tent-detail-vpd-source">
+              {fallbackVpdSourceLabel}
+            </span>
+          )}
+          {headerVpdObservation.capturedAt && (
+            <span data-testid="tent-detail-vpd-captured">
+              Captured{" "}
+              {formatDistanceToNow(new Date(headerVpdObservation.capturedAt), { addSuffix: true })}
+            </span>
+          )}
+          {headerVpdObservation.stale && (
+            <span
+              className="rounded-md border border-[hsl(var(--warning))] px-1.5 py-0.5 text-[hsl(var(--warning))]"
+              data-testid="tent-detail-vpd-stale"
+            >
+              Stale
+            </span>
+          )}
+        </p>
+      )}
       {headerVpd !== null &&
         headerVpd !== undefined &&
         normalizeVpdStage(envStage) === "unknown" && (
           <VpdStageMissingBadge testId="tent-detail-vpd-stage-missing-badge" className="mb-4" />
         )}
 
+      <QuickLogManualHistoryNotice
+        state={manualHistoryReadState}
+        onRetry={() => {
+          void quickLogManuals.refetch();
+        }}
+        testIdPrefix="tent-detail-manual-history"
+        className="mb-2"
+      />
       <EnvironmentStabilityCard
         testId="tent-detail-environment-stability"
         className="mb-4"
@@ -515,23 +555,22 @@ export default function TentDetail() {
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
           <h2 className="font-display font-semibold">Environment</h2>
-          {(header.hasReadings || vpdFromFallback) && (
+          {header.hasReadings && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              {provenanceCapturedAt && (
+              {header.capturedAt && (
                 <span data-testid="tent-detail-sensor-captured">
-                  Captured{" "}
-                  {formatDistanceToNow(new Date(provenanceCapturedAt), { addSuffix: true })}
+                  Captured {formatDistanceToNow(new Date(header.capturedAt), { addSuffix: true })}
                 </span>
               )}
-              {provenanceSourceLabel && (
+              {header.sourceLabel && (
                 <span
                   className="rounded-md border px-1.5 py-0.5"
                   data-testid="tent-detail-sensor-source"
                 >
-                  {provenanceSourceLabel}
+                  {header.sourceLabel}
                 </span>
               )}
-              {provenanceStale && (
+              {header.stale && (
                 <span
                   className="rounded-md border border-[hsl(var(--warning))] px-1.5 py-0.5 text-[hsl(var(--warning))]"
                   data-testid="tent-detail-sensor-stale"

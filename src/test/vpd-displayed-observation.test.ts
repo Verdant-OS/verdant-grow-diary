@@ -97,3 +97,19 @@ describe("resolveDisplayedVpdObservation", () => {
     ).toBe(true);
   });
 });
+
+describe("resolveDisplayedVpdObservation respects a header that rejected its VPD", () => {
+  it("does not restore a VPD the stored snapshot observed but sensor truth rejected", () => {
+    expect(
+      resolveDisplayedVpdObservation({
+        snapshotVpd: null,
+        snapshotVpdRejected: true,
+        snapshotCapturedAt: "2026-10-15T11:58:00.000Z",
+        snapshotSource: "live",
+        snapshotStale: false,
+        fallback: { ts: "2026-10-15T11:50:00.000Z", vpd: 1.1, source: "manual" },
+        nowMs: NOW_MS,
+      }),
+    ).toEqual({ value: null, capturedAt: null, source: null, stale: false });
+  });
+});

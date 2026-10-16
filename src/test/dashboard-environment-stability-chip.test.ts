@@ -46,8 +46,10 @@ describe("Dashboard environment stability chip — wiring", () => {
     // Alerts do (Codex review on #1683); the behavior is rendered in
     // dashboard-strip-stage-and-manual-save-gate.
     expect(SRC).toMatch(/const envStage = resolveTentEnvironmentStage\(/);
+    // #2148: the single strip tent grades stored VPD merged with Quick Log
+    // manual VPD (`stabilityReadings`); other tents grade `rs` unchanged.
     expect(SRC).toMatch(
-      /computeEnvironmentStability\(\s*rs\s*,\s*\{\s*stage:\s*envStage\s*\}\s*\)/,
+      /computeEnvironmentStability\(\s*stabilityReadings\s*,\s*\{\s*stage:\s*envStage\s*\}\s*\)/,
     );
     expect(SRC).toMatch(/formatStabilityChipView\(stability\)/);
   });

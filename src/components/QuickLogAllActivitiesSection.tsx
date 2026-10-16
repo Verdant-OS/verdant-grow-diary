@@ -608,6 +608,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomStageConfirmed(false);
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
+    photoContentGenerationRef.current += 1;
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
@@ -642,6 +643,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomStageConfirmed(false);
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
+    photoContentGenerationRef.current += 1;
     setPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
       setSelectedDraft(null);
@@ -784,6 +786,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestUnit("g");
       setDetailValues({});
       envCheckTempEntryUnitRef.current = null;
+      photoContentGenerationRef.current += 1;
       setPhotoFile(null);
     },
     [
@@ -1471,6 +1474,7 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomStageConfirmed(false);
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
+        photoContentGenerationRef.current += 1;
         setPhotoFile(null);
         setSelectedDraft(null);
         setErrorReason(null);
@@ -2174,6 +2178,8 @@ export default function QuickLogAllActivitiesSection({
                   variant="ghost"
                   onClick={() => {
                     if (isMutationBlocked()) return;
+                    photoContentGenerationRef.current += 1;
+                    setPhotoFile(null);
                     setSelectedDraft(null);
                     setNote("");
                     setGuidedSymptomCheck(false);

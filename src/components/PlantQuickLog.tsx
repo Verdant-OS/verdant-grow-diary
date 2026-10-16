@@ -60,16 +60,22 @@ import {
   type QuickLogActionChip,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
-import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import {
+  createQuickLogPhotoDiaryEntry,
+  hasConfirmedQuickLogPhotoDiaryEntryForOwner,
+} from "@/lib/quickLogPhotoDiaryEntry";
 import {
   fileClaimsPng,
   inspectQuickLogPngClaimNow,
   validateQuickLogPngClaim,
 } from "@/lib/quickLogPhotoContentRules";
 import {
+  clearQuickLogPhotoAttachmentRecoveryLock,
+  getQuickLogPhotoAttachmentRecoveryRecord,
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
+import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
@@ -195,6 +201,45 @@ export default function PlantQuickLog({
     if (libraryFileRef.current) libraryFileRef.current.value = "";
     return () => {
       saveContextRevisionRef.current += 1;
+    };
+  }, [open, user?.id, plantId, growId, tentId]);
+
+  // When the exact owner-scoped diary row is readable, clear the session
+  // photo lock and release Save for this plant.
+  useEffect(() => {
+    if (!open) return;
+    const scope = {
+      ownerId: user?.id ?? null,
+      growId,
+      tentId: tentId ?? null,
+      plantId,
+    };
+    const recovery = getQuickLogPhotoAttachmentRecoveryRecord(scope);
+    const ownerId = scope.ownerId;
+    if (!recovery?.diaryEntryId || typeof ownerId !== "string" || ownerId.trim() === "") return;
+
+    let active = true;
+    void hasConfirmedQuickLogPhotoDiaryEntryForOwner(ownerId, recovery.diaryEntryId).then(
+      (confirmed) => {
+        if (!active || !confirmed) return;
+        clearQuickLogPhotoAttachmentRecoveryLock(scope);
+        setPhotoAttachmentUnconfirmed(false);
+        setError((current) =>
+          current === "Could not confirm the photo attachment; it may still appear in history."
+            ? null
+            : current,
+        );
+        dispatchQuickLogV2EntryCreated({
+          createdAt: new Date().toISOString(),
+          growEventId: null,
+          source: "quick_log_v2",
+          activityId: "photo",
+        });
+        trackQuickLogSuccess("photo", { reused: false });
+      },
+    );
+    return () => {
+      active = false;
     };
   }, [open, user?.id, plantId, growId, tentId]);
 

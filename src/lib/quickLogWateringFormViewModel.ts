@@ -135,7 +135,9 @@ function metricInRange(value: number | null, min: number, max: number): boolean 
 }
 
 export function isWateringFormPristine(form: QuickLogWateringFormState): boolean {
-  return Object.values(form).every((value) => value === "");
+  return (Object.keys(form) as (keyof QuickLogWateringFormState)[]).every(
+    (key) => form[key] === "",
+  );
 }
 
 export function buildWateringFormPayload(

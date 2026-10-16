@@ -4,13 +4,14 @@
  * Mobile-first presenter. Search/filter rules are pure and shared; cards render
  * labeled sample/reference data only. No private grow reads or writes.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import SearchShortcutHint from "@/components/SearchShortcutHint";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useSearchShortcut } from "@/hooks/useSearchShortcut";
 import {
   VERDANT_CULTIVARS,
   formatVerificationStatus,
@@ -56,25 +57,7 @@ function validOption<T extends string>(
 export default function CultivarsIndex() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchOpen, setSearchOpen] = useState(false);
-
-  // Same chord the hint advertises. Skip inputs so the filter controls keep Ctrl+K.
-  useEffect(() => {
-    function isTypingTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      if (target.isContentEditable) return true;
-      const tag = target.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-    }
-    function onKey(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        if (isTypingTarget(event.target)) return;
-        event.preventDefault();
-        setSearchOpen((open) => !open);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useSearchShortcut(setSearchOpen);
   usePageSeo(buildCultivarsIndexSeo(searchParams));
 
   const query = searchParams.get("q") ?? "";

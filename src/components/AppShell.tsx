@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useManualSensorCorrectionRefresh } from "@/hooks/useManualSensorCorrectionRefresh";
 import { useHydrated } from "@/hooks/useHydrated";
+import { useSearchShortcut } from "@/hooks/useSearchShortcut";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   buildSignedOutRedirect,
@@ -159,26 +160,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     entitlement.effectivePlanId !== "free";
   useCheckoutReturnCompletionTracking(paidDestinationReady);
 
-  // Global ⌘K / Ctrl+K shortcut to open the search palette. Guarded so
-  // it does not steal keystrokes while the grower is typing in an input,
-  // textarea, or contenteditable surface.
-  useEffect(() => {
-    function isTypingTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      if (target.isContentEditable) return true;
-      const tag = target.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-    }
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        if (isTypingTarget(e.target)) return;
-        e.preventDefault();
-        setSearchOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useSearchShortcut(setSearchOpen);
 
   useEffect(() => {
     function onOpenV2(event: Event) {

@@ -488,6 +488,7 @@ export default function Timeline() {
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [directorySensorEpoch, setDirectorySensorEpoch] = useState(0);
   const [coreRead, setCoreRead] = useState<TimelineCoreReadState>({ status: "idle" });
   const [partialReadSources, setPartialReadSources] = useState<TimelineSupplementalReadSource[]>(
     [],
@@ -495,6 +496,7 @@ export default function Timeline() {
   const [supplementalLoading, setSupplementalLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
   const readRequestIdRef = useRef(0);
+  const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -772,6 +774,10 @@ export default function Timeline() {
       setPartialReadSources([]);
       setCoreRead({ status: "success", readKey: requestedReadKey });
       setLoading(false);
+      // Manual sensor receipts are cleared with this commit. The directory
+      // loader runs from the epoch effect, including after an event refresh,
+      // without putting directoryGrowId on this callback.
+      if (isCurrentRequest()) setDirectorySensorEpoch((epoch) => epoch + 1);
 
       const markPartial = (source: TimelineSupplementalReadSource) => {
         if (!isCurrentRequest()) return;
@@ -901,9 +907,12 @@ export default function Timeline() {
     if (directoryGrowId) {
       if (!activeGrowId || !user) return;
       const requestId = readRequestIdRef.current;
+      const sensorGeneration = ++directorySensorGenerationRef.current;
       const requestedReadKey = activeReadKey;
       const isCurrentRequest = () =>
-        requestId === readRequestIdRef.current && activeReadKeyRef.current === requestedReadKey;
+        requestId === readRequestIdRef.current &&
+        sensorGeneration === directorySensorGenerationRef.current &&
+        activeReadKeyRef.current === requestedReadKey;
       const markPartial = (source: TimelineSupplementalReadSource) => {
         if (!isCurrentRequest()) return;
         setPartialReadSources((current) => mergeTimelinePartialSources(current, [source]));
@@ -1107,8 +1116,9 @@ export default function Timeline() {
     load();
   }, [load]);
   useEffect(() => {
+    if (directorySensorEpoch === 0) return;
     void loadDirectorySensors();
-  }, [loadDirectorySensors]);
+  }, [directorySensorEpoch, loadDirectorySensors]);
   useEffect(
     () =>
       subscribeManualSensorCorrections(ownerId, () => {

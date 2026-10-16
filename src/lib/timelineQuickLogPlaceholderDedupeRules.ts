@@ -20,9 +20,13 @@ function hasPhoto(row: TimelineQuickLogPlaceholderRow): boolean {
   return typeof row.photo_url === "string" && row.photo_url.trim().length > 0;
 }
 
-/** Checks whether a timeline row is a blank "(quick log)" placeholder without a photo. */
-function isBlankPlaceholder(row: TimelineQuickLogPlaceholderRow): boolean {
-  return (row.note ?? "").trim() === QUICK_LOG_PLACEHOLDER_NOTE && !hasPhoto(row);
+/**
+ * The manual RPC mirror uses this note. A later page can sign `details.photo_url`
+ * onto the column before the photo row is in the same set, so a signed URL does
+ * not stop the row from being the mirror.
+ */
+function isQuickLogMirror(row: TimelineQuickLogPlaceholderRow): boolean {
+  return (row.note ?? "").trim() === QUICK_LOG_PLACEHOLDER_NOTE;
 }
 
 function readNonBlankString(value: unknown): string | null {
@@ -90,19 +94,26 @@ function sharesTarget(
  * A photo Quick Log writes a diary photo row and the manual RPC also inserts a
  * blank "(quick log)" mirror. Drop only that blank mirror when a photo row for
  * the same plant or tent landed within two minutes and the rows share a
- * positive link: equal grow-event ids, or the photo column path equal to
- * the mirror's details.photo_url. A missing id on both rows never hides
- * the placeholder. A lone placeholder stays.
+ * positive link: equal grow-event ids, or the photo object path equal to
+ * the mirror's stored path. Pages are combined before this runs again, so a
+ * pair split by the 100-row boundary still matches. A missing id on both
+ * rows never hides the placeholder. A lone placeholder stays.
  */
 export function dropBlankQuickLogPlaceholderRows<T extends TimelineQuickLogPlaceholderRow>(
   rows: readonly T[],
 ): T[] {
   return rows.filter((row) => {
-    if (!isBlankPlaceholder(row)) return true;
+    if (!isQuickLogMirror(row)) return true;
     const at = new Date(row.entry_at).getTime();
     if (Number.isNaN(at)) return true;
     const hasCompanion = rows.some((other) => {
-      if (other.id === row.id || !hasPhoto(other) || !sharesTarget(row, other)) return false;
+      if (
+        other.id === row.id ||
+        isQuickLogMirror(other) ||
+        !hasPhoto(other) ||
+        !sharesTarget(row, other)
+      )
+        return false;
       if (!placeholderLinksPhoto(row, other)) return false;
       const otherAt = new Date(other.entry_at).getTime();
       if (Number.isNaN(otherAt)) return false;

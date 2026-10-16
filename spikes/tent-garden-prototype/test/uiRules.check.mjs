@@ -83,6 +83,16 @@ test("regression: on a crowded narrow viewport labels hide rather than overlap; 
   );
 });
 
+test("regression: the selected label's fallback never covers a reserved rect, even when crowded", () => {
+  const banner = { x: 0, y: 0, w: 200, h: 60 };
+  const tiny = { width: 200, height: 95, avoid: [banner], selectedId: "S" }; // nothing fits cleanly
+  const items = ["A", "B", "C", "S"].map((id, i) => item(id, 100, 50 + i * 4, 120, 30));
+  const s = layoutLabels(items, tiny).find((l) => l.id === "S");
+  assert.equal(s.hidden, false);
+  assert.ok(s.y >= banner.h, `selected label y ${s.y} must clear the banner`);
+  assert.ok(s.x >= 0 && s.x + s.w <= 200);
+});
+
 test("layout is deterministic for identical input", () => {
   const items = [item("A", 200, 200), item("B", 230, 205), item("C", 260, 190)];
   assert.deepEqual(layoutLabels(items, box), layoutLabels(items, box));
@@ -99,13 +109,20 @@ test("camera-side hardware fades and the set changes across all four 90° orient
   const seen = new Set();
   for (const az of [-30, 60, 150, 240]) {
     const o = hardwareOpacity(az);
-    const faded = HARDWARE_KEYS.filter((k) => o[k] < 1).sort();
+    const faded = HARDWARE_KEYS.filter((k) => k !== "bar" && o[k] < 1).sort();
     assert.ok(faded.length >= 2, `az ${az} fades something`);
     assert.ok(faded.length < HARDWARE_KEYS.length, `az ${az} does not fade everything`);
     seen.add(faded.join(","));
     for (const k of HARDWARE_KEYS) assert.ok(o[k] > 0 && o[k] <= 1);
   }
   assert.equal(seen.size, 4, "each orientation fades a different foreground set");
+});
+
+test("the overhead light bar is translucent at every orientation (it crosses the back row from any side)", () => {
+  for (const az of [-30, 60, 150, 240]) {
+    const o = hardwareOpacity(az);
+    assert.ok(o.bar < 0.5 && o.bar > 0, `bar opacity at ${az}° is ${o.bar}`);
+  }
 });
 
 test("default view (az −30°) fades the front-left pole and front rail, keeps the back-right pole", () => {

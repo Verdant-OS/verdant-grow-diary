@@ -4,6 +4,8 @@
 // raycasts plant pick meshes, never hardware.
 
 export const FADED_OPACITY = 0.22;
+/** The light bar hangs over the canopy centre, so it crosses the back row from every side. */
+export const BAR_OPACITY = 0.3;
 
 /** Hardware pieces keyed by position; poles at the four corners, rails along the four top edges. */
 export const HARDWARE_KEYS = Object.freeze([
@@ -15,6 +17,7 @@ export const HARDWARE_KEYS = Object.freeze([
   "rail:zD",
   "rail:x0",
   "rail:xW",
+  "bar",
 ]);
 
 // Offsets from the tent centre, in half-tent units. Three.js spherical theta: 0 = camera on +z.
@@ -27,6 +30,7 @@ const OFFSET = {
   "rail:zD": [0, 1],
   "rail:x0": [-1, 0],
   "rail:xW": [1, 0],
+  bar: [0, 0],
 };
 
 /**
@@ -42,7 +46,7 @@ export function hardwareOpacity(azimuthDeg) {
     const [ox, oz] = OFFSET[key];
     // Pieces on the camera's side of the tent centre are foreground and fade.
     const facing = ox * dx + oz * dz;
-    out[key] = facing > 0.05 ? FADED_OPACITY : 1;
+    out[key] = key === "bar" ? BAR_OPACITY : facing > 0.05 ? FADED_OPACITY : 1;
   }
   return out;
 }

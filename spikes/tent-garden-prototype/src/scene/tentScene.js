@@ -78,7 +78,7 @@ export function createTentScene(host, handlers) {
   leaderSvg.setAttribute("class", "leader-layer");
   host.appendChild(leaderSvg);
   let labelAvoid = [];
-  const hardware = new Map(); // key -> mesh with its own material
+  const hardware = new Map(); // key -> mesh with its own material (+ door label element)
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(34, 1, 1, 600);
@@ -264,17 +264,20 @@ export function createTentScene(host, handlers) {
     );
     pickMesh.position.y = (POT_H + 4) / 2;
     group.add(pickMesh);
+    // Selection halo at pot-rim height so it reads from every angle (a floor disc hides
+    // behind neighbouring pots). Drawn on top so leaves never cover it.
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(TENT.potRadiusIn + 0.8, TENT.potRadiusIn + 2.2, 40),
+      new THREE.TorusGeometry(TENT.potRadiusIn + 0.9, 0.5, 8, 48),
       new THREE.MeshBasicMaterial({
         color: COLORS.selectRing,
         transparent: true,
-        opacity: 0.85,
-        side: THREE.DoubleSide,
+        opacity: 0.95,
+        depthTest: false,
       }),
     );
+    ring.renderOrder = 10;
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = FLOOR_Y + 0.05;
+    ring.position.y = POT_H + 0.2;
     ring.visible = false;
     group.add(ring);
     const labelEl = document.createElement("div");
@@ -430,9 +433,11 @@ export function createTentScene(host, handlers) {
       m.opacity += (want - m.opacity) * 0.25; // short ease so rotation does not pop
       if (Math.abs(m.opacity - want) < 0.01) m.opacity = want;
       const ink = mesh.children[0];
-      if (ink?.material) ink.material.opacity = m.opacity;
-      ink?.material && (ink.material.transparent = true);
-      ink && (ink.visible = m.opacity > 0.9);
+      if (ink?.material) {
+        ink.material.transparent = true;
+        ink.material.opacity = m.opacity;
+        ink.visible = m.opacity > 0.9;
+      }
     }
   }
 
@@ -452,7 +457,7 @@ export function createTentScene(host, handlers) {
       if (!p.group.visible) continue;
       const g = p.group.position;
       const a = project(g.x, p.labelAnchorY, g.z);
-      const b = project(g.x, 0, g.z);
+      const b = project(g.x, POT_H + 0.2, g.z); // pot rim: where a leader should point
       if (a.behind) {
         p.labelEl.style.display = "none";
         continue;
@@ -464,7 +469,7 @@ export function createTentScene(host, handlers) {
     // Overlays are measured every frame: a banner can re-wrap after the app rendered it.
     const hostRect = host.getBoundingClientRect();
     const avoid = [];
-    for (const a of labelAvoid) {
+    for (const a of [...labelAvoid, hardware.get("door-label-el")]) {
       if (a && typeof a.getBoundingClientRect === "function") {
         if (a.hidden) continue;
         const r = a.getBoundingClientRect();
@@ -485,12 +490,22 @@ export function createTentScene(host, handlers) {
       if (l.hidden) continue;
       p.labelEl.style.transform = `translate(${l.x.toFixed(1)}px, ${l.y.toFixed(1)}px) rotate(-1.2deg)`;
       if (l.leader) {
+        // A leader points at the pot rim, never the canopy top, so a small plant beside a
+        // tall neighbour cannot be mistaken for the tall one.
+        const sel = l.id === selectedId;
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("x1", (l.x + l.w / 2).toFixed(1));
         line.setAttribute("y1", (l.y + l.h).toFixed(1));
-        line.setAttribute("x2", l.ax.toFixed(1));
-        line.setAttribute("y2", l.ay.toFixed(1));
+        line.setAttribute("x2", l.bx.toFixed(1));
+        line.setAttribute("y2", l.by.toFixed(1));
+        if (sel) line.setAttribute("class", "is-selected");
         leaderSvg.appendChild(line);
+        const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot.setAttribute("cx", l.bx.toFixed(1));
+        dot.setAttribute("cy", l.by.toFixed(1));
+        dot.setAttribute("r", sel ? "4" : "3");
+        if (sel) dot.setAttribute("class", "is-selected");
+        leaderSvg.appendChild(dot);
       }
     }
   }
@@ -643,19 +658,15 @@ function buildTent(scene, hardware) {
     scene.add(rail);
     hardware.set(key, rail);
   }
+  // overhead light bar: always translucent (hardwareVisibilityRules "bar"); no glow plane,
+  // which read as a solid slab over the back row from every orientation
   const bar = new THREE.Mesh(
     new THREE.BoxGeometry(w * 0.7, 1.0, 6),
-    toon(COLORS.lamp, { transparent: true, opacity: 0.55 }),
+    toon(COLORS.lamp, { transparent: true, opacity: 0.3 }),
   );
   bar.position.set(w / 2, WALL_H + 4.2, d / 2);
   scene.add(bar);
-  const barGlow = new THREE.Mesh(
-    new THREE.PlaneGeometry(w * 0.66, 4.6),
-    new THREE.MeshBasicMaterial({ color: 0xfff6d2, transparent: true, opacity: 0.8 }),
-  );
-  barGlow.rotation.x = Math.PI / 2;
-  barGlow.position.set(w / 2, WALL_H + 3.6, d / 2);
-  scene.add(barGlow);
+  hardware.set("bar", bar);
 
   // door mat at the front edge with an upright label
   const doorStrip = outlined(
@@ -668,6 +679,7 @@ function buildTent(scene, hardware) {
   doorEl.className = "door-label";
   doorEl.textContent = "Door (front)";
   const doorLabel = new CSS2DObject(doorEl);
+  hardware.set("door-label-el", doorEl);
   doorLabel.position.set(w / 2, 2, d + 4);
   scene.add(doorLabel);
 }

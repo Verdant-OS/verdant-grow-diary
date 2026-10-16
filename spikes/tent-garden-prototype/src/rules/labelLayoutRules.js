@@ -94,11 +94,34 @@ export function layoutLabels(items, opts) {
     if (!chosen && it.id !== selectedId) {
       // Nothing fits without covering another label: hide this one rather than overlap.
       // The plant stays selectable and its full name is in details and List view.
-      out.push({ id: it.id, x: 0, y: 0, w, h, leader: false, hidden: true, ax: it.ax, ay: it.ay });
+      out.push({
+        id: it.id,
+        x: 0,
+        y: 0,
+        w,
+        h,
+        leader: false,
+        hidden: true,
+        ax: it.ax,
+        ay: it.ay,
+        bx: it.bx,
+        by: it.by,
+      });
       continue;
     }
     if (!chosen) {
-      // the selected plant's label is always shown: clamp into the viewport
+      // The selected plant's label is always shown. Try again ignoring other labels but never
+      // the reserved rectangles (banner, controls); labels it lands on are hidden below.
+      for (const c of candidates(it, w, h)) {
+        const r = { x: c.x, y: c.y, w, h };
+        if (!inBounds(r, width, height)) continue;
+        if (avoid.some((a) => overlaps(r, a, PAD))) continue;
+        chosen = r;
+        break;
+      }
+    }
+    if (!chosen) {
+      // Last resort: clamp into the viewport, then push below any reserved rect it touches.
       const pref = candidates(it, w, h)[0];
       chosen = {
         x: Math.min(Math.max(pref.x, 0), Math.max(0, width - w)),
@@ -106,6 +129,8 @@ export function layoutLabels(items, opts) {
         w,
         h,
       };
+      for (const a of avoid) if (overlaps(chosen, a, PAD)) chosen.y = a.y + a.h + PAD;
+      chosen.y = Math.min(chosen.y, Math.max(0, height - h));
     }
     placed.push(chosen);
     const preferred = candidates(it, w, h)[0];
@@ -120,6 +145,8 @@ export function layoutLabels(items, opts) {
       hidden: false,
       ax: it.ax,
       ay: it.ay,
+      bx: Number.isFinite(it.bx) ? it.bx : it.ax,
+      by: it.by,
     });
   }
   return out;

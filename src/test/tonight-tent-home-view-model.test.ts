@@ -7,6 +7,7 @@ import {
   type TonightSensorRow,
 } from "@/lib/tonightTentHomeViewModel";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 
 const NOW = new Date("2026-10-01T12:00:00.000Z");
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
@@ -253,6 +254,116 @@ describe("buildTonightTentMetrics — per-metric provenance", () => {
     expect(temp.state).toBe("value");
     // A failed read cannot prove absence.
     expect(rh.state).toBe("unavailable");
+  });
+
+  it("calculates VPD from temperature and RH when no vpd_kpa row exists", () => {
+    const capturedAt = minutesAgo(4);
+    const metrics = buildTonightTentMetrics({
+      rows: [
+        row({
+          metric: "temperature_c",
+          value: 24,
+          source: "manual",
+          captured_at: capturedAt,
+          ts: capturedAt,
+        }),
+        row({
+          metric: "humidity_pct",
+          value: 55,
+          source: "manual",
+          captured_at: capturedAt,
+          ts: capturedAt,
+        }),
+      ],
+      rowsRead: OK_ROWS,
+      snapshot: NO_SNAPSHOT,
+      now: NOW,
+    });
+    const vpd = metrics.find((m) => m.key === "vpd")!;
+    expect(vpd).toMatchObject({
+      state: "value",
+      value: calculateVpdKpa({ tempC: 24, rhPercent: 55 }),
+      source: "manual",
+      capturedAt,
+    });
+    expect(vpd.value).toBe(1.34);
+  });
+
+  it("prefers a same-time temperature and RH pair over a newer unpaired reading", () => {
+    const together = minutesAgo(10);
+    const metrics = buildTonightTentMetrics({
+      rows: [
+        row({
+          metric: "temperature_c",
+          value: 25,
+          source: "manual",
+          captured_at: together,
+          ts: together,
+        }),
+        row({
+          metric: "humidity_pct",
+          value: 60,
+          source: "manual",
+          captured_at: together,
+          ts: together,
+        }),
+        row({
+          metric: "temperature_c",
+          value: 30,
+          source: "manual",
+          captured_at: minutesAgo(1),
+          ts: minutesAgo(1),
+        }),
+      ],
+      rowsRead: OK_ROWS,
+      snapshot: NO_SNAPSHOT,
+      now: NOW,
+    });
+    const vpd = metrics.find((m) => m.key === "vpd")!;
+    expect(vpd).toMatchObject({
+      state: "value",
+      value: calculateVpdKpa({ tempC: 25, rhPercent: 60 }),
+      capturedAt: together,
+    });
+  });
+
+  it("keeps VPD Missing when temperature or RH is absent", () => {
+    const metrics = buildTonightTentMetrics({
+      rows: [row({ metric: "temperature_c", value: 24, source: "manual" })],
+      rowsRead: OK_ROWS,
+      snapshot: NO_SNAPSHOT,
+      now: NOW,
+    });
+    expect(metrics.find((m) => m.key === "vpd")).toMatchObject({ state: "missing", value: null });
+  });
+
+  it("does not show a calculated VPD when temperature is outside the VPD range", () => {
+    const metrics = buildTonightTentMetrics({
+      rows: [
+        row({ metric: "temperature_c", value: 70, source: "manual" }),
+        row({ metric: "humidity_pct", value: 50, source: "manual" }),
+      ],
+      rowsRead: OK_ROWS,
+      snapshot: NO_SNAPSHOT,
+      now: NOW,
+    });
+    const vpd = metrics.find((m) => m.key === "vpd")!;
+    expect(vpd.state).toBe("invalid");
+    expect(vpd.value).toBeNull();
+  });
+
+  it("keeps a stored vpd_kpa reading ahead of a calculated value", () => {
+    const metrics = buildTonightTentMetrics({
+      rows: [
+        row({ metric: "temperature_c", value: 24, source: "manual" }),
+        row({ metric: "humidity_pct", value: 55, source: "manual" }),
+        row({ metric: "vpd_kpa", value: 0.9, source: "manual" }),
+      ],
+      rowsRead: OK_ROWS,
+      snapshot: NO_SNAPSHOT,
+      now: NOW,
+    });
+    expect(metrics.find((m) => m.key === "vpd")).toMatchObject({ state: "value", value: 0.9 });
   });
 });
 

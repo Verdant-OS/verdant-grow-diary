@@ -33,6 +33,10 @@ import {
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
+import {
+  QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
+  QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
+} from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { TentQuickLogTargetScope } from "@/components/TentQuickLogTargetScope";
@@ -437,14 +441,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           <main
             id="main-content"
             tabIndex={-1}
-            className="mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pb-9 md:pt-7 lg:px-10"
+            className={`mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pt-7 lg:px-10 ${QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS}`}
           >
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
-              <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
-                {pageContent}
-              </TentQuickLogTargetScope>
+              <div
+                data-testid="app-shell-page-content"
+                className={QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS}
+              >
+                <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
+                  {pageContent}
+                </TentQuickLogTargetScope>
+              </div>
             )}
             {/* In-flow legal footer: stays at the end of scrolled content
                 (never fixed), so the mobile FAB cannot clip it. */}

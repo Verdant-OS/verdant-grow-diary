@@ -131,7 +131,7 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
 
   it("does not apply a stale sensor-read catch to a newer request", () => {
     expect(TIMELINE_SRC).toMatch(
-      /catch\s*\{[\s\S]{0,80}!isCurrentRequest\(\)[\s\S]{0,160}setManualSensorMeasurementEntries\(\[\]\)/,
+      /catch\s*\{[\s\S]{0,80}!isCurrentRequest\(\)[\s\S]{0,160}setManualSensorPageRows\(\[\]\)/,
     );
   });
 

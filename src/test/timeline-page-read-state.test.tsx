@@ -206,6 +206,11 @@ vi.mock("@/components/CopyTraceLinkButton", () => ({ default: () => null }));
 vi.mock("@/components/ActionResponseMemoryCard", () => ({ default: () => null }));
 
 import Timeline from "@/pages/Timeline";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+  TEMPERATURE_UNIT_CHANGE_EVENT,
+} from "@/lib/temperatureUnitPreference";
 
 const GROW_A = {
   id: "grow-a",
@@ -2176,6 +2181,75 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.queryByTestId("timeline-load-older-error")).not.toBeInTheDocument();
     expect(screen.getByText("Newest retained entry")).toBeInTheDocument();
     expect(olderAttempts).toBe(2);
+  });
+
+  it("keeps loaded older pages and issues no new reads when the temperature unit changes", async () => {
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const capturedAt = "2026-07-20T11:00:00.000Z";
+    const reading = (metric: string, value: number, index: number) => ({
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      tent_id: tent,
+      metric,
+      value,
+      captured_at: capturedAt,
+      user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      source: "manual",
+      quality: "ok",
+      ts: capturedAt,
+      created_at: capturedAt,
+      device_id: null,
+      raw_payload: null,
+      correction_valid: true,
+    });
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") {
+        const isLegacyStream = spec.filters.some(
+          (filter) => filter.op === "is" && filter.column === "captured_at",
+        );
+        return {
+          data: isLegacyStream
+            ? []
+            : [reading("temperature_c", 24, 0), reading("humidity_pct", 58, 1)],
+          error: null,
+        };
+      }
+      if (spec.table === "diary_entries" && isOlderPage(spec)) {
+        return {
+          data: [diaryEntry("entry-older", "Older entry stays loaded", "2026-07-19T12:00:00.000Z")],
+          error: null,
+        };
+      }
+      if (spec.table === "diary_entries") {
+        return { data: [diaryEntry("entry-new", "Newest entry")], error: null, count: 2 };
+      }
+      return defaultResult(spec);
+    });
+
+    try {
+      renderTimeline();
+      expect(await screen.findByText("Newest entry")).toBeInTheDocument();
+      expect(await screen.findByText("Manual sensor snapshot: 75.2°F, 58% RH")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("timeline-load-older"));
+      expect(await screen.findByText("Older entry stays loaded")).toBeInTheDocument();
+      const readsBefore = harness.executeQuery.mock.calls.length;
+
+      // Settings → Units in this document (Quick Log) or another tab (storage event):
+      // receipts reformat in place; the fetch effect does not re-run.
+      act(() => {
+        saveTemperatureUnitPreference("celsius");
+        window.dispatchEvent(new Event(TEMPERATURE_UNIT_CHANGE_EVENT));
+      });
+
+      expect(
+        await screen.findByText(/Manual sensor snapshot: 24(\.0)?°C, 58% RH/),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Older entry stays loaded")).toBeInTheDocument();
+      expect(screen.getByText("Newest entry")).toBeInTheDocument();
+      expect(harness.executeQuery.mock.calls.length).toBe(readsBefore);
+    } finally {
+      clearTemperatureUnitPreference();
+    }
   });
 
   it("keeps an older text entry when supplemental photo signing rejects", async () => {

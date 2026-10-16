@@ -11,6 +11,7 @@
  *  - Empty filtered state copy is exactly: "No events match this filter."
  */
 import { useMemo, useState } from "react";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { History, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,9 +55,13 @@ function toScope(props: Props): TimelineMemoryScope | null {
 }
 
 function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "diary" }> }) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const sensorVm = useMemo(
-    () => buildTimelineSensorSnapshotViewModel(item.sensorSnapshot),
-    [item.sensorSnapshot],
+    () =>
+      buildTimelineSensorSnapshotViewModel(item.sensorSnapshot, {
+        preferUnit: temperatureUnit === "celsius" ? "C" : "F",
+      }),
+    [item.sensorSnapshot, temperatureUnit],
   );
   const photoVm = useMemo(
     () =>

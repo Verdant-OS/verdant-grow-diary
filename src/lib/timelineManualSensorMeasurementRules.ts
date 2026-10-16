@@ -10,6 +10,7 @@
  * Pure: no I/O, no React, no Supabase.
  */
 import { groupSensorReadingRows } from "@/lib/growAdapters";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { SensorReadingRow } from "@/lib/db";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
@@ -196,12 +197,20 @@ function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRo
 
 function buildReceiptNote(input: {
   tempF: number | null;
+  tempC: number | null;
   humidityPct: number | null;
   vpdKpa: number | null;
   soilPct: number | null;
+  temperatureUnit: TemperatureUnitPreference;
 }): string {
   const parts: string[] = [];
-  if (input.tempF !== null) parts.push(`${formatFinite(input.tempF)}°F`);
+  // Display-time conversion only: the persisted snapshot keeps its stored
+  // values (production QA 2026-10-14: Timeline read °F under Celsius).
+  if (input.temperatureUnit === "celsius") {
+    if (input.tempC !== null) parts.push(`${formatFinite(input.tempC)}°C`);
+  } else if (input.tempF !== null) {
+    parts.push(`${formatFinite(input.tempF)}°F`);
+  }
   if (input.humidityPct !== null) parts.push(`${formatFinite(input.humidityPct)}% RH`);
   if (input.vpdKpa !== null) parts.push(`${formatFinite(input.vpdKpa)} kPa VPD`);
   if (input.soilPct !== null) parts.push(`${formatFinite(input.soilPct)}% soil moisture`);
@@ -223,7 +232,9 @@ function formatFinite(n: number): string {
 export function manualSensorReadingsToTimelineEntries(
   rows: readonly ManualSensorTimelineMetricRow[] | null | undefined,
   now: Date = new Date(),
+  options: { temperatureUnit?: TemperatureUnitPreference } = {},
 ): TimelineManualSensorReceipt[] {
+  const temperatureUnit = options.temperatureUnit ?? "fahrenheit";
   if (!Array.isArray(rows) || rows.length === 0) return [];
   const manualRows = rows.filter((row) => (row?.source ?? "").toLowerCase() === "manual");
   if (manualRows.length === 0) return [];
@@ -278,7 +289,14 @@ export function manualSensorReadingsToTimelineEntries(
 
     const receipt: TimelineManualSensorReceipt = {
       id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}${reading.tentId}:${capturedAt}`,
-      note: buildReceiptNote({ tempF, humidityPct, vpdKpa, soilPct }),
+      note: buildReceiptNote({
+        tempF,
+        tempC: tempMetricValid ? reading.temp : null,
+        humidityPct,
+        vpdKpa,
+        soilPct,
+        temperatureUnit,
+      }),
       photo_url: null,
       stage: null,
       details: {

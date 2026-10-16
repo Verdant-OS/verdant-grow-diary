@@ -1,7 +1,9 @@
 # Quick Log event request hash — session TimeZone independence
 
-Status: **IMPLEMENTED as a draft PR — stays draft. Schema/function change: Matthew approves before anything ships.**
-Audited on deploy tip `0107d9406` (#1836), 2026-10-01. Companion to draft #1841 (manual path).
+Status: **IMPLEMENTED in PR #1846 (ready for review since 2026-10-12). Schema/function change: the migration merge/apply decision stays with Matthew; nothing is applied.**
+Audited on deploy tip `0107d9406` (#1836), 2026-10-01. Companion to #1841 (manual path), merged 2026-10-13 as `feb94d9ad`.
+
+> **Dated correction, 2026-10-16:** this status block originally said "implemented as a draft PR — stays draft" and called #1841 a draft. The owner marked #1846 ready on 2026-10-12 and #1841 merged on 2026-10-13. The hold is unchanged: no merge or apply of `20261013190000` without Matthew's decision.
 
 ## 1. Finding
 

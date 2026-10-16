@@ -165,12 +165,13 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
     refresh();
   }, [refresh]);
 
-  // Auto-select first grow if none selected
+  // Auto-select first grow if none selected; clear after a successful read with no active grows
   useEffect(() => {
     if (!activeGrowId && grows.length > 0) setActiveGrowId(grows[0].id);
     if (activeGrowId && grows.length > 0 && !grows.find((g) => g.id === activeGrowId))
       setActiveGrowId(grows[0].id);
-  }, [grows, activeGrowId]);
+    if (activeGrowId && !loading && !error && grows.length === 0) setActiveGrowId(null);
+  }, [grows, activeGrowId, loading, error]);
 
   const activeGrow = grows.find((g) => g.id === activeGrowId) ?? null;
 

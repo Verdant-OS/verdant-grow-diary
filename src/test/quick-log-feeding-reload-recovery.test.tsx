@@ -4,12 +4,60 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import type { QuickLogFeedingEventRpcArgs } from "@/lib/writeFeedingTypedEvent";
 import { claimPendingQuickLogNote } from "@/lib/quickLogPendingNoteStore";
+import { readPendingQuickLogFeeding } from "@/lib/quickLogPendingFeedingStore";
 
 const owner = vi.hoisted(() => ({ id: "owner-a" }));
+// Lets a test move the read-back parent row, as another edit would have.
+const readbackOverride = vi.hoisted(() => ({ event: null as Record<string, unknown> | null }));
+// Readback faults for the reused-receipt check; both off by default.
+const readback = vi.hoisted(() => ({ missingChild: false, error: false }));
 const rpc = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (...args: unknown[]) => rpc(...args) },
+  supabase: {
+    rpc: (...args: unknown[]) => rpc(...args),
+    from: (table: string) => {
+      if (table !== "grow_events" && table !== "feeding_events")
+        throw new Error(`Unexpected table ${table}`);
+      return {
+        select: () => ({
+          eq: (_column: string, id: string) => ({
+            // Mirrors the real builder: the receipt readback passes its deadline signal.
+            abortSignal() {
+              return this;
+            },
+            maybeSingle: async () => {
+              if (readback.error) return { data: null, error: new Error("read failed") };
+              if (readback.missingChild && table === "feeding_events")
+                return { data: null, error: null };
+              const args = rpc.mock.calls.at(-1)?.[1] as QuickLogFeedingEventRpcArgs | undefined;
+              return {
+                data: args
+                  ? table === "grow_events"
+                    ? {
+                        id,
+                        event_type: args.p_event_type,
+                        source: "manual",
+                        is_deleted: false,
+                        grow_id: args.p_grow_id,
+                        tent_id: args.p_tent_id,
+                        plant_id: args.p_plant_id,
+                        ...readbackOverride.event,
+                      }
+                    : {
+                        event_id: id,
+                        volume_ml: args.p_feed.volume_ml,
+                        line_id: args.p_feed.line_id,
+                      }
+                  : null,
+                error: null,
+              };
+            },
+          }),
+        }),
+      };
+    },
+  },
 }));
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: owner.id } }) }));
 vi.mock("@/hooks/use-plants", () => ({
@@ -85,12 +133,60 @@ function acceptedThenLost() {
   return ledger;
 }
 beforeEach(() => {
+  readbackOverride.event = null;
   owner.id = "owner-a";
+  readback.missingChild = false;
+  readback.error = false;
   window.sessionStorage.clear();
   rpc.mockReset();
   toastSuccess.mockReset();
 });
 afterEach(() => vi.restoreAllMocks());
+
+describe("Feed reused receipt now on another plant", () => {
+  it("links history review to the verified destination, not the original plant", async () => {
+    acceptedThenLost();
+    sheet();
+    fill();
+    await uncertain();
+    readbackOverride.event = { grow_id: "grow-b", tent_id: "tent-b", plant_id: "plant-b" };
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible());
+    const href = screen.getByTestId("qlv2-history-review-link").getAttribute("href")!;
+    expect(href).toContain("grow-b");
+    expect(href).toContain("plantId=plant-b");
+    expect(href).not.toContain("plant-a");
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(window.sessionStorage.getItem(storageKey())!).historyCheckReason).toBe(
+      "receipt_target_moved",
+    );
+  });
+
+  it("keeps the verified destination for history review after a reload", async () => {
+    acceptedThenLost();
+    const first = sheet();
+    fill();
+    await uncertain();
+    readbackOverride.event = { grow_id: "grow-b", tent_id: "tent-b", plant_id: "plant-b" };
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible());
+    first.unmount();
+
+    sheet();
+    const href = screen.getByTestId("qlv2-history-review-link").getAttribute("href")!;
+    expect(href).toContain("grow-b");
+    expect(href).toContain("plantId=plant-b");
+    expect(href).not.toContain("plant-a");
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(JSON.parse(window.sessionStorage.getItem(storageKey())!).historyReviewTarget).toEqual({
+      growId: "grow-b",
+      tentId: "tent-b",
+      plantId: "plant-b",
+    });
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("Feed permanent replay refusal recovery", () => {
   const permanentReasons = [
@@ -580,4 +676,61 @@ it("keeps a malformed receipt unresolved across a target-changing remount and re
   expect(rpc.mock.calls[1][1]).toEqual(original);
   expect(original).toMatchObject({ p_plant_id: "plant-a", p_grow_id: "grow-a" });
   expect(window.sessionStorage.getItem(storageKey())).toBeNull();
+});
+
+describe("Feed reused receipt that cannot be verified", () => {
+  it("routes a missing feeding child to history review, keeping the key", async () => {
+    // The parent read back but its typed child did not: a confirmed mismatch,
+    // which every same-key Retry would return again.
+    readback.missingChild = true;
+    rpc.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      error: null,
+    });
+    sheet();
+    fill();
+    await uncertain();
+    const original = rpc.mock.calls[0][1];
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible();
+    const pending = readPendingQuickLogFeeding("owner-a");
+    expect(pending.status).toBe("pending");
+    if (pending.status !== "pending") throw new Error("claim was released");
+    expect(pending.record.payload.idempotency_key).toBe(original.p_idempotency_key);
+    expect(pending.record.historyCheckReason).toBe("idempotency_receipt_missing");
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the key and claim after a readback error, and Retry reuses that key", async () => {
+    readback.error = true;
+    rpc.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      error: null,
+    });
+    sheet();
+    fill();
+    await uncertain();
+    const original = rpc.mock.calls[0][1];
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.getByTestId("qlv2-save-retry")).toBeEnabled();
+    expect(screen.queryByTestId("qlv2-history-review-link")).toBeNull();
+    const pending = readPendingQuickLogFeeding("owner-a");
+    expect(pending.status).toBe("pending");
+    if (pending.status !== "pending") throw new Error("claim was released");
+    expect(pending.record.payload.idempotency_key).toBe(original.p_idempotency_key);
+    expect(pending.record.historyCheckReason).toBeUndefined();
+
+    readback.missingChild = false;
+    readback.error = false;
+    rpc.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      error: null,
+    });
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc.mock.calls[1][1]).toEqual(original);
+    expect(readPendingQuickLogFeeding("owner-a").status).toBe("empty");
+  });
 });

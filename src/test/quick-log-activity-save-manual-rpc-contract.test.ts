@@ -14,7 +14,28 @@ import { renderHook, act } from "@testing-library/react";
 const rpcMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
+  supabase: {
+    rpc: (...args: unknown[]) => rpcMock(...args),
+    from: () => ({
+      select: () => ({
+        eq: (_column: string, id: string) => ({
+          maybeSingle: async () => ({
+            data: {
+              id,
+              event_type: "observation",
+              source: "manual",
+              is_deleted: false,
+              grow_id: "grow-1",
+              tent_id: "tent-1",
+              plant_id: "plant-1",
+              note: null,
+            },
+            error: null,
+          }),
+        }),
+      }),
+    }),
+  },
 }));
 
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";

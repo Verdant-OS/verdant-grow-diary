@@ -12,7 +12,7 @@
  */
 import type { GrowOutcomeSummary } from "@/lib/growOutcomeRollupRules";
 import type { ActionOutcomeLearningReport } from "@/lib/actionOutcomeLearningRules";
-import { alertsPath, growDetailPath, logsPath } from "@/lib/routes";
+import { alertsPath, growDetailPath, growLearningPath, logsPath } from "@/lib/routes";
 
 export type ReportsHubCardId =
   | "action_outcome_learning"
@@ -107,7 +107,7 @@ export function buildReportsHubSummary(input: ReportsHubInput): ReportsHubSummar
           ? [`${totalOutcomes} recorded outcome${totalOutcomes === 1 ? "" : "s"}`]
           : [],
       caveat: "Early patterns only — more grow history improves confidence.",
-      href: growDetailPath(growId),
+      href: growLearningPath(growId),
       hrefLabel: "Open learning report",
       empty: learningGroups === 0 && totalOutcomes === 0,
     },

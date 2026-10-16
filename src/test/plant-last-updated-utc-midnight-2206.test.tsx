@@ -64,9 +64,19 @@ function makeItem(overrides: Partial<RelativeTimelineItem> & { id: string }): Re
   };
 }
 
-describe("Plant Last updated — UTC-midnight calendar day stability across time zones (#2206)", () => {
-  it("formatRelativeTimelineHeader keeps a UTC-midnight timestamp on that calendar day in America/Chicago", () => {
+describe("Plant Last updated — UTC-midnight diary events format in the viewer's local time zone (#2206)", () => {
+  it("formatRelativeTimelineHeader formats a UTC-midnight timestamp as the previous calendar day in America/Chicago and same day in UTC", () => {
     withTimeZone("America/Chicago", () => {
+      const h = formatRelativeTimelineHeader([
+        makeItem({ id: "a", occurredAt: "2026-04-10T00:00:00Z" }),
+        makeItem({ id: "b", occurredAt: "2026-05-31T00:00:00Z" }),
+        makeItem({ id: "c", occurredAt: "2026-05-01T00:00:00Z" }),
+      ]);
+      expect(h.lastUpdatedAt).toBe("2026-05-31T00:00:00Z");
+      expect(h.lastUpdatedLabel).toBe("Last updated May 30, 2026");
+    });
+
+    withTimeZone("UTC", () => {
       const h = formatRelativeTimelineHeader([
         makeItem({ id: "a", occurredAt: "2026-04-10T00:00:00Z" }),
         makeItem({ id: "b", occurredAt: "2026-05-31T00:00:00Z" }),
@@ -77,7 +87,7 @@ describe("Plant Last updated — UTC-midnight calendar day stability across time
     });
   });
 
-  it("buildPlantQuickStatusView keeps a UTC-midnight timestamp on that calendar day in America/Chicago", () => {
+  it("buildPlantQuickStatusView formats a UTC-midnight timestamp in America/Chicago as May 30, 2026", () => {
     withTimeZone("America/Chicago", () => {
       const v = buildPlantQuickStatusView({
         stage: "vegetation",
@@ -87,12 +97,12 @@ describe("Plant Last updated — UTC-midnight calendar day stability across time
           makeItem({ id: "c", occurredAt: "2026-04-20T00:00:00Z" }),
         ],
       });
-      expect(v.lastUpdateLabel).toBe("Last updated May 31, 2026");
+      expect(v.lastUpdateLabel).toBe("Last updated May 30, 2026");
       expect(v.lastUpdateIsFallback).toBe(false);
     });
   });
 
-  it("PlantRelativeTimelineSection header renders 'Last updated May 31, 2026' for a UTC-midnight entry in America/Chicago", () => {
+  it("PlantRelativeTimelineSection header renders 'Last updated May 30, 2026' for a UTC-midnight entry in America/Chicago", () => {
     withTimeZone("America/Chicago", () => {
       mockTimelineHistory.mockReturnValue({
         data: [
@@ -139,7 +149,7 @@ describe("Plant Last updated — UTC-midnight calendar day stability across time
 
       render(<PlantRelativeTimelineSection plantId={PLANT_ID} plantStartedAt={PLANT_STARTED} />);
       expect(screen.getByTestId("relative-timeline-header-last-updated")).toHaveTextContent(
-        "Last updated May 31, 2026",
+        "Last updated May 30, 2026",
       );
     });
   });

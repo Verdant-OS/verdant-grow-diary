@@ -21,7 +21,6 @@ import {
   classifyTimelineEntry,
   type TimelineFilterCategory,
 } from "@/lib/timelineEntryClassification";
-import { resolvePlantStartCalendarDate } from "@/lib/plantStartDateRules";
 import { readPersistedHarvestDetails } from "@/lib/harvestDetailsRules";
 
 export type RelativeTimelineItemSource = "note" | "photo" | "sensor";
@@ -738,14 +737,15 @@ export interface RelativeTimelineHeaderView {
 }
 
 function formatHeaderDate(iso: string | null): string | null {
-  const calendarDate = resolvePlantStartCalendarDate(iso);
-  if (!calendarDate) return null;
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
   try {
     return new Intl.DateTimeFormat("en-US", {
       month: "long",
       day: "numeric",
       year: "numeric",
-    }).format(new Date(calendarDate.year, calendarDate.month - 1, calendarDate.day));
+    }).format(new Date(ms));
   } catch {
     return null;
   }

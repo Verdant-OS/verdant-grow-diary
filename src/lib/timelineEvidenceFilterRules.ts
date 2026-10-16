@@ -500,6 +500,34 @@ export function deriveTimelineTentOptions(
  * Derive distinct event-type options from the rows (already lower-cased
  * tokens such as "watering", "feeding", "note").
  */
+const TIMELINE_EVENT_TYPE_OPTION_LABELS: Readonly<Record<string, string>> = {
+  note: "Note",
+  photo: "Photo",
+  quicklog_photo_attachment: "Photo attachment",
+  watering: "Watering",
+  feeding: "Feeding",
+  observation: "Observation",
+  measurement: "Measurement",
+  environment: "Environment",
+  environment_check: "Environment check",
+  training: "Training",
+  harvest: "Harvest",
+  pest_disease: "Pest / disease",
+};
+
+/** Grower-facing log-type label. The option value stays the stored token. */
+export function timelineEventTypeOptionLabel(token: string): string {
+  const known = Object.hasOwn(TIMELINE_EVENT_TYPE_OPTION_LABELS, token)
+    ? TIMELINE_EVENT_TYPE_OPTION_LABELS[token]
+    : undefined;
+  if (known) return known;
+  const words = token
+    .split(/[_-]+/)
+    .filter((word) => word.length > 0)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1));
+  return words.length > 0 ? words.join(" ") : token;
+}
+
 export function deriveTimelineEventTypeOptions(
   rows: ReadonlyArray<TimelineEvidenceRow>,
 ): TimelineEvidenceFilterOption[] {
@@ -509,9 +537,21 @@ export function deriveTimelineEventTypeOptions(
     if (!t) continue;
     m.set(t, (m.get(t) ?? 0) + 1);
   }
-  return Array.from(m.entries())
-    .map(([id, count]) => ({ id, label: id, count }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  const options = Array.from(m.entries()).map(([id, count]) => ({
+    id,
+    label: timelineEventTypeOptionLabel(id),
+    count,
+  }));
+  const labelCounts = new Map<string, number>();
+  for (const option of options) {
+    labelCounts.set(option.label, (labelCounts.get(option.label) ?? 0) + 1);
+  }
+  return options
+    .map((option) => {
+      if ((labelCounts.get(option.label) ?? 0) < 2 || option.label === option.id) return option;
+      return { ...option, label: `${option.label} (${option.id})` };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
 }
 
 export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInput): boolean {

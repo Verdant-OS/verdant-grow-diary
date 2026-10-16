@@ -34,7 +34,6 @@ import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Sprout,
-  Image as ImageIcon,
   Camera,
   FileText,
   FlaskConical,
@@ -2469,49 +2468,45 @@ export default function Timeline() {
                           hidden
                         />
                       ) : null}
-                      {e.photo_url ? (
-                        (() => {
-                          const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
-                          const item = idx >= 0 ? lightboxItems[idx] : null;
-                          const alt = buildTimelinePhotoAltText(item);
-                          const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
-                            hasPhoto: true,
-                            details: e.details,
-                          });
-                          return (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (idx >= 0) setLightboxPhotoId(e.id);
-                                }}
-                                aria-label={`Open photo: ${alt}`}
-                                data-testid="timeline-photo-open"
-                                className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
-                              >
-                                <img
-                                  src={e.photo_url}
-                                  className="w-full aspect-[4/3] object-cover"
-                                  alt={alt}
-                                  loading="lazy"
-                                />
-                              </button>
-                              {showNonDiagnostic && (
-                                <div
-                                  data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
-                                  className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                      {e.photo_url
+                        ? (() => {
+                            const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
+                            const item = idx >= 0 ? lightboxItems[idx] : null;
+                            const alt = buildTimelinePhotoAltText(item);
+                            const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
+                              hasPhoto: true,
+                              details: e.details,
+                            });
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (idx >= 0) setLightboxPhotoId(e.id);
+                                  }}
+                                  aria-label={`Open photo: ${alt}`}
+                                  data-testid="timeline-photo-open"
+                                  className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
                                 >
-                                  {PHOTO_NON_DIAGNOSTIC_LABEL}
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()
-                      ) : (
-                        <div className="w-full aspect-[4/3] bg-secondary/40 flex items-center justify-center text-muted-foreground">
-                          <ImageIcon className="h-8 w-8" />
-                        </div>
-                      )}
+                                  <img
+                                    src={e.photo_url}
+                                    className="w-full aspect-[4/3] object-cover"
+                                    alt={alt}
+                                    loading="lazy"
+                                  />
+                                </button>
+                                {showNonDiagnostic && (
+                                  <div
+                                    data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+                                    className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                                  >
+                                    {PHOTO_NON_DIAGNOSTIC_LABEL}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()
+                        : null}
                       <div
                         className="p-4"
                         onClick={() => setDetailEntryId(e.id)}
@@ -2727,7 +2722,7 @@ export default function Timeline() {
                                 ) : null}
                               </div>
                               <p
-                                className="text-sm whitespace-pre-wrap cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                                className="text-sm text-foreground whitespace-pre-wrap cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
                                 role="button"
                                 tabIndex={0}
                                 data-testid="timeline-entry-body"

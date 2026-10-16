@@ -6,6 +6,7 @@ import {
   VERDANT_LEGAL_PAGE_JSON_LD_SELECTOR,
 } from "@/lib/seo/legalPageStructuredData";
 import { safeJsonLdStringify } from "@/lib/seoStructuredData";
+import { resolveLegalPageIntroClosing } from "@/lib/legalPageIntroCopyRules";
 
 /**
  * Shared shell for public legal pages (Terms, Privacy, Refund).
@@ -73,7 +74,7 @@ export function LegalPageShell({
             <p className="mt-2 text-sm text-muted-foreground">Last updated: {lastUpdated}</p>
             <p className="mt-2 text-sm text-muted-foreground">
               This page is maintained by Matthew Tyler Cheek (operating Verdant Grow Diary) to
-              answer common questions about the service. Please review these terms carefully.
+              answer common questions about the service. {resolveLegalPageIntroClosing(path)}
             </p>
           </div>
           <div className="prose prose-invert max-w-none space-y-5 text-sm leading-relaxed [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mt-8 [&_h2]:text-foreground [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:text-foreground [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_a]:underline [&_a]:text-primary">

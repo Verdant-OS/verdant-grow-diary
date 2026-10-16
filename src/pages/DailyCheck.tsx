@@ -164,6 +164,7 @@ export default function DailyCheck() {
   const { activeGrowId } = useGrows();
 
   const [plantId, setPlantId] = useState<string>("");
+  const [plantChoice, setPlantChoice] = useState<"route" | "explicit">("route");
   const [tentId, setTentId] = useState<string>("");
   const [step, setStep] = useState<DailyGrowCheckStep>("select");
   const [state, setState] = useState<DailyGrowCheckState>(INITIAL_DAILY_GROW_CHECK_STATE);
@@ -278,6 +279,7 @@ export default function DailyCheck() {
   useEffect(() => {
     if (tentsLoading || plantsLoading || !routeIdentityPending) return;
     setPlantId(fallbackPlantId);
+    setPlantChoice("route");
     setTentId(routeTentId);
     setStep(routeStep);
     setQuickLogOpen(routeStep === "quicklog");
@@ -294,6 +296,12 @@ export default function DailyCheck() {
     routeTentId,
     tentsLoading,
   ]);
+
+  // An untouched default follows the selectable list. A grower choice stays.
+  useEffect(() => {
+    if (routeIdentityPending || plantChoice === "explicit") return;
+    if (plantId !== fallbackPlantId) setPlantId(fallbackPlantId);
+  }, [fallbackPlantId, plantChoice, plantId, routeIdentityPending]);
 
   // When a plant is chosen, sync its assigned tent
   useEffect(() => {
@@ -400,13 +408,14 @@ export default function DailyCheck() {
   }, [renderedStep]);
 
   // Sole-plant preselect fills the form when the URL names no plant. Post-submit
-  // return actions stay on the route plant, or a plant the grower chose after
-  // that default, so an implicit sole plant does not add View Plant.
+  // follows an explicit selector choice, including a cleared picker. An
+  // untouched route plant still returns there. An untouched sole-plant default
+  // does not add View Plant.
   const postSubmitPlantId =
-    plantResolution.status === "valid"
-      ? (routePlant?.id ?? null)
-      : renderedPlantId && renderedPlantId !== fallbackPlantId
-        ? renderedPlantId
+    plantChoice === "explicit"
+      ? renderedPlantId || null
+      : plantResolution.status === "valid"
+        ? (routePlant?.id ?? null)
         : null;
   const postSubmitActions = useMemo(
     () =>
@@ -542,7 +551,10 @@ export default function DailyCheck() {
                 <Label className="text-xs">Current Plant</Label>
                 <Select
                   value={renderedPlantId || "__none"}
-                  onValueChange={(value) => setPlantId(value === "__none" ? "" : value)}
+                  onValueChange={(value) => {
+                    setPlantChoice("explicit");
+                    setPlantId(value === "__none" ? "" : value);
+                  }}
                 >
                   <SelectTrigger
                     className="min-h-11 w-full min-w-0"

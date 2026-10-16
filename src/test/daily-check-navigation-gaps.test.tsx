@@ -82,7 +82,10 @@ describe("Daily Check navigation gaps", () => {
     fireEvent.click(screen.getByTestId("daily-grow-check-next"));
 
     expect(screen.getByTestId("daily-grow-check-finish")).toBeInTheDocument();
-    expect(screen.getByTestId("daily-grow-check-review-back")).toHaveAccessibleName(/back/i);
+    const back = screen.getByTestId("daily-grow-check-review-back");
+    expect(back).toHaveAccessibleName(/back/i);
+    fireEvent.click(back);
+    expect(screen.getByText("Step 5 · Handheld Readings")).toBeInTheDocument();
   });
 
   it("pads the select step so the sticky Start bar does not cover inline forms", () => {

@@ -9,10 +9,12 @@ import { renderToString } from "react-dom/server";
 
 const request = vi.hoisted(() => ({
   url: "https://verdantgrowdiary.com/pricing" as string | null,
+  calls: 0,
 }));
 
 vi.mock("@tanstack/react-start/server", () => ({
   getRequest: () => {
+    request.calls += 1;
     if (request.url === null) throw new Error("no request in this context");
     return new Request(request.url);
   },
@@ -24,10 +26,11 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 const LIVE_TOKEN = "live_fixturetokenpayload00000000";
 
-async function serverBanner(url: string | null) {
+async function serverBanner(url: string | null, token = LIVE_TOKEN) {
   request.url = url;
+  request.calls = 0;
   vi.resetModules();
-  vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", LIVE_TOKEN);
+  vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", token);
   const { PaymentTestModeBanner } = await import("@/components/PaymentTestModeBanner");
   return renderToString(<PaymentTestModeBanner />);
 }
@@ -61,5 +64,28 @@ describe("server render uses the request host", () => {
   it("falls back to the browser host when there is no request", async () => {
     const html = await serverBanner(null);
     expect(html).toContain("Live checkout is only available on verdantgrowdiary.com.");
+  });
+
+  // Codex P2 at d3443169: the request-host lookup must not run when the host
+  // cannot change the answer (sandbox or malformed token, or checkout paused).
+  // The public browser census uses a test_ build; its batch-1 /auth load
+  // aborted while every SSR render called getRequest().
+  it("never reads the request for a sandbox token", async () => {
+    const html = await serverBanner(
+      "http://localhost:5173/auth",
+      "test_fixturetokenpayload00000000",
+    );
+    expect(html).toContain('data-payment-env="sandbox"');
+    expect(request.calls).toBe(0);
+  });
+
+  it("never reads the request for a malformed token", async () => {
+    await serverBanner("http://localhost:5173/auth", "live_short");
+    expect(request.calls).toBe(0);
+  });
+
+  it("reads the request only for a well-formed live token", async () => {
+    await serverBanner("https://verdantgrowdiary.com/pricing");
+    expect(request.calls).toBeGreaterThan(0);
   });
 });

@@ -65,9 +65,13 @@ export function getPaddleEnvironment(): "sandbox" | "live" {
  * checkout; `'unavailable'` never does.
  */
 export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
+  // Only a well-formed live token depends on the host. For a sandbox, missing,
+  // malformed or switched-off token the host cannot change the answer, so the
+  // request-host lookup (a server-side getRequest() during SSR) is skipped.
+  const hostDecides = !checkoutDisabled && classifyPaddleToken(clientToken) === "live";
   return resolvePaddleCheckoutEnvironment({
     token: clientToken,
-    hostname: currentHostname(),
+    hostname: hostDecides ? currentHostname() : null,
     checkoutDisabled,
   });
 }

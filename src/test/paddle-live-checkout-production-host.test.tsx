@@ -170,7 +170,7 @@ describe("checkout-disabled rollback artifact on the production hostname", () =>
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it.each(["false", "", "1", "TRUE "])(
+  it.each(["false", "", "1", "TRUE ", "true ", " true", "\ttrue", "true\n", " true "])(
     "treats VITE_CHECKOUT_DISABLED=%j as not disabled",
     async (value) => {
       const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000", value);

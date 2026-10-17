@@ -113,7 +113,8 @@ export interface ResolvePaddleCheckoutEnvironmentInput {
 
 /** Parse the build-time kill switch. Only the exact string "true" disables. */
 export function isCheckoutDisabledFlag(value: unknown): boolean {
-  return typeof value === "string" && value.trim() === "true";
+  // Exact match only: a whitespace typo must not ship a closed-checkout build.
+  return value === "true";
 }
 
 /**

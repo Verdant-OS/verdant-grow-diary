@@ -128,6 +128,13 @@ migration in this doc. So if either is still pending in production, a version-or
 _(Superseded 2026-10-16 as operational guidance: the receipt below measured both versions
 and forbids `supabase db push` on production outright.)_
 
+> **Production stop rule (2026-10-16 receipt).** Never run `supabase db push` (with or
+> without `--include-all`) against production `knkwiiywfkbqznbxwqfh`: migration history
+> records none of the versions in this doc, so a push would re-run applied files. Production
+> applies go one owner-approved file at a time with a catalog readback, as in "Production
+> measurement and apply, 2026-10-16" below. The version-ordered guidance in this section and
+> in "Migrations in dependency order" is the pre-receipt inventory, kept as history.
+
 **Before any version-ordered apply, the owner checks whether `20260916111000` and
 `20260917183000` are recorded in production** (same check as below:
 `supabase_migrations.schema_migrations` or the Remote column of `supabase migration list`).
@@ -227,6 +234,9 @@ pair sorts ahead of `20260924120000`. Until the checklist itself is corrected in
 change, use the order in this doc. That correction is not assigned yet.
 
 ## Migrations in dependency order
+
+> **Production stop rule:** see the box above. Do not use this order with `supabase db push`
+> on production; it documents version ordering and file prerequisites only.
 
 Supabase applies by version (timestamp), not by merge order. Any pending earlier version
 sorts ahead of row 1: the parked `20260916111000` (#1460) and `20260917183000` (#1545), then

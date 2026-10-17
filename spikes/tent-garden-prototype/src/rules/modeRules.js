@@ -26,3 +26,20 @@ export function resolveModeChange(current, requested) {
 export function cameraLocked(mode) {
   return mode === "edit";
 }
+
+/**
+ * Should Escape clear the current selection? Anywhere on the page, except where Escape already
+ * means something else: an open dialog (Escape closes it), a text field or select (Escape is
+ * the user's own cancel there), or a key another handler already consumed.
+ * @param {{ key?:string, defaultPrevented?:boolean, dialogOpen?:boolean, editableTarget?:boolean, hasSelection?:boolean }} e
+ */
+export function escapeClearsSelection(e) {
+  return (
+    !!e &&
+    e.key === "Escape" &&
+    !e.defaultPrevented &&
+    !e.dialogOpen &&
+    !e.editableTarget &&
+    !!e.hasSelection
+  );
+}

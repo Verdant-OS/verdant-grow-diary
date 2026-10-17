@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveModeChange, cameraLocked } from "../src/rules/modeRules.js";
+import { resolveModeChange, cameraLocked, escapeClearsSelection } from "../src/rules/modeRules.js";
+
+test("Escape clears a selection from anywhere, except dialogs, text fields and consumed keys", () => {
+  const base = { key: "Escape", hasSelection: true };
+  assert.equal(escapeClearsSelection(base), true);
+  assert.equal(escapeClearsSelection({ ...base, dialogOpen: true }), false);
+  assert.equal(escapeClearsSelection({ ...base, editableTarget: true }), false);
+  assert.equal(escapeClearsSelection({ ...base, defaultPrevented: true }), false);
+  assert.equal(escapeClearsSelection({ ...base, hasSelection: false }), false);
+  assert.equal(escapeClearsSelection({ ...base, key: "Enter" }), false);
+  assert.equal(escapeClearsSelection(null), false);
+  assert.equal(escapeClearsSelection(undefined), false);
+});
 import { resolveDrop } from "../src/rules/layoutRules.js";
 import {
   noteChanges,

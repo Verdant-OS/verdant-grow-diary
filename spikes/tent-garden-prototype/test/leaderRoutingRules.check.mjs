@@ -226,6 +226,62 @@ test("with an 8 px edge inset, every card keeps 8 px from each edge and routing 
   assert.deepEqual(problems.slice(0, 6), [], `${problems.length} problems`);
 });
 
+// A label is hidden only when its chip genuinely has nowhere to go. Independent oracle: for each
+// hidden plant, try every chip position on the same 6 px grid against the FINAL layout, with the
+// same rules (6 px card gap, 6 px gap to reserved rects, 24 px pot keep-out squares, no sitting on
+// a drawn leader, its own leader crossing no card or reserved rect). Any free position is a fail.
+test("a plant's label is hidden only when no chip position anywhere in view is free", () => {
+  const INSET = 8;
+  const GAP = 6;
+  const KEEP = 24;
+  const STEP = 6;
+  const sep = (a, b, pad) =>
+    a.x + a.w + pad <= b.x ||
+    b.x + b.w + pad <= a.x ||
+    a.y + a.h + pad <= b.y ||
+    b.y + b.h + pad <= a.y;
+  const wasted = [];
+  let hiddenTotal = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    const { items, opts } = scene(seed);
+    for (const it of items) {
+      it.tx = it.bx + 3;
+      it.ty = it.by + 14;
+    }
+    const o = { ...opts, inset: INSET };
+    const out = layoutLabels(items, o);
+    const shown = out.filter((l) => !l.hidden);
+    const leaders = shown.filter((l) => l.leader).map(drawnLeader);
+    for (const h of out.filter((l) => l.hidden)) {
+      hiddenTotal++;
+      const it = items.find((i) => i.id === h.id);
+      const keep = items
+        .filter((i) => i.id !== it.id)
+        .flatMap((i) => [
+          { x: i.bx - KEEP, y: i.by - KEEP, w: 2 * KEEP, h: 2 * KEEP },
+          { x: i.tx - KEEP, y: i.ty - KEEP, w: 2 * KEEP, h: 2 * KEEP },
+        ]);
+      outer: for (let y = INSET; y + it.ch <= o.height - INSET; y += STEP) {
+        for (let x = INSET; x + it.cw <= o.width - INSET; x += STEP) {
+          const r = { x, y, w: it.cw, h: it.ch };
+          if (!shown.every((s) => sep(r, s, GAP))) continue;
+          if (!o.avoid.every((a) => sep(r, a, GAP))) continue;
+          if (!keep.every((k) => sep(r, k, 0))) continue;
+          if (leaders.some(({ p, q }) => crossesInterior(p, q, r, -2))) continue;
+          const c = { x: x + it.cw / 2, y: y + it.ch / 2 };
+          const pot = { x: it.bx, y: it.by };
+          if (shown.some((s) => crossesInterior(c, pot, s, -2))) continue;
+          if (o.avoid.some((a) => crossesInterior(c, pot, a, -2))) continue;
+          wasted.push(`seed ${seed}: ${it.id} hidden, but a chip fits at ${x},${y}`);
+          break outer;
+        }
+      }
+    }
+  }
+  assert.ok(hiddenTotal > 0, "scenes must still exercise hiding");
+  assert.deepEqual(wasted.slice(0, 6), [], `${wasted.length} labels hidden despite free space`);
+});
+
 test("inset defaults to 0: callers that omit it keep the old edge behaviour", () => {
   const { items, opts } = scene(11);
   assert.deepEqual(layoutLabels(items, opts), layoutLabels(items, { ...opts, inset: 0 }));

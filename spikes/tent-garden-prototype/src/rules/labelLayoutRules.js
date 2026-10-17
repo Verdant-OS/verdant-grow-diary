@@ -227,6 +227,20 @@ function placeOnce(items, opts) {
   const placed = [];
   const segs = []; // leaders already drawn: later cards may not sit on them
   const out = [];
+  const deferred = []; // { slot, it, tryGrid }: tappable pots whose usual spots were all taken
+  const hiddenEntry = (it) => ({
+    id: it.id,
+    x: 0,
+    y: 0,
+    w: it.w,
+    h: it.h,
+    leader: false,
+    hidden: true,
+    ax: it.ax,
+    ay: it.ay,
+    bx: it.bx,
+    by: it.by,
+  });
   for (const it of list) {
     const { w, h } = it;
     const coversPot = (r) => pots.some((q) => q.id !== it.id && overlaps(r, q, 0));
@@ -314,9 +328,9 @@ function placeOnce(items, opts) {
       }
       if (chosen) continue;
     }
-    if (!chosen && it.id !== selectedId && it.occluded) {
-      // Its pot is behind a neighbour's leaves, so its card is the only way to tap it: search the
-      // whole view (same rules: no overlap, no pot, no crossing leaders) before giving up.
+    // Search the whole view for a chip (same rules: no overlap, no pot, no crossing leaders).
+    // It reads the shared placed/segs state when it runs, so a deferred call sees later cards.
+    const tryGrid = () => {
       const cw = it.cw > 0 ? it.cw : w;
       const ch = it.ch > 0 ? it.ch : h;
       const pref = candidates(it, cw, ch)[0];
@@ -329,7 +343,7 @@ function placeOnce(items, opts) {
         if (!routeClear(r, lead.seg)) continue;
         placed.push(r);
         commitLeader(lead.seg);
-        out.push({
+        return {
           id: it.id,
           ...r,
           leader: lead.leader && !!lead.seg,
@@ -340,28 +354,21 @@ function placeOnce(items, opts) {
           ay: it.ay,
           bx: Number.isFinite(it.bx) ? it.bx : it.ax,
           by: it.by,
-        });
-        chosen = r;
-        break;
+        };
       }
-      if (chosen) continue;
+      return null;
+    };
+    if (!chosen && it.id !== selectedId && it.occluded) {
+      // Its pot is behind a neighbour's leaves, so its card is the only way to tap it: search the
+      // whole view now, before plants that can be tapped directly.
+      out.push(tryGrid() ?? hiddenEntry(it));
+      continue;
     }
     if (!chosen && it.id !== selectedId) {
-      // Nothing fits, not even a chip: hide this one rather than overlap.
-      // The plant stays selectable and its full name is in details and List view.
-      out.push({
-        id: it.id,
-        x: 0,
-        y: 0,
-        w,
-        h,
-        leader: false,
-        hidden: true,
-        ax: it.ax,
-        ay: it.ay,
-        bx: it.bx,
-        by: it.by,
-      });
+      // Its pot can be tapped directly. Search the whole view too, but only after every plant
+      // has had its usual spots, so this chip uses leftover space and never displaces a card.
+      deferred.push({ slot: out.length, it, tryGrid });
+      out.push(null);
       continue;
     }
     if (!chosen) {
@@ -411,5 +418,8 @@ function placeOnce(items, opts) {
       by: it.by,
     });
   }
+  // Nothing fits even in leftover space: hide it rather than overlap. The plant stays tappable
+  // through its pot, and its full name is in details and List view.
+  for (const d of deferred) out[d.slot] = d.tryGrid() ?? hiddenEntry(d.it);
   return out;
 }

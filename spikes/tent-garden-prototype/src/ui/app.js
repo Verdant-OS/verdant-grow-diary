@@ -25,7 +25,7 @@ import {
   canSave,
 } from "../rules/saveRules.js";
 import { timelinePoints, pointAt, evidenceFor } from "../rules/historyRules.js";
-import { resolveModeChange, cameraLocked } from "../rules/modeRules.js";
+import { resolveModeChange, cameraLocked, escapeClearsSelection } from "../rules/modeRules.js";
 import { visualForStage, sexLabel } from "../rules/plantVisualRules.js";
 // Which fictional garden to load. The query value only ever selects from a fixed map, so no
 // user-supplied text reaches an import path.
@@ -814,7 +814,26 @@ function wireControls() {
     } else if (e.key === "[") scene?.rotateBy(-90);
     else if (e.key === "]") scene?.rotateBy(90);
     else if (e.key === "r" || e.key === "R") scene?.resetView();
-    else if (e.key === "Escape") select(null);
+  });
+  // Escape clears the selection from anywhere on the page, not only with focus in the 3D view.
+  document.addEventListener("keydown", (e) => {
+    const t = e.target;
+    const editableTarget =
+      !!t &&
+      ((t.tagName === "INPUT" && !/^(checkbox|radio|range|button|submit|reset)$/.test(t.type)) ||
+        /^(TEXTAREA|SELECT)$/.test(t.tagName || "") ||
+        t.isContentEditable === true);
+    const dialogOpen = !!document.querySelector("dialog[open]");
+    if (
+      escapeClearsSelection({
+        key: e.key,
+        defaultPrevented: e.defaultPrevented,
+        dialogOpen,
+        editableTarget,
+        hasSelection: state.selectedId != null,
+      })
+    )
+      select(null);
   });
 }
 

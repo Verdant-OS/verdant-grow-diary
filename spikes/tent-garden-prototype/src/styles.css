@@ -559,6 +559,16 @@ button {
   .brand__name {
     white-space: nowrap;
   }
+  /* The pot-size warning reads as a thin full-width line under the controls, so it no longer
+     pushes Animation and List view onto an extra 44 px row. */
+  .toolbar .pot-note {
+    order: 1;
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .toolbar .pot-note:empty {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   * {

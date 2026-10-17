@@ -430,7 +430,7 @@ describe("temporary authenticated One-Tent Actions lane", () => {
       return;
     }
 
-    const sandboxToken = `test_${"s".repeat(16)}`;
+    const sandboxToken = `test_${"s".repeat(27)}`;
     const liveOverride = `live_${"l".repeat(16)}`;
     const resolvedToken = resolveCanonicalPaddleSandboxToken(
       `VITE_PAYMENTS_CLIENT_TOKEN=${sandboxToken}\n`,

@@ -62,7 +62,7 @@ describe("live checkout presentation is hydration-stable on a non-production hos
   });
 
   it("keeps a test token's sandbox banner identical on the server and after hydration", async () => {
-    const { PaymentTestModeBanner } = await loadBannerWithToken("test_fixture_token_payload");
+    const { PaymentTestModeBanner } = await loadBannerWithToken("test_fixturetokenpayload00000000");
     const html = renderToString(<PaymentTestModeBanner />);
     expect(html).toContain('data-payment-env="sandbox"');
     container.innerHTML = html;

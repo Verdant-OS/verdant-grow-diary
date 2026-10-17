@@ -6,8 +6,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const TOKEN_NAME = "VITE_PAYMENTS_CLIENT_TOKEN";
-const TEST_SANDBOX_TOKEN = "test_sandboxfixture";
-const OTHER_SANDBOX_TOKEN = "test_sandboxfixture_other";
+const TEST_SANDBOX_TOKEN = "test_sandboxfixture0000000000000";
+const OTHER_SANDBOX_TOKEN = "test_sandboxfixtureother00000000";
 const TEST_LIVE_TOKEN = "live_livefixture0000000000000000";
 const OTHER_LIVE_TOKEN = "live_livefixtureother00000000000";
 const GARBAGE_TOKEN = "pk_not_a_paddle_client_token";

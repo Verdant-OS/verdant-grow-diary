@@ -77,7 +77,7 @@ describe("Paddle production test-only policy", () => {
       Checkout: { open: vi.fn() },
     };
 
-    const paddle = await loadPaddleWithToken("test_policy_fixture");
+    const paddle = await loadPaddleWithToken("test_policyfixture00000000000000");
     await paddle.initializePaddle();
 
     expect(environmentSet).toHaveBeenCalledTimes(1);

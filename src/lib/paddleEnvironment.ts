@@ -20,18 +20,19 @@ export type PaddleTokenClass = "sandbox" | "live" | "unavailable";
 export type PaddleCheckoutEnvironment = "sandbox" | "live" | "unavailable";
 
 /**
- * Paddle documents client-side tokens as the prefix plus exactly 27 letters
- * and digits. A `live_` value of any other shape (for example `live_invalid`)
- * is malformed and must never enable live checkout.
+ * Paddle documents client-side tokens as the prefix (`test_` or `live_`) plus
+ * exactly 27 letters and digits. A value of any other shape (for example
+ * `live_invalid` or `test_abc`) is malformed and must never initialize Paddle.
  */
+const PADDLE_SANDBOX_CLIENT_TOKEN_SHAPE = /^test_[A-Za-z0-9]{27}$/;
 const PADDLE_LIVE_CLIENT_TOKEN_SHAPE = /^live_[A-Za-z0-9]{27}$/;
 
 /**
  * Classify a raw Paddle client token.
  *
- * - `"test_..."`  → `"sandbox"`
+ * - `"test_"` + 27 letters/digits → `"sandbox"`
  * - `"live_"` + 27 letters/digits → `"live"`
- * - malformed `live_`, null / undefined / empty / whitespace / unknown prefix → `"unavailable"`
+ * - any other shape, null / undefined / empty / whitespace / unknown prefix → `"unavailable"`
  *
  * The token payload is never returned or logged.
  */
@@ -39,9 +40,7 @@ export function classifyPaddleToken(token: string | null | undefined): PaddleTok
   if (typeof token !== "string") return "unavailable";
   const trimmed = token.trim();
   if (trimmed.length === 0) return "unavailable";
-  // Guard: reject tokens that are only the prefix ("test_" / "live_" with
-  // no payload) — those are malformed and must not initialize Paddle.
-  if (trimmed.startsWith("test_") && trimmed.length > "test_".length) {
+  if (PADDLE_SANDBOX_CLIENT_TOKEN_SHAPE.test(trimmed)) {
     return "sandbox";
   }
   if (PADDLE_LIVE_CLIENT_TOKEN_SHAPE.test(trimmed)) {

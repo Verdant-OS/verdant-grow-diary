@@ -15,7 +15,7 @@ import {
 
 describe("classifyPaddleToken", () => {
   it("classifies well-formed sandbox tokens", () => {
-    expect(classifyPaddleToken("test_abc123xyz")).toBe("sandbox");
+    expect(classifyPaddleToken("test_abc123xyz000000000000000000")).toBe("sandbox");
   });
 
   it("classifies well-formed live tokens", () => {
@@ -43,14 +43,14 @@ describe("classifyPaddleToken", () => {
   });
 
   it("trims surrounding whitespace before classifying", () => {
-    expect(classifyPaddleToken("  test_abc  ")).toBe("sandbox");
+    expect(classifyPaddleToken("  test_abc000000000000000000000000  ")).toBe("sandbox");
     expect(classifyPaddleToken("\tlive_abc000000000000000000000000\n")).toBe("live");
   });
 
   it("never returns the token value in the classification", () => {
     // Sanity: the return type is a fixed union, but assert the actual
     // returned string is only one of the three known labels.
-    const out = classifyPaddleToken("test_super_secret_token_value");
+    const out = classifyPaddleToken("test_supersecrettokenvalue000000");
     expect(["sandbox", "live", "unavailable"]).toContain(out);
     expect(out).not.toContain("super_secret_token_value");
   });
@@ -111,19 +111,19 @@ describe("resolvePaddleCheckoutEnvironment", () => {
   it("returns sandbox for a sandbox token on any host, including loopback", () => {
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "test_abc",
+        token: "test_abc000000000000000000000000",
         hostname: "localhost",
       }),
     ).toBe("sandbox");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "test_abc",
+        token: "test_abc000000000000000000000000",
         hostname: "127.0.0.1",
       }),
     ).toBe("sandbox");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "test_abc",
+        token: "test_abc000000000000000000000000",
         hostname: "id-preview--x.lovable.app",
       }),
     ).toBe("sandbox");
@@ -196,7 +196,7 @@ describe("resolvePaddleCheckoutEnvironment", () => {
     expect(resolvePaddleCheckoutEnvironment({ token: "live_abc000000000000000000000000", hostname: null })).toBe(
       "unavailable",
     );
-    expect(resolvePaddleCheckoutEnvironment({ token: "test_abc", hostname: null })).toBe("sandbox");
+    expect(resolvePaddleCheckoutEnvironment({ token: "test_abc000000000000000000000000", hostname: null })).toBe("sandbox");
   });
 });
 

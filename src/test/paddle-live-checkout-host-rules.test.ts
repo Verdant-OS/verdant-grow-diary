@@ -13,7 +13,7 @@ import {
 import { LIVE_CHECKOUT_FAQ_ANSWER, buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 
 const LIVE = "live_fixturetokenpayload00000000";
-const TEST = "test_fixture_token_payload";
+const TEST = "test_fixturetokenpayload00000000";
 
 describe("live checkout production hostnames", () => {
   it("allows exactly the apex and www production hosts", () => {

@@ -86,7 +86,7 @@ describe("live token on the production hostname", () => {
       Checkout: { open: vi.fn() },
     };
 
-    const paddle = await loadPaddleWithToken("test_fixture_token_payload");
+    const paddle = await loadPaddleWithToken("test_fixturetokenpayload00000000");
     expect(paddle.resolvePaddleCheckout()).toBe("sandbox");
     expect(paddle.getPaddleEnvironment()).toBe("sandbox");
     await paddle.initializePaddle();

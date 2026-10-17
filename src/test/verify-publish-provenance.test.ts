@@ -26,8 +26,8 @@ import {
   sanitizeDirtyPathList,
 } from "../../scripts/verify-publish-provenance.mjs";
 
-const FIXTURE_TEST_TOKEN = "test_REDACTED_SANDBOX";
-const FIXTURE_LIVE_TOKEN = "live_REDACTED_LIVE";
+const FIXTURE_TEST_TOKEN = "test_REDACTEDSANDBOX000000000000";
+const FIXTURE_LIVE_TOKEN = "live_REDACTEDLIVE000000000000000";
 
 const CLEAN_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 

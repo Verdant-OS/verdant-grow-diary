@@ -11,8 +11,10 @@
  * inject a no-op for treeHash/dirty; Vite then bundles the committed class.
  *
  * Scope: ONLY `.env.production`. No other paths. Stamper stays fail-open.
- * Does not teach stamp-version to ignore this file. Does not authorize live
- * checkout — client sandbox gate is unchanged.
+ * Does not teach stamp-version to ignore this file. Does not by itself authorize
+ * live checkout: whether a committed `live_` token may open checkout is decided
+ * by the client host rule in src/lib/paddleEnvironment.ts (production
+ * hostnames only).
  *
  * Fail closed when HEAD has no `.env.production`, or when git is unavailable.
  * Never invents a file. Stdout reports token CLASS only (never token bytes).

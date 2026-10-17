@@ -90,6 +90,29 @@ describe("live token on the production hostname", () => {
     expect(environmentSet.mock.calls).toEqual([["sandbox"]]);
   });
 
+  it("server-renders and hydrates the banner with no mismatch and no banner on the production host", async () => {
+    vi.resetModules();
+    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");
+    const { PaymentTestModeBanner } = await import("@/components/PaymentTestModeBanner");
+    const { renderToString } = await import("react-dom/server");
+    const { hydrateRoot } = await import("react-dom/client");
+    const { act } = await import("react");
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    try {
+      container.innerHTML = renderToString(<PaymentTestModeBanner />);
+      expect(container.innerHTML).toBe("");
+      const recoverable = vi.fn();
+      await act(async () => {
+        hydrateRoot(container, <PaymentTestModeBanner />, { onRecoverableError: recoverable });
+      });
+      expect(recoverable).not.toHaveBeenCalled();
+      expect(container.innerHTML).toBe("");
+    } finally {
+      container.remove();
+    }
+  });
+
   it("does not mark checkout unavailable in the hook", async () => {
     vi.resetModules();
     vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");

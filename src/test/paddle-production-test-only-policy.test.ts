@@ -92,7 +92,9 @@ describe("Paddle production test-only policy", () => {
     const paddle = await loadPaddleWithToken("live_policy_fixture");
 
     expect(paddle.resolvePaddleCheckout()).toBe("unavailable");
-    expect(paddle.getPaddleEnvironment()).toBe("sandbox");
+    // Entitlement reads follow the token class: only a test_ token selects
+    // sandbox, so a live token never unlocks sandbox rows on any host.
+    expect(paddle.getPaddleEnvironment()).toBe("live");
     await expect(paddle.initializePaddle()).rejects.toBeInstanceOf(
       paddle.PaddleCheckoutUnavailableError,
     );

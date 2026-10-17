@@ -289,7 +289,7 @@ jobs:
               evaluateBoundedPublicAssetResponseMetadata,
               evaluatePublicDeploymentIdentity,
               evaluatePublicPaddleBundle,
-              resolveCanonicalPaddleSandboxToken,
+              resolveCanonicalPaddleProductionToken,
               resolvePublicMainModuleAsset,
             } = await import("./scripts/e2e/managed-session-materialize-core.mjs");
             const response = await new Promise((resolve, reject) => {
@@ -370,7 +370,7 @@ jobs:
               throw new Error(identity.reason);
             }
 
-            const canonicalToken = resolveCanonicalPaddleSandboxToken(
+            const canonicalToken = resolveCanonicalPaddleProductionToken(
               readBoundedProductionEnv(),
             );
             if (!canonicalToken.ok) {

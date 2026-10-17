@@ -319,20 +319,39 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
   }
 }
 
-/** Compare the bounded deployed entry bundle with the committed token class. */
+const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN = /(?:^|[^A-Za-z0-9_])(live_[A-Za-z0-9_-]+)/g;
+
+/**
+ * Compare the bounded deployed entry bundle with the committed production
+ * token. The bundle must carry exactly the committed token bytes:
+ * - committed `test_` token: any `live_` token in the bundle fails;
+ * - committed `live_` token: any OTHER `live_` token in the bundle fails.
+ * Fixed reason codes only; token bytes never leave this function.
+ */
 export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
   if (
     typeof canonicalToken !== "string" ||
-    !PADDLE_SANDBOX_TOKEN_PATTERN.test(canonicalToken) ||
+    !PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN.test(canonicalToken) ||
     typeof bundle !== "string"
   ) {
     return { ok: false, reason: "public_paddle_contract_invalid" };
   }
-  if (PADDLE_LIVE_TOKEN_PATTERN.test(bundle)) {
-    return { ok: false, reason: "public_paddle_live_token_present" };
+  if (PADDLE_SANDBOX_TOKEN_PATTERN.test(canonicalToken)) {
+    if (PADDLE_LIVE_TOKEN_PATTERN.test(bundle)) {
+      return { ok: false, reason: "public_paddle_live_token_present" };
+    }
+    if (!bundle.includes(canonicalToken)) {
+      return { ok: false, reason: "public_paddle_sandbox_token_missing" };
+    }
+    return { ok: true };
+  }
+  for (const match of bundle.matchAll(PADDLE_LIVE_TOKEN_GLOBAL_PATTERN)) {
+    if (match[1] !== canonicalToken) {
+      return { ok: false, reason: "public_paddle_live_token_mismatch" };
+    }
   }
   if (!bundle.includes(canonicalToken)) {
-    return { ok: false, reason: "public_paddle_sandbox_token_missing" };
+    return { ok: false, reason: "public_paddle_live_token_missing" };
   }
   return { ok: true };
 }

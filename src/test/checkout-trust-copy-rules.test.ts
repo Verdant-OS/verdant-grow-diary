@@ -41,12 +41,26 @@ describe("buildCheckoutTrustCopy", () => {
     }
   });
 
-  it("keeps live copy after a runtime failure, because other plans can still charge", () => {
-    const result = buildCheckoutTrustCopy({ environment: "live", blocked: true });
+  it("keeps live copy after a single-plan failure, because other plans can still charge", () => {
+    const result = buildCheckoutTrustCopy({
+      environment: "live",
+      blocked: true,
+      blockedScope: "plan",
+    });
 
     expect(result.state).toBe("live");
     expect(result.canCreateLiveCharge).toBe(true);
     expect(result.summary).not.toContain("Live checkout is disabled");
+  });
+
+  it("fails a checkout-wide or unscoped live failure closed, without sandbox wording", () => {
+    for (const blockedScope of ["checkout", null, undefined] as const) {
+      const result = buildCheckoutTrustCopy({ environment: "live", blocked: true, blockedScope });
+      expect(result.state).toBe("unavailable");
+      expect(result.canCreateLiveCharge).toBe(false);
+      expect(result.summary).toContain("no charge was made");
+      expect(result.summary).not.toMatch(/sandbox/i);
+    }
   });
 
   it("is deterministic and returns immutable shared copy", () => {

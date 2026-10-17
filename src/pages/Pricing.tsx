@@ -235,6 +235,7 @@ export default function Pricing() {
     unavailableMessage,
     blockedReason,
     blockedReasonCode,
+    blockedScope,
     dismissBlocked,
   } = usePaddleCheckout();
   const checkoutRetryGate = resolvePricingCheckoutRetryGate(
@@ -297,9 +298,14 @@ export default function Pricing() {
     if (blockedSku === null) return true;
     return blockedSku === sku;
   }
+  // Only a failure the hook reports as checkout-wide (environment, Paddle.js
+  // load/init, overlay open) blocks every plan; a catalog failure belongs to
+  // the plan that failed.
+  const checkoutBlockedScope = blockedScope === "checkout" ? "checkout" : "plan";
   const checkoutTrustCopy = buildCheckoutTrustCopy({
     environment: checkoutEnvironment,
     blocked: Boolean(checkoutRecoveryReason),
+    blockedScope: checkoutBlockedScope,
   });
   /**
    * Founder Lifetime is no longer part of the public pricing grid. It stays
@@ -510,14 +516,16 @@ export default function Pricing() {
       setBlockedSku(null);
       return;
     }
-    // Bind the failure to the SKU that caused it. This runs after the attempt,
-    // so the ref still holds that attempt's SKU.
-    setBlockedSku(lastCheckoutSkuRef.current);
+    // Bind a plan-scoped failure to the SKU that caused it. This runs after the
+    // attempt, so the ref still holds that attempt's SKU. A checkout-wide
+    // failure (Paddle.js load/init, environment, overlay open) blocks every
+    // plan, so it stays unattributed and isSkuBlocked fails closed page-wide.
+    setBlockedSku(blockedScope === "checkout" ? null : lastCheckoutSkuRef.current);
     trackPricingEvent("pricing_checkout_blocked", {
       plan: lastCheckoutSkuRef.current ?? interestPlanRef.current,
       reason: "runtime_failure",
     });
-  }, [blockedReason]);
+  }, [blockedReason, blockedScope]);
 
   useEffect(() => {
     if (!checkoutRecoveryReason || !recoveryRequested) return;

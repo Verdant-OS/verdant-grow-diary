@@ -15,6 +15,13 @@ export interface CheckoutTrustCopyInput {
   environment: PaddleCheckoutEnvironment | null | undefined;
   /** Runtime checkout failures temporarily override an otherwise valid environment. */
   blocked: boolean;
+  /**
+   * Scope of a runtime failure. "plan": one plan's price could not resolve,
+   * other plans can still check out. "checkout": checkout itself failed (for
+   * example Paddle.js did not load), so no plan can check out. Missing means
+   * "checkout" (fail closed).
+   */
+  blockedScope?: "plan" | "checkout" | null;
 }
 
 export const CHECKOUT_MECHANISM_FAQ_ANSWER =
@@ -42,6 +49,16 @@ const LIVE_COPY: CheckoutTrustCopy = Object.freeze({
   canCreateLiveCharge: true,
 });
 
+/** Live checkout failed as a whole (for example Paddle.js did not load). */
+const LIVE_FAILED_COPY: CheckoutTrustCopy = Object.freeze({
+  state: "unavailable",
+  label: "Checkout unavailable right now",
+  summary: "Checkout could not load, so no charge was made. Reload the page to try again.",
+  faqQuestion: "Is checkout live?",
+  faqAnswer: LIVE_CHECKOUT_FAQ_ANSWER,
+  canCreateLiveCharge: false,
+});
+
 const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "unavailable",
   label: "Sandbox test checkout unavailable",
@@ -59,10 +76,13 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
  * checkout can still charge.
  */
 export function buildCheckoutTrustCopy(input: CheckoutTrustCopyInput): CheckoutTrustCopy {
-  // Live stays live copy even after a runtime or single-plan failure: other
-  // plans can still create a real charge, so "no real charge is possible"
-  // would be false. The failure itself is reported by the blocked-reason UI.
-  if (input.environment === "live") return LIVE_COPY;
+  // Live keeps live copy after a single-plan failure: other plans can still
+  // create a real charge. A checkout-wide failure (or an unknown scope)
+  // means no plan can charge right now, so it says so without sandbox wording.
+  if (input.environment === "live") {
+    if (input.blocked && input.blockedScope !== "plan") return LIVE_FAILED_COPY;
+    return LIVE_COPY;
+  }
   if (input.blocked) return UNAVAILABLE_COPY;
   if (input.environment === "sandbox") return SANDBOX_COPY;
   return UNAVAILABLE_COPY;

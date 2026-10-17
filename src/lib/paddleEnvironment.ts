@@ -127,3 +127,23 @@ export const CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE =
  */
 export const CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE =
   "Checkout is currently unavailable. Please try again later.";
+
+/**
+ * Presentation-only environment for the server render and React's hydration
+ * pass, when no trustworthy hostname exists yet. It depends on the token alone
+ * so the server markup and the production browser's first render agree:
+ * `test_` → "sandbox", `live_` → "live", anything else → "unavailable".
+ *
+ * NEVER use this to authorize checkout. Opening checkout, initializing
+ * Paddle and resolving prices always use `resolvePaddleCheckoutEnvironment`
+ * with the real hostname, so a live token still cannot open checkout off the
+ * production hostnames. After hydration, presenters switch to the real value.
+ */
+export function resolvePaddleCheckoutPresentationBeforeHydration(
+  token: string | null | undefined,
+): PaddleCheckoutEnvironment {
+  const cls = classifyPaddleToken(token);
+  if (cls === "sandbox") return "sandbox";
+  if (cls === "live") return "live";
+  return "unavailable";
+}

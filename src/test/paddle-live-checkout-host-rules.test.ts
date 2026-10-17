@@ -92,9 +92,23 @@ describe("checkout trust copy for live checkout", () => {
   });
 
   it("keeps live copy truthful after a single-plan failure (other plans can still charge)", () => {
-    const copy = buildCheckoutTrustCopy({ environment: "live", blocked: true });
+    const copy = buildCheckoutTrustCopy({
+      environment: "live",
+      blocked: true,
+      blockedScope: "plan",
+    });
     expect(copy.state).toBe("live");
     expect(copy.canCreateLiveCharge).toBe(true);
+  });
+
+  it("does not claim live checkout after a checkout-wide failure", () => {
+    const copy = buildCheckoutTrustCopy({
+      environment: "live",
+      blocked: true,
+      blockedScope: "checkout",
+    });
+    expect(copy.state).toBe("unavailable");
+    expect(copy.canCreateLiveCharge).toBe(false);
   });
 
   it("still replaces sandbox copy when sandbox checkout is blocked", () => {

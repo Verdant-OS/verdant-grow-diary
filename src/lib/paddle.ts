@@ -3,8 +3,10 @@
  *
  * SAFETY:
  *  - The client token is public by design (see paddle-security knowledge).
- *  - Development and production builds intentionally carry sandbox-class
- *    client tokens. Live tokens fail closed on every host.
+ *  - Development builds carry a sandbox-class `test_` token. Production
+ *    carries a `live_` token, which opens live checkout only on the
+ *    production hostnames (`paddleEnvironment.ts`) and fails closed on every
+ *    other host.
  *  - This module is client-side only. It does not touch the existing
  *    BYO Paddle stack (`src/lib/paddleConfig.ts`, `billing_subscriptions`,
  *    `paddle-webhook`) — those remain in place for the operator audit
@@ -15,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunctionsFetchError } from "@supabase/supabase-js";
 import {
   resolvePaddleCheckoutEnvironment,
+  resolvePaddleCheckoutPresentationBeforeHydration,
   classifyPaddleToken,
   CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
   CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
@@ -36,13 +39,15 @@ function currentHostname(): string | null {
 }
 
 /**
- * Billing environment this client expects for entitlement reads. Live only
- * when checkout itself resolves live (a live token on a production host);
- * otherwise sandbox, as before. Live rows always count in entitlement reads;
- * sandbox rows count only when this returns "sandbox".
+ * Billing environment this client expects for entitlement reads. Only an
+ * explicit, well-formed `test_` token selects sandbox; a live, missing or
+ * malformed token falls back to live, matching the server, which grants
+ * sandbox rows only when it is explicitly sandbox. Host-independent, so it is
+ * the same on the server, during hydration and after. Live rows always count
+ * in entitlement reads; sandbox rows count only when this returns "sandbox".
  */
 export function getPaddleEnvironment(): "sandbox" | "live" {
-  return resolvePaddleCheckout() === "live" ? "live" : "sandbox";
+  return classifyPaddleToken(clientToken) === "sandbox" ? "sandbox" : "live";
 }
 
 /**
@@ -60,6 +65,15 @@ export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
  * Grower-facing blocking copy for the current unavailable case. Returns
  * `null` when sandbox or live checkout is available. Never reveals a token.
  */
+/**
+ * Presentation-only value for the server render and the hydration pass (see
+ * `resolvePaddleCheckoutPresentationBeforeHydration`). Never authorizes
+ * checkout; render through `useRenderedPaddleCheckoutEnvironment`.
+ */
+export function resolvePaddleCheckoutBeforeHydration(): PaddleCheckoutEnvironment {
+  return resolvePaddleCheckoutPresentationBeforeHydration(clientToken);
+}
+
 export function getCheckoutUnavailableMessage(): string | null {
   const env = resolvePaddleCheckout();
   if (env === "sandbox" || env === "live") return null;

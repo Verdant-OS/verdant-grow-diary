@@ -127,10 +127,11 @@ sandbox event classified as `null` with no error raised.
 
 ## Live checkout release
 
-Merging #2230 into `verdant-grow-diary` is customer exposure: the production
-host builds from that branch, and the live token opens checkout there. There
-is no operator-only gate. So backend readiness is verified first, in this
-order, and the merge waits for all of it:
+Merging #2230 into `verdant-grow-diary` makes it the build the configured
+publisher deploys to production. Customer exposure starts when the live
+`/version.json` reports the merge SHA; from then the live token opens checkout,
+and there is no operator-only gate. So backend readiness is verified first, in
+this order, and the merge waits for all of it:
 
 1. Merge #2229 (shared webhook-verifier packaging repair) through the queue.
    Confirm Lovable has pulled the merged source. Then, with the owner naming
@@ -151,8 +152,10 @@ order, and the merge waits for all of it:
    Choose the canonical destination from evidence. A live test event is a
    production write and needs its own authorization.
 5. Build and verify the rollback artifact (below).
-6. Merge #2230 through the queue. After deploy, confirm `/version.json` names
-   the merge commit and `/pricing` shows "Secure checkout by Paddle". A
+6. Merge #2230 through the queue. Measure the publisher deployment for the
+   merge commit; exposure and live verification start only when the live
+   `/version.json` names it. Then confirm `/pricing` shows "Secure checkout by
+   Paddle". A
    real-money verification charge needs the owner's explicit approval of
    amount, account, and refund plan.
 

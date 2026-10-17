@@ -41,4 +41,31 @@ describe("buildCheckoutTrustCopy — pack scope and paused checkout", () => {
     expect(copy.state).toBe("live");
     expect(copy.label).not.toBe("Checkout paused");
   });
+
+  it("gives a live token off the production host its own copy, never sandbox wording", () => {
+    const copy = buildCheckoutTrustCopy({
+      environment: "unavailable",
+      blocked: true,
+      liveOffHost: true,
+    });
+    expect(copy.state).toBe("unavailable");
+    expect(copy.label).toBe("Checkout unavailable on this site");
+    expect(copy.canCreateLiveCharge).toBe(false);
+    expect(`${copy.label} ${copy.summary} ${copy.faqAnswer}`).not.toMatch(/sandbox|test mode/i);
+    expect(copy.summary).toMatch(/verdantgrowdiary\.com/);
+  });
+
+  it("ignores liveOffHost when checkout is live, and paused still wins", () => {
+    expect(
+      buildCheckoutTrustCopy({ environment: "live", blocked: false, liveOffHost: true }).state,
+    ).toBe("live");
+    expect(
+      buildCheckoutTrustCopy({
+        environment: "unavailable",
+        blocked: true,
+        liveOffHost: true,
+        paused: true,
+      }).label,
+    ).toBe("Checkout paused");
+  });
 });

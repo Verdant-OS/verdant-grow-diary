@@ -58,4 +58,18 @@ describe("public bundle Paddle token scan", () => {
       }),
     ).toEqual({ ok: false, reason: "public_paddle_live_token_present" });
   });
+
+  it.each([
+    ["followed by a letter", (t: string) => `"${t}b"`],
+    ["followed by a digit", (t: string) => `"${t}7"`],
+    ["followed by _ or -", (t: string) => `"${t}_x";"${t}-x"`],
+    ["preceded by a letter", (t: string) => `"x${t}"`],
+  ])("does not count the committed token when it is %s", (_label, wrap) => {
+    expect(
+      evaluatePublicPaddleBundle({ canonicalToken: LIVE_TOKEN, bundle: wrap(LIVE_TOKEN) }),
+    ).toEqual({ ok: false, reason: "public_paddle_live_token_missing" });
+    expect(
+      evaluatePublicPaddleBundle({ canonicalToken: TEST_TOKEN, bundle: wrap(TEST_TOKEN) }),
+    ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_missing" });
+  });
 });

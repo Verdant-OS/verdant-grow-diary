@@ -12,7 +12,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CHECKOUT_PAUSED_MESSAGE } from "@/lib/paddleEnvironment";
+import {
+  CHECKOUT_PAUSED_MESSAGE,
+  CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
+} from "@/lib/paddleEnvironment";
 
 const mocks = vi.hoisted(() => ({
   openCheckout: vi.fn(),
@@ -180,5 +183,23 @@ describe("live checkout blocked scope on /pricing", () => {
     expect(trust).toHaveAttribute("data-checkout-state", "unavailable");
     expect(trust).toHaveTextContent("Checkout paused");
     expect(trust).not.toHaveTextContent(/sandbox/i);
+  });
+
+  it("shows live off-host copy, not sandbox copy, for a live token on another host", () => {
+    mocks.checkout.environment = "unavailable";
+    mocks.checkout.unavailable = true;
+    mocks.checkout.unavailableMessage = CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE;
+    const { container } = render(page());
+
+    const trust = screen.getByTestId("pricing-checkout-trust");
+    expect(trust).toHaveAttribute("data-checkout-state", "unavailable");
+    expect(trust).toHaveTextContent("Checkout unavailable on this site");
+    expect(trust).not.toHaveTextContent(/sandbox/i);
+    // The FAQ (and its JSON-LD) must not claim Verdant opens sandbox checkout.
+    expect(container.textContent ?? "").not.toMatch(/opens Paddle's sandbox/i);
+    const jsonLd = Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+      .map((node) => node.textContent ?? "")
+      .join(" ");
+    expect(jsonLd).not.toMatch(/opens Paddle's sandbox/i);
   });
 });

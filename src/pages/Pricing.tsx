@@ -46,7 +46,10 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { sanitizeCheckoutRecoveryPlanSlug } from "@/lib/checkoutRecoveryPlanSlug";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
-import { CHECKOUT_PAUSED_MESSAGE } from "@/lib/paddleEnvironment";
+import {
+  CHECKOUT_PAUSED_MESSAGE,
+  CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
+} from "@/lib/paddleEnvironment";
 import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";
 import {
   resolvePaidAcquisitionSource,
@@ -312,6 +315,8 @@ export default function Pricing() {
     blockedScope: checkoutBlockedScope,
     // The kill switch surfaces as the paused unavailable message.
     paused: unavailableMessage === CHECKOUT_PAUSED_MESSAGE,
+    // A live token off the production host: closed here, not a sandbox build.
+    liveOffHost: unavailableMessage === CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
   });
   /**
    * Founder Lifetime is no longer part of the public pricing grid. It stays

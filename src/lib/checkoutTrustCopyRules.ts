@@ -24,6 +24,12 @@ export interface CheckoutTrustCopyInput {
   blockedScope?: "plan" | "pack" | "checkout" | null;
   /** The build-time kill switch is on: checkout is paused on every host. */
   paused?: boolean;
+  /**
+   * A well-formed live token on a host other than the production hostnames.
+   * Checkout is closed here, but this is not a sandbox build, so the copy must
+   * not talk about sandbox checkout.
+   */
+  liveOffHost?: boolean;
 }
 
 export const CHECKOUT_MECHANISM_FAQ_ANSWER =
@@ -74,6 +80,17 @@ const PAUSED_COPY: CheckoutTrustCopy = Object.freeze({
   canCreateLiveCharge: false,
 });
 
+/** Live token on a non-production hostname: closed here, never sandbox wording. */
+const LIVE_OFF_HOST_COPY: CheckoutTrustCopy = Object.freeze({
+  state: "unavailable",
+  label: "Checkout unavailable on this site",
+  summary: "Checkout opens only on verdantgrowdiary.com. No charge can be made here.",
+  faqQuestion: "Is checkout live?",
+  faqAnswer:
+    "Checkout runs only on verdantgrowdiary.com. On any other address it stays closed, so no charge can be made there.",
+  canCreateLiveCharge: false,
+});
+
 const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "unavailable",
   label: "Sandbox test checkout unavailable",
@@ -92,6 +109,7 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
  */
 export function buildCheckoutTrustCopy(input: CheckoutTrustCopyInput): CheckoutTrustCopy {
   if (input.paused === true) return PAUSED_COPY;
+  if (input.liveOffHost === true && input.environment !== "live") return LIVE_OFF_HOST_COPY;
   // Live keeps live copy after a single-plan failure: other plans can still
   // create a real charge. A checkout-wide failure (or an unknown scope)
   // means no plan can charge right now, so it says so without sandbox wording.

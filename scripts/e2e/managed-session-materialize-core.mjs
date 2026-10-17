@@ -337,6 +337,23 @@ const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
  * - committed `live_` token: any OTHER `live_` token in the bundle fails.
  * Fixed reason codes only; token bytes never leave this function.
  */
+/**
+ * True when `token` appears in `bundle` as a standalone value: not preceded by
+ * a letter, digit or `_`, and not followed by a letter, digit, `_` or `-`.
+ * `${token}b` or `x${token}` is a different (malformed) value, not the token.
+ */
+function bundleContainsStandaloneToken(bundle, token) {
+  let from = 0;
+  for (;;) {
+    const at = bundle.indexOf(token, from);
+    if (at === -1) return false;
+    const before = at === 0 ? "" : bundle[at - 1];
+    const after = bundle[at + token.length] ?? "";
+    if (!/[A-Za-z0-9_]/.test(before) && !/[A-Za-z0-9_-]/.test(after)) return true;
+    from = at + 1;
+  }
+}
+
 export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
   if (
     typeof canonicalToken !== "string" ||
@@ -349,17 +366,21 @@ export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
     if (PADDLE_LIVE_TOKEN_PATTERN.test(bundle)) {
       return { ok: false, reason: "public_paddle_live_token_present" };
     }
-    if (!bundle.includes(canonicalToken)) {
+    if (!bundleContainsStandaloneToken(bundle, canonicalToken)) {
       return { ok: false, reason: "public_paddle_sandbox_token_missing" };
     }
     return { ok: true };
   }
+  let foundCanonical = false;
   for (const match of bundle.matchAll(PADDLE_LIVE_TOKEN_GLOBAL_PATTERN)) {
     if (match[1] !== canonicalToken) {
       return { ok: false, reason: "public_paddle_live_token_mismatch" };
     }
+    foundCanonical = true;
   }
-  if (!bundle.includes(canonicalToken)) {
+  // Presence comes from the same boundary-aware scan, never a substring check:
+  // `${canonicalToken}b` is a malformed 28-character value, not the token.
+  if (!foundCanonical) {
     return { ok: false, reason: "public_paddle_live_token_missing" };
   }
   return { ok: true };

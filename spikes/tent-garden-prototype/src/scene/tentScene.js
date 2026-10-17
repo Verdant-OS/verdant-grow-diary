@@ -329,7 +329,20 @@ export function createTentScene(host, handlers, opts = {}) {
       ev.stopPropagation();
       handlers.onSelect(id);
     };
-    labelEl.addEventListener("click", pick);
+    // A touch tap fires click after pointerdown. A tap on a pot selects that plant on pointerdown,
+    // the phone details panel opens, the scene re-fits and labels move — so the trailing click can
+    // land on a different plant's label. Only a gesture that started on this label may select it.
+    let pressedHere = null;
+    const press = (ev) => {
+      pressedHere = ev.currentTarget;
+    };
+    const clickPick = (ev) => {
+      const started = pressedHere === ev.currentTarget;
+      pressedHere = null;
+      if (started) pick(ev);
+    };
+    labelEl.addEventListener("pointerdown", press);
+    labelEl.addEventListener("click", clickPick);
     labelEl.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") pick(ev);
     });
@@ -342,7 +355,8 @@ export function createTentScene(host, handlers, opts = {}) {
     chipEl.setAttribute("aria-label", `Select ${plantRecord?.shortName ?? id} (${id})`);
     chipEl.textContent = id;
     chipEl.style.display = "none";
-    chipEl.addEventListener("click", pick);
+    chipEl.addEventListener("pointerdown", press);
+    chipEl.addEventListener("click", clickPick);
     chipEl.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") pick(ev);
     });

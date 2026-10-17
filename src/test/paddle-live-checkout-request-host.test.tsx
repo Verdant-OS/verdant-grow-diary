@@ -26,11 +26,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 const LIVE_TOKEN = "live_fixturetokenpayload00000000";
 
-async function serverBanner(url: string | null, token = LIVE_TOKEN) {
+async function serverBanner(url: string | null, token = LIVE_TOKEN, paused = false) {
   request.url = url;
   request.calls = 0;
   vi.resetModules();
   vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", token);
+  if (paused) vi.stubEnv("VITE_CHECKOUT_DISABLED", "true");
   const { PaymentTestModeBanner } = await import("@/components/PaymentTestModeBanner");
   return renderToString(<PaymentTestModeBanner />);
 }
@@ -81,6 +82,12 @@ describe("server render uses the request host", () => {
 
   it("never reads the request for a malformed token", async () => {
     await serverBanner("http://localhost:5173/auth", "live_short");
+    expect(request.calls).toBe(0);
+  });
+
+  // Codex P2 at bf3ef609: the paused guard needs its own regression.
+  it("never reads the request for a live token while checkout is paused", async () => {
+    await serverBanner("https://verdantgrowdiary.com/pricing", LIVE_TOKEN, true);
     expect(request.calls).toBe(0);
   });
 

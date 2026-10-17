@@ -286,13 +286,17 @@ silently discarded. Build it like this:
    pinned artifact. If the base moves after review, update the PR, get a fresh
    exact-head review, and rebuild and re-verify the artifact on the new head
    before enqueueing. Never enqueue while the artifact's parent differs from
-   the head being merged.
+   the head being merged. Enqueue only into an empty merge queue, and enqueue
+   nothing else until this PR lands, so no other entry can land first. If the
+   queue tip changes anyway while this PR is queued, remove it from the queue
+   before it merges, update it, get a fresh exact-head review, and rebuild and
+   re-verify the artifact before re-enqueueing. The merge must never land on a
+   tree that differs from the verified artifact's parent.
 6. After the merge, confirm `git diff <reviewed head> <merge commit>` is
-   empty. If it is not (the base moved while queued), the pre-merge artifact is
-   not a valid rollback target, because deploying it would revert base-branch
-   changes: rebuild and verify the artifact on the merge commit at once and
-   record that SHA. Until it is verified, the emergency action is the same
-   one-line switch committed on top of the merge commit.
+   empty. This is a check of step 5, not a recovery path: a non-empty diff
+   means step 5 failed. Treat it as a release incident, ship the one-line
+   switch on top of the merge commit as the emergency action, and rebuild and
+   verify the artifact on the merge commit before closing it.
 
 On every host, including the production
 hostname, it resolves checkout to unavailable before Paddle.js loads, before

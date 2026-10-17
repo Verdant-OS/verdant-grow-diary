@@ -4,9 +4,12 @@ Window cutoff: midnight Central time at the start of 2026-09-26, which is **2026
 Every other time in this doc is UTC. Two server-changing merges landed on 2026-09-26 UTC but
 before this cutoff; see "Edge of window" below.
 
-Status: inventory only. No SQL, deploy, publish, secret or production query was run to
-produce this. Applied/published state comes **only** from `docs/agents/CURRENT_STATE.md`
-at the deploy tip. This inventory was built at `cf929cf7baf0011045430e3a38b28b09632847c6`; the tip
+Status: a repository inventory plus a dated production receipt. The inventory, which is
+everything above "Production measurement and apply, 2026-10-16", was produced without SQL,
+deploy, publish, secret or production query; its applied/published state came **only** from
+`docs/agents/CURRENT_STATE.md` at the deploy tip. That final section is a separate,
+owner-authorized production receipt (production was read and migrations were applied) and
+supersedes the inventory's labels for the versions it names. This inventory was built at `cf929cf7baf0011045430e3a38b28b09632847c6`; the tip
 is now `5ea8f1f74209c3576afea0317a471370222fbae3`, and `cf929cf7..5ea8f1f7` touches neither
 `supabase/` nor `CURRENT_STATE.md`, so nothing below changes. The later amendment (#1704's
 `20260925090000` and the parked #1460/#1545 versions) re-read `supabase/migrations/`,
@@ -21,7 +24,8 @@ state stays **NOT_MEASURED**. `CURRENT_STATE.md` still records #1460 and #1545 a
 Since `a980489a`, five migrations were added under `supabase/migrations/`
 (`20261001160000`, `20261003010000`, `20261003020000`, `20261010120000`,
 `20261013180000`). All sort after every version named here, so the order below is
-unchanged. This doc does not cover them.
+unchanged. These versions are outside the ordering list above; their production states
+are recorded in the 2026-10-16 receipt below.
 
 **Production receipt, 2026-10-16 (supersedes the `NOT_MEASURED` labels below for the
 versions it names).** See "Production measurement and apply, 2026-10-16" at the end. In
@@ -95,7 +99,8 @@ server changes that are also not recorded as shipped, and they interact with thi
 
 - **Applied/published state:** `CURRENT_STATE.md` :448 (written while #1683 still carried
   the migration) says only "Committed is not applied". Applied state of `20260924120000` and
-  publish state of #1683's functions are **NOT_MEASURED**.
+  publish state of #1683's functions are **NOT_MEASURED**. _(Superseded 2026-10-16 for
+  `20260924120000`: the receipt below measured it APPLIED, with no history row.)_
 - **Redeploying for #1658/#1869 ships #1683 too, in two functions.** Deploys are built from
   the deploy tip. #1658 and #1869 both require an `ai-doctor-review` redeploy, which also
   publishes #1683's `ai-doctor-review/index.ts` and shared-lib changes. #1869 also requires a
@@ -120,6 +125,8 @@ not applied", with production applied-migration state `NOT_MEASURED`. The live
 parked." Both versions sort **before** `20260924120000`, `20260925090000` and every
 migration in this doc. So if either is still pending in production, a version-ordered apply
 (`supabase db push`) runs it **first** and applies a parked migration nobody approved.
+_(Superseded 2026-10-16 as operational guidance: the receipt below measured both versions
+and forbids `supabase db push` on production outright.)_
 
 **Before any version-ordered apply, the owner checks whether `20260916111000` and
 `20260917183000` are recorded in production** (same check as below:
@@ -337,20 +344,20 @@ Recording the versions below in history is the owner's call; nothing here ran
 
 ### State before today's applies (measured 22:55–23:10)
 
-| Version          | PR             | State                     | Evidence                                                                                                                                                     |
-| ---------------- | -------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `20260914212330` | #1374          | APPLIED, superseded       | Replaced by `20260915193000`; its `paddle_subscription_ref` logic is present                                                                                 |
-| `20260915193000` | #1398          | APPLIED (body-equivalent) | Allocator md5 `c9c89539` equals the file. Revoker md5 `42bc7920` vs file `a8962dee`: one collapsed space (`int  :=` → `int :=`); whitespace-normalized match |
-| `20260916111000` | #1460 (parked) | NOT_APPLIED               | No `quicklog_revision_idempotency` table or `quicklog_revision_apply_once`                                                                                   |
-| `20260917183000` | #1545 (parked) | Objects present           | Table, sequence, policies, index, trigger and all four function bodies match. View ACL does not (below)                                                      |
-| `20260924120000` | #1703          | APPLIED                   | `validate_plant_row` md5 equals the file; `plants.health` default and comment match                                                                          |
-| `20260925090000` | #1704          | NOT_APPLIED               | `anon` and `authenticated` each held every table privilege on `user_roles`                                                                                   |
-| `20260927002000` | #1831          | NOT_APPLIED               | Wrapper md5 `0d3098b8` (predecessor)                                                                                                                         |
-| `20260927012000` | #1834          | NOT_APPLIED               | Event wrapper md5 `0043154b`                                                                                                                                 |
-| `20260927094000` | #1741          | NOT_APPLIED               | No restrictive policies, guard function or trigger                                                                                                           |
-| `20260927160000` | #1831          | NOT_APPLIED               | Delegate md5 `7ec296e4`                                                                                                                                      |
-| `20260928183000` | #1831          | NOT_APPLIED               | Wrapper not `1875cf01`                                                                                                                                       |
-| `20261001140000` | #1836          | NOT_APPLIED               | Event wrapper not `959d2add`                                                                                                                                 |
+| Version          | PR             | State                                     | Evidence                                                                                                                                                     |
+| ---------------- | -------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `20260914212330` | #1374          | Execution NOT_MEASURED; effect superseded | `20260915193000` replaces the same revoker and itself carries the `paddle_subscription_ref` logic, so the live body cannot show whether this file ever ran   |
+| `20260915193000` | #1398          | APPLIED (body-equivalent)                 | Allocator md5 `c9c89539` equals the file. Revoker md5 `42bc7920` vs file `a8962dee`: one collapsed space (`int  :=` → `int :=`); whitespace-normalized match |
+| `20260916111000` | #1460 (parked) | NOT_APPLIED                               | No `quicklog_revision_idempotency` table or `quicklog_revision_apply_once`                                                                                   |
+| `20260917183000` | #1545 (parked) | Objects present                           | Table, sequence, policies, index, trigger and all four function bodies match. View ACL does not (below)                                                      |
+| `20260924120000` | #1703          | APPLIED                                   | `validate_plant_row` md5 equals the file; `plants.health` default and comment match                                                                          |
+| `20260925090000` | #1704          | NOT_APPLIED                               | `anon` and `authenticated` each held every table privilege on `user_roles`                                                                                   |
+| `20260927002000` | #1831          | NOT_APPLIED                               | Wrapper md5 `0d3098b8` (predecessor)                                                                                                                         |
+| `20260927012000` | #1834          | NOT_APPLIED                               | Event wrapper md5 `0043154b`                                                                                                                                 |
+| `20260927094000` | #1741          | NOT_APPLIED                               | No restrictive policies, guard function or trigger                                                                                                           |
+| `20260927160000` | #1831          | NOT_APPLIED                               | Delegate md5 `7ec296e4`                                                                                                                                      |
+| `20260928183000` | #1831          | NOT_APPLIED                               | Wrapper not `1875cf01`                                                                                                                                       |
+| `20261001140000` | #1836          | NOT_APPLIED                               | Event wrapper not `959d2add`                                                                                                                                 |
 
 Both open P2s on this PR are answered by this table. `20260915193000` is applied
 (body-equivalent, no history row), so it does not run "first" in a correct apply; it only
@@ -380,9 +387,13 @@ in the same transaction, with a readback of the expected hash before `COMMIT`.
 | 11    | `20261010120000` | #1961 | Two columns, two CHECKs, view gains `notes`, `unit_unconfirmed`. Ran with `SET LOCAL lock_timeout = '5s'`  |
 | 12    | `20261013180000` | #1841 | Guarded step 4. Wrapper `f587dc4669f65580eed2d5097caac806`                                                 |
 
-Every file's own preflight and postcondition passed; nothing was retried or edited. Rows 9–11
-were wrapped in a transaction because the files have none; the SQL itself is the committed
-bytes. Readbacks at 23:42:50 (rows 2 and 4–12) and 23:43:38 (rows 1 and 3) confirmed the
+Each file ran once without error; nothing was retried or edited. Only some files carry their
+own checks, and those that do passed: rows 4–8 and 12 define both a preflight and a
+postcondition; rows 9 and 10 define a preflight only; rows 1, 2, 3 and 11 define neither (the
+one `RAISE` in row 2 is a runtime argument check inside the function). For the files without
+their own checks, the evidence is the external readback below, not file-defined validation.
+Rows 9–11 were wrapped in a transaction because the files have none; the SQL itself is the
+committed bytes. Readbacks at 23:42:50 (rows 2 and 4–12) and 23:43:38 (rows 1 and 3) confirmed the
 end state of every row.
 
 ### Not applied, and why
@@ -426,6 +437,36 @@ listed above; `auth-email-hook`, `delete-account`, `ecowitt-real-ingest`,
 `PAYMENTS_ENVIRONMENT=live` (#1869) and `GEMINI_API_KEY` present (#1982; AI Doctor and
 Coach fail closed without it). The `payments-webhook` ordering precondition is now met,
 because `20261003010000` is applied.
+
+**Update, 2026-10-16 (partial deployment, between 23:54 and 23:59 UTC).** The statement above
+stays true for the receipt as written. Afterwards, Matthew authorized deploying through the Lovable project agent's
+`supabase--deploy_edge_functions` tool, built from the Lovable project's code. That code was
+not the deploy tip byte-for-byte, but its diff from `bfd2a85c` touched no file under
+`supabase/functions/`. Preconditions, read through the agent (secret names only, never
+values): `PAYMENTS_ENVIRONMENT` exists, its value is **NOT_MEASURED**, and `GEMINI_API_KEY`
+**does not exist**. So only the 10 functions that read neither setting (traced through their
+relative imports) were attempted. The other 13 were held: `ai-coach` and `ai-doctor-review`
+for the missing key; `get-paddle-price`, `paddle-webhook` and the other nine
+`unionEntitlementLookup` consumers for the unverified payments setting. Recent production
+payment events are sandbox only, so a `sandbox` value is plausible (inference).
+
+- **Tool reported deployed (7):** `mcp`, `auth-email-hook`, `ecowitt-real-ingest`,
+  `edge-metrics-alert-check`, `preview-transactional-email`, `send-transactional-email`,
+  `operator-ggs-real-payload-commit`. The tool returned source SHA-256s but no version or
+  timestamp. An unauthenticated GET to each returned its expected 401/405 refusal rather than
+  a boot error. That shows each responds, not which version runs: deployed versions remain
+  **NOT_MEASURED**.
+- **Failed to bundle (3), not deployed:** `payments-webhook`, `delete-account`,
+  `paddle-portal-session`. Error: module not found
+  `supabase/functions/paddle-webhook/verifyPaddleSignature.ts`, imported at
+  `_shared/paddle.ts:14` from a sibling function folder (present since #826). The previous
+  versions keep running, so #2221's raw-payload normalization and the webhook's clawback
+  call are **not live** (the clawback RPC itself is applied). The repair, moving the verifier
+  into `_shared/` with a compatibility export, is pending a protected-file/test approval.
+- **Side effect:** the Lovable agent's turns committed regenerated files (`.env.production`
+  checkout token `test_` → `live_`, `src/integrations/supabase/types.ts`,
+  `.lovable/mcp/manifest.json`) to the side branch `lovable-sync-1792194870`, not to the
+  deploy branch. Nothing from that branch is merged.
 
 ### Other production facts recorded for the access review (not changed)
 

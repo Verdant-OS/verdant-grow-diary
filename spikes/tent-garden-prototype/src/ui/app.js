@@ -138,6 +138,7 @@ async function boot() {
   // screen and read state without poking private closures.
   window.__tentGarden = {
     screenPositionOf: (id) => scene?.screenPositionOf(id) ?? null,
+    inspectPoint: (x, y) => scene?.inspectPoint(x, y) ?? null,
     isCameraAnimating: () => !!scene?.isCameraAnimating(),
     snapshot: () => ({
       gardenId: GARDEN_ID,

@@ -3,7 +3,10 @@
 
 const PAD = 6; // gap between labels
 const LIFT = 8; // gap between anchor and label bottom
-const POT_KEEPOUT = 10; // px around each pot point that other labels must leave clear (they are clickable)
+// px every card keeps from other plants' pots. Cards are clickable, and phones snap a touch to a
+// nearby clickable element (Chrome touch adjustment), so a card merely close to a pot steals the
+// pot's tap. Half of a 44 px touch target.
+const POT_KEEPOUT = 22;
 
 /**
  * @typedef {{ id:string, ax:number, ay:number, bx?:number, by?:number, w?:number, h?:number }} LabelItem
@@ -18,6 +21,54 @@ function overlaps(a, b, pad = PAD) {
     a.y + a.h + pad <= b.y ||
     b.y + b.h + pad <= a.y
   );
+}
+
+const LEADER_GAP = 2; // px a leader keeps from any card or reserved rect it passes
+
+/**
+ * Where a leader leaves its card: the point on the card border along the line from the card's
+ * centre to `target`. Null when the target is inside the card (no line needed).
+ * @param {Rect} r @param {{x:number,y:number}} target
+ */
+export function leaderStart(r, target) {
+  const cx = r.x + r.w / 2;
+  const cy = r.y + r.h / 2;
+  const dx = target.x - cx;
+  const dy = target.y - cy;
+  const tx = dx > 0 ? (r.x + r.w - cx) / dx : dx < 0 ? (r.x - cx) / dx : Infinity;
+  const ty = dy > 0 ? (r.y + r.h - cy) / dy : dy < 0 ? (r.y - cy) / dy : Infinity;
+  const t = Math.min(tx, ty);
+  if (!(t < 1)) return null; // target inside (or on) the card
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+
+/** Does segment p→q touch rect r grown by `pad`? Liang–Barsky clip. */
+export function segmentHitsRect(p, q, r, pad = 0) {
+  const x0 = r.x - pad;
+  const y0 = r.y - pad;
+  const x1 = r.x + r.w + pad;
+  const y1 = r.y + r.h + pad;
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  let t0 = 0;
+  let t1 = 1;
+  const edges = [
+    [-dx, p.x - x0],
+    [dx, x1 - p.x],
+    [-dy, p.y - y0],
+    [dy, y1 - p.y],
+  ];
+  for (const [pp, qq] of edges) {
+    if (pp === 0) {
+      if (qq < 0) return false;
+      continue;
+    }
+    const t = qq / pp;
+    if (pp < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return false;
+  }
+  return true;
 }
 
 function inBounds(r, width, height) {
@@ -109,45 +160,82 @@ function placeOnce(items, opts) {
     return p.id < q.id ? -1 : p.id > q.id ? 1 : 0;
   });
   // Labels are clickable: one resting on another plant's pot would capture that pot's tap.
-  const pots = list
-    .filter((it) => Number.isFinite(it.bx) && Number.isFinite(it.by))
-    .map((it) => ({
-      id: it.id,
-      x: it.bx - POT_KEEPOUT,
-      y: it.by - POT_KEEPOUT,
-      w: 2 * POT_KEEPOUT,
-      h: 2 * POT_KEEPOUT,
-    }));
+  // Two points per pot: the rim point leaders aim at (bx,by) and the pot-body point a tap lands
+  // on (tx,ty, when the scene supplies it).
+  const keep = (id, x, y) => ({
+    id,
+    x: x - POT_KEEPOUT,
+    y: y - POT_KEEPOUT,
+    w: 2 * POT_KEEPOUT,
+    h: 2 * POT_KEEPOUT,
+  });
+  const pots = [];
+  for (const it of list) {
+    if (Number.isFinite(it.bx) && Number.isFinite(it.by)) pots.push(keep(it.id, it.bx, it.by));
+    if (Number.isFinite(it.tx) && Number.isFinite(it.ty)) pots.push(keep(it.id, it.tx, it.ty));
+  }
   const placed = [];
+  const segs = []; // leaders already drawn: later cards may not sit on them
   const out = [];
   for (const it of list) {
     const { w, h } = it;
     const coversPot = (r) => pots.some((q) => q.id !== it.id && overlaps(r, q, 0));
+    const pot = { x: Number.isFinite(it.bx) ? it.bx : it.ax, y: it.by };
+    // A displaced card draws a leader from its own border to its pot. That line may not pass
+    // through another card or a reserved rect (the Door card, banner), and the card itself may
+    // not sit on a leader already drawn — rectangles alone miss a line through a name.
+    const leaderOf = (r, pref) => {
+      const displaced = Math.abs(r.x - pref.x) > 1 || Math.abs(r.y - pref.y) > 1;
+      if (!displaced) return { leader: false, seg: null };
+      const start = leaderStart(r, pot);
+      return { leader: true, seg: start ? { p: start, q: pot } : null };
+    };
+    const routeClear = (r, seg) =>
+      !segs.some((s) => segmentHitsRect(s.p, s.q, r, LEADER_GAP)) &&
+      (!seg ||
+        (!placed.some((o) => segmentHitsRect(seg.p, seg.q, o, LEADER_GAP)) &&
+          !avoid.some((a) => segmentHitsRect(seg.p, seg.q, a, LEADER_GAP))));
+    const commitLeader = (seg) => {
+      if (seg) segs.push(seg);
+    };
+    const leaderFields = (lead) =>
+      lead.seg
+        ? { lx1: lead.seg.p.x, ly1: lead.seg.p.y, lx2: lead.seg.q.x, ly2: lead.seg.q.y }
+        : {};
     let chosen = null;
+    let chosenLead = null;
+    const prefFull = candidates(it, w, h)[0];
     for (const c of candidates(it, w, h)) {
       const r = { x: c.x, y: c.y, w, h };
       if (!inBounds(r, width, height)) continue;
       if (avoid.some((a) => overlaps(r, a, PAD))) continue; // keep a gap: labels are slightly rotated
       if (placed.some((p) => overlaps(r, p))) continue;
       if (coversPot(r)) continue;
+      const lead = leaderOf(r, prefFull);
+      if (!routeClear(r, lead.seg)) continue;
       chosen = r;
+      chosenLead = lead;
       break;
     }
     if (!chosen && it.id !== selectedId && it.cw > 0 && it.ch > 0) {
       // No room for the full label: try a compact ID chip (same text size, shorter content)
       // so the plant keeps a visible, tappable handle even when its pot is behind leaves.
+      const prefChip = candidates(it, it.cw, it.ch)[0];
       for (const c of candidates(it, it.cw, it.ch)) {
         const r = { x: c.x, y: c.y, w: it.cw, h: it.ch };
         if (!inBounds(r, width, height)) continue;
         if (avoid.some((a) => overlaps(r, a, PAD))) continue;
         if (placed.some((p) => overlaps(r, p))) continue;
         if (coversPot(r)) continue;
+        const lead = leaderOf(r, prefChip);
+        if (!routeClear(r, lead.seg)) continue;
         placed.push(r);
-        const pref = candidates(it, it.cw, it.ch)[0];
+        commitLeader(lead.seg);
         out.push({
           id: it.id,
           ...r,
-          leader: Math.abs(r.x - pref.x) > 1 || Math.abs(r.y - pref.y) > 1,
+          leader: lead.leader && !!lead.seg,
+          ...leaderFields(lead),
           hidden: false,
           compact: true,
           ax: it.ax,
@@ -185,7 +273,11 @@ function placeOnce(items, opts) {
         const r = { x: c.x, y: c.y, w, h };
         if (!inBounds(r, width, height)) continue;
         if (avoid.some((a) => overlaps(r, a, PAD))) continue;
+        const lead = leaderOf(r, prefFull);
+        if (lead.seg && avoid.some((a) => segmentHitsRect(lead.seg.p, lead.seg.q, a, LEADER_GAP)))
+          continue;
         chosen = r;
+        chosenLead = lead;
         break;
       }
     }
@@ -200,17 +292,18 @@ function placeOnce(items, opts) {
       };
       for (const a of avoid) if (overlaps(chosen, a, PAD)) chosen.y = a.y + a.h + PAD;
       chosen.y = Math.min(chosen.y, Math.max(0, height - h));
+      chosenLead = leaderOf(chosen, prefFull);
     }
     placed.push(chosen);
-    const preferred = candidates(it, w, h)[0];
-    const leader = Math.abs(chosen.x - preferred.x) > 1 || Math.abs(chosen.y - preferred.y) > 1;
+    commitLeader(chosenLead.seg);
     out.push({
       id: it.id,
       x: chosen.x,
       y: chosen.y,
       w,
       h,
-      leader,
+      leader: chosenLead.leader && !!chosenLead.seg,
+      ...leaderFields(chosenLead),
       hidden: false,
       compact: false,
       ax: it.ax,

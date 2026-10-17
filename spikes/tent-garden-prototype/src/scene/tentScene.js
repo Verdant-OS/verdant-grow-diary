@@ -178,6 +178,11 @@ export function createTentScene(host, handlers, opts = {}) {
   }
   /** Plant id under `pointer` (NDC). Pot columns and foliage both count; nearest wins. */
   function pickAtPointer() {
+    const hits = pickHitsAtPointer();
+    return hits[0] ? hits[0].object.userData.plantId : null;
+  }
+  /** Ranked selection hits under `pointer`: pot pick-columns and foliage, nearest first. */
+  function pickHitsAtPointer() {
     raycaster.setFromCamera(pointer, camera);
     const meshes = [];
     for (const [id, p] of plants) {
@@ -201,7 +206,61 @@ export function createTentScene(host, handlers, opts = {}) {
       if (o) hits.push({ distance: h.distance, object: o });
     }
     hits.sort((a, b) => a.distance - b.distance);
-    return hits[0] ? hits[0].object.userData.plantId : null;
+    return hits;
+  }
+
+  // ---- test hook: what a tap at a host point would see, and what it would select ------------
+  /** Which plant part an object belongs to (pot, foliage, pick column, ring) or what else it is. */
+  function partOf(obj) {
+    for (let o = obj; o; o = o.parent) {
+      for (const [id, p] of plants) {
+        if (o === p.pot) return { plantId: id, part: "pot" };
+        if (o === p.plantMesh) return { plantId: id, part: "foliage" };
+        if (o === p.pickMesh) return { plantId: id, part: "pick-column" };
+        if (o === p.ring) return { plantId: id, part: "ring" };
+      }
+    }
+    return { plantId: null, part: obj.name || obj.type };
+  }
+  /** Drawn and mostly opaque: what the eye actually sees at a pixel. */
+  function seenObject(o) {
+    for (let a = o; a; a = a.parent) if (a.visible === false) return false;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    return mats.some(
+      (m) =>
+        m &&
+        m.visible !== false &&
+        m.side !== THREE.BackSide &&
+        (!m.transparent || m.opacity >= 0.5),
+    );
+  }
+  /**
+   * Read-only probe for verification: the first drawn surface along the ray (what is visible)
+   * and the ranked selection hits (what a tap would select). Does not change state.
+   */
+  function inspectPoint(hx, hy) {
+    syncSize();
+    const w = host.clientWidth || 1;
+    const h = host.clientHeight || 1;
+    pointer.set((hx / w) * 2 - 1, -(hy / h) * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    const seen = raycaster.intersectObject(scene, true).find((x) => seenObject(x.object));
+    const ranked = pickHitsAtPointer().map((x) => ({
+      ...partOf(x.object),
+      plantId: x.object.userData.plantId,
+      distance: +x.distance.toFixed(2),
+    }));
+    return {
+      visible: seen
+        ? {
+            ...partOf(seen.object),
+            object: `${seen.object.type}#${seen.object.id}`,
+            distance: +seen.distance.toFixed(2),
+          }
+        : null,
+      pick: ranked.slice(0, 4),
+      wouldSelect: ranked[0]?.plantId ?? null,
+    };
   }
   function floorPoint(ev) {
     toPointer(ev);
@@ -568,6 +627,7 @@ export function createTentScene(host, handlers, opts = {}) {
       const g = p.group.position;
       const a = project(g.x, p.labelAnchorY, g.z);
       const b = project(g.x, POT_H + 0.2, g.z); // pot rim: where a leader should point
+      const t = project(g.x, 10, g.z); // pot body: where a tap lands (same point as screenPositionOf)
       if (a.behind) {
         p.labelEl.style.display = "none";
         p.chipEl.style.display = "none";
@@ -587,6 +647,8 @@ export function createTentScene(host, handlers, opts = {}) {
         ay: a.y,
         bx: b.x,
         by: b.y,
+        tx: t.x,
+        ty: t.y,
         w: p.labelSize.w,
         h: p.labelSize.h,
         cw: p.chipSize.w,
@@ -623,11 +685,14 @@ export function createTentScene(host, handlers, opts = {}) {
         // A leader points at the pot rim, never the canopy top, so a small plant beside a
         // tall neighbour cannot be mistaken for the tall one.
         const sel = l.id === selectedId;
+        // Endpoints come from the layout rule: clipped at this card's own border and routed so
+        // the line never crosses another card or the Door card.
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", (l.x + l.w / 2).toFixed(1));
-        line.setAttribute("y1", (l.y + l.h).toFixed(1));
-        line.setAttribute("x2", l.bx.toFixed(1));
-        line.setAttribute("y2", l.by.toFixed(1));
+        line.setAttribute("x1", l.lx1.toFixed(1));
+        line.setAttribute("y1", l.ly1.toFixed(1));
+        line.setAttribute("x2", l.lx2.toFixed(1));
+        line.setAttribute("y2", l.ly2.toFixed(1));
+        line.setAttribute("data-for", l.id);
         if (sel) line.setAttribute("class", "is-selected");
         leaderSvg.appendChild(line);
         const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -717,6 +782,7 @@ export function createTentScene(host, handlers, opts = {}) {
       const s = project(g.x, 10, g.z);
       return { x: s.x, y: s.y };
     },
+    inspectPoint,
     isDragging: () => !!drag,
     isCameraAnimating: () => !!camAnim,
     lastRenderedTick: () => lastRenderedTick,

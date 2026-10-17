@@ -54,7 +54,10 @@ test("regression: an anchor inside a reserved rectangle gets its label placed be
   const out = layoutLabels([item("J", 300, 45)], { ...box, avoid: [banner] });
   const j = out[0];
   assert.ok(j.y >= banner.h, `label y ${j.y} must clear the banner`);
-  assert.equal(j.leader, true);
+  // Leaders are clipped at the card's own border: a displaced card either draws a clipped leader
+  // to its pot, or already sits on its own pot and needs no line at all.
+  const containsPot = j.bx >= j.x && j.bx <= j.x + j.w && j.by >= j.y && j.by <= j.y + j.h;
+  assert.ok(j.leader ? Number.isFinite(j.lx1) : containsPot, JSON.stringify(j));
 });
 
 test("regression: on a crowded narrow viewport labels hide rather than overlap; selected always shows", () => {

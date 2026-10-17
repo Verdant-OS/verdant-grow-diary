@@ -333,14 +333,19 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
 // `obj.${token}`, `${token}.x`) makes it part of a larger value.
 const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
   /(?:^|[^A-Za-z0-9_.-])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_.-])/g;
+// A standalone sandbox client token (same shape and boundaries). A production
+// bundle must carry none: a live bundle with any sandbox token is mixed.
+const PADDLE_SANDBOX_TOKEN_STANDALONE_PATTERN =
+  /(?:^|[^A-Za-z0-9_.-])test_[A-Za-z0-9]{27}(?![A-Za-z0-9_.-])/;
 
 /**
  * Compare the bounded deployed entry bundle with the committed production
  * token. The bundle must carry exactly the committed token bytes:
  * - committed `test_` token: refused (`public_paddle_canonical_not_live`);
  *   production ships live checkout;
- * - committed `live_` token: any OTHER `live_` token in the bundle fails, and
- *   the committed token must appear as a standalone value.
+ * - committed `live_` token: any standalone `test_` token or any OTHER `live_`
+ *   token in the bundle fails, and the committed token must appear as a
+ *   standalone value.
  * Fixed reason codes only; token bytes never leave this function.
  */
 export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
@@ -355,6 +360,9 @@ export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
   // the smoke cannot pass a production that reopened sandbox checkout.
   if (!canonicalToken.startsWith("live_")) {
     return { ok: false, reason: "public_paddle_canonical_not_live" };
+  }
+  if (PADDLE_SANDBOX_TOKEN_STANDALONE_PATTERN.test(bundle)) {
+    return { ok: false, reason: "public_paddle_sandbox_token_present" };
   }
   let foundCanonical = false;
   for (const match of bundle.matchAll(PADDLE_LIVE_TOKEN_GLOBAL_PATTERN)) {

@@ -91,3 +91,23 @@ describe("public bundle Paddle token scan — real bundle shapes", () => {
     ).toEqual({ ok: true });
   });
 });
+
+describe("public bundle Paddle token scan — mixed tokens", () => {
+  it("fails a live bundle that also carries a standalone sandbox token", () => {
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: LIVE_TOKEN,
+        bundle: `{VITE_PAYMENTS_CLIENT_TOKEN:"${LIVE_TOKEN}",VITE_PADDLE_CLIENT_TOKEN:"${TEST_TOKEN}"}`,
+      }),
+    ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_present" });
+  });
+
+  it("ignores test_ runs that are not standalone sandbox tokens", () => {
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: LIVE_TOKEN,
+        bundle: `"${LIVE_TOKEN}";"x-${TEST_TOKEN}";obj.${TEST_TOKEN};"test_${"a".repeat(26)}";"test_mode"`,
+      }),
+    ).toEqual({ ok: true });
+  });
+});

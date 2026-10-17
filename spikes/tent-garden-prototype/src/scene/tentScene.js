@@ -9,6 +9,7 @@ import { TENT, clampToTent } from "../rules/layoutRules.js";
 import { visualForStage, labelFor } from "../rules/plantVisualRules.js";
 import { layoutLabels } from "../rules/labelLayoutRules.js";
 import { hardwareOpacity, HARDWARE_KEYS } from "../rules/hardwareVisibilityRules.js";
+import { decideFrame, fadeStep } from "../rules/renderScheduleRules.js";
 import {
   STORYBOOK,
   toon,
@@ -120,12 +121,21 @@ export function createTentScene(host, handlers, opts = {}) {
   controls.addEventListener("start", () => {
     userMovedCamera = true;
   });
+  controls.addEventListener("change", requestRender);
   let editable = false;
   let animations = true;
   let selectedId = null;
   let drag = null; // { id, offset:{x,z}, moved:boolean }
   let currentView = null;
   let lastRenderedTick = 0;
+  // Render on demand: a frame is drawn only when something changed, and frames continue only
+  // while something is still moving (camera ease, tweens, orbit damping, hardware fade).
+  let raf = 0;
+  let inFrame = false;
+  let lastFrameAt = 0;
+  function requestRender() {
+    if (!raf && !inFrame) raf = requestAnimationFrame(frame);
+  }
 
   // Size the renderer was last fitted to. The browser runs animation frames before it delivers
   // ResizeObserver callbacks, so a frame can see a host that has already changed size (the phone
@@ -144,6 +154,7 @@ export function createTentScene(host, handlers, opts = {}) {
     camera.updateProjectionMatrix();
     // Keep the fitted default until the grower moves the camera themselves.
     if (!userMovedCamera) setCamera(DEFAULT_CAM, false);
+    requestRender();
   }
   /** Fit the renderer and camera to the host now if it changed size since the last fit. */
   function syncSize() {
@@ -261,9 +272,11 @@ export function createTentScene(host, handlers, opts = {}) {
       camera.position.copy(dest);
       camAnim = null;
       controls.update();
+      requestRender();
       return;
     }
     camAnim = { from: camera.position.clone(), to: dest, t0: performance.now(), ms: 600 };
+    requestRender();
   }
   function currentSpherical() {
     const off = camera.position.clone().sub(target);
@@ -430,6 +443,7 @@ export function createTentScene(host, handlers, opts = {}) {
       }
     }
     applySelection();
+    requestRender();
   }
 
   /** Move one pot immediately (used during a drag). No animation, no record. */
@@ -439,14 +453,17 @@ export function createTentScene(host, handlers, opts = {}) {
     p.from = null;
     p.to = pos;
     p.group.position.set(pos.x * UNIT, FLOOR_Y, pos.z * UNIT);
+    requestRender();
   }
   function showGhost(pos, ok) {
     ghost.visible = true;
     ghost.position.set(pos.x * UNIT, FLOOR_Y + 0.06, pos.z * UNIT);
     ghost.material.color.setHex(ok ? COLORS.ghost : 0xe5726b);
+    requestRender();
   }
   function hideGhost() {
     ghost.visible = false;
+    requestRender();
   }
   function applySelection() {
     for (const [id, p] of plants) {
@@ -459,6 +476,7 @@ export function createTentScene(host, handlers, opts = {}) {
   function setSelected(id) {
     selectedId = id;
     applySelection();
+    requestRender();
   }
   function setAnimations(on) {
     animations = !!on;
@@ -474,19 +492,22 @@ export function createTentScene(host, handlers, opts = {}) {
     } else {
       controls.enabled = !drag;
     }
+    requestRender();
   }
 
   // ---- hardware fading: whatever is camera-side fades, in every orientation ----------------
-  function updateHardware() {
-    if (hardware.size === 0) return;
+  /** Eases hardware opacity toward its target; returns true while any piece is still fading. */
+  function updateHardware(dtMs) {
+    if (hardware.size === 0) return false;
+    let fading = false;
     const target = hardwareOpacity(currentSpherical().azimuthDeg);
     for (const key of HARDWARE_KEYS) {
       const mesh = hardware.get(key);
       if (!mesh) continue;
       const want = target[key];
       const m = mesh.material;
-      m.opacity += (want - m.opacity) * 0.25; // short ease so rotation does not pop
-      if (Math.abs(m.opacity - want) < 0.01) m.opacity = want;
+      m.opacity = fadeStep(m.opacity, want, dtMs); // short ease so rotation does not pop
+      if (m.opacity !== want) fading = true;
       const ink = mesh.children[0];
       if (ink?.material) {
         ink.material.transparent = true;
@@ -494,6 +515,7 @@ export function createTentScene(host, handlers, opts = {}) {
         ink.visible = m.opacity > 0.9;
       }
     }
+    return fading;
   }
 
   // ---- labels: project anchors, let the pure rule place them, draw leaders ----------------
@@ -508,8 +530,8 @@ export function createTentScene(host, handlers, opts = {}) {
   // screen position would pick someone else. Re-checked at most every 300 ms (raycasts).
   let occlusionAt = 0;
   const occlusionV = new THREE.Vector3();
-  function refreshOcclusion(now) {
-    if (now - occlusionAt < 300) return;
+  function refreshOcclusion(now, force) {
+    if (!force && now - occlusionAt < 300) return;
     occlusionAt = now;
     for (const [id, p] of plants) {
       if (!p.group.visible) continue;
@@ -520,10 +542,12 @@ export function createTentScene(host, handlers, opts = {}) {
     }
   }
 
-  function updateLabels() {
+  function updateLabels(settled) {
     const w = host.clientWidth || 1;
     const h = host.clientHeight || 1;
-    refreshOcclusion(performance.now());
+    // While moving, occlusion is re-checked at most every 300 ms; on the frame where everything
+    // settles it is always re-checked, so the resting layout never uses a stale answer.
+    refreshOcclusion(performance.now(), settled);
     const items = [];
     for (const [id, p] of plants) {
       if (!p.group.visible) continue;
@@ -603,11 +627,13 @@ export function createTentScene(host, handlers, opts = {}) {
   }
 
   // ---- render loop --------------------------------------------------------------------
-  let raf = 0;
   function frame() {
-    raf = requestAnimationFrame(frame);
+    raf = 0;
+    inFrame = true;
     syncSize();
     const now = performance.now();
+    const dt = lastFrameAt ? now - lastFrameAt : 1000 / 60;
+    lastFrameAt = now;
     if (camAnim) {
       const k = easeInOut(Math.min(1, (now - camAnim.t0) / camAnim.ms));
       camera.position.lerpVectors(camAnim.from, camAnim.to, k);
@@ -628,15 +654,21 @@ export function createTentScene(host, handlers, opts = {}) {
         if (k >= 1) p.scaleT0 = 0;
       }
     }
+    let tweensActive = !!camAnim;
+    for (const p of plants.values()) if (p.from || p.scaleT0) tweensActive = true;
     // While locked, skip controls.update() so orbit damping cannot drift the camera.
-    if (!cameraLockedFlag) controls.update();
-    updateHardware();
+    const controlsChanged = !cameraLockedFlag && controls.update() === true;
+    const fadeActive = updateHardware(dt);
+    const { keepGoing } = decideFrame({ controlsChanged, tweensActive, fadeActive });
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
-    updateLabels();
+    updateLabels(!keepGoing);
     lastRenderedTick = now;
+    inFrame = false;
+    if (keepGoing) raf = requestAnimationFrame(frame);
+    else lastFrameAt = 0;
   }
-  frame();
+  requestRender();
 
   return {
     setView,
@@ -660,6 +692,7 @@ export function createTentScene(host, handlers, opts = {}) {
     /** Overlay elements (or host-px rects) labels must keep clear of: banner, edit hint. */
     setLabelAvoid(items) {
       labelAvoid = Array.isArray(items) ? items : [];
+      requestRender();
     },
     /** Screen position (host px) of a plant's pot — for tests and keyboard focus aids. */
     screenPositionOf(id) {

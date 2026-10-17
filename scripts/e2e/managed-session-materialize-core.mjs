@@ -78,7 +78,10 @@ export function evaluatePublicDeploymentIdentity({ version, expectedSha, expecte
 
 const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9_-]+$/;
 const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_|live_)[A-Za-z0-9_-]+$/;
-const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9_-]+/;
+// A Paddle live client token is `live_` plus 16 or more letters/digits (real
+// tokens carry 27). Ordinary app identifiers that start with `live_` (the
+// `live_confirmed` sensor status, snake_case names) are not tokens.
+const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9]{16,}(?![A-Za-z0-9_-])/;
 
 /**
  * Parse the single VITE_PAYMENTS_CLIENT_TOKEN assignment from dotenv text.
@@ -319,7 +322,8 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
   }
 }
 
-const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN = /(?:^|[^A-Za-z0-9_])(live_[A-Za-z0-9_-]+)/g;
+const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
+  /(?:^|[^A-Za-z0-9_])(live_[A-Za-z0-9]{16,})(?![A-Za-z0-9_-])/g;
 
 /**
  * Compare the bounded deployed entry bundle with the committed production

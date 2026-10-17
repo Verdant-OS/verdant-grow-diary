@@ -52,9 +52,10 @@ What the pricing page sells, from `src/constants/pricing.ts` (amounts) and
 
 Included AI Doctor credits: Free 3 per grow; Pro and Founder 100 per month;
 Craft 300 per month. Founder Lifetime is a limited early-supporter offer.
-Credit packs are one-time top-ups for Pro, Craft and Founder members with an
-active monthly plan; they never expire and are spent only after the monthly
-allowance.
+Credit packs are one-time top-ups for any active paid entitlement that
+includes a monthly AI allowance: Pro and Craft subscriptions, and Founder
+Lifetime (one-time, but it carries the monthly bucket). They never expire and
+are spent only after the monthly allowance.
 
 Deliberate unavailable cases at launch. Each must show a calm, scoped block,
 never a page-wide one (see [Live checkout release sequence](#live-checkout-release-sequence)):
@@ -63,7 +64,8 @@ never a page-wide one (see [Live checkout release sequence](#live-checkout-relea
   `price_not_configured` and only the Craft buttons show "Checkout unavailable".
 - **Founder Lifetime** returns `plan_sold_out` once the cap is reached.
 - **Credit packs** return `pack_requires_monthly_plan` for a grower without an
-  active monthly plan, which blocks both packs and leaves subscriptions open.
+  active paid entitlement that includes a monthly AI allowance, which blocks
+  both packs and leaves subscriptions open.
 
 ## Configuration
 
@@ -218,7 +220,8 @@ it. So the merge waits until every step below is green.
    HTTP status and log line (`reason`, `stage`, `env_var_configured`):
    `pro_monthly`, `pro_annual`, `craft_monthly`, `craft_annual`,
    `founder_lifetime`, `credit_pack_50`, `credit_pack_150` (packs need a
-   session with an active monthly plan). Each must return a live price ID, or
+   session whose paid plan includes a monthly AI allowance, such as Pro or
+   Founder). Each must return a live price ID, or
    a deliberate calm block: `price_not_configured` for a product that does not
    exist in live Paddle (Craft today) or `plan_sold_out`. Any SKU returning
    `price_resolution_unavailable` (for example a live product whose

@@ -141,7 +141,7 @@ order, and the merge waits for all of it:
 3. From a signed-in production session, call `get-paddle-price` once for each
    SKU the pricing page sells (`pro_monthly`, `pro_annual`, `craft_monthly`,
    `craft_annual`, `founder_lifetime`, `credit_pack_50`, `credit_pack_150`;
-   packs need an active monthly plan) and record status and log line. Each
+   packs need a paid plan with a monthly AI allowance, e.g. Pro or Founder) and record status and log line. Each
    must return a live price ID or a deliberate calm block
    (`price_not_configured` for a product absent from live Paddle, or
    `plan_sold_out`). Any `price_resolution_unavailable` blocks the release:

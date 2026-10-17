@@ -1,28 +1,17 @@
-# Fix: pheno_crosses.channel missing in production
+# Billing environment check — read-only findings
 
-## Confirmed diagnosis
-- `src/lib/phenoKeepersService.ts` `listCrossesForHunt` selects `channel, generation, recurrent_parent_id` from `pheno_crosses`.
-- Those columns are added by `supabase/migrations/20260707210000_pheno_crosses_full_taxonomy.sql`, which is present in the repo and pinned by `src/test/required-core-migrations-gate.test.ts` (`PHENO_CROSSES_TAXONOMY_COLUMNS`).
-- Production is throwing Postgres `42703` on `pheno_crosses.channel` (9 hits, 2026-07-28). The migration exists locally but is not recorded in the production ledger — this matches the earlier `BLOCKED_LEDGER_FILENAME_DIVERGENCE` and `BLOCKED_PHENO_ACL_LEAK` audits.
+No files, secrets, settings or deployments were changed.
 
-## Why no code change here
-The frontend code and migration file are correct. This is a **production schema-drift issue**, not a code defect. Per project rules the sandbox never applies migrations to production; only Matthew's Windows machine dispatches the pinned production migration workflows.
+## 1. Function logs
+- get-paddle-price, payments-webhook, paddle-webhook, redeem-referral: NO_DATA. The log tool found no entries for any of them, with or without the "environment" or "price_resolution_unavailable" filter.
+- The tool only covers a short recent window, not 14 days, so older lines are NOT_MEASURED.
+- Only founder-slots-remaining has recent logs (2026-10-17 01:45–01:46 UTC). It names no billing environment. It shows deploy_version `..._112` and repeated `metric_persist_failed` status 400 warnings (metrics not saving; requests themselves succeed).
 
-## Recommended path (operator-run, from Windows)
-The reconciliation migration `supabase/migrations/20260728090000_production_schema_reconciliation.sql` already covers the missing pheno taxonomy columns, but its last apply attempt was halted with `BLOCKED_PHENO_ACL_LEAK` because production `pheno_crosses` / `pheno_reversals` carry a legacy default-ACL leak (anon/authenticated hold 8 privileges each).
+## 2. Deployed function list with versions
+BLOCKED: I have no tool that lists deployed functions with version numbers and last-deployed times. The only version I can see is in log lines, which exist for founder-slots-remaining only (version 112).
 
-Two ordered steps:
+## 3. Verdict
+Which billing environment production resolves: NOT_MEASURED. No log line in reach says it.
 
-1. **Author an additive REVOKE migration** normalizing `pheno_crosses` and `pheno_reversals` ACLs to the canonical set (`GRANT SELECT, INSERT, UPDATE, DELETE ON ... TO authenticated; GRANT ALL ... TO service_role;` after `REVOKE ALL ... FROM anon, authenticated`). No column changes.
-   - New file: `supabase/migrations/<new-ts>_pheno_crosses_acl_normalize.sql`.
-   - Ship via normal PR + `Apply pinned production migrations` workflow.
-
-2. **Re-dispatch** `.github/workflows/apply-pinned-production-migrations.yml` for `20260728090000_production_schema_reconciliation.sql`. With the ACL leak closed, the `DO $reconcile$` guard will pass and `channel`, `generation`, `recurrent_parent_id` will be added to `pheno_crosses`.
-
-## Verification after apply
-- `/operator/schema-audit` should show `pheno_crosses` taxonomy columns present and RLS/ACL audit clean.
-- `select column_name from information_schema.columns where table_name='pheno_crosses' and column_name in ('channel','generation','recurrent_parent_id');` returns 3 rows.
-- Pheno Hunt cross list stops emitting `42703` in edge logs.
-
-## Rollback
-Both migrations are additive; no destructive change. Rollback is only necessary if the REVOKE breaks a policy — mitigate by re-granting the exact prior set from the schema baseline at `/mnt/documents/db-baselines/schema-baseline-20260724T103225Z.txt`.
+## Possible next step (needs your approval)
+A single checkout attempt on /pricing would make get-paddle-price write a log line. I could read it afterwards, without changing anything.

@@ -302,9 +302,12 @@ export function releaseQuickLogPhotoAttachmentRecoveryLockForEntry(
   const key = buildQuickLogPhotoAttachmentRecoveryKey(scope);
   const entryId = normalizeDiaryEntryId(diaryEntryId);
   if (!key || !entryId) return false;
+  // Read while this attempt still counts as live: the reader drops upload
+  // records with no live owner, so reading after the delete below would hide
+  // this very reservation and skip both its removal and the notification.
+  const locks = readStoredLocks();
   // This attempt no longer runs in this page either way.
   liveUploadReservations.delete(entryId);
-  const locks = readStoredLocks();
   if (locks.get(key)?.diaryEntryId !== entryId) return false;
   locks.delete(key);
   writeStoredLocks(locks);

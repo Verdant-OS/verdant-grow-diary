@@ -37,6 +37,7 @@ const state: {
   insertGates: Array<(value: InsertResult) => void>;
   uploadPaths: string[];
   uploadGates: Array<(value: UploadResult) => void>;
+  uploadRejects: Array<(reason: unknown) => void>;
   deferUploads: boolean;
   removedPaths: string[];
   readableRowId: string | null;
@@ -47,6 +48,7 @@ const state: {
   insertGates: [],
   uploadPaths: [],
   uploadGates: [],
+  uploadRejects: [],
   deferUploads: false,
   removedPaths: [],
   readableRowId: null,
@@ -71,8 +73,9 @@ vi.mock("@/integrations/supabase/client", () => ({
         upload: (path: string) => {
           state.uploadPaths.push(path);
           if (!state.deferUploads) return Promise.resolve({ data: { path }, error: null });
-          return new Promise((resolve) => {
+          return new Promise((resolve, reject) => {
             state.uploadGates.push(resolve);
+            state.uploadRejects.push(reject);
           });
         },
         remove: async (paths: string[]) => {
@@ -214,6 +217,7 @@ beforeEach(() => {
   state.insertGates = [];
   state.uploadPaths = [];
   state.uploadGates = [];
+  state.uploadRejects = [];
   state.deferUploads = false;
   state.removedPaths = [];
   state.readableRowId = null;
@@ -499,6 +503,47 @@ describe("Photo only claims its exact scope and id before awaiting the insert", 
       expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
       expect(entryCreatedEvents).toHaveLength(announces ? 1 : 0);
       expect(state.insertCalls).toHaveLength(1);
+    },
+  );
+
+  // Codex P1 at eaeeb2b45: releasing a live upload reservation read the store
+  // after dropping its live marker, so the reader filtered the record as stale
+  // and the release returned before removing it or notifying the sheet.
+  it.each([
+    ["the upload returns an error", "error"],
+    ["the upload throws", "throw"],
+  ] as const)(
+    "restores Save on a remounted sheet when the original upload ends before any insert (%s)",
+    async (_label, outcome) => {
+      state.deferUploads = true;
+      const view = render(sheet());
+      await choosePhotoOnly();
+      fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+      await waitFor(() => expect(state.uploadGates).toHaveLength(1));
+      view.unmount();
+
+      render(sheet());
+      await settle();
+      expect(screen.getByText(/could not confirm the photo attachment/i)).toBeTruthy();
+
+      await act(async () => {
+        if (outcome === "error") {
+          state.uploadGates[0]?.({ data: null, error: { message: "network" } });
+        } else {
+          state.uploadRejects[0]?.(new Error("network"));
+        }
+      });
+      await settle();
+
+      expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(false);
+      expect(screen.queryByText(/could not confirm the photo attachment/i)).toBeNull();
+      expect(state.insertCalls).toHaveLength(0);
+      expect(entryCreatedEvents).toHaveLength(0);
+      expect(trackMock).not.toHaveBeenCalled();
+
+      state.deferUploads = false;
+      await choosePhotoOnly();
+      expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
     },
   );
 

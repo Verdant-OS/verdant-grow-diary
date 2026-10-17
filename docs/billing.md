@@ -61,7 +61,10 @@ Deliberate unavailable cases at launch. Each must show a calm, scoped block,
 never a page-wide one (see [Live checkout release sequence](#live-checkout-release-sequence)):
 
 - **Craft** has no live Paddle product today, so `get-paddle-price` returns
-  `price_not_configured` and only the Craft buttons show "Checkout unavailable".
+  `price_not_configured`. That block is per SKU: only the Craft button that was
+  tried (monthly or annual) changes to "Join the Craft launch list"; the other
+  Craft button stays available until it is tried, and other plans are
+  unaffected.
 - **Founder Lifetime** returns `plan_sold_out` once the cap is reached.
 - **Credit packs** return `pack_requires_monthly_plan` for a grower without an
   active paid entitlement that includes a monthly AI allowance, which blocks
@@ -214,8 +217,9 @@ the live-token change into `verdant-grow-diary` makes it the build the
 configured publisher deploys to production; customer exposure starts when the
 live `/version.json` reports the merge SHA, and from then the live token opens
 checkout. Nothing in this document treats the merge itself as the release. The
-merge waits until steps 1–5 are green; step 6 is the merge followed by post-merge
-deployment verification.
+merge waits until steps 1–5 are green **and** every standing check in
+[What must be true before live payments open to customers](#what-must-be-true-before-live-payments-open-to-customers)
+is done; step 6 is the merge followed by post-merge deployment verification.
 
 1. **#2229 merged and `payments-webhook` redeployed.** Merge the shared
    webhook-verifier packaging repair through the queue. Confirm Lovable has
@@ -310,7 +314,9 @@ The owner chose `PAYMENTS_ENVIRONMENT=live` for this release.
 That choice covers the client change; it does not make any single
 token or settings flip sufficient. The release sequence above is the order.
 
-Standing checks:
+Standing checks. Each one is a pre-merge gate for the live release, alongside
+steps 1–5 of the release sequence; none is optional, because the merge lets
+the publisher expose live checkout:
 
 - [ ] Complete Paddle live verification (merchant of record onboarding).
 - [ ] Confirm acceptable use policy fit for Verdant (software-only).

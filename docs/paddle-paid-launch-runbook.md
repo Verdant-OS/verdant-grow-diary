@@ -93,6 +93,8 @@ Edge function secrets on the production project:
 | `PADDLE_SANDBOX_PRICE_PRO_MONTHLY` / `_PRO_ANNUAL` / `_FOUNDER_LIFETIME`                        | paddle-webhook plan mapping (sandbox-scoped; preferred)                                                     | same                                   |
 | `PADDLE_PRICE_PRO_MONTHLY` / `PADDLE_PRICE_PRO_ANNUAL` / `PADDLE_PRICE_FOUNDER_LIFETIME`        | legacy fallback for paddle-webhook when the sandbox-scoped names are unset; also read by `get-paddle-price` | same                                   |
 | `PAYMENTS_ENVIRONMENT`                                                                          | get-paddle-price env selection (server-controlled)                                                          | same                                   |
+| `PADDLE_PRICE_CREDIT_PACK_50` / `PADDLE_PRICE_CREDIT_PACK_150`                                  | get-paddle-price for both pack SKUs; must hold the live pack price IDs for the live release                 | same                                   |
+| `PADDLE_PRICE_CRAFT_MONTHLY` / `PADDLE_PRICE_CRAFT_ANNUAL`                                      | get-paddle-price; may be deliberately absent while Craft has no live product (`price_not_configured`)       | same (absence is expected today)       |
 | `PADDLE_SANDBOX_API_KEY` (+ `PADDLE_LIVE_API_KEY` only at live approval)                        | gateway price lookups                                                                                       | same                                   |
 | `LOVABLE_API_KEY`, `PAYMENTS_SANDBOX_WEBHOOK_SECRET` (+ `PAYMENTS_LIVE_WEBHOOK_SECRET` at live) | Lovable lane                                                                                                | same                                   |
 
@@ -131,8 +133,10 @@ Merging #2230 into `verdant-grow-diary` makes it the build the configured
 publisher deploys to production. Customer exposure starts when the live
 `/version.json` reports the merge SHA; from then the live token opens checkout,
 and there is no operator-only gate. So backend readiness is verified first, in
-this order, and the merge waits for steps 1–5; step 6 is the merge followed by
-post-merge deployment verification:
+this order, and the merge waits for steps 1–5 and for every standing check in
+`docs/billing.md` ("What must be true before live payments open to
+customers"); step 6 is the merge followed by post-merge deployment
+verification:
 
 1. Merge #2229 (shared webhook-verifier packaging repair) through the queue.
    Confirm Lovable has pulled the merged source. Then, with the owner naming

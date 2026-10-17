@@ -328,7 +328,9 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
 // Bundle scans match only Paddle's exact live client-token shape: a standalone
 // `live_` plus exactly 27 letters/digits. Ordinary app identifiers that start
 // with `live_` (`live_confirmed`, snake_case names, shorter or longer runs)
-// are not tokens.
+// are not tokens. Standalone means the same neighbour set is excluded on both
+// sides: a letter, digit, `_`, `.` or `-` next to the token (`x-${token}`,
+// `obj.${token}`, `${token}.x`) makes it part of a larger value.
 const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
   /(?:^|[^A-Za-z0-9_.-])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_.-])/g;
 
@@ -341,27 +343,6 @@ const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
  *   the committed token must appear as a standalone value.
  * Fixed reason codes only; token bytes never leave this function.
  */
-/**
- * True when `token` appears in `bundle` as a standalone value: neither side
- * touches a letter, digit, `_`, `.` or `-`. `${token}b`, `x-${token}` or
- * `obj.${token}` is part of a different value, not the token.
- */
-// The same neighbour set on both sides: a letter, digit, `_`, `.` or `-` next to
-// the token makes it part of a larger identifier, property or slug.
-const TOKEN_NEIGHBOUR = /[A-Za-z0-9_.-]/;
-
-function bundleContainsStandaloneToken(bundle, token) {
-  let from = 0;
-  for (;;) {
-    const at = bundle.indexOf(token, from);
-    if (at === -1) return false;
-    const before = at === 0 ? "" : bundle[at - 1];
-    const after = bundle[at + token.length] ?? "";
-    if (!TOKEN_NEIGHBOUR.test(before) && !TOKEN_NEIGHBOUR.test(after)) return true;
-    from = at + 1;
-  }
-}
-
 export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
   if (
     typeof canonicalToken !== "string" ||

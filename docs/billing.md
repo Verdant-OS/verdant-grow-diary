@@ -319,9 +319,10 @@ Standing checks:
 - [ ] Customer portal / "manage subscription" surface for the grower
       (Settings currently shows a placeholder dialog).
 - [ ] Tax / receipt copy reviewed for software-only positioning.
-- [ ] Sandbox smoke green per `docs/paddle-sandbox-smoke.md` (Pro Monthly,
-      Pro Annual, Founder Lifetime, duplicate-delivery idempotency,
-      cancel-and-resubscribe).
+- [ ] Pre-transition sandbox evidence recorded per `docs/paddle-sandbox-smoke.md`
+      (Pro Monthly, Pro Annual, Founder Lifetime, duplicate-delivery
+      idempotency, cancel-and-resubscribe). Do not reconfigure production to
+      sandbox to rerun it; live validation is the release sequence above.
 - [ ] Prepare the code, configuration, secrets, price IDs, notification
       destinations, public copy, tests, and rollback as one reviewed change;
       apply none of them independently.

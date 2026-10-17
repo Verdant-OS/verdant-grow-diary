@@ -214,7 +214,8 @@ the live-token change into `verdant-grow-diary` makes it the build the
 configured publisher deploys to production; customer exposure starts when the
 live `/version.json` reports the merge SHA, and from then the live token opens
 checkout. Nothing in this document treats the merge itself as the release. The
-merge waits until every step below is green.
+merge waits until steps 1–5 are green; step 6 is the merge followed by post-merge
+deployment verification.
 
 1. **#2229 merged and `payments-webhook` redeployed.** Merge the shared
    webhook-verifier packaging repair through the queue. Confirm Lovable has
@@ -251,7 +252,7 @@ merge waits until every step below is green.
    logs. Choose the canonical destination from that evidence. A live test
    event is a production write and needs its own authorization.
 5. **Rollback artifact built and verified** (below) before the merge.
-6. **Merge, then confirm the deploy.** Measure the configured publisher and its
+6. **Merge, then confirm the deploy (post-merge verification).** Measure the configured publisher and its
    deployment for the merge commit. Until the live `/version.json` names that
    commit, production still runs the previous build and no live verification
    applies. Once it does, confirm `/pricing` shows "Secure checkout by Paddle".

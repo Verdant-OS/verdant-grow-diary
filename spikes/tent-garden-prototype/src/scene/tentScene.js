@@ -145,6 +145,10 @@ export function createTentScene(host, handlers, opts = {}) {
     // Keep the fitted default until the grower moves the camera themselves.
     if (!userMovedCamera) setCamera(DEFAULT_CAM, false);
   }
+  /** Fit the renderer and camera to the host now if it changed size since the last fit. */
+  function syncSize() {
+    if ((host.clientWidth || 1) !== sizedW || (host.clientHeight || 1) !== sizedH) resize();
+  }
   const ro = new ResizeObserver(resize);
   ro.observe(host);
   resize();
@@ -152,6 +156,7 @@ export function createTentScene(host, handlers, opts = {}) {
 
   // ---- pointer handling ---------------------------------------------------------------
   function toPointer(ev) {
+    syncSize(); // a tap right after a layout change must not pick with the old camera aspect
     const r = renderer.domElement.getBoundingClientRect();
     pointer.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
     pointer.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
@@ -601,7 +606,7 @@ export function createTentScene(host, handlers, opts = {}) {
   let raf = 0;
   function frame() {
     raf = requestAnimationFrame(frame);
-    if ((host.clientWidth || 1) !== sizedW || (host.clientHeight || 1) !== sizedH) resize();
+    syncSize();
     const now = performance.now();
     if (camAnim) {
       const k = easeInOut(Math.min(1, (now - camAnim.t0) / camAnim.ms));
@@ -658,6 +663,7 @@ export function createTentScene(host, handlers, opts = {}) {
     },
     /** Screen position (host px) of a plant's pot — for tests and keyboard focus aids. */
     screenPositionOf(id) {
+      syncSize();
       const p = plants.get(id);
       if (!p || !p.group.visible) return null;
       const g = p.group.position;

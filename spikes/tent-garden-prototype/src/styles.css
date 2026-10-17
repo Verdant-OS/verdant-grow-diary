@@ -542,9 +542,22 @@ button {
   }
   .toolbar {
     gap: 6px;
+    padding: 6px 10px;
   }
   .btn {
     padding: 6px 9px;
+  }
+  /* Phone header: tighter padding, and the name stays on one line (the pill and status may wrap,
+     which leaves the status room to break at a space, never inside the date). */
+  .topbar {
+    padding: 6px 12px;
+    gap: 8px;
+  }
+  .brand {
+    gap: 8px;
+  }
+  .brand__name {
+    white-space: nowrap;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -562,6 +575,10 @@ button {
     min-height: 44px;
   }
   input[type="range"] {
+    min-height: 44px;
+  }
+  /* The Animation checkbox is tapped through its label, so the label is the touch target. */
+  .toolbar .toggle {
     min-height: 44px;
   }
 }

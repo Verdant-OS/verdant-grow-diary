@@ -100,18 +100,19 @@ function entryParam(p, q, r, pad) {
   return Math.max(0, t0 - 1e-6);
 }
 
-function inBounds(r, width, height) {
-  return r.x >= 0 && r.y >= 0 && r.x + r.w <= width && r.y + r.h <= height;
+/** b is the usable area: the viewport shrunk by the edge inset on every side. */
+function inBounds(r, b) {
+  return r.x >= b.x0 && r.y >= b.y0 && r.x + r.w <= b.x1 && r.y + r.h <= b.y1;
 }
 
 /**
  * Every grid position in the viewport, nearest to the anchor first (ties: higher, then left).
  * Used only for an occluded plant, whose card is its sole tap handle, after the usual spots fail.
  */
-function gridCandidates(it, w, h, width, height) {
+function gridCandidates(it, w, h, b) {
   const out = [];
-  for (let y = 0; y + h <= height; y += GRID_STEP) {
-    for (let x = 0; x + w <= width; x += GRID_STEP) {
+  for (let y = b.y0; y + h <= b.y1; y += GRID_STEP) {
+    for (let x = b.x0; x + w <= b.x1; x += GRID_STEP) {
       const d = Math.hypot(x + w / 2 - it.ax, y + h / 2 - (it.ay - h / 2 - LIFT));
       out.push({ x, y, d });
     }
@@ -183,6 +184,10 @@ export function layoutLabels(items, opts) {
 function placeOnce(items, opts) {
   const width = Number(opts?.width) || 0;
   const height = Number(opts?.height) || 0;
+  // Cards keep this many px from every viewport edge (shadow and tilt included), so a card
+  // never touches the toolbar or timeline. Default 0 keeps callers without it unchanged.
+  const inset = Math.max(0, Number(opts?.inset) || 0);
+  const b = { x0: inset, y0: inset, x1: width - inset, y1: height - inset };
   const avoid = Array.isArray(opts?.avoid) ? opts.avoid : [];
   const selectedId = opts?.selectedId ?? null;
   const list = (Array.isArray(items) ? items : [])
@@ -268,7 +273,7 @@ function placeOnce(items, opts) {
     const prefFull = candidates(it, w, h)[0];
     for (const c of candidates(it, w, h)) {
       const r = { x: c.x, y: c.y, w, h };
-      if (!inBounds(r, width, height)) continue;
+      if (!inBounds(r, b)) continue;
       if (avoid.some((a) => overlaps(r, a, PAD))) continue; // keep a gap: labels are slightly rotated
       if (placed.some((p) => overlaps(r, p))) continue;
       if (coversPot(r)) continue;
@@ -284,7 +289,7 @@ function placeOnce(items, opts) {
       const prefChip = candidates(it, it.cw, it.ch)[0];
       for (const c of candidates(it, it.cw, it.ch)) {
         const r = { x: c.x, y: c.y, w: it.cw, h: it.ch };
-        if (!inBounds(r, width, height)) continue;
+        if (!inBounds(r, b)) continue;
         if (avoid.some((a) => overlaps(r, a, PAD))) continue;
         if (placed.some((p) => overlaps(r, p))) continue;
         if (coversPot(r)) continue;
@@ -315,7 +320,7 @@ function placeOnce(items, opts) {
       const cw = it.cw > 0 ? it.cw : w;
       const ch = it.ch > 0 ? it.ch : h;
       const pref = candidates(it, cw, ch)[0];
-      for (const c of gridCandidates(it, cw, ch, width, height)) {
+      for (const c of gridCandidates(it, cw, ch, b)) {
         const r = { x: c.x, y: c.y, w: cw, h: ch };
         if (avoid.some((a) => overlaps(r, a, PAD))) continue;
         if (placed.some((p) => overlaps(r, p))) continue;
@@ -364,7 +369,7 @@ function placeOnce(items, opts) {
       // the reserved rectangles (banner, controls); labels it lands on are hidden below.
       for (const c of candidates(it, w, h)) {
         const r = { x: c.x, y: c.y, w, h };
-        if (!inBounds(r, width, height)) continue;
+        if (!inBounds(r, b)) continue;
         if (avoid.some((a) => overlaps(r, a, PAD))) continue;
         const lead = leaderOf(r, prefFull);
         if (lead.seg && avoid.some((a) => segmentHitsRect(lead.seg.p, lead.seg.q, a, LEADER_GAP)))
@@ -377,9 +382,10 @@ function placeOnce(items, opts) {
     if (!chosen) {
       // Last resort: clamp into the viewport, then push below any reserved rect it touches.
       const pref = candidates(it, w, h)[0];
+      // A reserved rect wins over the edge inset when the viewport is too small for both.
       chosen = {
-        x: Math.min(Math.max(pref.x, 0), Math.max(0, width - w)),
-        y: Math.min(Math.max(pref.y, 0), Math.max(0, height - h)),
+        x: Math.min(Math.max(pref.x, b.x0), Math.max(0, b.x1 - w)),
+        y: Math.min(Math.max(pref.y, b.y0), Math.max(0, b.y1 - h)),
         w,
         h,
       };

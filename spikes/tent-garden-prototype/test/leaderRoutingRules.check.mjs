@@ -191,6 +191,46 @@ test("no card sits within touch slop of another plant's pot (rim or tap point)",
   assert.deepEqual(problems.slice(0, 6), [], `${problems.length} cards inside touch slop`);
 });
 
+// The scene passes an 8 px edge inset so no card (shadow and tilt included) touches the toolbar or
+// timeline. The inset must hold for every shown card without breaking routing or reachability.
+test("with an 8 px edge inset, every card keeps 8 px from each edge and routing still holds", () => {
+  const INSET = 8;
+  const problems = [];
+  for (let seed = 1; seed <= 300; seed++) {
+    const { items, opts } = scene(seed);
+    for (const it of items) {
+      it.tx = it.bx + 3;
+      it.ty = it.by + 14;
+    }
+    const o = { ...opts, inset: INSET };
+    const out = layoutLabels(items, o);
+    const shown = out.filter((l) => !l.hidden);
+    for (const l of shown) {
+      if (l.x < INSET || l.y < INSET || l.x + l.w > o.width - INSET || l.y + l.h > o.height - INSET)
+        problems.push(
+          `seed ${seed}: ${l.id} at ${l.x.toFixed(1)},${l.y.toFixed(1)} breaks the inset`,
+        );
+      if (!l.leader) continue;
+      const { p, q } = drawnLeader(l);
+      for (const c of shown)
+        if (c.id !== l.id && crossesInterior(p, q, c))
+          problems.push(`seed ${seed}: ${l.id}→${c.id}`);
+      for (const a of o.avoid)
+        if (crossesInterior(p, q, a)) problems.push(`seed ${seed}: ${l.id} crosses Door`);
+    }
+    for (const it of items.filter((i) => i.occluded)) {
+      const l = out.find((x) => x.id === it.id);
+      if (!l || l.hidden) problems.push(`seed ${seed}: occluded ${it.id} hidden`);
+    }
+  }
+  assert.deepEqual(problems.slice(0, 6), [], `${problems.length} problems`);
+});
+
+test("inset defaults to 0: callers that omit it keep the old edge behaviour", () => {
+  const { items, opts } = scene(11);
+  assert.deepEqual(layoutLabels(items, opts), layoutLabels(items, { ...opts, inset: 0 }));
+});
+
 // A plant whose pot is covered by a neighbour's leaves (occluded) can only be reached through its
 // card, so it must never end up hidden while the viewport still has room for its chip.
 test("an occluded plant is never left hidden: it gets a label or chip somewhere in view", () => {

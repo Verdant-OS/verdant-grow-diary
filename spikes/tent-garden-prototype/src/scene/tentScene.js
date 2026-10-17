@@ -20,6 +20,7 @@ import {
 } from "./storybookPlant.js";
 
 const UNIT = 1; // 1 scene unit = 1 inch
+const LABEL_EDGE_INSET = 8; // px between label cards (with shadow and tilt) and the scene edges
 const FLOOR_Y = 0;
 const POT_H = 7;
 const WALL_H = 26;
@@ -672,7 +673,13 @@ export function createTentScene(host, handlers, opts = {}) {
           });
       } else if (a && Number.isFinite(a.w)) avoid.push(a);
     }
-    const placed = layoutLabels(items, { width: w, height: h, avoid, selectedId });
+    const placed = layoutLabels(items, {
+      width: w,
+      height: h,
+      inset: LABEL_EDGE_INSET,
+      avoid,
+      selectedId,
+    });
     while (leaderSvg.firstChild) leaderSvg.removeChild(leaderSvg.firstChild);
     for (const l of placed) {
       const p = plants.get(l.id);

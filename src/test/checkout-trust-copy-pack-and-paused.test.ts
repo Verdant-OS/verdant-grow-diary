@@ -52,7 +52,9 @@ describe("buildCheckoutTrustCopy — pack scope and paused checkout", () => {
     expect(copy.label).toBe("Checkout unavailable on this site");
     expect(copy.canCreateLiveCharge).toBe(false);
     expect(`${copy.label} ${copy.summary} ${copy.faqAnswer}`).not.toMatch(/sandbox|test mode/i);
-    expect(copy.summary).toMatch(/verdantgrowdiary\.com/);
+    expect(copy.summary).toBe(
+      "Checkout opens only on verdantgrowdiary.com. No charge can be made here.",
+    );
   });
 
   it("ignores liveOffHost when checkout is live, and paused still wins", () => {

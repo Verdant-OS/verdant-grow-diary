@@ -323,8 +323,10 @@ the publisher expose live checkout:
 - [ ] Refund / chargeback / adjustment handling beyond "record and ignore"
       (currently `adjustment.created/updated` events are stored but not
       auto-acted on; operator-manual only).
-- [ ] Customer portal / "manage subscription" surface for the grower
-      (Settings currently shows a placeholder dialog).
+- [ ] Customer portal verified: Settings → "Manage subscription" (the existing
+      `SubscriptionTile` flow, `src/lib/customerPortal.ts` → the
+      `paddle-portal-session` Edge function) opens the Paddle customer portal
+      for a live subscriber after the redeploy. No payment is made to check it.
 - [ ] Tax / receipt copy reviewed for software-only positioning.
 - [ ] Pre-transition sandbox evidence recorded per `docs/paddle-sandbox-smoke.md`
       (Pro Monthly, Pro Annual, Founder Lifetime, duplicate-delivery

@@ -431,7 +431,7 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     }
 
     const sandboxToken = `test_${"s".repeat(27)}`;
-    const liveOverride = `live_${"l".repeat(16)}`;
+    const liveOverride = `live_${"l".repeat(27)}`;
     const resolvedToken = resolveCanonicalPaddleSandboxToken(
       `VITE_PAYMENTS_CLIENT_TOKEN=${sandboxToken}\n`,
     );
@@ -510,7 +510,7 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     if (!resolveProductionToken || !evaluatePublicPaddleBundle) return;
 
     const liveToken = `live_${"c".repeat(27)}`;
-    const otherLive = `live_${"x".repeat(16)}`;
+    const otherLive = `live_${"x".repeat(27)}`;
     expect(
       resolveProductionToken(`VITE_PAYMENTS_CLIENT_TOKEN=${liveToken}
 `).ok,

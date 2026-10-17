@@ -74,14 +74,16 @@ built-in Paddle integration). The committed `.env.production` carries the
 live-class (`live_`) production token; the prebuild gate requires the bundled
 token to equal it. Client resolution:
 
-- `test_` → sandbox on every host.
-- `live_` plus exactly 27 letters/digits (Paddle's documented client-token
-  shape) → live only on `verdantgrowdiary.com` / `www.verdantgrowdiary.com`;
-  unavailable on every other host. The production prebuild gate requires the
-  same shape.
-- Missing or malformed (including any other `live_` value, such as
-  `live_invalid`) → unavailable everywhere, and a malformed `live_` value fails
-  the production build.
+Paddle's documented client-token shape is the prefix plus exactly 27
+letters/digits. The runtime and the production prebuild gate both require it.
+
+- `test_` plus exactly 27 letters/digits → sandbox on every host.
+- `live_` plus exactly 27 letters/digits → live only on
+  `verdantgrowdiary.com` / `www.verdantgrowdiary.com`; unavailable on every
+  other host.
+- Missing or malformed, for either prefix (for example `test_invalid`,
+  `live_invalid`, or a payload with `_`, `-` or the wrong length) →
+  unavailable everywhere, and a malformed value fails the production build.
 - `VITE_CHECKOUT_DISABLED="true"` (exact string) → unavailable everywhere,
   including production, with paused copy. This is the rollback switch; see
   [Live checkout rollback](#live-checkout-rollback).

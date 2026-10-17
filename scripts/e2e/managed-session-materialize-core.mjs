@@ -81,10 +81,11 @@ const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9]{27}$/;
 // A production client token must have Paddle's documented shape: `test_` or
 // `live_` plus exactly 27 letters/digits. A malformed value fails the gate.
 const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_|live_)[A-Za-z0-9]{27}$/;
-// A Paddle live client token is `live_` plus 16 or more letters/digits (real
-// tokens carry 27). Ordinary app identifiers that start with `live_` (the
-// `live_confirmed` sensor status, snake_case names) are not tokens.
-const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9]{16,}(?![A-Za-z0-9_-])/;
+// Bundle scans match only Paddle's exact live client-token shape: a standalone
+// `live_` plus exactly 27 letters/digits. Ordinary app identifiers that start
+// with `live_` (`live_confirmed`, snake_case names, shorter or longer runs)
+// are not tokens.
+const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9]{27}(?![A-Za-z0-9_-])/;
 
 /**
  * Parse the single VITE_PAYMENTS_CLIENT_TOKEN assignment from dotenv text.
@@ -128,10 +129,11 @@ export function resolveCanonicalPaddleSandboxToken(envText) {
 
 /**
  * Read the single production Paddle client token from dotenv text.
- * Standing production gate: accepts test_ or live_ so publishable builds pass
- * prebuild (Lovable injects live_ at publish; preview may stay test_ for test
- * cards). Fails closed only on missing, multiple, malformed, empty, or
- * non-Paddle values — never because the token is live_.
+ * Standing production gate: accepts a well-formed test_ or live_ token, because
+ * the committed production token is sandbox-class until the live release
+ * commits a live-class one, and both must pass the same gate. Fails closed on
+ * missing, multiple, malformed, empty, or non-Paddle values — never because
+ * the token is live_.
  */
 export function resolveCanonicalPaddleProductionToken(envText) {
   const parsed = parseCanonicalPaddleClientTokenAssignment(envText);
@@ -326,7 +328,7 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
 }
 
 const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
-  /(?:^|[^A-Za-z0-9_])(live_[A-Za-z0-9]{16,})(?![A-Za-z0-9_-])/g;
+  /(?:^|[^A-Za-z0-9_])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_-])/g;
 
 /**
  * Compare the bounded deployed entry bundle with the committed production

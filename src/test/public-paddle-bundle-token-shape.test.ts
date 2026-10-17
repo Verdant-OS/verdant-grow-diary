@@ -1,14 +1,15 @@
 /**
  * Codex P2 on #2230 at 34e0814b: the production smoke scans the deployed entry
  * bundle for Paddle `live_` tokens. Ordinary app identifiers that merely start
- * with `live_` (the `live_confirmed` sensor-proof status, snake_case names)
- * are not Paddle client tokens and must not fail the smoke. Real token shapes
- * (`live_` + 16 or more letters/digits) are still caught.
+ * with `live_` (the `live_confirmed` sensor-proof status, snake_case names,
+ * and shorter or longer alphanumeric runs) are not Paddle client tokens and
+ * must not fail the smoke. Only Paddle's exact shape (`live_` + exactly 27
+ * letters/digits) is treated as a token.
  */
 import { describe, expect, it } from "vitest";
 import { evaluatePublicPaddleBundle } from "../../scripts/e2e/managed-session-materialize-core.mjs";
 
-const LIVE_TOKEN = `live_${"2f975b194d4ec4c7".repeat(1)}20525928b62`;
+const LIVE_TOKEN = `live_${"c3".repeat(13)}d`;
 const OTHER_LIVE_TOKEN = `live_${"9a".repeat(13)}b`;
 const TEST_TOKEN = `test_${"7d".repeat(13)}e`;
 const APP_IDENTIFIERS = [
@@ -16,6 +17,9 @@ const APP_IDENTIFIERS = [
   `{live_sensor_readings_effective:1}`,
   `var live_mode=!0`,
   `"live_ingest-v2"`,
+  `"live_abcdefghijklmnop"`,
+  `"live_${"a".repeat(26)}"`,
+  `"live_${"b".repeat(28)}"`,
 ].join(";");
 
 describe("public bundle Paddle token scan", () => {

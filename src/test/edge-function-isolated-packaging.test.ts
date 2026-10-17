@@ -33,33 +33,42 @@ function functionNames(): string[] {
 }
 
 /** Every relative import, transitively, that resolves outside the bundle. */
-function outOfBundleImports(fn: string): string[] {
+/**
+ * Every relative import, transitively, that would break isolated bundling:
+ * one that resolves outside the bundle, or one whose target file is missing
+ * (which also fails with "Module not found" at bundle time).
+ */
+function bundlingProblems(fn: string): string[] {
   const ownRoot = join(FUNCTIONS_ROOT, fn) + sep;
   const entries = readdirSync(join(FUNCTIONS_ROOT, fn))
     .filter((file) => file.endsWith(".ts") && !isTestOrHarness(file))
     .map((file) => join(FUNCTIONS_ROOT, fn, file));
   const seen = new Set<string>();
   const stack = [...entries];
-  const escapes = new Set<string>();
+  const problems = new Set<string>();
   while (stack.length > 0) {
     const file = stack.pop()!;
-    if (seen.has(file) || !existsSync(file)) continue;
+    if (seen.has(file)) continue;
     seen.add(file);
     const source = readFileSync(file, "utf8");
     for (const match of source.matchAll(RELATIVE_IMPORT)) {
       const target = resolve(dirname(file), match[1]!);
-      if (!target.startsWith(ownRoot) && !target.startsWith(SHARED_ROOT)) {
-        escapes.add(
-          `${relative(FUNCTIONS_ROOT, file)} -> ${relative(FUNCTIONS_ROOT, target)}`.replace(
-            /\\/g,
-            "/",
-          ),
+      const edge =
+        `${relative(FUNCTIONS_ROOT, file)} -> ${relative(FUNCTIONS_ROOT, target)}`.replace(
+          /\\/g,
+          "/",
         );
+      if (!target.startsWith(ownRoot) && !target.startsWith(SHARED_ROOT)) {
+        problems.add(`outside bundle: ${edge}`);
+      }
+      if (!existsSync(target)) {
+        problems.add(`missing target: ${edge}`);
+        continue;
       }
       stack.push(target);
     }
   }
-  return [...escapes].sort();
+  return [...problems].sort();
 }
 
 describe("edge function isolated packaging", () => {
@@ -68,9 +77,12 @@ describe("edge function isolated packaging", () => {
     expect(functionNames()).toContain("payments-webhook");
   });
 
-  it.each(functionNames())("%s imports only its own folder and _shared/", (fn) => {
-    expect(outOfBundleImports(fn)).toEqual([]);
-  });
+  it.each(functionNames())(
+    "%s imports only existing files in its own folder and _shared/",
+    (fn) => {
+      expect(bundlingProblems(fn)).toEqual([]);
+    },
+  );
 
   it("keeps the Paddle verifier in _shared with a compatibility re-export", () => {
     const shared = join(FUNCTIONS_ROOT, "_shared", "verifyPaddleSignature.ts");

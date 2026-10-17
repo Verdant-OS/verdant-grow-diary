@@ -123,12 +123,15 @@ export function resolveCanonicalPaddleSandboxToken(envText) {
 }
 
 /**
- * Read the single production Paddle client token from dotenv text.
- * Standing production gate: accepts a well-formed test_ or live_ token, because
- * the committed production token is sandbox-class until the live release
- * commits a live-class one, and both must pass the same gate. Fails closed on
- * missing, multiple, malformed, empty, or non-Paddle values — never because
- * the token is live_.
+ * Shape-only parser for the single Paddle client token in dotenv text.
+ * Accepts a well-formed test_ or live_ token (prefix + 27 letters/digits) and
+ * fails closed on missing, multiple, malformed, empty, or non-Paddle values.
+ * It does NOT decide what production may ship: the production prebuild gate
+ * (scripts/assert-paddle-production-sandbox.mjs) and the public-bundle
+ * attestation (evaluatePublicPaddleBundle) additionally refuse any token that
+ * is not live_. Callers that only report a token's class (for example the
+ * publish provenance report) use this parser; never treat its acceptance of
+ * test_ as permission for a sandbox production build.
  */
 export function resolveCanonicalPaddleProductionToken(envText) {
   const parsed = parseCanonicalPaddleClientTokenAssignment(envText);

@@ -116,7 +116,7 @@ sandbox event classified as `null` with no error raised.
 4. [ ] JWT settings deployed as pinned in config.toml
 5. [ ] All required secret NAMES present (list above)
 6. [ ] Price IDs configured for the matching Paddle environment
-7. [ ] Sandbox smoke green — see `docs/paddle-sandbox-smoke.md`: one sandbox checkout → `lovable_paddle_events` row `processed_ok=true` → `public.subscriptions` row `environment='sandbox' status='active'`; duplicate delivery → noop (23505); Founder Lifetime cap decrements; cancel-and-resubscribe leaves both rows and resolves to the newer active one
+7. [ ] **Pre-transition evidence only:** sandbox smoke recorded green before the live build — see `docs/paddle-sandbox-smoke.md` (do not reconfigure production to sandbox to rerun it; after the live release the production build refuses a `test_` token). Live validation is item 8, the per-SKU resolution and the controlled verification in "Live checkout release", with no payment submitted without approval. Recorded evidence: one sandbox checkout → `lovable_paddle_events` row `processed_ok=true` → `public.subscriptions` row `environment='sandbox' status='active'`; duplicate delivery → noop (23505); Founder Lifetime cap decrements; cancel-and-resubscribe leaves both rows and resolves to the newer active one
 8. [ ] **Live layers agree before the live build ships** — the live client
        token, `PAYMENTS_ENVIRONMENT=live`, live API key, live webhook secret
        and destination, live price IDs, and public copy all agree on live;

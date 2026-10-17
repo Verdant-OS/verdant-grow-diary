@@ -64,6 +64,9 @@ describe("public bundle Paddle token scan", () => {
     ["followed by a digit", (t: string) => `"${t}7"`],
     ["followed by _ or -", (t: string) => `"${t}_x";"${t}-x"`],
     ["preceded by a letter", (t: string) => `"x${t}"`],
+    ["preceded by a hyphen", (t: string) => `"x-${t}"`],
+    ["preceded by a dot (property access)", (t: string) => `obj.${t}`],
+    ["followed by a dot", (t: string) => `"${t}.x"`],
   ])("does not count the committed token when it is %s", (_label, wrap) => {
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: LIVE_TOKEN, bundle: wrap(LIVE_TOKEN) }),
@@ -71,5 +74,20 @@ describe("public bundle Paddle token scan", () => {
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: TEST_TOKEN, bundle: wrap(TEST_TOKEN) }),
     ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
+  });
+});
+
+describe("public bundle Paddle token scan — real bundle shapes", () => {
+  it.each([
+    ["a quoted literal", (t: string) => `const t="${t}";`],
+    [
+      "a template literal in the env object",
+      (t: string) => `{VITE_PAYMENTS_CLIENT_TOKEN:\`${t}\`}`,
+    ],
+    ["a single-quoted literal", (t: string) => `x='${t}'`],
+  ])("accepts the committed live token as %s", (_label, wrap) => {
+    expect(
+      evaluatePublicPaddleBundle({ canonicalToken: LIVE_TOKEN, bundle: wrap(LIVE_TOKEN) }),
+    ).toEqual({ ok: true });
   });
 });

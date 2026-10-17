@@ -330,7 +330,7 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
 // with `live_` (`live_confirmed`, snake_case names, shorter or longer runs)
 // are not tokens.
 const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
-  /(?:^|[^A-Za-z0-9_])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_-])/g;
+  /(?:^|[^A-Za-z0-9_.-])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_.-])/g;
 
 /**
  * Compare the bounded deployed entry bundle with the committed production
@@ -342,10 +342,14 @@ const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
  * Fixed reason codes only; token bytes never leave this function.
  */
 /**
- * True when `token` appears in `bundle` as a standalone value: not preceded by
- * a letter, digit or `_`, and not followed by a letter, digit, `_` or `-`.
- * `${token}b` or `x${token}` is a different (malformed) value, not the token.
+ * True when `token` appears in `bundle` as a standalone value: neither side
+ * touches a letter, digit, `_`, `.` or `-`. `${token}b`, `x-${token}` or
+ * `obj.${token}` is part of a different value, not the token.
  */
+// The same neighbour set on both sides: a letter, digit, `_`, `.` or `-` next to
+// the token makes it part of a larger identifier, property or slug.
+const TOKEN_NEIGHBOUR = /[A-Za-z0-9_.-]/;
+
 function bundleContainsStandaloneToken(bundle, token) {
   let from = 0;
   for (;;) {
@@ -353,7 +357,7 @@ function bundleContainsStandaloneToken(bundle, token) {
     if (at === -1) return false;
     const before = at === 0 ? "" : bundle[at - 1];
     const after = bundle[at + token.length] ?? "";
-    if (!/[A-Za-z0-9_]/.test(before) && !/[A-Za-z0-9_-]/.test(after)) return true;
+    if (!TOKEN_NEIGHBOUR.test(before) && !TOKEN_NEIGHBOUR.test(after)) return true;
     from = at + 1;
   }
 }

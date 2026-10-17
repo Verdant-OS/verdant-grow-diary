@@ -71,7 +71,6 @@ import {
 } from "@/lib/quickLogPhotoContentRules";
 import {
   claimQuickLogPhotoAttachmentRecoveryLock,
-  clearQuickLogPhotoAttachmentRecoveryLock,
   getQuickLogPhotoAttachmentRecoveryRecord,
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
@@ -123,6 +122,12 @@ interface PhotoOnlyAttempt {
   freshUpload: boolean;
 }
 const SAVE_DETAIL_HELPER = "You can add more detail later from the timeline.";
+const PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE =
+  "Could not confirm the photo attachment; it may still appear in history.";
+// Photo only needs the browser-session fence before anything is uploaded or
+// inserted. Without it, an unmount and remount could save the photo twice.
+const PHOTO_FENCE_UNAVAILABLE_MESSAGE =
+  "Verdant could not reserve this photo save in this browser, so nothing was saved. Allow site storage and try again, or add a note to save the photo with your log.";
 
 function buildTimelineNote(rawNote: string, hasPhoto: boolean, hasManualReadings: boolean): string {
   const note = rawNote.trim();
@@ -208,7 +213,7 @@ export default function PlantQuickLog({
     });
     setPhotoAttachmentUnconfirmed(recoveryLocked);
     if (recoveryLocked) {
-      setError("Could not confirm the photo attachment; it may still appear in history.");
+      setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
     }
     if (fileRef.current) fileRef.current.value = "";
     if (libraryFileRef.current) libraryFileRef.current.value = "";
@@ -232,25 +237,27 @@ export default function PlantQuickLog({
     if (!recovery?.diaryEntryId || typeof ownerId !== "string" || ownerId.trim() === "") return;
 
     let active = true;
-    void hasConfirmedQuickLogPhotoDiaryEntryForOwner(ownerId, recovery.diaryEntryId).then(
-      (confirmed) => {
-        if (!active || !confirmed) return;
-        clearQuickLogPhotoAttachmentRecoveryLock(scope);
-        setPhotoAttachmentUnconfirmed(false);
-        setError((current) =>
-          current === "Could not confirm the photo attachment; it may still appear in history."
-            ? null
-            : current,
-        );
-        dispatchQuickLogV2EntryCreated({
-          createdAt: new Date().toISOString(),
-          growEventId: null,
-          source: "quick_log_v2",
-          activityId: "photo",
-        });
-        trackQuickLogSuccess("photo", { reused: false });
-      },
-    );
+    const entryId = recovery.diaryEntryId;
+    void hasConfirmedQuickLogPhotoDiaryEntryForOwner(ownerId, entryId).then((confirmed) => {
+      if (!active || !confirmed) return;
+      // Release only this exact attempt. If the original save's own response
+      // already released it, that path announced the row; never announce twice,
+      // and never clear a different attempt's claim.
+      const releasedHere = releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
+      const stillLocked = hasQuickLogPhotoAttachmentRecoveryLock(scope);
+      setPhotoAttachmentUnconfirmed(stillLocked);
+      if (!stillLocked) {
+        setError((current) => (current === PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE ? null : current));
+      }
+      if (!releasedHere) return;
+      dispatchQuickLogV2EntryCreated({
+        createdAt: new Date().toISOString(),
+        growEventId: null,
+        source: "quick_log_v2",
+        activityId: "photo",
+      });
+      trackQuickLogSuccess("photo", { reused: false });
+    });
     return () => {
       active = false;
     };
@@ -495,10 +502,42 @@ export default function PlantQuickLog({
     // A later rejection cannot disprove an earlier uncertain commit.
     let cleanupAllowed = !retry && !retainedPhotoOnly;
     let saveConfirmed = false;
+    const photoOnlyScope =
+      photoOnly && user ? { ownerId: user.id, growId, tentId: tentId ?? null, plantId } : null;
+    // Set once this attempt holds the session fence before its upload. Until
+    // the insert starts, no diary row can exist for this id, so a stop before
+    // then releases the claim (persistPhotoOnlyEntry owns it after that).
+    let photoOnlyEarlyClaim = false;
+    let photoOnlyInsertStarted = false;
+    const releaseEarlyPhotoOnlyClaim = () => {
+      if (!photoOnlyEarlyClaim || photoOnlyInsertStarted || !photoOnlyScope || !photoOnlyEntryId) {
+        return;
+      }
+      photoOnlyEarlyClaim = false;
+      releaseQuickLogPhotoAttachmentRecoveryLockForEntry(photoOnlyScope, photoOnlyEntryId);
+    };
     try {
       if (photoOnly && !photoOnlyEntryId) {
         setError("Verdant could not prepare a safe photo attachment. Refresh and try again.");
         return;
+      }
+      if (photoOnlyScope && photoOnlyEntryId && !retry && !retainedPhotoOnly) {
+        // Claim the exact scope and id BEFORE uploading, so a sheet remounted
+        // for the same plant mid-upload finds the fence and cannot start a
+        // second upload or insert, however the two attempts interleave.
+        const claim = claimQuickLogPhotoAttachmentRecoveryLock(photoOnlyScope, photoOnlyEntryId);
+        if (claim === "held_by_other") {
+          if (!canContinue()) return;
+          setPhotoAttachmentUnconfirmed(true);
+          setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
+          return;
+        }
+        if (claim !== "claimed") {
+          if (!canContinue()) return;
+          setError(PHOTO_FENCE_UNAVAILABLE_MESSAGE);
+          return;
+        }
+        photoOnlyEarlyClaim = true;
       }
       if (photoFile && user && !retry && !retainedPhotoOnly) {
         const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
@@ -510,6 +549,7 @@ export default function PlantQuickLog({
             upsert: false,
           });
         if (upErr) {
+          releaseEarlyPhotoOnlyClaim();
           if (canContinue()) {
             console.error("PlantQuickLog photo upload failed", upErr);
             setError(
@@ -525,6 +565,7 @@ export default function PlantQuickLog({
       if (uploadedPath && user && photoFile && photoOnly && photoOnlyEntryId) {
         const freshUpload = cleanupAllowed;
         cleanupAllowed = false;
+        photoOnlyInsertStarted = true;
         await persistPhotoOnlyEntry(
           {
             scope: { ownerId: user.id, growId, tentId: tentId ?? null, plantId },
@@ -686,6 +727,9 @@ export default function PlantQuickLog({
           : `${failure.message} ${failure.recovery}`,
       );
     } finally {
+      // Any stop before the insert (an upload that throws included) leaves no
+      // diary row for this id. A no-op once persistPhotoOnlyEntry owns the claim.
+      releaseEarlyPhotoOnlyClaim();
       if (canContinue()) {
         saveInFlightRef.current = false;
         setBusy(false);
@@ -710,11 +754,13 @@ export default function PlantQuickLog({
     // Claim the exact scope and id BEFORE awaiting the insert. A sheet that
     // unmounts and remounts for the same plant while this insert is pending
     // then finds the fence and cannot upload or insert a second id.
+    // Normally this attempt already holds the claim from before its upload; the
+    // call then confirms it. Insert only under a durable claim: `unavailable`
+    // (storage could not persist the fence) must not fall through.
     const claim = claimQuickLogPhotoAttachmentRecoveryLock(scope, entryId);
-    if (claim === "held_by_other") {
-      // Another attempt for this exact target is pending or unconfirmed.
-      // Never insert a second id; an object this attempt just uploaded is
-      // referenced by nothing, so it alone may be removed.
+    if (claim !== "claimed") {
+      // Never insert without the fence. An object this attempt just uploaded
+      // is referenced by nothing, so it alone may be removed.
       if (attempt.freshUpload) {
         await supabase.storage
           .from("diary-photos")
@@ -722,8 +768,13 @@ export default function PlantQuickLog({
           .catch(() => {});
       }
       if (!canContinue()) return;
-      setPhotoAttachmentUnconfirmed(true);
-      setError("Could not confirm the photo attachment; it may still appear in history.");
+      if (claim === "held_by_other") {
+        // Another attempt for this exact target is pending or unconfirmed.
+        setPhotoAttachmentUnconfirmed(true);
+        setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
+      } else {
+        setError(PHOTO_FENCE_UNAVAILABLE_MESSAGE);
+      }
       return;
     }
     let entryResult: Awaited<ReturnType<typeof createQuickLogPhotoDiaryEntry>>;
@@ -740,7 +791,7 @@ export default function PlantQuickLog({
         entryId,
       });
     } catch {
-      retainUnconfirmed("Could not confirm the photo attachment; it may still appear in history.");
+      retainUnconfirmed(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
       return;
     }
     if (!entryResult.ok) {
@@ -767,7 +818,7 @@ export default function PlantQuickLog({
     // it already sent the success telemetry and entry-created signal; do not
     // send them a second time for the same row.
     const releasedHere = releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
-    const alreadyAnnounced = claim === "claimed" && !releasedHere;
+    const alreadyAnnounced = !releasedHere;
     try {
       if (!alreadyAnnounced) trackQuickLogSuccess("photo", { reused: false });
       rememberRecentQuickLogTarget(

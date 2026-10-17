@@ -29,6 +29,8 @@ const state: {
   deferUploads: boolean;
   removedPaths: string[];
   readableRowId: string | null;
+  deferLookups: boolean;
+  lookupGates: Array<() => void>;
 } = {
   insertCalls: [],
   insertGates: [],
@@ -37,6 +39,8 @@ const state: {
   deferUploads: false,
   removedPaths: [],
   readableRowId: null,
+  deferLookups: false,
+  lookupGates: [],
 };
 
 const { trackMock } = vi.hoisted(() => ({ trackMock: vi.fn() }));
@@ -88,15 +92,22 @@ vi.mock("@/integrations/supabase/client", () => ({
             filters[column] = value;
             return chain;
           },
-          maybeSingle: async () => ({
-            data:
-              state.readableRowId !== null &&
-              filters.id === state.readableRowId &&
-              filters.user_id === "user-test-1"
-                ? { id: state.readableRowId }
-                : null,
-            error: null,
-          }),
+          maybeSingle: async () => {
+            if (state.deferLookups) {
+              await new Promise<void>((resolve) => {
+                state.lookupGates.push(resolve);
+              });
+            }
+            return {
+              data:
+                state.readableRowId !== null &&
+                filters.id === state.readableRowId &&
+                filters.user_id === "user-test-1"
+                  ? { id: state.readableRowId }
+                  : null,
+              error: null,
+            };
+          },
         };
         return chain;
       },
@@ -195,6 +206,8 @@ beforeEach(() => {
   state.deferUploads = false;
   state.removedPaths = [];
   state.readableRowId = null;
+  state.deferLookups = false;
+  state.lookupGates = [];
   trackMock.mockClear();
   entryCreatedEvents = [];
   window.addEventListener("verdant:entry-created", onEntryCreated);
@@ -210,6 +223,7 @@ beforeEach(() => {
 
 afterEach(() => {
   window.removeEventListener("verdant:entry-created", onEntryCreated);
+  vi.restoreAllMocks();
 });
 
 describe("Photo only claims its exact scope and id before awaiting the insert", () => {
@@ -300,35 +314,122 @@ describe("Photo only claims its exact scope and id before awaiting the insert", 
     expect(trackMock).toHaveBeenCalledTimes(1);
   });
 
-  it("never inserts a second id when two uploads race and the first attempt claims the scope", async () => {
+  // Codex P1-1 on #2196 at 27aeff639: the claim used to start only after the
+  // upload. A remount during the first upload could start a second upload,
+  // and if the first attempt finished (upload, insert, release) before the
+  // second upload settled, the second claimed an empty scope and inserted.
+  it("claims the scope before uploading, so a remount mid-upload cannot start a second attempt", async () => {
     state.deferUploads = true;
     const view = render(sheet());
     await choosePhotoOnly();
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
     await waitFor(() => expect(state.uploadGates).toHaveLength(1));
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(true);
     view.unmount();
 
     render(sheet());
     await settle();
     await choosePhotoOnly();
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
-    await waitFor(() => expect(state.uploadGates).toHaveLength(2));
+    await settle();
 
+    // The first attempt finishes completely before anything else settles.
     await act(async () => {
       state.uploadGates[0]?.({ data: { path: state.uploadPaths[0] }, error: null });
     });
     await waitFor(() => expect(state.insertCalls).toHaveLength(1));
-    const firstId = state.insertCalls[0]?.id;
+    await act(async () => {
+      state.insertGates[0]?.({ data: null, error: null });
+    });
+    await settle();
+    for (const gate of state.uploadGates.slice(1)) {
+      await act(async () => {
+        gate({ data: { path: "late" }, error: null });
+      });
+    }
+    await settle();
+
+    expect(state.uploadPaths).toHaveLength(1);
+    expect(state.insertCalls).toHaveLength(1);
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(false);
+    expect(entryCreatedEvents).toHaveLength(1);
+    expect(trackMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the early claim when the upload definitively fails, without inserting", async () => {
+    state.deferUploads = true;
+    render(sheet());
+    await choosePhotoOnly();
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+    await waitFor(() => expect(state.uploadGates).toHaveLength(1));
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(true);
 
     await act(async () => {
-      state.uploadGates[1]?.({ data: { path: state.uploadPaths[1] }, error: null });
+      state.uploadGates[0]?.({ data: null, error: { message: "network" } });
+    });
+    await settle();
+
+    expect(state.insertCalls).toHaveLength(0);
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(false);
+    expect(screen.getByText(/could not upload the photo, so nothing was saved/i)).toBeTruthy();
+  });
+
+  // Codex P1-2 on #2196 at 27aeff639: an `unavailable` claim (browser storage
+  // cannot persist the fence) used to fall through to the diary insert.
+  it.each([
+    ["setItem throws", "setItem"],
+    ["getItem throws", "getItem"],
+  ] as const)(
+    "fails closed with no upload or insert when the session fence is unavailable (%s)",
+    async (_label, method) => {
+      vi.spyOn(Storage.prototype, method).mockImplementation(() => {
+        throw new Error("QuotaExceededError");
+      });
+
+      const view = render(sheet());
+      await choosePhotoOnly();
+      fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+      await settle();
+      view.unmount();
+
+      render(sheet());
+      await settle();
+      await choosePhotoOnly();
+      fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+      await settle();
+
+      expect(state.uploadPaths).toHaveLength(0);
+      expect(state.insertCalls).toHaveLength(0);
+      expect(entryCreatedEvents).toHaveLength(0);
+      expect(screen.getByText(/could not reserve this photo save/i)).toBeTruthy();
+    },
+  );
+
+  // Codex P1-3 on #2196 at 27aeff639: when the first insert's own response
+  // arrived before the remount's exact-row lookup, both paths announced.
+  it("announces once when the insert response wins over the remount reconciliation", async () => {
+    const firstId = await startFirstAttemptAndUnmount();
+    state.readableRowId = firstId;
+    state.deferLookups = true;
+    render(sheet());
+    await waitFor(() => expect(state.lookupGates).toHaveLength(1));
+
+    await act(async () => {
+      state.insertGates[0]?.({ data: null, error: null });
+    });
+    await settle();
+    expect(entryCreatedEvents).toHaveLength(1);
+
+    await act(async () => {
+      state.lookupGates[0]?.();
     });
     await settle();
 
     expect(state.insertCalls).toHaveLength(1);
-    expect(getQuickLogPhotoAttachmentRecoveryRecord(SCOPE)?.diaryEntryId).toBe(firstId);
-    // The second object was never referenced by any insert, so it is removed.
-    expect(state.removedPaths).toEqual([state.uploadPaths[1]]);
-    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(false);
+    expect(entryCreatedEvents).toHaveLength(1);
+    expect(trackMock).toHaveBeenCalledTimes(1);
+    // The confirmed row unlocks the remounted sheet.
+    expect(screen.queryByText(/could not confirm the photo attachment/i)).toBeNull();
   });
 });

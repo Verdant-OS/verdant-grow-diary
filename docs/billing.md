@@ -37,15 +37,33 @@ all laws applicable to cultivation in their own jurisdiction.
 
 ## Plans
 
-| Plan             | Price           | Cadence  | Slug               |
-| ---------------- | --------------- | -------- | ------------------ |
-| Pro Monthly      | $12             | / month  | `pro-monthly`      |
-| Pro Annual       | $99             | / year   | `pro-annual`       |
-| Founder Lifetime | $129 (one-time) | one-time | `founder-lifetime` |
+What the pricing page sells, from `src/constants/pricing.ts` (amounts) and
+`get-paddle-price` (the seven SKUs it resolves):
 
-Founder Lifetime is limited to the first 100 buyers. Founder Lifetime includes
-100 AI Doctor credits per month; additional credit packs are planned later but
-are not live yet.
+| Plan / pack        | Price           | Cadence  | Checkout SKU       |
+| ------------------ | --------------- | -------- | ------------------ |
+| Pro Monthly        | $12             | / month  | `pro_monthly`      |
+| Pro Annual         | $99             | / year   | `pro_annual`       |
+| Craft Monthly      | $29             | / month  | `craft_monthly`    |
+| Craft Annual       | $249            | / year   | `craft_annual`     |
+| Founder Lifetime   | $129 (one-time) | one-time | `founder_lifetime` |
+| AI credit pack 50  | $9 (one-time)   | one-time | `credit_pack_50`   |
+| AI credit pack 150 | $19 (one-time)  | one-time | `credit_pack_150`  |
+
+Included AI Doctor credits: Free 3 per grow; Pro and Founder 100 per month;
+Craft 300 per month. Founder Lifetime is a limited early-supporter offer.
+Credit packs are one-time top-ups for Pro, Craft and Founder members with an
+active monthly plan; they never expire and are spent only after the monthly
+allowance.
+
+Deliberate unavailable cases at launch. Each must show a calm, scoped block,
+never a page-wide one (see [Live checkout release sequence](#live-checkout-release-sequence)):
+
+- **Craft** has no live Paddle product today, so `get-paddle-price` returns
+  `price_not_configured` and only the Craft buttons show "Checkout unavailable".
+- **Founder Lifetime** returns `plan_sold_out` once the cap is reached.
+- **Credit packs** return `pack_requires_monthly_plan` for a grower without an
+  active monthly plan, which blocks both packs and leaves subscriptions open.
 
 ## Configuration
 

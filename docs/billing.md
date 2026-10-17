@@ -75,18 +75,22 @@ live-class (`live_`) production token; the prebuild gate requires the bundled
 token to equal it. Client resolution:
 
 - `test_` → sandbox on every host.
-- `live_` → live only on `verdantgrowdiary.com` / `www.verdantgrowdiary.com`;
-  unavailable on every other host.
-- Missing or malformed → unavailable everywhere.
+- `live_` plus exactly 27 letters/digits (Paddle's documented client-token
+  shape) → live only on `verdantgrowdiary.com` / `www.verdantgrowdiary.com`;
+  unavailable on every other host. The production prebuild gate requires the
+  same shape.
+- Missing or malformed (including any other `live_` value, such as
+  `live_invalid`) → unavailable everywhere, and a malformed `live_` value fails
+  the production build.
 - `VITE_CHECKOUT_DISABLED="true"` (exact string) → unavailable everywhere,
   including production, with paused copy. This is the rollback switch; see
   [Live checkout rollback](#live-checkout-rollback).
 
 Paddle.js is initialized with `Environment.set("production")` for live and
 `Environment.set("sandbox")` for sandbox. Entitlement reads always read live
-rows; sandbox rows are read only for a `test_` token. Classify tokens by
-prefix only and never print or copy their values into logs, tickets, or review
-comments. A publishable client token is public by design, but it still goes
+rows; sandbox rows are read only for a `test_` token. Check a token by its
+prefix and shape only, never by printing it: never copy a value into logs,
+tickets, or review comments. A publishable client token is public by design, but it still goes
 only in `.env.production`, never in a review comment.
 
 Legacy BYO client env vars (`VITE_PADDLE_ENVIRONMENT`,

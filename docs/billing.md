@@ -268,9 +268,21 @@ rollback, any visitor on the production hostname can open live checkout.
 
 ## Live checkout rollback
 
-The rollback artifact is a pre-built, pre-verified client build: the live
-checkout code with `VITE_CHECKOUT_DISABLED="true"` added to `.env.production`
-next to the unchanged live token. On every host, including the production
+The rollback artifact is a **pinned commit**, not a working-tree edit. The
+prebuild step (`restore-env-production-from-head.mjs`) resets
+`.env.production` to `HEAD` before every build, so an uncommitted switch is
+silently discarded. Build it like this:
+
+1. Start from the exact release commit (the #2230 merge on
+   `verdant-grow-diary`).
+2. Add one commit, on a branch that is never merged, that only appends
+   `VITE_CHECKOUT_DISABLED="true"` to `.env.production`, next to the unchanged
+   live token.
+3. Build that commit with the normal `bun run build` (prebuild included) and
+   record its SHA as the rollback SHA.
+4. Verify that exact SHA (below).
+
+On every host, including the production
 hostname, it resolves checkout to unavailable before Paddle.js loads, before
 any price lookup, and before any redirect. `/pricing` and the payments banner
 show "Checkout paused". It does not touch tokens, secrets, entitlement reads,

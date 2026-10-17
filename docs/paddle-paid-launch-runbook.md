@@ -74,13 +74,18 @@ Apply in timestamp order via the Lovable/Supabase migration path for
 
 ## Checkout metadata contract (attribution)
 
-The BYO webhook attributes buyers ONLY from checkout `custom_data`. The
-sandbox checkout (`src/hooks/usePaddleCheckout.ts`) sends
-`customData: { userId }`,
-and the webhook accepts `verdant_user_id`, `user_id`, `userId`,
-`auth_user_id`, or `verdant_auth_user_id`. If the checkout payload shape ever
-changes, update the webhook's extraction list in the SAME change — a mismatch
-records paid events with `missing_user_id` and grants no entitlement.
+**Canonical lane (`payments-webhook`, live and sandbox).** Checkout
+(`src/hooks/usePaddleCheckout.ts`) sends `customData: { userId }`. After
+signature verification, `payments-webhook` normalizes Paddle's raw
+`custom_data` (#2221), and `eventProcessor.ts` attributes subscriptions, Founder
+Lifetime and credit packs ONLY from `customData.userId`. A missing value records
+the event as `missing_user_id` and grants no entitlement. If the checkout
+payload shape ever changes, update `eventProcessor.ts` in the SAME change.
+
+**Legacy BYO audit sink (`paddle-webhook`, sandbox-only).** It also accepts the
+aliases `verdant_user_id`, `user_id`, `userId`, `auth_user_id` and
+`verdant_auth_user_id`, and grants nothing. Live attribution is verified on
+`payments-webhook`, never here.
 
 ## Required configuration (presence only — never echo values)
 
@@ -183,8 +188,21 @@ must fail closed.
 
 ### Live checkout rollback
 
-The rollback artifact is the #2230 code with `VITE_CHECKOUT_DISABLED="true"`
-added to `.env.production` next to the unchanged live token. It makes checkout
+The rollback artifact is a **pinned commit**, not a working-tree edit. The
+prebuild step (`restore-env-production-from-head.mjs`) resets
+`.env.production` to `HEAD` before every build, so an uncommitted switch is
+silently discarded. Build it like this:
+
+1. Start from the exact release commit (the #2230 merge on
+   `verdant-grow-diary`).
+2. Add one commit, on a branch that is never merged, that only appends
+   `VITE_CHECKOUT_DISABLED="true"` to `.env.production`, next to the unchanged
+   live token.
+3. Build that commit with the normal `bun run build` (prebuild included) and
+   record its SHA as the rollback SHA.
+4. Verify that exact SHA (below).
+
+It makes checkout
 unavailable on every host, including the production hostname, before Paddle.js
 loads or any price lookup runs, and shows "Checkout paused". It changes no
 token, secret, entitlement read, webhook or portal path, so existing live

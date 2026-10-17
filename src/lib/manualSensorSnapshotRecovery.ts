@@ -2,7 +2,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingInsert, SensorReadingRow } from "@/lib/db";
 import { matchesManualSensorPayload } from "@/lib/manualSensorProvenanceRules";
 
-type ManualSnapshotStoredRow = Omit<SensorReadingRow, "created_at">;
+type ManualSnapshotStoredRow = Pick<
+  SensorReadingRow,
+  "id" | "user_id" | "tent_id" | "source" | "metric" | "value" | "ts" | "captured_at" | "quality" | "device_id" | "raw_payload"
+>;
 
 function sameInstant(a: unknown, b: unknown): boolean {
   if (typeof a !== "string" || typeof b !== "string") return false;

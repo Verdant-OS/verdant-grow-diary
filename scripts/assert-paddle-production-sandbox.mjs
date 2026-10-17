@@ -85,7 +85,8 @@ async function loadEffectiveProductionEnv(rootDir) {
 
 /**
  * Standing production client-token gate: verify the committed production
- * source and the exact value Vite will bundle. Accepts test_ or live_.
+ * source and the exact value Vite will bundle. The committed token must be a
+ * well-formed live_ token (prefix + 27 letters/digits); test_ is refused.
  * Results contain fixed codes only; token bytes never leave locals.
  */
 async function verifyPaddleProductionClientToken(rootDir = process.cwd()) {
@@ -94,6 +95,9 @@ async function verifyPaddleProductionClientToken(rootDir = process.cwd()) {
 
   const canonical = resolveCanonicalPaddleProductionToken(rawEnv.text);
   if (!canonical.ok) return fixedFailure(canonical.reason);
+  // Production ships live checkout: a well-formed sandbox token is refused, so
+  // a later commit cannot quietly restore sandbox checkout in production.
+  if (!canonical.token.startsWith("live_")) return fixedFailure("canonical_paddle_token_not_live");
 
   const effectiveEnv = await loadEffectiveProductionEnv(rootDir);
   if (!effectiveEnv.ok) return effectiveEnv;

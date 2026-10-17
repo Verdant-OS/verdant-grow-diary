@@ -81,11 +81,6 @@ const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9]{27}$/;
 // A production client token must have Paddle's documented shape: `test_` or
 // `live_` plus exactly 27 letters/digits. A malformed value fails the gate.
 const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_|live_)[A-Za-z0-9]{27}$/;
-// Bundle scans match only Paddle's exact live client-token shape: a standalone
-// `live_` plus exactly 27 letters/digits. Ordinary app identifiers that start
-// with `live_` (`live_confirmed`, snake_case names, shorter or longer runs)
-// are not tokens.
-const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9]{27}(?![A-Za-z0-9_-])/;
 
 /**
  * Parse the single VITE_PAYMENTS_CLIENT_TOKEN assignment from dotenv text.
@@ -327,14 +322,20 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
   }
 }
 
+// Bundle scans match only Paddle's exact live client-token shape: a standalone
+// `live_` plus exactly 27 letters/digits. Ordinary app identifiers that start
+// with `live_` (`live_confirmed`, snake_case names, shorter or longer runs)
+// are not tokens.
 const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
   /(?:^|[^A-Za-z0-9_])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_-])/g;
 
 /**
  * Compare the bounded deployed entry bundle with the committed production
  * token. The bundle must carry exactly the committed token bytes:
- * - committed `test_` token: any `live_` token in the bundle fails;
- * - committed `live_` token: any OTHER `live_` token in the bundle fails.
+ * - committed `test_` token: refused (`public_paddle_canonical_not_live`);
+ *   production ships live checkout;
+ * - committed `live_` token: any OTHER `live_` token in the bundle fails, and
+ *   the committed token must appear as a standalone value.
  * Fixed reason codes only; token bytes never leave this function.
  */
 /**
@@ -362,14 +363,10 @@ export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
   ) {
     return { ok: false, reason: "public_paddle_contract_invalid" };
   }
-  if (PADDLE_SANDBOX_TOKEN_PATTERN.test(canonicalToken)) {
-    if (PADDLE_LIVE_TOKEN_PATTERN.test(bundle)) {
-      return { ok: false, reason: "public_paddle_live_token_present" };
-    }
-    if (!bundleContainsStandaloneToken(bundle, canonicalToken)) {
-      return { ok: false, reason: "public_paddle_sandbox_token_missing" };
-    }
-    return { ok: true };
+  // Production ships live checkout: a sandbox canonical token is refused, so
+  // the smoke cannot pass a production that reopened sandbox checkout.
+  if (!canonicalToken.startsWith("live_")) {
+    return { ok: false, reason: "public_paddle_canonical_not_live" };
   }
   let foundCanonical = false;
   for (const match of bundle.matchAll(PADDLE_LIVE_TOKEN_GLOBAL_PATTERN)) {

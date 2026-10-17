@@ -41,13 +41,13 @@ describe("public bundle Paddle token scan", () => {
     ).toEqual({ ok: false, reason: "public_paddle_live_token_mismatch" });
   });
 
-  it("keeps a sandbox build green next to ordinary live_ app identifiers", () => {
+  it("refuses a sandbox committed token: production ships live checkout", () => {
     expect(
       evaluatePublicPaddleBundle({
         canonicalToken: TEST_TOKEN,
         bundle: `${APP_IDENTIFIERS};"${TEST_TOKEN}"`,
       }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
   });
 
   it("still fails a sandbox build that carries a token-shaped live_ value", () => {
@@ -56,7 +56,7 @@ describe("public bundle Paddle token scan", () => {
         canonicalToken: TEST_TOKEN,
         bundle: `"${TEST_TOKEN}";"${OTHER_LIVE_TOKEN}"`,
       }),
-    ).toEqual({ ok: false, reason: "public_paddle_live_token_present" });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
   });
 
   it.each([
@@ -70,6 +70,6 @@ describe("public bundle Paddle token scan", () => {
     ).toEqual({ ok: false, reason: "public_paddle_live_token_missing" });
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: TEST_TOKEN, bundle: wrap(TEST_TOKEN) }),
-    ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_missing" });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
   });
 });

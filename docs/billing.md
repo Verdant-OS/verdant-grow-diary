@@ -72,7 +72,9 @@ never a page-wide one (see [Live checkout release sequence](#live-checkout-relea
 The **canonical** client env var is `VITE_PAYMENTS_CLIENT_TOKEN` (Lovable
 built-in Paddle integration). The committed `.env.production` carries the
 live-class (`live_`) production token; the prebuild gate requires the bundled
-token to equal it. Client resolution:
+token to equal it and refuses a sandbox (`test_`) token, and the production
+smoke refuses a sandbox committed token, so a later commit cannot quietly
+restore sandbox checkout in production. Client resolution:
 
 Paddle's documented client-token shape is the prefix plus exactly 27
 letters/digits. The runtime and the production prebuild gate both require it.

@@ -87,12 +87,14 @@ describe("Paddle client-token shape", () => {
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: VALID_LIVE, bundle: "no token here" }),
     ).toEqual({ ok: false, reason: "public_paddle_live_token_missing" });
+    // Production ships live checkout: a well-formed sandbox committed token is
+    // refused by the attestation, whatever the bundle carries.
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: VALID_TEST, bundle: `"${VALID_TEST}"` }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: VALID_TEST, bundle: "no token here" }),
-    ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_missing" });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: `live_${"a".repeat(26)}`, bundle: VALID_LIVE }),
     ).toEqual({ ok: false, reason: "public_paddle_contract_invalid" });

@@ -442,13 +442,13 @@ describe("temporary authenticated One-Tent Actions lane", () => {
         canonicalToken: sandboxToken,
         bundle: `${sandboxToken} ${liveOverride}`,
       }),
-    ).toEqual({ ok: false, reason: "public_paddle_live_token_present" });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
     expect(
       evaluatePublicPaddleBundle({
         canonicalToken: sandboxToken,
         bundle: "paddle sandbox bundle without committed credential bytes",
       }),
-    ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_missing" });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
 
     expect(
       evaluateBoundedPublicAssetResponseMetadata({
@@ -496,7 +496,7 @@ describe("temporary authenticated One-Tent Actions lane", () => {
         canonicalToken: sandboxToken,
         bundle: `public bundle ${sandboxToken}`,
       }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
   });
 
   it("accepts exactly the committed live production token and rejects other live bytes", () => {

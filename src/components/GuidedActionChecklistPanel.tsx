@@ -9,6 +9,8 @@
  * with a 12h TTL so a genuine gap eventually resurfaces.
  */
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/store/auth";
 import { Link } from "@/lib/react-router-compat";
 import {
   AlertTriangle,
@@ -39,6 +41,7 @@ import {
   buildGuidedActionChecklist,
   type GuidedActionItem,
   type GuidedActionItemKind,
+  type GuidedChecklistGrowEvent,
 } from "@/lib/guidedActionChecklistRules";
 import { dismissItem, readActiveDismissals } from "@/lib/guidedActionChecklistDismissals";
 import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
@@ -62,6 +65,40 @@ const KIND_LABEL: Record<GuidedActionItemKind, string> = {
   stage_transition: "Stage",
 };
 
+const CHECKLIST_FEEDING_EVENT_TYPES = ["watering", "feeding"] as const;
+
+/**
+ * Grow-scoped grow_events read. The query filters grow_id, is_deleted = false,
+ * and event_type in watering or feeding. It does not filter user_id.
+ * RLS limits a non-operator to rows where auth.uid() = user_id. An operator
+ * matches "Operators view all grow_events", so this read is not owner-scoped.
+ * A failed or empty read returns no events, so a gap stays visible instead
+ * of being treated as a recent feeding.
+ */
+async function readChecklistGrowFeedingEvents(growId: string): Promise<GuidedChecklistGrowEvent[]> {
+  const { data, error } = await supabase
+    .from("grow_events")
+    .select("id, event_type, plant_id, tent_id, occurred_at")
+    .eq("grow_id", growId)
+    .eq("is_deleted", false)
+    .in("event_type", [...CHECKLIST_FEEDING_EVENT_TYPES])
+    .order("occurred_at", { ascending: false })
+    .limit(200);
+  if (error || !data) return [];
+  const events: GuidedChecklistGrowEvent[] = [];
+  for (const row of data) {
+    if (!row.id) continue;
+    events.push({
+      id: row.id,
+      eventType: row.event_type,
+      plantId: row.plant_id,
+      tentId: row.tent_id,
+      occurredAt: row.occurred_at,
+    });
+  }
+  return events;
+}
+
 function priorityTone(priority: GuidedActionItem["priority"]): string {
   switch (priority) {
     case 1:
@@ -76,6 +113,9 @@ function priorityTone(priority: GuidedActionItem["priority"]): string {
 }
 
 export default function GuidedActionChecklistPanel({ scopedGrowId, className }: Props) {
+  const ownerId = useAuth().user?.id ?? null;
+  const [growEvents, setGrowEvents] = useState<readonly GuidedChecklistGrowEvent[]>([]);
+  const [feedingReadNonce, setFeedingReadNonce] = useState(0);
   const plantsQuery = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const tentsQuery = useGrowTents(scopedGrowId ?? undefined);
   const diaryQuery = useDiaryEntries();
@@ -102,6 +142,24 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
 
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const now = useNowTick();
+  useEffect(() => {
+    if (!scopedGrowId || !ownerId) {
+      setGrowEvents([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await readChecklistGrowFeedingEvents(scopedGrowId);
+        if (!cancelled) setGrowEvents(rows);
+      } catch {
+        if (!cancelled) setGrowEvents([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scopedGrowId, ownerId, feedingReadNonce]);
   const readState = resolveGuidedChecklistReadState(
     [plantsQuery, tentsQuery, diaryQuery, readingsQuery],
     alertsQuery.status,
@@ -156,6 +214,7 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
       plants,
       tents,
       diaryEntries: growDiary,
+      growEvents,
       latestReadingByTent,
       openAlerts,
       dismissedIds,
@@ -167,6 +226,7 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
     plantsQuery.data,
     tentsQuery.data,
     diaryQuery.data,
+    growEvents,
     readingsQuery.data,
     alertsQuery.alerts,
     dismissedIds,
@@ -185,6 +245,7 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
       readingsQuery.refetch(),
       Promise.resolve(alertsQuery.reload()),
     ]);
+    setFeedingReadNonce((nonce) => nonce + 1);
   };
 
   if (!scopedGrowId) return null;

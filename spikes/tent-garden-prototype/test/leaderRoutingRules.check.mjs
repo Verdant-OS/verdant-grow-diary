@@ -40,6 +40,12 @@ function drawnLeader(l) {
   return { p: { x: l.x + l.w / 2, y: l.y + l.h }, q: { x: l.bx, y: l.by } };
 }
 
+/** Proper crossing of two segments (independent of the implementation). */
+function cross(a1, a2, b1, b2) {
+  const side = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+  return side(b1, b2, a1) * side(b1, b2, a2) < 0 && side(a1, a2, b1) * side(a1, a2, b2) < 0;
+}
+
 function onBorder(pt, r, tol = 0.75) {
   const inX = pt.x >= r.x - tol && pt.x <= r.x + r.w + tol;
   const inY = pt.y >= r.y - tol && pt.y <= r.y + r.h + tol;
@@ -272,6 +278,7 @@ test("a plant's label is hidden only when no chip position anywhere in view is f
           const pot = { x: it.bx, y: it.by };
           if (shown.some((s) => crossesInterior(c, pot, s, -2))) continue;
           if (o.avoid.some((a) => crossesInterior(c, pot, a, -2))) continue;
+          if (leaders.some(({ p, q }) => cross(c, pot, p, q))) continue;
           wasted.push(`seed ${seed}: ${it.id} hidden, but a chip fits at ${x},${y}`);
           break outer;
         }
@@ -280,6 +287,40 @@ test("a plant's label is hidden only when no chip position anywhere in view is f
   }
   assert.ok(hiddenTotal > 0, "scenes must still exercise hiding");
   assert.deepEqual(wasted.slice(0, 6), [], `${wasted.length} labels hidden despite free space`);
+});
+
+test("no two leader lines cross, so each card clearly points at one pot", () => {
+  const problems = [];
+  let pairs = 0;
+  let allowed = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    const { items, opts } = scene(seed);
+    for (const it of items) {
+      it.tx = it.bx + 3;
+      it.ty = it.by + 14;
+    }
+    for (const o of [opts, { ...opts, inset: 8 }]) {
+      const ls = layoutLabels(items, o).filter((l) => !l.hidden && l.leader);
+      for (let i = 0; i < ls.length; i++)
+        for (let j = i + 1; j < ls.length; j++) {
+          pairs++;
+          const a = drawnLeader(ls[i]);
+          const b = drawnLeader(ls[j]);
+          if (!cross(a.p, a.q, b.p, b.q)) continue;
+          // Allowed only as the last resort for a covered pot, and then flagged.
+          const flagged = [ls[i], ls[j]].find((l) => l.crossesLeader);
+          const coveredPot = flagged && items.find((it) => it.id === flagged.id)?.occluded;
+          if (coveredPot) {
+            allowed++;
+            continue;
+          }
+          problems.push(`seed ${seed}: ${ls[i].id} × ${ls[j].id}`);
+        }
+    }
+  }
+  assert.ok(pairs >= 100, `scenes must exercise leader pairs (got ${pairs})`);
+  assert.deepEqual(problems.slice(0, 6), [], `${problems.length} crossing leader pairs`);
+  assert.ok(allowed <= 3, `last-resort crossings for covered pots stay rare (got ${allowed})`);
 });
 
 test("inset defaults to 0: callers that omit it keep the old edge behaviour", () => {

@@ -43,6 +43,16 @@ export function leaderStart(r, target) {
   return { x: cx + dx * t, y: cy + dy * t };
 }
 
+/** Do segments a1→a2 and b1→b2 cross at a point strictly inside both? (Touching ends do not.) */
+export function segmentsCross(a1, a2, b1, b2) {
+  const o = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const d1 = o(b1, b2, a1);
+  const d2 = o(b1, b2, a2);
+  const d3 = o(a1, a2, b1);
+  const d4 = o(a1, a2, b2);
+  return d1 * d2 < 0 && d3 * d4 < 0;
+}
+
 /** Does segment p→q touch rect r grown by `pad`? Liang–Barsky clip. */
 export function segmentHitsRect(p, q, r, pad = 0) {
   const x0 = r.x - pad;
@@ -270,11 +280,13 @@ function placeOnce(items, opts) {
       const start = leaderStart(r, pot);
       return { leader: true, seg: start ? { p: start, q: endFor(start) } : null };
     };
-    const routeClear = (r, seg) =>
+    const routeClear = (r, seg, allowLeaderCross = false) =>
       !segs.some((s) => segmentHitsRect(s.p, s.q, r, LEADER_GAP)) &&
       (!seg ||
         (!placed.some((o) => segmentHitsRect(seg.p, seg.q, o, LEADER_GAP)) &&
-          !avoid.some((a) => segmentHitsRect(seg.p, seg.q, a, LEADER_GAP))));
+          !avoid.some((a) => segmentHitsRect(seg.p, seg.q, a, LEADER_GAP)) &&
+          // Two crossing leaders make it unclear which pot each card points at.
+          (allowLeaderCross || !segs.some((s) => segmentsCross(seg.p, seg.q, s.p, s.q)))));
     const commitLeader = (seg) => {
       if (seg) segs.push(seg);
     };
@@ -330,7 +342,7 @@ function placeOnce(items, opts) {
     }
     // Search the whole view for a chip (same rules: no overlap, no pot, no crossing leaders).
     // It reads the shared placed/segs state when it runs, so a deferred call sees later cards.
-    const tryGrid = () => {
+    const tryGrid = (allowLeaderCross = false) => {
       const cw = it.cw > 0 ? it.cw : w;
       const ch = it.ch > 0 ? it.ch : h;
       const pref = candidates(it, cw, ch)[0];
@@ -340,10 +352,13 @@ function placeOnce(items, opts) {
         if (placed.some((p) => overlaps(r, p))) continue;
         if (coversPot(r)) continue;
         const lead = leaderOf(r, pref);
-        if (!routeClear(r, lead.seg)) continue;
+        if (!routeClear(r, lead.seg, allowLeaderCross)) continue;
+        const crossesLeader =
+          !!lead.seg && segs.some((s) => segmentsCross(lead.seg.p, lead.seg.q, s.p, s.q));
         placed.push(r);
         commitLeader(lead.seg);
         return {
+          ...(crossesLeader ? { crossesLeader: true } : {}),
           id: it.id,
           ...r,
           leader: lead.leader && !!lead.seg,
@@ -361,7 +376,9 @@ function placeOnce(items, opts) {
     if (!chosen && it.id !== selectedId && it.occluded) {
       // Its pot is behind a neighbour's leaves, so its card is the only way to tap it: search the
       // whole view now, before plants that can be tapped directly.
-      out.push(tryGrid() ?? hiddenEntry(it));
+      // Reachability beats tidy lines: if no spot avoids every other leader, accept one that
+      // crosses (flagged crossesLeader) rather than leave this plant with no tap target.
+      out.push(tryGrid() ?? tryGrid(true) ?? hiddenEntry(it));
       continue;
     }
     if (!chosen && it.id !== selectedId) {

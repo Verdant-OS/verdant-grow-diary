@@ -201,13 +201,18 @@ silently discarded. Build it like this:
 3. Build that commit with the normal `bun run build` (prebuild included) and
    record its SHA as the rollback SHA.
 4. Verify that exact SHA (below). This is the pre-merge gate.
-5. After the merge, compare the merge commit with the reviewed head
-   (`git diff <reviewed head> <merge commit>`). If the trees differ at all, the
-   pre-merge artifact is no longer a valid rollback target: deploying it would
-   also revert the intervening base-branch changes. Rebuild steps 2–4 on the
-   merge commit, verify that SHA, and record it in the release packet. Only an
-   identical tree lets the pre-merge artifact stand. To keep the trees
-   identical, bring the PR up to date with the base before enqueueing.
+5. Before enqueueing (pre-merge gate): the reviewed head must already contain
+   the current base, so the merge tree will equal the reviewed head and the
+   pinned artifact. If the base moves after review, update the PR, get a fresh
+   exact-head review, and rebuild and re-verify the artifact on the new head
+   before enqueueing. Never enqueue while the artifact's parent differs from
+   the head being merged.
+6. After the merge, confirm `git diff <reviewed head> <merge commit>` is
+   empty. If it is not (the base moved while queued), the pre-merge artifact is
+   not a valid rollback target, because deploying it would revert base-branch
+   changes: rebuild and verify the artifact on the merge commit at once and
+   record that SHA. Until it is verified, the emergency action is the same
+   one-line switch committed on top of the merge commit.
 
 It makes checkout
 unavailable on every host, including the production hostname, before Paddle.js

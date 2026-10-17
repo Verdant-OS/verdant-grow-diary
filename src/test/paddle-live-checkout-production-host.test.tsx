@@ -13,9 +13,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: invokeMock } },
 }));
 
-async function loadPaddleWithToken(token: string) {
+async function loadPaddleWithToken(token: string, checkoutDisabled?: string) {
   vi.resetModules();
   vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", token);
+  if (checkoutDisabled !== undefined) vi.stubEnv("VITE_CHECKOUT_DISABLED", checkoutDisabled);
   return import("@/lib/paddle");
 }
 
@@ -42,7 +43,7 @@ describe("live token on the production hostname", () => {
     expect(paddle.getCheckoutUnavailableMessage()).toBeNull();
   });
 
-  it("initializes Paddle without forcing the sandbox environment", async () => {
+  it("initializes Paddle in the SDK's production environment", async () => {
     const script = document.createElement("script");
     script.dataset.paddleLoader = "true";
     document.head.appendChild(script);
@@ -57,7 +58,9 @@ describe("live token on the production hostname", () => {
     const paddle = await loadPaddleWithToken("live_fixture_token_payload");
     await paddle.initializePaddle();
 
-    expect(environmentSet).not.toHaveBeenCalled();
+    // The SDK names live "production"; the explicit call keeps a stale
+    // sandbox setting from surviving on the production host.
+    expect(environmentSet.mock.calls).toEqual([["production"]]);
     expect(initialize).toHaveBeenCalledTimes(1);
     expect(initialize.mock.calls[0]?.[0]?.token).toBe("live_fixture_token_payload");
   });
@@ -126,5 +129,99 @@ describe("live token on the production hostname", () => {
     expect(result.current.environment).toBe("live");
     expect(result.current.unavailable).toBe(false);
     expect(result.current.unavailableMessage).toBeNull();
+  });
+});
+
+/**
+ * Rollback artifact: the same live token and production hostname, built with
+ * VITE_CHECKOUT_DISABLED="true". Checkout must be unavailable on the real
+ * production host with no Paddle.js load, no price lookup and no charge path,
+ * while entitlement reads stay live.
+ */
+describe("checkout-disabled rollback artifact on the production hostname", () => {
+  it("resolves unavailable with the paused message and keeps live entitlement reads", async () => {
+    const paddle = await loadPaddleWithToken("live_fixture_token_payload", "true");
+    expect(window.location.hostname).toBe("verdantgrowdiary.com");
+    expect(paddle.isPaddleCheckoutPaused()).toBe(true);
+    expect(paddle.resolvePaddleCheckout()).toBe("unavailable");
+    expect(paddle.resolvePaddleCheckoutBeforeHydration()).toBe("unavailable");
+    expect(paddle.getCheckoutUnavailableMessage()).toBe(
+      "Checkout is paused right now, so no charge can be made. Existing plans and billing are not affected.",
+    );
+    expect(paddle.getPaddleEnvironment()).toBe("live");
+  });
+
+  it("refuses to initialize without loading Paddle.js", async () => {
+    const appendSpy = vi.spyOn(document.head, "appendChild");
+    const paddle = await loadPaddleWithToken("live_fixture_token_payload", "true");
+    await expect(paddle.initializePaddle()).rejects.toBeInstanceOf(
+      paddle.PaddleCheckoutUnavailableError,
+    );
+    expect(appendSpy).not.toHaveBeenCalled();
+    expect(document.querySelector('script[data-paddle-loader="true"]')).toBeNull();
+    expect((window as any).Paddle).toBeUndefined();
+  });
+
+  it("refuses a price lookup without calling the resolver", async () => {
+    const paddle = await loadPaddleWithToken("live_fixture_token_payload", "true");
+    await expect(paddle.getPaddlePriceId("pro_monthly")).rejects.toBeInstanceOf(
+      paddle.PaddleCheckoutUnavailableError,
+    );
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["false", "", "1", "TRUE "])(
+    "treats VITE_CHECKOUT_DISABLED=%j as not disabled",
+    async (value) => {
+      const paddle = await loadPaddleWithToken("live_fixture_token_payload", value);
+      expect(paddle.resolvePaddleCheckout()).toBe("live");
+    },
+  );
+
+  it("server-renders and hydrates the paused banner with no mismatch", async () => {
+    vi.resetModules();
+    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");
+    vi.stubEnv("VITE_CHECKOUT_DISABLED", "true");
+    const { PaymentTestModeBanner } = await import("@/components/PaymentTestModeBanner");
+    const { renderToString } = await import("react-dom/server");
+    const { hydrateRoot } = await import("react-dom/client");
+    const { act } = await import("react");
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    try {
+      container.innerHTML = renderToString(<PaymentTestModeBanner />);
+      expect(container.textContent).toContain("Checkout is paused right now");
+      const recoverable = vi.fn();
+      await act(async () => {
+        hydrateRoot(container, <PaymentTestModeBanner />, { onRecoverableError: recoverable });
+      });
+      expect(recoverable).not.toHaveBeenCalled();
+      const banner = container.querySelector('[data-testid="payments-unavailable-banner"]');
+      expect(banner?.textContent).toContain("Checkout is paused right now");
+    } finally {
+      container.remove();
+    }
+  });
+
+  it("blocks checkout in the hook before any Paddle call", async () => {
+    vi.resetModules();
+    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");
+    vi.stubEnv("VITE_CHECKOUT_DISABLED", "true");
+    vi.doMock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
+    vi.doMock("@/lib/react-router-compat", () => ({
+      useNavigate: () => vi.fn(),
+      useLocation: () => ({ pathname: "/pricing", search: "", hash: "" }),
+    }));
+    const { usePaddleCheckout } = await import("@/hooks/usePaddleCheckout");
+    const { act } = await import("react");
+    const { result } = renderHook(() => usePaddleCheckout());
+    expect(result.current.environment).toBe("unavailable");
+    expect(result.current.unavailable).toBe(true);
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "pro_monthly" });
+    });
+    expect(result.current.blockedScope).toBe("checkout");
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(document.querySelector('script[data-paddle-loader="true"]')).toBeNull();
   });
 });

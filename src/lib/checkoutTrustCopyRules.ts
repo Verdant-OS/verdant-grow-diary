@@ -16,12 +16,14 @@ export interface CheckoutTrustCopyInput {
   /** Runtime checkout failures temporarily override an otherwise valid environment. */
   blocked: boolean;
   /**
-   * Scope of a runtime failure. "plan": one plan's price could not resolve,
-   * other plans can still check out. "checkout": checkout itself failed (for
-   * example Paddle.js did not load), so no plan can check out. Missing means
-   * "checkout" (fail closed).
+   * Scope of a runtime failure (see checkoutBlockedScopeRules). "plan": one
+   * plan's price could not resolve. "pack": every credit pack is blocked.
+   * In both, other plans can still check out. "checkout": checkout itself
+   * failed, so no plan can check out. Missing means "checkout" (fail closed).
    */
-  blockedScope?: "plan" | "checkout" | null;
+  blockedScope?: "plan" | "pack" | "checkout" | null;
+  /** The build-time kill switch is on: checkout is paused on every host. */
+  paused?: boolean;
 }
 
 export const CHECKOUT_MECHANISM_FAQ_ANSWER =
@@ -59,6 +61,18 @@ const LIVE_FAILED_COPY: CheckoutTrustCopy = Object.freeze({
   canCreateLiveCharge: false,
 });
 
+/** Rollback artifact: checkout paused by the build-time kill switch. */
+const PAUSED_COPY: CheckoutTrustCopy = Object.freeze({
+  state: "unavailable",
+  label: "Checkout paused",
+  summary:
+    "Checkout is paused right now, so no charge can be made. Existing plans and billing are not affected.",
+  faqQuestion: "Is checkout live?",
+  faqAnswer:
+    "Not right now. Checkout is paused, so no new charge can be made. Existing plans, renewals and billing management are not affected.",
+  canCreateLiveCharge: false,
+});
+
 const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "unavailable",
   label: "Sandbox test checkout unavailable",
@@ -76,11 +90,13 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
  * checkout can still charge.
  */
 export function buildCheckoutTrustCopy(input: CheckoutTrustCopyInput): CheckoutTrustCopy {
+  if (input.paused === true) return PAUSED_COPY;
   // Live keeps live copy after a single-plan failure: other plans can still
   // create a real charge. A checkout-wide failure (or an unknown scope)
   // means no plan can charge right now, so it says so without sandbox wording.
   if (input.environment === "live") {
-    if (input.blocked && input.blockedScope !== "plan") return LIVE_FAILED_COPY;
+    const otherPlansCanCharge = input.blockedScope === "plan" || input.blockedScope === "pack";
+    if (input.blocked && !otherPlansCanCharge) return LIVE_FAILED_COPY;
     return LIVE_COPY;
   }
   if (input.blocked) return UNAVAILABLE_COPY;

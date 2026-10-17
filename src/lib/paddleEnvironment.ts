@@ -94,6 +94,18 @@ export function isProductionCheckoutHostname(hostname: string | null | undefined
 export interface ResolvePaddleCheckoutEnvironmentInput {
   token: string | null | undefined;
   hostname: string | null | undefined;
+  /**
+   * Build-time checkout kill switch (`VITE_CHECKOUT_DISABLED="true"`). When
+   * true, checkout is unavailable on EVERY host, including production. This is
+   * the rollback artifact: it disables new checkout without touching tokens,
+   * secrets, entitlement reads or existing subscriptions.
+   */
+  checkoutDisabled?: boolean;
+}
+
+/** Parse the build-time kill switch. Only the exact string "true" disables. */
+export function isCheckoutDisabledFlag(value: unknown): boolean {
+  return typeof value === "string" && value.trim() === "true";
 }
 
 /**
@@ -108,6 +120,7 @@ export interface ResolvePaddleCheckoutEnvironmentInput {
 export function resolvePaddleCheckoutEnvironment(
   input: ResolvePaddleCheckoutEnvironmentInput,
 ): PaddleCheckoutEnvironment {
+  if (input.checkoutDisabled === true) return "unavailable";
   const cls = classifyPaddleToken(input.token);
   if (cls === "sandbox") return "sandbox";
   if (cls === "live" && isProductionCheckoutHostname(input.hostname)) return "live";
@@ -120,6 +133,10 @@ export function resolvePaddleCheckoutEnvironment(
  */
 export const CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE =
   "Live checkout is only available on verdantgrowdiary.com.";
+
+/** Fixed, safe copy while the build-time kill switch is on. */
+export const CHECKOUT_PAUSED_MESSAGE =
+  "Checkout is paused right now, so no charge can be made. Existing plans and billing are not affected.";
 
 /**
  * Fixed, safe copy for a missing or malformed token. Never reveals which
@@ -141,7 +158,9 @@ export const CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE =
  */
 export function resolvePaddleCheckoutPresentationBeforeHydration(
   token: string | null | undefined,
+  checkoutDisabled = false,
 ): PaddleCheckoutEnvironment {
+  if (checkoutDisabled) return "unavailable";
   const cls = classifyPaddleToken(token);
   if (cls === "sandbox") return "sandbox";
   if (cls === "live") return "live";

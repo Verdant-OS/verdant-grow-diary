@@ -9,6 +9,10 @@ import {
   type PaddleCheckoutCatalogReason,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
+import {
+  checkoutBlockedScopeForReason,
+  type CheckoutBlockedScope,
+} from "@/lib/checkoutBlockedScopeRules";
 import { useRenderedPaddleCheckoutEnvironment } from "@/hooks/useRenderedPaddleCheckoutEnvironment";
 import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { toast } from "@/hooks/use-toast";
@@ -61,12 +65,12 @@ export interface UsePaddleCheckoutResult {
   /** Sanitized catalog reason for cause-aware recovery UI. Never render it. */
   blockedReasonCode: PaddleCheckoutCatalogReason | null;
   /**
-   * Scope of the current block. "plan": one plan's price could not resolve
-   * (other plans may still check out). "checkout": checkout itself failed
-   * (environment, Paddle.js load or initialize, overlay open), so no plan can
-   * check out right now. Null when nothing is blocked.
+   * Scope of the current block (see checkoutBlockedScopeRules): "plan" for the
+   * attempted plan only, "pack" for every credit pack, "checkout" when no plan
+   * can check out (environment, Paddle.js load/init, overlay open, or a shared
+   * or unknown resolver reason). Null when nothing is blocked.
    */
-  blockedScope: "plan" | "checkout" | null;
+  blockedScope: CheckoutBlockedScope | null;
   dismissBlocked: () => void;
 }
 
@@ -113,7 +117,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const [blockedReasonCode, setBlockedReasonCode] = useState<PaddleCheckoutCatalogReason | null>(
     null,
   );
-  const [blockedScope, setBlockedScope] = useState<"plan" | "checkout" | null>(null);
+  const [blockedScope, setBlockedScope] = useState<CheckoutBlockedScope | null>(null);
 
   // Track mount state so the Paddle `checkout.closed` cancel handler (which
   // fires asynchronously from Paddle.js after the modal actually closes)
@@ -269,8 +273,12 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           setBlockedReasonCode(
             err instanceof PaddleCheckoutCatalogUnavailableError ? err.reason : null,
           );
+          // Map the resolver's reason to its real scope; shared or unknown
+          // reasons fail closed to checkout-wide.
           setBlockedScope(
-            err instanceof PaddleCheckoutCatalogUnavailableError ? "plan" : "checkout",
+            err instanceof PaddleCheckoutCatalogUnavailableError
+              ? checkoutBlockedScopeForReason(err.reason)
+              : "checkout",
           );
           setBlockedReason(err.message);
         } else {

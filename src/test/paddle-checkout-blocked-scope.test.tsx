@@ -1,8 +1,9 @@
 /**
  * Codex P1 on #2230: a checkout-wide failure (Paddle.js load/initialize,
  * environment) blocks every plan, so it must not be bound to one SKU or keep
- * live trust copy. The hook reports the scope explicitly: "plan" for a
- * catalog failure on one price, "checkout" for everything else.
+ * live trust copy. The hook reports the scope explicitly, derived from the
+ * resolver's reason: "plan" for one price, "pack" for every credit pack, and
+ * "checkout" for shared or unknown reasons and every non-catalog failure.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
@@ -25,6 +26,7 @@ vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 const state = {
   env: "live" as "sandbox" | "live" | "unavailable",
   failure: null as null | "catalog" | "load" | "unavailable",
+  reason: "price_not_configured",
 };
 
 vi.mock("@/lib/paddle", async () => {
@@ -56,7 +58,7 @@ vi.mock("@/lib/paddle", async () => {
     getPaddlePriceId: vi.fn(async (id: string) => {
       if (state.failure === "catalog") {
         throw new PaddleCheckoutCatalogUnavailableError(
-          "price_not_configured",
+          state.reason,
           id,
           "That plan isn't set up for checkout yet.",
         );
@@ -75,6 +77,7 @@ function wrapper({ children }: { children: ReactNode }) {
 beforeEach(() => {
   state.env = "live";
   state.failure = null;
+  state.reason = "price_not_configured";
   window.sessionStorage.clear();
   (window as any).Paddle = { Checkout: { open: vi.fn() } };
 });
@@ -94,6 +97,25 @@ describe("usePaddleCheckout blocked scope", () => {
     expect(result.current.blockedScope).toBe("plan");
     expect(result.current.blockedReasonCode).toBe("price_not_configured");
   });
+
+  it("reports pack_requires_monthly_plan as pack-scoped", async () => {
+    state.failure = "catalog";
+    state.reason = "pack_requires_monthly_plan";
+    const result = await attempt();
+    expect(result.current.blockedScope).toBe("pack");
+    expect(result.current.blockedReasonCode).toBe("pack_requires_monthly_plan");
+  });
+
+  it.each(["price_resolution_unavailable", "auth_required", "price_gateway_unavailable"])(
+    "reports the shared catalog reason %s as checkout-wide",
+    async (reason) => {
+      state.failure = "catalog";
+      state.reason = reason;
+      const result = await attempt();
+      expect(result.current.blockedScope).toBe("checkout");
+      expect(result.current.blockedReasonCode).toBe(reason);
+    },
+  );
 
   it.each(["load", "unavailable"] as const)(
     "reports a %s failure as checkout-wide",

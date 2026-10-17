@@ -46,6 +46,7 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { sanitizeCheckoutRecoveryPlanSlug } from "@/lib/checkoutRecoveryPlanSlug";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+import { CHECKOUT_PAUSED_MESSAGE } from "@/lib/paddleEnvironment";
 import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";
 import {
   resolvePaidAcquisitionSource,
@@ -296,16 +297,21 @@ export default function Pricing() {
     // behaviour exactly. Narrowing only ever applies where the attribution is
     // real, so this cannot turn a genuine block into a live button.
     if (blockedSku === null) return true;
+    // A pack-scoped failure (pack_requires_monthly_plan) blocks every credit
+    // pack, not just the one that was clicked.
+    if (blockedScope === "pack" && CREDIT_PACKS.some((pack) => pack.sku === sku)) return true;
     return blockedSku === sku;
   }
-  // Only a failure the hook reports as checkout-wide (environment, Paddle.js
-  // load/init, overlay open) blocks every plan; a catalog failure belongs to
-  // the plan that failed.
-  const checkoutBlockedScope = blockedScope === "checkout" ? "checkout" : "plan";
+  // Only a failure the hook reports as checkout-wide blocks every plan; a
+  // plan- or pack-scoped failure leaves other plans able to check out.
+  const checkoutBlockedScope =
+    blockedScope === "checkout" ? "checkout" : blockedScope === "pack" ? "pack" : "plan";
   const checkoutTrustCopy = buildCheckoutTrustCopy({
     environment: checkoutEnvironment,
     blocked: Boolean(checkoutRecoveryReason),
     blockedScope: checkoutBlockedScope,
+    // The kill switch surfaces as the paused unavailable message.
+    paused: unavailableMessage === CHECKOUT_PAUSED_MESSAGE,
   });
   /**
    * Founder Lifetime is no longer part of the public pricing grid. It stays

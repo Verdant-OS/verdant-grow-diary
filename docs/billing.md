@@ -1,10 +1,14 @@
 # Verdant Billing
 
-## Status: sandbox / test mode only
+## Status: live checkout on the production hostname, held behind backend readiness
 
-Verdant is currently configured for **Paddle sandbox only**. No live charges
-are accepted. No real money moves. No customer is granted Pro entitlement
-from the client.
+The tracked production client token is live-class (`live_`). Live checkout
+opens only on `verdantgrowdiary.com` and `www.verdantgrowdiary.com`; every
+other host (previews, staging, localhost) is unavailable for a live token, and
+a sandbox-class (`test_`) token stays sandbox everywhere. This build must not
+reach customers until the backend readiness checks in
+[Live checkout release sequence](#live-checkout-release-sequence) pass. No
+customer is granted Pro entitlement from the client.
 
 ## Compliance note
 
@@ -31,7 +35,7 @@ What Verdant does not sell:
 Verdant is a software tool. The grower is responsible for complying with
 all laws applicable to cultivation in their own jurisdiction.
 
-## Plans (sandbox)
+## Plans
 
 | Plan             | Price           | Cadence  | Slug               |
 | ---------------- | --------------- | -------- | ------------------ |
@@ -46,12 +50,24 @@ are not live yet.
 ## Configuration
 
 The **canonical** client env var is `VITE_PAYMENTS_CLIENT_TOKEN` (Lovable
-built-in Paddle integration). The tracked development and production builds
-both use a sandbox-class (`test_`) token. The client authorizes checkout only
-when that exact class is present. A `live_`, missing, or malformed token fails
-closed as unavailable on every hostname; a production hostname never enables
-live checkout by itself. Classify tokens by prefix only and never print or
-copy their values into logs, tickets, or review comments.
+built-in Paddle integration). The committed `.env.production` carries the
+live-class (`live_`) production token; the prebuild gate requires the bundled
+token to equal it. Client resolution:
+
+- `test_` → sandbox on every host.
+- `live_` → live only on `verdantgrowdiary.com` / `www.verdantgrowdiary.com`;
+  unavailable on every other host.
+- Missing or malformed → unavailable everywhere.
+- `VITE_CHECKOUT_DISABLED="true"` (exact string) → unavailable everywhere,
+  including production, with paused copy. This is the rollback switch; see
+  [Live checkout rollback](#live-checkout-rollback).
+
+Paddle.js is initialized with `Environment.set("production")` for live and
+`Environment.set("sandbox")` for sandbox. Entitlement reads always read live
+rows; sandbox rows are read only for a `test_` token. Classify tokens by
+prefix only and never print or copy their values into logs, tickets, or review
+comments. A publishable client token is public by design, but it still goes
+only in `.env.production`, never in a review comment.
 
 Legacy BYO client env vars (`VITE_PADDLE_ENVIRONMENT`,
 `VITE_PADDLE_CLIENT_TOKEN`, `VITE_PADDLE_PRICE_*`) are `@deprecated` and only
@@ -163,35 +179,82 @@ specifically reports that the new overload is absent. See
 for the mandatory pause, residual expand-stage exposure, verification evidence,
 and rollback order.
 
-## Coordinated production-to-sandbox settings transition
+## Live checkout release sequence
 
-The source policy and tracked production token are sandbox-only. Making the
-deployed stack match that policy is a coordinated operator change, not a
-client-token-only flip:
+Backend readiness is verified **before** this build reaches customers. Merging
+the live-token change into `verdant-grow-diary` is customer exposure: the
+production host builds from that branch and the live token opens checkout on
+it. So the merge waits until every step below is green.
 
-1. Confirm the sandbox secret and price-ID **names** are present without
-   printing their values.
-2. Pin `PAYMENTS_ENVIRONMENT=sandbox` and legacy `PADDLE_ENVIRONMENT=sandbox`.
-3. Confirm `PAYMENTS_SANDBOX_WEBHOOK_SECRET`, `PADDLE_SANDBOX_API_KEY`, and all
-   sandbox catalog price IDs belong to the same Paddle sandbox account.
-4. Publish the build that contains both the sandbox-class production client
-   token and the exact-sandbox runtime gate.
-5. Run `docs/paddle-sandbox-smoke.md` against the published app. If any layer
-   disagrees, disable checkout or roll back to the prior reviewed release;
-   never solve a mismatch by enabling live checkout ad hoc.
+1. **#2229 merged and `payments-webhook` redeployed.** Merge the shared
+   webhook-verifier packaging repair through the queue. Confirm Lovable has
+   pulled the merged source, then (owner-named Edge deploy) redeploy
+   `payments-webhook`, `delete-account`, `paddle-portal-session` and
+   `get-paddle-price`. Record each returned fingerprint against the deploy
+   head.
+2. **Server selector read.** The owner reads `PAYMENTS_ENVIRONMENT` and confirms
+   it is exactly `live`. `get-paddle-price` returns
+   `503 price_resolution_unavailable` for an unset or invalid value.
+3. **Catalog resolution observed.** Confirm the credit-pack price secrets hold
+   live IDs. From a signed-in production session, resolve `pro_monthly` once
+   and read its `get-paddle-price` log line (`reason`, `stage`,
+   `env_var_configured`) and HTTP status.
+4. **Webhook path decided, read-only.** Paddle notification logs for both live
+   destinations, live rows in `lovable_paddle_events`, and `payments-webhook`
+   logs. Choose the canonical destination from that evidence. A live test
+   event is a production write and needs its own authorization.
+5. **Rollback artifact built and verified** (below) before the merge.
+6. **Merge, then verify.** After the merge deploys, confirm `/version.json`
+   names the merge commit and `/pricing` shows "Secure checkout by Paddle".
+   A real-money verification charge needs the owner's explicit approval of
+   amount, account, and refund plan.
+
+There is no operator-only gate in this build. From the deploy until a
+rollback, any visitor on the production hostname can open live checkout.
+
+## Live checkout rollback
+
+The rollback artifact is a pre-built, pre-verified client build: the live
+checkout code with `VITE_CHECKOUT_DISABLED="true"` added to `.env.production`
+next to the unchanged live token. On every host, including the production
+hostname, it resolves checkout to unavailable before Paddle.js loads, before
+any price lookup, and before any redirect. `/pricing` and the payments banner
+show "Checkout paused". It does not touch tokens, secrets, entitlement reads,
+`payments-webhook`, or `paddle-portal-session`, so existing live subscribers
+keep their access and billing management.
+
+Before the merge, verify the artifact under production-host conditions:
+
+- `src/test/paddle-live-checkout-production-host.test.tsx` runs on
+  `https://verdantgrowdiary.com/` and proves the switch blocks init, price
+  lookup and the hook, and that the paused banner hydrates without mismatch.
+- Build the artifact and load `/pricing` with `verdantgrowdiary.com` mapped to
+  the built server: paused copy, no request to `cdn.paddle.com`.
+- Deploy it to staging (`verdant-grow-diary2`) and repeat the `/pricing`
+  check: unavailable trust copy, `openCheckout` blocks, no Paddle.js load.
+
+Keep it deployable as a pinned commit. To roll back, state the action and its
+effect on live subscriptions, then deploy that commit.
+
+Do **not** use these as a generic rollback:
+
+- Flipping `PAYMENTS_ENVIRONMENT` back to `sandbox`. That breaks live portal
+  and price lookups for existing customers, and recreates a sandbox/live
+  hybrid if a live client is still served.
+- Restoring an earlier `test_`-token build. That reopens sandbox checkout
+  against a live server selector.
+- Revoking the live client token or rotating secrets as a reflex. Revoke the
+  token only if it must be invalidated, and say so first.
 
 This repository change does not mutate Lovable/Paddle/Supabase settings.
 
-## What is still required before live payments can be proposed
+## What must be true before live payments open to customers
 
-Live checkout is intentionally unsupported by current source. A future change
-requires explicit owner authorization and one coordinated, independently
-reviewed transition covering client code and copy, a live-class production
-token, server environment selectors, live API/webhook secrets, live price IDs,
-notification destinations, tests, smoke evidence, monitoring, and rollback.
-No individual token or settings flip authorizes live checkout.
+The owner chose `PAYMENTS_ENVIRONMENT=live` for this release.
+That choice covers the client change; it does not make any single
+token or settings flip sufficient. The release sequence above is the order.
 
-Before proposing that transition:
+Standing checks:
 
 - [ ] Complete Paddle live verification (merchant of record onboarding).
 - [ ] Confirm acceptable use policy fit for Verdant (software-only).

@@ -18,6 +18,8 @@ import { FunctionsFetchError } from "@supabase/supabase-js";
 import {
   resolvePaddleCheckoutEnvironment,
   resolvePaddleCheckoutPresentationBeforeHydration,
+  isCheckoutDisabledFlag,
+  CHECKOUT_PAUSED_MESSAGE,
   classifyPaddleToken,
   CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
   CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
@@ -27,6 +29,14 @@ import { handlePaddleCheckoutEvent } from "@/lib/checkoutOverlaySession";
 import { readEdgeFunctionErrorCode } from "@/lib/edgeFunctionError";
 
 const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined;
+// Rollback artifact switch: a build with VITE_CHECKOUT_DISABLED="true" never
+// opens checkout on any host. See docs/billing.md, "Live checkout rollback".
+const checkoutDisabled = isCheckoutDisabledFlag(import.meta.env.VITE_CHECKOUT_DISABLED);
+
+/** True when this build was produced with the checkout kill switch on. */
+export function isPaddleCheckoutPaused(): boolean {
+  return checkoutDisabled;
+}
 
 // Global `(window as any).Paddle` typing is already declared by src/pages/Upgrade.tsx
 // (loose PaddleGlobal shape). We access it via `(window as any).Paddle` here
@@ -58,6 +68,7 @@ export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
   return resolvePaddleCheckoutEnvironment({
     token: clientToken,
     hostname: currentHostname(),
+    checkoutDisabled,
   });
 }
 
@@ -71,12 +82,13 @@ export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
  * checkout; render through `useRenderedPaddleCheckoutEnvironment`.
  */
 export function resolvePaddleCheckoutBeforeHydration(): PaddleCheckoutEnvironment {
-  return resolvePaddleCheckoutPresentationBeforeHydration(clientToken);
+  return resolvePaddleCheckoutPresentationBeforeHydration(clientToken, checkoutDisabled);
 }
 
 export function getCheckoutUnavailableMessage(): string | null {
   const env = resolvePaddleCheckout();
   if (env === "sandbox" || env === "live") return null;
+  if (checkoutDisabled) return CHECKOUT_PAUSED_MESSAGE;
   if (classifyPaddleToken(clientToken) === "live") {
     return CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE;
   }
@@ -297,8 +309,9 @@ export async function initializePaddle(): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>('script[data-paddle-loader="true"]');
     const onLoad = () => {
       try {
-        // Paddle.js defaults to production; only sandbox needs an override.
-        if (env === "sandbox") (window as any).Paddle.Environment.set("sandbox");
+        // One explicit map at the single Environment.set call: the SDK takes
+        // "sandbox" | "production", never "live".
+        (window as any).Paddle.Environment.set(env === "live" ? "production" : "sandbox");
         // Slice D: single module-level event router. Registered exactly
         // once at Initialize time — StrictMode-safe because
         // `paddleInitialized` guards re-entry.

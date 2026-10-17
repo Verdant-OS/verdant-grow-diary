@@ -6,12 +6,13 @@
  * `paddle-webhook/` edge function — that continues to run against the
  * BYO PADDLE_* secrets.
  *
- * Webhook verification uses the pure HMAC verifier (same algorithm as
- * paddle-webhook/verifyPaddleSignature.ts) so secrets never need a full
- * SDK client just to fail-closed on a bad signature.
+ * Webhook verification uses the pure HMAC verifier
+ * (_shared/verifyPaddleSignature.ts, also re-exported at
+ * paddle-webhook/verifyPaddleSignature.ts) so secrets never need a full SDK
+ * client just to fail-closed on a bad signature.
  */
 import { Environment, Paddle, EventName } from "npm:@paddle/paddle-node-sdk";
-import { verifyPaddleWebhookSignature } from "../paddle-webhook/verifyPaddleSignature.ts";
+import { verifyPaddleWebhookSignature } from "./verifyPaddleSignature.ts";
 
 const getEnv = (key: string): string => {
   const value = Deno.env.get(key);

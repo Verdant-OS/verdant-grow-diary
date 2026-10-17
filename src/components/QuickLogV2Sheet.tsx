@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
   readPendingQuickLogNote,
@@ -535,6 +536,7 @@ function QuickLogV2SheetForOwner({
   const [videoMeta, setVideoMeta] = useState<QuickLogVideoMeta | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
+  const [photoChecking, setPhotoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
@@ -619,6 +621,8 @@ function QuickLogV2SheetForOwner({
   // from installing a stale file when its probe resolves late.
   const videoValidationGenerationRef = useRef(0);
   const videoValidationInFlightRef = useRef(false);
+  const photoValidationGenerationRef = useRef(0);
+  const photoValidationInFlightRef = useRef(false);
   // Dedicated synchronous guard for the photo-diary insert path so
   // rapid re-taps during photo capture/upload cannot enqueue a second
   // insert before the first resolves. Reset in try/finally.
@@ -966,6 +970,9 @@ function QuickLogV2SheetForOwner({
         });
 
   function resetPhotoSelection() {
+    photoValidationGenerationRef.current += 1;
+    photoValidationInFlightRef.current = false;
+    setPhotoChecking(false);
     setPhotoFile(null);
     setPhotoPreview(null);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -1236,9 +1243,45 @@ function QuickLogV2SheetForOwner({
 
   function handlePhotoInputChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0] ?? null;
-    if (!file) return;
-    handlePhotoSelected(file);
     e.currentTarget.value = "";
+    if (!file || submissionLockedRef.current) return;
+    if (!fileClaimsPng(file)) {
+      photoValidationGenerationRef.current += 1;
+      photoValidationInFlightRef.current = false;
+      setPhotoChecking(false);
+      handlePhotoSelected(file);
+      return;
+    }
+    const validationGeneration = photoValidationGenerationRef.current + 1;
+    photoValidationGenerationRef.current = validationGeneration;
+    photoValidationInFlightRef.current = true;
+    setPhotoChecking(true);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setLocalError(null);
+    setSaveStatus("Checking photo…");
+    void (async () => {
+      try {
+        const pngClaim = await validateQuickLogPngClaim(file);
+        if (validationGeneration !== photoValidationGenerationRef.current) return;
+        if (!pngClaim.ok) {
+          setLocalError(pngClaim.message);
+          setSaveStatus("");
+          return;
+        }
+        if (submissionLockedRef.current) return;
+        handlePhotoSelected(file);
+      } catch {
+        if (validationGeneration !== photoValidationGenerationRef.current) return;
+        setLocalError("That photo could not be read. Try a different file.");
+        setSaveStatus("");
+      } finally {
+        if (validationGeneration === photoValidationGenerationRef.current) {
+          photoValidationInFlightRef.current = false;
+          setPhotoChecking(false);
+        }
+      }
+    })();
   }
 
   async function handleVideoInputChange(e: ChangeEvent<HTMLInputElement>) {
@@ -1497,6 +1540,10 @@ function QuickLogV2SheetForOwner({
     const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
+      return;
+    }
+    if (photoValidationInFlightRef.current) {
+      setLocalError("Wait for the photo check to finish before saving.");
       return;
     }
     // Synchronous re-entry guard: prevents a rapid double-click from
@@ -3516,6 +3563,7 @@ function QuickLogV2SheetForOwner({
                     feedingSaving ||
                     wateringSaving ||
                     videoChecking ||
+                    photoChecking ||
                     (contextBlocked && !retryPending)
                   }
                   onClick={handleSave}
@@ -3651,6 +3699,7 @@ function QuickLogV2SheetForOwner({
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
+                      photoChecking ||
                       historyCheckRequired ||
                       (contextBlocked && !retryPending) ||
                       (selectedTargetMissing && !retryPending) ||

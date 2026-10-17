@@ -26,12 +26,24 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 const LIVE_TOKEN = "live_fixturetokenpayload00000000";
 
-async function serverBanner(url: string | null, token = LIVE_TOKEN, paused = false) {
+async function serverBanner(
+  url: string | null,
+  token = LIVE_TOKEN,
+  paused = false,
+  installReader = true,
+) {
   request.url = url;
   request.calls = 0;
   vi.resetModules();
   vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", token);
   if (paused) vi.stubEnv("VITE_CHECKOUT_DISABLED", "true");
+  const { REQUEST_HOSTNAME_READER_KEY } = await import("@/lib/requestHostname");
+  delete (globalThis as Record<symbol, unknown>)[REQUEST_HOSTNAME_READER_KEY];
+  // The SSR entry (src/server.ts) installs this reader in production.
+  if (installReader) {
+    const { installRequestHostnameReader } = await import("@/lib/requestHostname.server");
+    installRequestHostnameReader();
+  }
   const { PaymentTestModeBanner } = await import("@/components/PaymentTestModeBanner");
   return renderToString(<PaymentTestModeBanner />);
 }
@@ -64,6 +76,17 @@ describe("server render uses the request host", () => {
 
   it("falls back to the browser host when there is no request", async () => {
     const html = await serverBanner(null);
+    expect(html).toContain("Live checkout is only available on verdantgrowdiary.com.");
+  });
+
+  it("falls back to the browser host when the SSR entry installed no reader", async () => {
+    const html = await serverBanner(
+      "https://verdantgrowdiary.com/pricing",
+      LIVE_TOKEN,
+      false,
+      false,
+    );
+    expect(request.calls).toBe(0);
     expect(html).toContain("Live checkout is only available on verdantgrowdiary.com.");
   });
 

@@ -8,6 +8,10 @@ import {
 } from "./lib/cloudflareHostRoutingRules";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { installRequestHostnameReader } from "./lib/requestHostname.server";
+
+// Server renders resolve checkout against the request host (see requestHostname.ts).
+installRequestHostnameReader();
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;

@@ -273,14 +273,19 @@ prebuild step (`restore-env-production-from-head.mjs`) resets
 `.env.production` to `HEAD` before every build, so an uncommitted switch is
 silently discarded. Build it like this:
 
-1. Start from the exact release commit (the #2230 merge on
-   `verdant-grow-diary`).
+1. Before the merge, start from the exact reviewed #2230 head (the merge commit
+   does not exist yet).
 2. Add one commit, on a branch that is never merged, that only appends
    `VITE_CHECKOUT_DISABLED="true"` to `.env.production`, next to the unchanged
    live token.
 3. Build that commit with the normal `bun run build` (prebuild included) and
    record its SHA as the rollback SHA.
-4. Verify that exact SHA (below).
+4. Verify that exact SHA (below). This is the pre-merge gate.
+5. After the merge, compare the merge commit with the reviewed head
+   (`git diff <reviewed head> <merge commit>`). If only base-branch changes
+   differ, the pinned artifact still closes checkout and remains the rollback.
+   For an exact-tree artifact, rebuild steps 2–4 on the merge commit and
+   record that SHA in the release packet.
 
 On every host, including the production
 hostname, it resolves checkout to unavailable before Paddle.js loads, before

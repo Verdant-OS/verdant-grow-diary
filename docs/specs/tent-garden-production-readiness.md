@@ -39,7 +39,8 @@ All `established fact` from `src/integrations/supabase/types.ts` and `src/lib/*`
   slot or coordinate. The prototype's drag-to-arrange and saved layouts therefore have nowhere to live.
 - **Tent size is free text** (`"4x4"`, `"5' x 5'"`, `"120x120 cm"`), validated by
   `tentSizeValidationMessage` in `src/lib/tentManagementRules.ts`; the dimension parser there
-  (`tentSizeDimensions`) is not exported. Many tents have no size.
+  (`tentSizeDimensions`) is not exported. `size` is nullable; how many production tents lack a parseable
+  size is `NOT_MEASURED` (§12).
 - **Pot size is free text** (`"3 gal"` appears in tests). It may be null.
 - **Stages are six**, from `STAGES` in `src/lib/grow.ts`: `seedling`, `veg`, `flower`, `flush`,
   `harvest`, `drying`, labelled by `stageLabel()`. Test fixtures also show legacy spellings

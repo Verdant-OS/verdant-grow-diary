@@ -70,6 +70,7 @@ import {
   validateQuickLogPngClaim,
 } from "@/lib/quickLogPhotoContentRules";
 import {
+  QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT,
   claimQuickLogPhotoAttachmentRecoveryLock,
   completeQuickLogPhotoAttachmentAttempt,
   getQuickLogPhotoAttachmentRecoveryRecord,
@@ -189,6 +190,10 @@ export default function PlantQuickLog({
   const [photoChecking, setPhotoChecking] = useState(false);
   const photoValidationGenerationRef = useRef(0);
   const photoOnlyAttemptRef = useRef<{ entryId: string; path: string; file: File } | null>(null);
+  // True while this sheet is locked only because the session fence for its
+  // target is held (by an earlier or other attempt). Other locks, such as a
+  // confirmed save whose photo patch failed, never clear from fence changes.
+  const sessionFenceLockedRef = useRef(false);
 
   useEffect(() => {
     // A draft and its asynchronous save belong to one owner, target and open
@@ -212,6 +217,7 @@ export default function PlantQuickLog({
       tentId: tentId ?? null,
       plantId,
     });
+    sessionFenceLockedRef.current = recoveryLocked;
     setPhotoAttachmentUnconfirmed(recoveryLocked);
     if (recoveryLocked) {
       setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
@@ -246,6 +252,7 @@ export default function PlantQuickLog({
       // whichever path is first announces the row and the other does not.
       const announce = completeQuickLogPhotoAttachmentAttempt(scope, entryId);
       const stillLocked = hasQuickLogPhotoAttachmentRecoveryLock(scope);
+      sessionFenceLockedRef.current = stillLocked;
       setPhotoAttachmentUnconfirmed(stillLocked);
       if (!stillLocked) {
         setError((current) => (current === PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE ? null : current));
@@ -261,6 +268,34 @@ export default function PlantQuickLog({
     });
     return () => {
       active = false;
+    };
+  }, [open, user?.id, plantId, growId, tentId]);
+
+  // A sheet locked by the session fence re-checks it whenever a fence is
+  // released in this page. When the original save settles after this sheet's
+  // one-shot lookup missed (the insert was still pending), Save is restored
+  // without a close/reopen. The original save's own path announces the row.
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    const scope = {
+      ownerId: user?.id ?? null,
+      growId,
+      tentId: tentId ?? null,
+      plantId,
+    };
+    const onRecoveryChanged = () => {
+      if (!sessionFenceLockedRef.current) return;
+      if (hasQuickLogPhotoAttachmentRecoveryLock(scope)) return;
+      sessionFenceLockedRef.current = false;
+      setPhotoAttachmentUnconfirmed(false);
+      setError((current) => (current === PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE ? null : current));
+    };
+    window.addEventListener(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT, onRecoveryChanged);
+    return () => {
+      window.removeEventListener(
+        QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT,
+        onRecoveryChanged,
+      );
     };
   }, [open, user?.id, plantId, growId, tentId]);
 
@@ -533,6 +568,7 @@ export default function PlantQuickLog({
         );
         if (claim === "held_by_other") {
           if (!canContinue()) return;
+          sessionFenceLockedRef.current = true;
           setPhotoAttachmentUnconfirmed(true);
           setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
           return;
@@ -779,6 +815,7 @@ export default function PlantQuickLog({
       if (!canContinue()) return;
       if (claim === "held_by_other") {
         // Another attempt for this exact target is pending or unconfirmed.
+        sessionFenceLockedRef.current = true;
         setPhotoAttachmentUnconfirmed(true);
         setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
       } else {

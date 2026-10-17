@@ -14,6 +14,23 @@
 export const QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY =
   "verdant:quick-log:photo-attachment-uncertain:v1" as const;
 
+/**
+ * Window event sent after a fence is durably released in this page, so a sheet
+ * that is locked by that fence (for example one remounted while the original
+ * insert was pending) can re-check it. Carries no detail; listeners re-read.
+ */
+export const QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT =
+  "verdant:quick-log:photo-attachment-recovery-changed" as const;
+
+function notifyRecoveryChanged(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT));
+  } catch {
+    // A notification failure must never turn a settled save into an error.
+  }
+}
+
 const PHOTO_DIARY_INSERT_OPERATION = "photo_diary_insert" as const;
 
 export interface QuickLogPhotoAttachmentRecoveryScope {
@@ -291,7 +308,9 @@ export function releaseQuickLogPhotoAttachmentRecoveryLockForEntry(
   if (locks.get(key)?.diaryEntryId !== entryId) return false;
   locks.delete(key);
   writeStoredLocks(locks);
-  return !storedLockHolds(key, entryId);
+  const released = !storedLockHolds(key, entryId);
+  if (released) notifyRecoveryChanged();
+  return released;
 }
 
 /**

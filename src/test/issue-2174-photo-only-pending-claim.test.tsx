@@ -470,6 +470,81 @@ describe("Photo only claims its exact scope and id before awaiting the insert", 
     expect(state.uploadPaths).toHaveLength(2);
   });
 
+  // Codex P1 at 28d51a2e9: a sheet remounted while the insert was pending ran
+  // its one-shot lookup, missed, and stayed locked after the original save
+  // settled, until a close/reopen.
+  it.each([
+    ["the insert is confirmed", { data: null, error: null }, true],
+    [
+      "the insert is definitively rejected",
+      { data: null, error: { message: "permission denied", code: "42501" } },
+      false,
+    ],
+  ] as const)(
+    "restores Save on a remounted sheet when the pending insert settles (%s)",
+    async (_label, result, announces) => {
+      await startFirstAttemptAndUnmount();
+      render(sheet());
+      await settle();
+      expect(screen.getByText(/could not confirm the photo attachment/i)).toBeTruthy();
+
+      await act(async () => {
+        state.insertGates[0]?.(result);
+      });
+      await settle();
+
+      expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(false);
+      expect(screen.queryByText(/could not confirm the photo attachment/i)).toBeNull();
+      await choosePhotoOnly();
+      expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
+      expect(entryCreatedEvents).toHaveLength(announces ? 1 : 0);
+      expect(state.insertCalls).toHaveLength(1);
+    },
+  );
+
+  it("stays locked when a fence for a different target is released", async () => {
+    await startFirstAttemptAndUnmount();
+    render(sheet());
+    await settle();
+
+    const otherScope = { ...SCOPE, plantId: "plant-2" };
+    act(() => {
+      expect(
+        recoveryModule.claimQuickLogPhotoAttachmentRecoveryLock(otherScope, "other-entry"),
+      ).toBe("claimed");
+      expect(
+        recoveryModule.releaseQuickLogPhotoAttachmentRecoveryLockForEntry(
+          otherScope,
+          "other-entry",
+        ),
+      ).toBe(true);
+    });
+    await settle();
+
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(true);
+    expect(screen.getByText(/could not confirm the photo attachment/i)).toBeTruthy();
+    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+  });
+
+  it("stays locked when the pending insert succeeds but storage refuses to remove the fence", async () => {
+    await startFirstAttemptAndUnmount();
+    render(sheet());
+    await settle();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+
+    await act(async () => {
+      state.insertGates[0]?.({ data: null, error: null });
+    });
+    await settle();
+
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(true);
+    expect(screen.getByText(/could not confirm the photo attachment/i)).toBeTruthy();
+    expect(entryCreatedEvents).toHaveLength(1);
+    expect(state.insertCalls).toHaveLength(1);
+  });
+
   it("keeps the fence across a reload once the insert has started", async () => {
     const firstId = await startFirstAttemptAndUnmount();
     simulatePageReload();

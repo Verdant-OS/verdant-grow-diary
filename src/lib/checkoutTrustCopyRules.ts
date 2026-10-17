@@ -1,6 +1,6 @@
 import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 
-export type CheckoutTrustState = "sandbox" | "unavailable";
+export type CheckoutTrustState = "sandbox" | "live" | "unavailable";
 
 export interface CheckoutTrustCopy {
   state: CheckoutTrustState;
@@ -29,6 +29,19 @@ const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
   canCreateLiveCharge: false,
 });
 
+/** Answer shown when live checkout is open on a production hostname. */
+export const LIVE_CHECKOUT_FAQ_ANSWER =
+  "Yes. Checkout runs on Paddle, which processes the payment and shows the full price, tax and renewal terms before you confirm. Paid access starts only after Paddle confirms the payment to Verdant's server.";
+
+const LIVE_COPY: CheckoutTrustCopy = Object.freeze({
+  state: "live",
+  label: "Secure checkout by Paddle",
+  summary: "Paddle processes your payment. You see the exact price and tax before you pay.",
+  faqQuestion: "Is checkout live?",
+  faqAnswer: LIVE_CHECKOUT_FAQ_ANSWER,
+  canCreateLiveCharge: true,
+});
+
 const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "unavailable",
   label: "Sandbox test checkout unavailable",
@@ -46,5 +59,6 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
 export function buildCheckoutTrustCopy(input: CheckoutTrustCopyInput): CheckoutTrustCopy {
   if (input.blocked) return UNAVAILABLE_COPY;
   if (input.environment === "sandbox") return SANDBOX_COPY;
+  if (input.environment === "live") return LIVE_COPY;
   return UNAVAILABLE_COPY;
 }

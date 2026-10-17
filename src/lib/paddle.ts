@@ -36,17 +36,18 @@ function currentHostname(): string | null {
 }
 
 /**
- * Entitlement reads stay pinned to sandbox while the product is test-only.
- * Checkout uses the stricter `resolvePaddleCheckout()` gate below.
+ * Billing environment this client expects for entitlement reads. Live only
+ * when checkout itself resolves live (a live token on a production host);
+ * otherwise sandbox, as before. Live rows always count in entitlement reads;
+ * sandbox rows count only when this returns "sandbox".
  */
-export function getPaddleEnvironment(): "sandbox" {
-  return "sandbox";
+export function getPaddleEnvironment(): "sandbox" | "live" {
+  return resolvePaddleCheckout() === "live" ? "live" : "sandbox";
 }
 
 /**
- * Deterministic checkout gate. Only `'sandbox'` authorizes checkout. The
- * broader return type is retained for compatibility with existing callers,
- * but the resolver currently returns only `'sandbox'` or `'unavailable'`.
+ * Deterministic checkout gate: `'sandbox'` and `'live'` authorize
+ * checkout; `'unavailable'` never does.
  */
 export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
   return resolvePaddleCheckoutEnvironment({
@@ -57,11 +58,11 @@ export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
 
 /**
  * Grower-facing blocking copy for the current unavailable case. Returns
- * `null` only when sandbox checkout is available. Never reveals a token.
+ * `null` when sandbox or live checkout is available. Never reveals a token.
  */
 export function getCheckoutUnavailableMessage(): string | null {
   const env = resolvePaddleCheckout();
-  if (env === "sandbox") return null;
+  if (env === "sandbox" || env === "live") return null;
   if (classifyPaddleToken(clientToken) === "live") {
     return CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE;
   }
@@ -269,10 +270,10 @@ export async function initializePaddle(): Promise<void> {
   if (paddleInitialized) return;
   if (paddleInitPromise) return paddleInitPromise;
 
-  // Fail closed before loading Paddle.js unless the environment is exactly
-  // sandbox. This protects every host from a stray live client token.
+  // Fail closed before loading Paddle.js unless checkout resolved to sandbox
+  // or live. A live token resolves live only on a production hostname.
   const env = resolvePaddleCheckout();
-  if (env !== "sandbox") {
+  if (env !== "sandbox" && env !== "live") {
     throw new PaddleCheckoutUnavailableError(
       getCheckoutUnavailableMessage() ?? CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
     );
@@ -282,7 +283,8 @@ export async function initializePaddle(): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>('script[data-paddle-loader="true"]');
     const onLoad = () => {
       try {
-        (window as any).Paddle.Environment.set("sandbox");
+        // Paddle.js defaults to production; only sandbox needs an override.
+        if (env === "sandbox") (window as any).Paddle.Environment.set("sandbox");
         // Slice D: single module-level event router. Registered exactly
         // once at Initialize time — StrictMode-safe because
         // `paddleInitialized` guards re-entry.
@@ -313,15 +315,17 @@ export async function initializePaddle(): Promise<void> {
 }
 
 export async function getPaddlePriceId(priceId: string): Promise<string> {
-  // Never ask the catalog for a price unless checkout is exactly sandbox.
+  // Never ask the catalog for a price unless checkout resolved to sandbox or
+  // live. The resolver picks the billing environment server-side
+  // (PAYMENTS_ENVIRONMENT) and ignores this field; it is sent for logs.
   const env = resolvePaddleCheckout();
-  if (env !== "sandbox") {
+  if (env !== "sandbox" && env !== "live") {
     throw new PaddleCheckoutUnavailableError(
       getCheckoutUnavailableMessage() ?? CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
     );
   }
   const { data, error } = await supabase.functions.invoke("get-paddle-price", {
-    body: { priceId, environment: "sandbox" },
+    body: { priceId, environment: env },
   });
   if (error || !data?.paddleId) {
     // Prefer what the resolver said about itself; fall back to what its

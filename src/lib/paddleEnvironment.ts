@@ -1,8 +1,11 @@
 /**
  * Pure, null-safe helpers that decide whether Paddle checkout may run in the
- * current browser context. Verdant's current product policy is sandbox-only:
- * only a well-formed `test_` token resolves to `"sandbox"`; every other
- * token class resolves to `"unavailable"` on every host.
+ * current browser context. A well-formed `test_` token resolves to
+ * `"sandbox"` on every host. A well-formed `live_` token resolves to
+ * `"live"` only on an explicit production hostname
+ * (`PRODUCTION_CHECKOUT_HOSTNAMES`) and to `"unavailable"` everywhere else,
+ * so previews, staging and local builds can never open live checkout.
+ * Missing or malformed tokens are `"unavailable"`.
  *
  * SAFETY:
  *  - Never logs, returns, or embeds the token value.
@@ -40,8 +43,8 @@ export function classifyPaddleToken(token: string | null | undefined): PaddleTok
 
 /**
  * Detect loopback / local-development hostnames. Retained for callers that
- * need hostname diagnostics; checkout authorization no longer depends on
- * hostname because live tokens are unavailable everywhere.
+ * need hostname diagnostics. Live checkout authorization uses the explicit
+ * production allowlist below, so loopback is never a live host either way.
  *
  * Matches:
  *   - "localhost" and any "*.localhost" subdomain
@@ -71,6 +74,23 @@ export function isLoopbackHostname(hostname: string | null | undefined): boolean
   return false;
 }
 
+/**
+ * The only hostnames where a live token may open live checkout. Exact,
+ * lowercase matches; no suffix or wildcard matching, so preview hosts such as
+ * `*.lovable.app`, `*.pages.dev` or `*.workers.dev` never qualify.
+ */
+export const PRODUCTION_CHECKOUT_HOSTNAMES: readonly string[] = Object.freeze([
+  "verdantgrowdiary.com",
+  "www.verdantgrowdiary.com",
+]);
+
+export function isProductionCheckoutHostname(hostname: string | null | undefined): boolean {
+  if (typeof hostname !== "string") return false;
+  // A single trailing dot is the same fully-qualified host.
+  const h = hostname.trim().toLowerCase().replace(/\.$/, "");
+  return PRODUCTION_CHECKOUT_HOSTNAMES.includes(h);
+}
+
 export interface ResolvePaddleCheckoutEnvironmentInput {
   token: string | null | undefined;
   hostname: string | null | undefined;
@@ -80,24 +100,26 @@ export interface ResolvePaddleCheckoutEnvironmentInput {
  * Deterministically resolve whether checkout may open in the current context.
  *
  * Rules:
- *   1. Sandbox token             → "sandbox" (all hosts)
- *   2. Live token                → "unavailable" (all hosts)
- *   3. Malformed / missing token → "unavailable"
+ *   1. Sandbox token                         → "sandbox" (all hosts)
+ *   2. Live token on a production hostname   → "live"
+ *   3. Live token on any other host          → "unavailable"
+ *   4. Malformed / missing token             → "unavailable"
  */
 export function resolvePaddleCheckoutEnvironment(
   input: ResolvePaddleCheckoutEnvironmentInput,
 ): PaddleCheckoutEnvironment {
   const cls = classifyPaddleToken(input.token);
   if (cls === "sandbox") return "sandbox";
+  if (cls === "live" && isProductionCheckoutHostname(input.hostname)) return "live";
   return "unavailable";
 }
 
 /**
- * Fixed, safe copy for a blocked live token. The legacy export name is kept
- * to avoid widening this policy slice; the message applies on every host.
+ * Fixed, safe copy for a live token outside the production hostnames. The
+ * legacy export name is kept for existing callers.
  */
 export const CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE =
-  "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
+  "Live checkout is only available on verdantgrowdiary.com.";
 
 /**
  * Fixed, safe copy for a missing or malformed token. Never reveals which

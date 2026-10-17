@@ -137,22 +137,21 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
     expect(result.current.loading).toBe(false);
   });
 
-  it("treats a live environment as unavailable", () => {
+  it("treats a resolved live environment as available (resolved only on a production host)", () => {
     paddleState.env = "live";
-    paddleState.message =
-      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
+    paddleState.message = null;
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
 
     expect(result.current.environment).toBe("live");
-    expect(result.current.unavailable).toBe(true);
-    expect(result.current.unavailableMessage).toContain("sandbox testing only");
+    expect(result.current.unavailable).toBe(false);
+    expect(result.current.unavailableMessage).toBeNull();
   });
 
-  it("blocks a live environment before auth, storage, session, or overlay work", async () => {
-    paddleState.env = "live";
-    paddleState.message =
-      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
+  it("blocks a live token off the production host before auth, storage, session, or overlay work", async () => {
+    // A live token on any non-production host resolves "unavailable".
+    paddleState.env = "unavailable";
+    paddleState.message = "Live checkout is only available on verdantgrowdiary.com.";
     const openSpy = vi.fn();
     (window as any).Paddle = { Checkout: { open: openSpy } };
 
@@ -162,7 +161,7 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
       await result.current.openCheckout({ priceId: "pro_monthly" });
     });
 
-    expect(result.current.blockedReason).toContain("sandbox testing only");
+    expect(result.current.blockedReason).toContain("only available on verdantgrowdiary.com");
     expect(navigateMock).not.toHaveBeenCalled();
     expect(toastMock).not.toHaveBeenCalled();
     expect(window.sessionStorage.length).toBe(0);

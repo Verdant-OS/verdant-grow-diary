@@ -41,7 +41,7 @@ export interface UsePaddleCheckoutResult {
   environment: PaddleCheckoutEnvironment;
   /**
    * True when the client-side environment gate has blocked checkout
-   * (anything other than an exact sandbox environment). Derived
+   * (environment `"unavailable"`; sandbox and live may open). Derived
    * from the same helper the banner uses, so UI stays consistent.
    */
   unavailable: boolean;
@@ -85,7 +85,8 @@ function defaultSuccessUrl(): string {
  *
  * SAFETY:
  *  - Fails closed via `resolvePaddleCheckout()` before any Paddle call
- *    unless the environment is exactly `"sandbox"`. The caller sees a
+ *    when the environment is `"unavailable"` (sandbox and live may open).
+ *    The caller sees a
  *    calm `blockedReason` string; no navigation, no toast, no crash.
  *  - If the user is not signed in, redirects to /auth with a return-to
  *    parameter so we never open a checkout that cannot be attributed
@@ -127,7 +128,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
 
     [],
   );
-  const unavailable = environment !== "sandbox";
+  const unavailable = environment === "unavailable";
   const unavailableMessage = useMemo(
     () => (unavailable ? getCheckoutUnavailableMessage() : null),
     [unavailable],
@@ -143,7 +144,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
       // Fail-closed gate BEFORE any auth redirect: if checkout cannot run
       // here, we must not detour the user to /auth and then dead-end.
       const env = resolvePaddleCheckout();
-      if (env !== "sandbox") {
+      if (env === "unavailable") {
         setBlockedReasonCode(null);
         setBlockedReason(getCheckoutUnavailableMessage());
         return;

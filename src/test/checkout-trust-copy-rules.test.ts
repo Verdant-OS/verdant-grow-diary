@@ -2,14 +2,24 @@ import { describe, expect, it } from "vitest";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 
 describe("buildCheckoutTrustCopy", () => {
-  it("fails closed when a presenter is handed a live environment", () => {
-    const result = buildCheckoutTrustCopy({ environment: "live", blocked: false });
+  it("labels live checkout truthfully, and fails closed when live is blocked or unknown", () => {
+    // Live is only ever resolved on a production hostname (paddleEnvironment).
+    const live = buildCheckoutTrustCopy({ environment: "live", blocked: false });
+    expect(live.state).toBe("live");
+    expect(live.canCreateLiveCharge).toBe(true);
+    expect(live.faqAnswer).not.toContain("sandbox");
+    expect(live.faqAnswer).toContain("Paddle");
 
-    expect(result.state).toBe("unavailable");
-    expect(result.canCreateLiveCharge).toBe(false);
-    expect(result.summary).toContain("Live checkout is disabled");
-    expect(result.faqAnswer).toContain("sandbox");
-    expect(result.faqAnswer).toContain("cannot create a real charge");
+    for (const result of [
+      buildCheckoutTrustCopy({ environment: "live", blocked: true }),
+      buildCheckoutTrustCopy({ environment: "unavailable", blocked: false }),
+      buildCheckoutTrustCopy({ environment: undefined, blocked: false }),
+    ]) {
+      expect(result.state).toBe("unavailable");
+      expect(result.canCreateLiveCharge).toBe(false);
+      expect(result.summary).toContain("Live checkout is disabled");
+      expect(result.faqAnswer).toContain("cannot create a real charge");
+    }
   });
 
   it("labels sandbox checkout and never implies a live charge", () => {

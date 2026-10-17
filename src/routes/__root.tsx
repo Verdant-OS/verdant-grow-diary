@@ -131,8 +131,9 @@ function isGrowHelpToolkitPath(pathname: string): boolean {
 }
 
 function RootErrorComponent({ error }: { error: unknown }) {
-  const normalizedError = useMemo(() => {
-    if (error instanceof Error) return error;
+  const normalizedError = useMemo((): Error | Response => {
+    // A thrown Response passes through so the reporters keep its status and URL.
+    if (error instanceof Error || error instanceof Response) return error;
     try {
       return new Error(String(error));
     } catch {

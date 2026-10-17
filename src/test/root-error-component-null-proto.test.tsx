@@ -64,6 +64,24 @@ describe("RootErrorComponent safe error handling", () => {
     });
   });
 
+  it("passes a thrown Response through unchanged so reporters keep its status and URL", () => {
+    const response = new Response(null, { status: 503 });
+    Object.defineProperty(response, "url", { value: "https://verdantgrowdiary.com/api/plants" });
+    render(createElement(ErrorComp, { error: response }));
+
+    expect(reportLovableErrorMock).toHaveBeenCalledTimes(1);
+    const reportedLovable = reportLovableErrorMock.mock.calls[0]?.[0];
+    expect(reportedLovable).toBe(response);
+    expect((reportedLovable as Response).status).toBe(503);
+    expect((reportedLovable as Response).url).toBe("https://verdantgrowdiary.com/api/plants");
+
+    expect(reportErrorWhenReadyMock).toHaveBeenCalledWith(response, {
+      source: "route_error_component",
+      route: "/plants/1",
+      handled: false,
+    });
+  });
+
   it("passes an Error instance through unchanged", () => {
     const err = new Error("boom");
     render(createElement(ErrorComp, { error: err }));

@@ -71,6 +71,7 @@ import {
 } from "@/lib/quickLogPhotoContentRules";
 import {
   claimQuickLogPhotoAttachmentRecoveryLock,
+  completeQuickLogPhotoAttachmentAttempt,
   getQuickLogPhotoAttachmentRecoveryRecord,
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
@@ -240,16 +241,16 @@ export default function PlantQuickLog({
     const entryId = recovery.diaryEntryId;
     void hasConfirmedQuickLogPhotoDiaryEntryForOwner(ownerId, entryId).then((confirmed) => {
       if (!active || !confirmed) return;
-      // Release only this exact attempt. If the original save's own response
-      // already released it, that path announced the row; never announce twice,
-      // and never clear a different attempt's claim.
-      const releasedHere = releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
+      // Settle only this exact attempt, and never clear a different attempt's
+      // claim. The save's own response settles through the same gate, so
+      // whichever path is first announces the row and the other does not.
+      const announce = completeQuickLogPhotoAttachmentAttempt(scope, entryId);
       const stillLocked = hasQuickLogPhotoAttachmentRecoveryLock(scope);
       setPhotoAttachmentUnconfirmed(stillLocked);
       if (!stillLocked) {
         setError((current) => (current === PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE ? null : current));
       }
-      if (!releasedHere) return;
+      if (!announce) return;
       dispatchQuickLogV2EntryCreated({
         createdAt: new Date().toISOString(),
         growEventId: null,
@@ -525,7 +526,11 @@ export default function PlantQuickLog({
         // Claim the exact scope and id BEFORE uploading, so a sheet remounted
         // for the same plant mid-upload finds the fence and cannot start a
         // second upload or insert, however the two attempts interleave.
-        const claim = claimQuickLogPhotoAttachmentRecoveryLock(photoOnlyScope, photoOnlyEntryId);
+        const claim = claimQuickLogPhotoAttachmentRecoveryLock(
+          photoOnlyScope,
+          photoOnlyEntryId,
+          "upload",
+        );
         if (claim === "held_by_other") {
           if (!canContinue()) return;
           setPhotoAttachmentUnconfirmed(true);
@@ -757,10 +762,14 @@ export default function PlantQuickLog({
     // Normally this attempt already holds the claim from before its upload; the
     // call then confirms it. Insert only under a durable claim: `unavailable`
     // (storage could not persist the fence) must not fall through.
-    const claim = claimQuickLogPhotoAttachmentRecoveryLock(scope, entryId);
+    const claim = claimQuickLogPhotoAttachmentRecoveryLock(scope, entryId, "insert");
     if (claim !== "claimed") {
-      // Never insert without the fence. An object this attempt just uploaded
+      // Never insert without the fence. No insert has started for this id, so
+      // its own upload reservation (if any) is released; a claim held by
+      // another attempt is left alone. An object this attempt just uploaded
       // is referenced by nothing, so it alone may be removed.
+      if (claim === "unavailable")
+        releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
       if (attempt.freshUpload) {
         await supabase.storage
           .from("diary-photos")
@@ -814,11 +823,10 @@ export default function PlantQuickLog({
     // plant. Telemetry, the recent target, the Timeline refresh and the single
     // entry-created signal therefore run for the captured plant even after an
     // unmount or target switch; only the sheet's own UI completion is gated.
-    // If a remounted sheet's exact reconciliation already released this claim,
-    // it already sent the success telemetry and entry-created signal; do not
-    // send them a second time for the same row.
-    const releasedHere = releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
-    const alreadyAnnounced = !releasedHere;
+    // If a remounted sheet's exact reconciliation already settled this row, it
+    // already sent the success telemetry and entry-created signal; do not send
+    // them a second time, even if the browser refused to remove the fence.
+    const alreadyAnnounced = !completeQuickLogPhotoAttachmentAttempt(scope, entryId);
     try {
       if (!alreadyAnnounced) trackQuickLogSuccess("photo", { reused: false });
       rememberRecentQuickLogTarget(

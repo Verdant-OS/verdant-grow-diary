@@ -13,10 +13,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as recoveryModule from "@/lib/quickLogPhotoAttachmentRecovery";
 import {
   getQuickLogPhotoAttachmentRecoveryRecord,
   hasQuickLogPhotoAttachmentRecoveryLock,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
+
+/**
+ * A page reload ends every in-flight attempt but keeps sessionStorage. The
+ * module's per-page memory is reset to model that; storage is left as is.
+ */
+function simulatePageReload() {
+  (
+    recoveryModule as { resetQuickLogPhotoAttachmentRecoveryMemoryForTests?: () => void }
+  ).resetQuickLogPhotoAttachmentRecoveryMemoryForTests?.();
+}
 
 type InsertResult = { data: null; error: { message: string; code?: string } | null };
 type UploadResult = { data: { path: string } | null; error: { message: string } | null };
@@ -212,6 +223,7 @@ beforeEach(() => {
   entryCreatedEvents = [];
   window.addEventListener("verdant:entry-created", onEntryCreated);
   window.sessionStorage.clear();
+  simulatePageReload();
   if (typeof URL.createObjectURL !== "function") {
     (URL as unknown as { createObjectURL: () => string }).createObjectURL = vi.fn(
       () => "blob:mock-preview",
@@ -432,4 +444,85 @@ describe("Photo only claims its exact scope and id before awaiting the insert", 
     // The confirmed row unlocks the remounted sheet.
     expect(screen.queryByText(/could not confirm the photo attachment/i)).toBeNull();
   });
+
+  // Codex re-review at c3db89609, defect 1: a reload during the upload ended
+  // the attempt before its insert could start, but the session reservation
+  // stayed and closing/reopening never restored Save.
+  it("drops a reservation whose upload was ended by a reload, so Save works again", async () => {
+    state.deferUploads = true;
+    const view = render(sheet());
+    await choosePhotoOnly();
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+    await waitFor(() => expect(state.uploadGates).toHaveLength(1));
+    view.unmount();
+    simulatePageReload();
+
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(false);
+    render(sheet());
+    await settle();
+    expect(screen.queryByText(/could not confirm the photo attachment/i)).toBeNull();
+
+    state.deferUploads = false;
+    await choosePhotoOnly();
+    expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+    await waitFor(() => expect(state.insertCalls).toHaveLength(1));
+    expect(state.uploadPaths).toHaveLength(2);
+  });
+
+  it("keeps the fence across a reload once the insert has started", async () => {
+    const firstId = await startFirstAttemptAndUnmount();
+    simulatePageReload();
+
+    expect(getQuickLogPhotoAttachmentRecoveryRecord(SCOPE)?.diaryEntryId).toBe(firstId);
+    await remountAndAttemptSecondSave();
+    expect(state.uploadPaths).toHaveLength(1);
+    expect(state.insertCalls).toHaveLength(1);
+    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+  });
+
+  // Codex re-review at c3db89609, defect 2: when the browser refused to remove
+  // the fence, both completion paths still reported a release and announced.
+  it.each([
+    ["insert response first", "insert-first"],
+    ["remount lookup first", "lookup-first"],
+  ] as const)(
+    "announces once when storage refuses to remove the fence (%s)",
+    async (_label, order) => {
+      const firstId = await startFirstAttemptAndUnmount();
+      state.readableRowId = firstId;
+      state.deferLookups = true;
+      render(sheet());
+      await waitFor(() => expect(state.lookupGates).toHaveLength(1));
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("QuotaExceededError");
+      });
+
+      const settleInsert = async () => {
+        await act(async () => {
+          state.insertGates[0]?.({ data: null, error: null });
+        });
+        await settle();
+      };
+      const settleLookup = async () => {
+        await act(async () => {
+          state.lookupGates[0]?.();
+        });
+        await settle();
+      };
+      if (order === "insert-first") {
+        await settleInsert();
+        await settleLookup();
+      } else {
+        await settleLookup();
+        await settleInsert();
+      }
+
+      expect(state.insertCalls).toHaveLength(1);
+      expect(entryCreatedEvents).toHaveLength(1);
+      expect(trackMock).toHaveBeenCalledTimes(1);
+      // The fence could not be removed, so this sheet stays locked (fail-closed).
+      expect(hasQuickLogPhotoAttachmentRecoveryLock(SCOPE)).toBe(true);
+    },
+  );
 });

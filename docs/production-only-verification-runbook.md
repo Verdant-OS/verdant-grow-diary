@@ -49,7 +49,7 @@ once the head moves. Migrations, payments or billing, `.github` workflows, secur
 or auth, and dependency or lockfile changes still need Codex (not on a PR Codex
 authored or repaired), or Blue Dream, Critical Mass, or Durban Poison. Claude may
 add peer observations but is not the acceptance reviewer. Codex opens repairs as
-drafts and uses normal pushes only. **Chemdawg** alone owns merge after all 35
+drafts and uses normal pushes only. **Chemdawg** alone owns merge after all 36
 required checks are SUCCESS and an independent PASS covers the exact head. Earlier
 self-integration phases grant no current authority. Publish gates remain with
 Matthew. Historical receipts keep their original reviewer.
@@ -57,23 +57,23 @@ Matthew. Historical receipts keep their original reviewer.
 ## Existing non-production dependencies — separate CI slices
 
 These are source bindings, not successful target inspection. Rows marked RETIRED
-had their sandbox jobs, dispatch options or workflows removed (#2071 and #2075);
+had their sandbox jobs, dispatch options or workflows removed (#2071, #2075, #2086);
 every other row's job, trigger, environment, secret reference, script and
 protection are unchanged. Do not substitute a production URL into a legacy
 mutation harness.
 
-| Existing lane                              | Existing source binding                                                                  | Separate follow-up / status                                                                                                                             |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Supabase Preview (provider)                | Preview migration replay; #1175 reports 42P07, ai_credit_grants exists                   | BLOCKED: SQL/provider reconciliation outside this repair scope; no production acceptance.                                                               |
-| Required core schema present               | required-core-migrations.yml, verify-sandbox (removed)                                   | RETIRED: the sandbox job and `sandbox` dispatch option were removed. Only the manual production verifier remains, behind a typed `LIVE` confirmation.   |
-| Required money-critical migrations present | required-money-migrations.yml, assert-money-migrations-applied-sandbox (removed)         | RETIRED: the sandbox job and `sandbox` dispatch option were removed (#2071). Only the manual LIVE verifier remains; APPLY remains Matthew's approval.   |
-| Prefix diff against SANDBOX                | prefix-diff-sarif.yml, prefix-diff-sandbox (removed)                                     | RETIRED: the sandbox job and `sandbox` dispatch option were removed (#2071). Only the manual LIVE prefix diff remains; no production inference from CI. |
-| Sandbox credit-packs smoke                 | sandbox-credit-packs-smoke.yml (deleted), nightly sandbox DB read                        | RETIRED: the workflow was deleted. A fixture-scoped production read-only equivalent is a separate slice; no payment-mode change or charge.              |
-| Gamification staging smoke                 | gamification-staging-smoke.yml, main-only privileged setup; recorded step-env gating gap | BLOCKED CI alignment: effective gating and fixture safety need review before production; no role/credit setup authorized.                               |
-| Conditional QuickLog RPC harness           | ci.yml, test:db:quicklog-rpc-runtime, privileged DB setup                                | BLOCKED production smoke: audit fixture/writes separately; never simply repoint setup credentials.                                                      |
-| Pheno paid-user local smoke                | test:pheno-paid-smoke:local, disposable user/subscription seeding, local-only refusal    | BLOCKED hosted verification: separately assign production-safe fixture lane; never repoint seeder/cleanup.                                              |
-| Mocked/local browser and DB CI             | Local web-server / disposable fixtures, including Demo Proof/native recovery             | NOT_APPLICABLE to production acceptance. Preserve code validation jobs; any target changes need a separate CI slice.                                    |
-| deployment-preview                         | Artifact build/upload/status, no hosted target measured                                  | NOT_APPLICABLE to live acceptance. Status-message alignment is a separate CI slice, not a deployment or alternate-host requirement.                     |
+| Existing lane                              | Existing source binding                                                               | Separate follow-up / status                                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase Preview (provider)                | Preview migration replay; #1175 reports 42P07, ai_credit_grants exists                | BLOCKED: SQL/provider reconciliation outside this repair scope; no production acceptance.                                                               |
+| Required core schema present               | required-core-migrations.yml, verify-sandbox (removed)                                | RETIRED: the sandbox job and `sandbox` dispatch option were removed. Only the manual production verifier remains, behind a typed `LIVE` confirmation.   |
+| Required money-critical migrations present | required-money-migrations.yml, assert-money-migrations-applied-sandbox (removed)      | RETIRED: the sandbox job and `sandbox` dispatch option were removed (#2071). Only the manual LIVE verifier remains; APPLY remains Matthew's approval.   |
+| Prefix diff against SANDBOX                | prefix-diff-sarif.yml, prefix-diff-sandbox (removed)                                  | RETIRED: the sandbox job and `sandbox` dispatch option were removed (#2071). Only the manual LIVE prefix diff remains; no production inference from CI. |
+| Sandbox credit-packs smoke                 | sandbox-credit-packs-smoke.yml (deleted), nightly sandbox DB read                     | RETIRED: the workflow was deleted. A fixture-scoped production read-only equivalent is a separate slice; no payment-mode change or charge.              |
+| Gamification staging smoke                 | gamification-staging-smoke.yml (deleted), main-only privileged setup                  | RETIRED: the dormant workflow was deleted (#2086). `bun run smoke:award-nugs` remains a manual script; no role/credit setup authorized.                 |
+| Conditional QuickLog RPC harness           | ci.yml, test:db:quicklog-rpc-runtime, privileged DB setup                             | BLOCKED production smoke: audit fixture/writes separately; never simply repoint setup credentials.                                                      |
+| Pheno paid-user local smoke                | test:pheno-paid-smoke:local, disposable user/subscription seeding, local-only refusal | BLOCKED hosted verification: separately assign production-safe fixture lane; never repoint seeder/cleanup.                                              |
+| Mocked/local browser and DB CI             | Local web-server / disposable fixtures, including Demo Proof/native recovery          | NOT_APPLICABLE to production acceptance. Preserve code validation jobs; any target changes need a separate CI slice.                                    |
+| deployment-preview                         | Artifact build/upload/status, no hosted target measured                               | NOT_APPLICABLE to live acceptance. Status-message alignment is a separate CI slice, not a deployment or alternate-host requirement.                     |
 
 Provider-sandbox accounting and telemetry/CSV/Doctor preview UI are not alternate
 smoke hosts. Preserve their semantics; no billing-mode/entitlement/auth/schema

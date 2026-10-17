@@ -25,8 +25,10 @@ bun run test:security-regression
 
 No network, no database, no Deno. Must stay fast so it can gate every PR.
 
-**Manual step (one-time):** mark `test:security-regression` as a required
-status check on `main` in GitHub branch protection.
+**Manual step (one-time):** add `test:security-regression` to the required status
+checks of ruleset 20421416 ("verdant-grow-diary merge queue", `refs/heads/verdant-grow-diary`).
+`config/required-status-checks.json` already lists it under `required` (2026-10-14); the
+ruleset is the enforcement, and only a repository admin can change it.
 
 ## Tier 2 — `test:paddle-webhook-edge-security` (Deno)
 

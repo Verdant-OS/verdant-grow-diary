@@ -258,16 +258,17 @@ JSX; use the capability helpers.
 
 ### The required set
 
-Thirty-five contexts are required by ruleset 20421416 on `refs/heads/verdant-grow-diary`,
-pinned in `config/required-status-checks.json`. **All 35 come from `ci.yml`:**
+Thirty-six contexts are required by ruleset 20421416 on `refs/heads/verdant-grow-diary`,
+pinned in `config/required-status-checks.json`. Thirty-five come from `ci.yml`:
 
 - `Full test suite (shard 1/32)` … `(shard 32/32)` — the `full-suite` matrix job
 - `Lint, typecheck, test, build` — job `test`
 - `Preflight — edge shared-lib mirror in sync` — job `edge-shared-sync-preflight`
 - `test:legal-seo` — job `legal-seo`
 
-`mustBeGreen` but **not** in the ruleset: `test:security-regression`. The config records
-that it failed on the head of PR #769 and merged anyway — a documented enforcement hole.
+The thirty-sixth is `test:security-regression`, job `test-security-regression` in
+`security-regression.yml`. It was `mustBeGreen` until 2026-10-14: the config records that it
+failed on the head of PR #769 and merged anyway, the enforcement hole that promotion closes.
 
 ### Governance and integrity gates
 
@@ -319,7 +320,7 @@ immutable workspace, then runs the individual RLS lanes), `security-regression`,
 `one-tent-loop-proof-never-healthy`, `one-tent-loop-smoke-test`,
 `demo-proof-walkthrough-readonly`, `dispatch-history-e2e`, `symptom-check-branch-e2e`,
 `genetics-traceability-smoke`, `irrigation-overflow-smoke`, `agent-integrations-smoke`,
-`gamification-staging-smoke`, `pi-ingest-smoke`, `e2e-fixture-garden-rotation`,
+`pi-ingest-smoke`, `e2e-fixture-garden-rotation`,
 the `ai-doctor-*` trio, the `pheno-*` set, `contextual-pheno-comparison-v0`.
 
 ### SEO / performance

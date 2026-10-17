@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-14.2**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -42,7 +42,7 @@ publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison*
 may supply an independently assigned acceptance. **Codex** is an equal independent
 exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
 Claude may add peer observations but is not the acceptance reviewer.
-Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
+Chemdawg owns merge only after **36/36 required checks** succeed and Blue Dream,
 Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
 **Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
 PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new

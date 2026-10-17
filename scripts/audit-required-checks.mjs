@@ -67,7 +67,7 @@ async function api(path, { token = TOKEN } = {}) {
 }
 
 /**
- * Check runs paginate at 100; a 35-context repo can exceed one page.
+ * Check runs paginate at 100; a 36-context repo can exceed one page.
  *
  * `filter=all` is load-bearing, not tidiness. The endpoint defaults to
  * `filter=latest`, which returns only the most recent attempt per check — so
@@ -167,7 +167,7 @@ async function resolveRulesetDrift(pinned) {
     });
   } catch (error) {
     // A 404 is not an inability to verify — it is a verified answer. The
-    // pinned ruleset does not exist, so nothing is enforcing the 35 contexts
+    // pinned ruleset does not exist, so nothing is enforcing the 36 contexts
     // this audit assumes are required. BLOCKED is advisory and would let an
     // otherwise-green run report PASS beside a ruleset that has been deleted
     // or replaced, so that case has to fail. BLOCKED stays for what it is for:

@@ -123,11 +123,12 @@ describe("queued merges with supplemental PR-only checks", () => {
     },
   );
 
-  it("does not opt the merge-group security gate into PR-head fallback", () => {
-    const entry = PINNED.mustBeGreen.find(
-      (item: { context: string }) => item.context === "test:security-regression",
-    );
-    expect(entry?.allowPrHeadEvidence).not.toBe(true);
+  it("keeps the merge-group security gate required, never a PR-head fallback lane", () => {
+    // Promoted from mustBeGreen to required (2026-10-14). Required contexts never
+    // take the PR-head fallback, and the merge queue can only wait for a context
+    // whose workflow runs on merge_group.
+    expect(PINNED.required).toContain("test:security-regression");
+    expect(MUST_BE_GREEN).not.toContain("test:security-regression");
     const workflow = loadYaml(
       readFileSync(resolve(ROOT, ".github/workflows/security-regression.yml"), "utf8"),
     ) as { on: Record<string, unknown> };
@@ -272,7 +273,7 @@ describe("queued merges with supplemental PR-only checks", () => {
 });
 
 describe("config/required-status-checks.json", () => {
-  it("pins the 35 contexts of ruleset 20421416 and targets the deploy branch", () => {
+  it("pins the 36 contexts of ruleset 20421416 and targets the deploy branch", () => {
     expect(PINNED.rulesetId).toBe(20421416);
     expect(PINNED.branch).toBe("verdant-grow-diary");
     expect(PINNED.enforcement).toBe("active");
@@ -280,12 +281,13 @@ describe("config/required-status-checks.json", () => {
       include: ["refs/heads/verdant-grow-diary"],
       exclude: [],
     });
-    expect(PINNED.required).toHaveLength(35);
+    expect(PINNED.required).toHaveLength(36);
     expect(PINNED.strictRequiredStatusChecksPolicy).toBe(true);
-    // 32 sharded full-suite contexts plus three named gates.
+    // 32 sharded full-suite contexts plus four named gates.
     expect(PINNED.required.filter((c: string) => c.startsWith("Full test suite"))).toHaveLength(32);
     expect(PINNED.required).toContain("Lint, typecheck, test, build");
     expect(PINNED.required).toContain("test:legal-seo");
+    expect(PINNED.required).toContain("test:security-regression");
   });
 
   it("keeps mustBeGreen disjoint from required (a context has one provenance)", () => {
@@ -295,15 +297,15 @@ describe("config/required-status-checks.json", () => {
 
   it("lists every self-declared gate that the ruleset does not actually enforce", () => {
     // Six workflows call themselves a required gate or stop-ship check, or were
-    // created by this remediation to run coverage nothing else runs; only ci.yml
-    // has a job name in `required`. The other five are coverage holes, and
+    // created by this remediation to run coverage nothing else runs; ci.yml and
+    // security-regression.yml (promoted 2026-10-14) have job names in `required`.
+    // The other four are coverage holes, and
     // `required-check-audit.yml` can only catch a hole that is declared. The
     // closure lane is the one P2(b) added — a PR that wires 15 specs and then
     // leaves its own job ungated repeats exactly what P4 exists to close
     // (Codex, round 3 on #1221). #1702 added a second job to that lane, the
     // Timeline local-day proof, and the same rule applies to it (Copilot on #1702).
     for (const context of [
-      "test:security-regression",
       "test:security-db-local",
       "pgTAP irrigation (feeding + watering)",
       "irrigation harness typecheck (tsc --noEmit)",
@@ -331,18 +333,12 @@ describe("config/required-status-checks.json", () => {
     }
   });
 
-  it("lists test:security-regression as a coverage hole, not a ruleset gate", () => {
-    // The workflow's own header calls it "the required PR gate". It is not in
-    // the ruleset, so nothing enforces it — that is the whole point of the list.
-    expect(MUST_BE_GREEN).toContain("test:security-regression");
-    expect(PINNED.required).not.toContain("test:security-regression");
-  });
-
-  it("marks test:security-regression alwaysRuns — it has no path filter (Codex, PR #818)", () => {
-    const entry = normalizeMustBeGreen(PINNED.mustBeGreen).find(
-      (e: { context: string }) => e.context === "test:security-regression",
-    );
-    expect(entry?.alwaysRuns).toBe(true);
+  it("pins test:security-regression as a ruleset gate, no longer a coverage hole", () => {
+    // The workflow's own header calls it "the required PR gate". It was a
+    // mustBeGreen alwaysRuns entry while the ruleset omitted it; it is now
+    // required, so an absent or red result blocks the merge itself.
+    expect(PINNED.required).toContain("test:security-regression");
+    expect(MUST_BE_GREEN).not.toContain("test:security-regression");
   });
 });
 
@@ -679,7 +675,7 @@ describe("auditRequiredChecks — happy path", () => {
     });
     expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
     expect(result.failingFindings).toHaveLength(0);
-    expect(result.counts.required).toBe(35);
+    expect(result.counts.required).toBe(36);
   });
 
   it("is deterministic — identical evidence yields an identical report", () => {
@@ -725,31 +721,45 @@ describe("auditRequiredChecks — the failures it exists to catch", () => {
 
   it("fails when a must-be-green context is red even though nothing gates it", () => {
     const runs = allGreen(EVERY_PINNED);
-    runs.find((r) => r.name === "test:security-regression")!.conclusion = "failure";
+    runs.find((r) => r.name === "test:security-db-local")!.conclusion = "failure";
     const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
     expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
     expect(result.failingFindings[0].provenance).toBe("mustBeGreen");
   });
 
   it("fails when an alwaysRuns must-be-green context never reported (Codex, PR #818)", () => {
-    // test:security-regression has no path filter. If it is renamed, disabled,
-    // or fails to schedule, MISSING is the silent-gate failure its own workflow
-    // header documents — not "did not apply".
-    const runs = allGreen(EVERY_PINNED).filter((r) => r.name !== "test:security-regression");
-    const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+    // An alwaysRuns lane has no path filter. If it is renamed, disabled, or
+    // fails to schedule, MISSING is a silent-gate failure — not "did not apply".
+    // (test:security-regression was this lane until it became required.)
+    const pinned = { ...PINNED, mustBeGreen: [{ context: "always-lane", alwaysRuns: true }] };
+    const result = auditRequiredChecks({
+      pinned,
+      checkRuns: allGreen(PINNED.required),
+      prResolution: MERGED,
+    });
     expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
-    const finding = result.failingFindings.find((f) => f.context === "test:security-regression");
+    const finding = result.failingFindings.find((f) => f.context === "always-lane");
     expect(finding?.status).toBe(CHECK_STATUS.MISSING);
     expect(finding?.provenance).toBe("mustBeGreen");
   });
 
   it("fails when an alwaysRuns must-be-green context was skipped", () => {
-    const runs = allGreen(EVERY_PINNED);
-    runs.find((r) => r.name === "test:security-regression")!.conclusion = "skipped";
+    const pinned = { ...PINNED, mustBeGreen: [{ context: "always-lane", alwaysRuns: true }] };
+    const runs = allGreen([...PINNED.required, "always-lane"]);
+    runs.find((r) => r.name === "always-lane")!.conclusion = "skipped";
+    const result = auditRequiredChecks({ pinned, checkRuns: runs, prResolution: MERGED });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const finding = result.failingFindings.find((f) => f.context === "always-lane");
+    expect(finding?.status).toBe(CHECK_STATUS.NOT_MEASURED);
+  });
+
+  it("fails when the required security gate never reported", () => {
+    const runs = allGreen(EVERY_PINNED).filter((r) => r.name !== "test:security-regression");
     const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
     expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
     const finding = result.failingFindings.find((f) => f.context === "test:security-regression");
-    expect(finding?.status).toBe(CHECK_STATUS.NOT_MEASURED);
+    expect(finding?.status).toBe(CHECK_STATUS.MISSING);
+    expect(finding?.provenance).toBe("required");
   });
 
   it("does NOT fail when a CONDITIONAL must-be-green context did not run", () => {
@@ -1049,7 +1059,9 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
     expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
 
     const requiredFailures = result.failingFindings.filter((f) => f.provenance === "required");
-    expect(requiredFailures).toHaveLength(35);
+    // 36 since test:security-regression became required; it finished at
+    // 01:44:12Z, after the merge, like every other required context.
+    expect(requiredFailures).toHaveLength(36);
 
     const shard26 = requiredFailures.find((f) => f.context === "Full test suite (shard 26/32)");
     expect(shard26?.lateForMerge).toBe(true);
@@ -1060,7 +1072,7 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
     expect(shard1?.lateForMerge).toBe(true);
     expect(shard1?.observed).toBe("success");
 
-    expect(result.counts.lateForMerge).toBeGreaterThanOrEqual(35);
+    expect(result.counts.lateForMerge).toBeGreaterThanOrEqual(36);
   });
 
   it("does not let a post-merge re-run launder a pre-merge red", () => {

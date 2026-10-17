@@ -202,10 +202,12 @@ silently discarded. Build it like this:
    record its SHA as the rollback SHA.
 4. Verify that exact SHA (below). This is the pre-merge gate.
 5. After the merge, compare the merge commit with the reviewed head
-   (`git diff <reviewed head> <merge commit>`). If only base-branch changes
-   differ, the pinned artifact still closes checkout and remains the rollback.
-   For an exact-tree artifact, rebuild steps 2–4 on the merge commit and
-   record that SHA in the release packet.
+   (`git diff <reviewed head> <merge commit>`). If the trees differ at all, the
+   pre-merge artifact is no longer a valid rollback target: deploying it would
+   also revert the intervening base-branch changes. Rebuild steps 2–4 on the
+   merge commit, verify that SHA, and record it in the release packet. Only an
+   identical tree lets the pre-merge artifact stand. To keep the trees
+   identical, bring the PR up to date with the base before enqueueing.
 
 It makes checkout
 unavailable on every host, including the production hostname, before Paddle.js

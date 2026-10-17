@@ -130,10 +130,10 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     };
   }, []);
 
-  // Rendered environment: the server render and hydration pass use the
-  // token-only presentation (no hostname exists on the server), so markup
-  // matches; after hydration it applies the production-host rule. Opening
-  // checkout below re-checks with resolvePaddleCheckout() at action time.
+  // Rendered environment: the server render reads the request host and the
+  // browser reads window.location.hostname (renderHostname), so both apply the
+  // production-host rule and the markup matches on hydration. Opening checkout
+  // below re-checks with resolvePaddleCheckout() at action time.
   const environment = useRenderedPaddleCheckoutEnvironment();
   const unavailable = environment === "unavailable";
   const unavailableMessage = useMemo(

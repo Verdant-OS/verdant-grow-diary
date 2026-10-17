@@ -129,19 +129,19 @@ describe("resolvePaddleCheckoutEnvironment", () => {
     ).toBe("sandbox");
   });
 
-  it("fails closed for a live token on every host", () => {
+  it("opens a live token only on the production hosts and fails closed on every other host", () => {
     expect(
       resolvePaddleCheckoutEnvironment({
         token: "live_abc",
         hostname: "verdantgrowdiary.com",
       }),
-    ).toBe("unavailable");
+    ).toBe("live");
     expect(
       resolvePaddleCheckoutEnvironment({
         token: "live_abc",
         hostname: "www.verdantgrowdiary.com",
       }),
-    ).toBe("unavailable");
+    ).toBe("live");
     expect(
       resolvePaddleCheckoutEnvironment({
         token: "live_abc",
@@ -201,9 +201,9 @@ describe("resolvePaddleCheckoutEnvironment", () => {
 });
 
 describe("blocking copy constants", () => {
-  it("live-token blocking copy states the sandbox-only policy", () => {
+  it("off-host live-token blocking copy names the only live checkout host", () => {
     expect(CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE).toBe(
-      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.",
+      "Live checkout is only available on verdantgrowdiary.com.",
     );
   });
 

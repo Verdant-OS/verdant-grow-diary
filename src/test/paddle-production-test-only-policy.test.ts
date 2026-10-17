@@ -85,12 +85,16 @@ describe("Paddle production test-only policy", () => {
     expect(initialize).toHaveBeenCalledTimes(1);
   });
 
-  it("blocks a live token before script loading or price resolution", async () => {
+  it("blocks a live token off the production host before script loading or price resolution", async () => {
+    // This file runs on jsdom's default localhost, never a production host.
+    expect(window.location.hostname).toBe("localhost");
     const appendChild = vi.spyOn(document.head, "appendChild");
     const paddle = await loadPaddleWithToken("live_policy_fixture");
 
     expect(paddle.resolvePaddleCheckout()).toBe("unavailable");
-    expect(paddle.getPaddleEnvironment()).toBe("sandbox");
+    // Entitlement reads follow the token class: only a test_ token selects
+    // sandbox, so a live token never unlocks sandbox rows on any host.
+    expect(paddle.getPaddleEnvironment()).toBe("live");
     await expect(paddle.initializePaddle()).rejects.toBeInstanceOf(
       paddle.PaddleCheckoutUnavailableError,
     );
@@ -99,6 +103,8 @@ describe("Paddle production test-only policy", () => {
     );
     expect(appendChild).not.toHaveBeenCalled();
     expect(invokeMock).not.toHaveBeenCalled();
-    expect(paddle.getCheckoutUnavailableMessage()).toContain("sandbox testing only");
+    expect(paddle.getCheckoutUnavailableMessage()).toBe(
+      "Live checkout is only available on verdantgrowdiary.com.",
+    );
   });
 });

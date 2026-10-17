@@ -111,8 +111,26 @@ test("a leader is clipped at its own card's border and ends on its own pot", () 
       const { p, q } = drawnLeader(l);
       assert.ok(onBorder(p, l), `seed ${seed} ${l.id}: starts on its card border`);
       assert.ok(!crossesInterior(p, q, l), `seed ${seed} ${l.id}: never re-enters its own card`);
-      assert.equal(q.x, l.bx);
-      assert.equal(q.y, l.by);
+      // Ends on its own pot — or, when a reserved rect (the Door card) covers the pot or sits within
+      // 3 px of it, just
+      // outside that rect on the straight line to the pot, never through it.
+      const cover = opts.avoid.find(
+        (a) => l.bx >= a.x - 3 && l.bx <= a.x + a.w + 3 && l.by >= a.y - 3 && l.by <= a.y + a.h + 3,
+      );
+      if (!cover) {
+        assert.equal(q.x, l.bx);
+        assert.equal(q.y, l.by);
+      } else {
+        const cross = (q.x - p.x) * (l.by - p.y) - (q.y - p.y) * (l.bx - p.x);
+        assert.ok(
+          Math.abs(cross) < 1e-6 * Math.hypot(l.bx - p.x, l.by - p.y) ** 2 + 1e-6,
+          "aims at its pot",
+        );
+        assert.ok(
+          !crossesInterior(p, q, cover, 0),
+          `seed ${seed} ${l.id}: stops outside the Door card`,
+        );
+      }
     }
   }
 });
@@ -171,4 +189,23 @@ test("no card sits within touch slop of another plant's pot (rim or tap point)",
     }
   }
   assert.deepEqual(problems.slice(0, 6), [], `${problems.length} cards inside touch slop`);
+});
+
+// A plant whose pot is covered by a neighbour's leaves (occluded) can only be reached through its
+// card, so it must never end up hidden while the viewport still has room for its chip.
+test("an occluded plant is never left hidden: it gets a label or chip somewhere in view", () => {
+  const stranded = [];
+  for (let seed = 1; seed <= 300; seed++) {
+    const { items, opts } = scene(seed);
+    for (const it of items) {
+      it.tx = it.bx + 3;
+      it.ty = it.by + 14;
+    }
+    const out = layoutLabels(items, opts);
+    for (const it of items.filter((i) => i.occluded)) {
+      const l = out.find((o) => o.id === it.id);
+      if (!l || l.hidden) stranded.push(`seed ${seed}: ${it.id}`);
+    }
+  }
+  assert.deepEqual(stranded.slice(0, 6), [], `${stranded.length} occluded plants hidden`);
 });

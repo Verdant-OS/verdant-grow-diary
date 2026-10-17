@@ -5,8 +5,9 @@ const PAD = 6; // gap between labels
 const LIFT = 8; // gap between anchor and label bottom
 // px every card keeps from other plants' pots. Cards are clickable, and phones snap a touch to a
 // nearby clickable element (Chrome touch adjustment), so a card merely close to a pot steals the
-// pot's tap. Half of a 44 px touch target.
-const POT_KEEPOUT = 22;
+// pot's tap. Half of a 44 px touch target (22 px) plus 2 px for the cards' 1.2° tilt.
+const POT_KEEPOUT = 24;
+const GRID_STEP = 6; // px between positions tried when an occluded plant needs a card anywhere
 
 /**
  * @typedef {{ id:string, ax:number, ay:number, bx?:number, by?:number, w?:number, h?:number }} LabelItem
@@ -71,8 +72,52 @@ export function segmentHitsRect(p, q, r, pad = 0) {
   return true;
 }
 
+/** Parameter t∈[0,1] where segment p→q first enters rect r grown by `pad`; null if it never does. */
+function entryParam(p, q, r, pad) {
+  const x0 = r.x - pad;
+  const y0 = r.y - pad;
+  const x1 = r.x + r.w + pad;
+  const y1 = r.y + r.h + pad;
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [pp, qq] of [
+    [-dx, p.x - x0],
+    [dx, x1 - p.x],
+    [-dy, p.y - y0],
+    [dy, y1 - p.y],
+  ]) {
+    if (pp === 0) {
+      if (qq < 0) return null;
+      continue;
+    }
+    const t = qq / pp;
+    if (pp < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return null;
+  }
+  return Math.max(0, t0 - 1e-6);
+}
+
 function inBounds(r, width, height) {
   return r.x >= 0 && r.y >= 0 && r.x + r.w <= width && r.y + r.h <= height;
+}
+
+/**
+ * Every grid position in the viewport, nearest to the anchor first (ties: higher, then left).
+ * Used only for an occluded plant, whose card is its sole tap handle, after the usual spots fail.
+ */
+function gridCandidates(it, w, h, width, height) {
+  const out = [];
+  for (let y = 0; y + h <= height; y += GRID_STEP) {
+    for (let x = 0; x + w <= width; x += GRID_STEP) {
+      const d = Math.hypot(x + w / 2 - it.ax, y + h / 2 - (it.ay - h / 2 - LIFT));
+      out.push({ x, y, d });
+    }
+  }
+  out.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x);
+  return out;
 }
 
 /** Candidate positions in preference order: above, then nudged sideways, then higher rows. */
@@ -184,11 +229,27 @@ function placeOnce(items, opts) {
     // A displaced card draws a leader from its own border to its pot. That line may not pass
     // through another card or a reserved rect (the Door card, banner), and the card itself may
     // not sit on a leader already drawn — rectangles alone miss a line through a name.
+    // A pot under a reserved rect (the Door card sits at floor level by the front pots): the
+    // leader stops just outside that rect on its way to the pot instead of crossing it.
+    const COVER_PAD = LEADER_GAP + 1;
+    const potCover = avoid.find(
+      (a) =>
+        pot.x >= a.x - COVER_PAD &&
+        pot.x <= a.x + a.w + COVER_PAD &&
+        pot.y >= a.y - COVER_PAD &&
+        pot.y <= a.y + a.h + COVER_PAD,
+    );
+    const endFor = (start) => {
+      if (!potCover) return pot;
+      const t = entryParam(start, pot, potCover, COVER_PAD);
+      if (t === null) return pot;
+      return { x: start.x + (pot.x - start.x) * t, y: start.y + (pot.y - start.y) * t };
+    };
     const leaderOf = (r, pref) => {
       const displaced = Math.abs(r.x - pref.x) > 1 || Math.abs(r.y - pref.y) > 1;
       if (!displaced) return { leader: false, seg: null };
       const start = leaderStart(r, pot);
-      return { leader: true, seg: start ? { p: start, q: pot } : null };
+      return { leader: true, seg: start ? { p: start, q: endFor(start) } : null };
     };
     const routeClear = (r, seg) =>
       !segs.some((s) => segmentHitsRect(s.p, s.q, r, LEADER_GAP)) &&
@@ -238,6 +299,38 @@ function placeOnce(items, opts) {
           ...leaderFields(lead),
           hidden: false,
           compact: true,
+          ax: it.ax,
+          ay: it.ay,
+          bx: Number.isFinite(it.bx) ? it.bx : it.ax,
+          by: it.by,
+        });
+        chosen = r;
+        break;
+      }
+      if (chosen) continue;
+    }
+    if (!chosen && it.id !== selectedId && it.occluded) {
+      // Its pot is behind a neighbour's leaves, so its card is the only way to tap it: search the
+      // whole view (same rules: no overlap, no pot, no crossing leaders) before giving up.
+      const cw = it.cw > 0 ? it.cw : w;
+      const ch = it.ch > 0 ? it.ch : h;
+      const pref = candidates(it, cw, ch)[0];
+      for (const c of gridCandidates(it, cw, ch, width, height)) {
+        const r = { x: c.x, y: c.y, w: cw, h: ch };
+        if (avoid.some((a) => overlaps(r, a, PAD))) continue;
+        if (placed.some((p) => overlaps(r, p))) continue;
+        if (coversPot(r)) continue;
+        const lead = leaderOf(r, pref);
+        if (!routeClear(r, lead.seg)) continue;
+        placed.push(r);
+        commitLeader(lead.seg);
+        out.push({
+          id: it.id,
+          ...r,
+          leader: lead.leader && !!lead.seg,
+          ...leaderFields(lead),
+          hidden: false,
+          compact: it.cw > 0,
           ax: it.ax,
           ay: it.ay,
           bx: Number.isFinite(it.bx) ? it.bx : it.ax,

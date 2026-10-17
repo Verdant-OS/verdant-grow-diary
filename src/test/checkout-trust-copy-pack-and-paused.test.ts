@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
+import { LIVE_CHECKOUT_FAQ_ANSWER, buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 
 describe("buildCheckoutTrustCopy — pack scope and paused checkout", () => {
   it("keeps live copy after a pack-scoped failure, because subscriptions can still charge", () => {
@@ -10,6 +10,17 @@ describe("buildCheckoutTrustCopy — pack scope and paused checkout", () => {
     });
     expect(copy.state).toBe("live");
     expect(copy.canCreateLiveCharge).toBe(true);
+  });
+
+  it("answers the FAQ as unavailable after a checkout-wide live failure, never as live", () => {
+    for (const blockedScope of ["checkout", null, undefined] as const) {
+      const copy = buildCheckoutTrustCopy({ environment: "live", blocked: true, blockedScope });
+      expect(copy.state).toBe("unavailable");
+      expect(copy.faqAnswer).not.toBe(LIVE_CHECKOUT_FAQ_ANSWER);
+      expect(copy.faqAnswer).toMatch(/^Not right now\./);
+      expect(copy.faqAnswer).toMatch(/no charge was made/i);
+      expect(copy.faqAnswer).not.toMatch(/sandbox|test mode/i);
+    }
   });
 
   it("shows paused copy for the kill switch on any environment, never live or sandbox", () => {

@@ -122,7 +122,7 @@ sandbox event classified as `null` with no error raised.
        and destination, live price IDs, and public copy all agree on live;
        legacy `PADDLE_ENVIRONMENT` stays `sandbox` (below).
 9. [ ] **Rollback artifact verified** — the checkout-disabled build is built,
-       verified under production-host conditions and on staging, and pinned
+       verified under production-host conditions, and pinned
        (see "Live checkout rollback").
 
 ## Live checkout release
@@ -138,9 +138,14 @@ order, and the merge waits for all of it:
    `paddle-portal-session` and `get-paddle-price`, and record each
    fingerprint against the deploy head.
 2. The owner reads `PAYMENTS_ENVIRONMENT` and confirms it is exactly `live`.
-3. Confirm the credit-pack price secrets hold live IDs. From a signed-in
-   production session, resolve `pro_monthly` once and read its
-   `get-paddle-price` log line and HTTP status.
+3. From a signed-in production session, call `get-paddle-price` once for each
+   SKU the pricing page sells (`pro_monthly`, `pro_annual`, `craft_monthly`,
+   `craft_annual`, `founder_lifetime`, `credit_pack_50`, `credit_pack_150`;
+   packs need an active monthly plan) and record status and log line. Each
+   must return a live price ID or a deliberate calm block
+   (`price_not_configured` for a product absent from live Paddle, or
+   `plan_sold_out`). Any `price_resolution_unavailable` blocks the release:
+   one click on that SKU closes checkout for every plan on the page.
 4. Read-only webhook pass: Paddle notification logs for both live
    destinations, live `lovable_paddle_events` rows, `payments-webhook` logs.
    Choose the canonical destination from evidence. A live test event is a
@@ -176,9 +181,14 @@ Verify it before the #2230 merge:
    `https://verdantgrowdiary.com/`): the switch blocks init, price lookup and
    the hook; the paused banner hydrates without mismatch.
 2. Build the artifact and load `/pricing` with `verdantgrowdiary.com` mapped
-   to the built server: paused copy, no request to `cdn.paddle.com`.
-3. Deploy it to staging (`verdant-grow-diary2`) and repeat: unavailable trust
-   copy, `openCheckout` blocks, no Paddle.js load.
+   to the built server: paused copy, `openCheckout` blocks, no request to
+   `cdn.paddle.com`. A control build without the switch on the same mapping
+   must show live copy.
+
+No staging deploy: Verdant is production only, and a live token is
+unavailable on any non-production host, so a preview cannot exercise this
+path. After a real rollback deploy, the owner confirms on production that
+`/pricing` shows "Checkout paused" with no Paddle.js request.
 
 Keep it deployable as a pinned commit. To roll back, state the action and its
 effect on live subscriptions, then deploy that commit.

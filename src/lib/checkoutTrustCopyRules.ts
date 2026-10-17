@@ -57,7 +57,8 @@ const LIVE_FAILED_COPY: CheckoutTrustCopy = Object.freeze({
   label: "Checkout unavailable right now",
   summary: "Checkout could not load, so no charge was made. Reload the page to try again.",
   faqQuestion: "Is checkout live?",
-  faqAnswer: LIVE_CHECKOUT_FAQ_ANSWER,
+  faqAnswer:
+    "Not right now. Checkout could not load, so no charge was made. Reload the page to try again. Existing plans and billing are not affected.",
   canCreateLiveCharge: false,
 });
 

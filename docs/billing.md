@@ -4,7 +4,7 @@
 
 The tracked production client token is live-class (`live_`). Live checkout
 opens only on `verdantgrowdiary.com` and `www.verdantgrowdiary.com`; every
-other host (previews, staging, localhost) is unavailable for a live token, and
+other host (preview URLs, localhost) is unavailable for a live token, and
 a sandbox-class (`test_`) token stays sandbox everywhere. This build must not
 reach customers until the backend readiness checks in
 [Live checkout release sequence](#live-checkout-release-sequence) pass. No
@@ -195,10 +195,18 @@ it. So the merge waits until every step below is green.
 2. **Server selector read.** The owner reads `PAYMENTS_ENVIRONMENT` and confirms
    it is exactly `live`. `get-paddle-price` returns
    `503 price_resolution_unavailable` for an unset or invalid value.
-3. **Catalog resolution observed.** Confirm the credit-pack price secrets hold
-   live IDs. From a signed-in production session, resolve `pro_monthly` once
-   and read its `get-paddle-price` log line (`reason`, `stage`,
-   `env_var_configured`) and HTTP status.
+3. **Every sellable SKU resolves.** From a signed-in production session, call
+   `get-paddle-price` once for each SKU the pricing page sells and record its
+   HTTP status and log line (`reason`, `stage`, `env_var_configured`):
+   `pro_monthly`, `pro_annual`, `craft_monthly`, `craft_annual`,
+   `founder_lifetime`, `credit_pack_50`, `credit_pack_150` (packs need a
+   session with an active monthly plan). Each must return a live price ID, or
+   a deliberate calm block: `price_not_configured` for a product that does not
+   exist in live Paddle (Craft today) or `plan_sold_out`. Any SKU returning
+   `price_resolution_unavailable` (for example a live product whose
+   `PADDLE_PRICE_*` secret is empty or holds a sandbox ID) blocks: the client
+   cannot tell that from a shared failure, so one click on it closes checkout
+   for every plan on the page.
 4. **Webhook path decided, read-only.** Paddle notification logs for both live
    destinations, live rows in `lovable_paddle_events`, and `payments-webhook`
    logs. Choose the canonical destination from that evidence. A live test
@@ -229,9 +237,15 @@ Before the merge, verify the artifact under production-host conditions:
   `https://verdantgrowdiary.com/` and proves the switch blocks init, price
   lookup and the hook, and that the paused banner hydrates without mismatch.
 - Build the artifact and load `/pricing` with `verdantgrowdiary.com` mapped to
-  the built server: paused copy, no request to `cdn.paddle.com`.
-- Deploy it to staging (`verdant-grow-diary2`) and repeat the `/pricing`
-  check: unavailable trust copy, `openCheckout` blocks, no Paddle.js load.
+  the built server: paused copy, `openCheckout` blocks, no request to
+  `cdn.paddle.com`. A control build without the switch, on the same mapping,
+  must show live copy, so the result comes from the switch.
+
+There is no staging environment (`AGENTS.md`, production only), and a live
+token is unavailable on any non-production host anyway, so a preview deploy
+cannot exercise this path. After a real rollback deploy, the owner confirms
+on production that `/pricing` shows "Checkout paused" and no Paddle.js
+request is made.
 
 Keep it deployable as a pinned commit. To roll back, state the action and its
 effect on live subscriptions, then deploy that commit.

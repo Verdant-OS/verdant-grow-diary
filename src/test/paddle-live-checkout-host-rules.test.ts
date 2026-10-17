@@ -91,9 +91,15 @@ describe("checkout trust copy for live checkout", () => {
     expect(copy.faqAnswer).not.toMatch(/sandbox/i);
   });
 
-  it("fails closed to unavailable copy when a live checkout is blocked at runtime", () => {
+  it("keeps live copy truthful after a single-plan failure (other plans can still charge)", () => {
     const copy = buildCheckoutTrustCopy({ environment: "live", blocked: true });
-    expect(copy.state).toBe("unavailable");
-    expect(copy.canCreateLiveCharge).toBe(false);
+    expect(copy.state).toBe("live");
+    expect(copy.canCreateLiveCharge).toBe(true);
+  });
+
+  it("still replaces sandbox copy when sandbox checkout is blocked", () => {
+    expect(buildCheckoutTrustCopy({ environment: "sandbox", blocked: true }).state).toBe(
+      "unavailable",
+    );
   });
 });

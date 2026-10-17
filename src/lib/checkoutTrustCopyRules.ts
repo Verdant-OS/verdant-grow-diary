@@ -54,11 +54,16 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
 
 /**
  * Build truthful buyer-facing checkout copy from the same environment decision
- * that gates the Paddle overlay. Unknown values and runtime failures fail closed.
+ * that gates the Paddle overlay. Unknown values fail closed; a runtime failure
+ * replaces sandbox copy with unavailable copy but never hides that live
+ * checkout can still charge.
  */
 export function buildCheckoutTrustCopy(input: CheckoutTrustCopyInput): CheckoutTrustCopy {
+  // Live stays live copy even after a runtime or single-plan failure: other
+  // plans can still create a real charge, so "no real charge is possible"
+  // would be false. The failure itself is reported by the blocked-reason UI.
+  if (input.environment === "live") return LIVE_COPY;
   if (input.blocked) return UNAVAILABLE_COPY;
   if (input.environment === "sandbox") return SANDBOX_COPY;
-  if (input.environment === "live") return LIVE_COPY;
   return UNAVAILABLE_COPY;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 
 describe("buildCheckoutTrustCopy", () => {
-  it("labels live checkout truthfully, and fails closed when live is blocked or unknown", () => {
+  it("labels live checkout truthfully, and fails closed when sandbox is blocked or the environment is unknown", () => {
     // Live is only ever resolved on a production hostname (paddleEnvironment).
     const live = buildCheckoutTrustCopy({ environment: "live", blocked: false });
     expect(live.state).toBe("live");
@@ -11,7 +11,7 @@ describe("buildCheckoutTrustCopy", () => {
     expect(live.faqAnswer).toContain("Paddle");
 
     for (const result of [
-      buildCheckoutTrustCopy({ environment: "live", blocked: true }),
+      buildCheckoutTrustCopy({ environment: "sandbox", blocked: true }),
       buildCheckoutTrustCopy({ environment: "unavailable", blocked: false }),
       buildCheckoutTrustCopy({ environment: undefined, blocked: false }),
     ]) {
@@ -41,12 +41,12 @@ describe("buildCheckoutTrustCopy", () => {
     }
   });
 
-  it("lets a runtime failure override live environment copy", () => {
+  it("keeps live copy after a runtime failure, because other plans can still charge", () => {
     const result = buildCheckoutTrustCopy({ environment: "live", blocked: true });
 
-    expect(result.state).toBe("unavailable");
-    expect(result.canCreateLiveCharge).toBe(false);
-    expect(result.summary).toContain("Live checkout is disabled");
+    expect(result.state).toBe("live");
+    expect(result.canCreateLiveCharge).toBe(true);
+    expect(result.summary).not.toContain("Live checkout is disabled");
   });
 
   it("is deterministic and returns immutable shared copy", () => {

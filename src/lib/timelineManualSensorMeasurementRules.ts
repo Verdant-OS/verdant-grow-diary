@@ -191,6 +191,8 @@ function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRo
     user_id: "",
     created_at: row.ts,
     device_id: null,
+    notes: null,
+    unit_unconfirmed: false,
   };
 }
 

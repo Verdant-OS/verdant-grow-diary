@@ -201,7 +201,7 @@ export function getPaddleCheckoutCatalogMessage(reason: PaddleCheckoutCatalogRea
       return "Checkout didn't return what Verdant needs to continue, and nothing was charged. Please try again in a moment.";
     case "price_resolution_unavailable":
     default:
-      return "Checkout is temporarily unavailable for this plan. Please try again in a moment or pick another plan.";
+      return "Checkout is temporarily unavailable. Please try again in a moment.";
   }
 }
 

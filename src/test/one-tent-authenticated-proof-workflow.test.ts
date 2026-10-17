@@ -509,7 +509,7 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(evaluatePublicPaddleBundle).toBeTypeOf("function");
     if (!resolveProductionToken || !evaluatePublicPaddleBundle) return;
 
-    const liveToken = `live_${"c".repeat(16)}`;
+    const liveToken = `live_${"c".repeat(27)}`;
     const otherLive = `live_${"x".repeat(16)}`;
     expect(
       resolveProductionToken(`VITE_PAYMENTS_CLIENT_TOKEN=${liveToken}

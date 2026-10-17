@@ -12,7 +12,7 @@ import {
 } from "@/lib/paddleEnvironment";
 import { LIVE_CHECKOUT_FAQ_ANSWER, buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 
-const LIVE = "live_fixture_token_payload";
+const LIVE = "live_fixturetokenpayload00000000";
 const TEST = "test_fixture_token_payload";
 
 describe("live checkout production hostnames", () => {

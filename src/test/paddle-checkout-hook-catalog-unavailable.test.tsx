@@ -122,7 +122,7 @@ describe("usePaddleCheckout — catalog-unavailable calm state", () => {
     state.resolverError = {
       reason: "price_resolution_unavailable",
       message:
-        "Checkout is temporarily unavailable for this plan. Please try again in a moment or pick another plan.",
+        "Checkout is temporarily unavailable. Please try again in a moment.",
     };
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });

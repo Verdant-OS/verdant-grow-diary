@@ -37,7 +37,7 @@ describe("live token on the production hostname", () => {
   });
 
   it("resolves live checkout, live entitlement reads and no blocking copy", async () => {
-    const paddle = await loadPaddleWithToken("live_fixture_token_payload");
+    const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000");
     expect(paddle.resolvePaddleCheckout()).toBe("live");
     expect(paddle.getPaddleEnvironment()).toBe("live");
     expect(paddle.getCheckoutUnavailableMessage()).toBeNull();
@@ -55,19 +55,19 @@ describe("live token on the production hostname", () => {
       Checkout: { open: vi.fn() },
     };
 
-    const paddle = await loadPaddleWithToken("live_fixture_token_payload");
+    const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000");
     await paddle.initializePaddle();
 
     // The SDK names live "production"; the explicit call keeps a stale
     // sandbox setting from surviving on the production host.
     expect(environmentSet.mock.calls).toEqual([["production"]]);
     expect(initialize).toHaveBeenCalledTimes(1);
-    expect(initialize.mock.calls[0]?.[0]?.token).toBe("live_fixture_token_payload");
+    expect(initialize.mock.calls[0]?.[0]?.token).toBe("live_fixturetokenpayload00000000");
   });
 
   it("asks the price resolver with the live environment label", async () => {
     invokeMock.mockResolvedValue({ data: { paddleId: "pri_live_fixture" }, error: null });
-    const paddle = await loadPaddleWithToken("live_fixture_token_payload");
+    const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000");
 
     await expect(paddle.getPaddlePriceId("pro_monthly")).resolves.toBe("pri_live_fixture");
     expect(invokeMock).toHaveBeenCalledWith("get-paddle-price", {
@@ -95,7 +95,7 @@ describe("live token on the production hostname", () => {
 
   it("server-renders and hydrates the banner with no mismatch and no banner on the production host", async () => {
     vi.resetModules();
-    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");
+    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixturetokenpayload00000000");
     const { PaymentTestModeBanner } = await import("@/components/PaymentTestModeBanner");
     const { renderToString } = await import("react-dom/server");
     const { hydrateRoot } = await import("react-dom/client");
@@ -118,7 +118,7 @@ describe("live token on the production hostname", () => {
 
   it("does not mark checkout unavailable in the hook", async () => {
     vi.resetModules();
-    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");
+    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixturetokenpayload00000000");
     vi.doMock("@/store/auth", () => ({ useAuth: () => ({ user: null }) }));
     vi.doMock("@/lib/react-router-compat", () => ({
       useNavigate: () => vi.fn(),
@@ -140,20 +140,20 @@ describe("live token on the production hostname", () => {
  */
 describe("checkout-disabled rollback artifact on the production hostname", () => {
   it("resolves unavailable with the paused message and keeps live entitlement reads", async () => {
-    const paddle = await loadPaddleWithToken("live_fixture_token_payload", "true");
+    const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000", "true");
     expect(window.location.hostname).toBe("verdantgrowdiary.com");
     expect(paddle.isPaddleCheckoutPaused()).toBe(true);
     expect(paddle.resolvePaddleCheckout()).toBe("unavailable");
     expect(paddle.resolvePaddleCheckoutBeforeHydration()).toBe("unavailable");
     expect(paddle.getCheckoutUnavailableMessage()).toBe(
-      "Checkout is paused right now, so no charge can be made. Existing plans and billing are not affected.",
+      "New checkout is paused. Existing plans, renewals and billing management are not affected.",
     );
     expect(paddle.getPaddleEnvironment()).toBe("live");
   });
 
   it("refuses to initialize without loading Paddle.js", async () => {
     const appendSpy = vi.spyOn(document.head, "appendChild");
-    const paddle = await loadPaddleWithToken("live_fixture_token_payload", "true");
+    const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000", "true");
     await expect(paddle.initializePaddle()).rejects.toBeInstanceOf(
       paddle.PaddleCheckoutUnavailableError,
     );
@@ -163,7 +163,7 @@ describe("checkout-disabled rollback artifact on the production hostname", () =>
   });
 
   it("refuses a price lookup without calling the resolver", async () => {
-    const paddle = await loadPaddleWithToken("live_fixture_token_payload", "true");
+    const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000", "true");
     await expect(paddle.getPaddlePriceId("pro_monthly")).rejects.toBeInstanceOf(
       paddle.PaddleCheckoutUnavailableError,
     );
@@ -173,14 +173,14 @@ describe("checkout-disabled rollback artifact on the production hostname", () =>
   it.each(["false", "", "1", "TRUE "])(
     "treats VITE_CHECKOUT_DISABLED=%j as not disabled",
     async (value) => {
-      const paddle = await loadPaddleWithToken("live_fixture_token_payload", value);
+      const paddle = await loadPaddleWithToken("live_fixturetokenpayload00000000", value);
       expect(paddle.resolvePaddleCheckout()).toBe("live");
     },
   );
 
   it("server-renders and hydrates the paused banner with no mismatch", async () => {
     vi.resetModules();
-    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");
+    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixturetokenpayload00000000");
     vi.stubEnv("VITE_CHECKOUT_DISABLED", "true");
     const { PaymentTestModeBanner } = await import("@/components/PaymentTestModeBanner");
     const { renderToString } = await import("react-dom/server");
@@ -190,14 +190,14 @@ describe("checkout-disabled rollback artifact on the production hostname", () =>
     document.body.appendChild(container);
     try {
       container.innerHTML = renderToString(<PaymentTestModeBanner />);
-      expect(container.textContent).toContain("Checkout is paused right now");
+      expect(container.textContent).toContain("New checkout is paused.");
       const recoverable = vi.fn();
       await act(async () => {
         hydrateRoot(container, <PaymentTestModeBanner />, { onRecoverableError: recoverable });
       });
       expect(recoverable).not.toHaveBeenCalled();
       const banner = container.querySelector('[data-testid="payments-unavailable-banner"]');
-      expect(banner?.textContent).toContain("Checkout is paused right now");
+      expect(banner?.textContent).toContain("New checkout is paused.");
     } finally {
       container.remove();
     }
@@ -205,7 +205,7 @@ describe("checkout-disabled rollback artifact on the production hostname", () =>
 
   it("blocks checkout in the hook before any Paddle call", async () => {
     vi.resetModules();
-    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixture_token_payload");
+    vi.stubEnv("VITE_PAYMENTS_CLIENT_TOKEN", "live_fixturetokenpayload00000000");
     vi.stubEnv("VITE_CHECKOUT_DISABLED", "true");
     vi.doMock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
     vi.doMock("@/lib/react-router-compat", () => ({

@@ -30,7 +30,9 @@ describe("buildCheckoutTrustCopy — pack scope and paused checkout", () => {
       expect(copy.label).toBe("Checkout paused");
       expect(copy.canCreateLiveCharge).toBe(false);
       expect(`${copy.summary} ${copy.faqAnswer}`).not.toMatch(/sandbox|test mode/i);
-      expect(copy.summary).toMatch(/no charge can be made/i);
+      expect(copy.summary).toBe(
+        "New checkout is paused. Existing plans, renewals and billing management are not affected.",
+      );
     }
   });
 

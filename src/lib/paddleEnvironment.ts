@@ -9,7 +9,9 @@
  *
  * SAFETY:
  *  - Never logs, returns, or embeds the token value.
- *  - Only inspects the token PREFIX ("test_" | "live_") — never the payload.
+ *  - Inspects the prefix and, for `live_`, only the payload SHAPE (Paddle
+ *    client tokens are the prefix plus 27 letters/digits) — never returns or
+ *    logs the payload.
  *  - Pure functions: no imports, no window access, no side effects. Callers
  *    pass hostname explicitly so this module stays SSR/test friendly.
  */
@@ -18,13 +20,20 @@ export type PaddleTokenClass = "sandbox" | "live" | "unavailable";
 export type PaddleCheckoutEnvironment = "sandbox" | "live" | "unavailable";
 
 /**
- * Classify a raw Paddle client token by prefix only.
+ * Paddle documents client-side tokens as the prefix plus exactly 27 letters
+ * and digits. A `live_` value of any other shape (for example `live_invalid`)
+ * is malformed and must never enable live checkout.
+ */
+const PADDLE_LIVE_CLIENT_TOKEN_SHAPE = /^live_[A-Za-z0-9]{27}$/;
+
+/**
+ * Classify a raw Paddle client token.
  *
  * - `"test_..."`  → `"sandbox"`
- * - `"live_..."`  → `"live"`
- * - null / undefined / empty / whitespace / unknown prefix → `"unavailable"`
+ * - `"live_"` + 27 letters/digits → `"live"`
+ * - malformed `live_`, null / undefined / empty / whitespace / unknown prefix → `"unavailable"`
  *
- * The token payload after the prefix is never inspected and never returned.
+ * The token payload is never returned or logged.
  */
 export function classifyPaddleToken(token: string | null | undefined): PaddleTokenClass {
   if (typeof token !== "string") return "unavailable";
@@ -35,7 +44,7 @@ export function classifyPaddleToken(token: string | null | undefined): PaddleTok
   if (trimmed.startsWith("test_") && trimmed.length > "test_".length) {
     return "sandbox";
   }
-  if (trimmed.startsWith("live_") && trimmed.length > "live_".length) {
+  if (PADDLE_LIVE_CLIENT_TOKEN_SHAPE.test(trimmed)) {
     return "live";
   }
   return "unavailable";
@@ -136,7 +145,7 @@ export const CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE =
 
 /** Fixed, safe copy while the build-time kill switch is on. */
 export const CHECKOUT_PAUSED_MESSAGE =
-  "Checkout is paused right now, so no charge can be made. Existing plans and billing are not affected.";
+  "New checkout is paused. Existing plans, renewals and billing management are not affected.";
 
 /**
  * Fixed, safe copy for a missing or malformed token. Never reveals which

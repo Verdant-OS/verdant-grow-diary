@@ -19,7 +19,7 @@ describe("classifyPaddleToken", () => {
   });
 
   it("classifies well-formed live tokens", () => {
-    expect(classifyPaddleToken("live_abc123xyz")).toBe("live");
+    expect(classifyPaddleToken("live_abc123xyz000000000000000000")).toBe("live");
   });
 
   it("fails closed on null / undefined / empty / whitespace", () => {
@@ -44,7 +44,7 @@ describe("classifyPaddleToken", () => {
 
   it("trims surrounding whitespace before classifying", () => {
     expect(classifyPaddleToken("  test_abc  ")).toBe("sandbox");
-    expect(classifyPaddleToken("\tlive_abc\n")).toBe("live");
+    expect(classifyPaddleToken("\tlive_abc000000000000000000000000\n")).toBe("live");
   });
 
   it("never returns the token value in the classification", () => {
@@ -132,43 +132,43 @@ describe("resolvePaddleCheckoutEnvironment", () => {
   it("opens a live token only on the production hosts and fails closed on every other host", () => {
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "verdantgrowdiary.com",
       }),
     ).toBe("live");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "www.verdantgrowdiary.com",
       }),
     ).toBe("live");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "localhost",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "127.0.0.1",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "::1",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "app.localhost",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "id-preview--x.lovable.app",
       }),
     ).toBe("unavailable");
@@ -193,7 +193,7 @@ describe("resolvePaddleCheckoutEnvironment", () => {
   });
 
   it("requires sandbox even when hostname is missing", () => {
-    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc", hostname: null })).toBe(
+    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc000000000000000000000000", hostname: null })).toBe(
       "unavailable",
     );
     expect(resolvePaddleCheckoutEnvironment({ token: "test_abc", hostname: null })).toBe("sandbox");

@@ -135,10 +135,17 @@ this order, and the merge waits for all of it:
 
 1. Merge #2229 (shared webhook-verifier packaging repair) through the queue.
    Confirm Lovable has pulled the merged source. Then, with the owner naming
-   the Edge deploy, redeploy `payments-webhook`, `delete-account`,
-   `paddle-portal-session` and `get-paddle-price`, and record each
-   fingerprint against the deploy head.
-2. The owner reads `PAYMENTS_ENVIRONMENT` and confirms it is exactly `live`.
+   the Edge deploy, redeploy `payments-webhook`, `delete-account` and
+   `paddle-portal-session`. Record each reported result with its
+   submitted-source fingerprint and verify each live deployment receipt
+   (version and last-updated time, or a boot log line); a success message or
+   sync commit is not a receipt. Don't redeploy only because an unrelated
+   file differs in Lovable's working copy.
+2. The owner reads `PAYMENTS_ENVIRONMENT` in the production backend
+   (`knkwiiywfkbqznbxwqfh`) and confirms it is exactly `live`, never inferred
+   from the client token. Only then, with its own approval, deploy
+   `get-paddle-price` and record its fingerprint and receipt. This comes
+   before customer exposure.
 3. From a signed-in production session, call `get-paddle-price` once for each
    SKU the pricing page sells (`pro_monthly`, `pro_annual`, `craft_monthly`,
    `craft_annual`, `founder_lifetime`, `credit_pack_50`, `credit_pack_150`;

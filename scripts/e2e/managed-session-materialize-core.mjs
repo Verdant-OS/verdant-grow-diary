@@ -77,7 +77,9 @@ export function evaluatePublicDeploymentIdentity({ version, expectedSha, expecte
 }
 
 const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9_-]+$/;
-const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_|live_)[A-Za-z0-9_-]+$/;
+// A live client token must have Paddle's documented shape: `live_` plus exactly
+// 27 letters/digits. A malformed `live_` value fails the production gate.
+const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_[A-Za-z0-9_-]+|live_[A-Za-z0-9]{27})$/;
 // A Paddle live client token is `live_` plus 16 or more letters/digits (real
 // tokens carry 27). Ordinary app identifiers that start with `live_` (the
 // `live_confirmed` sensor status, snake_case names) are not tokens.

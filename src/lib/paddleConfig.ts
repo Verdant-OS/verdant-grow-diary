@@ -85,7 +85,9 @@ export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv(
 
   const clientToken = (source.VITE_PADDLE_CLIENT_TOKEN ?? "").trim();
   const tokenClass = classifyPaddleToken(clientToken);
-  if (tokenClass === "live") {
+  // The legacy BYO lane refuses every `live_` value, well-formed or not, so
+  // check the prefix here rather than the shape-checked live class.
+  if (tokenClass === "live" || clientToken.startsWith("live_")) {
     return { available: false, reason: "live_not_allowed", environment: env };
   }
   if (tokenClass !== "sandbox") {

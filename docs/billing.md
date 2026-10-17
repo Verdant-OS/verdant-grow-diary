@@ -211,12 +211,20 @@ merge waits until every step below is green.
 1. **#2229 merged and `payments-webhook` redeployed.** Merge the shared
    webhook-verifier packaging repair through the queue. Confirm Lovable has
    pulled the merged source, then (owner-named Edge deploy) redeploy
-   `payments-webhook`, `delete-account`, `paddle-portal-session` and
-   `get-paddle-price`. Record each returned fingerprint against the deploy
-   head.
-2. **Server selector read.** The owner reads `PAYMENTS_ENVIRONMENT` and confirms
-   it is exactly `live`. `get-paddle-price` returns
-   `503 price_resolution_unavailable` for an unset or invalid value.
+   `payments-webhook`, `delete-account` and `paddle-portal-session`. Record
+   each reported result with its submitted-source fingerprint, then verify the
+   live deployment receipt for each (version and last-updated time in Lovable
+   Cloud, or a boot log line). A deploy tool's success message or a sync
+   commit is not a receipt. Don't redeploy solely because an unrelated file
+   (for example a test) differs in Lovable's working copy.
+2. **Server selector read.** The owner reads `PAYMENTS_ENVIRONMENT` in the
+   production backend (Lovable Cloud project `knkwiiywfkbqznbxwqfh`) and
+   confirms it is exactly `live`. Never infer it from the client token.
+   `get-paddle-price` returns `503 price_resolution_unavailable` for an unset
+   or invalid value. This read comes before the `get-paddle-price` deploy and
+   before customer exposure.
+   Then, with its own owner approval, deploy `get-paddle-price` and record
+   its fingerprint and live receipt the same way.
 3. **Every sellable SKU resolves.** From a signed-in production session, call
    `get-paddle-price` once for each SKU the pricing page sells and record its
    HTTP status and log line (`reason`, `stage`, `env_var_configured`):

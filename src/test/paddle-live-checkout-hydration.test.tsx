@@ -42,12 +42,12 @@ describe("live checkout presentation is hydration-stable on a non-production hos
   });
 
   it("server-renders no banner for a live token, regardless of host", async () => {
-    const { PaymentTestModeBanner } = await loadBannerWithToken("live_fixture_token_payload");
+    const { PaymentTestModeBanner } = await loadBannerWithToken("live_fixturetokenpayload00000000");
     expect(renderToString(<PaymentTestModeBanner />)).toBe("");
   });
 
   it("hydrates the server markup without a mismatch, then shows the off-host block", async () => {
-    const { PaymentTestModeBanner } = await loadBannerWithToken("live_fixture_token_payload");
+    const { PaymentTestModeBanner } = await loadBannerWithToken("live_fixturetokenpayload00000000");
     container.innerHTML = renderToString(<PaymentTestModeBanner />);
     const recoverable = vi.fn();
 

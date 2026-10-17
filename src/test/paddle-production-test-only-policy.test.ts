@@ -49,7 +49,7 @@ describe("Paddle production test-only policy", () => {
         envFile,
         [
           "VITE_PAYMENTS_CLIENT_TOKEN=test_policy_first",
-          "VITE_PAYMENTS_CLIENT_TOKEN=live_policy_last",
+          "VITE_PAYMENTS_CLIENT_TOKEN=live_policylast00000000000000000",
           "",
         ].join("\n"),
         "utf8",
@@ -89,7 +89,7 @@ describe("Paddle production test-only policy", () => {
     // This file runs on jsdom's default localhost, never a production host.
     expect(window.location.hostname).toBe("localhost");
     const appendChild = vi.spyOn(document.head, "appendChild");
-    const paddle = await loadPaddleWithToken("live_policy_fixture");
+    const paddle = await loadPaddleWithToken("live_policyfixture00000000000000");
 
     expect(paddle.resolvePaddleCheckout()).toBe("unavailable");
     // Entitlement reads follow the token class: only a test_ token selects

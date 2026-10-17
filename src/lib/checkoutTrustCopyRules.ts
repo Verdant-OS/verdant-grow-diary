@@ -67,10 +67,10 @@ const PAUSED_COPY: CheckoutTrustCopy = Object.freeze({
   state: "unavailable",
   label: "Checkout paused",
   summary:
-    "Checkout is paused right now, so no charge can be made. Existing plans and billing are not affected.",
+    "New checkout is paused. Existing plans, renewals and billing management are not affected.",
   faqQuestion: "Is checkout live?",
   faqAnswer:
-    "Not right now. Checkout is paused, so no new charge can be made. Existing plans, renewals and billing management are not affected.",
+    "Not right now. New checkout is paused. Existing plans, renewals and billing management are not affected.",
   canCreateLiveCharge: false,
 });
 

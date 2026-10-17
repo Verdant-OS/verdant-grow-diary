@@ -5,12 +5,11 @@ import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 /**
  * Checkout environment for RENDERING only.
  *
- * The server has no hostname, so it cannot apply the production-host rule.
- * During the server render and React's hydration pass this returns the
- * token-only presentation (live token → "live"), which is exactly what the
- * production browser renders, so the markup matches. After hydration it
- * returns the real host-checked value, so a live token on a preview, staging
- * or local host re-renders as "unavailable".
+ * The server render resolves against the request host and the browser against
+ * `window.location.hostname` (see `renderHostname`), so both apply the
+ * production-host rule and the markup matches: a live token renders "live"
+ * only when the page is served from a production hostname, including in the
+ * server HTML.
  *
  * Opening checkout must still call `resolvePaddleCheckout()` at action time.
  */

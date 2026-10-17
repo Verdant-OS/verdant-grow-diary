@@ -13,11 +13,11 @@
  *    surfaces until Phase 2 explicitly bridges the two systems.
  */
 
+import { renderHostname } from "@/lib/requestHostname";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsFetchError } from "@supabase/supabase-js";
 import {
   resolvePaddleCheckoutEnvironment,
-  resolvePaddleCheckoutPresentationBeforeHydration,
   isCheckoutDisabledFlag,
   CHECKOUT_PAUSED_MESSAGE,
   classifyPaddleToken,
@@ -43,9 +43,9 @@ export function isPaddleCheckoutPaused(): boolean {
 // to avoid conflicting declarations while calling methods not modeled there
 // (e.g. `Checkout.open({ customer, customData, settings })`).
 
+// Server: the request host; browser: window.location.hostname (see renderHostname).
 function currentHostname(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.location?.hostname ?? null;
+  return renderHostname();
 }
 
 /**
@@ -77,12 +77,15 @@ export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
  * `null` when sandbox or live checkout is available. Never reveals a token.
  */
 /**
- * Presentation-only value for the server render and the hydration pass (see
- * `resolvePaddleCheckoutPresentationBeforeHydration`). Never authorizes
- * checkout; render through `useRenderedPaddleCheckoutEnvironment`.
+ * Presentation-only value for the server render and the hydration pass. Both
+ * sides resolve against the same host (the request host on the server,
+ * `window.location.hostname` in the browser), so the markup matches. Never
+ * authorizes checkout; render through `useRenderedPaddleCheckoutEnvironment`.
  */
 export function resolvePaddleCheckoutBeforeHydration(): PaddleCheckoutEnvironment {
-  return resolvePaddleCheckoutPresentationBeforeHydration(clientToken, checkoutDisabled);
+  // Host-aware on the server too: the request host decides, so a live token on
+  // a non-production hostname never renders as live in server HTML.
+  return resolvePaddleCheckout();
 }
 
 export function getCheckoutUnavailableMessage(): string | null {

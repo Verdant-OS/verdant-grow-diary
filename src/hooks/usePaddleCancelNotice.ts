@@ -62,8 +62,9 @@ export function usePaddleCancelNotice(): PaddleCancelNotice {
           .order("paddle_subscription_id", { ascending: false })
           .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
 
-      // Live subscription rows remain canonical production evidence even
-      // while new checkout is intentionally sandbox-only. Read the same
+      // Live subscription rows are canonical production evidence, and new
+      // production checkout is live (sandbox rows count only for a test_
+      // client token). Read the same
       // bounded environment windows as the entitlement hook, then apply its
       // Founder-first per-environment picker and live-first environment
       // precedence before deriving copy.

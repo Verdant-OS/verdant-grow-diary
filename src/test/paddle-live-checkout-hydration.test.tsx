@@ -3,11 +3,12 @@
  * hostname, so the old host-checked render resolved "unavailable" on the
  * server and "live" in the production browser, a hydration mismatch.
  *
- * Rendered checkout state now comes from the token alone until hydration
- * (live token → "live"), then from the real host check. This file runs on
- * jsdom's default localhost, a NON-production host: the server markup must not
- * depend on the host, hydration must not report a mismatch, and only after
- * hydration may the off-host block appear.
+ * Rendered checkout state is host-aware on both sides: the server resolves
+ * against the request host and the browser against window.location.hostname
+ * (Codex P2 at 9b41b975: server HTML must not claim live checkout off-host).
+ * This file runs on jsdom's default localhost, a NON-production host: the
+ * server markup already shows the off-host block, and hydration must not
+ * report a mismatch.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
@@ -41,9 +42,11 @@ describe("live checkout presentation is hydration-stable on a non-production hos
     expect(window.location.hostname).toBe("localhost");
   });
 
-  it("server-renders no banner for a live token, regardless of host", async () => {
+  it("server-renders the off-host block for a live token on a non-production host", async () => {
     const { PaymentTestModeBanner } = await loadBannerWithToken("live_fixturetokenpayload00000000");
-    expect(renderToString(<PaymentTestModeBanner />)).toBe("");
+    const html = renderToString(<PaymentTestModeBanner />);
+    expect(html).toContain('data-payment-env="unavailable"');
+    expect(html).toContain("Live checkout is only available on verdantgrowdiary.com.");
   });
 
   it("hydrates the server markup without a mismatch, then shows the off-host block", async () => {

@@ -112,4 +112,48 @@ describe("resolveDisplayedVpdObservation respects a header that rejected its VPD
       }),
     ).toEqual({ value: null, capturedAt: null, source: null, stale: false });
   });
+
+  it("lets a newer valid fallback supersede a rejected snapshot VPD", () => {
+    // Codex P1 at 80ec8672: a Quick Log manual VPD logged after the rejected
+    // snapshot is the grower's current valid reading and must not be hidden.
+    expect(
+      resolveDisplayedVpdObservation({
+        snapshotVpd: null,
+        snapshotVpdRejected: true,
+        snapshotCapturedAt: "2026-10-15T11:50:00.000Z",
+        snapshotSource: "live",
+        snapshotStale: false,
+        fallback: { ts: "2026-10-15T11:58:00.000Z", vpd: 1.1, source: "manual" },
+        nowMs: NOW_MS,
+      }),
+    ).toEqual({
+      value: 1.1,
+      capturedAt: "2026-10-15T11:58:00.000Z",
+      source: "manual",
+      stale: false,
+    });
+  });
+
+  it("still withholds a same-instant fallback or one when the snapshot time is unknown", () => {
+    const base = {
+      snapshotVpd: null,
+      snapshotVpdRejected: true,
+      snapshotSource: "live",
+      snapshotStale: false,
+      fallback: { ts: "2026-10-15T11:58:00.000Z", vpd: 1.1, source: "manual" },
+      nowMs: NOW_MS,
+    };
+    const hidden = { value: null, capturedAt: null, source: null, stale: false };
+    expect(
+      resolveDisplayedVpdObservation({ ...base, snapshotCapturedAt: "2026-10-15T11:58:00.000Z" }),
+    ).toEqual(hidden);
+    expect(resolveDisplayedVpdObservation({ ...base, snapshotCapturedAt: null })).toEqual(hidden);
+    expect(
+      resolveDisplayedVpdObservation({
+        ...base,
+        snapshotCapturedAt: "2026-10-15T11:50:00.000Z",
+        fallback: { ts: "not-a-time", vpd: 1.1, source: "manual" },
+      }),
+    ).toEqual(hidden);
+  });
 });

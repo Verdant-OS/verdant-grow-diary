@@ -137,6 +137,11 @@ function observationTimestamp(ts: StabilityReadingInput["ts"] | null | undefined
   return null;
 }
 
+function isStrictlyNewer(candidate: string | null, reference: string | null): boolean {
+  if (candidate === null || reference === null) return false;
+  return new Date(candidate).getTime() > new Date(reference).getTime();
+}
+
 /**
  * Header VPD keeps the stored snapshot when that snapshot observed VPD.
  * Otherwise it uses the newest shared series point, with that point's own
@@ -145,8 +150,11 @@ function observationTimestamp(ts: StabilityReadingInput["ts"] | null | undefined
  * the current header.
  *
  * When the stored snapshot observed a VPD that sensor truth rejected
- * (`snapshotVpdRejected`), nothing is shown: an older point must not stand
- * in for a current reading the header deliberately withheld.
+ * (`snapshotVpdRejected`), only a fallback strictly newer than that snapshot
+ * may be shown: an older (or same-instant) point must not stand in for a
+ * reading the header deliberately withheld, but a later valid observation
+ * (e.g. a Quick Log manual VPD) supersedes the rejected one. If either time
+ * is unknown, nothing is shown.
  */
 export function resolveDisplayedVpdObservation(args: {
   snapshotVpd: number | null | undefined;
@@ -167,10 +175,16 @@ export function resolveDisplayedVpdObservation(args: {
     };
   }
   const fallbackValue = finiteDisplayedVpd(args.fallback?.vpd);
-  if (args.snapshotVpdRejected === true || fallbackValue === null || !args.fallback) {
+  if (fallbackValue === null || !args.fallback) {
     return { value: null, capturedAt: null, source: null, stale: false };
   }
   const capturedAt = observationTimestamp(args.fallback.ts);
+  if (
+    args.snapshotVpdRejected === true &&
+    !isStrictlyNewer(capturedAt, observationTimestamp(args.snapshotCapturedAt))
+  ) {
+    return { value: null, capturedAt: null, source: null, stale: false };
+  }
   const source = typeof args.fallback.source === "string" ? args.fallback.source : null;
   return {
     value: fallbackValue,

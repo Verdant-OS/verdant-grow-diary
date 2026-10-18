@@ -117,6 +117,11 @@ function emptyForm(tentId: string) {
   };
 }
 
+/** Physical key identity; falls back to `key` when `code` is unavailable. */
+function physicalKeyId(event: KeyboardEvent): string {
+  return event.code || event.key;
+}
+
 export default function CreatePlantDialog({
   trigger,
   defaultTentId,
@@ -241,17 +246,19 @@ export default function CreatePlantDialog({
   const closedAfterSubmitRef = useRef(false);
   const releaseReopenGuardRef = useRef<(() => void) | null>(null);
   useEffect(() => () => releaseReopenGuardRef.current?.(), []);
-  // Keys physically held right now. A save usually resolves after the
-  // submitting key's keyup, and a guard armed then would swallow the next
-  // genuine activation of New plant (Codex P2 at 885e48b8).
+  // Keys physically held right now, keyed by physical key (`code`): `key`
+  // changes with Shift/dead keys between keydown and keyup and would leave
+  // phantom entries. A save usually resolves after the submitting key's keyup,
+  // and a guard armed then would swallow the next genuine activation of
+  // New plant (Codex P2 at 885e48b8).
   const heldKeysRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const held = heldKeysRef.current;
     const onKeyDown = (event: KeyboardEvent) => {
-      held.add(event.key);
+      held.add(physicalKeyId(event));
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      held.delete(event.key);
+      held.delete(physicalKeyId(event));
     };
     const onBlur = () => held.clear();
     window.addEventListener("keydown", onKeyDown, true);
@@ -378,25 +385,41 @@ export default function CreatePlantDialog({
   // After a successful create, let Radix return focus to the New plant trigger
   // (keyboard users keep their place) but keep the reopen guard armed until the
   // submitting gesture ends: a held or trailing key must not reopen the dialog
-  // empty. The next keyup or pointerdown releases it. When no key is held at
-  // close (pointer submit, or a keyboard save that resolved after keyup), the
-  // gesture has already ended, so the guard is released immediately.
+  // empty. It is released once every key held at close is up (in any order),
+  // on the next pointerdown, or on window blur (keyups elsewhere are lost).
+  // When no key is held at close (pointer submit, or a keyboard save that
+  // resolved after keyup), the gesture has already ended, so the guard is
+  // released immediately.
   function handleDialogCloseAutoFocus(_event: Event) {
     if (!closedAfterSubmitRef.current) return;
     releaseReopenGuardRef.current?.();
-    if (heldKeysRef.current.size === 0) {
+    const held = heldKeysRef.current;
+    if (held.size === 0) {
       closedAfterSubmitRef.current = false;
       return;
     }
     const release = () => {
       closedAfterSubmitRef.current = false;
-      window.removeEventListener("keyup", release, true);
+      window.removeEventListener("keyup", onKeyUp, true);
       window.removeEventListener("pointerdown", release, true);
+      window.removeEventListener("blur", release);
       releaseReopenGuardRef.current = null;
     };
+    const onKeyUp = (event: KeyboardEvent) => {
+      held.delete(physicalKeyId(event));
+      if (held.size === 0) release();
+    };
     releaseReopenGuardRef.current = release;
-    window.addEventListener("keyup", release, true);
+    window.addEventListener("keyup", onKeyUp, true);
     window.addEventListener("pointerdown", release, true);
+    window.addEventListener("blur", release);
+  }
+
+  // Closing the listbox arms the same-turn submit guard too: reselecting the
+  // already-selected tent does not fire onValueChange (Radix keeps the value).
+  function handleTentSelectOpenChange(next: boolean) {
+    if (!next) armTentSelectSubmitGuard();
+    setTentSelectOpen(next);
   }
 
   function handleOpenChange(next: boolean) {
@@ -969,7 +992,7 @@ export default function CreatePlantDialog({
               </div>
               <Select
                 open={tentSelectOpen}
-                onOpenChange={setTentSelectOpen}
+                onOpenChange={handleTentSelectOpenChange}
                 value={form.tent_id}
                 onValueChange={onTentSelect}
               >

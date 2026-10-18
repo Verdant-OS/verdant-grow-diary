@@ -302,4 +302,125 @@ describe("CreatePlantDialog tent selection and submit safety", () => {
     await screen.findByTestId("create-plant-form");
     expect(screen.getByTestId("create-plant-name")).toHaveValue("");
   });
+
+  async function createWithKeysHeld(user: ReturnType<typeof userEvent.setup>, press: string) {
+    renderDialog({ initiallyOpen: false });
+    const newPlantTrigger = screen.getByRole("button", { name: /New plant/i });
+    await user.click(newPlantTrigger);
+    await screen.findByTestId("create-plant-form");
+    await user.type(screen.getByTestId("create-plant-name"), "Blue Dream");
+    await user.click(screen.getByTestId("create-plant-tent-select"));
+    await user.click(await screen.findByRole("option", { name: "Tent A" }));
+    screen.getByTestId("plant-create-submit").focus();
+    await user.keyboard(press);
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+    });
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(newPlantTrigger).toHaveFocus();
+    return newPlantTrigger;
+  }
+
+  function expectRepeatedEnterBlocked(trigger: HTMLElement) {
+    fireEvent.keyDown(trigger, { key: "Enter", code: "Enter" });
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+  }
+
+  // Codex P2 at 30efbb8e: with Shift+Enter held across the close, the first
+  // keyup must not release the guard while another submitting key is still down.
+  it("keeps the reopen guard until both Shift and Enter are up when Shift is released first", async () => {
+    const user = userEvent.setup();
+    const trigger = await createWithKeysHeld(user, "{Shift>}{Enter>}");
+    await user.keyboard("{/Shift}");
+    expectRepeatedEnterBlocked(trigger);
+    await user.keyboard("{/Enter}");
+    await user.click(trigger);
+    await screen.findByTestId("create-plant-form");
+    expect(screen.getByTestId("create-plant-name")).toHaveValue("");
+  });
+
+  it("keeps the reopen guard until both Shift and Enter are up when Enter is released first", async () => {
+    const user = userEvent.setup();
+    const trigger = await createWithKeysHeld(user, "{Shift>}{Enter>}");
+    await user.keyboard("{/Enter}");
+    expectRepeatedEnterBlocked(trigger);
+    await user.keyboard("{/Shift}");
+    await user.click(trigger);
+    await screen.findByTestId("create-plant-form");
+  });
+
+  it("releases the reopen guard on window blur because keyups elsewhere are lost", async () => {
+    // Copilot at 30efbb8e: Enter released in another window must not leave the guard armed.
+    const user = userEvent.setup();
+    const trigger = await createWithKeysHeld(user, "{Enter>}");
+    fireEvent.blur(window);
+    fireEvent.click(trigger);
+    await screen.findByTestId("create-plant-form");
+  });
+
+  it("tracks physical keys so a Shift-changed key value leaves no phantom held key", async () => {
+    // Cursor/Copilot at 30efbb8e: keydown "Q" then keyup "q" (Shift released
+    // first) is one physical key; a phantom entry would arm the guard after a
+    // save that resolves once every key is up.
+    let resolveInsert: (value: unknown) => void = () => {};
+    singleMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveInsert = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    renderDialog({ initiallyOpen: false });
+    fireEvent.keyDown(window, { key: "Shift", code: "ShiftLeft" });
+    fireEvent.keyDown(window, { key: "Q", code: "KeyQ" });
+    fireEvent.keyUp(window, { key: "Shift", code: "ShiftLeft" });
+    fireEvent.keyUp(window, { key: "q", code: "KeyQ" });
+    const trigger = screen.getByRole("button", { name: /New plant/i });
+    await user.click(trigger);
+    await screen.findByTestId("create-plant-form");
+    await user.type(screen.getByTestId("create-plant-name"), "Blue Dream");
+    await user.click(screen.getByTestId("create-plant-tent-select"));
+    await user.click(await screen.findByRole("option", { name: "Tent A" }));
+    screen.getByTestId("plant-create-submit").focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    });
+    resolveInsert({ data: buildCreatedPlantRow(), error: null });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+    });
+    fireEvent.click(trigger);
+    await screen.findByTestId("create-plant-form");
+  });
+
+  it("reselecting the already-selected tent by pointer never submits even if a stray submit fires in the same turn", async () => {
+    // Copilot at 30efbb8e: Radix does not fire onValueChange for the current value.
+    renderDialog({ initiallyOpen: true });
+    const form = await screen.findByTestId<HTMLFormElement>("create-plant-form");
+    fireEvent.change(screen.getByTestId("create-plant-name"), {
+      target: { value: "Blue Dream" },
+    });
+    const tentTrigger = screen.getByTestId("create-plant-tent-select");
+    const openTentA = async () => {
+      fireEvent.pointerDown(tentTrigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      fireEvent.click(tentTrigger);
+      return screen.findByRole("option", { name: "Tent A" });
+    };
+    const choose = (option: HTMLElement) => {
+      fireEvent.pointerDown(option, { button: 0, pointerType: "mouse" });
+      fireEvent.pointerUp(option, { button: 0, pointerType: "mouse" });
+      fireEvent.click(option);
+    };
+    choose(await openTentA());
+    await waitFor(() => {
+      expect(tentTrigger).toHaveTextContent("Tent A");
+    });
+    const again = await openTentA();
+    // Same turn: reselect the current tent, then a stray submit lands.
+    choose(again);
+    fireEvent.submit(form);
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "New plant" })).toBeInTheDocument();
+  });
 });

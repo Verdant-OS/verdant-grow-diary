@@ -49,6 +49,7 @@ function startHashScrollFollow(anchorId: string): () => void {
     window.removeEventListener("wheel", stop);
     window.removeEventListener("touchmove", stop);
     window.removeEventListener("keydown", stop);
+    window.removeEventListener("pointerdown", stop);
   };
 
   const observer = new ResizeObserver(() => {
@@ -61,6 +62,9 @@ function startHashScrollFollow(anchorId: string): () => void {
   window.addEventListener("wheel", stop, { passive: true });
   window.addEventListener("touchmove", stop, { passive: true });
   window.addEventListener("keydown", stop);
+  // Section-nav and quick-action buttons navigate without changing the hash,
+  // so a pointer press is the grower taking over from the landing hash.
+  window.addEventListener("pointerdown", stop, { passive: true });
   return stop;
 }
 
@@ -181,6 +185,9 @@ export function usePlantDetailDisclosureNavigation({
     (targetValue, preferredTarget, options) => {
       const target = resolvePlantDetailDisclosureTarget(targetValue);
       if (!target) return;
+      // A new section navigation replaces any landing-hash follow; otherwise a
+      // layout change from opening this disclosure would scroll back to the old hash.
+      endHashScrollFollow();
       const revealGroup = target.group;
       if (revealGroup) {
         setDisclosureState((current) => {
@@ -210,7 +217,15 @@ export function usePlantDetailDisclosureNavigation({
         );
       }
     },
-    [location.hash, location.pathname, location.search, navigate, plantId, scheduleNavigation],
+    [
+      endHashScrollFollow,
+      location.hash,
+      location.pathname,
+      location.search,
+      navigate,
+      plantId,
+      scheduleNavigation,
+    ],
   );
 
   useEffect(() => {

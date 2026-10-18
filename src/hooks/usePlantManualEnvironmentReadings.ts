@@ -23,7 +23,12 @@ export function usePlantManualEnvironmentReadings(
 ): UseQueryResult<PlantTentReadingRow[]> {
   const { user } = useAuth();
   return useQuery({
+    // Prefixed with "grow_events" so the frozen Quick Log post-save refresh
+    // (applyQuickLogV2Refresh) and the correction/retraction invalidation
+    // set, which both invalidate ["grow_events"], refetch this read without
+    // a second refresh path.
     queryKey: [
+      "grow_events",
       "plant-tent-manual-environment",
       tentId ?? "none",
       plantId ?? "none",

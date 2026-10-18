@@ -140,12 +140,17 @@ export function usePlantManualSensorHistory(plantId: string | null | undefined) 
     queryKey: ["plant_manual_sensor_history", plantId ?? null],
     enabled: !!plantId,
     queryFn: async (): Promise<PlantManualSensorHistory> => {
+      // The grow_events read is supplemental: when it fails, keep the
+      // diary-backed readings instead of rejecting the whole query and
+      // showing every metric as never logged. A diary failure still throws.
       const [rows, events] = await Promise.all([
         fetchPlantManualSensorDiaryRows(plantId as string),
-        fetchPlantManualEnvironmentEvents(plantId as string),
+        fetchPlantManualEnvironmentEvents(plantId as string).catch(() => null),
       ]);
+      const diaryReadings = deriveLatestManualReadings(rows);
+      if (events === null) return diaryReadings;
       return mergeLatestManualReadings(
-        deriveLatestManualReadings(rows),
+        diaryReadings,
         latestManualReadingsFromEnvironmentEvents(events),
       );
     },

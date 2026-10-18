@@ -16,6 +16,7 @@ import React from "react";
 type TableData = Record<string, unknown[]>;
 const tableData: TableData = {};
 const calls: Array<{ table: string; method: string; args: unknown[] }> = [];
+const failTables = new Set<string>();
 
 function chainFor(table: string) {
   const chain: Record<string, unknown> = {};
@@ -27,7 +28,11 @@ function chainFor(table: string) {
     };
   for (const m of ["select", "eq", "is", "or", "order", "limit", "in"]) chain[m] = record(m);
   chain.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-    Promise.resolve({ data: tableData[table] ?? [], error: null }).then(resolve, reject);
+    Promise.resolve(
+      failTables.has(table)
+        ? { data: null, error: { message: "read failed" } }
+        : { data: tableData[table] ?? [], error: null },
+    ).then(resolve, reject);
   return chain;
 }
 
@@ -78,6 +83,7 @@ function wrapper() {
 beforeEach(() => {
   for (const k of Object.keys(tableData)) delete tableData[k];
   calls.length = 0;
+  failTables.clear();
 });
 
 describe("plantManualEnvironmentEventRules (pure)", () => {
@@ -217,5 +223,86 @@ describe("plant hooks surface manual environment_events", () => {
     });
     expect(result.current.data?.humidity_percent?.value).toBe(60);
     expect(calls).toContainEqual({ table: "grow_events", method: "eq", args: ["plant_id", PLANT] });
+  });
+});
+
+import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { buildQuickLogRevisionInvalidationKeys } from "@/lib/quickLogRevisionInvalidationRules";
+
+describe("Codex review on #2115", () => {
+  function clientAndWrapper() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const w = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: qc }, children);
+    return { qc, w };
+  }
+  const growReads = () =>
+    calls.filter((c) => c.table === "grow_events" && c.method === "from").length;
+
+  it("the plant environment read refetches after the frozen Quick Log post-save refresh", async () => {
+    tableData.grow_events = [];
+    const { qc, w } = clientAndWrapper();
+    const { result } = renderHook(() => usePlantManualEnvironmentReadings(TENT, PLANT), {
+      wrapper: w,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual([]);
+    const before = growReads();
+
+    tableData.grow_events = [envRow()];
+    applyQuickLogV2Refresh(qc, { targetType: "plant", targetId: PLANT, tentId: TENT });
+
+    await waitFor(() =>
+      expect(result.current.data?.find((r) => r.metric === "temperature_c")).toMatchObject({
+        value: 25.56,
+      }),
+    );
+    expect(growReads()).toBe(before + 1);
+  });
+
+  it("the plant environment read is covered by the correction/retraction invalidation set", async () => {
+    tableData.grow_events = [];
+    const { qc, w } = clientAndWrapper();
+    const { result } = renderHook(() => usePlantManualEnvironmentReadings(TENT, PLANT), {
+      wrapper: w,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const before = growReads();
+    tableData.grow_events = [envRow()];
+    for (const queryKey of buildQuickLogRevisionInvalidationKeys({
+      plantId: PLANT,
+      tentId: TENT,
+    })) {
+      void qc.invalidateQueries({ queryKey });
+    }
+    await waitFor(() => expect(result.current.data?.length ?? 0).toBeGreaterThan(0));
+    expect(growReads()).toBe(before + 1);
+  });
+
+  it("keeps diary-backed manual memory when the grow_events read fails", async () => {
+    tableData.diary_entries = [
+      {
+        id: "d-1",
+        entry_at: "2026-10-13T09:00:00+00:00",
+        details: { manual_sensor_snapshot: { source: "manual", temp_f: 74, humidity_percent: 55 } },
+      },
+    ];
+    failTables.add("grow_events");
+    const { w } = clientAndWrapper();
+    const { result } = renderHook(() => usePlantManualSensorHistory(PLANT), { wrapper: w });
+    await waitFor(() => expect(result.current.isFetched).toBe(true));
+    expect(result.current.isSuccess).toBe(true);
+    expect(result.current.data?.temp_f).toEqual({
+      value: 74,
+      loggedAt: "2026-10-13T09:00:00+00:00",
+    });
+    expect(result.current.data?.humidity_percent?.value).toBe(55);
+  });
+
+  it("still fails when the diary read itself fails", async () => {
+    failTables.add("diary_entries");
+    const { w } = clientAndWrapper();
+    const { result } = renderHook(() => usePlantManualSensorHistory(PLANT), { wrapper: w });
+    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });

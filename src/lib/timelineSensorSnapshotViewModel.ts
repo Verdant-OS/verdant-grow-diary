@@ -23,7 +23,11 @@ import { validateManualSnapshot } from "@/lib/manualSensorSnapshotRules";
 import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import { classifyManualMetric, CO2_PPM_RANGE } from "@/lib/sensorTruthRules";
 import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import { fahrenheitToCelsius, tempFFromC } from "@/lib/temperatureUnits";
+import {
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type TimelineSensorChipMetric =
   "temp_f" | "temp_c" | "rh" | "ph" | "ec" | "vpd" | "soil_moisture" | "co2";
@@ -141,14 +145,19 @@ export function resolveTimelineCardSensorResolution(
 /** Validate every persisted source; manual provenance only selects the existing copy. */
 export function buildTimelineCardSensorSnapshotViewModel(
   input: TimelineCardSensorResolution | null | undefined,
-  options: { validateManualCompatibility: true } = { validateManualCompatibility: true },
+  options: {
+    validateManualCompatibility?: boolean;
+    temperatureUnit?: TemperatureUnitPreference;
+  } = { validateManualCompatibility: true },
 ): TimelineCardSensorSnapshotViewModel {
   const resolution = input ?? { sensor: undefined, useManualValidation: false };
+  const temperatureUnit = options.temperatureUnit ?? loadTemperatureUnitPreference();
+  const preferUnit = temperatureUnit === "celsius" ? "C" : "F";
   return {
     ...resolution,
     sensorViewModel: buildTimelineSensorSnapshotViewModel(resolution.sensor, {
-      preferUnit: "F",
-      validateManualCompatibility: options.validateManualCompatibility,
+      preferUnit,
+      validateManualCompatibility: options.validateManualCompatibility ?? true,
       // Retain Timeline's persisted generic-temperature Celsius convention.
       genericTempUnit: "C",
       preserveLegacyPrecision: !resolution.useManualValidation,
@@ -253,12 +262,27 @@ export function buildTimelineSensorSnapshotViewModel(
     return { kind: "none" };
   }
   const genericTemp = isFiniteNumber(tempGeneric) && options.genericTempUnit ? tempGeneric : null;
-  const manualTemp = isFiniteNumber(tempF) ? tempF : isFiniteNumber(tempC) ? tempC : genericTemp;
-  const manualTempUnit = isFiniteNumber(tempF)
-    ? "F"
-    : isFiniteNumber(tempC)
+  const preferCelsius = options.preferUnit === "C";
+  const manualTemp =
+    preferCelsius && isFiniteNumber(tempC)
+      ? tempC
+      : isFiniteNumber(tempF)
+        ? tempF
+        : isFiniteNumber(tempC)
+          ? tempC
+          : genericTemp;
+  const manualTempUnit =
+    preferCelsius && isFiniteNumber(tempC)
       ? "C"
-      : (options.genericTempUnit ?? "C");
+      : isFiniteNumber(tempF)
+        ? "F"
+        : isFiniteNumber(tempC)
+          ? "C"
+          : (options.genericTempUnit ?? "C");
+  const dualTempMismatch =
+    isFiniteNumber(tempF) &&
+    isFiniteNumber(tempC) &&
+    Math.abs(fahrenheitToCelsius(tempF) - tempC) > 0.6;
   const legacyPrecision =
     options.preserveLegacyPrecision ||
     (options.genericTempUnit === "C" &&
@@ -290,25 +314,37 @@ export function buildTimelineSensorSnapshotViewModel(
   ) {
     manualWarnings.push("Temperature unit unverified; the generic temperature was not shown.");
   }
-  const explicitTempF = isFiniteNumber(tempF)
-    ? tempF
-    : isFiniteNumber(tempC)
+  const tempCOutOfRange =
+    isFiniteNumber(tempC) && !classifyManualMetric("temperature_c", tempC).valid;
+  const tempFOutOfRange =
+    isFiniteNumber(tempF) && (tempF < AIR_TEMP_F_REALISTIC.min || tempF > AIR_TEMP_F_REALISTIC.max);
+  const explicitTempF =
+    preferCelsius && isFiniteNumber(tempC)
       ? tempFFromC(tempC)
-      : genericTemp === null
-        ? null
-        : manualTempUnit === "C"
-          ? tempFFromC(genericTemp)
-          : genericTemp;
+      : isFiniteNumber(tempF)
+        ? tempF
+        : isFiniteNumber(tempC)
+          ? tempFFromC(tempC)
+          : genericTemp === null
+            ? null
+            : manualTempUnit === "C"
+              ? tempFFromC(genericTemp)
+              : genericTemp;
   const manualTempOutsideRealisticBand =
     manualValidation !== null &&
-    explicitTempF !== null &&
-    (explicitTempF < AIR_TEMP_F_REALISTIC.min || explicitTempF > AIR_TEMP_F_REALISTIC.max);
+    (tempCOutOfRange ||
+      tempFOutOfRange ||
+      (explicitTempF !== null &&
+        (explicitTempF < AIR_TEMP_F_REALISTIC.min || explicitTempF > AIR_TEMP_F_REALISTIC.max)));
   const manualEcUnitMismatch =
     manualValidation !== null && isFiniteNumber(ec) && ec >= EC_MSCM_UNIT_MISMATCH_AT;
   const manualVpdOutsideRealisticBand =
     manualValidation !== null && isFiniteNumber(vpd) && !classifyManualMetric("vpd_kpa", vpd).valid;
   const manualCo2OutsideRealisticBand =
     manualValidation !== null && isFiniteNumber(co2) && !classifyManualMetric("co2_ppm", co2).valid;
+  if (dualTempMismatch) {
+    manualErrors.push("Air temperature °F and °C fields do not match; the reading was not shown.");
+  }
   if (manualTempOutsideRealisticBand) {
     manualErrors.push(
       `Air temperature is outside the realistic ${AIR_TEMP_F_REALISTIC.min}–${AIR_TEMP_F_REALISTIC.max}°F grow-room range.`,
@@ -335,35 +371,61 @@ export function buildTimelineSensorSnapshotViewModel(
     manualWarnings.push(`Humidity ${rh}% may indicate a stuck sensor; review before trusting.`);
   }
   const allowedManualFields = new Set(manualValidation?.metrics.map((metric) => metric.field));
-  if (manualTempOutsideRealisticBand) allowedManualFields.delete("air_temp_c");
+  if (manualTempOutsideRealisticBand || dualTempMismatch) allowedManualFields.delete("air_temp_c");
   if (manualEcUnitMismatch) allowedManualFields.delete("reservoir_ec_mscm");
   if (manualVpdOutsideRealisticBand) allowedManualFields.delete("vpd_kpa");
   if (manualCo2OutsideRealisticBand) allowedManualFields.delete("co2_ppm");
-  const allows = (field: Parameters<typeof allowedManualFields.has>[0]): boolean =>
-    manualValidation === null || allowedManualFields.has(field);
+  const allows = (field: Parameters<typeof allowedManualFields.has>[0]): boolean => {
+    if (
+      field === "air_temp_c" &&
+      (dualTempMismatch ||
+        tempCOutOfRange ||
+        (options.preferUnit === "C" && tempFOutOfRange) ||
+        manualTempOutsideRealisticBand)
+    ) {
+      return false;
+    }
+    return manualValidation === null || allowedManualFields.has(field);
+  };
 
   const chips: TimelineSensorChip[] = [];
 
-  // Temperature chip — never double-convert explicit Fahrenheit values.
+  // Temperature chip — never double-convert explicit Fahrenheit or Celsius values.
   if (isFiniteNumber(tempF) && allows("air_temp_c")) {
-    const v = roundTo(tempF, 1);
-    chips.push({
-      metric: "temp_f",
-      label: "Temp",
-      value: v,
-      unit: "°F",
-      display: `${v}°F`,
-    });
-  } else if (isFiniteNumber(tempC) && allows("air_temp_c")) {
     if (options.preferUnit === "C") {
-      const v = roundTo(tempC, 1);
+      const convertedC = isFiniteNumber(tempC) ? tempC : fahrenheitToCelsius(tempF);
+      if (classifyManualMetric("temperature_c", convertedC).valid) {
+        const v = roundTo(convertedC, 1);
+        chips.push({
+          metric: "temp_c",
+          label: "Temp",
+          value: v,
+          unit: "°C",
+          display: `${v}°C`,
+        });
+      }
+    } else {
+      const v = roundTo(tempF, 1);
       chips.push({
-        metric: "temp_c",
+        metric: "temp_f",
         label: "Temp",
         value: v,
-        unit: "°C",
-        display: `${v}°C`,
+        unit: "°F",
+        display: `${v}°F`,
       });
+    }
+  } else if (isFiniteNumber(tempC) && allows("air_temp_c")) {
+    if (options.preferUnit === "C") {
+      if (classifyManualMetric("temperature_c", tempC).valid) {
+        const v = roundTo(tempC, 1);
+        chips.push({
+          metric: "temp_c",
+          label: "Temp",
+          value: v,
+          unit: "°C",
+          display: `${v}°C`,
+        });
+      }
     } else {
       const converted = tempFFromC(tempC);
       if (isFiniteNumber(converted)) {

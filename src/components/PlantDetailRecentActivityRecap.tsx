@@ -10,6 +10,7 @@ import { useMemo } from "react";
 import { Activity, ArrowDown, Link2, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { enrichPlantFeedingDiaryRows } from "@/lib/plantFeedingDisplayRules";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import {
   buildPlantRecentActivityRecap,
@@ -74,7 +75,7 @@ export default function PlantDetailRecentActivityRecap({
 
   const rows = useMemo(() => {
     if (!plantId || !Array.isArray(rawRows)) return [];
-    return buildPlantRecentActivity(rawRows, {
+    return buildPlantRecentActivity(enrichPlantFeedingDiaryRows(rawRows), {
       plantId,
       limit: 10,
     });

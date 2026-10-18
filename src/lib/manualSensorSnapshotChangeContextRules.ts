@@ -17,6 +17,7 @@
  */
 
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 export type ChangeContextMetric =
   | "temperature_c"
@@ -148,17 +149,23 @@ function formatDelta(
   key: ChangeContextMetric,
   latest: number,
   previous: number,
+  temperatureUnit: TemperatureUnitPreference = "fahrenheit",
 ): ChangeContextDelta | null {
   let delta: number;
   let label: string;
   let formatted: string;
   switch (key) {
     case "temperature_c": {
-      // Stored in °C, displayed in °F to match the rest of the grow UI.
-      const dF = celsiusToFahrenheit(latest) - celsiusToFahrenheit(previous);
-      delta = Math.round(dF * 10) / 10;
-      label = "Temp";
-      formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}°F`;
+      if (temperatureUnit === "celsius") {
+        delta = Math.round((latest - previous) * 10) / 10;
+        label = "Temp";
+        formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}°C`;
+      } else {
+        const dF = celsiusToFahrenheit(latest) - celsiusToFahrenheit(previous);
+        delta = Math.round(dF * 10) / 10;
+        label = "Temp";
+        formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}°F`;
+      }
       break;
     }
     case "humidity_pct": {
@@ -211,8 +218,10 @@ function formatDelta(
 export function buildManualSnapshotChangeContext(input: {
   latest: ChangeContextSnapshot | null | undefined;
   previous: ChangeContextSnapshot | null | undefined;
+  temperatureUnit?: TemperatureUnitPreference;
 }): ChangeContextResult {
   const { latest, previous } = input;
+  const temperatureUnit = input.temperatureUnit ?? "fahrenheit";
   if (!latest) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
   if (!previous) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
 
@@ -239,7 +248,7 @@ export function buildManualSnapshotChangeContext(input: {
       });
       continue;
     }
-    const d = formatDelta(key, a, b);
+    const d = formatDelta(key, a, b, temperatureUnit);
     if (d) deltas.push(d);
   }
   return { firstSnapshot: false, deltas, suppressedDeltas };
@@ -251,11 +260,12 @@ export function buildManualSnapshotChangeContext(input: {
  */
 export function deriveChangeContextFromReadings(
   rows: ReadonlyArray<ChangeContextReading>,
-  opts: { tentId?: string | null } = {},
+  opts: { tentId?: string | null; temperatureUnit?: TemperatureUnitPreference } = {},
 ): ChangeContextResult {
   const snapshots = groupManualReadingsToSnapshots(rows, opts);
   return buildManualSnapshotChangeContext({
     latest: snapshots[0] ?? null,
     previous: snapshots[1] ?? null,
+    temperatureUnit: opts.temperatureUnit,
   });
 }

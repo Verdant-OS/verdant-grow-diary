@@ -9,6 +9,10 @@
  */
 import type { NormalizedDiaryEntry } from "./diaryEntryRules";
 import {
+  isQuickLogPlaceholderNote,
+  resolveFeedingNutrientLineName,
+} from "./plantFeedingDisplayRules";
+import {
   normalizeRootZoneSource,
   rootZoneSourceLabel,
   type RootZoneSource,
@@ -71,10 +75,21 @@ function pickString(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v !== null && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
+function pickFeedingEnvelope(entry: NormalizedDiaryEntry): Record<string, unknown> | null {
+  return asRecord(entry.details.extras?.feeding);
+}
+
 function pickRecipe(entry: NormalizedDiaryEntry): string | null {
   const extras = entry.details.extras;
   if (!extras) return null;
   return (
+    resolveFeedingNutrientLineName(extras) ??
     pickString(extras.recipe) ??
     pickString(extras.recipe_name) ??
     pickString(extras.recipeName) ??
@@ -86,6 +101,7 @@ function pickRecipe(entry: NormalizedDiaryEntry): string | null {
 
 function previewNote(note: string): string {
   const trimmed = (note ?? "").trim();
+  if (isQuickLogPlaceholderNote(trimmed)) return "";
   if (trimmed.length <= NOTE_PREVIEW_MAX) return trimmed;
   return trimmed.slice(0, NOTE_PREVIEW_MAX - 1).trimEnd() + "…";
 }
@@ -140,23 +156,40 @@ function isFeedingEntry(entry: NormalizedDiaryEntry): boolean {
 
 function pickRunoffMl(entry: NormalizedDiaryEntry): number | null {
   const extras = entry.details.extras;
-  if (!extras) return null;
-  return pickNumber(extras.runoff_ml) ?? pickNumber(extras.runoffMl) ?? null;
+  const feed = pickFeedingEnvelope(entry);
+  if (!extras && !feed) return null;
+  return (
+    pickNumber(extras?.runoff_ml) ??
+    pickNumber(extras?.runoffMl) ??
+    pickNumber(feed?.runoff_ml) ??
+    pickNumber(feed?.runoffMl) ??
+    null
+  );
 }
 
 function pickOutputEc(entry: NormalizedDiaryEntry): number | null {
   const extras = entry.details.extras;
-  if (!extras) return null;
-  return pickNumber(extras.ec_out) ?? pickNumber(extras.ecOut) ?? null;
+  const feed = pickFeedingEnvelope(entry);
+  if (!extras && !feed) return null;
+  return (
+    pickNumber(extras?.ec_out) ??
+    pickNumber(extras?.ecOut) ??
+    pickNumber(feed?.ec_out) ??
+    pickNumber(feed?.ecOut) ??
+    null
+  );
 }
 
 function pickWaterTempC(entry: NormalizedDiaryEntry): number | null {
   const extras = entry.details.extras;
-  if (!extras) return null;
+  const feed = pickFeedingEnvelope(entry);
+  if (!extras && !feed) return null;
   return (
-    pickNumber(extras.water_temp_c) ??
-    pickNumber(extras.waterTempC) ??
-    pickNumber(extras.waterTempCelsius) ??
+    pickNumber(extras?.water_temp_c) ??
+    pickNumber(extras?.waterTempC) ??
+    pickNumber(extras?.waterTempCelsius) ??
+    pickNumber(feed?.water_temp_c) ??
+    pickNumber(feed?.waterTempC) ??
     null
   );
 }
@@ -166,11 +199,22 @@ function pickSource(entry: NormalizedDiaryEntry): RootZoneSource {
 }
 
 function toNutrients(entry: NormalizedDiaryEntry): FeedingNutrient[] {
-  const src = entry.details.nutrients;
+  const feed = pickFeedingEnvelope(entry);
+  const rawProducts = Array.isArray(feed?.products)
+    ? feed.products
+    : Array.isArray(feed?.nutrients)
+      ? feed.nutrients
+      : null;
+  const src =
+    entry.details.nutrients && entry.details.nutrients.length > 0
+      ? entry.details.nutrients
+      : rawProducts;
   if (!src || src.length === 0) return [];
   const out: FeedingNutrient[] = [];
-  for (const n of src) {
-    const name = pickString(n?.name);
+  for (const item of src) {
+    const n = asRecord(item);
+    if (!n) continue;
+    const name = pickString(n.name);
     if (!name) continue;
     out.push({
       name,
@@ -182,13 +226,18 @@ function toNutrients(entry: NormalizedDiaryEntry): FeedingNutrient[] {
 }
 
 function toRow(entry: NormalizedDiaryEntry): FeedingHistoryRow {
+  const feed = pickFeedingEnvelope(entry);
   const volumeMl =
-    entry.details.wateringAmountMl !== undefined ? entry.details.wateringAmountMl : null;
-  const ph = entry.details.ph ?? null;
-  const ec = entry.details.ec ?? null;
+    entry.details.wateringAmountMl !== undefined
+      ? entry.details.wateringAmountMl
+      : (pickNumber(feed?.volume_ml) ?? pickNumber(feed?.volumeMl) ?? null);
+  const ph = entry.details.ph ?? pickNumber(feed?.ph) ?? null;
+  const ec = entry.details.ec ?? pickNumber(feed?.ec_in) ?? pickNumber(feed?.ec_ms_cm) ?? null;
   const tds = entry.details.tds ?? null;
-  const runoffPh = entry.details.runoffPh ?? null;
-  const runoffEc = entry.details.runoffEc ?? null;
+  const runoffPh =
+    entry.details.runoffPh ?? pickNumber(feed?.runoff_ph) ?? pickNumber(feed?.runoffPh) ?? null;
+  const runoffEc =
+    entry.details.runoffEc ?? pickNumber(feed?.runoff_ec) ?? pickNumber(feed?.runoffEc) ?? null;
   const runoffTds = entry.details.runoffTds ?? null;
   const runoffMl = pickRunoffMl(entry);
   const outputEc = pickOutputEc(entry);

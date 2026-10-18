@@ -149,14 +149,17 @@ export const OAUTH_RETURN_HASH_STASH_KEY = "__VERDANT_OAUTH_RETURN_HASH__" as co
 
 /**
  * GoTrue implicit-callback types that must keep the full fragment in the
- * address bar. Session OAuth (Google SSO) has access/refresh and no `type`
- * (or only `token_type=bearer`) and still gets wiped.
+ * address bar for ResetPassword. Session OAuth (Google SSO) has access/refresh
+ * and no `type` (or only `token_type=bearer`) and still gets wiped.
+ * `type=magiclink` is a plain sign-in return to the public origin: it takes
+ * the same stash → setSession bootstrap as Google OAuth, so sign-in never
+ * depends on auth-js reading the hash after first paint (production QA
+ * 2026-10-14: magic-link returns landed signed out).
  */
 export const AUTH_CALLBACK_HASH_PRESERVE_TYPES = [
   "recovery",
   "signup",
   "invite",
-  "magiclink",
   "email_change",
 ] as const;
 

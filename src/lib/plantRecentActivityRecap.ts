@@ -17,6 +17,7 @@ import {
   INVALID_EVENT_TYPE_IDENTITY,
   INVALID_EVENT_TYPE_NEUTRAL_LABEL,
 } from "@/lib/quickLogEventIdentityRules";
+import { isQuickLogPlaceholderNote } from "@/lib/plantFeedingDisplayRules";
 import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
 
 export const PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT = 3 as const;
@@ -130,12 +131,15 @@ export function buildPlantRecentActivityRecap(
     // Log summary (e.g. "500 ml"), prefer that over the generic
     // "No details recorded." placeholder.
     const structured = (r.summarySuffix ?? "").trim();
+    const notePreview = isQuickLogPlaceholderNote(r.notePreview)
+      ? ""
+      : (r.notePreview ?? "").trim();
     const summary =
-      r.notePreview && r.notePreview.trim().length > 0
-        ? previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot)
+      notePreview.length > 0
+        ? previewSummary(notePreview, r.hasPhoto, r.hasSnapshot)
         : structured.length > 0
           ? structured
-          : previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot);
+          : previewSummary("", r.hasPhoto, r.hasSnapshot);
     out.push({
       key: out.length.toString(),
       category,

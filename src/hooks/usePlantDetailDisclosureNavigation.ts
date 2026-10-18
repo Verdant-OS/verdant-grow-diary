@@ -28,6 +28,42 @@ const ALL_CLOSED: PlantDetailDisclosureOpenState = {
   ai: false,
 };
 
+/** How long a hash landing keeps correcting scroll while async cards above it mount. */
+const HASH_SCROLL_FOLLOW_MS = 3000;
+
+function startHashScrollFollow(anchorId: string): () => void {
+  if (
+    typeof document === "undefined" ||
+    typeof window === "undefined" ||
+    typeof ResizeObserver === "undefined"
+  ) {
+    return () => {};
+  }
+
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    observer.disconnect();
+    window.clearTimeout(timer);
+    window.removeEventListener("wheel", stop);
+    window.removeEventListener("touchmove", stop);
+    window.removeEventListener("keydown", stop);
+  };
+
+  const observer = new ResizeObserver(() => {
+    if (stopped) return;
+    const target = document.getElementById(anchorId);
+    if (target) safelyFocusAndScroll(target);
+  });
+  observer.observe(document.documentElement);
+  const timer = window.setTimeout(stop, HASH_SCROLL_FOLLOW_MS);
+  window.addEventListener("wheel", stop, { passive: true });
+  window.addEventListener("touchmove", stop, { passive: true });
+  window.addEventListener("keydown", stop);
+  return stop;
+}
+
 interface PlantDetailDisclosureState {
   plantId: string | null | undefined;
   routeHash: string;
@@ -72,6 +108,20 @@ export function usePlantDetailDisclosureNavigation({
     openGroups: openStateFor(initialTarget?.group ?? null),
   }));
   const pendingFrameRef = useRef<number | null>(null);
+  const stopFollowRef = useRef<(() => void) | null>(null);
+
+  const endHashScrollFollow = useCallback(() => {
+    stopFollowRef.current?.();
+    stopFollowRef.current = null;
+  }, []);
+
+  const beginHashScrollFollow = useCallback(
+    (anchorId: string) => {
+      endHashScrollFollow();
+      stopFollowRef.current = startHashScrollFollow(anchorId);
+    },
+    [endHashScrollFollow],
+  );
 
   const routeScopeChanged =
     disclosureState.plantId !== plantId || disclosureState.routeHash !== location.hash;
@@ -174,8 +224,21 @@ export function usePlantDetailDisclosureNavigation({
         openGroups: openStateFor(target?.group ?? null),
       };
     });
-    if (target) scheduleNavigation(target.anchorId);
-  }, [cancelPendingFrame, location.hash, plantId, scheduleNavigation]);
+    if (target) {
+      scheduleNavigation(target.anchorId);
+      beginHashScrollFollow(target.anchorId);
+    } else {
+      endHashScrollFollow();
+    }
+    return endHashScrollFollow;
+  }, [
+    beginHashScrollFollow,
+    cancelPendingFrame,
+    endHashScrollFollow,
+    location.hash,
+    plantId,
+    scheduleNavigation,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -196,10 +259,11 @@ export function usePlantDetailDisclosureNavigation({
         });
       }
       scheduleNavigation(target.anchorId);
+      beginHashScrollFollow(target.anchorId);
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
-  }, [location.hash, plantId, scheduleNavigation]);
+  }, [beginHashScrollFollow, location.hash, plantId, scheduleNavigation]);
 
   useEffect(() => cancelPendingFrame, [cancelPendingFrame]);
 

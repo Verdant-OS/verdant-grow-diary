@@ -75,7 +75,9 @@ import {
 } from "@/lib/dailyGrowCheckRules";
 import {
   DAILY_CHECK_WHAT_COUNTS_HINT,
+  defaultDailyCheckPlantId,
   resolveDailyCheckPlantSelection,
+  resolveDailyCheckPostSubmitPlantId,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
@@ -163,6 +165,7 @@ export default function DailyCheck() {
   const { activeGrowId } = useGrows();
 
   const [plantId, setPlantId] = useState<string>("");
+  const [plantChoice, setPlantChoice] = useState<"route" | "explicit">("route");
   const [tentId, setTentId] = useState<string>("");
   const [step, setStep] = useState<DailyGrowCheckStep>("select");
   const [state, setState] = useState<DailyGrowCheckState>(INITIAL_DAILY_GROW_CHECK_STATE);
@@ -239,7 +242,12 @@ export default function DailyCheck() {
         : "select";
   const requestedActivityId = dailyCheckMethodToActivityId(methodHint);
   const routeIdentityPending = appliedRouteIdentity !== routeIdentity;
-  const renderedPlantId = routeIdentityPending ? routePlantId : plantId;
+  const fallbackPlantId = defaultDailyCheckPlantId({
+    routePlantId,
+    resolutionStatus: plantResolution.status,
+    selectablePlantIds: selectablePlants.map((plant) => plant.id),
+  });
+  const renderedPlantId = routeIdentityPending ? fallbackPlantId : plantId;
 
   const selectedPlant = useMemo(
     () => selectablePlants.find((plant) => plant.id === renderedPlantId) ?? null,
@@ -271,7 +279,8 @@ export default function DailyCheck() {
   // effect resets the local guided-flow state.
   useEffect(() => {
     if (tentsLoading || plantsLoading || !routeIdentityPending) return;
-    setPlantId(routePlantId);
+    setPlantId(fallbackPlantId);
+    setPlantChoice("route");
     setTentId(routeTentId);
     setStep(routeStep);
     setQuickLogOpen(routeStep === "quicklog");
@@ -282,20 +291,27 @@ export default function DailyCheck() {
   }, [
     plantsLoading,
     routeIdentity,
+    fallbackPlantId,
     routeIdentityPending,
-    routePlantId,
     routeStep,
     routeTentId,
     tentsLoading,
   ]);
+
+  // An untouched default follows the selectable list. A grower choice stays.
+  useEffect(() => {
+    if (routeIdentityPending || plantChoice === "explicit") return;
+    if (plantId !== fallbackPlantId) setPlantId(fallbackPlantId);
+  }, [fallbackPlantId, plantChoice, plantId, routeIdentityPending]);
 
   // When a plant is chosen, sync its assigned tent
   useEffect(() => {
     if (routeIdentityPending) return;
     if (!plantId) return;
     const match = selectablePlants.find((p) => p.id === plantId);
-    setTentId(resolveCompatibleAssignedTentId(match, selectableTents));
-  }, [plantId, routeIdentityPending, selectablePlants, selectableTents]);
+    const nextTent = resolveCompatibleAssignedTentId(match, selectableTents);
+    if (nextTent !== tentId) setTentId(nextTent);
+  }, [plantId, routeIdentityPending, selectablePlants, selectableTents, tentId]);
 
   // Default tent to first if none selected and no plant chosen
   useEffect(() => {
@@ -392,23 +408,33 @@ export default function DailyCheck() {
     };
   }, [renderedStep]);
 
+  // Sole-plant preselect fills the form when the URL names no plant. Post-submit
+  // follows an explicit selector choice, including a cleared picker. An
+  // untouched route plant still returns there. An untouched sole-plant default
+  // does not add View Plant.
+  const postSubmitPlantId = resolveDailyCheckPostSubmitPlantId({
+    plantChoice,
+    renderedPlantId,
+    resolutionStatus: plantResolution.status,
+    routePlantId: routePlant?.id ?? null,
+  });
   const postSubmitActions = useMemo(
     () =>
       buildDailyCheckPostSubmitActions({
-        plantId: selectedPlant?.id ?? null,
+        plantId: postSubmitPlantId,
         source: entrySource,
         growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource, urlGrowId],
+    [postSubmitPlantId, entrySource, urlGrowId],
   );
   const postSubmitHref = useMemo(
     () =>
       resolveDailyCheckPostSubmitHref({
-        plantId: selectedPlant?.id ?? null,
+        plantId: postSubmitPlantId,
         source: entrySource,
         growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource, urlGrowId],
+    [postSubmitPlantId, entrySource, urlGrowId],
   );
   const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
   const backHref = useMemo(
@@ -526,7 +552,10 @@ export default function DailyCheck() {
                 <Label className="text-xs">Current Plant</Label>
                 <Select
                   value={renderedPlantId || "__none"}
-                  onValueChange={(value) => setPlantId(value === "__none" ? "" : value)}
+                  onValueChange={(value) => {
+                    setPlantChoice("explicit");
+                    setPlantId(value === "__none" ? "" : value);
+                  }}
                 >
                   <SelectTrigger
                     className="min-h-11 w-full min-w-0"
@@ -600,7 +629,9 @@ export default function DailyCheck() {
           QUICK_LOG_ACTIVITY_DEFINITIONS via QuickLogActivityPicker and
           routes saves through useQuickLogActivitySave. Harvest is available
           only for eligible selected-plant stages and fails closed otherwise. */}
-      <div className="mb-4 w-full min-w-0">
+      <div
+        className={`mb-4 w-full min-w-0${renderedStep === "select" && guard.ok ? " pb-16" : ""}`}
+      >
         <QuickLogAllActivitiesSection
           growId={growId}
           tentId={activityTarget.tentId}
@@ -1213,7 +1244,15 @@ export default function DailyCheck() {
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
               />
-              <div className="mt-3 grid min-w-0 grid-cols-2 gap-2">
+              <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+                <Button
+                  variant="outline"
+                  className="min-h-11 min-w-0 whitespace-normal"
+                  onClick={() => setStep(previousStep(renderedStep))}
+                  data-testid="daily-grow-check-review-back"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </Button>
                 <Button
                   variant="outline"
                   className="min-h-11 min-w-0 whitespace-normal"

@@ -129,6 +129,11 @@ export function buildDailyGrowCheckConsistency(input: ConsistencyInput): Consist
 
   const todayRow = rows[0];
   const todayHasActivity = !!todayRow && ACTIVE_KINDS.has(todayRow.kind);
+  // Today is still open. No activity yet is pending, not a missed day.
+  const todayIsOpen =
+    !!todayRow &&
+    !todayHasActivity &&
+    !(trackingStartDayKey && todayRow.dayKey < trackingStartDayKey);
 
   let todayMethod: TodayCheckMethod = "none";
   if (todayHasActivity && todayRow) {
@@ -141,7 +146,7 @@ export function buildDailyGrowCheckConsistency(input: ConsistencyInput): Consist
     windowDays,
     checkedDays,
     currentStreak,
-    missedDays: windowDays - checkedDays - untrackedDays,
+    missedDays: windowDays - checkedDays - untrackedDays - (todayIsOpen ? 1 : 0),
     todayHasActivity,
     todayMethod,
     hasAnyActivity: checkedDays > 0,
@@ -156,11 +161,13 @@ export function buildDailyGrowCheckConsistency(input: ConsistencyInput): Consist
  *  - "note":   only a plant QuickLog counted that day
  *  - "sensor": only a current-tent manual sensor snapshot counted
  *  - "both":   both kinds counted
- *  - "missed": nothing counted
+ *  - "missed": nothing counted, and the local day has already ended
+ *  - "pending": nothing counted for today, which is still in progress
  *  - "not-tracked": nothing counted, and the day precedes tracking start
  * Never implies plant health, completion, or quality.
  */
-export type DailyMethodBreakdownMethod = "note" | "sensor" | "both" | "missed" | "not-tracked";
+export type DailyMethodBreakdownMethod =
+  "note" | "sensor" | "both" | "missed" | "not-tracked" | "pending";
 
 export interface DailyMethodBreakdownDay {
   dayKey: string;
@@ -179,12 +186,14 @@ export function buildDailyMethodBreakdown(
   order: DailyMethodBreakdownOrder = "oldest-first",
 ): DailyMethodBreakdownDay[] {
   const trackingStart = summary.trackingStartDayKey ?? null;
+  const todayKey = summary.rows[0]?.dayKey ?? null;
   const days: DailyMethodBreakdownDay[] = summary.rows.map((r) => {
     let method: DailyMethodBreakdownMethod;
     if (r.hasManual && r.hasQuickLog) method = "both";
     else if (r.hasManual) method = "sensor";
     else if (r.hasQuickLog) method = "note";
     else if (trackingStart && r.dayKey < trackingStart) method = "not-tracked";
+    else if (r.dayKey === todayKey) method = "pending";
     else method = "missed";
     return { dayKey: r.dayKey, label: r.label, method };
   });
@@ -203,8 +212,13 @@ export function formatDailyMethodBreakdownLabel(method: DailyMethodBreakdownMeth
       return "Both";
     case "not-tracked":
       return "Not tracked";
+    case "pending":
+      return "Not yet";
     case "missed":
-    default:
       return "Missed";
+    default: {
+      const _exhaustive: never = method;
+      return _exhaustive;
+    }
   }
 }

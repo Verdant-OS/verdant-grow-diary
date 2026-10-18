@@ -32,6 +32,7 @@ import {
 } from "./lib/supabaseMigrationLedgerShape.mjs";
 import {
   assertSupabaseDatabaseTargetIdentity,
+  SupabaseDatabaseTargetIdentityError,
   SUPABASE_DATABASE_TARGETS,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
 
@@ -789,6 +790,33 @@ function runPlainFile({ path, childEnv, spawnImpl, failureKind }) {
   return { ok: true };
 }
 
+const IDENTITY_REASON_CODES = new Set([
+  "missing_database_url",
+  "unsafe_database_url",
+  "malformed_database_url",
+  "unsupported_protocol",
+  "url_fragment_not_allowed",
+  "missing_credentials",
+  "unexpected_database_name",
+  "unsupported_sslmode",
+  "malformed_username",
+  "unexpected_direct_username",
+  "unexpected_direct_port",
+  "unexpected_supavisor_port",
+  "unsupported_supabase_host",
+  "malformed_project_ref",
+  "project_ref_mismatch",
+  "sandbox_verifier_identity_mismatch",
+]);
+
+function identityReasonCode(err) {
+  if (err instanceof SupabaseDatabaseTargetIdentityError && IDENTITY_REASON_CODES.has(err.code)) {
+    return err.code;
+  }
+  if (err instanceof URIError) return "libpq_environment_rejected";
+  return "unknown_identity_error";
+}
+
 const AUDIT_OUTCOMES = new Set([
   "input_rejected",
   "deploy_head_advanced",
@@ -857,6 +885,11 @@ function makeArtifactWriters({ reportPath, auditPath, receiptPath, authorization
             : {}),
           ...(typeof extra.reason === "string" && /^[a-z_]{1,64}$/.test(extra.reason)
             ? { reason: extra.reason }
+            : {}),
+          ...(IDENTITY_REASON_CODES.has(extra.identity_reason_code) ||
+          extra.identity_reason_code === "libpq_environment_rejected" ||
+          extra.identity_reason_code === "unknown_identity_error"
+            ? { identity_reason_code: extra.identity_reason_code }
             : {}),
         },
         null,
@@ -1002,10 +1035,14 @@ export function runQuickLogRevisionIdempotentReplay({
   try {
     assertSupabaseDatabaseTargetIdentity({ targetEnv: "production", databaseUrl });
     childEnv = buildPsqlEnvironment(env, databaseUrl, "production");
-  } catch {
-    logger.error("Production database identity was rejected.");
-    writeReport("BLOCKED - target identity rejected", ["No database process was started."]);
-    writeAudit("target_rejected", base);
+  } catch (err) {
+    const identity_reason_code = identityReasonCode(err);
+    logger.error(`Production database identity was rejected (${identity_reason_code}).`);
+    writeReport("BLOCKED - target identity rejected", [
+      `Production database identity was rejected (${identity_reason_code}).`,
+      "No database process was started.",
+    ]);
+    writeAudit("target_rejected", base, { identity_reason_code });
     return EXIT.TARGET_REJECTED;
   }
   try {

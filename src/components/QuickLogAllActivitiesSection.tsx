@@ -47,6 +47,7 @@ import {
   recordQuickLogPhotoAttachmentRecoveryLock,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
@@ -323,6 +324,7 @@ export default function QuickLogAllActivitiesSection({
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const photoContentGenerationRef = useRef(0);
   // A lost diary-insert response cannot prove the uploaded object is orphaned.
   // Keep the object and lock only the exact grow/tent/plant target that owns
   // the uncertain write. A target switch must not disable a different plant's
@@ -606,6 +608,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomStageConfirmed(false);
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
+    photoContentGenerationRef.current += 1;
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
@@ -640,6 +643,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomStageConfirmed(false);
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
+    photoContentGenerationRef.current += 1;
     setPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
       setSelectedDraft(null);
@@ -782,6 +786,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestUnit("g");
       setDetailValues({});
       envCheckTempEntryUnitRef.current = null;
+      photoContentGenerationRef.current += 1;
       setPhotoFile(null);
     },
     [
@@ -1469,6 +1474,7 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomStageConfirmed(false);
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
+        photoContentGenerationRef.current += 1;
         setPhotoFile(null);
         setSelectedDraft(null);
         setErrorReason(null);
@@ -1884,20 +1890,51 @@ export default function QuickLogAllActivitiesSection({
                       if (isMutationBlocked()) return;
                       const file = e.target.files?.[0] ?? null;
                       if (!file) {
+                        photoContentGenerationRef.current += 1;
                         setPhotoFile(null);
                         return;
                       }
                       const check = validatePlantProfilePhotoFile(file);
                       if (!check.ok) {
+                        photoContentGenerationRef.current += 1;
                         const failure = check as { ok: false; message: string };
                         setPhotoFile(null);
                         setErrorReason(failure.message);
                         setErrorForActivity("photo");
                         return;
                       }
+                      if (!fileClaimsPng(file)) {
+                        photoContentGenerationRef.current += 1;
+                        setErrorReason(null);
+                        setErrorForActivity(null);
+                        setPhotoFile(file);
+                        return;
+                      }
+                      const generation = photoContentGenerationRef.current + 1;
+                      photoContentGenerationRef.current = generation;
+                      setPhotoFile(null);
                       setErrorReason(null);
                       setErrorForActivity(null);
-                      setPhotoFile(file);
+                      void validateQuickLogPngClaim(file).then(
+                        (content) => {
+                          if (generation !== photoContentGenerationRef.current) return;
+                          if (!content.ok) {
+                            setPhotoFile(null);
+                            setErrorReason(content.message);
+                            setErrorForActivity("photo");
+                            return;
+                          }
+                          setErrorReason(null);
+                          setErrorForActivity(null);
+                          setPhotoFile(file);
+                        },
+                        () => {
+                          if (generation !== photoContentGenerationRef.current) return;
+                          setPhotoFile(null);
+                          setErrorReason("That photo could not be read. Try a different file.");
+                          setErrorForActivity("photo");
+                        },
+                      );
                     }}
                     className="text-sm"
                   />
@@ -2141,6 +2178,8 @@ export default function QuickLogAllActivitiesSection({
                   variant="ghost"
                   onClick={() => {
                     if (isMutationBlocked()) return;
+                    photoContentGenerationRef.current += 1;
+                    setPhotoFile(null);
                     setSelectedDraft(null);
                     setNote("");
                     setGuidedSymptomCheck(false);

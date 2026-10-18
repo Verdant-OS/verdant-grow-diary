@@ -275,14 +275,16 @@ describe("daily check does not count days before tracking started (BUG-013)", ()
     });
     expect(summary.checkedDays).toBe(1);
     expect(summary.untrackedDays).toBe(5);
-    expect(summary.missedDays).toBe(1);
+    expect(summary.missedDays).toBe(0);
   });
 
   it("keeps the existing behaviour when no tracking start is supplied", () => {
     const summary = buildDailyGrowCheckConsistency({ ...base, diaryEntries: [] });
-    expect(summary.missedDays).toBe(7);
+    expect(summary.missedDays).toBe(6);
     expect(summary).not.toHaveProperty("trackingStartDayKey");
-    expect(buildDailyMethodBreakdown(summary).every((d) => d.method === "missed")).toBe(true);
+    const methods = buildDailyMethodBreakdown(summary, "newest-first").map((d) => d.method);
+    expect(methods[0]).toBe("pending");
+    expect(methods.slice(1).every((method) => method === "missed")).toBe(true);
   });
 });
 

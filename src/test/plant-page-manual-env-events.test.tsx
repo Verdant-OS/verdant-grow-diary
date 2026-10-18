@@ -306,3 +306,45 @@ describe("Codex review on #2115", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });
+
+import { snapshotFromReadings } from "@/lib/sensorSnapshot";
+
+describe("Codex re-review on #2115 — equal-time collisions", () => {
+  const AT = "2026-10-14T12:00:00+00:00";
+
+  it.each(["live", "csv"])(
+    "a manual reading wins a same-metric, same-time collision with a %s row",
+    (other) => {
+      const sensor = [
+        { ts: AT, captured_at: AT, metric: "temperature_c", value: 20, source: other },
+      ];
+      const manual = manualEnvironmentEventsToTentReadingRows([
+        envRow({ environment_events: { temperature_c: 25.56, humidity_pct: null, vpd_kpa: null } }),
+      ]);
+      const merged = mergePlantTentReadingsWithManualEvents(sensor, manual);
+      expect(merged.map((r) => r.source)).toEqual(["manual", other]);
+      const snap = snapshotFromReadings(merged as never);
+      expect(snap?.source).toBe("manual");
+      expect(snap?.temp).toBe(25.56);
+    },
+  );
+
+  it("keeps sensor rows' relative order and puts strictly older manual rows after them", () => {
+    const sensor = [
+      { ts: AT, metric: "temperature_c", value: 24, source: "live" },
+      { ts: AT, metric: "humidity_pct", value: 50, source: "live" },
+    ];
+    const manual = manualEnvironmentEventsToTentReadingRows([
+      envRow({
+        occurred_at: "2026-10-14T11:00:00+00:00",
+        environment_events: { temperature_c: 25.56, humidity_pct: null, vpd_kpa: null },
+      }),
+    ]);
+    const merged = mergePlantTentReadingsWithManualEvents(sensor, manual);
+    expect(merged.map((r) => `${r.source}:${r.metric}`)).toEqual([
+      "live:temperature_c",
+      "live:humidity_pct",
+      "manual:temperature_c",
+    ]);
+  });
+});

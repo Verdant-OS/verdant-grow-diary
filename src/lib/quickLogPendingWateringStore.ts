@@ -7,6 +7,7 @@ import {
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { projectRootZoneManualObservationFromDetails } from "./rootZoneManualObservationRules";
 import { isUuid } from "./isUuid";
+import { QUICK_LOG_WATER_VOLUME_MAX_ML } from "./quickLogWateringFormViewModel";
 import {
   quickLogSaveRequiresHistoryCheck,
   type QuickLogHistoryCheckReason,
@@ -184,7 +185,9 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
     (p.plant_id != null && !isUuid(p.plant_id))
   )
     return false;
-  if (!numberInRange(p.volume_ml, Number.MIN_VALUE, 1_000_000)) return false;
+  // Same single-watering ceiling as the Water form: a journal written before
+  // the ceiling (or crafted in session storage) must not replay 1,000,000 ml.
+  if (!numberInRange(p.volume_ml, Number.MIN_VALUE, QUICK_LOG_WATER_VOLUME_MAX_ML)) return false;
   if (
     !OPTIONAL_NUMERIC_RANGES.every(
       ([key, min, max]) =>

@@ -393,10 +393,16 @@ jobs:
       - name: Gamification direct-insert scan + static tests
         run: bun run test:security-gamification
 
+      # Unit tests for the pure helpers of the candidate-number migration
+      # verifier (scripts/verify-candidate-number-migration-history.mjs). No
+      # database; the verifier itself runs only by manual dispatch.
+      - name: Candidate-number migration verifier unit tests
+        run: bun run test:candidate-number-history
+
       # Legacy gamification setup is not production acceptance and stays out
       # of PR-default jobs. Current hosted verification is verdantgrowdiary.com.
-      # The dormant gamification-staging-smoke.yml needs separate fixture-safety
-      # and effective-gating review; never repoint privileged setup to production.
+      # The dormant gamification-staging-smoke.yml was retired; never repoint
+      # privileged setup to production.
       # This comment changes no job, trigger or credential binding.
 
       # Stop-ship: every Shelly H&T edge function declared in

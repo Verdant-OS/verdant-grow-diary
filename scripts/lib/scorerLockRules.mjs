@@ -263,7 +263,7 @@ export const SCORER_PATH_RULES = Object.freeze([
   Object.freeze({
     kind: "exact",
     value: "scripts/smoke-award-nugs.ts",
-    why: "the gamification smoke lane's judge (gamification-staging-smoke.yml); exits non-zero on a failed award_nugs path",
+    why: "the gamification smoke judge, run by hand as `bun run smoke:award-nugs` (its dormant workflow was retired); exits non-zero on a failed award_nugs path",
   }),
   Object.freeze({
     kind: "regex",

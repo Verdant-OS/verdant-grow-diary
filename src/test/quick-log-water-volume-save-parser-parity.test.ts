@@ -16,6 +16,7 @@ import {
   EMPTY_QUICKLOG_WATERING_FORM,
   buildWateringFormPayload,
 } from "@/lib/quickLogWateringFormViewModel";
+import { buildWateringReview } from "@/lib/quickLogWateringReviewViewModel";
 
 function save(volumeMl: string) {
   return buildWateringFormPayload({
@@ -88,6 +89,26 @@ describe("water volume save parser parity", () => {
       }
       if (aboveThreshold) expect(saveable, amount).toBe(true);
       expect(gate(amount).blocksSave, amount).toBe(!saveable);
+    }
+  });
+
+  it("keeps the review model in step with the save path", () => {
+    const samples = [
+      OVERSIZED_VALID,
+      JUST_ABOVE_HARD_MAX,
+      "1000000",
+      "1000001",
+      "10001",
+      " 10.5 ",
+      "+5",
+      "0",
+      "-5",
+      "",
+      "abc",
+    ];
+    for (const amount of samples) {
+      const review = buildWateringReview({ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: amount });
+      expect(review.needsInput, amount).toBe(!save(amount).ok);
     }
   });
 });

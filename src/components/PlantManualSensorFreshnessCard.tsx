@@ -22,6 +22,7 @@ import {
   computeFreshnessCta,
   METRIC_LABELS,
   METRIC_UNITS,
+  PLANT_MANUAL_SENSOR_MISSING_COPY,
   type FreshnessSnapshot,
   type FreshnessState,
   type ManualSensorMetric,
@@ -103,6 +104,12 @@ export default function PlantManualSensorFreshnessCard({ plantId, onUpdate }: Pr
           </Button>
         ) : null}
       </header>
+      <p
+        data-testid="plant-manual-sensor-freshness-scope"
+        className="text-[11px] text-muted-foreground"
+      >
+        Plant diary only. Tent readings in Recent Sensor Readings are separate.
+      </p>
       <div className="grid grid-cols-2 gap-2">
         {snapshots.map((s) =>
           isLoading ? (
@@ -146,7 +153,7 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
           className={cn("text-sm", STATE_STYLES[state])}
           data-testid={`plant-manual-sensor-freshness-${metric}-missing`}
         >
-          No recent log
+          {PLANT_MANUAL_SENSOR_MISSING_COPY}
         </span>
       ) : (
         <>

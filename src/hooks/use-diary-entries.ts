@@ -13,8 +13,9 @@ export async function fetchDiaryEntries() {
   return data ?? [];
 }
 
-export const useDiaryEntries = () =>
+export const useDiaryEntries = (options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: ["diary_entries"],
     queryFn: fetchDiaryEntries,
+    enabled: options?.enabled ?? true,
   });

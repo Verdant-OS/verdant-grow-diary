@@ -21,21 +21,31 @@ export interface PlantDetailPhotoStripItem extends PlantPhotoStripSourceItem {
   latestReview: PhotoDiagnosisLatestReview | null;
 }
 
-/** Newest-first photo strip items for one plant. Shared by the strip and the hero fallback. */
-export function usePlantDetailPhotoStripItems(plantId: string | null | undefined) {
-  const diary = useDiaryEntries();
+export type PlantDetailPhotoStripLookup = ReturnType<typeof usePlantDetailPhotoStripItems>;
+
+/**
+ * Newest-first photo strip items for one plant. Shared by the strip and the hero fallback.
+ * With `enabled: false` it starts no diary read and hands no rows to private-photo signing,
+ * so Plant Detail can keep the lookup off until the active plant view renders.
+ */
+export function usePlantDetailPhotoStripItems(
+  plantId: string | null | undefined,
+  options?: { enabled?: boolean },
+) {
+  const enabled = options?.enabled ?? true;
+  const diary = useDiaryEntries({ enabled });
   const hasPlantContext = !!plantId?.trim();
   const scopedDiary = useMemo(
     () =>
-      hasPlantContext && Array.isArray(diary.data)
+      enabled && hasPlantContext && Array.isArray(diary.data)
         ? diary.data.filter((row) => normalizeDiaryEntry(row)?.plantId === plantId?.trim())
         : [],
-    [diary.data, hasPlantContext, plantId],
+    [diary.data, enabled, hasPlantContext, plantId],
   );
   const display = useDiaryPhotoDisplayRows(scopedDiary as ReadonlyArray<DiaryPhotoDisplayRow>);
   const latestReviewsByPhotoId = useMemo(
-    () => projectLatestPhotoDiagnosisReviewsByPhoto(diary.data),
-    [diary.data],
+    () => projectLatestPhotoDiagnosisReviewsByPhoto(enabled ? diary.data : []),
+    [diary.data, enabled],
   );
   const items = useMemo(() => {
     if (!plantId || display.rows.length === 0) return [] as PlantDetailPhotoStripItem[];

@@ -53,6 +53,21 @@ export function segmentsCross(a1, a2, b1, b2) {
   return d1 * d2 < 0 && d3 * d4 < 0;
 }
 
+/**
+ * Does segment p→q come closer than `radius` to point c?
+ * A distance equal to `radius` does not count (the line may touch the rim).
+ */
+export function segmentHitsDisc(p, q, c, radius) {
+  if (!p || !q || !c || !(radius > 0)) return false;
+  if (![p.x, p.y, q.x, q.y, c.x, c.y].every(Number.isFinite)) return false;
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const l2 = dx * dx + dy * dy;
+  let t = l2 === 0 ? 0 : ((c.x - p.x) * dx + (c.y - p.y) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(c.x - (p.x + t * dx), c.y - (p.y + t * dy)) < radius;
+}
+
 /** Does segment p→q touch rect r grown by `pad`? Liang–Barsky clip. */
 export function segmentHitsRect(p, q, r, pad = 0) {
   const x0 = r.x - pad;
@@ -230,9 +245,14 @@ function placeOnce(items, opts) {
     h: 2 * POT_KEEPOUT,
   });
   const pots = [];
+  // Screen discs of pot rims. A leader may end on its own disc. It may not pass through another.
+  // Callers that omit `pr` keep the previous routes (no disc obstacles).
+  const discs = [];
   for (const it of list) {
     if (Number.isFinite(it.bx) && Number.isFinite(it.by)) pots.push(keep(it.id, it.bx, it.by));
     if (Number.isFinite(it.tx) && Number.isFinite(it.ty)) pots.push(keep(it.id, it.tx, it.ty));
+    if (Number.isFinite(it.bx) && Number.isFinite(it.by) && Number(it.pr) > 0)
+      discs.push({ id: it.id, x: it.bx, y: it.by, r: it.pr });
   }
   const placed = [];
   const segs = []; // leaders already drawn: later cards may not sit on them
@@ -280,11 +300,14 @@ function placeOnce(items, opts) {
       const start = leaderStart(r, pot);
       return { leader: true, seg: start ? { p: start, q: endFor(start) } : null };
     };
+    const missesOtherPots = (seg) =>
+      !seg || !discs.some((d) => d.id !== it.id && segmentHitsDisc(seg.p, seg.q, d, d.r));
     const routeClear = (r, seg, allowLeaderCross = false) =>
       !segs.some((s) => segmentHitsRect(s.p, s.q, r, LEADER_GAP)) &&
       (!seg ||
         (!placed.some((o) => segmentHitsRect(seg.p, seg.q, o, LEADER_GAP)) &&
           !avoid.some((a) => segmentHitsRect(seg.p, seg.q, a, LEADER_GAP)) &&
+          missesOtherPots(seg) &&
           // Two crossing leaders make it unclear which pot each card points at.
           (allowLeaderCross || !segs.some((s) => segmentsCross(seg.p, seg.q, s.p, s.q)))));
     const commitLeader = (seg) => {
@@ -398,6 +421,7 @@ function placeOnce(items, opts) {
         const lead = leaderOf(r, prefFull);
         if (lead.seg && avoid.some((a) => segmentHitsRect(lead.seg.p, lead.seg.q, a, LEADER_GAP)))
           continue;
+        if (!missesOtherPots(lead.seg)) continue;
         chosen = r;
         chosenLead = lead;
         break;
@@ -416,6 +440,13 @@ function placeOnce(items, opts) {
       for (const a of avoid) if (overlaps(chosen, a, PAD)) chosen.y = a.y + a.h + PAD;
       chosen.y = Math.min(chosen.y, Math.max(0, height - h));
       chosenLead = leaderOf(chosen, prefFull);
+    }
+    if (chosenLead?.seg && !missesOtherPots(chosenLead.seg)) {
+      const alt = tryGrid() ?? tryGrid(true);
+      if (alt) {
+        out.push(alt);
+        continue;
+      }
     }
     placed.push(chosen);
     commitLeader(chosenLead.seg);

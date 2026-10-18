@@ -21,7 +21,7 @@ Supabase access, no real diary writes, no sensors, no billing, no Action Queue.
 No install step. From the repository root:
 
 ```bash
-node --test spikes/tent-garden-prototype/test/*.check.mjs   # 33 checks
+node --test spikes/tent-garden-prototype/test/*.check.mjs   # 98 checks
 cd spikes/tent-garden-prototype && python3 -m http.server 8081
 # open http://127.0.0.1:8081/
 ```

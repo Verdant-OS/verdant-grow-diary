@@ -42,24 +42,35 @@
           <button id="rotateLeft" class="btn" title="Rotate view 90° left (key: [)">⟲ 90°</button>
           <button id="rotateRight" class="btn" title="Rotate view 90° right (key: ])">⟳ 90°</button>
           <button id="resetView" class="btn" title="Reset view (key: R)">Reset View</button>
-          <label class="field">
-            <span>Tent</span>
-            <select id="gardenSelect" aria-label="Sample tent"></select>
-          </label>
-          <label class="field">
-            <span>Pots</span>
-            <select
-              id="potSize"
-              aria-label="Pot size for this tent"
-              aria-describedby="potSizeNote"
-            ></select>
-          </label>
-          <span id="potSizeNote" class="muted small pot-note" aria-live="polite"></span>
-          <label class="toggle" title="Device-local setting. Reduced-motion users default to off.">
-            <input type="checkbox" id="animToggle" />
-            <span>Animation</span>
-          </label>
-          <button id="showList" class="btn btn--ghost" aria-pressed="false">List view</button>
+          <div class="view-options" id="viewOptions">
+            <button
+              type="button"
+              id="viewOptionsBtn"
+              class="btn view-options__btn"
+              aria-expanded="false"
+              aria-controls="viewOptionsPanel"
+            >View options</button>
+            <div id="viewOptionsPanel" class="view-options__panel">
+              <label class="field">
+                <span>Tent</span>
+                <select id="gardenSelect" aria-label="Sample tent"></select>
+              </label>
+              <label class="field">
+                <span>Pots</span>
+                <select
+                  id="potSize"
+                  aria-label="Pot size for this tent"
+                  aria-describedby="potSizeNote"
+                ></select>
+              </label>
+              <span id="potSizeNote" class="muted small pot-note" aria-live="polite"></span>
+              <label class="toggle" title="Device-local setting. Reduced-motion users default to off.">
+                <input type="checkbox" id="animToggle" />
+                <span>Animation</span>
+              </label>
+              <button id="showList" class="btn btn--ghost" aria-pressed="false">List view</button>
+            </div>
+          </div>
         </div>
 
         <div class="canvas-wrap" id="canvasWrap">
@@ -108,6 +119,7 @@
 
         <div id="saveBar" class="savebar" hidden>
           <span id="draftSummary">No changes</span>
+          <button id="doneEdit" class="btn btn--small btn--primary" hidden>Done</button>
           <button id="undoDraft" class="btn btn--small" disabled>Undo</button>
           <button id="cancelEdit" class="btn btn--small btn--ghost">Cancel</button>
           <button id="saveBtn" class="btn btn--small btn--primary" disabled>Save…</button>
@@ -132,7 +144,7 @@
       <aside id="details" class="details" aria-label="Plant details">
         <div class="details__handle" aria-hidden="true"></div>
         <div id="detailsBody" class="details__body">
-          <p class="muted">Tap or click a plant to see its recorded details.</p>
+          <p class="muted">Tap a pot or a label to see its recorded details.</p>
         </div>
         <section class="events" aria-label="Simulated timeline events">
           <h3>Simulated Timeline events</h3>

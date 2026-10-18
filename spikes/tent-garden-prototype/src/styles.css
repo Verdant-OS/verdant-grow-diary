@@ -216,7 +216,6 @@ button {
   left: 0;
   top: 0;
   pointer-events: auto;
-  cursor: pointer;
   background: #fbf3df;
   border: 1.5px solid #3f3327;
   color: #3a2e22;
@@ -611,6 +610,48 @@ button {
 }
 .pot-note {
   max-width: 26ch;
+}
+
+/* Desktop: the wrapper adds no box, so Tent, Pots, Animation and List view stay in the toolbar. */
+.view-options {
+  display: contents;
+}
+.view-options__panel {
+  display: contents;
+}
+.view-options__btn {
+  display: none;
+}
+
+/* Below 640 px, those four controls move into a disclosure. View, Edit and the rotate buttons stay. */
+@media (max-width: 639px) {
+  .view-options__btn {
+    display: inline-flex;
+    align-items: center;
+  }
+  .view-options__panel {
+    display: none;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .view-options__panel.is-open {
+    display: flex;
+  }
+}
+
+/* Fine pointers only: a pointer cursor and a light outline on a pot's label. */
+@media (hover: hover) and (pointer: fine) {
+  .plant-label:hover,
+  .plant-label.is-hover {
+    cursor: pointer;
+    outline: 2px solid #ffd23f;
+    outline-offset: 2px;
+  }
+  .scene-host.is-over-pot canvas {
+    cursor: pointer;
+  }
 }
 @media (pointer: coarse) {
   .field select {

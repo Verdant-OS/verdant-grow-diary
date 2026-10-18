@@ -126,6 +126,31 @@ export function canCompleteDailyGrowCheck(_state: DailyGrowCheckState): boolean 
   return true;
 }
 
+export const DAILY_GROW_CHECK_EMPTY_MANUAL_STEP_WARNING =
+  "No manual snapshot saved for this step — continuing without a manual reading.";
+
+export function shouldAdvanceGuidedDailyCheckOnSubmit(input: {
+  method: "note" | "sensor";
+  renderedStep: DailyGrowCheckStep;
+  methodHint: string | null | undefined;
+}): boolean {
+  if (input.methodHint) return false;
+  if (input.method === "sensor") return input.renderedStep === "manual";
+  return input.renderedStep === "quicklog" || input.renderedStep === "handheld";
+}
+
+export function shouldWarnOnEmptyManualStepNext(input: {
+  renderedStep: DailyGrowCheckStep;
+  state: DailyGrowCheckState;
+  hasSavedManualSnapshot?: boolean;
+}): boolean {
+  if (input.renderedStep !== "manual") return false;
+  if (input.hasSavedManualSnapshot !== undefined) {
+    return !input.hasSavedManualSnapshot && input.state.manual !== "visited";
+  }
+  return input.state.manual === "pending";
+}
+
 /**
  * Conservative human-facing label for a step outcome. Save-confirmed steps
  * render as "Added"; user-marked steps without save confirmation render as

@@ -1,16 +1,14 @@
 /**
- * Plant page Harvest, photo, and snapshot entry points open the shared
- * Quick Log on the matching activity, and manual-reading links share one href.
+ * Plant page Harvest and photo entry points open the shared Quick Log on the
+ * matching activity, and manual-reading links share one href. The manual
+ * snapshot CTA keeps opening PlantQuickLog; see
+ * plant-detail-manual-snapshot-cta-writable.test.tsx.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildPlantDetailQuickActions } from "@/lib/plantDetailQuickActions";
 import { buildPlantDetailWhatsMissing } from "@/lib/plantDetailWhatsMissing";
 import { buildRelativeTimelineEmptyState } from "@/lib/relativeTimelineEmptyStateRules";
-
-const PAGE = readFileSync(resolve(__dirname, "../pages/PlantDetail.tsx"), "utf8");
 
 const context = {
   plantId: "p1",
@@ -61,11 +59,5 @@ describe("plant page Quick Log activity handoff", () => {
       growId: "g1",
     }).find((entry) => entry.kind === "manual_sensor_snapshot");
     expect(quick?.href).toBe("/sensors?growId=g1#manual-reading");
-  });
-
-  it("opens Add first snapshot in the shared Quick Log on manual readings", () => {
-    expect(PAGE).not.toMatch(/onUpdate=\{\(\) => setQuickLogOpen\(true\)\}/);
-    expect(PAGE).toContain('activityId: "manual_sensor_snapshot"');
-    expect(PAGE).toContain("PLANT_QUICKLOG_PREFILL_EVENT");
   });
 });

@@ -40,6 +40,9 @@ export const METRIC_LABELS: Record<ManualSensorMetric, string> = {
   ec: "EC",
 };
 
+/** Missing-tile copy. Plant diary only, so it does not deny tent Recent Sensor Readings. */
+export const PLANT_MANUAL_SENSOR_MISSING_COPY = "No plant manual log";
+
 export const METRIC_UNITS: Record<ManualSensorMetric, string> = {
   temp_f: "°F",
   humidity_percent: "%",

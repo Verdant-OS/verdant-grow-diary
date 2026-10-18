@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { Suspense, createElement, useEffect } from "react";
+import { Suspense, createElement, useEffect, useMemo } from "react";
 import {
   HeadContent,
   Outlet,
@@ -130,25 +130,34 @@ function isGrowHelpToolkitPath(pathname: string): boolean {
   return pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`;
 }
 
-function RootErrorComponent({ error }: { error: Error }) {
+function RootErrorComponent({ error }: { error: unknown }) {
+  const normalizedError = useMemo((): Error | Response => {
+    // A thrown Response passes through so the reporters keep its status and URL.
+    if (error instanceof Error || error instanceof Response) return error;
+    try {
+      return new Error(String(error));
+    } catch {
+      return new Error(Object.prototype.toString.call(error));
+    }
+  }, [error]);
   const pathname = useRouterState({
     select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
   });
   const isToolkit = isGrowHelpToolkitPath(pathname);
   if (!isToolkit) {
-    reportLovableError(error);
+    reportLovableError(normalizedError);
   }
   // A root-route error renders this component instead of ApplicationRootComponent,
   // so the root effect that starts the reporter may never run. Report from an
   // effect (once per error, not on every re-render) after starting it here.
   useEffect(() => {
     if (isToolkit) return;
-    void reportErrorWhenReady(error, {
+    void reportErrorWhenReady(normalizedError, {
       source: "route_error_component",
       route: pathname,
       handled: false,
     });
-  }, [error, isToolkit, pathname]);
+  }, [normalizedError, isToolkit, pathname]);
   return (
     <RootDocument>
       <div

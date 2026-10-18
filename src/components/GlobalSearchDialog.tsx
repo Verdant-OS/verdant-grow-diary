@@ -38,6 +38,7 @@ import {
   resolveContextFreeQuickLogStart,
   type PendingContextFreeQuickLogIntent,
 } from "@/lib/globalSearchQuickLogFallbackRules";
+import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -121,6 +122,7 @@ function resultsContentKey(rows: readonly GlobalSearchResult[]): string {
 }
 
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
+  const restoreOpenerFocus = useDialogOpenerRestore(open);
   const navigate = useNavigate();
   const location = useLocation();
   // Signed-in growers must never be handed the public /quick-log starter:
@@ -413,7 +415,10 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="overflow-hidden p-0 shadow-lg md:max-w-3xl">
+      <DialogContent
+        className="overflow-hidden p-0 shadow-lg md:max-w-3xl"
+        onCloseAutoFocus={restoreOpenerFocus}
+      >
         <CommandPrimitive
           shouldFilter={false}
           value={activeValue}
@@ -733,14 +738,14 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                   {!hasAny && !isError ? (
                     <CommandEmpty className="py-6">
                       <div
-                        className="mx-auto flex max-w-xs flex-col items-center gap-3 text-center"
+                        className="mx-auto flex w-full min-w-0 max-w-xs flex-col items-center gap-3 text-center"
                         data-testid="global-search-empty"
                       >
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
                           <SearchX className="h-5 w-5" aria-hidden="true" />
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">
+                        <div className="w-full min-w-0 space-y-1">
+                          <p className="w-full min-w-0 break-words text-sm font-medium text-foreground [overflow-wrap:anywhere]">
                             No matches for “{trimmed}”
                           </p>
                           <p className="text-xs text-muted-foreground">

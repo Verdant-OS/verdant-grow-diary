@@ -16,6 +16,10 @@ import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import { classifyManualMetric, classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+import {
   MEASUREMENT_DETAIL_KEYS,
   MEASUREMENT_EVENT_TYPES,
 } from "@/lib/timelineEntryClassification";
@@ -195,13 +199,19 @@ function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRo
 }
 
 function buildReceiptNote(input: {
+  tempC: number | null;
   tempF: number | null;
   humidityPct: number | null;
   vpdKpa: number | null;
   soilPct: number | null;
+  temperatureUnit?: TemperatureUnitPreference;
 }): string {
   const parts: string[] = [];
-  if (input.tempF !== null) parts.push(`${formatFinite(input.tempF)}°F`);
+  if (input.temperatureUnit === "celsius") {
+    if (input.tempC !== null) parts.push(`${formatFinite(input.tempC)}°C`);
+  } else if (input.tempF !== null) {
+    parts.push(`${formatFinite(input.tempF)}°F`);
+  }
   if (input.humidityPct !== null) parts.push(`${formatFinite(input.humidityPct)}% RH`);
   if (input.vpdKpa !== null) parts.push(`${formatFinite(input.vpdKpa)} kPa VPD`);
   if (input.soilPct !== null) parts.push(`${formatFinite(input.soilPct)}% soil moisture`);
@@ -223,10 +233,12 @@ function formatFinite(n: number): string {
 export function manualSensorReadingsToTimelineEntries(
   rows: readonly ManualSensorTimelineMetricRow[] | null | undefined,
   now: Date = new Date(),
+  options: { temperatureUnit?: TemperatureUnitPreference } = {},
 ): TimelineManualSensorReceipt[] {
   if (!Array.isArray(rows) || rows.length === 0) return [];
   const manualRows = rows.filter((row) => (row?.source ?? "").toLowerCase() === "manual");
   if (manualRows.length === 0) return [];
+  const temperatureUnit = options.temperatureUnit ?? loadTemperatureUnitPreference();
 
   const grouped = groupSensorReadingRows(
     manualRows.map(toSensorReadingRow).filter((row): row is SensorReadingRow => row !== null),
@@ -258,6 +270,7 @@ export function manualSensorReadingsToTimelineEntries(
     const soilMetricValid =
       hasSoilMetric && classifyManualMetric("soil_moisture_pct", reading.soil).valid;
 
+    const tempC = tempMetricValid ? reading.temp : null;
     const tempF = tempMetricValid ? tempFFromC(reading.temp) : null;
     const humidityPct = humidityMetricValid ? reading.rh : null;
     const vpdKpa = vpdMetricValid ? reading.vpd : null;
@@ -278,7 +291,7 @@ export function manualSensorReadingsToTimelineEntries(
 
     const receipt: TimelineManualSensorReceipt = {
       id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}${reading.tentId}:${capturedAt}`,
-      note: buildReceiptNote({ tempF, humidityPct, vpdKpa, soilPct }),
+      note: buildReceiptNote({ tempC, tempF, humidityPct, vpdKpa, soilPct, temperatureUnit }),
       photo_url: null,
       stage: null,
       details: {
@@ -300,6 +313,47 @@ export function manualSensorReadingsToTimelineEntries(
     if (byTime !== 0) return byTime;
     return a.id.localeCompare(b.id);
   });
+}
+
+/**
+ * Re-format a manual sensor receipt's note for the active temperature unit
+ * without mutating stored details or re-running the database query.
+ */
+export function formatTimelineManualSensorReceiptForUnit<
+  T extends { id: string; note?: string | null; details?: Record<string, unknown> | null },
+>(entry: T, temperatureUnit: TemperatureUnitPreference): T {
+  if (!isTimelineSensorDerivedDiaryId(entry.id)) return entry;
+  const sensorSnap = entry.details?.sensor_snapshot as Record<string, unknown> | undefined;
+  const manualSnap = entry.details?.manual_sensor_snapshot as Record<string, unknown> | undefined;
+  if (!sensorSnap || typeof sensorSnap !== "object") return entry;
+
+  const rawTempC = typeof sensorSnap.temp_c === "number" ? sensorSnap.temp_c : null;
+  const tempValid = rawTempC !== null && classifyManualMetric("temperature_c", rawTempC).valid;
+  const tempC = tempValid ? rawTempC : null;
+  const tempF =
+    typeof manualSnap?.temp_f === "number"
+      ? manualSnap.temp_f
+      : tempC !== null
+        ? tempFFromC(tempC)
+        : null;
+  const rawRh = typeof sensorSnap.rh === "number" ? sensorSnap.rh : null;
+  const humidityPct =
+    rawRh !== null && classifyManualMetric("humidity_pct", rawRh).valid ? rawRh : null;
+  const rawVpd = typeof sensorSnap.vpd_kpa === "number" ? sensorSnap.vpd_kpa : null;
+  const vpdKpa = rawVpd !== null && classifyManualMetric("vpd_kpa", rawVpd).valid ? rawVpd : null;
+  const rawSoil = typeof sensorSnap.soil === "number" ? sensorSnap.soil : null;
+  const soilPct =
+    rawSoil !== null && classifyManualMetric("soil_moisture_pct", rawSoil).valid ? rawSoil : null;
+
+  const nextNote = buildReceiptNote({
+    tempC,
+    tempF,
+    humidityPct,
+    vpdKpa,
+    soilPct,
+    temperatureUnit,
+  });
+  return nextNote === entry.note ? entry : { ...entry, note: nextNote };
 }
 
 /** Merge sensor-derived receipts with diary rows without duplicating ids. */

@@ -135,6 +135,10 @@ import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
 import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
 import {
+  assessLargeWaterAmount,
+  confirmLargeWaterAmount,
+} from "@/lib/quickLogWaterVolumeWarningRules";
+import {
   EMPTY_QUICKLOG_WATERING_FORM,
   WATERING_SAVE_FAILURE_MESSAGE,
   WATERING_SAVE_SUCCESS_MESSAGE,
@@ -516,6 +520,15 @@ function QuickLogV2SheetForOwner({
   const [wateringForm, setWateringForm] = useState<QuickLogWateringFormState>(
     initialWateringForm?.wateringForm ?? EMPTY_QUICKLOG_WATERING_FORM,
   );
+  const largeWaterSessionRef = useRef<{ inFlight: boolean; confirmedKey: string | null }>({
+    inFlight: false,
+    confirmedKey: null,
+  });
+  const [largeWaterConfirmedKey, setLargeWaterConfirmedKey] = useState<string | null>(null);
+  const clearLargeWaterConfirmation = () => {
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
   const [maturityEvidenceForm, setMaturityEvidenceForm] =
     useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
@@ -921,6 +934,14 @@ function QuickLogV2SheetForOwner({
     ],
   );
   const waterFieldMessage = retryPending ? null : (waterSaveGate?.footerMessage ?? null);
+  const largeWaterAssessment =
+    form.action === "water" && !retryPending
+      ? assessLargeWaterAmount({
+          amount: wateringForm.volumeMl,
+          unit: "ml",
+          confirmedKey: largeWaterConfirmedKey,
+        })
+      : null;
   const criticalContentMissing = isQuickLogV2CriticalContentMissing({
     action: form.action,
     note: form.note,
@@ -989,6 +1010,9 @@ function QuickLogV2SheetForOwner({
           selectedTargetMissing,
           volumeMissing,
           waterFieldMessage,
+          largeWaterMessage: largeWaterAssessment?.needsConfirmation
+            ? largeWaterAssessment.message
+            : null,
           criticalContentMissing,
           saving: saving || feedingSaving || wateringSaving,
         });
@@ -1051,6 +1075,7 @@ function QuickLogV2SheetForOwner({
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
@@ -1267,6 +1292,7 @@ function QuickLogV2SheetForOwner({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setWateringVolumeDefaultsApplied(false);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
@@ -1585,15 +1611,32 @@ function QuickLogV2SheetForOwner({
     );
   }
 
+  const releaseUnstartedLargeWaterConfirm = () => {
+    if (saveInFlightRef.current) return;
+    if (
+      !largeWaterSessionRef.current.inFlight &&
+      largeWaterSessionRef.current.confirmedKey === null
+    ) {
+      return;
+    }
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
+
   const handleSave = async () => {
-    if (recoveryStorageFence || historyCheckRequiredRef.current) return;
+    if (recoveryStorageFence || historyCheckRequiredRef.current) {
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
     const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     if (photoValidationInFlightRef.current) {
       setLocalError("Wait for the photo check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     // Synchronous re-entry guard: prevents a rapid double-click from
@@ -1605,7 +1648,19 @@ function QuickLogV2SheetForOwner({
         postSaveShown: postSave !== null,
       })
     ) {
+      releaseUnstartedLargeWaterConfirm();
       return;
+    }
+    if (form.action === "water" && !wateringRetrySubmissionRef.current) {
+      const largeWater = assessLargeWaterAmount({
+        amount: wateringForm.volumeMl,
+        unit: "ml",
+        confirmedKey: largeWaterSessionRef.current.confirmedKey,
+      });
+      if (largeWater.needsConfirmation) {
+        releaseUnstartedLargeWaterConfirm();
+        return;
+      }
     }
     // Freeze every supported submission before the first await, using the
     // same synchronous guard as Water. Local validation releases this lock.
@@ -1621,6 +1676,10 @@ function QuickLogV2SheetForOwner({
     try {
       await runHandleSave();
     } finally {
+      largeWaterSessionRef.current = {
+        ...largeWaterSessionRef.current,
+        inFlight: false,
+      };
       if (lifetime.active) {
         saveInFlightRef.current = false;
         if (lockSubmission) {
@@ -2689,6 +2748,7 @@ function QuickLogV2SheetForOwner({
     feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
     wateringTempEntryUnitRef.current = null;
+    clearLargeWaterConfirmation();
     setWateringRetryPending(false);
     setFailedWaterPhotoUpload(false);
     setWaterPhotoOmitted(false);
@@ -3189,11 +3249,28 @@ function QuickLogV2SheetForOwner({
                   } else if (nextWaterTempC === "") {
                     wateringTempEntryUnitRef.current = null;
                   }
+                  if (next.volumeMl !== wateringForm.volumeMl) {
+                    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+                    setLargeWaterConfirmedKey(null);
+                  }
                   setWateringForm(next);
                   setLocalError(null);
                 }}
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
                 volumeError={retryPending ? null : (waterSaveGate?.fields.volume ?? null)}
+                confirmedLargeWaterKey={largeWaterConfirmedKey}
+                onConfirmLargeWater={(confirmationKey) => {
+                  const next = confirmLargeWaterAmount(
+                    largeWaterSessionRef.current,
+                    confirmationKey,
+                  );
+                  largeWaterSessionRef.current = {
+                    inFlight: next.inFlight,
+                    confirmedKey: next.confirmedKey,
+                  };
+                  setLargeWaterConfirmedKey(next.confirmedKey);
+                  if (next.save) void handleSave();
+                }}
               />
               {wateringRetryPending && (
                 <div
@@ -3768,6 +3845,7 @@ function QuickLogV2SheetForOwner({
                       (selectedTargetStale && !retryPending) ||
                       (criticalContentMissing && !retryPending) ||
                       (Boolean(waterFieldMessage) && !retryPending) ||
+                      Boolean(largeWaterAssessment?.needsConfirmation) ||
                       Boolean(archivedGrowActionBlock)
                     }
                     aria-describedby="qlv2-save-helper"
@@ -3797,6 +3875,7 @@ function getSaveHelperMessage(input: {
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
   waterFieldMessage: string | null;
+  largeWaterMessage?: string | null;
   criticalContentMissing: boolean;
   saving: boolean;
 }): string {
@@ -3806,6 +3885,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.waterFieldMessage) return input.waterFieldMessage;
+  if (input.largeWaterMessage) return input.largeWaterMessage;
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";

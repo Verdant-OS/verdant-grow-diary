@@ -119,6 +119,7 @@ import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayR
 import {
   completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
+  formatTimelineManualSensorReceiptForUnit,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
@@ -1126,8 +1127,14 @@ export default function Timeline() {
   );
 
   const displayEntries = useMemo(
-    () => mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),
-    [entries, manualSensorMeasurementEntries],
+    () =>
+      mergeTimelineMeasurementDisplayEntries(
+        entries,
+        manualSensorMeasurementEntries.map((entry) =>
+          formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+        ),
+      ),
+    [entries, manualSensorMeasurementEntries, temperatureUnit],
   );
 
   const eventCounts = useMemo(() => {
@@ -2561,7 +2568,7 @@ export default function Timeline() {
                           const { sensorViewModel, reviewMessage, warningMessage } =
                             buildTimelineCardSensorSnapshotViewModel(
                               { sensor, useManualValidation },
-                              { validateManualCompatibility: true },
+                              { validateManualCompatibility: true, temperatureUnit },
                             );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0

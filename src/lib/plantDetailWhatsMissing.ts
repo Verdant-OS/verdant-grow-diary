@@ -178,7 +178,8 @@ const PROMPTS: Record<WhatsMissingPromptKind, { title: string; description: stri
   },
   no_sensor_snapshot: {
     title: "No sensor snapshot",
-    description: "Sensor snapshots help separate environment issues from plant issues.",
+    description:
+      "Sensor snapshots help separate environment issues from plant issues. This check uses the plant diary only and does not include the tent's Recent Sensor Readings.",
   },
   no_recent_watering_or_feed: {
     title: "No recent watering or feed note",

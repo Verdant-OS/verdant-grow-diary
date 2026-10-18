@@ -10,24 +10,10 @@
 import { Link } from "@/lib/react-router-compat";
 import { Image as ImageIcon, Upload, AlertCircle, ClipboardCheck } from "lucide-react";
 
-import { useDiaryEntries } from "@/hooks/use-diary-entries";
-import {
-  useDiaryPhotoDisplayRows,
-  type DiaryPhotoDisplayRow,
-} from "@/hooks/useDiaryPhotoDisplayRows";
-import { normalizeDiaryEntries, normalizeDiaryEntry } from "@/lib/diaryEntryRules";
-import { buildPhotoHistory } from "@/lib/photoHistoryRules";
-import {
-  buildPlantPhotoStripItemsWithSource,
-  PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
-} from "@/lib/plantPhotoPreviewStrip";
-import {
-  projectLatestPhotoDiagnosisReviewsByPhoto,
-  type PhotoDiagnosisLatestReview,
-} from "@/lib/photoDiagnosisNoteRules";
+import { usePlantDetailPhotoStripItems } from "@/hooks/usePlantDetailPhotoStripItems";
+import type { PhotoDiagnosisLatestReview } from "@/lib/photoDiagnosisNoteRules";
 import { Button } from "@/components/ui/button";
 import { logsPath } from "@/lib/routes";
-import { useMemo } from "react";
 
 interface PlantDetailPhotoStripProps {
   plantId: string | null | undefined;
@@ -61,59 +47,14 @@ export default function PlantDetailPhotoStrip({
   onUploadPhoto,
   onReviewPhoto,
 }: PlantDetailPhotoStripProps) {
+  const { diary, display, items, hasPlantContext } = usePlantDetailPhotoStripItems(plantId);
+  const { isLoading, isPending, isFetching, fetchStatus, isError, refetch, data: rawDiary } = diary;
   const {
-    data: rawDiary,
-    isLoading,
-    isPending,
-    isFetching,
-    fetchStatus,
-    isError,
-    refetch,
-  } = useDiaryEntries();
-  const hasPlantContext = !!plantId?.trim();
-  const scopedDiary = useMemo(
-    () =>
-      hasPlantContext && Array.isArray(rawDiary)
-        ? rawDiary.filter((row) => normalizeDiaryEntry(row)?.plantId === plantId?.trim())
-        : [],
-    [hasPlantContext, plantId, rawDiary],
-  );
-  const {
-    rows: diaryRowsForDisplay,
     isResolvingPrivatePhotos,
     hasPrivatePhotoError,
     isPrivatePhotoReadPaused,
     refetchPrivatePhotos,
-  } = useDiaryPhotoDisplayRows(scopedDiary as ReadonlyArray<DiaryPhotoDisplayRow>);
-
-  const latestReviewsByPhotoId = useMemo(
-    () => projectLatestPhotoDiagnosisReviewsByPhoto(rawDiary),
-    [rawDiary],
-  );
-
-  const items = useMemo(() => {
-    if (!plantId || diaryRowsForDisplay.length === 0) return [];
-    // Lift details.event_type for normalization parity with PhotoHistoryPanel.
-    const lifted = diaryRowsForDisplay.map((raw) => {
-      const r = (raw ?? {}) as Record<string, unknown>;
-      if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
-      const det = (r.details ?? null) as Record<string, unknown> | null;
-      const liftedType = det && typeof det === "object" ? det.event_type : undefined;
-      return typeof liftedType === "string" && liftedType.length > 0
-        ? { ...r, entry_type: liftedType }
-        : r;
-    });
-    const normalized = normalizeDiaryEntries({ rawEntries: lifted });
-    const photoRows = buildPhotoHistory(normalized);
-    return buildPlantPhotoStripItemsWithSource({
-      plantId,
-      rows: photoRows,
-      limit: PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
-    }).map((item) => ({
-      ...item,
-      latestReview: latestReviewsByPhotoId.get(item.sourcePhotoId) ?? null,
-    }));
-  }, [diaryRowsForDisplay, latestReviewsByPhotoId, plantId]);
+  } = display;
 
   const canReviewPhotos = hasPlantContext && !!growId?.trim() && !!onReviewPhoto;
   const uploadHref = logsPath(growId ?? null);

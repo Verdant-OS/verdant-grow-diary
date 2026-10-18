@@ -6,8 +6,10 @@ import {
 
 export function SandboxCheckoutTestModeNote({
   environment,
+  onCheckoutLiveClick,
 }: {
   environment: PaddleCheckoutEnvironment | null | undefined;
+  onCheckoutLiveClick?: () => void;
 }) {
   const note = sandboxCheckoutTestModeNote(environment);
   if (!note) return null;
@@ -17,7 +19,11 @@ export function SandboxCheckoutTestModeNote({
       className="mb-3 text-sm leading-relaxed text-muted-foreground"
     >
       {note}{" "}
-      <a href={`#${CHECKOUT_LIVE_FAQ_ID}`} className="underline underline-offset-2">
+      <a
+        href={`#${CHECKOUT_LIVE_FAQ_ID}`}
+        className="underline underline-offset-2"
+        onClick={onCheckoutLiveClick}
+      >
         Is checkout live?
       </a>
     </p>

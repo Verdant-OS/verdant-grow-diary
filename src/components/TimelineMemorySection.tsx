@@ -83,7 +83,7 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
       data-item-key={item.key}
       data-event-type={item.eventType ?? ""}
       data-stage={item.stage ?? ""}
-      className="rounded-lg border border-border/40 bg-card/40 p-3 text-sm"
+      className="min-w-0 max-w-full rounded-lg border border-border/40 bg-card/40 p-3 text-sm"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -108,7 +108,11 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
           {formatSnapshotTimestamp(item.occurredAt)}
         </time>
       </div>
-      {item.note && <p className="mt-1.5 text-sm text-foreground/90 break-words">{item.note}</p>}
+      {item.note && (
+        <p className="mt-1.5 min-w-0 max-w-full text-sm text-foreground/90 [overflow-wrap:anywhere]">
+          {item.note}
+        </p>
+      )}
 
       {item.earlyStage && (
         <div
@@ -144,7 +148,7 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
           )}
           {item.earlyStage.note && (
             <p
-              className="basis-full text-xs text-muted-foreground"
+              className="basis-full min-w-0 max-w-full text-xs text-muted-foreground [overflow-wrap:anywhere]"
               data-testid="timeline-diary-early-stage-note"
             >
               What changed: {item.earlyStage.note}

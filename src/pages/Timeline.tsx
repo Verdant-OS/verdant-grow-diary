@@ -1727,7 +1727,7 @@ export default function Timeline() {
   }
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full overflow-x-clip">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -1828,7 +1828,7 @@ export default function Timeline() {
           </div>
           <div
             aria-label="Grow stage progression"
-            className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin"
+            className="-mx-1 min-w-0 max-w-full overflow-x-auto px-1 pb-1 scrollbar-thin"
             data-testid="timeline-stage-progression-scroll"
             tabIndex={0}
           >
@@ -2732,7 +2732,7 @@ export default function Timeline() {
                                 ) : null}
                               </div>
                               <p
-                                className="text-sm text-foreground whitespace-pre-wrap cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                                className="min-w-0 max-w-full text-sm text-foreground whitespace-pre-wrap [overflow-wrap:anywhere] cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
                                 role="button"
                                 tabIndex={0}
                                 data-testid="timeline-entry-body"

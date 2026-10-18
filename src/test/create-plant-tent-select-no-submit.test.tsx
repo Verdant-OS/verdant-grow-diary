@@ -236,7 +236,9 @@ describe("CreatePlantDialog tent selection and submit safety", () => {
     expect(tentTrigger).toHaveTextContent("Tent A");
     expect(insertMock).not.toHaveBeenCalled();
 
-    await user.click(screen.getByTestId("plant-create-submit"));
+    // Submit by keyboard and keep Enter held until after the dialog closes.
+    screen.getByTestId("plant-create-submit").focus();
+    await user.keyboard("{Enter>}");
 
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
@@ -258,9 +260,45 @@ describe("CreatePlantDialog tent selection and submit safety", () => {
     fireEvent.keyDown(newPlantTrigger, { key: "Enter" });
     fireEvent.click(newPlantTrigger);
     expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
-    fireEvent.keyUp(window, { key: "Enter" });
+    await user.keyboard("{/Enter}");
 
     await user.click(newPlantTrigger);
+    await screen.findByTestId("create-plant-form");
+    expect(screen.getByTestId("create-plant-name")).toHaveValue("");
+  });
+
+  it("reopens on the first Enter when a keyboard save resolves after the submitting keyup", async () => {
+    // Codex P2 at 885e48b8: a network-backed save usually finishes after the
+    // original Enter keyup, so the reopen guard must not stay armed waiting for it.
+    let resolveInsert: (value: unknown) => void = () => {};
+    singleMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveInsert = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    renderDialog({ initiallyOpen: false });
+
+    const newPlantTrigger = screen.getByRole("button", { name: /New plant/i });
+    await user.click(newPlantTrigger);
+    await screen.findByTestId("create-plant-form");
+    await user.type(screen.getByTestId("create-plant-name"), "Blue Dream");
+    await user.click(screen.getByTestId("create-plant-tent-select"));
+    await user.click(await screen.findByRole("option", { name: "Tent A" }));
+
+    screen.getByTestId("plant-create-submit").focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    });
+    resolveInsert({ data: buildCreatedPlantRow(), error: null });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+    });
+    expect(newPlantTrigger).toHaveFocus();
+
+    await user.keyboard("{Enter}");
     await screen.findByTestId("create-plant-form");
     expect(screen.getByTestId("create-plant-name")).toHaveValue("");
   });

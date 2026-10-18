@@ -241,6 +241,29 @@ export default function CreatePlantDialog({
   const closedAfterSubmitRef = useRef(false);
   const releaseReopenGuardRef = useRef<(() => void) | null>(null);
   useEffect(() => () => releaseReopenGuardRef.current?.(), []);
+  // Keys physically held right now. A save usually resolves after the
+  // submitting key's keyup, and a guard armed then would swallow the next
+  // genuine activation of New plant (Codex P2 at 885e48b8).
+  const heldKeysRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const held = heldKeysRef.current;
+    const onKeyDown = (event: KeyboardEvent) => {
+      held.add(event.key);
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      held.delete(event.key);
+    };
+    const onBlur = () => held.clear();
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onBlur);
+      held.clear();
+    };
+  }, []);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
   });
@@ -355,10 +378,16 @@ export default function CreatePlantDialog({
   // After a successful create, let Radix return focus to the New plant trigger
   // (keyboard users keep their place) but keep the reopen guard armed until the
   // submitting gesture ends: a held or trailing key must not reopen the dialog
-  // empty. The next keyup or pointerdown releases it.
+  // empty. The next keyup or pointerdown releases it. When no key is held at
+  // close (pointer submit, or a keyboard save that resolved after keyup), the
+  // gesture has already ended, so the guard is released immediately.
   function handleDialogCloseAutoFocus(_event: Event) {
     if (!closedAfterSubmitRef.current) return;
     releaseReopenGuardRef.current?.();
+    if (heldKeysRef.current.size === 0) {
+      closedAfterSubmitRef.current = false;
+      return;
+    }
     const release = () => {
       closedAfterSubmitRef.current = false;
       window.removeEventListener("keyup", release, true);

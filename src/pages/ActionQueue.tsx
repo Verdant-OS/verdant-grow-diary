@@ -106,6 +106,7 @@ import {
   type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { ActionQueueRpcStatusPill } from "@/components/ActionQueueRpcStatusPill";
+import { ActionQueueCreateButton } from "@/components/ActionQueueCreateButton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -1070,8 +1071,15 @@ export default function ActionQueue() {
           description="Suggestions are approval-gated. Verdant never sends commands to equipment."
           icon={<ListChecks className="h-5 w-5" aria-hidden="true" />}
           actions={
-            <div className="flex items-center gap-2">
-              <ActionQueueRpcStatusPill availability={rpcAvailability} />
+            <div className="flex flex-wrap items-center gap-2">
+              {(rpcAvailability !== "unknown" || rows.length > 0) && (
+                <ActionQueueRpcStatusPill availability={rpcAvailability} />
+              )}
+              <ActionQueueCreateButton
+                growId={effectiveGrowId}
+                disabled={loading || isRefreshing || hasInvalidScope}
+                onCreated={() => load()}
+              />
               <Button
                 size="sm"
                 variant="ghost"

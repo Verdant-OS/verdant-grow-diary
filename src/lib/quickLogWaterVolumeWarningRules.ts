@@ -70,6 +70,28 @@ function compareMilliliters(raw: string, limitMl: number): number | null {
   return 0;
 }
 
+export type WaterVolumeTextAssessment =
+  { status: "missing" } | { status: "invalid" } | { status: "valid"; volumeMl: number };
+
+/**
+ * Save-path classification of the Volume text, shared with the warning so both
+ * read every entry the same way: text longer than the input cap is invalid, and
+ * the 1,000,000 ml hard maximum is compared exactly, before any Number()
+ * rounding can turn an entry above it into an accepted value.
+ */
+export function assessWaterVolumeText(raw: string | null | undefined): WaterVolumeTextAssessment {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed === "") return { status: "missing" };
+  const rational = milliliterRational(trimmed);
+  if (!rational || rational.negative || rational.numerator === 0n) return { status: "invalid" };
+  if (compareMilliliters(trimmed, LARGE_WATER_AMOUNT_HARD_MAX_ML) === 1) {
+    return { status: "invalid" };
+  }
+  const volumeMl = Number(trimmed);
+  if (!Number.isFinite(volumeMl) || volumeMl <= 0) return { status: "invalid" };
+  return { status: "valid", volumeMl };
+}
+
 export function largeWaterConfirmationKey(amount: string, unit: WaterVolumeUnit): string | null {
   const comparison = compareMilliliters(amount, LARGE_WATER_AMOUNT_THRESHOLD_ML);
   const hard = compareMilliliters(amount, LARGE_WATER_AMOUNT_HARD_MAX_ML);

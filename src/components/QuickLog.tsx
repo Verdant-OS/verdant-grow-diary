@@ -130,6 +130,14 @@ import {
   isArchivedGrowQuickLogNote,
 } from "@/lib/archivedGrowQuickLogRules";
 import {
+  EMPTY_QUICK_LOG_NOTE_OCCURRED_AT,
+  QUICK_LOG_NOTE_OCCURRED_AT_HELPER,
+  QUICK_LOG_NOTE_OCCURRED_AT_LABEL,
+  formatQuickLogNoteLocalDateTime,
+  quickLogRowStartedAt,
+  resolveQuickLogNoteOccurredAt,
+} from "@/lib/quickLogNoteOccurredAtRules";
+import {
   QUICK_LOG_TARGET_BLOCKED_COPY,
   quickLogPrefillTargetKey,
   resolveQuickLogEditorTarget,
@@ -435,6 +443,7 @@ export default function QuickLog({
     !plants.some((p) => typeof p.tent_id === "string" && p.tent_id.length > 0);
 
   const [note, setNote] = useState("");
+  const [noteOccurredAt, setNoteOccurredAt] = useState(EMPTY_QUICK_LOG_NOTE_OCCURRED_AT);
   // Slice A2: stage starts UNKNOWN ("") and is defaulted from the selected
   // plant / active grow by the effect below. It is NOT hardcoded to "veg" —
   // an unknown context must stay unknown, not be mislabeled Vegetative.
@@ -566,8 +575,9 @@ export default function QuickLog({
   // submission, and a dedupe hit would hand back the OLD entry while the
   // edits silently never saved.
   const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
-  // Signature (key + timestamp excluded) of the last FAILED attempt's
-  // payload, so an edited retry is distinguished from a pure retry.
+  // Signature (idempotency key excluded) of the last FAILED attempt's
+  // payload, so an edited retry — including a changed occurrence time —
+  // is distinguished from a pure retry.
   const lastFailedSaveSigRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -1248,6 +1258,7 @@ export default function QuickLog({
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     lastFailedSaveSigRef.current = null;
     setNote("");
+    setNoteOccurredAt(EMPTY_QUICK_LOG_NOTE_OCCURRED_AT);
     setShowMore(false);
     eventTypeUserTouchedRef.current = false;
     setEventType("observation");
@@ -1358,6 +1369,7 @@ export default function QuickLog({
     lastFailedSaveSigRef.current = null;
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
+    setNoteOccurredAt(EMPTY_QUICK_LOG_NOTE_OCCURRED_AT);
     setShowMore(false);
     eventTypeUserTouchedRef.current = true;
     setEventType("observation");
@@ -1498,6 +1510,23 @@ export default function QuickLog({
       toast.error(message);
       noteRef.current?.focus();
       return;
+    }
+    let noteOccurredAtIso: string | null = null;
+    if (saveEventType === "observation" || saveEventType === "note") {
+      const occurredDecision = resolveQuickLogNoteOccurredAt({
+        touched: noteOccurredAt.touched,
+        localValue: noteOccurredAt.value,
+        now: new Date(),
+        growStartedAt: quickLogRowStartedAt(saveGrow),
+        plantStartedAt: quickLogRowStartedAt(savePlant),
+        endedAt: null,
+      });
+      if (occurredDecision.ok !== true) {
+        setSaveError(occurredDecision.message);
+        toast.error(occurredDecision.message);
+        return;
+      }
+      noteOccurredAtIso = occurredDecision.pOccurredAt;
     }
     if (saveEventType === "watering") {
       const raw = details.watering.trim();
@@ -1641,6 +1670,7 @@ export default function QuickLog({
         environmentCheck: environmentCheckRecord,
         phenoEvidenceReceipt,
         noteSuffix: earlyStageSuffix || null,
+        occurredAt: noteOccurredAtIso,
       });
       if (built.ok !== true) {
         setSaveError(built.message);
@@ -1649,14 +1679,14 @@ export default function QuickLog({
       }
 
       // Pure retries reuse the idempotency key; EDITED retries must not.
-      // Compare this attempt's payload (key + occurred_at excluded) to the
-      // last failed attempt: a change means new content, so a fresh key —
-      // otherwise a lost-response dedupe would return the old entry and
-      // silently drop the edits.
+      // Compare this attempt's payload (key excluded) to the last failed
+      // attempt. Occurrence time is part of the entry: a backdated note is
+      // different content, so changing it rotates the key. An unedited retry
+      // rebuilds the same p_occurred_at, including null when the grower left
+      // the field alone, so a server re-stamp of the sent object is not an edit.
       const attemptSig = JSON.stringify({
         ...built.payload,
         p_idempotency_key: null,
-        p_occurred_at: null,
       });
       if (lastFailedSaveSigRef.current !== null && lastFailedSaveSigRef.current !== attemptSig) {
         saveIdempotencyKeyRef.current = newQuickLogSaveKey();
@@ -2104,6 +2134,14 @@ export default function QuickLog({
   const displayedPlantId = inFlightSaveContext?.target.plantId ?? editorPlantId;
   const displayedGrowId = inFlightSaveContext?.target.growId ?? activeGrowId ?? "";
   const displayedEventType = inFlightSaveContext?.eventType ?? eventType;
+  const noteOccurredAtEventType = eventTypeUserTouchedRef.current
+    ? eventType
+    : (prefill?.eventType ?? eventType);
+  const showNoteOccurredAtField =
+    noteOccurredAtEventType === "observation" || noteOccurredAtEventType === "note";
+  const noteOccurredAtDisplay = noteOccurredAt.touched
+    ? noteOccurredAt.value
+    : formatQuickLogNoteLocalDateTime(new Date());
   const displayedStage = inFlightSaveContext?.stage ?? stage;
   const targetPlantName =
     inFlightSaveContext?.plantName ??
@@ -3111,6 +3149,34 @@ export default function QuickLog({
                 autoCapitalize="sentences"
                 spellCheck={true}
               />
+              {showNoteOccurredAtField && (
+                <div className="space-y-1">
+                  <Label htmlFor="quick-log-note-occurred-at" className="text-xs">
+                    {QUICK_LOG_NOTE_OCCURRED_AT_LABEL}
+                  </Label>
+                  <Input
+                    id="quick-log-note-occurred-at"
+                    data-testid="quick-log-note-occurred-at"
+                    type="datetime-local"
+                    value={noteOccurredAtDisplay}
+                    disabled={saveLocked}
+                    aria-label={QUICK_LOG_NOTE_OCCURRED_AT_LABEL}
+                    aria-describedby="quick-log-note-occurred-at-helper"
+                    autoComplete="off"
+                    onChange={(e) => {
+                      if (restoreLockedDraftValue(e.currentTarget, noteOccurredAtDisplay)) return;
+                      setNoteOccurredAt({ touched: true, value: e.target.value });
+                      setSaveError(null);
+                    }}
+                  />
+                  <p
+                    id="quick-log-note-occurred-at-helper"
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    {QUICK_LOG_NOTE_OCCURRED_AT_HELPER}
+                  </p>
+                </div>
+              )}
             </section>
 
             {selectedPhenoHuntId && eventType === "observation" && (

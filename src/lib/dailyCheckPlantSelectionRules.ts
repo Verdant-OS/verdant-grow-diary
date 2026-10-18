@@ -123,14 +123,24 @@ export function resolveDailyCheckPlantSelection(
  * Plant the post-submit links and redirect should name.
  * An explicit picker choice wins, including a cleared picker. An untouched
  * valid route plant stays. An untouched sole-plant default does not.
+ * When `selectablePlantIds` is given, an explicit choice must still be in it:
+ * a plant removed by a list refresh no longer scopes saves, so post-submit
+ * links and redirects must not name it either.
  */
 export function resolveDailyCheckPostSubmitPlantId(input: {
   plantChoice: "route" | "explicit";
   renderedPlantId: string;
   resolutionStatus: DailyCheckPlantResolutionStatus;
   routePlantId: string | null;
+  selectablePlantIds?: readonly string[];
 }): string | null {
-  if (input.plantChoice === "explicit") return input.renderedPlantId || null;
+  if (input.plantChoice === "explicit") {
+    const chosen = input.renderedPlantId || null;
+    if (chosen && input.selectablePlantIds && !input.selectablePlantIds.includes(chosen)) {
+      return null;
+    }
+    return chosen;
+  }
   if (input.resolutionStatus === "valid") return input.routePlantId || null;
   return null;
 }

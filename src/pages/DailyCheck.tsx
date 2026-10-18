@@ -60,6 +60,7 @@ import { usePlants } from "@/hooks/use-plants";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import {
+  DAILY_GROW_CHECK_EMPTY_MANUAL_STEP_WARNING,
   DAILY_GROW_CHECK_STEPS,
   INITIAL_DAILY_GROW_CHECK_STATE,
   buildDailyGrowCheckReviewLinks,
@@ -68,6 +69,8 @@ import {
   formatOutcomeLabel,
   nextStep,
   previousStep,
+  shouldAdvanceGuidedDailyCheckOnSubmit,
+  shouldWarnOnEmptyManualStepNext,
   stepProgress,
   type DailyGrowCheckState,
   type DailyGrowCheckStep,
@@ -112,6 +115,7 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { useAuth } from "@/store/auth";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
 import {
@@ -175,6 +179,7 @@ export default function DailyCheck() {
   const [lastSubmittedSource, setLastSubmittedSource] = useState<DailyCheckSavedSource | null>(
     null,
   );
+  const [emptyManualWarning, setEmptyManualWarning] = useState(false);
 
   const selectablePlants = useMemo(
     () => (urlGrowId ? plants.filter((plant) => plant.grow_id === urlGrowId) : plants),
@@ -287,6 +292,7 @@ export default function DailyCheck() {
     setState(INITIAL_DAILY_GROW_CHECK_STATE);
     setLastSubmittedAt(null);
     setLastSubmittedSource(null);
+    setEmptyManualWarning(false);
     setAppliedRouteIdentity(routeIdentity);
   }, [
     plantsLoading,
@@ -396,6 +402,7 @@ export default function DailyCheck() {
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
       setLastSubmittedSource("sensor");
+      setEmptyManualWarning(false);
       setState((s) =>
         renderedStep === "manual" && s.manual === "pending" ? { ...s, manual: "added" } : s,
       );
@@ -473,22 +480,62 @@ export default function DailyCheck() {
     toast.success(
       method === "note" ? DAILY_CHECK_NOTE_SAVED_TOAST : DAILY_CHECK_SENSOR_SAVED_TOAST,
     );
+    if (
+      shouldAdvanceGuidedDailyCheckOnSubmit({
+        method,
+        renderedStep,
+        methodHint,
+      })
+    ) {
+      if (method === "sensor") {
+        setEmptyManualWarning(false);
+        setState((s) => ({ ...s, manual: "added" }));
+      } else {
+        setQuickLogOpen(false);
+        setState((s) => ({
+          ...s,
+          quicklog: renderedStep === "quicklog" ? "added" : s.quicklog,
+          handheld: renderedStep === "handheld" ? "added" : s.handheld,
+        }));
+      }
+      setStep((s) => nextStep(s));
+      return;
+    }
     navigate(postSubmitHref);
   }
 
   // Pull the latest manual readings for the current tent so we can show a
   // compact "Changed since last snapshot" panel after a sensor save.
   // Read-only — no writes, no ingestion changes.
+  const temperatureUnit = useTemperatureUnitPreference();
   const { data: tentReadings = [] } = useSensorReadings(effectiveTentId || null, 50);
   const changeContext = useMemo(
-    () => deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId }),
-    [effectiveTentId, tentReadings],
+    () =>
+      deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId, temperatureUnit }),
+    [effectiveTentId, tentReadings, temperatureUnit],
   );
 
   const progress = stepProgress(renderedStep);
 
   function markAndAdvance(field: keyof DailyGrowCheckState, value: StepOutcome) {
+    if (field === "manual") setEmptyManualWarning(false);
     setState((s) => ({ ...s, [field]: value }));
+    setStep((s) => nextStep(s));
+  }
+
+  function handleFooterNext() {
+    if (
+      shouldWarnOnEmptyManualStepNext({
+        renderedStep,
+        state,
+        hasSavedManualSnapshot: state.manual === "added" || lastSubmittedSource === "sensor",
+      })
+    ) {
+      setEmptyManualWarning(true);
+      toast.warning(DAILY_GROW_CHECK_EMPTY_MANUAL_STEP_WARNING);
+    } else if (renderedStep === "manual") {
+      setEmptyManualWarning(false);
+    }
     setStep((s) => nextStep(s));
   }
 
@@ -1051,6 +1098,17 @@ export default function DailyCheck() {
                 </div>
                 <Progress value={progress.percent} className="h-1.5" />
               </div>
+              {emptyManualWarning && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="daily-grow-check-manual-empty-warning"
+                  className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300"
+                >
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>{DAILY_GROW_CHECK_EMPTY_MANUAL_STEP_WARNING}</span>
+                </div>
+              )}
             </>
           )}
 
@@ -1337,6 +1395,8 @@ export default function DailyCheck() {
                   className="h-11"
                   onClick={() => {
                     setState(INITIAL_DAILY_GROW_CHECK_STATE);
+                    setLastSubmittedSource(null);
+                    setEmptyManualWarning(false);
                     setStep("select");
                   }}
                   data-testid="daily-grow-check-restart"
@@ -1362,7 +1422,7 @@ export default function DailyCheck() {
               </Button>
               <Button
                 variant="default"
-                onClick={() => setStep(nextStep(renderedStep))}
+                onClick={handleFooterNext}
                 className="min-h-11 min-w-0 flex-1 whitespace-normal"
                 data-testid="daily-grow-check-next"
               >

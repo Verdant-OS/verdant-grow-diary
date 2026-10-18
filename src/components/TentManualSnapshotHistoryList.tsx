@@ -20,6 +20,7 @@ import {
   DEFAULT_HISTORY_LIMIT,
 } from "@/lib/manualSensorSnapshotHistoryListRules";
 import type { ChangeContextReading } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 /** The five columns the history list reads; V2 manual events supply the same. */
 export type ManualSnapshotHistoryReading = Pick<
@@ -50,6 +51,7 @@ export default function TentManualSnapshotHistoryList({
   onRetry,
   limit = DEFAULT_HISTORY_LIMIT,
 }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
   if (!tentId) return null;
 
   // Only a settled successful read establishes empty or populated history.
@@ -65,7 +67,9 @@ export default function TentManualSnapshotHistoryList({
       }))
     : [];
 
-  const entries = canShowHistory ? buildManualSnapshotHistoryList(rows, { tentId, limit }) : [];
+  const entries = canShowHistory
+    ? buildManualSnapshotHistoryList(rows, { tentId, limit, temperatureUnit })
+    : [];
 
   return (
     <div className="glass rounded-2xl p-4 mb-6" data-testid="tent-manual-snapshot-history">

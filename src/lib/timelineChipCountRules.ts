@@ -48,26 +48,92 @@ export function timelineMeasurementChipCount(
   return diaryCount + receipts;
 }
 
+/** Which persisted field a Timeline row's displayed photo was projected from. */
+export type TimelineDiaryPhotoReferenceSource = "top" | "details" | null;
+
+function isDisplayablePhotoKind(kind: string): boolean {
+  return kind === "external" || kind === "storage";
+}
+
+/** Where a loaded row's displayable photo reference lives (top-level wins). */
+export function resolveTimelineDiaryPhotoReferenceSource(
+  row: { photo_url?: unknown; details?: unknown },
+  viewerUserId: string | null,
+): TimelineDiaryPhotoReferenceSource {
+  const top = parseDiaryPhotoDisplayReferenceFromRow(
+    { photo_url: row.photo_url, details: null },
+    { viewerUserId },
+  );
+  if (isDisplayablePhotoKind(top.kind)) return "top";
+  const any = parseDiaryPhotoDisplayReferenceFromRow(
+    { photo_url: row.photo_url, details: row.details },
+    { viewerUserId },
+  );
+  return isDisplayablePhotoKind(any.kind) ? "details" : null;
+}
+
+export interface TimelineDiaryPhotoEditRow {
+  id: string;
+  /** Projected display URL (external, signed, or null while unsigned). */
+  photo_url: string | null;
+  details?: unknown;
+  photoReferenceSource?: TimelineDiaryPhotoReferenceSource;
+}
+
+export interface TimelineDiaryPhotoEditResult {
+  photo_url: string | null;
+  photoReferenceSource: TimelineDiaryPhotoReferenceSource;
+  photoIds: ReadonlySet<string>;
+}
+
 /**
- * Apply a diary edit to the photo-membership set. Only the delta between the
- * row before and after the edit is applied, so a reference that lives
- * outside the edited fields (e.g. a storage path held back for signing) is
- * never dropped.
+ * Apply an EntryEditDialog save (which rewrites `details` only) to a row's
+ * projected photo and to the Photos membership set. The decision uses the
+ * persisted reference source recorded at load, never the projected URL: a
+ * top-level reference is untouched by a details edit, while a details
+ * fallback is re-derived from the edited details, so removing it clears the
+ * projected URL and drops the row from Photos.
  */
 export function applyTimelineDiaryPhotoEdit(
   current: ReadonlySet<string>,
-  before: TimelinePhotoIdentityRow | null | undefined,
-  after: TimelinePhotoIdentityRow | null | undefined,
+  before: TimelineDiaryPhotoEditRow,
+  nextDetails: unknown,
   viewerUserId: string | null,
-): ReadonlySet<string> {
-  if (!before || !after || before.id !== after.id) return current;
-  const had = collectTimelineDiaryPhotoIds([before], viewerUserId).has(before.id);
-  const has = collectTimelineDiaryPhotoIds([after], viewerUserId).has(after.id);
-  if (had === has) return current;
-  const next = new Set(current);
-  if (has) next.add(after.id);
-  else next.delete(after.id);
-  return next;
+): TimelineDiaryPhotoEditResult {
+  const source = before.photoReferenceSource ?? null;
+  if (source === "top") {
+    return { photo_url: before.photo_url, photoReferenceSource: "top", photoIds: current };
+  }
+  const withId = (add: boolean): ReadonlySet<string> => {
+    if (current.has(before.id) === add) return current;
+    const next = new Set(current);
+    if (add) next.add(before.id);
+    else next.delete(before.id);
+    return next;
+  };
+  const ref = parseDiaryPhotoDisplayReferenceFromRow(
+    { photo_url: null, details: nextDetails },
+    { viewerUserId },
+  );
+  if (ref.kind === "external") {
+    return { photo_url: ref.url, photoReferenceSource: "details", photoIds: withId(true) };
+  }
+  if (ref.kind === "storage") {
+    const prior =
+      source === "details"
+        ? parseDiaryPhotoDisplayReferenceFromRow(
+            { photo_url: null, details: before.details },
+            { viewerUserId },
+          )
+        : null;
+    const samePath = prior?.kind === "storage" && prior.path === ref.path;
+    return {
+      photo_url: samePath ? before.photo_url : null,
+      photoReferenceSource: "details",
+      photoIds: withId(true),
+    };
+  }
+  return { photo_url: null, photoReferenceSource: null, photoIds: withId(false) };
 }
 
 /**

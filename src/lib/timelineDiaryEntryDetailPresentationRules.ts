@@ -182,20 +182,25 @@ export const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
   volume_ml: "Water Volume",
 };
 
+const ML_VOLUME_KEYS: ReadonlySet<string> = new Set([
+  "volume_ml",
+  "runoff_ml",
+  "watering_amount_ml",
+  "wateringAmountMl",
+  "watering_amount",
+  "wateringAmount",
+]);
+
+/** A bare finite number written as text (EntryEditDialog saves details as strings). */
+const BARE_NUMBER_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
+
 function typedActivityScalar(
   key: string,
   value: unknown,
   tempUnit: TemperatureUnitPreference,
 ): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
-    if (
-      key === "volume_ml" ||
-      key === "runoff_ml" ||
-      key === "watering_amount_ml" ||
-      key === "wateringAmountMl" ||
-      key === "watering_amount" ||
-      key === "wateringAmount"
-    ) {
+    if (ML_VOLUME_KEYS.has(key)) {
       return `${value} ml`;
     }
     if (key === "water_temp_c") {
@@ -208,6 +213,8 @@ function typedActivityScalar(
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "" || trimmed === "default") return null;
+    // Unit-bearing text ("500 ml", "2 L") is kept verbatim.
+    if (ML_VOLUME_KEYS.has(key) && BARE_NUMBER_RE.test(trimmed)) return `${trimmed} ml`;
     return trimmed;
   }
   return null;

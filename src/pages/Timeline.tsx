@@ -131,6 +131,8 @@ import {
   dedupeAlertEventsForTimeline,
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
   applyTimelineDiaryPhotoEdit,
+  resolveTimelineDiaryPhotoReferenceSource,
+  type TimelineDiaryPhotoReferenceSource,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
   timelineMeasurementChipCount,
@@ -281,6 +283,8 @@ interface Entry {
   entry_at: string;
   plant_id: string | null;
   tent_id: string | null;
+  /** Client-only: persisted field the displayed photo came from (not a column). */
+  photoReferenceSource?: TimelineDiaryPhotoReferenceSource;
 }
 
 interface TimelineDiaryPhotoDisplayRows {
@@ -301,15 +305,16 @@ function buildTimelineDiaryPhotoDisplayRows(
   const privatePhotoPathById = new Map<string, string>();
   const displayRows = rows.map((row) => {
     const reference = parseDiaryPhotoDisplayReferenceFromRow(row, { viewerUserId });
+    const photoReferenceSource = resolveTimelineDiaryPhotoReferenceSource(row, viewerUserId);
 
     if (reference.kind === "external") {
-      return { ...row, photo_url: reference.url };
+      return { ...row, photo_url: reference.url, photoReferenceSource };
     }
     if (reference.kind === "storage") {
       privatePhotoPathById.set(row.id, reference.path);
     }
 
-    return { ...row, photo_url: null };
+    return { ...row, photo_url: null, photoReferenceSource };
   });
 
   return { rows: displayRows, privatePhotoPathById };
@@ -3220,13 +3225,26 @@ export default function Timeline() {
         }}
         onSaved={(patch) => {
           const before = entries.find((r) => r.id === patch.id);
-          if (before) {
-            setDiaryPhotoIds((current) =>
-              applyTimelineDiaryPhotoEdit(current, before, { ...before, ...patch }, user),
-            );
-          }
+          const photo =
+            before && patch.details !== undefined
+              ? applyTimelineDiaryPhotoEdit(diaryPhotoIds, before, patch.details, user)
+              : null;
+          if (photo) setDiaryPhotoIds(photo.photoIds);
           setEntries((rows) =>
-            rows.map((r) => (r.id === patch.id ? ({ ...r, ...patch } as Entry) : r)),
+            rows.map((r) =>
+              r.id === patch.id
+                ? ({
+                    ...r,
+                    ...patch,
+                    ...(photo
+                      ? {
+                          photo_url: photo.photo_url,
+                          photoReferenceSource: photo.photoReferenceSource,
+                        }
+                      : {}),
+                  } as Entry)
+                : r,
+            ),
           );
         }}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}

@@ -19,7 +19,10 @@ import { AlertTriangle, Bell, Box, Gauge, ListTodo } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { usePlantManualEnvironmentReadings } from "@/hooks/usePlantManualEnvironmentReadings";
-import { mergePlantTentReadingsWithManualEvents } from "@/lib/plantManualEnvironmentEventRules";
+import {
+  combinePlantEnvironmentReads,
+  mergePlantTentReadingsWithManualEvents,
+} from "@/lib/plantManualEnvironmentEventRules";
 import { useNowTick } from "@/hooks/useNowTick";
 import {
   buildPlantEnvironmentReadView,
@@ -51,7 +54,11 @@ export default function PlantStatusStrip({ tentId, tentName, growId, plantId }: 
     : [];
   const env = buildPlantTentEnvironmentView(readings, nowMs);
   const environmentReadView = buildPlantEnvironmentReadView({
-    ...environmentQuery,
+    ...combinePlantEnvironmentReads({
+      sensor: environmentQuery,
+      manual: manualQuery,
+      manualEnabled: hasTent && !!plantId,
+    }),
     enabled: hasTent,
     hasCachedReadings: readings.length > 0,
   });

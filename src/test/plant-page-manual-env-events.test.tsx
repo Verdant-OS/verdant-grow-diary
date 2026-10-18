@@ -348,3 +348,101 @@ describe("Codex re-review on #2115 — equal-time collisions", () => {
     ]);
   });
 });
+
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
+import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
+import PlantStatusStrip from "@/components/PlantStatusStrip";
+import { combinePlantEnvironmentReads } from "@/lib/plantManualEnvironmentEventRules";
+
+describe("Codex re-review on #2115 — environment read state covers both reads", () => {
+  const ok = {
+    isError: false,
+    isPending: false,
+    isLoading: false,
+    isFetching: false,
+    fetchStatus: "idle",
+  };
+
+  it("is an error when only the manual read failed, and retries both sources", () => {
+    const sensorRefetch = vi.fn();
+    const manualRefetch = vi.fn();
+    const read = combinePlantEnvironmentReads({
+      sensor: { ...ok, refetch: sensorRefetch },
+      manual: { ...ok, isError: true, refetch: manualRefetch },
+      manualEnabled: true,
+    });
+    expect(read.isError).toBe(true);
+    read.refetch();
+    expect(sensorRefetch).toHaveBeenCalledTimes(1);
+    expect(manualRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("is pending or paused while only the manual read is", () => {
+    expect(
+      combinePlantEnvironmentReads({
+        sensor: { ...ok, refetch: () => {} },
+        manual: {
+          ...ok,
+          isPending: true,
+          isLoading: true,
+          fetchStatus: "fetching",
+          refetch: () => {},
+        },
+        manualEnabled: true,
+      }),
+    ).toMatchObject({ isPending: true, isLoading: true, fetchStatus: "fetching" });
+    expect(
+      combinePlantEnvironmentReads({
+        sensor: { ...ok, refetch: () => {} },
+        manual: { ...ok, isPending: true, fetchStatus: "paused", refetch: () => {} },
+        manualEnabled: true,
+      }).fetchStatus,
+    ).toBe("paused");
+  });
+
+  it("ignores a disabled manual read (no plant id)", () => {
+    const manualRefetch = vi.fn();
+    const read = combinePlantEnvironmentReads({
+      sensor: { ...ok, refetch: () => {} },
+      manual: { ...ok, isPending: true, refetch: manualRefetch },
+      manualEnabled: false,
+    });
+    expect(read).toMatchObject({ isError: false, isPending: false, fetchStatus: "idle" });
+    read.refetch();
+    expect(manualRefetch).not.toHaveBeenCalled();
+  });
+
+  function renderWithProviders(node: React.ReactNode) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>{node}</MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("the panel shows unavailable, not 'No sensor readings', when only grow_events failed, and Retry reads both", async () => {
+    tableData.sensor_readings_effective = [];
+    failTables.add("grow_events");
+    renderWithProviders(<PlantTentEnvironmentPanel tentId={TENT} plantId={PLANT} />);
+    expect(await screen.findByText("Sensor readings unavailable.")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-tent-environment-empty-no-readings")).toBeNull();
+
+    const before = calls.filter((c) => c.method === "from").map((c) => c.table);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => {
+      const after = calls.filter((c) => c.method === "from").map((c) => c.table);
+      const added = after.slice(before.length);
+      expect(added).toContain("grow_events");
+      expect(added.some((t) => t !== "grow_events")).toBe(true);
+    });
+  });
+
+  it("the status strip does not call the environment known while grow_events failed", async () => {
+    tableData.sensor_readings_effective = [];
+    failTables.add("grow_events");
+    renderWithProviders(<PlantStatusStrip tentId={TENT} growId="grow-1" plantId={PLANT} />);
+    expect(await screen.findByText(/Unavailable/)).toBeInTheDocument();
+  });
+});

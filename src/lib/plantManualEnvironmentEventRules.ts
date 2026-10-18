@@ -261,3 +261,56 @@ export function mergeLatestManualReadings(
   }
   return out;
 }
+
+/** The part of a React Query result the plant environment read state needs. */
+export interface PlantEnvironmentSourceRead {
+  isError?: boolean;
+  isPending?: boolean;
+  isLoading?: boolean;
+  isFetching?: boolean;
+  fetchStatus?: string;
+  refetch: () => unknown;
+}
+
+export interface CombinedPlantEnvironmentRead {
+  isError: boolean;
+  isPending: boolean;
+  isLoading: boolean;
+  isFetching: boolean;
+  fetchStatus: "paused" | "fetching" | "idle";
+  /** Refetches every enabled source. */
+  refetch: () => void;
+}
+
+/**
+ * The plant environment surfaces merge sensor rows with Quick Log manual
+ * rows, so their read state must cover both reads: either failed read is an
+ * error, either paused read is paused, either unsettled read is loading or
+ * refreshing, and Retry refetches both. A disabled manual read (no plant id;
+ * react-query reports it pending and idle forever) is ignored. Cached rows
+ * from either source stay visible; the read view labels them as cached.
+ */
+export function combinePlantEnvironmentReads(input: {
+  sensor: PlantEnvironmentSourceRead;
+  manual: PlantEnvironmentSourceRead;
+  manualEnabled: boolean;
+}): CombinedPlantEnvironmentRead {
+  const { sensor, manual } = input;
+  const sources = input.manualEnabled ? [sensor, manual] : [sensor];
+  const any = (pick: (s: PlantEnvironmentSourceRead) => boolean | undefined) =>
+    sources.some((s) => pick(s) === true);
+  return {
+    isError: any((s) => s.isError),
+    isPending: any((s) => s.isPending),
+    isLoading: any((s) => s.isLoading),
+    isFetching: any((s) => s.isFetching),
+    fetchStatus: sources.some((s) => s.fetchStatus === "paused")
+      ? "paused"
+      : sources.some((s) => s.fetchStatus === "fetching")
+        ? "fetching"
+        : "idle",
+    refetch: () => {
+      for (const s of sources) void s.refetch();
+    },
+  };
+}

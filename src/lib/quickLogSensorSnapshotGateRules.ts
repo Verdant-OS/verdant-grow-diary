@@ -2,11 +2,23 @@
  * Render-time gate for the Quick Log V2 sensor snapshot fields
  * (temperature / humidity / VPD) on every action that carries a snapshot.
  * Inputs are the raw typed strings; temperature is in the grower's unit.
- * Bounds mirror the server rule in quickLogV2SavePayload.ts (temperature
- * -10..60 °C, humidity 0..100 %, VPD 0..10 kPa), which stays authoritative.
+ * Bands come from the canonical guards in sensorReadingNormalizationRules.ts
+ * (the same guards quickLogV2SavePayload.ts uses, which stays authoritative),
+ * applied after the same °F → °C conversion the sheet's save seam performs.
  */
 import type { TemperatureUnitPreference } from "./temperatureUnitPreference";
 import { wateringTemperatureRangeMessage } from "./quickLogWaterSaveGateRules";
+import { isHumidityValid, isTemperatureValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { fahrenheitToCelsius } from "./temperatureUnits";
+
+/**
+ * Plain-decimal grammar the Quick Log save seam (QuickLogV2Sheet
+ * `typedTempToCelsiusInput`) accepts for a Fahrenheit conversion. Anything
+ * else (`1e2`, `0x10`, `Infinity`) would reach the payload unconverted
+ * and be read as °C, so a Fahrenheit grower's input outside this grammar is
+ * rejected here rather than silently reinterpreted.
+ */
+export const QUICK_LOG_PLAIN_TEMPERATURE_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 
 export const QUICK_LOG_SNAPSHOT_HUMIDITY_RANGE_MESSAGE =
   "Humidity must be between 0 and 100%." as const;
@@ -26,8 +38,22 @@ function parseOptional(raw: string | null | undefined): number | null {
   return Number(trimmed);
 }
 
-function inRange(value: number, min: number, max: number): boolean {
-  return Number.isFinite(value) && value >= min && value <= max;
+/**
+ * Typed temperature → canonical °C exactly as the save seam produces it
+ * (°F converted and rounded to 2 dp). NaN when a Fahrenheit input is outside
+ * the plain-decimal grammar the seam can convert.
+ */
+function typedTemperatureToCelsius(trimmed: string, unit: TemperatureUnitPreference): number {
+  if (unit !== "fahrenheit") return Number(trimmed);
+  if (!QUICK_LOG_PLAIN_TEMPERATURE_INPUT.test(trimmed)) return Number.NaN;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return Number.NaN;
+  return Math.round(fahrenheitToCelsius(parsed) * 100) / 100;
+}
+
+/** A present value must be a finite number that the canonical guard accepts. */
+function isPresentValueValid(value: number, guard: (v: number | null) => boolean): boolean {
+  return Number.isFinite(value) && guard(value);
 }
 
 export function assessQuickLogSensorSnapshotGate(input: {
@@ -38,19 +64,19 @@ export function assessQuickLogSensorSnapshotGate(input: {
 }): QuickLogSensorSnapshotGate {
   const fields: QuickLogSensorSnapshotGate["fields"] = {};
 
-  const t = parseOptional(input.temperatureInput);
-  if (t !== null) {
-    const celsius = input.temperatureUnit === "fahrenheit" ? ((t - 32) * 5) / 9 : t;
-    if (!inRange(celsius, -10, 60)) {
+  const rawTemperature = (input.temperatureInput ?? "").trim();
+  if (rawTemperature !== "") {
+    const celsius = typedTemperatureToCelsius(rawTemperature, input.temperatureUnit);
+    if (!isPresentValueValid(celsius, isTemperatureValid)) {
       fields.temperature = wateringTemperatureRangeMessage(input.temperatureUnit);
     }
   }
   const h = parseOptional(input.humidityInput);
-  if (h !== null && !inRange(h, 0, 100)) {
+  if (h !== null && !isPresentValueValid(h, isHumidityValid)) {
     fields.humidity = QUICK_LOG_SNAPSHOT_HUMIDITY_RANGE_MESSAGE;
   }
   const v = parseOptional(input.vpdInput);
-  if (v !== null && !inRange(v, 0, 10)) {
+  if (v !== null && !isPresentValueValid(v, isVpdValid)) {
     fields.vpd = QUICK_LOG_SNAPSHOT_VPD_RANGE_MESSAGE;
   }
 

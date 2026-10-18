@@ -37,6 +37,7 @@ import {
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
+import { usePlantDetailPhotoStripItems } from "@/hooks/usePlantDetailPhotoStripItems";
 import PhotoDiagnosisReviewDialog from "@/components/PhotoDiagnosisReviewDialog";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActionResponse";
@@ -296,6 +297,7 @@ export default function PlantDetail() {
     plantId: plant?.id ?? null,
   });
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
+  const photoStrip = usePlantDetailPhotoStripItems(plant?.id ?? null);
   // Same query key as PlantQuickStatusStrip, so this adds no request.
   const recentActivityQuery = usePlantRecentActivity(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
@@ -615,6 +617,7 @@ export default function PlantDetail() {
           <div className="min-w-0 rounded-2xl glass overflow-hidden lg:col-span-1">
             <PlantPhoto
               src={plant.photo}
+              fallbackSrc={photoStrip.items[0]?.thumbnailUrl ?? null}
               alt={plant.name}
               className="aspect-square"
               caption="No plant photo yet"

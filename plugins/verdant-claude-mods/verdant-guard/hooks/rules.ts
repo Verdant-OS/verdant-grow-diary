@@ -117,6 +117,10 @@ export function segments(command: string, redirections = true): string[][] {
       quote = c;
       inToken = true;
       quoted = true;
+    } else if (redirections && c === "#" && !inToken) {
+      // An unquoted `#` that starts a word begins a comment: Bash ignores the rest of the line,
+      // so `gh pr ready 1 # --undo` runs `gh pr ready 1`. Inside a word (`a#b`) it is a character.
+      while (i + 1 < text.length && text[i + 1] !== "\n") i += 1;
     } else if (
       redirections &&
       !redirect &&
@@ -171,8 +175,10 @@ function naiveSegments(text: string): string[][] {
     .filter((t) => t.length > 0);
 }
 
-// Wrapper commands and their options that consume the next token. Any other option is taken to
-// stand alone; `--` ends the wrapper's options.
+// Wrapper commands, the options they are known to read a value for, and the options they are
+// known to read as flags. An option on neither list is read both ways and every reading is
+// checked, so an option this guard has not heard of cannot hide the command. `--` ends the
+// wrapper's options.
 const WRAPPER_VALUE_OPTIONS = new Map<string, ReadonlySet<string>>([
   ["env", new Set(["-u", "--unset", "-C", "--chdir"])],
   [
@@ -186,7 +192,6 @@ const WRAPPER_VALUE_OPTIONS = new Map<string, ReadonlySet<string>>([
       "--close-from",
       "-D",
       "--chdir",
-      "-h",
       "--host",
       "-p",
       "--prompt",
@@ -206,7 +211,51 @@ const WRAPPER_VALUE_OPTIONS = new Map<string, ReadonlySet<string>>([
   ["time", new Set(["-f", "--format", "-o", "--output"])],
 ]);
 
-/** Splits a string into words the way a shell would, removing quotes (`env -S`, `npx -c`). */
+const WRAPPER_FLAGS = new Map<string, ReadonlySet<string>>([
+  ["env", new Set(["-i", "-0", "-v", "--ignore-environment", "--null", "--debug"])],
+  [
+    "sudo",
+    new Set([
+      "-A",
+      "--askpass",
+      "-B",
+      "--bell",
+      "-b",
+      "--background",
+      "-E",
+      "--preserve-env",
+      "-e",
+      "--edit",
+      "-H",
+      "--set-home",
+      "-i",
+      "--login",
+      "-K",
+      "--remove-timestamp",
+      "-k",
+      "--reset-timestamp",
+      "-l",
+      "--list",
+      "-N",
+      "--no-update",
+      "-n",
+      "--non-interactive",
+      "-P",
+      "--preserve-groups",
+      "-S",
+      "--stdin",
+      "-s",
+      "--shell",
+      "-V",
+      "-v",
+      "--validate",
+    ]),
+  ],
+  ["exec", new Set(["-c", "-l"])],
+  ["time", new Set(["-p", "--portability", "-v", "--verbose", "-q", "--quiet", "-a", "--append"])],
+]);
+
+/** Splits a string into words the way a shell would, removing quotes (`env -S`). */
 function shellWords(text: string): string[] {
   return segments(text, false).flat();
 }
@@ -227,85 +276,109 @@ function isWrapperAssignment(head: string, word: string): boolean {
   return head === "env" && !word.startsWith("-") && word.includes("=");
 }
 
+/** More wrapper readings or parse steps than this make the command uncheckable. */
+const MAX_PREFIX_STEPS = 512;
+
+/** True when long option `option` abbreviates a `--name` in `set` (getopt_long prefixes). */
+function longIn(option: string, set: ReadonlySet<string>): boolean {
+  return [...set].some((v) => v.startsWith("--") && longOpt(option, v.slice(2)));
+}
+
 /**
- * Drops leading `VAR=value` assignments and `sudo`/`env`/`exec`/`time` wrappers with their own
- * options, so `env -i git push --force` is checked as `git push --force`. `env -S "<cmd>"`
- * (`--split-string`) runs its argument as the command, so that argument is split and checked.
- * A short-option cluster (`sudo -Eu runner`) is read letter by letter: the first value-taking
- * letter takes the rest of the cluster as its value, or the next token when it is last.
+ * Every reading of a command once leading `VAR=value` assignments and `sudo`/`env`/`exec`/`time`
+ * wrappers with their own options are dropped, so `env -i git push --force` is checked as
+ * `git push --force`. `env -S "<cmd>"` (`--split-string`) runs its argument as the command, so
+ * that argument is split and read again. A short-option cluster (`sudo -Eu runner`) is read
+ * letter by letter: a value-taking letter takes the rest of the cluster as its value, or the
+ * next word when it is last. An option the guard does not classify yields two readings, one
+ * where it is a flag and one where it takes a value. Returns null when there are too many
+ * readings to check.
  */
-function stripPrefix(tokens: string[], onSplit?: (split: string) => void): string[] {
-  let rest = tokens;
-  for (;;) {
+function prefixReadings(tokens: string[], onSplit?: (split: string) => void): string[][] | null {
+  const out: string[][] = [];
+  const seen = new Set<string>();
+  let steps = 0;
+
+  const visit = (words: string[]): void => {
+    if ((steps += 1) > MAX_PREFIX_STEPS) return;
+    let rest = words;
+    while (rest[0] !== undefined && ASSIGNMENT.test(rest[0])) rest = rest.slice(1);
+    const key = rest.join("\u0000");
+    if (seen.has(key)) return;
+    seen.add(key);
     const head = rest[0];
-    if (head === undefined) return rest;
-    if (ASSIGNMENT.test(head)) {
-      rest = rest.slice(1);
-      continue;
+    const values = head === undefined ? undefined : WRAPPER_VALUE_OPTIONS.get(head);
+    if (head === undefined || values === undefined) {
+      out.push(rest);
+      return;
     }
-    const valueOptions = WRAPPER_VALUE_OPTIONS.get(head);
-    if (valueOptions === undefined) return rest;
-    let i = 1;
-    let split: string | null = null;
-    while (i < rest.length) {
-      const option = rest[i]!;
-      if (isWrapperAssignment(head, option)) {
-        i += 1;
-        continue;
+    const flags = WRAPPER_FLAGS.get(head) ?? new Set<string>();
+    const split = (text: string, next: number): void => {
+      onSplit?.(text);
+      // GNU env puts the split words back in place of `-S` and keeps parsing them as its own
+      // options, so `env -S '-- git push -f'` runs the push: parse them as env options again.
+      visit([head, ...shellWords(text), ...rest.slice(next)]);
+    };
+
+    // Each option position is read once, so the two readings of every unknown option keep the
+    // walk linear in the number of words instead of doubling with each one.
+    const walked = new Set<string>();
+    const options = (i: number): void => {
+      if (walked.has(`${i}`) || (steps += 1) > MAX_PREFIX_STEPS) return;
+      walked.add(`${i}`);
+      const option = rest[i];
+      if (option === undefined) return visit(rest.slice(i));
+      if (isWrapperAssignment(head, option)) return options(i + 1);
+      if (!option.startsWith("-") || option === "-") {
+        // GNU env reads a lone `-` as `-i`; for the others it is the command.
+        if (option === "-" && head === "env") return options(i + 1);
+        return visit(rest.slice(i));
       }
-      if (!option.startsWith("-")) break;
       if (option === "--") {
         // `--` ends the wrapper's options, not its assignments: `env -- 1=x cmd` still sets `1=x`.
-        i += 1;
-        while (i < rest.length && isWrapperAssignment(head, rest[i]!)) i += 1;
-        break;
+        let j = i + 1;
+        while (j < rest.length && isWrapperAssignment(head, rest[j]!)) j += 1;
+        return visit(rest.slice(j));
       }
       if (option.startsWith("--")) {
         // Long options match by unambiguous prefix, as getopt_long does (`--spli`, `--us`).
         const eq = option.indexOf("=");
         if (head === "env" && longOpt(option, "split-string")) {
-          split = eq >= 0 ? option.slice(eq + 1) : (rest[i + 1] ?? "");
-          i += eq >= 0 ? 1 : 2;
-          break;
+          return eq >= 0 ? split(option.slice(eq + 1), i + 1) : split(rest[i + 1] ?? "", i + 2);
         }
-        const takesValue =
-          eq < 0 &&
-          [...valueOptions].some((v) => v.startsWith("--") && longOpt(option, v.slice(2)));
-        i += takesValue ? 2 : 1;
-        continue;
+        if (eq >= 0) return options(i + 1);
+        const value = longIn(option, values);
+        const flag = longIn(option, flags);
+        if (!value || flag) options(i + 1);
+        if (value || !flag) options(i + 2);
+        return;
       }
-      // A single-dash option is read letter by letter, whatever follows the first letter: an
-      // attached value can hold any character (`env -S'git push -f'`, `sudo -urunner`).
-      if (/^-[A-Za-z]/.test(option)) {
-        let consumed = 1;
-        for (let k = 1; k < option.length; k += 1) {
-          const letter = `-${option[k]}`;
-          const attached = option.slice(k + 1);
-          if (head === "env" && letter === "-S") {
-            split = attached !== "" ? attached : (rest[i + 1] ?? "");
-            consumed = attached !== "" ? 1 : 2;
-            break;
-          }
-          if (valueOptions.has(letter)) {
-            if (attached === "") consumed = 2;
-            break;
-          }
-        }
-        i += consumed;
-        if (split !== null) break;
-        continue;
+      letters(i, 1);
+    };
+
+    // A single-dash option is read letter by letter, whatever follows the first letter: an
+    // attached value can hold any character (`env -S'git push -f'`, `sudo -urunner`).
+    const letters = (i: number, k: number): void => {
+      if (walked.has(`${i}:${k}`) || (steps += 1) > MAX_PREFIX_STEPS) return;
+      walked.add(`${i}:${k}`);
+      const option = rest[i]!;
+      if (k >= option.length) return options(i + 1);
+      const letter = `-${option[k]}`;
+      const attached = option.slice(k + 1);
+      if (head === "env" && letter === "-S") {
+        return attached !== "" ? split(attached, i + 1) : split(rest[i + 1] ?? "", i + 2);
       }
-      i += valueOptions.has(option) ? 2 : 1;
-    }
-    if (split === null) {
-      rest = rest.slice(i);
-      continue;
-    }
-    onSplit?.(split);
-    // GNU env puts the split words back in place of `-S` and keeps parsing them as its own
-    // options, so `env -S '-- git push -f'` runs the push: parse them as env options again.
-    rest = [head, ...shellWords(split), ...rest.slice(i)];
-  }
+      const value = values.has(letter);
+      const flag = flags.has(letter);
+      if (!value || flag) letters(i, k + 1);
+      if (value || !flag) options(attached === "" ? i + 2 : i + 1);
+    };
+
+    options(1);
+  };
+
+  visit(tokens);
+  return steps > MAX_PREFIX_STEPS ? null : out;
 }
 
 /** True when a short-option cluster such as `-uf` sets `flag` before any value-taking letter. */
@@ -585,14 +658,15 @@ const PW_MOCKED_PROJECTS = ["chromium-mocked", "webkit-mocked"] as const;
 const PW_PROJECT_LITERAL = /^[A-Za-z0-9._/:@+=*-]+$/;
 
 /**
- * True when a `--project` selector picks a mocked project. Playwright 1.62 compares names
+ * True when a `--project` selector picks a mocked project, or cannot be read here (a word the
+ * shell can still expand), so an uncheckable selector is treated as mocked and fails closed. Playwright 1.62 compares names
  * case-insensitively and reads `*` as a wildcard (`filterProjects` in `lib/runner/index.js`).
  */
 function selectsMockedProject(selector: string): boolean {
   // A selector the shell can still expand (`$P`, a substitution, `{a,b}`, `?`/`[…]` globs) is
   // unknown here, so it fails closed. `*` stays: Playwright reads it as its own wildcard.
   if (!PW_PROJECT_LITERAL.test(selector)) return true;
-  const lower = selector.toLocaleLowerCase();
+  const lower = selector.toLowerCase();
   if (!lower.includes("*")) return lower.includes("mocked");
   const escaped = lower.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const pattern = new RegExp(`^${escaped.join(".*")}$`);
@@ -695,6 +769,9 @@ const MAX_RUNNER_DEPTH = 8;
 
 const RUNNER_DEPTH_MSG = `Package runners nested more than ${MAX_RUNNER_DEPTH} deep cannot be checked here. Run the inner command directly.`;
 
+const PREFIX_STEPS_MSG =
+  "This command's wrapper options (env, sudo, exec, time) have too many possible readings to check here. Write the command out without the wrapper options.";
+
 /** The whole Bash rule set. `depth` counts package runners already unwrapped. */
 export function checkBash(command: string, depth = 0): string | null {
   for (const raw of segments(command)) {
@@ -708,7 +785,7 @@ export function checkBash(command: string, depth = 0): string | null {
 function checkCommand(raw: string[], whole: string, depth: number): string | null {
   if (depth > MAX_RUNNER_DEPTH) return RUNNER_DEPTH_MSG;
   let expands = false;
-  const tokens = stripPrefix(raw, (split) => {
+  const readings = prefixReadings(raw, (split) => {
     // GNU `env -S` has its own grammar beyond quotes: `${NAME}` expansion, backslash
     // escapes (`\_` separates arguments, `\c` ends the string) and `#` comments. And the
     // operand reaches this point with its quotes already removed, so a brace, glob,
@@ -720,6 +797,16 @@ function checkCommand(raw: string[], whole: string, depth: number): string | nul
   if (expands) {
     return "`env -S` with `$`, `\\`, `#`, braces, globs, backticks or `~` uses expansion, escapes or comments this guard cannot follow, so the command it runs cannot be checked here. Write the command out without `env -S`.";
   }
+  if (readings === null) return PREFIX_STEPS_MSG;
+  for (const tokens of readings) {
+    const reason = checkTokens(tokens, whole, depth);
+    if (reason) return reason;
+  }
+  return null;
+}
+
+/** Checks one reading of a simple command, then every command a package runner can run. */
+function checkTokens(tokens: string[], whole: string, depth: number): string | null {
   if (tokens.length === 0) return null;
   const git = gitArgs(tokens);
   const reason =

@@ -121,7 +121,6 @@ import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import AlertReasonText from "@/components/AlertReasonText";
-import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { mergeDashboardChartReadingsWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 
 import { Button } from "@/components/ui/button";

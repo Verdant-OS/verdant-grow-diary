@@ -1636,6 +1636,7 @@ function QuickLogV2SheetForOwner({
     }
     if (photoValidationInFlightRef.current) {
       setLocalError("Wait for the photo check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     // Synchronous re-entry guard: prevents a rapid double-click from

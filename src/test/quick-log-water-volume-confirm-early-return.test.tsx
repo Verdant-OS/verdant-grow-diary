@@ -9,9 +9,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const rpcMock = vi.fn();
 const videoValidationMock = vi.fn();
 const wateringWriterMock = vi.fn();
+const pngGate = vi.hoisted(() => ({
+  pending: [] as Array<(result: { ok: true } | { ok: false; message: string }) => void>,
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
+  supabase: {
+    rpc: (...args: unknown[]) => rpcMock(...args),
+    storage: {
+      from: () => ({
+        upload: async (path: string) => ({ data: { path }, error: null }),
+        remove: async () => ({ data: [], error: null }),
+      }),
+    },
+  },
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
@@ -65,6 +76,21 @@ vi.mock("@/lib/videoAttachmentRules", async () => {
   };
 });
 
+vi.mock("@/lib/quickLogPhotoContentRules", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/quickLogPhotoContentRules")>(
+    "@/lib/quickLogPhotoContentRules",
+  );
+  return {
+    ...actual,
+    validateQuickLogPngClaim: (file: { name?: string | null; type?: string | null }) => {
+      if (!actual.fileClaimsPng(file)) return Promise.resolve({ ok: true as const });
+      return new Promise((resolve) => {
+        pngGate.pending.push(resolve);
+      });
+    },
+  };
+});
+
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 
 function renderSheet() {
@@ -103,6 +129,7 @@ beforeEach(() => {
       },
     },
   });
+  pngGate.pending.length = 0;
   rpcMock.mockReset();
   rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "event-1" }, error: null });
   wateringWriterMock.mockReset();
@@ -151,6 +178,35 @@ describe("large water confirm early return", () => {
 
     const confirm = screen.getByRole("button", { name: "Confirm amount" });
     expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("accepts Confirm again after the photo check blocked the first one", async () => {
+    renderSheet();
+    enterLargeWater();
+    const png = new File([new Uint8Array(16)], "roots.png", { type: "image/png" });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
+        target: { files: [png] },
+      });
+    });
+    expect(pngGate.pending).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm amount" }));
+    expect(
+      await screen.findByText("Wait for the photo check to finish before saving."),
+    ).toBeInTheDocument();
+    expect(wateringWriterMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pngGate.pending[0]?.({ ok: true });
+      await Promise.resolve();
+    });
+
+    const confirm = screen.getByRole("button", { name: "Confirm amount" });
+    expect(confirm).toBeEnabled();
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
     fireEvent.click(confirm);
     await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
   });

@@ -5,6 +5,7 @@ import WateringCadenceHistoryStrip from "@/components/WateringCadenceHistoryStri
 import DrybackMonitoringStrip from "@/components/DrybackMonitoringStrip";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
+import { formatTentHeaderDescription, formatTentLightLine } from "@/lib/tentDetailBlankFieldRules";
 import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/store/auth";
@@ -330,7 +331,7 @@ export default function TentDetail() {
       </Button>
       <PageHeader
         title={tent.name}
-        description={`${tent.brand} · ${tent.size}`}
+        description={formatTentHeaderDescription(tent.brand, tent.size)}
         icon={<Box className="h-5 w-5" />}
         actions={<StageBadge stage={tent.stage} />}
       />
@@ -432,7 +433,7 @@ export default function TentDetail() {
           <Lightbulb
             className={`h-3.5 w-3.5 ${tent.light.on ? "text-[hsl(var(--warning))]" : ""}`}
           />
-          {tent.light.schedule} · {tent.light.wattage}W
+          {formatTentLightLine(tent.light.schedule, tent.light.wattage)}
         </span>
       </div>
       {snap?.vpd !== null &&

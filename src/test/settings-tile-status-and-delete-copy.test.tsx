@@ -2,8 +2,9 @@
  * Settings copy from production QA 2026-10-14 (disposable Free-plan account):
  *  1. Status: destructive and not-ready tiles never claim "Available" / "live",
  *     and the Subscription tile names the plan once.
- *  2. Delete dialog: no billing or refund copy unless the plan is paid (or
- *     unknown); type-DELETE gating is unchanged.
+ *  2. Delete dialog: the confirm button names billing cancellation unless the
+ *     plan is confirmed Free; the conditional cancellation/refund disclosure
+ *     stays on every plan state; type-DELETE gating is unchanged.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
@@ -64,7 +65,7 @@ vi.mock("@/components/RewardedReferralCard", () => ({
 }));
 
 import Settings from "@/pages/Settings";
-import { deleteAccountDisclosesBilling } from "@/lib/settingsTilesRules";
+import { deleteAccountConfirmNamesBilling } from "@/lib/settingsTilesRules";
 
 function renderSettings() {
   return render(
@@ -121,12 +122,32 @@ describe("Settings tile status", () => {
 });
 
 describe("Delete account dialog billing copy", () => {
-  it("Free plan: plain 'Delete account' button and no billing or refund text", () => {
+  it("Free plan: plain 'Delete account' button", () => {
     renderSettings();
     const dialog = openDeleteDialog();
     const confirm = within(dialog).getByTestId("settings-delete-account-confirm");
     expect(confirm).toHaveTextContent(/^Delete account$/);
-    expect(dialog.textContent ?? "").not.toMatch(/Paddle|subscription|refund|billing/i);
+  });
+
+  // Codex P1 at 423b7526: a Free display plan is presentation-only. A
+  // cancelable public.subscriptions row the client adapter rejects (unknown
+  // price_id/status, malformed period), a sandbox row a live client never
+  // reads, or a legacy billing_subscriptions row all resolve to Free here, yet
+  // the delete-account Edge workflow still cancels every billable row. The
+  // client cannot prove billing absence, so the conditional disclosure stays
+  // on every plan state; only the confirm label varies.
+  it.each([
+    ["confirmed Free", {}],
+    ["paid", { displayPlanId: "pro_monthly" }],
+    ["loading", { loading: true }],
+    ["lookup failed", { lookupFailed: true }],
+    ["missing plan", { displayPlanId: null }],
+  ])("%s plan: keeps the cancellation and refund disclosure", (_label, patch) => {
+    Object.assign(ent, patch);
+    renderSettings();
+    const dialog = openDeleteDialog();
+    expect(dialog).toHaveTextContent(/Any recurring Paddle subscription is canceled/);
+    expect(dialog).toHaveTextContent(/does not automatically issue a refund/);
   });
 
   it("paid plan keeps the billing and refund disclosure", () => {
@@ -164,14 +185,25 @@ describe("Delete account dialog billing copy", () => {
     );
   });
 
-  it.each([null, undefined])("rule: settled lookup with plan %s still discloses billing", (id) => {
-    expect(
-      deleteAccountDisclosesBilling({ loading: false, lookupFailed: false, displayPlanId: id }),
-    ).toBe(true);
-    expect(
-      deleteAccountDisclosesBilling({ loading: false, lookupFailed: false, displayPlanId: "free" }),
-    ).toBe(false);
-  });
+  it.each([null, undefined])(
+    "rule: settled lookup with plan %s still names billing on the confirm",
+    (id) => {
+      expect(
+        deleteAccountConfirmNamesBilling({
+          loading: false,
+          lookupFailed: false,
+          displayPlanId: id,
+        }),
+      ).toBe(true);
+      expect(
+        deleteAccountConfirmNamesBilling({
+          loading: false,
+          lookupFailed: false,
+          displayPlanId: "free",
+        }),
+      ).toBe(false);
+    },
+  );
 
   it("keeps type-DELETE gating on the Free plan", () => {
     renderSettings();

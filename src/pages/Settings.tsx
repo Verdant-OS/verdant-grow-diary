@@ -29,7 +29,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
 import { PRICING_TIERS } from "@/config/pricing";
 import {
-  deleteAccountDisclosesBilling,
+  deleteAccountConfirmNamesBilling,
   describeSettingsTile,
   settingsTileAriaLabel,
   type SettingsTileState,
@@ -478,7 +478,7 @@ function DeleteAccountTile() {
   const previousOwner = useRef(user?.id);
   const activeRequest = useRef<ReturnType<typeof createAccountDeletionContinuation> | null>(null);
   const plan = useMyEntitlements();
-  const disclosesBilling = deleteAccountDisclosesBilling({
+  const confirmNamesBilling = deleteAccountConfirmNamesBilling({
     loading: plan.loading,
     lookupFailed: plan.lookupFailed,
     displayPlanId: plan.entitlement?.displayPlanId,
@@ -582,14 +582,8 @@ function DeleteAccountTile() {
             <DialogTitle>Delete your Verdant account?</DialogTitle>
             <DialogDescription>
               This permanently deletes your account, grows, tents, plants, diary entries, photos,
-              and sensor snapshots. This cannot be undone.
-              {disclosesBilling ? (
-                <>
-                  {" "}
-                  Any recurring Paddle subscription is canceled immediately before deletion.
-                  Deletion does not automatically issue a refund.
-                </>
-              ) : null}
+              and sensor snapshots. This cannot be undone. Any recurring Paddle subscription is
+              canceled immediately before deletion. Deletion does not automatically issue a refund.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-2">
@@ -627,7 +621,7 @@ function DeleteAccountTile() {
               aria-busy={busy}
               data-testid="settings-delete-account-confirm"
             >
-              {disclosesBilling
+              {confirmNamesBilling
                 ? busy
                   ? "Canceling billing and deleting…"
                   : "Cancel billing and delete"

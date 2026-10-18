@@ -46,12 +46,19 @@ export function settingsTileAriaLabel(name: string, state: SettingsTileState): s
 }
 
 /**
- * Whether the delete-account dialog must disclose billing cancellation and
- * refund terms. Hidden only when the plan is confirmed Free; a loading, failed
- * or unrecognised plan keeps the disclosure so a paying grower is never told
- * less than the truth.
+ * Whether the delete-account confirm button is labelled as a billing
+ * cancellation ("Cancel billing and delete"). Plain "Delete account" only when
+ * the plan is confirmed Free; a loading, failed or unrecognised plan keeps the
+ * billing label.
+ *
+ * This governs the LABEL only. The dialog's conditional cancellation and
+ * refund disclosure is shown on every plan state: a Free display plan is
+ * presentation-only and does not prove billing absence (a cancelable row the
+ * client adapter rejects, a sandbox row a live client never reads, or a legacy
+ * billing_subscriptions row all resolve to Free here), while the
+ * delete-account Edge workflow cancels every billable row it finds.
  */
-export function deleteAccountDisclosesBilling(input: {
+export function deleteAccountConfirmNamesBilling(input: {
   loading: boolean;
   lookupFailed: boolean;
   displayPlanId: string | null | undefined;

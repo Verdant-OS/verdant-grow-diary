@@ -157,7 +157,11 @@ vi.mock("@/components/GrowBreadcrumbs", () => ({ default: () => null }));
 vi.mock("@/components/EntryEditDialog", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogEntryIntegrityControls", () => ({ default: () => null }));
 vi.mock("@/components/ScopedGrowBanner", () => ({ default: () => null }));
-vi.mock("@/components/DiaryEntryBadges", () => ({ default: () => null }));
+vi.mock("@/components/DiaryEntryBadges", () => ({
+  default: ({ item }: { item: { eventType: string; tags: string[] } }) => (
+    <span data-testid="diary-badge-model">{`${item.eventType}|${item.tags.join(",")}`}</span>
+  ),
+}));
 vi.mock("@/components/EnvironmentCheckSnapshotLinkButton", () => ({ default: () => null }));
 vi.mock("@/components/AiDoctorCheckInTimelineBadge", () => ({ default: () => null }));
 vi.mock("@/components/AiDoctorReadinessTimelineBadge", () => ({ default: () => null }));
@@ -506,5 +510,8 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
     expect(card).toHaveTextContent("Feeding");
     expect(card).toHaveTextContent("Feed Volume: 750 ml");
     expect(card).not.toHaveTextContent("Water Volume: 750 ml");
+    // Codex P2 at 9aa6ecb1: the badge/FAQ model is built from the enriched
+    // row too, so it carries the recovered feeding identity, not a Note.
+    expect(screen.getByTestId("diary-badge-model").textContent?.split("|")[0]).toBe("feeding");
   });
 });

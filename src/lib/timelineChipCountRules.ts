@@ -49,6 +49,28 @@ export function timelineMeasurementChipCount(
 }
 
 /**
+ * Apply a diary edit to the photo-membership set. Only the delta between the
+ * row before and after the edit is applied, so a reference that lives
+ * outside the edited fields (e.g. a storage path held back for signing) is
+ * never dropped.
+ */
+export function applyTimelineDiaryPhotoEdit(
+  current: ReadonlySet<string>,
+  before: TimelinePhotoIdentityRow | null | undefined,
+  after: TimelinePhotoIdentityRow | null | undefined,
+  viewerUserId: string | null,
+): ReadonlySet<string> {
+  if (!before || !after || before.id !== after.id) return current;
+  const had = collectTimelineDiaryPhotoIds([before], viewerUserId).has(before.id);
+  const has = collectTimelineDiaryPhotoIds([after], viewerUserId).has(after.id);
+  if (had === has) return current;
+  const next = new Set(current);
+  if (has) next.add(after.id);
+  else next.delete(after.id);
+  return next;
+}
+
+/**
  * Ids whose saved photo reference is displayable. Call this on the rows
  * returned by the diary read, before storage paths are cleared for signing.
  */
@@ -90,9 +112,18 @@ export function dedupeAlertEventsForTimeline<
   T extends { id: string; alert_id: string; event_type: string; created_at: string },
 >(events: readonly T[] | null | undefined): T[] {
   if (!Array.isArray(events) || events.length === 0) return [];
-  const sorted = [...events].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  // Newest first; ties (and unparseable times, sorted oldest) break by id so
+  // the surviving 'created' row never depends on database response order.
+  const time = (value: string) => {
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY;
+  };
+  const sorted = [...events].sort((a, b) => {
+    const ta = time(a.created_at);
+    const tb = time(b.created_at);
+    if (ta !== tb) return tb > ta ? 1 : -1;
+    return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+  });
   // Keep the earliest 'created' event per alert_id so historical duplicate
   // 'created' rows never render 2x–3x on the Timeline.
   const earliestCreatedIdByAlert = new Map<string, string>();

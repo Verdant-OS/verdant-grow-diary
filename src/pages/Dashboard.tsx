@@ -274,7 +274,7 @@ export default function Dashboard() {
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
-  const targetsState = useGrowTargets(scopedGrowId ?? null);
+  const targetsState = useGrowTargets(scopedGrowId ?? null, { retryOnUnavailable: true });
   const targetsPending = targetsState.status !== "ok";
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);

@@ -470,4 +470,37 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
     const deduped = dedupeAlertEventsForTimeline(events);
     expect(deduped.map((e) => e.id)).toEqual(["ev-ack", "ev-other-created", "ev-created-1"]);
   });
+
+  it("keeps the earliest CREATED event deterministically when created_at ties, regardless of input order (#2165)", () => {
+    const tie = "2026-10-15T12:00:00.000Z";
+    const a = { id: "ev-a", alert_id: "alert-1", event_type: "created", created_at: tie };
+    const b = { id: "ev-b", alert_id: "alert-1", event_type: "created", created_at: tie };
+    const bad = { id: "ev-0", alert_id: "alert-2", event_type: "created", created_at: "nope" };
+    const forward = dedupeAlertEventsForTimeline([a, b, bad]).map((e) => e.id);
+    const reverse = dedupeAlertEventsForTimeline([bad, b, a]).map((e) => e.id);
+    expect(forward).toEqual(reverse);
+    expect(forward.filter((id) => id.startsWith("ev-a") || id.startsWith("ev-b"))).toHaveLength(1);
+    expect(forward).toContain("ev-0");
+  });
+
+  it("never renders a signed zero in a target-breach reason (#2179)", () => {
+    const snap = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual" as const,
+      ts: "2026-10-15T12:00:00.000Z",
+      temp: 24,
+      rh: 60,
+      soil_temp: -0.001,
+    };
+    const derived = buildEnvironmentAlerts({
+      snapshot: snap,
+      quality: evaluateSensorQuality(snap),
+      targets: compareSnapshotToTargets(snap, { soil_temp: { min: 18, max: 24 } }),
+      stage: "veg",
+      includeConfiguredRangeInTargetBreachReason: true,
+    });
+    const reasons = derived.map((d) => d.reason).join(" | ");
+    expect(reasons).toContain("Observed 0°C");
+    expect(reasons).not.toContain("-0°C");
+  });
 });

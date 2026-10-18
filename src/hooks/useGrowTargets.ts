@@ -8,10 +8,11 @@
  * Read-only: SELECT only. No ai-coach call. No external-control surface.
  * No elevated keys. No new write paths.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import type { GrowTargets, MetricKey } from "@/lib/environmentTargetComparison";
+import { growTargetsRetryDelayMs } from "@/lib/growTargetsRetryRules";
 
 type InnerState =
   | { status: "idle"; targets: GrowTargets | null }
@@ -50,7 +51,21 @@ export function normalizeTargetsRow(row: Record<string, unknown> | null): GrowTa
   return Object.keys(out).length > 0 ? out : null;
 }
 
-export function useGrowTargets(growId: string | null | undefined): TargetsState {
+export interface UseGrowTargetsOptions {
+  /**
+   * Retry an "unavailable" read on a bounded backoff (growTargetsRetryRules).
+   * Used by fail-closed alert persistence so a transient error cannot leave
+   * it skipped for the rest of the mounted session.
+   */
+  retryOnUnavailable?: boolean;
+}
+
+export function useGrowTargets(
+  growId: string | null | undefined,
+  options: UseGrowTargetsOptions = {},
+): TargetsState {
+  const retryOnUnavailable = options.retryOnUnavailable === true;
+  const retryAttemptRef = useRef(0);
   const { user } = useAuth();
   const [state, setState] = useState<InnerState>({
     status: "idle",
@@ -83,8 +98,21 @@ export function useGrowTargets(growId: string | null | undefined): TargetsState 
   }, [user, growId]);
 
   useEffect(() => {
+    retryAttemptRef.current = 0;
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (state.status === "ok") retryAttemptRef.current = 0;
+    if (!retryOnUnavailable || state.status !== "unavailable") return;
+    const delay = growTargetsRetryDelayMs(retryAttemptRef.current);
+    if (delay === null) return;
+    const timer = window.setTimeout(() => {
+      retryAttemptRef.current += 1;
+      load();
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [state.status, retryOnUnavailable, load]);
 
   return { ...state, reload: load };
 }

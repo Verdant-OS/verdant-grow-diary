@@ -102,7 +102,8 @@ function fmtTargetNum(v: number, unit: string): string {
   const s = Number.isInteger(v)
     ? String(v)
     : (Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1)).replace(/\.?0+$/, "");
-  return `${s}${unit}`;
+  // A tiny negative value rounds to "-0"; never render a signed zero.
+  return `${s === "-0" ? "0" : s}${unit}`;
 }
 
 function buildTargetBreachReason(

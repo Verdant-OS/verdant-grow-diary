@@ -61,7 +61,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
   const snapshot = buildSensorSnapshotReadState(sensorState).confirmedSnapshot;
-  const targetsState = useGrowTargets(safeGrowId);
+  const targetsState = useGrowTargets(safeGrowId, { retryOnUnavailable: true });
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement.
   const plantStages = safeGrowId ? resolveGrowPlantStages(plants, safeGrowId, tents) : plants;

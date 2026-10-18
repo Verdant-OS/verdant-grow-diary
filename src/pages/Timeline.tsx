@@ -130,6 +130,7 @@ import {
   collectTimelineDiaryPhotoIds,
   dedupeAlertEventsForTimeline,
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  applyTimelineDiaryPhotoEdit,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
   timelineMeasurementChipCount,
@@ -1707,8 +1708,10 @@ export default function Timeline() {
   // future-proof empty/limited disclosure. Includes invalid entries so
   // malformed diary rows still surface as "Limited data" instead of vanishing.
   const normalizedById = useMemo(() => {
+    // Built from enrichedEntries so a linked feeding companion's recovered
+    // type reaches DiaryEntryBadges and the FAQ model, not just the card.
     const items = buildGrowDiaryTimeline({
-      rawEntries: entries.map((e) => ({
+      rawEntries: enrichedEntries.map((e) => ({
         id: e.id,
         grow_id: activeGrowId ?? null,
         plant_id: e.plant_id,
@@ -1725,7 +1728,7 @@ export default function Timeline() {
     const map = new Map<string, (typeof items)[number]>();
     items.forEach((it) => map.set(it.id, it));
     return map;
-  }, [entries, activeGrowId]);
+  }, [enrichedEntries, activeGrowId]);
 
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
@@ -3215,11 +3218,17 @@ export default function Timeline() {
         onOpenChange={(o) => {
           if (!o) setEditingId(null);
         }}
-        onSaved={(patch) =>
+        onSaved={(patch) => {
+          const before = entries.find((r) => r.id === patch.id);
+          if (before) {
+            setDiaryPhotoIds((current) =>
+              applyTimelineDiaryPhotoEdit(current, before, { ...before, ...patch }, user),
+            );
+          }
           setEntries((rows) =>
             rows.map((r) => (r.id === patch.id ? ({ ...r, ...patch } as Entry) : r)),
-          )
-        }
+          );
+        }}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
       />
       {lightboxIndex >= 0 && lightboxItems.length > 0 && (

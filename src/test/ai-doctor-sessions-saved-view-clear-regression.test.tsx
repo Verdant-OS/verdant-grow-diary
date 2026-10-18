@@ -14,6 +14,7 @@ import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import { DEFAULT_FILTERS } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
+  BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
   BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID,
   SAVED_VIEWS_STORAGE_KEY,
 } from "@/lib/aiDoctorSessionsSavedViewsRules";
@@ -80,32 +81,58 @@ beforeEach(() => {
   }
 });
 
+// Each built-in view and the filter selects it moves off their defaults.
+const VIEW_FILTERS = [
+  {
+    id: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
+    changed: {
+      "ai-doctor-sessions-index-filter-caution": "yes",
+      "ai-doctor-sessions-index-filter-has-checklist": "yes",
+    },
+  },
+  {
+    id: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID,
+    changed: { "ai-doctor-sessions-index-filter-review-status": "needs_follow_up" },
+  },
+] as const;
+
+const DEFAULT_BY_TEST_ID: Record<string, string> = {
+  "ai-doctor-sessions-index-filter-risk": DEFAULT_FILTERS.risk,
+  "ai-doctor-sessions-index-filter-needs-review": DEFAULT_FILTERS.needsReview,
+  "ai-doctor-sessions-index-filter-caution": DEFAULT_FILTERS.caution,
+  "ai-doctor-sessions-index-filter-has-checklist": DEFAULT_FILTERS.hasChecklist,
+  "ai-doctor-sessions-index-filter-review-status": DEFAULT_FILTERS.reviewStatus,
+};
+
+const filterValue = (id: string) => (screen.getByTestId(id) as HTMLSelectElement).value;
+
 describe("AiDoctorSessionsIndex — saved-view clear regression", () => {
-  it("choosing the empty option removes built-in badge and clear-filters chrome", async () => {
-    renderPage();
-    await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
+  it.each(VIEW_FILTERS)(
+    "choosing the empty option after $id resets the filters it changed and the view chrome",
+    async ({ id, changed }) => {
+      renderPage();
+      await screen.findByTestId("ai-doctor-sessions-index-list");
+      const select = screen.getByTestId(
+        "ai-doctor-sessions-saved-views-select",
+      ) as HTMLSelectElement;
 
-    fireEvent.change(select, { target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID } });
-    await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge");
-    expect(screen.getByTestId("ai-doctor-sessions-index-clear-filters")).toBeTruthy();
+      fireEvent.change(select, { target: { value: id } });
+      await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge");
+      expect(screen.getByTestId("ai-doctor-sessions-index-clear-filters")).toBeTruthy();
+      // The view really moved these filters off their defaults.
+      for (const [testId, value] of Object.entries(changed)) {
+        expect(filterValue(testId)).toBe(value);
+        expect(value).not.toBe(DEFAULT_BY_TEST_ID[testId]);
+      }
 
-    fireEvent.change(select, { target: { value: "" } });
+      fireEvent.change(select, { target: { value: "" } });
 
-    await waitFor(() => expect(select.value).toBe(""));
-    expect(screen.queryByTestId("ai-doctor-sessions-saved-views-builtin-badge")).toBeNull();
-    expect(screen.queryByTestId("ai-doctor-sessions-index-clear-filters")).toBeNull();
-    const filterValue = (id: string) => (screen.getByTestId(id) as HTMLSelectElement).value;
-    expect(filterValue("ai-doctor-sessions-index-filter-risk")).toBe(DEFAULT_FILTERS.risk);
-    expect(filterValue("ai-doctor-sessions-index-filter-needs-review")).toBe(
-      DEFAULT_FILTERS.needsReview,
-    );
-    expect(filterValue("ai-doctor-sessions-index-filter-caution")).toBe(DEFAULT_FILTERS.caution);
-    expect(filterValue("ai-doctor-sessions-index-filter-has-checklist")).toBe(
-      DEFAULT_FILTERS.hasChecklist,
-    );
-    expect(filterValue("ai-doctor-sessions-index-filter-review-status")).toBe(
-      DEFAULT_FILTERS.reviewStatus,
-    );
-  });
+      await waitFor(() => expect(select.value).toBe(""));
+      expect(screen.queryByTestId("ai-doctor-sessions-saved-views-builtin-badge")).toBeNull();
+      expect(screen.queryByTestId("ai-doctor-sessions-index-clear-filters")).toBeNull();
+      for (const [testId, value] of Object.entries(DEFAULT_BY_TEST_ID)) {
+        expect(filterValue(testId)).toBe(value);
+      }
+    },
+  );
 });

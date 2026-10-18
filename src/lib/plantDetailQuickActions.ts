@@ -119,6 +119,21 @@ const LABELS: Record<PlantDetailQuickActionKind, { label: string; description: s
   },
 };
 
+/** One sensors-page manual reading href for plant-page snapshot links. */
+export function buildPlantManualReadingHref(input: {
+  tentId?: string | null;
+  growId?: string | null;
+}): string {
+  const tentId = input.tentId ?? null;
+  const growId = input.growId ?? null;
+  const tentScopedSensorsHref = buildSensorsTentRouteHref(tentId, {
+    requireExactMatch: true,
+  });
+  return `${
+    tentScopedSensorsHref === SENSORS_TENT_ROUTE ? sensorsPath(growId) : tentScopedSensorsHref
+  }#manual-reading`;
+}
+
 /** Deterministic Plant Detail quick-action list. */
 export function buildPlantDetailQuickActions(
   input: PlantDetailQuickActionsInput,
@@ -129,12 +144,7 @@ export function buildPlantDetailQuickActions(
   const tentId = input.tentId ?? null;
   const tentName = input.tentName ?? null;
   const hasTimelineSection = input.hasTimelineSection ?? true;
-  const tentScopedSensorsHref = buildSensorsTentRouteHref(tentId, {
-    requireExactMatch: true,
-  });
-  const manualSensorSnapshotHref = `${
-    tentScopedSensorsHref === SENSORS_TENT_ROUTE ? sensorsPath(growId) : tentScopedSensorsHref
-  }#manual-reading`;
+  const manualSensorSnapshotHref = buildPlantManualReadingHref({ tentId, growId });
 
   const quickLogPayload = buildPlantQuickLogPrefill({
     plantId,
@@ -142,6 +152,22 @@ export function buildPlantDetailQuickActions(
     growId,
     tentId,
     tentName,
+  });
+  const photoLogPayload = buildPlantQuickLogPrefill({
+    plantId,
+    plantName,
+    growId,
+    tentId,
+    tentName,
+    activityId: "photo",
+  });
+  const harvestLogPayload = buildPlantQuickLogPrefill({
+    plantId,
+    plantName,
+    growId,
+    tentId,
+    tentName,
+    activityId: "harvest",
   });
   const quickLogDisabledReason = !plantId
     ? "Plant context is not loaded yet."
@@ -176,7 +202,7 @@ export function buildPlantDetailQuickActions(
       // is the safest existing entry point — no new upload route, no direct
       // storage writes from here.
       event: "open-quicklog",
-      eventPayload: quickLogPayload,
+      eventPayload: photoLogPayload,
       testId: "plant-detail-quick-action-upload-photo",
       disabled: !quickLogPayload,
       disabledReason: quickLogDisabledReason,
@@ -200,13 +226,11 @@ export function buildPlantDetailQuickActions(
       disabledReason: hasTimelineSection ? undefined : "Timeline section is not available yet.",
     },
     {
-      // Harvest is fully backed by quicklog_save_event now; this entry
-      // point opens the shared Quick Log flow with plant/tent/grow
-      // context. Activity preselection inside the dialog is a follow-up.
+      // Harvest opens the shared Quick Log on the harvest activity.
       kind: "harvest",
       ...LABELS.harvest,
       event: "open-quicklog",
-      eventPayload: quickLogPayload,
+      eventPayload: harvestLogPayload,
       testId: "plant-detail-quick-action-harvest",
       disabled: !quickLogPayload,
       disabledReason: quickLogDisabledReason,

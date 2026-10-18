@@ -114,7 +114,9 @@ describe("AUD-P3 settings tile copy", () => {
     );
     const tiles = screen.getAllByTestId("settings-tile");
     const states = tiles.map((t) => t.getAttribute("data-tile-state"));
-    expect(new Set(states)).toEqual(new Set(["available"]));
+    // Delete account and Refer a friend carry no status badge (QA 2026-10-14);
+    // every tile that does carry one is a shipped, available setting.
+    expect(new Set(states)).toEqual(new Set(["available", null]));
 
     // Profile is available and live
     const profile = tiles.find((t) => within(t).queryByText("Profile"));

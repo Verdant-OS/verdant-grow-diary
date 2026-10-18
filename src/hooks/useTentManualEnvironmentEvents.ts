@@ -23,10 +23,18 @@ export async function fetchTentManualEnvironmentEvents(
     .eq("is_deleted", false)
     .eq("event_type", "environment")
     .order("occurred_at", { ascending: false })
+    // occurred_at is not unique (backdated Quick Logs can share a time), so
+    // a unique final key keeps the limited subset deterministic.
+    .order("id", { ascending: true })
     .limit(limit);
   if (error) throw error;
   return parseTentManualEnvironmentEvents((data ?? []) as TentManualEnvEventRow[]);
 }
+
+export const TENT_MANUAL_ENVIRONMENT_EVENTS_QUERY_KEY_PREFIX = [
+  "grow_events",
+  "tent-manual-environment-events",
+] as const;
 
 /**
  * Quick Log manual readings for this tent. They live only in grow_events +
@@ -39,7 +47,14 @@ export function useTentManualEnvironmentEvents(
 ): UseQueryResult<TentManualEnvironmentEvent[]> {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["tent-manual-environment-events", tentId ?? "none", user?.id ?? "anon"],
+    // Prefixed with "grow_events" so the frozen Quick Log post-save refresh
+    // (applyQuickLogV2Refresh, which always invalidates ["grow_events"])
+    // refetches this read without a second refresh path.
+    queryKey: [
+      ...TENT_MANUAL_ENVIRONMENT_EVENTS_QUERY_KEY_PREFIX,
+      tentId ?? "none",
+      user?.id ?? "anon",
+    ],
     enabled: !!tentId,
     queryFn: () => fetchTentManualEnvironmentEvents(tentId as string),
   });

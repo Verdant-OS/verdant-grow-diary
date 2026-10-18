@@ -18,14 +18,19 @@ const db = vi.hoisted(() => ({
   reads: [] as string[],
   failTables: new Set<string>(),
   holdTables: new Set<string>(),
+  orders: [] as Array<{ table: string; column: string; ascending: boolean | undefined }>,
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
   function makeQuery(table: string) {
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "or", "not", "is", "in", "order", "neq", "gte", "lte"]) {
+    for (const m of ["select", "eq", "or", "not", "is", "in", "neq", "gte", "lte"]) {
       q[m] = () => q;
     }
+    q.order = (column: string, opts?: { ascending?: boolean }) => {
+      db.orders.push({ table, column, ascending: opts?.ascending });
+      return q;
+    };
     q.limit = () => {
       db.reads.push(table);
       if (db.holdTables.has(table)) return new Promise(() => {});
@@ -75,6 +80,7 @@ beforeEach(() => {
   db.reads = [];
   db.failTables = new Set();
   db.holdTables = new Set();
+  db.orders = [];
 });
 afterEach(() => cleanup());
 
@@ -298,5 +304,37 @@ describe("tent manual snapshot history — both sources gate the read state", ()
       expect(screen.queryByTestId("tent-manual-snapshot-history-error")).toBeNull(),
     );
     expect(screen.queryByTestId("tent-manual-snapshot-history-empty")).toBeNull();
+  });
+});
+
+import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { fetchTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+
+describe("tent manual environment events — Codex review on #2114", () => {
+  it("orders by a unique id after occurred_at before limiting", async () => {
+    await fetchTentManualEnvironmentEvents(TENT_ID);
+    const cols = db.orders.filter((o) => o.table === "grow_events").map((o) => o.column);
+    expect(cols).toEqual(["occurred_at", "id"]);
+  });
+
+  it("refetches after the frozen Quick Log post-save refresh runs for this tent", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    function Probe() {
+      const q = useTentManualEnvironmentEvents(TENT_ID);
+      return <p data-testid="probe-count">{q.data?.length ?? -1}</p>;
+    }
+    render(
+      <QueryClientProvider client={qc}>
+        <Probe />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("probe-count").textContent).toBe("0"));
+    const readsBefore = db.reads.filter((t) => t === "grow_events").length;
+
+    db.byTable = { grow_events: [eventRow("2026-10-14T10:00:00.000Z")] };
+    applyQuickLogV2Refresh(qc, { targetType: "tent", targetId: TENT_ID, tentId: TENT_ID });
+
+    await waitFor(() => expect(screen.getByTestId("probe-count").textContent).toBe("1"));
+    expect(db.reads.filter((t) => t === "grow_events").length).toBe(readsBefore + 1);
   });
 });

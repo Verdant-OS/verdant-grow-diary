@@ -2,9 +2,11 @@
  * Production QA 2026-10-14 (disposable Free account): /sensors rendered the
  * EcoWitt testbench & setup panel (backend URL, ingest endpoint, Mint token,
  * curl/PowerShell copy) to a Free grower. The panel is a live-sensor setup
- * surface, so it is shown only when the grower's entitlement carries the
- * `liveSensors` capability (the same capability the ingest Edge functions
- * and the token mint enforce server-side).
+ * surface, so it mounts only after the server-authoritative
+ * live-sensor-entitlement preflight (useLiveSensorServerGate) returns
+ * "allowed" (the same canonical-subscription resolution mint-bridge-token
+ * and the ingest Edge functions enforce). The client useMyEntitlements
+ * capability map, which carries a presentation-only staff lift, is ignored.
  */
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -93,15 +95,37 @@ vi.mock("@/components/SensorsTestbenchPanel", () => ({
   default: () => <div data-testid="sensors-testbench-panel">EcoWitt testbench &amp; setup</div>,
 }));
 
-const entitlementState = { liveSensors: false, loading: false };
+// Client entitlement map: presentation-only. A staff account resolves
+// liveSensors: true here even without a paid subscription.
+const entitlementState = { liveSensors: false };
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
-    loading: entitlementState.loading,
+    loading: false,
     lookupFailed: false,
     entitlement: { capabilities: { liveSensors: entitlementState.liveSensors } },
     refetch: vi.fn(),
   }),
 }));
+
+// Server-authoritative preflight (live-sensor-entitlement Edge function).
+const serverGate = vi.hoisted(() => ({
+  state: "denied" as string,
+  result: null as Record<string, unknown> | null,
+}));
+vi.mock("@/hooks/useLiveSensorServerGate", () => ({
+  useLiveSensorServerGate: () => ({
+    state: serverGate.state,
+    result: serverGate.result,
+    recheck: vi.fn(),
+  }),
+}));
+
+const ALLOWED_RESULT = {
+  ok: true,
+  state: "allowed",
+  reason: null,
+  displayPlanId: "pro_monthly",
+};
 
 function renderAt(url: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -118,22 +142,48 @@ describe("Sensors page — EcoWitt testbench panel entitlement gate", () => {
   beforeEach(() => {
     operatorRoleState.status = "denied";
     entitlementState.liveSensors = false;
-    entitlementState.loading = false;
+    serverGate.state = "denied";
+    serverGate.result = { ok: false, state: "denied", reason: "upgrade_required" };
   });
 
-  it("hides the testbench panel from a grower without the liveSensors capability", () => {
+  it("hides the testbench panel when the server preflight denies (Free plan)", () => {
     renderAt("/sensors");
     expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
   });
 
-  it("hides the testbench panel while the entitlement is still loading", () => {
-    entitlementState.loading = true;
-    renderAt("/sensors");
-    expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
-  });
-
-  it("shows the testbench panel to a grower whose plan carries liveSensors", () => {
+  // Codex P2 at 79236e8f: loading is pinned independently of denial. The
+  // client capability is true and a stale allowed result is present, so only
+  // the completed-lookup requirement keeps the panel hidden.
+  it("hides the testbench panel while the server preflight is still loading", () => {
     entitlementState.liveSensors = true;
+    serverGate.state = "loading";
+    serverGate.result = ALLOWED_RESULT;
+    renderAt("/sensors");
+    expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
+  });
+
+  // Codex P2 at 79236e8f: useMyEntitlements lifts staff to liveSensors: true,
+  // but mint-bridge-token and ingest reject them with upgrade_required.
+  it("hides the testbench panel for a staff lift the server rejects", () => {
+    entitlementState.liveSensors = true;
+    renderAt("/sensors");
+    expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
+  });
+
+  it.each(["invalid_request", "network_error"])(
+    "hides the testbench panel when the server preflight returns %s",
+    (state) => {
+      entitlementState.liveSensors = true;
+      serverGate.state = state;
+      serverGate.result = { ok: false, state, reason: state };
+      renderAt("/sensors");
+      expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
+    },
+  );
+
+  it("shows the testbench panel when the server preflight allows the active tent", () => {
+    serverGate.state = "allowed";
+    serverGate.result = ALLOWED_RESULT;
     renderAt("/sensors");
     expect(screen.getByTestId("sensors-testbench-panel")).toBeInTheDocument();
   });

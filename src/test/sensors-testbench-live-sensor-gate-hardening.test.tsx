@@ -2,18 +2,15 @@
  * Regression hardening for the Sensors page EcoWitt testbench entitlement gate
  * (see sensors-testbench-live-sensor-gate.test.tsx for the primary behavioral pins).
  *
- * Covers tent-selection prerequisites and static wiring so a Free grower cannot
- * see mint/token setup surfaces again when entitlement or tent context is incomplete.
+ * Covers tent-selection prerequisites and the server-gate wiring (rendered
+ * behavior, not source text) so a Free grower cannot see mint/token setup
+ * surfaces again when entitlement or tent context is incomplete.
  */
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Sensors from "@/pages/Sensors";
-
-const SENSORS_PAGE = readFileSync(resolve(process.cwd(), "src/pages/Sensors.tsx"), "utf8");
 
 const operatorRoleState: {
   status: "loading" | "granted" | "denied" | "unauthenticated" | "error";
@@ -88,16 +85,25 @@ vi.mock("@/components/SensorsTestbenchPanel", () => ({
   default: () => <div data-testid="sensors-testbench-panel">EcoWitt testbench &amp; setup</div>,
 }));
 
-const entitlementState = { liveSensors: false, loading: false, entitlementNull: false };
+const entitlementState = { liveSensors: false };
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
-    loading: entitlementState.loading,
-    lookupFailed: entitlementState.entitlementNull,
-    entitlement: entitlementState.entitlementNull
-      ? null
-      : { capabilities: { liveSensors: entitlementState.liveSensors } },
+    loading: false,
+    lookupFailed: false,
+    entitlement: { capabilities: { liveSensors: entitlementState.liveSensors } },
     refetch: vi.fn(),
   }),
+}));
+
+const serverGate = vi.hoisted(() => ({
+  state: "denied" as string,
+  calls: [] as Array<[string, Record<string, unknown>]>,
+}));
+vi.mock("@/hooks/useLiveSensorServerGate", () => ({
+  useLiveSensorServerGate: (surface: string, scope: Record<string, unknown> = {}) => {
+    serverGate.calls.push([surface, scope]);
+    return { state: serverGate.state, result: null, recheck: vi.fn() };
+  },
 }));
 
 function renderAt(url: string) {
@@ -111,50 +117,58 @@ function renderAt(url: string) {
   );
 }
 
-describe("Sensors page — EcoWitt testbench gate hardening", () => {
-  beforeEach(() => {
-    operatorRoleState.status = "denied";
-    entitlementState.liveSensors = false;
-    entitlementState.loading = false;
-    entitlementState.entitlementNull = false;
-    sensorPageState.tentsLoading = false;
-    sensorPageState.tentsEmpty = false;
-    sensorPageState.tentsError = false;
-  });
+function resetState() {
+  operatorRoleState.status = "denied";
+  entitlementState.liveSensors = false;
+  serverGate.state = "denied";
+  serverGate.calls = [];
+  sensorPageState.tentsLoading = false;
+  sensorPageState.tentsEmpty = false;
+  sensorPageState.tentsError = false;
+}
 
-  it("hides the testbench panel when liveSensors is granted but no tent is selected yet", () => {
-    entitlementState.liveSensors = true;
+describe("Sensors page — EcoWitt testbench gate hardening", () => {
+  beforeEach(resetState);
+
+  it("hides the testbench panel when the server allows but no tent is selected yet", () => {
+    serverGate.state = "allowed";
     sensorPageState.tentsEmpty = true;
     renderAt("/sensors");
     expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
   });
 
-  it("hides the testbench panel when liveSensors is granted but grow tents are still loading", () => {
-    entitlementState.liveSensors = true;
+  it("hides the testbench panel when the server allows but grow tents are still loading", () => {
+    serverGate.state = "allowed";
     sensorPageState.tentsLoading = true;
     renderAt("/sensors");
     expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
   });
 
-  it("fails closed when entitlement lookup returns null after loading", () => {
-    entitlementState.entitlementNull = true;
+  it("fails closed on an unrecognised server gate state", () => {
+    entitlementState.liveSensors = true;
+    serverGate.state = "unexpected";
     renderAt("/sensors");
     expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
   });
 });
 
-describe("Sensors page — EcoWitt testbench panel wiring (static)", () => {
-  it("reads liveSensors from useMyEntitlements with a strict true gate", () => {
-    expect(SENSORS_PAGE).toMatch(/useMyEntitlements\s*\(\s*\)/);
-    expect(SENSORS_PAGE).toMatch(/capabilities\?\.liveSensors\s*===\s*true/);
+// Codex P2 at 79236e8f: these replace source-text regexes over Sensors.tsx
+// with rendered behavior, so a commented-out or duplicated gate cannot pass.
+describe("Sensors page — EcoWitt testbench server-gate wiring (behavioral)", () => {
+  beforeEach(resetState);
+
+  it("queries the live-sensor server preflight scoped to the active tent", () => {
+    renderAt("/sensors");
+    expect(serverGate.calls).toContainEqual([
+      "live_sensor_stream",
+      { tentId: STABLE_GROW_TENTS[0].id },
+    ]);
   });
 
-  it("mounts SensorsTestbenchPanel only behind canShowTestbench and an active tent", () => {
-    expect(SENSORS_PAGE).toMatch(/\{canShowTestbench\s*&&\s*selectedTent\s*&&\s*activeTentId\s*&&/);
-    const panelIdx = SENSORS_PAGE.indexOf("<SensorsTestbenchPanel");
-    const gateIdx = SENSORS_PAGE.indexOf("canShowTestbench");
-    expect(panelIdx).toBeGreaterThan(-1);
-    expect(gateIdx).toBeGreaterThan(-1);
-    expect(panelIdx).toBeGreaterThan(gateIdx);
+  it("follows the server decision, not the client capability map", () => {
+    // Client capability false, server allowed: the server is the authority.
+    serverGate.state = "allowed";
+    renderAt("/sensors");
+    expect(screen.getByTestId("sensors-testbench-panel")).toBeInTheDocument();
   });
 });

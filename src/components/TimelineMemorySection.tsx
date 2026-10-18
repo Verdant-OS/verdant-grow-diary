@@ -29,6 +29,7 @@ import {
   TIMELINE_FILTER_RESET_KEY,
 } from "@/lib/timelineFilterViewModel";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import { buildTimelinePhotoPreviewViewModel } from "@/lib/timelinePhotoPreviewViewModel";
 import { buildTimelineDayGroups } from "@/lib/timelineDayGroupingViewModel";
@@ -54,8 +55,13 @@ function toScope(props: Props): TimelineMemoryScope | null {
   return props.tentId ? { kind: "tent", tentId: props.tentId } : null;
 }
 
-function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "diary" }> }) {
-  const temperatureUnit = useTemperatureUnitPreference();
+function DiaryItemRow({
+  item,
+  temperatureUnit,
+}: {
+  item: Extract<TimelineMemoryItem, { kind: "diary" }>;
+  temperatureUnit: TemperatureUnitPreference;
+}) {
   const sensorVm = useMemo(
     () =>
       buildTimelineSensorSnapshotViewModel(item.sensorSnapshot, {
@@ -343,6 +349,9 @@ export default function TimelineMemorySection(props: Props) {
   // companion is rendered once, by QuickLogGroupedTimelineSection.
   const timelineDisplayItems = displayItems ?? items;
   const [filter, setFilter] = useState<TimelineFilterKey>(TIMELINE_FILTER_RESET_KEY);
+  // One subscription for the whole section so diary chips and manual
+  // snapshot cards re-render together and never show mixed units.
+  const temperatureUnit = useTemperatureUnitPreference();
 
   const chips = useMemo(
     () => buildTimelineFilterChips(timelineDisplayItems, filter),
@@ -471,7 +480,10 @@ export default function TimelineMemorySection(props: Props) {
                       {group.items.map((item) =>
                         item.kind === "manual_sensor_snapshot" ? (
                           <li key={`snap:${item.key}`}>
-                            <ManualSnapshotTimelineCard card={item.card} />
+                            <ManualSnapshotTimelineCard
+                              card={item.card}
+                              temperatureUnit={temperatureUnit}
+                            />
                           </li>
                         ) : item.kind === "ai_doctor_sensor_evidence_audit" ? (
                           <li key={`aiaudit:${item.key}`}>
@@ -479,7 +491,7 @@ export default function TimelineMemorySection(props: Props) {
                           </li>
                         ) : item.kind === "diary" ? (
                           <li key={`diary:${item.key}`}>
-                            <DiaryItemRow item={item} />
+                            <DiaryItemRow item={item} temperatureUnit={temperatureUnit} />
                           </li>
                         ) : (
                           <li

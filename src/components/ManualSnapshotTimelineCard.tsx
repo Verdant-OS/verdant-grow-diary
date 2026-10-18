@@ -24,6 +24,8 @@ import {
 import { formatSensorFieldLabel } from "@/constants/sensorFields";
 import { DERIVED_LABEL, formatSensorValue } from "@/lib/sensorFormat";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { buildManualSensorProvenanceLabels } from "@/lib/manualSensorProvenanceRules";
 import {
   evaluateManualSensorSnapshotQuality,
@@ -79,6 +81,12 @@ interface Props {
    * caller must supply real IDs.
    */
   originalReadingIds?: Partial<Record<string, string>>;
+  /**
+   * Temperature display unit chosen by a parent that already subscribes
+   * to the preference, so sibling rows on one screen share one unit.
+   * When omitted the card subscribes itself and re-renders on a change.
+   */
+  temperatureUnit?: TemperatureUnitPreference;
 }
 
 function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
@@ -91,7 +99,10 @@ export default function ManualSnapshotTimelineCard({
   card,
   editSummary,
   originalReadingIds,
+  temperatureUnit: temperatureUnitProp,
 }: Props) {
+  const subscribedTemperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnit = temperatureUnitProp ?? subscribedTemperatureUnit;
   // Build correction context ONLY from real caller-supplied UUIDs and
   // real captured numeric values. Never infer IDs from timestamp/metric.
   const correctionHash = useMemo(() => {
@@ -251,7 +262,7 @@ export default function ManualSnapshotTimelineCard({
                 <span className="font-medium">{formatSensorFieldLabel(r.field)}</span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="tabular-nums text-muted-foreground">
-                    {formatSensorValue(r.field, r.value)}
+                    {formatSensorValue(r.field, r.value, temperatureUnit)}
                   </span>
                   {r.derived && (
                     <Badge

@@ -26,6 +26,7 @@ import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
 import {
   convertCelsiusForDisplay,
   getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
 const UNIT_BY_FIELD: Record<SensorFieldKey, string> = {
@@ -78,19 +79,26 @@ export function sensorFieldDecimals(field: SensorFieldKey | string): number {
  * the stored Celsius value to the user's preferred display unit
  * (default Fahrenheit) at this presenter boundary. Stored values are
  * never mutated and conversion happens exactly once.
+ *
+ * `temperatureUnit` is optional: a caller that already subscribes to the
+ * preference passes it so the value and the sibling surfaces on the same
+ * screen use one unit. When omitted, the saved preference is read.
  */
 export function formatSensorValue(
   field: SensorFieldKey | string,
   value: number | null | undefined,
+  temperatureUnit?: TemperatureUnitPreference,
 ): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return "—";
   }
   const digits = sensorFieldDecimals(field);
   const isTemp = TEMPERATURE_FIELDS.has(field as SensorFieldKey);
-  const unit = isTemp ? getTemperatureUnitSymbol() : (UNIT_BY_FIELD[field as SensorFieldKey] ?? "");
+  const unit = isTemp
+    ? getTemperatureUnitSymbol(temperatureUnit)
+    : (UNIT_BY_FIELD[field as SensorFieldKey] ?? "");
   const display = isTemp
-    ? (convertCelsiusForDisplay(value as number) as number)
+    ? (convertCelsiusForDisplay(value as number, temperatureUnit) as number)
     : (value as number);
   const num = display.toFixed(digits);
   return unit ? `${num} ${unit}` : num;

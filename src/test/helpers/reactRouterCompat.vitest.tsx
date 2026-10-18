@@ -43,6 +43,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  useMatch,
   useNavigate as useTanStackNavigate,
   useParams as useTanStackParams,
   useRouter,
@@ -50,7 +51,17 @@ import {
 } from "@tanstack/react-router";
 import { selectCommittedLocation } from "@/lib/routerCommittedLocation";
 
-export { TanStackOutlet as Outlet };
+/**
+ * react-router `<Outlet />`. Unit tests render pages under
+ * `RouterContextProvider` with no route match in context; TanStack's Outlet
+ * (>= 1.170.41) reads the parent match store and throws without one. Outside a
+ * match there is no child route to render, so render nothing, as the earlier
+ * router did. Inside a real match this is TanStack's Outlet unchanged.
+ */
+export function Outlet() {
+  const match = useMatch({ strict: false, shouldThrow: false });
+  return match ? <TanStackOutlet /> : null;
+}
 
 /**
  * TanStack stamps internal fields onto history state (`key`, `__TSR_*`,

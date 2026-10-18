@@ -1,10 +1,11 @@
+import { PRIVACY_PAGE_LAST_UPDATED } from "@/constants/agreements";
 import { LegalPageShell } from "./legal/LegalPageShell";
 
 export default function PrivacyPolicy() {
   return (
     <LegalPageShell
       title="Privacy Policy"
-      lastUpdated="July 9, 2026"
+      lastUpdated={PRIVACY_PAGE_LAST_UPDATED}
       path="/privacy"
       description="Privacy Policy for Verdant Grow Diary — what data is collected and why, retention, your rights, and Paddle's role as Merchant of Record payment processor."
     >

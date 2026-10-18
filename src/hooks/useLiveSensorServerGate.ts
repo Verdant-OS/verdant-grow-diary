@@ -15,7 +15,7 @@
  *  - No DB writes, no sensor ingest, no automation, no device control.
  *  - Fail closed: any error / non-200 response denies access.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type LiveSensorSurface = "live_sensor_stream" | "live_sensor_dashboard_widget";
@@ -100,27 +100,51 @@ export const requireLiveSensorAccess = checkLiveSensorEntitlement;
 /**
  * React hook variant. Triggers a preflight on mount + when scope changes;
  * exposes `{ state, result }` with a `"loading"` state during the call.
+ *
+ * Each decision is bound to the scope it was evaluated for. Until the
+ * preflight for the CURRENT scope settles, `state` is "loading" and
+ * `result` is null — including the first render after a scope change,
+ * before the effect runs. Completions of superseded requests are ignored
+ * (request-local cancellation), so a late response for an earlier scope can
+ * never overwrite the current decision. Every scope transition discards the
+ * stored decision, so revisiting a scope (A -> B -> A) never reuses the
+ * earlier visit's result; only the fresh preflight for this visit counts.
+ * `evaluatedTentId` is the tent the returned decision was evaluated for
+ * (null when unscoped or pending).
  */
 export function useLiveSensorServerGate(surface: LiveSensorSurface, scope: LiveSensorScope = {}) {
-  const [state, setState] = useState<LiveSensorGateState>("loading");
-  const [result, setResult] = useState<LiveSensorGateResult | null>(null);
-  const aliveRef = useRef(true);
-  const scopeKey = `${scope.growId ?? ""}|${scope.tentId ?? ""}|${scope.plantId ?? ""}`;
+  const scopeKey = `${surface}|${scope.growId ?? ""}|${scope.tentId ?? ""}|${scope.plantId ?? ""}`;
+  const [decision, setDecision] = useState<{
+    key: string;
+    tentId: string | null;
+    result: LiveSensorGateResult;
+  } | null>(null);
+  // Scope-visit identity: on any transition, drop the previous decision during
+  // render (React re-renders before committing), so no render of the new
+  // visit can see a decision from an earlier visit of the same scope.
+  const [visitKey, setVisitKey] = useState(scopeKey);
+  if (visitKey !== scopeKey) {
+    setVisitKey(scopeKey);
+    setDecision(null);
+  }
 
   useEffect(() => {
-    aliveRef.current = true;
-    setState("loading");
-    setResult(null);
+    let cancelled = false;
+    const tentId = scope.tentId ?? null;
     void checkLiveSensorEntitlement(surface, scope).then((r) => {
-      if (!aliveRef.current) return;
-      setResult(r);
-      setState(r.state);
+      if (cancelled) return;
+      setDecision({ key: scopeKey, tentId, result: r });
     });
     return () => {
-      aliveRef.current = false;
+      cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surface, scopeKey]);
+
+  const current = decision !== null && decision.key === scopeKey ? decision : null;
+  const state: LiveSensorGateState = current ? current.result.state : "loading";
+  const result: LiveSensorGateResult | null = current ? current.result : null;
+  const evaluatedTentId: string | null = current ? current.tentId : null;
 
   const recheck = useCallback(
     () => checkLiveSensorEntitlement(surface, scope),
@@ -131,6 +155,7 @@ export function useLiveSensorServerGate(surface: LiveSensorSurface, scope: LiveS
   return {
     state,
     result,
+    evaluatedTentId,
     recheck,
     require: checkLiveSensorEntitlement,
     paywallCopy: LIVE_SENSOR_PAYWALL_COPY,

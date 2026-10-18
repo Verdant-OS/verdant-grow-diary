@@ -142,10 +142,13 @@ export default function ManualSnapshotTimelineCard({
       captured_at: card.capturedAt,
       ...fields,
     };
+    // Same tick clock as isCurrentWindow, so the badge and the region label
+    // can never disagree across the 24 h boundary.
     return evaluateManualSensorSnapshotQuality(snap, {
       mode: isCurrentWindow ? "current" : "historical",
+      nowMs,
     });
-  }, [card.readings, card.source, card.capturedAt, isCurrentWindow]);
+  }, [card.readings, card.source, card.capturedAt, isCurrentWindow, nowMs]);
 
   const provenanceLabels = buildManualSensorProvenanceLabels(card.source);
 

@@ -6,6 +6,10 @@
  * compact "Linked timeline event" label. Falls back to safe copy when no
  * timeline event is linked.
  *
+ * When `verification` is supplied (#1001), an entry overrides the ref's own
+ * client-carried source: verified refs show the STORED row's source; an
+ * unverified ref shows "Unverified" with a caution line, never "Live".
+ *
  * No I/O. No writes. No automation. No device-control copy.
  */
 import type { ReactNode } from "react";
@@ -17,6 +21,11 @@ import {
   type OriginatingTimelineEventRef,
   type OriginatingTimelineEventSource,
 } from "@/lib/originatingTimelineEventRules";
+import {
+  UNVERIFIED_EVIDENCE_LABEL,
+  unverifiedEvidenceCaution,
+  type EvidenceRefVerification,
+} from "@/lib/actionEvidenceVerificationRules";
 
 const TONE: Record<OriginatingTimelineEventSource, string> = {
   live: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -43,6 +52,8 @@ export interface EvidenceLinkageBadgesProps {
    * preserved for tests and provenance equality checks.
    */
   renderEventLabel?: (ev: OriginatingTimelineEventRef) => ReactNode | null;
+  /** Per-ref verification against stored rows, keyed by ref id (#1001). */
+  verification?: ReadonlyMap<string, EvidenceRefVerification>;
   className?: string;
   testId?: string;
 }
@@ -57,6 +68,7 @@ export default function EvidenceLinkageBadges({
   surface = "alert-review",
   fallbackCopy = TIMELINE_EVIDENCE_NOT_LINKED_COPY,
   renderEventLabel,
+  verification,
   className,
   testId = "evidence-linkage-badges",
 }: EvidenceLinkageBadgesProps) {
@@ -84,8 +96,15 @@ export default function EvidenceLinkageBadges({
       </div>
       <ul className="flex flex-col gap-1" role="list">
         {events.map((ev) => {
-          const src = (ev.source ?? "unknown") as OriginatingTimelineEventSource;
-          const trusted = isTrustedTimelineEventSource(src);
+          const check = verification?.get(ev.id);
+          const unverified = check?.status === "unverified";
+          const src = (
+            check ? check.displaySource : (ev.source ?? "unknown")
+          ) as OriginatingTimelineEventSource;
+          const trusted = !unverified && isTrustedTimelineEventSource(src);
+          const sourceLabel = unverified
+            ? UNVERIFIED_EVIDENCE_LABEL
+            : originatingTimelineEventLabel(src);
           const occurredAt = formatOccurredAt(ev.occurred_at);
           const labelOverride = renderEventLabel ? renderEventLabel(ev) : null;
           return (
@@ -95,17 +114,20 @@ export default function EvidenceLinkageBadges({
               data-event-id={ev.id}
               data-source={src}
               data-trusted={trusted ? "true" : "false"}
+              data-verification={
+                check ? (unverified ? `unverified:${check.reason}` : "verified") : undefined
+              }
               className="flex flex-wrap items-center gap-2 text-xs"
             >
               <span
                 data-testid={`${testId}-source`}
-                title={`Evidence source: ${originatingTimelineEventLabel(src)}`}
+                title={`Evidence source: ${sourceLabel}`}
                 className={cn(
                   "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                  TONE[src],
+                  unverified ? TONE.unknown : TONE[src],
                 )}
               >
-                {originatingTimelineEventLabel(src)}
+                {sourceLabel}
               </span>
               {ev.type && !labelOverride && (
                 <span className="text-muted-foreground">{ev.type}</span>
@@ -125,7 +147,9 @@ export default function EvidenceLinkageBadges({
                   data-testid={`${testId}-caution`}
                   className="text-[11px] text-amber-700 dark:text-amber-300"
                 >
-                  Caution: untrusted source — approval required before action.
+                  {unverified && check
+                    ? unverifiedEvidenceCaution(check.reason)
+                    : "Caution: untrusted source — approval required before action."}
                 </span>
               )}
             </li>

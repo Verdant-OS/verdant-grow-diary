@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
   readPendingQuickLogNote,
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
   markPendingQuickLogNoteHistoryCheck,
+  updatePendingQuickLogNotePayload,
   NOTE_RECOVERY_UNAVAILABLE,
   NOTE_RECOVERY_PENDING,
   NOTE_RECOVERY_CLEAR_FAILED,
@@ -46,6 +48,7 @@ import {
 } from "@/lib/quickLogPendingFeedingStore";
 import { buildFeedingRecoveryForm } from "@/lib/quickLogFeedingRecoveryViewModel";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -254,6 +257,8 @@ interface LockedManualSubmission {
   videoMeta: QuickLogVideoMeta | null;
   note: string;
   action: "note";
+  /** Storage path of the photo already uploaded for this exact submission. */
+  uploadedPath?: string | null;
 }
 
 interface LockedFeedingSubmission {
@@ -304,6 +309,9 @@ function loadRecentTargetRecord(userId: string | null | undefined) {
 }
 
 function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmission {
+  // A journal written after the upload already names the photo path; the
+  // restored retry replays that same payload and never uploads again.
+  const journaledPhotoPath = record.payload.p_details?.photo_url;
   return {
     recovery: record,
     payload: record.payload,
@@ -313,6 +321,7 @@ function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmis
     videoMeta: null,
     note: record.payload.p_note ?? "",
     action: "note",
+    uploadedPath: typeof journaledPhotoPath === "string" ? journaledPhotoPath : null,
   };
 }
 
@@ -356,6 +365,7 @@ function QuickLogV2SheetForOwner({
   defaultTargetKey,
   defaultAction = "note",
 }: Props) {
+  const restoreOpenerFocus = useDialogOpenerRestore(open);
   const { user } = useAuth();
   const [initialRecovery] = useState(() => readPendingQuickLogNote(user?.id ?? null));
   const initialNote = initialRecovery.status === "pending" ? initialRecovery.record : null;
@@ -526,6 +536,7 @@ function QuickLogV2SheetForOwner({
   const [videoMeta, setVideoMeta] = useState<QuickLogVideoMeta | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
+  const [photoChecking, setPhotoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
@@ -610,6 +621,8 @@ function QuickLogV2SheetForOwner({
   // from installing a stale file when its probe resolves late.
   const videoValidationGenerationRef = useRef(0);
   const videoValidationInFlightRef = useRef(false);
+  const photoValidationGenerationRef = useRef(0);
+  const photoValidationInFlightRef = useRef(false);
   // Dedicated synchronous guard for the photo-diary insert path so
   // rapid re-taps during photo capture/upload cannot enqueue a second
   // insert before the first resolves. Reset in try/finally.
@@ -957,6 +970,9 @@ function QuickLogV2SheetForOwner({
         });
 
   function resetPhotoSelection() {
+    photoValidationGenerationRef.current += 1;
+    photoValidationInFlightRef.current = false;
+    setPhotoChecking(false);
     setPhotoFile(null);
     setPhotoPreview(null);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -1227,9 +1243,45 @@ function QuickLogV2SheetForOwner({
 
   function handlePhotoInputChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0] ?? null;
-    if (!file) return;
-    handlePhotoSelected(file);
     e.currentTarget.value = "";
+    if (!file || submissionLockedRef.current) return;
+    if (!fileClaimsPng(file)) {
+      photoValidationGenerationRef.current += 1;
+      photoValidationInFlightRef.current = false;
+      setPhotoChecking(false);
+      handlePhotoSelected(file);
+      return;
+    }
+    const validationGeneration = photoValidationGenerationRef.current + 1;
+    photoValidationGenerationRef.current = validationGeneration;
+    photoValidationInFlightRef.current = true;
+    setPhotoChecking(true);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setLocalError(null);
+    setSaveStatus("Checking photo…");
+    void (async () => {
+      try {
+        const pngClaim = await validateQuickLogPngClaim(file);
+        if (validationGeneration !== photoValidationGenerationRef.current) return;
+        if (!pngClaim.ok) {
+          setLocalError(pngClaim.message);
+          setSaveStatus("");
+          return;
+        }
+        if (submissionLockedRef.current) return;
+        handlePhotoSelected(file);
+      } catch {
+        if (validationGeneration !== photoValidationGenerationRef.current) return;
+        setLocalError("That photo could not be read. Try a different file.");
+        setSaveStatus("");
+      } finally {
+        if (validationGeneration === photoValidationGenerationRef.current) {
+          photoValidationInFlightRef.current = false;
+          setPhotoChecking(false);
+        }
+      }
+    })();
   }
 
   async function handleVideoInputChange(e: ChangeEvent<HTMLInputElement>) {
@@ -1488,6 +1540,10 @@ function QuickLogV2SheetForOwner({
     const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
+      return;
+    }
+    if (photoValidationInFlightRef.current) {
+      setLocalError("Wait for the photo check to finish before saving.");
       return;
     }
     // Synchronous re-entry guard: prevents a rapid double-click from
@@ -1942,8 +1998,10 @@ function QuickLogV2SheetForOwner({
     const submissionNote = exactSubmission?.note ?? form.note;
     const submissionAction: QuickLogV2Action = exactSubmission?.action ?? form.action;
 
-    let uploadedPath: string | null = null;
-    if (submissionPhotoFile) {
+    // An exact retry reuses its first upload: the replayed key returns the
+    // original event, whose details.photo_url names that path.
+    let uploadedPath: string | null = exactManualSubmission?.uploadedPath ?? null;
+    if (submissionPhotoFile && !uploadedPath) {
       if (!resolved.growId) {
         await releaseUnsentWatering();
         releaseUnsentNote();
@@ -1972,6 +2030,38 @@ function QuickLogV2SheetForOwner({
       }
       if (exactWateringSubmission) setFailedWaterPhotoUpload(false);
       uploadedPath = upload.path;
+    }
+    if (uploadedPath && exactManualSubmission) {
+      // The photo travels inside the single quicklog_save_manual write, so
+      // its diary mirror is the only row (production QA 2026-10-14 saw the
+      // mirror plus a second "Photo attached" companion insert).
+      // Keep the upload on the in-memory lock first: an exact retry reuses it
+      // whether or not the journal write below lands.
+      exactManualSubmission.uploadedPath = uploadedPath;
+      if (exactManualSubmission.payload.p_details?.photo_url !== uploadedPath) {
+        const payloadWithPhoto: QuickLogV2SavePayload = {
+          ...exactManualSubmission.payload,
+          p_details: {
+            ...(exactManualSubmission.payload.p_details ?? {}),
+            photo_url: uploadedPath,
+          },
+        };
+        // The RPC hashes p_details into its replay lock, so the journal a
+        // reload restores must carry this exact payload before dispatch.
+        const journaled = updatePendingQuickLogNotePayload(
+          exactManualSubmission.recovery,
+          payloadWithPhoto,
+        );
+        if (journaled.status !== "updated") {
+          keepSubmissionLockedRef.current = true;
+          setExactRetryPending(true);
+          setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+          setSaveStatus("");
+          return;
+        }
+        exactManualSubmission.payload = journaled.record.payload;
+        exactManualSubmission.recovery = journaled.record;
+      }
     }
 
     let res: Awaited<ReturnType<typeof save>>;
@@ -2119,7 +2209,9 @@ function QuickLogV2SheetForOwner({
       setExactRetryPending(unresolved);
       keepSubmissionLockedRef.current = unresolved;
       if (!unresolved) manualRetrySubmissionRef.current = null;
-      if (uploadedPath) {
+      // An unresolved note keeps its upload: the exact retry replays the same
+      // payload, whose details.photo_url names this path.
+      if (uploadedPath && !(unresolved && exactManualSubmission)) {
         await supabase.storage
           .from("diary-photos")
           .remove([uploadedPath])
@@ -2204,7 +2296,27 @@ function QuickLogV2SheetForOwner({
     let photoAttached = false;
     let videoAttached = false;
 
-    if (uploadedPath && confirmedScope.growId) {
+    if (uploadedPath && confirmedScope.growId && exactManualSubmission) {
+      // quicklog_save_manual already mirrored details.photo_url. This only
+      // fills the legacy top-level column through the client write fence;
+      // Timeline falls back to details.photo_url if the patch does not apply.
+      photoAttached = true;
+      if (res.growEventId) {
+        try {
+          const { data: patched, error: photoErr } = await supabase
+            .from("diary_entries")
+            .update({ photo_url: uploadedPath })
+            .filter("details->>linked_grow_event_id", "eq", res.growEventId)
+            .select("id");
+          if (photoErr || !Array.isArray(patched) || patched.length !== 1) {
+            console.warn("Quick Log companion photo_url normalization did not complete");
+          }
+        } catch (photoErr) {
+          console.warn("Quick Log companion photo_url normalization did not complete", photoErr);
+        }
+        if (exactSubmission && !canContinueNote()) return;
+      }
+    } else if (uploadedPath && confirmedScope.growId) {
       const photoEntry = await createPhotoDiaryEntry({
         growId: confirmedScope.growId,
         tentId: confirmedScope.tentId,
@@ -2608,6 +2720,7 @@ function QuickLogV2SheetForOwner({
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"
         aria-describedby="qlv2-sheet-description"
+        onCloseAutoFocus={restoreOpenerFocus}
       >
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>
@@ -3450,6 +3563,7 @@ function QuickLogV2SheetForOwner({
                     feedingSaving ||
                     wateringSaving ||
                     videoChecking ||
+                    photoChecking ||
                     (contextBlocked && !retryPending)
                   }
                   onClick={handleSave}
@@ -3585,6 +3699,7 @@ function QuickLogV2SheetForOwner({
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
+                      photoChecking ||
                       historyCheckRequired ||
                       (contextBlocked && !retryPending) ||
                       (selectedTargetMissing && !retryPending) ||

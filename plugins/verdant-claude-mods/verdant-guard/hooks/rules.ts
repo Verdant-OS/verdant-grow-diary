@@ -478,37 +478,104 @@ const PM_GLOBAL_VALUE_OPTIONS = new Set([
   "--workspace-concurrency",
 ]);
 
-/** For `pnpm [global options] exec|dlx …` returns the index of `exec`/`dlx`, or -1. */
-function pmRunnerIndex(tokens: string[]): number {
-  let i = 1;
-  for (let t = tokens[i]; t !== undefined && t.startsWith("-"); t = tokens[i]) {
-    i += !t.includes("=") && PM_GLOBAL_VALUE_OPTIONS.has(t) ? 2 : 1;
-  }
-  return tokens[i] === "dlx" || tokens[i] === "exec" ? i : -1;
+/**
+ * Every way `pnpm|yarn [global options] exec|dlx …` can be read: the words after `exec`/`dlx`
+ * for each reading. An option this guard does not know may take a value or not (`--test-pattern x`
+ * does), so both readings are kept and each is checked: unclassified options fail closed.
+ */
+function pmRunnerStarts(tokens: string[]): string[][] {
+  const starts: string[][] = [];
+  const seen = new Set<number>();
+  const walk = (i: number): void => {
+    if (seen.has(i)) return;
+    seen.add(i);
+    const t = tokens[i];
+    if (t === undefined) return;
+    if (t === "dlx" || t === "exec") {
+      starts.push(tokens.slice(i + 1));
+      return;
+    }
+    if (!t.startsWith("-")) return;
+    if (t.includes("=")) walk(i + 1);
+    else if (PM_GLOBAL_VALUE_OPTIONS.has(t)) walk(i + 2);
+    else {
+      walk(i + 1);
+      walk(i + 2);
+    }
+  };
+  walk(1);
+  return starts;
 }
 
-/** Drops a package-runner prefix: `bunx`, `npx`, `bun x`, `pnpm dlx|exec`, `yarn dlx|exec`. */
-function stripRunner(tokens: string[]): string[] {
+// Package-runner options (npx, bunx, `pnpm exec`) known to take no value, and known to take one.
+// Any other option written without `=` is read both ways, so neither reading can hide a command.
+const RUNNER_FLAGS = new Set([
+  "-y",
+  "--yes",
+  "--no",
+  "--bun",
+  "--silent",
+  "-s",
+  "-q",
+  "--quiet",
+  "--ignore-existing",
+  "--include-workspace-root",
+  "--workspaces",
+  "-ws",
+]);
+const RUNNER_VALUE_OPTIONS = new Set(["-p", "--package", "-w", "--workspace"]);
+
+/** One reading of a package-runner prefix: the command words it runs, or a shell call string. */
+type RunnerView = { tokens: string[] } | { call: string };
+
+/**
+ * Every reading of a package-runner prefix (`bunx`, `npx`, `bun x`, `pnpm dlx|exec`,
+ * `yarn dlx|exec`), or null when `tokens` is not one. `-c`/`--call` (and `-c=…`) give the
+ * command as one shell string, which may hold several commands (`a; git push -f`), so it is
+ * returned whole for checkBash to split and check like any other command line.
+ */
+function runnerViews(tokens: string[]): RunnerView[] | null {
   const [a, b] = tokens;
-  let rest: string[];
-  if (a === "bunx" || a === "npx") rest = tokens.slice(1);
-  else if (a === "bun" && b === "x") rest = tokens.slice(2);
-  else if ((a === "pnpm" || a === "yarn") && pmRunnerIndex(tokens) > 0) {
-    rest = tokens.slice(pmRunnerIndex(tokens) + 1);
-  } else return tokens;
-  // Skip the runner's own flags (`-y`, `--yes`, `--bun`, `--silent`, …). `-p`/`--package`
-  // take a value; `-c`/`--call` take the command itself as one shell string, which is split
-  // the way a shell would (quotes removed) before it is checked.
-  for (let i = 0; i < rest.length; i += 1) {
-    const t = rest[i] ?? "";
-    if (!t.startsWith("-")) return rest.slice(i);
-    if ((t === "-c" || t === "--call") && rest[i + 1] !== undefined) {
-      return shellWords(rest[i + 1]!);
-    }
-    if (t.startsWith("--call=")) return shellWords(t.slice("--call=".length));
-    if (t === "-p" || t === "--package") i += 1;
+  let starts: string[][];
+  if (a === "bunx" || a === "npx") starts = [tokens.slice(1)];
+  else if (a === "bun" && b === "x") starts = [tokens.slice(2)];
+  else if (a === "pnpm" || a === "yarn") starts = pmRunnerStarts(tokens);
+  else return null;
+  if (starts.length === 0) return null;
+  const views: RunnerView[] = [];
+  for (const rest of starts) {
+    const seen = new Set<number>();
+    const walk = (i: number): void => {
+      if (seen.has(i)) return;
+      seen.add(i);
+      const t = rest[i];
+      if (t === undefined) return;
+      if (!t.startsWith("-")) {
+        views.push({ tokens: rest.slice(i) });
+        return;
+      }
+      if (t === "--") {
+        views.push({ tokens: rest.slice(i + 1) });
+        return;
+      }
+      if (t.startsWith("-c=") || t.startsWith("--call=")) {
+        views.push({ call: t.slice(t.indexOf("=") + 1) });
+        return;
+      }
+      if (t === "-c" || t === "--call") {
+        if (rest[i + 1] !== undefined) views.push({ call: rest[i + 1]! });
+        return;
+      }
+      if (t.includes("=") || RUNNER_FLAGS.has(t)) walk(i + 1);
+      else if (RUNNER_VALUE_OPTIONS.has(t)) walk(i + 2);
+      else {
+        walk(i + 1);
+        walk(i + 2);
+      }
+    };
+    walk(0);
   }
-  return [];
+  return views;
 }
 
 /** The credential-free projects in `playwright.config.ts`, which install no global route mocks. */
@@ -532,8 +599,7 @@ function selectsMockedProject(selector: string): boolean {
   return PW_MOCKED_PROJECTS.some((name) => pattern.test(name));
 }
 
-function checkPlaywright(tokens: string[]): string | null {
-  const t = stripRunner(tokens);
+function checkPlaywright(t: string[]): string | null {
   if (t[0] !== "playwright" || t[1] !== "test") return null;
   const args = t.slice(2);
   const projects: string[] = [];
@@ -597,8 +663,7 @@ function undoIsSet(tokens: string[]): boolean {
 const PROD_MSG =
   "Production database changes, deploys, promotion and rollback are Matthew's decisions (AGENTS.md › Release and Environment Rules). Prepare a release packet or escalation instead.";
 
-function checkProductionOps(rawTokens: string[], whole: string): string | null {
-  const tokens = stripRunner(rawTokens);
+function checkProductionOps(tokens: string[], whole: string): string | null {
   const [cmd, a, b] = tokens;
   if (cmd === "supabase") {
     if (a === "db" && (b === "push" || (b === "reset" && tokens.includes("--linked"))))
@@ -625,31 +690,52 @@ function checkProductionOps(rawTokens: string[], whole: string): string | null {
   return null;
 }
 
-/** The whole Bash rule set. */
-export function checkBash(command: string): string | null {
+/** Runner nesting deeper than this is not unwrapped further; the command is refused instead. */
+const MAX_RUNNER_DEPTH = 8;
+
+const RUNNER_DEPTH_MSG = `Package runners nested more than ${MAX_RUNNER_DEPTH} deep cannot be checked here. Run the inner command directly.`;
+
+/** The whole Bash rule set. `depth` counts package runners already unwrapped. */
+export function checkBash(command: string, depth = 0): string | null {
   for (const raw of segments(command)) {
-    let expands = false;
-    const tokens = stripPrefix(raw, (split) => {
-      // GNU `env -S` has its own grammar beyond quotes: `${NAME}` expansion, backslash
-      // escapes (`\_` separates arguments, `\c` ends the string) and `#` comments. And the
-      // operand reaches this point with its quotes already removed, so a brace, glob,
-      // backtick or `~` here may be one Bash expands before env sees it
-      // (`env -S {git,push,-f}`). This guard models neither, so any of those makes the
-      // wrapped command uncheckable.
-      if (/[\\$#{}*?[\]`~]/.test(split)) expands = true;
-    });
-    if (expands) {
-      return "`env -S` with `$`, `\\`, `#`, braces, globs, backticks or `~` uses expansion, escapes or comments this guard cannot follow, so the command it runs cannot be checked here. Write the command out without `env -S`.";
-    }
-    if (tokens.length === 0) continue;
-    // A package runner can carry git too (`npx -c 'git push -f'`, `pnpm -C . exec git push -f`).
-    const git = gitArgs(tokens) ?? gitArgs(stripPrefix(stripRunner(tokens)));
-    const reason =
-      (git ? checkGit(git) : null) ??
-      checkPackageManager(tokens) ??
-      checkPlaywright(tokens) ??
-      checkProductionOps(tokens, command);
+    const reason = checkCommand(raw, command, depth);
     if (reason) return reason;
+  }
+  return null;
+}
+
+/** Checks one simple command, then every command a package runner prefix can run. */
+function checkCommand(raw: string[], whole: string, depth: number): string | null {
+  if (depth > MAX_RUNNER_DEPTH) return RUNNER_DEPTH_MSG;
+  let expands = false;
+  const tokens = stripPrefix(raw, (split) => {
+    // GNU `env -S` has its own grammar beyond quotes: `${NAME}` expansion, backslash
+    // escapes (`\_` separates arguments, `\c` ends the string) and `#` comments. And the
+    // operand reaches this point with its quotes already removed, so a brace, glob,
+    // backtick or `~` here may be one Bash expands before env sees it
+    // (`env -S {git,push,-f}`). This guard models neither, so any of those makes the
+    // wrapped command uncheckable.
+    if (/[\\$#{}*?[\]`~]/.test(split)) expands = true;
+  });
+  if (expands) {
+    return "`env -S` with `$`, `\\`, `#`, braces, globs, backticks or `~` uses expansion, escapes or comments this guard cannot follow, so the command it runs cannot be checked here. Write the command out without `env -S`.";
+  }
+  if (tokens.length === 0) return null;
+  const git = gitArgs(tokens);
+  const reason =
+    (git ? checkGit(git) : null) ??
+    checkPackageManager(tokens) ??
+    checkPlaywright(tokens) ??
+    checkProductionOps(tokens, whole);
+  if (reason) return reason;
+  // A package runner can carry any command, another runner included (`pnpm exec npx -c '…'`,
+  // `npx -c 'a; git push -f'`): check every reading of it with the whole rule set.
+  for (const view of runnerViews(tokens) ?? []) {
+    const inner =
+      "call" in view
+        ? checkBash(view.call, depth + 1)
+        : checkCommand(view.tokens, whole, depth + 1);
+    if (inner) return inner;
   }
   return null;
 }

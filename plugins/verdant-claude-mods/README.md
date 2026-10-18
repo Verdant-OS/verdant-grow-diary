@@ -12,7 +12,7 @@ They add no new policy: every refusal names the existing rule it enforces.
 ## Status
 
 `practical observation`: both mods pass `claude plugin validate` and `claude plugin test`
-(`verdant-guard` 105/105, `verdant-cache-clock` 6/6) on Claude Code 2.1.293. Removing the
+(`verdant-guard` 130/130, `verdant-cache-clock` 6/6) on Claude Code 2.1.288. Removing the
 guard's Bash and file checks turns two engine tests red. Behaviour inside a live agent
 session is `NOT_MEASURED`.
 
@@ -20,9 +20,11 @@ The guard is a tripwire against accidents, not a security boundary. It splits sh
 commands on `&&`, `||`, `;`, `|`, a background `&`, `(`, `)` and newlines outside quotes, so a
 quoted pattern such as `grep "a|git push --force"` is one command. A subshell or `$(…)` body is
 checked as its own command, including a `$(…)` inside double quotes, and an unclosed quote falls
-back to splitting on every operator. It strips `bunx`, `npx`, `bun x`, `pnpm dlx|exec` and
-`yarn dlx|exec` with their own flags (`-y`, `--bun`, `-p <pkg>`; the command given to `-c` is
-checked), strips `env`, `sudo`, `exec` and `time` with their own options (the command given to
+back to splitting on every operator. It unwraps `bunx`, `npx`, `bun x`, `pnpm dlx|exec` and
+`yarn dlx|exec` with their own flags (`-y`, `--bun`, `-p <pkg>`, `-w <workspace>`), repeatedly
+when runners nest, and checks the command given to `-c`/`--call` as a full command line (every
+command in `a; b` is checked). A runner option it does not know is read both as a flag and as
+taking a value, and each reading is checked. It strips `env`, `sudo`, `exec` and `time` with their own options (the command given to
 `env -S` is checked), reads clustered short flags such as `git push -uf` and `git commit -anm`,
 treats a Playwright option written without `=` as taking a value unless it is a known flag, anchors file paths on the checkout root from `git rev-parse --show-toplevel`, and
 matches MCP tools by service (`supabase`, `vercel`, `github`, `lovable` as a whole `_`- or

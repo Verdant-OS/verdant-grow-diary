@@ -46,3 +46,61 @@ describe("checkBash — pnpm/yarn global options before exec/dlx", () => {
     });
   }
 });
+
+// Codex P1s on #1935 at 4640df10: a call string holds whole command lines, runners nest, and
+// npx/pnpm accept option forms the first pass did not classify.
+
+describe("checkBash — every command inside an npx call string is checked", () => {
+  const denied = [
+    "npx -c 'printf ok; git push -f origin claude/task'",
+    "npx -c 'printf ok && git push -f origin claude/task'",
+  ];
+  for (const command of denied) {
+    test(`denies ${command}`, () => {
+      expect(checkBash(command)).not.toBeNull();
+    });
+  }
+  test("allows a call string whose commands are all harmless", () => {
+    expect(checkBash("npx -c 'printf ok; git push origin claude/task'")).toBeNull();
+  });
+});
+
+describe("checkBash — unclassified pnpm options before exec fail closed", () => {
+  test("denies pnpm --test-pattern x exec git push -f", () => {
+    expect(checkBash("pnpm --test-pattern x exec git push -f origin claude/task")).not.toBeNull();
+  });
+  test("allows pnpm --test-pattern x exec git status", () => {
+    expect(checkBash("pnpm --test-pattern x exec git status")).toBeNull();
+  });
+});
+
+describe("checkBash — nested package runners are unwrapped repeatedly", () => {
+  const denied = [
+    `pnpm exec npx -c 'git push "-f" origin claude/task'`,
+    "bunx npx git push -f origin claude/task",
+  ];
+  for (const command of denied) {
+    test(`denies ${command}`, () => {
+      expect(checkBash(command)).not.toBeNull();
+    });
+  }
+  test("allows a nested runner carrying a harmless push", () => {
+    expect(checkBash("pnpm exec npx -c 'git push origin claude/task'")).toBeNull();
+  });
+});
+
+describe("checkBash — npx -c= and workspace option values", () => {
+  const denied = [
+    "npx -c='git push -f origin claude/task'",
+    "npx --workspace a -c 'git push -f origin claude/task'",
+    "npx -w a -c 'git push -f origin claude/task'",
+  ];
+  for (const command of denied) {
+    test(`denies ${command}`, () => {
+      expect(checkBash(command)).not.toBeNull();
+    });
+  }
+  test("allows npx --workspace a -c with a harmless push", () => {
+    expect(checkBash("npx --workspace a -c 'git push origin claude/task'")).toBeNull();
+  });
+});

@@ -160,3 +160,23 @@ describe("legacy watering volume uses the structured form's plain-decimal gramma
     }
   });
 });
+
+describe("public starter watering volume uses the Water form grammar", () => {
+  const starter = { plantNickname: "Test Plant", stage: "", logType: "watering", note: "" };
+
+  it("refuses hex and exponent volumes before they are normalized into the draft", () => {
+    for (const raw of ["0x10", "1e2", "Infinity"]) {
+      const v = validatePublicQuickLogStarterInput({ ...starter, wateringVolumeRaw: raw });
+      expect(v.fields, raw).toBeNull();
+      expect(v.errors.wateringVolumeMl, raw).toBe(
+        "Enter how much water you gave, in ml (a number above 0).",
+      );
+    }
+  });
+
+  it("still accepts a plain decimal volume", () => {
+    const v = validatePublicQuickLogStarterInput({ ...starter, wateringVolumeRaw: " 250.5 " });
+    expect(v.errors).toEqual({});
+    expect(v.fields?.wateringVolumeMl).toBe(250.5);
+  });
+});

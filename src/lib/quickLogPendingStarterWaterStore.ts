@@ -1,6 +1,7 @@
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { QuickLogResolvedTarget } from "./quickLogTargetIntegrityRules";
 import { isUuid } from "./isUuid";
+import { QUICK_LOG_WATER_VOLUME_MAX_ML } from "./quickLogWateringFormViewModel";
 import {
   starterWaterRecoveryKey,
   typedWaterRecoveryKey,
@@ -96,7 +97,15 @@ function validRecord(value: unknown, ownerId: string): value is PendingStarterWa
     p.p_idempotency_key.length > 200
   )
     return false;
-  if (typeof p.p_volume_ml !== "number" || !Number.isFinite(p.p_volume_ml) || p.p_volume_ml <= 0)
+  // Single-watering ceiling: every read, claim and write of the starter
+  // journal passes through here, so a pre-ceiling or edited record cannot be
+  // replayed to quicklog_save_manual by retryStarterWater.
+  if (
+    typeof p.p_volume_ml !== "number" ||
+    !Number.isFinite(p.p_volume_ml) ||
+    p.p_volume_ml <= 0 ||
+    p.p_volume_ml > QUICK_LOG_WATER_VOLUME_MAX_ML
+  )
     return false;
   if (!nullableString(p.p_note) || (p.p_note?.length ?? 0) > 5_000) return false;
   if (![p.p_temperature_c, p.p_humidity_pct, p.p_vpd_kpa].every(nullableNumber)) return false;

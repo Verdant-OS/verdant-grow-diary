@@ -166,24 +166,64 @@ export function diaryRowMirroredGrowEventId(details: unknown): string | null {
   return null;
 }
 
+/** Fields of a fetched diary row the mirror match reads. */
+export interface TentManualMirrorDiaryRow {
+  details: unknown;
+  tent_id: string | null;
+  plant_id: string | null;
+  entry_at: string;
+}
+
+function siblingKey(tentId: unknown, plantId: unknown, iso: unknown): string | null {
+  if (typeof iso !== "string") return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  const t = typeof tentId === "string" ? tentId : "";
+  const p = typeof plantId === "string" ? plantId : "";
+  return `${t}|${p}|${ms}`;
+}
+
+function hasManualSensorSnapshot(details: unknown): boolean {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return false;
+  const snap = (details as { manual_sensor_snapshot?: unknown }).manual_sensor_snapshot;
+  return !!snap && typeof snap === "object" && (snap as { source?: unknown }).source === "manual";
+}
+
 /**
- * A Plant Quick Log save writes one grow_events row and a diary companion
- * that keeps `details.manual_sensor_snapshot`, so both reads return the same
- * reading. Drop the events a fetched diary companion already mirrors; the
- * companion keeps its note and pH/EC, exactly as the timeline showed it
- * before grow_events were read. Input order is preserved.
+ * A sensor-bearing Plant Quick Log save writes a parent action grow_event, a
+ * sibling `environment` grow_event, and a diary mirror that keeps
+ * `details.manual_sensor_snapshot` and links the PARENT id
+ * (`linked_grow_event_id`), never the environment id. quicklog_save_manual
+ * writes all three with the same tent_id, plant_id and occurred_at /
+ * entry_at, and the repo already treats that exact (tent, plant, instant)
+ * triple as the environment-sibling identity (connectedOneTentActivationRules).
+ *
+ * So an environment event is dropped when a fetched, linked Quick Log mirror
+ * carrying a manual snapshot shares its (tent_id, plant_id, instant). The
+ * mirror card is kept, with its note and pH/EC, exactly as the timeline
+ * showed it before grow_events were read. An event whose id the mirror links
+ * directly is also dropped. Input order is preserved.
  */
-export function dropEventsMirroredByDiaryRows<E extends { id: string }>(
+export function dropEventsMirroredByDiaryRows<E extends TentManualEnvironmentEvent>(
   events: ReadonlyArray<E>,
-  diaryRows: ReadonlyArray<{ details: unknown }>,
+  diaryRows: ReadonlyArray<TentManualMirrorDiaryRow | null | undefined>,
 ): E[] {
-  const mirrored = new Set<string>();
+  const linkedIds = new Set<string>();
+  const siblingKeys = new Set<string>();
   for (const row of diaryRows) {
-    const id = diaryRowMirroredGrowEventId(row?.details);
-    if (id) mirrored.add(id);
+    if (!row) continue;
+    const linked = diaryRowMirroredGrowEventId(row.details);
+    if (!linked || !hasManualSensorSnapshot(row.details)) continue;
+    linkedIds.add(linked);
+    const key = siblingKey(row.tent_id, row.plant_id, row.entry_at);
+    if (key) siblingKeys.add(key);
   }
-  if (mirrored.size === 0) return [...events];
-  return events.filter((ev) => !mirrored.has(ev.id));
+  if (linkedIds.size === 0) return [...events];
+  return events.filter((ev) => {
+    if (linkedIds.has(ev.id)) return false;
+    const key = siblingKey(ev.tentId, ev.plantId, ev.occurredAt);
+    return !(key && siblingKeys.has(key));
+  });
 }
 
 /** The part of a React Query result the tent history read needs. */

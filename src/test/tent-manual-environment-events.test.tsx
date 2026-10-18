@@ -202,6 +202,9 @@ describe("manual snapshot timeline card freshness", () => {
     withProviders(<ManualSnapshotTimelineCard card={card(justNow)} />);
     expect(screen.getByText("Usable current reading")).toBeInTheDocument();
     expect(screen.queryByText(/Historical reading —/)).toBeNull();
+    // The quality region announces the same freshness as its visible copy.
+    expect(screen.getByRole("region", { name: "Current snapshot quality" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Historical snapshot quality" })).toBeNull();
   });
 
   it("still labels a snapshot older than the current window as historical", () => {
@@ -209,6 +212,7 @@ describe("manual snapshot timeline card freshness", () => {
     withProviders(<ManualSnapshotTimelineCard card={card(threeDaysAgo)} />);
     expect(screen.getByText("Historical review reading")).toBeInTheDocument();
     expect(screen.getByText(/Historical reading —/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Historical snapshot quality" })).toBeInTheDocument();
   });
 });
 
@@ -377,14 +381,40 @@ describe("tent manual snapshots — Codex re-review on #2114", () => {
     return text === "" ? [] : text.split(",");
   }
 
-  it("renders one card for a Plant Quick Log save that returns from both reads", async () => {
+  // quicklog_save_manual (20260927160000_quicklog_manual_plant_tent_lineage)
+  // writes a parent action event, a sibling environment event with its OWN
+  // id, and a diary mirror whose linked_grow_event_id is the PARENT id. All
+  // three share tent_id, plant_id and occurred_at / entry_at.
+  it("renders one card for a Plant Quick Log save whose mirror links the parent, not the environment sibling", async () => {
     const at = "2026-10-14T10:00:00.000Z";
     db.byTable = {
-      diary_entries: [plantQuickLogCompanion(at, "ev-1")],
-      grow_events: [{ ...eventRow(at, "ev-1"), plant_id: "plant-1" }],
+      diary_entries: [plantQuickLogCompanion(at, "parent-1")],
+      grow_events: [{ ...eventRow(at, "env-1"), plant_id: "plant-1" }],
     };
     withProviders(<CardsProbe />);
     expect(await cardIds()).toEqual(["diary-1"]);
+  });
+
+  it("keeps an environment event at the same instant for a different plant", async () => {
+    const at = "2026-10-14T10:00:00.000Z";
+    db.byTable = {
+      diary_entries: [plantQuickLogCompanion(at, "parent-1")],
+      grow_events: [{ ...eventRow(at, "env-2"), plant_id: "plant-2" }],
+    };
+    withProviders(<CardsProbe />);
+    expect(await cardIds()).toEqual(["diary-1", "env-2"]);
+  });
+
+  it("keeps an environment event when the same-instant diary row is not a Quick Log mirror", async () => {
+    const at = "2026-10-14T10:00:00.000Z";
+    const unlinked = plantQuickLogCompanion(at, "parent-1");
+    delete (unlinked.details as Record<string, unknown>).linked_grow_event_id;
+    db.byTable = {
+      diary_entries: [unlinked],
+      grow_events: [{ ...eventRow(at, "env-3"), plant_id: "plant-1" }],
+    };
+    withProviders(<CardsProbe />);
+    expect(await cardIds()).toEqual(["diary-1", "env-3"]);
   });
 
   it("keeps an environment event that no fetched diary row mirrors", async () => {

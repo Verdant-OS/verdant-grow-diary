@@ -221,7 +221,7 @@ export default function ManualSnapshotTimelineCard({
       <CardContent className="space-y-2 pt-0">
         <section
           data-testid="manual-snapshot-timeline-card-quality"
-          aria-label="Historical snapshot quality"
+          aria-label={isCurrentWindow ? "Current snapshot quality" : "Historical snapshot quality"}
           className="rounded-md border border-border/40 bg-secondary/10 p-2"
         >
           <ManualSensorSnapshotQualityBadge evaluation={quality} />

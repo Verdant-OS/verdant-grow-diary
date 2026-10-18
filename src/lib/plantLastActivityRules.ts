@@ -12,6 +12,10 @@ import { formatDistance } from "date-fns";
 import { QUICK_LOG_HARVEST_CURE_LABELS } from "@/constants/quickLogEventTypes";
 import { EVENT_TYPE_MAP } from "@/lib/diary";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
+import {
+  enrichPlantFeedingDiaryRow,
+  isQuickLogPlaceholderNote,
+} from "@/lib/plantFeedingDisplayRules";
 import { buildRecentQuickLogActivity } from "@/lib/quickLogHistoryRules";
 
 /** A diary row: only the times are read directly; the rest goes to the normalizer. */
@@ -110,15 +114,19 @@ export function resolvePlantLastActivitySummary(
   const newest = newestActivity(input.rows);
   if (!newest) return null;
   const [entry] = buildRecentQuickLogActivity(
-    normalizeDiaryEntries({ rawEntries: [newest.row], now: input.now.getTime() }),
+    normalizeDiaryEntries({
+      rawEntries: [enrichPlantFeedingDiaryRow(newest.row)],
+      now: input.now.getTime(),
+    }),
     1,
   );
   if (!entry) return null;
-  const firstLine =
+  const rawFirstLine =
     entry.noteBody
       .split("\n")
       .map((line) => line.trim())
       .find(Boolean) ?? "";
+  const firstLine = isQuickLogPlaceholderNote(rawFirstLine) ? "" : rawFirstLine;
   const text =
     firstLine.length > PLANT_LAST_ACTIVITY_TEXT_MAX
       ? `${firstLine.slice(0, PLANT_LAST_ACTIVITY_TEXT_MAX - 1).trimEnd()}…`

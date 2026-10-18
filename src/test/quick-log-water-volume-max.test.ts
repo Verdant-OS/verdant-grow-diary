@@ -18,6 +18,7 @@ import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildLegacyQuickLogUnifiedPayload } from "@/lib/legacyQuickLogUnifiedSave";
 import { validatePublicQuickLogStarterInput } from "@/lib/publicQuickLogStarterRules";
+import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 
 const TOO_LARGE = /too large \(max 50,000 ml\)/i;
 
@@ -178,5 +179,35 @@ describe("public starter watering volume uses the Water form grammar", () => {
     const v = validatePublicQuickLogStarterInput({ ...starter, wateringVolumeRaw: " 250.5 " });
     expect(v.errors).toEqual({});
     expect(v.fields?.wateringVolumeMl).toBe(250.5);
+  });
+});
+
+describe("legacy Quick Log validation preview uses the same ceiling and grammar", () => {
+  const preview = (watering: string) =>
+    evaluateQuickLogPreview({
+      note: "Watered.",
+      eventType: "watering",
+      stage: "veg",
+      details: { watering },
+    });
+
+  it("warns with the shared too-large message above 50,000 ml", () => {
+    for (const watering of ["50001", "1000000"]) {
+      const w = preview(watering).warnings.find((x) => x.code === "watering:out-of-range");
+      expect(w?.message, watering).toBe(QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE);
+    }
+  });
+
+  it("does not warn at exactly the ceiling", () => {
+    expect(preview("50000").warnings.some((x) => x.code.startsWith("watering:"))).toBe(false);
+  });
+
+  it("flags hex and exponent volumes as not a number", () => {
+    for (const watering of ["0x10", "1e2"]) {
+      expect(
+        preview(watering).warnings.some((x) => x.code === "watering:invalid"),
+        watering,
+      ).toBe(true);
+    }
   });
 });

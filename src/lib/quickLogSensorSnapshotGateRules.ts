@@ -4,20 +4,13 @@
  * Inputs are the raw typed strings; temperature is in the grower's unit.
  * Bands come from the canonical guards in sensorReadingNormalizationRules.ts
  * (the same guards quickLogV2SavePayload.ts uses, which stays authoritative),
- * applied after the same °F → °C conversion the sheet's save seam performs.
+ * applied after the shared °F → °C conversion (quickLogTypedTemperatureRules)
+ * that the sheet's save seam also uses.
  */
 import type { TemperatureUnitPreference } from "./temperatureUnitPreference";
 import { isHumidityValid, isTemperatureValid, isVpdValid } from "./sensorReadingNormalizationRules";
-import { celsiusToFahrenheit, fahrenheitToCelsius } from "./temperatureUnits";
-
-/**
- * Plain-decimal grammar the Quick Log save seam (QuickLogV2Sheet
- * `typedTempToCelsiusInput`) accepts for a Fahrenheit conversion. Anything
- * else (`1e2`, `0x10`, `Infinity`) would reach the payload unconverted
- * and be read as °C, so a Fahrenheit grower's input outside this grammar is
- * rejected here rather than silently reinterpreted.
- */
-export const QUICK_LOG_PLAIN_TEMPERATURE_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+import { celsiusToFahrenheit } from "./temperatureUnits";
+import { convertTypedTemperatureToCelsius } from "./quickLogTypedTemperatureRules";
 
 export const QUICK_LOG_SNAPSHOT_HUMIDITY_RANGE_MESSAGE =
   "Humidity must be between 0 and 100%." as const;
@@ -55,19 +48,6 @@ function parseOptional(raw: string | null | undefined): number | null {
   return Number(trimmed);
 }
 
-/**
- * Typed temperature → canonical °C exactly as the save seam produces it
- * (°F converted and rounded to 2 dp). NaN when a Fahrenheit input is outside
- * the plain-decimal grammar the seam can convert.
- */
-function typedTemperatureToCelsius(trimmed: string, unit: TemperatureUnitPreference): number {
-  if (unit !== "fahrenheit") return Number(trimmed);
-  if (!QUICK_LOG_PLAIN_TEMPERATURE_INPUT.test(trimmed)) return Number.NaN;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return Number.NaN;
-  return Math.round(fahrenheitToCelsius(parsed) * 100) / 100;
-}
-
 /** A present value must be a finite number that the canonical guard accepts. */
 function isPresentValueValid(value: number, guard: (v: number | null) => boolean): boolean {
   return Number.isFinite(value) && guard(value);
@@ -81,12 +61,15 @@ export function assessQuickLogSensorSnapshotGate(input: {
 }): QuickLogSensorSnapshotGate {
   const fields: QuickLogSensorSnapshotGate["fields"] = {};
 
-  const rawTemperature = (input.temperatureInput ?? "").trim();
-  if (rawTemperature !== "") {
-    const celsius = typedTemperatureToCelsius(rawTemperature, input.temperatureUnit);
-    if (!isPresentValueValid(celsius, isTemperatureValid)) {
-      fields.temperature = quickLogSnapshotTemperatureRangeMessage(input.temperatureUnit);
-    }
+  const temperature = convertTypedTemperatureToCelsius(
+    input.temperatureInput,
+    input.temperatureUnit,
+  );
+  if (
+    temperature.kind === "unconvertible" ||
+    (temperature.kind === "celsius" && !isTemperatureValid(temperature.value))
+  ) {
+    fields.temperature = quickLogSnapshotTemperatureRangeMessage(input.temperatureUnit);
   }
   const h = parseOptional(input.humidityInput);
   if (h !== null && !isPresentValueValid(h, isHumidityValid)) {

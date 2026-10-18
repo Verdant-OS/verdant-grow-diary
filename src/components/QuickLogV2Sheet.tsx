@@ -214,29 +214,21 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
 import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import {
-  fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
-
-const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+import { typedTemperatureToCelsiusInput } from "@/lib/quickLogTypedTemperatureRules";
 
 /**
  * Convert a grower-typed temperature string (entered in the active
  * preference unit) into a canonical-°C string. Called EXACTLY ONCE per
  * save attempt, at the payload-build seam, on the raw typed value — the
  * built payload (including the locked watering retry submission) already
- * holds °C and is never re-converted. Blank stays blank and non-numeric
- * text passes through unchanged so the existing validators keep rejecting
- * it with their original reasons.
+ * holds °C and is never re-converted. The conversion itself is the shared
+ * pure helper the sensor snapshot gate also uses, so they cannot drift.
  */
 function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
-  if (unit !== "fahrenheit") return raw;
-  const trimmed = raw.trim();
-  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return raw;
-  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+  return typedTemperatureToCelsiusInput(raw, unit);
 }
 
 interface Props {

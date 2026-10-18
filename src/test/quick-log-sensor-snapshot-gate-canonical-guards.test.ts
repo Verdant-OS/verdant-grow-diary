@@ -34,6 +34,6 @@ describe("assessQuickLogSensorSnapshotGate canonical guard reuse", () => {
       vpdInput: null,
       temperatureUnit: "celsius",
     });
-    expect(gate).toEqual({ blocksSave: false, fields: {} });
+    expect(gate).toEqual({ blocksSave: false, fields: {}, footerMessage: null });
   });
 });

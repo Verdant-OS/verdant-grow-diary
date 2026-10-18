@@ -3,6 +3,7 @@ import {
   assessQuickLogSensorSnapshotGate,
   QUICK_LOG_SNAPSHOT_HUMIDITY_RANGE_MESSAGE,
   QUICK_LOG_SNAPSHOT_VPD_RANGE_MESSAGE,
+  quickLogSnapshotTemperatureRangeMessage,
 } from "@/lib/quickLogSensorSnapshotGateRules";
 
 const base = { temperatureInput: "", humidityInput: "", vpdInput: "" };
@@ -115,7 +116,7 @@ describe("assessQuickLogSensorSnapshotGate", () => {
       vpdInput: "0",
       temperatureUnit: "celsius",
     });
-    expect(floor).toEqual({ blocksSave: false, fields: {} });
+    expect(floor).toEqual({ blocksSave: false, fields: {}, footerMessage: null });
 
     const ceiling = assessQuickLogSensorSnapshotGate({
       ...base,
@@ -123,7 +124,7 @@ describe("assessQuickLogSensorSnapshotGate", () => {
       vpdInput: "10",
       temperatureUnit: "celsius",
     });
-    expect(ceiling).toEqual({ blocksSave: false, fields: {} });
+    expect(ceiling).toEqual({ blocksSave: false, fields: {}, footerMessage: null });
   });
 
   it("blocks non-numeric and non-finite humidity and VPD inputs", () => {
@@ -147,7 +148,7 @@ describe("assessQuickLogSensorSnapshotGate", () => {
       vpdInput: null,
       temperatureUnit: "fahrenheit",
     });
-    expect(gate).toEqual({ blocksSave: false, fields: {} });
+    expect(gate).toEqual({ blocksSave: false, fields: {}, footerMessage: null });
   });
 
   it("is deterministic", () => {
@@ -155,5 +156,33 @@ describe("assessQuickLogSensorSnapshotGate", () => {
     expect(assessQuickLogSensorSnapshotGate(input)).toEqual(
       assessQuickLogSensorSnapshotGate(input),
     );
+  });
+});
+
+describe("snapshot gate copy and footer", () => {
+  it("owns its temperature copy, matching the canonical band in each unit", () => {
+    expect(quickLogSnapshotTemperatureRangeMessage("fahrenheit")).toBe(
+      "Temperature must be between 14 and 140 °F.",
+    );
+    expect(quickLogSnapshotTemperatureRangeMessage("celsius")).toBe(
+      "Temperature must be between -10 and 60 °C.",
+    );
+  });
+
+  it("reports the first failing field as the footer message", () => {
+    const all = assessQuickLogSensorSnapshotGate({
+      temperatureInput: "500",
+      humidityInput: "150",
+      vpdInput: "11",
+      temperatureUnit: "fahrenheit",
+    });
+    expect(all.footerMessage).toBe("Temperature must be between 14 and 140 °F.");
+    const rhOnly = assessQuickLogSensorSnapshotGate({
+      temperatureInput: "",
+      humidityInput: "150",
+      vpdInput: "11",
+      temperatureUnit: "fahrenheit",
+    });
+    expect(rhOnly.footerMessage).toBe(QUICK_LOG_SNAPSHOT_HUMIDITY_RANGE_MESSAGE);
   });
 });

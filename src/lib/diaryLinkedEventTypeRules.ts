@@ -84,6 +84,32 @@ export function collectLinkedEventIdsNeedingType(rows: readonly unknown[]): stri
   return out;
 }
 
+/**
+ * Shape a `grow_events` lookup response (`id,event_type,feeding_events(line_id,nutrient_brand)`)
+ * into the map `applyLinkedEventTypes` reads. A feeding's line comes from
+ * `line_id`, then `nutrient_brand`; malformed rows are skipped.
+ */
+export function buildLinkedSpineTypeMap(data: unknown): Map<string, unknown> {
+  const types = new Map<string, unknown>();
+  if (!Array.isArray(data)) return types;
+  for (const e of data) {
+    if (!isPlainObject(e) || typeof e.id !== "string") continue;
+    const feedRel = Array.isArray(e.feeding_events) ? e.feeding_events[0] : e.feeding_events;
+    const feedObj = isPlainObject(feedRel) ? feedRel : null;
+    const lineId =
+      typeof feedObj?.line_id === "string" && feedObj.line_id.trim() !== ""
+        ? feedObj.line_id.trim()
+        : typeof feedObj?.nutrient_brand === "string" && feedObj.nutrient_brand.trim() !== ""
+          ? feedObj.nutrient_brand.trim()
+          : null;
+    types.set(
+      e.id.toLowerCase(),
+      lineId ? { event_type: e.event_type, line_id: lineId } : e.event_type,
+    );
+  }
+  return types;
+}
+
 /** Stamp the spine's event type (and optional feeding line_id) into each untyped linked row's details. */
 export function applyLinkedEventTypes<T>(
   rows: readonly T[],

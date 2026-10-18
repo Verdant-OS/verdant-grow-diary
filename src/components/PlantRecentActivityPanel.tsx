@@ -24,10 +24,7 @@ import {
   describeQuickLogDetailsFromExtras,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
-import {
-  enrichPlantFeedingDiaryRows,
-  resolveFeedingNutrientLineName,
-} from "@/lib/plantFeedingDisplayRules";
+import { enrichPlantFeedingDiaryRows } from "@/lib/plantFeedingDisplayRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
@@ -208,12 +205,9 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   const detailLinesById = new Map<string, readonly QuickLogDetailDisplayLine[]>();
   for (const raw of rawRows as Array<{ id?: unknown; details?: unknown }>) {
     if (typeof raw?.id !== "string") continue;
-    const baseLines = describeQuickLogDetailsFromExtras(raw.details, temperatureUnit);
-    const lineName = resolveFeedingNutrientLineName(raw.details);
-    const lines =
-      lineName && !baseLines.some((l) => l.key === "nutrient_line")
-        ? [{ key: "nutrient_line", label: "Nutrient line", value: lineName }, ...baseLines]
-        : baseLines;
+    // The nutrient line is already in the enriched note preview; adding a
+    // detail badge for it as well rendered the line name twice.
+    const lines = describeQuickLogDetailsFromExtras(raw.details, temperatureUnit);
     if (lines.length > 0) detailLinesById.set(raw.id, lines);
   }
 

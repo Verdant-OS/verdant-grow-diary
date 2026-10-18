@@ -87,6 +87,24 @@ describe("plantFeedingDisplayRules", () => {
       expect(enriched.note).toBe("Flora Series · Half strength today");
     });
 
+    it("keeps the line when a custom note merely contains the line text as a substring", () => {
+      // Codex P2 at 1a1985f3: line "Grow" must not be hidden by "Strong growth today".
+      const enriched = enrichPlantFeedingDiaryRow({
+        ...baseFeedingRow,
+        note: "Strong growth today",
+        details: { ...baseFeedingRow.details, feeding: { line_id: "Grow" } },
+      });
+      expect(enriched.note).toBe("Grow · Strong growth today");
+    });
+
+    it("does not prepend the line again when the note already is or starts with it", () => {
+      expect(enrichPlantFeedingDiaryRow({ ...baseFeedingRow, note: "flora series" }).note).toBe(
+        "flora series",
+      );
+      const once = enrichPlantFeedingDiaryRow({ ...baseFeedingRow, note: "Half strength" });
+      expect(enrichPlantFeedingDiaryRow(once).note).toBe("Flora Series · Half strength");
+    });
+
     it("returns non-feeding rows by reference", () => {
       const noteRow = {
         id: "n1",

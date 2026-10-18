@@ -187,6 +187,8 @@ describe("Issue #2172 part 2 — plant-page feedings show the nutrient line name
     const row = screen.getByTestId("plant-recent-activity-row");
     expect(row).toHaveTextContent("Cronk Bonnie & Clyde");
     expect(row).not.toHaveTextContent("(quick log)");
+    // Codex P2 at 1a1985f3: the line name renders once, not as note and badge.
+    expect(row.textContent?.split("Cronk Bonnie & Clyde").length).toBe(2);
   });
 
   it("resolves Plant Detail Last activity summary with the nutrient line name instead of '(quick log)'", () => {

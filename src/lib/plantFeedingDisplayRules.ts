@@ -109,6 +109,17 @@ export function resolveFeedingNutrientLineName(details: unknown): string | null 
   return null;
 }
 
+/**
+ * True only when the note already IS the line name, or already starts with the
+ * `<line> · ` prefix this module prepends. A grower note that merely contains
+ * the line text (line "Grow", note "Strong growth today") is not a match.
+ */
+function noteAlreadyShowsLine(note: string, lineName: string): boolean {
+  const lowerNote = note.toLowerCase();
+  const lowerLine = lineName.toLowerCase();
+  return lowerNote === lowerLine || lowerNote.startsWith(`${lowerLine} · `);
+}
+
 function isFeedingRow(row: PlainRecord, details: PlainRecord | null): boolean {
   for (const key of ["entry_type", "entryType", "event_type", "eventType", "type"]) {
     const v = row[key];
@@ -157,7 +168,7 @@ export function enrichPlantFeedingDiaryRow<T>(row: T): T {
     } else if (placeholder) {
       nextNote = "";
     }
-  } else if (lineName && !rawNote.toLowerCase().includes(lineName.toLowerCase())) {
+  } else if (lineName && !noteAlreadyShowsLine(rawNote, lineName)) {
     nextNote = `${lineName} · ${rawNote}`;
   }
 

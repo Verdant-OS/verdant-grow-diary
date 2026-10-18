@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import {
   applyLinkedEventTypes,
+  buildLinkedSpineTypeMap,
   collectLinkedEventIdsNeedingType,
 } from "@/lib/diaryLinkedEventTypeRules";
 
@@ -39,7 +40,8 @@ export async function fetchPlantRecentActivityRows(plantId: string) {
  * (a Quick Log watering read as "NOTE"). Recover the type from the linked
  * grow_events rows. A failed lookup keeps the rows exactly as read.
  */
-async function withLinkedEventTypes<T>(rows: T[]): Promise<T[]> {
+export async function withLinkedEventTypes<T>(rows: T[]): Promise<T[]> {
+  if (!Array.isArray(rows)) return rows;
   const ids = collectLinkedEventIdsNeedingType(rows);
   if (ids.length === 0) return rows;
   try {
@@ -48,30 +50,7 @@ async function withLinkedEventTypes<T>(rows: T[]): Promise<T[]> {
       .select("id,event_type,feeding_events(line_id,nutrient_brand)")
       .in("id", ids);
     if (error || !Array.isArray(data)) return rows;
-    const types = new Map<string, unknown>();
-    for (const e of data as Array<{
-      id?: unknown;
-      event_type?: unknown;
-      feeding_events?: unknown;
-    }>) {
-      if (typeof e?.id !== "string") continue;
-      const feedRel = Array.isArray(e.feeding_events) ? e.feeding_events[0] : e.feeding_events;
-      const feedObj =
-        feedRel && typeof feedRel === "object" && !Array.isArray(feedRel)
-          ? (feedRel as Record<string, unknown>)
-          : null;
-      const lineId =
-        typeof feedObj?.line_id === "string" && feedObj.line_id.trim() !== ""
-          ? feedObj.line_id.trim()
-          : typeof feedObj?.nutrient_brand === "string" && feedObj.nutrient_brand.trim() !== ""
-            ? feedObj.nutrient_brand.trim()
-            : null;
-      types.set(
-        e.id.toLowerCase(),
-        lineId ? { event_type: e.event_type, line_id: lineId } : e.event_type,
-      );
-    }
-    return applyLinkedEventTypes(rows, types);
+    return applyLinkedEventTypes(rows, buildLinkedSpineTypeMap(data));
   } catch {
     return rows;
   }

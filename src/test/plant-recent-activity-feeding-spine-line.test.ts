@@ -41,19 +41,17 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
       if (table === "diary_entries") {
-        return {
-          select: () => ({
-            eq: () => ({
-              order: () => ({
-                order: () => ({
-                  order: () => ({
-                    limit: async () => ({ data: backend.diary, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          }),
-        };
+        // Fluent double shared by Recent activity (3 orders) and the full
+        // Relative Timeline page fetch (2 orders, exact count).
+        const chain: Record<string, unknown> = {};
+        chain.eq = () => chain;
+        chain.order = () => chain;
+        chain.limit = async () => ({
+          data: backend.diary,
+          error: null,
+          count: backend.diary.length,
+        });
+        return { select: () => chain };
       }
       if (table === "grow_events") {
         return {
@@ -104,5 +102,28 @@ describe("fetchPlantRecentActivityRows — feeding spine nutrient line", () => {
     const details = rows[0]?.details as Record<string, unknown>;
     expect(details.line_id).toBe("General Hydroponics");
     expect(recapSummary(rows)).toEqual(["General Hydroponics"]);
+  });
+});
+
+describe("fetchPlantRelativeHistoryPage — feeding spine nutrient line", () => {
+  it("resolves an untyped linked mirror's feeding type and line before enrichment", async () => {
+    // Codex P2 at 1a1985f3: the full Relative Timeline never ran the spine
+    // lookup, so this mirror stayed a Note showing "(quick log)".
+    const { fetchPlantRelativeHistoryPage } =
+      await import("@/hooks/usePlantRelativeTimelineHistory");
+    backend.diary = [feedingMirror()];
+    backend.spine = [
+      {
+        id: SPINE,
+        event_type: "feeding",
+        feeding_events: [{ line_id: "Flora Series", nutrient_brand: null }],
+      },
+    ];
+    const page = await fetchPlantRelativeHistoryPage(PLANT, null);
+    const details = page.rows[0]?.details as Record<string, unknown>;
+    expect(details.event_type).toBe("feeding");
+    expect(details.line_id).toBe("Flora Series");
+    expect(page.totalCount).toBe(1);
+    expect(recapSummary(page.rows)).toEqual(["Flora Series"]);
   });
 });

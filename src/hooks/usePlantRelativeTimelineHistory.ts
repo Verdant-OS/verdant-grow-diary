@@ -12,6 +12,7 @@ import {
   type PlantHistoryCursor,
 } from "@/lib/plantRelativeTimelineHistoryRules";
 import { enrichPlantFeedingDiaryRows } from "@/lib/plantFeedingDisplayRules";
+import { withLinkedEventTypes } from "@/hooks/usePlantRecentActivity";
 
 export function plantRelativeHistoryQueryKey(
   plantId: string | null | undefined,
@@ -44,13 +45,17 @@ export async function fetchPlantRelativeHistoryPage(
   });
   rethrowIfAbortError(result.error);
   if (result.error) throw result.error;
-  return buildPlantHistoryPage(
+  const page = buildPlantHistoryPage(
     result.data,
     cursor ? null : result.count,
     plantId,
     PLANT_RELATIVE_HISTORY_PAGE_SIZE,
     ownerId,
   );
+  // Untyped Quick Log mirrors carry only linked_grow_event_id; recover their
+  // spine type and feeding line (after the page's ownership check) so the full
+  // timeline enriches them the same way Recent activity does.
+  return { ...page, rows: await withLinkedEventTypes(page.rows) };
 }
 
 export function usePlantRelativeTimelineHistory(plantId: string | null | undefined) {

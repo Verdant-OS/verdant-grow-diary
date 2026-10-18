@@ -2,11 +2,9 @@
  * AI Doctor Sessions — supplementary regression for clearing an applied saved view.
  *
  * Complements ai-doctor-sessions-saved-view-clear-option.test.tsx (scorer-locked on #2237):
- * pins the applySavedView → clearFilters wiring and the built-in badge / filter chrome
- * that must disappear when the empty select option is chosen.
+ * pins, through the rendered page, that choosing the empty select option resets every
+ * filter to its default and removes the built-in badge and Clear-filters chrome.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
@@ -14,6 +12,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import { DEFAULT_FILTERS } from "@/lib/aiDoctorSessionsIndexFilters";
 import {
   BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID,
   SAVED_VIEWS_STORAGE_KEY,
@@ -96,18 +95,17 @@ describe("AiDoctorSessionsIndex — saved-view clear regression", () => {
     await waitFor(() => expect(select.value).toBe(""));
     expect(screen.queryByTestId("ai-doctor-sessions-saved-views-builtin-badge")).toBeNull();
     expect(screen.queryByTestId("ai-doctor-sessions-index-clear-filters")).toBeNull();
-  });
-});
-
-describe("AiDoctorSessionsIndex — saved-view clear wiring (static)", () => {
-  const PAGE = readFileSync(
-    resolve(__dirname, "../../src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
-
-  it("applySavedView invokes clearFilters when the empty option is chosen", () => {
-    expect(PAGE).toMatch(
-      /const applySavedView = \(id: string\) => \{[\s\S]*?if \(!id\) \{\s*clearFilters\(\);/,
+    const filterValue = (id: string) => (screen.getByTestId(id) as HTMLSelectElement).value;
+    expect(filterValue("ai-doctor-sessions-index-filter-risk")).toBe(DEFAULT_FILTERS.risk);
+    expect(filterValue("ai-doctor-sessions-index-filter-needs-review")).toBe(
+      DEFAULT_FILTERS.needsReview,
+    );
+    expect(filterValue("ai-doctor-sessions-index-filter-caution")).toBe(DEFAULT_FILTERS.caution);
+    expect(filterValue("ai-doctor-sessions-index-filter-has-checklist")).toBe(
+      DEFAULT_FILTERS.hasChecklist,
+    );
+    expect(filterValue("ai-doctor-sessions-index-filter-review-status")).toBe(
+      DEFAULT_FILTERS.reviewStatus,
     );
   });
 });

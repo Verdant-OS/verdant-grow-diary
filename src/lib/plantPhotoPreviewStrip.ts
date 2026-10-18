@@ -127,6 +127,20 @@ export function buildPlantPhotoStripItemsWithSource(
  * Public display projection for the photo strip. It intentionally removes
  * private source diary ids before returning data to generic presenters.
  */
+/**
+ * Hero photo: the plant profile URL wins. When it is blank, use the newest
+ * photo-strip thumbnail (already the first newest-first strip item).
+ */
+export function resolvePlantHeroPhotoSrc(
+  profilePhoto: string | null | undefined,
+  newestStripThumbnailUrl: string | null | undefined,
+): string | null {
+  const profile = (profilePhoto ?? "").trim();
+  if (profile) return profile;
+  const strip = (newestStripThumbnailUrl ?? "").trim();
+  return strip || null;
+}
+
 export function buildPlantPhotoStripItems(input: PlantPhotoStripInput): PlantPhotoStripItem[] {
   return buildPlantPhotoStripItemsWithSource(input).map(
     ({ sourcePhotoId: _sourcePhotoId, ...item }) => item,

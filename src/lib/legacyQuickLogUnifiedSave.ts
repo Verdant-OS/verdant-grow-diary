@@ -33,6 +33,10 @@ import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
 import type { PhenoEvidenceReceiptDetails } from "./phenoEvidenceCaptureRules";
+import {
+  QUICK_LOG_WATER_VOLUME_MAX_ML,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "./quickLogWateringFormViewModel";
 
 /**
  * Redacted sensor envelope produced by `buildSensorSnapshotSavePayload`.
@@ -274,6 +278,15 @@ export function buildLegacyQuickLogUnifiedPayload(
         ok: false,
         reason: "invalid_volume",
         message: "Add a watering volume (ml) to save a watering log.",
+      };
+    }
+    // Same single-watering ceiling as the structured Water form and the V2
+    // payload, so a resumed public-starter draft cannot persist 1,000,000 ml.
+    if (volume > QUICK_LOG_WATER_VOLUME_MAX_ML) {
+      return {
+        ok: false,
+        reason: "volume_too_large",
+        message: QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
       };
     }
     return {

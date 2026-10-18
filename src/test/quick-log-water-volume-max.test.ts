@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import {
   QUICK_LOG_WATER_VOLUME_MAX_ML,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
   buildWateringFormPayload,
   EMPTY_QUICKLOG_WATERING_FORM,
   wateringFormReasonToHelper,
@@ -14,6 +15,8 @@ import {
 import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import { buildLegacyQuickLogUnifiedPayload } from "@/lib/legacyQuickLogUnifiedSave";
+import { validatePublicQuickLogStarterInput } from "@/lib/publicQuickLogStarterRules";
 
 const TOO_LARGE = /too large \(max 50,000 ml\)/i;
 
@@ -66,6 +69,61 @@ describe("Quick Log water volume ceiling", () => {
     if (!r.ok) {
       expect(r.reason).toBe("volume_too_large");
       expect(quickLogReasonToOperatorMessage(r.reason)).toMatch(TOO_LARGE);
+    }
+  });
+});
+
+describe("Quick Log water volume ceiling on the public-starter legacy path", () => {
+  const legacyBase = {
+    eventType: "watering",
+    idempotencyKey: "quicklog-legacy-volume-max-key",
+    noteWithHardware: "",
+    plantId: "11111111-1111-1111-1111-111111111111",
+    plantTentId: "22222222-2222-2222-2222-222222222222",
+    details: { ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" },
+  };
+
+  it("legacy adapter accepts exactly the ceiling", () => {
+    const r = buildLegacyQuickLogUnifiedPayload({
+      ...legacyBase,
+      details: { ...legacyBase.details, watering: "50000" },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.p_volume_ml).toBe(50_000);
+  });
+
+  it("legacy adapter refuses one ml above the ceiling and 1,000,000 ml", () => {
+    for (const watering of ["50001", "1000000"]) {
+      const r = buildLegacyQuickLogUnifiedPayload({
+        ...legacyBase,
+        details: { ...legacyBase.details, watering },
+      });
+      expect(r.ok, watering).toBe(false);
+      if (!r.ok) {
+        expect(r.reason).toBe("volume_too_large");
+        expect(r.message).toBe(QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE);
+      }
+    }
+  });
+
+  const starterInput = {
+    plantNickname: "Test Plant",
+    stage: "",
+    logType: "watering",
+    note: "",
+  };
+
+  it("starter validation accepts exactly the ceiling", () => {
+    const v = validatePublicQuickLogStarterInput({ ...starterInput, wateringVolumeRaw: "50000" });
+    expect(v.errors).toEqual({});
+    expect(v.fields?.wateringVolumeMl).toBe(50_000);
+  });
+
+  it("starter validation refuses volumes above the ceiling with the shared message", () => {
+    for (const raw of ["50001", "1000000"]) {
+      const v = validatePublicQuickLogStarterInput({ ...starterInput, wateringVolumeRaw: raw });
+      expect(v.fields, raw).toBeNull();
+      expect(v.errors.wateringVolumeMl, raw).toBe(QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE);
     }
   });
 });

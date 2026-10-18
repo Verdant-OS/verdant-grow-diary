@@ -21,6 +21,10 @@
  */
 import { normalizeQuickLogStage, UNKNOWN_STAGE } from "@/lib/quickLogStageDefaultRules";
 import { parseOptionalNumber } from "@/lib/quickLogRules";
+import {
+  QUICK_LOG_WATER_VOLUME_MAX_ML,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "@/lib/quickLogWateringFormViewModel";
 import { SAFE_UTM_KEYS, type SafeUtmKey } from "@/lib/utm/preserveUtm";
 
 /**
@@ -178,6 +182,9 @@ export function validatePublicQuickLogStarterInput(
     wateringVolumeMl = parseOptionalNumber(input.wateringVolumeRaw);
     if (wateringVolumeMl === null || !Number.isFinite(wateringVolumeMl) || wateringVolumeMl <= 0) {
       errors.wateringVolumeMl = "Enter how much water you gave, in ml (a number above 0).";
+      wateringVolumeMl = null;
+    } else if (wateringVolumeMl > QUICK_LOG_WATER_VOLUME_MAX_ML) {
+      errors.wateringVolumeMl = QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE;
       wateringVolumeMl = null;
     }
   }

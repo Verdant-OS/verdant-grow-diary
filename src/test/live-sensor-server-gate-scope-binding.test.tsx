@@ -114,6 +114,41 @@ describe("live-sensor server gate — decision bound to the evaluated tent", () 
     expect(result.current.mount).toBe(false);
   });
 
+  // Codex P2 at 7a9fdc7e: A -> B -> A before B settles must not reuse the
+  // first visit's A decision; only the fresh A preflight may count.
+  it("revisiting a tent: A -> B -> A ignores the earlier A decision until a fresh check settles", async () => {
+    const { result, rerender } = renderGate(TENT_A);
+    await settle(pending.calls[0], ALLOW);
+    expect(result.current.mount).toBe(true);
+
+    rerender({ tentId: TENT_B });
+    rerender({ tentId: TENT_A });
+    // Back on A, the first visit's allowed is stale: pending, fail closed.
+    expect(result.current.gate.state).toBe("loading");
+    expect(result.current.mount).toBe(false);
+
+    const freshA = pending.calls[2];
+    expect(freshA?.body.tent_id).toBe(TENT_A);
+    // B settling late (allowed) is superseded and cannot mount A or B.
+    await settle(pending.calls[1], ALLOW);
+    expect(result.current.mount).toBe(false);
+
+    // Access revoked since the first visit: the fresh A check denies.
+    await settle(freshA, DENY);
+    expect(result.current.gate.state).toBe("denied");
+    expect(result.current.mount).toBe(false);
+  });
+
+  it("revisiting a tent: a fresh A allowed mounts again", async () => {
+    const { result, rerender } = renderGate(TENT_A);
+    await settle(pending.calls[0], DENY);
+    rerender({ tentId: TENT_B });
+    rerender({ tentId: TENT_A });
+    expect(result.current.gate.state).toBe("loading");
+    await settle(pending.calls[2], ALLOW);
+    expect(result.current.mount).toBe(true);
+  });
+
   it("unscoped allowed on its own does not mount (no evaluated tent)", async () => {
     const { result } = renderGate(null);
     await settle(pending.calls[0], ALLOW);

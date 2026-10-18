@@ -106,8 +106,11 @@ export const requireLiveSensorAccess = checkLiveSensorEntitlement;
  * `result` is null — including the first render after a scope change,
  * before the effect runs. Completions of superseded requests are ignored
  * (request-local cancellation), so a late response for an earlier scope can
- * never overwrite the current decision. `evaluatedTentId` is the tent the
- * returned decision was evaluated for (null when unscoped or pending).
+ * never overwrite the current decision. Every scope transition discards the
+ * stored decision, so revisiting a scope (A -> B -> A) never reuses the
+ * earlier visit's result; only the fresh preflight for this visit counts.
+ * `evaluatedTentId` is the tent the returned decision was evaluated for
+ * (null when unscoped or pending).
  */
 export function useLiveSensorServerGate(surface: LiveSensorSurface, scope: LiveSensorScope = {}) {
   const scopeKey = `${surface}|${scope.growId ?? ""}|${scope.tentId ?? ""}|${scope.plantId ?? ""}`;
@@ -116,6 +119,14 @@ export function useLiveSensorServerGate(surface: LiveSensorSurface, scope: LiveS
     tentId: string | null;
     result: LiveSensorGateResult;
   } | null>(null);
+  // Scope-visit identity: on any transition, drop the previous decision during
+  // render (React re-renders before committing), so no render of the new
+  // visit can see a decision from an earlier visit of the same scope.
+  const [visitKey, setVisitKey] = useState(scopeKey);
+  if (visitKey !== scopeKey) {
+    setVisitKey(scopeKey);
+    setDecision(null);
+  }
 
   useEffect(() => {
     let cancelled = false;

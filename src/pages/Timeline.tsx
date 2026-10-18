@@ -119,6 +119,7 @@ import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayR
 import {
   completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
+  formatTimelineManualSensorReceiptForUnit,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
@@ -1209,8 +1210,14 @@ export default function Timeline() {
   }, [entries, growEvents, supplementalLinkedGrowEvents]);
 
   const displayEntries = useMemo(
-    () => mergeTimelineMeasurementDisplayEntries(enrichedEntries, manualSensorMeasurementEntries),
-    [enrichedEntries, manualSensorMeasurementEntries],
+    () =>
+      mergeTimelineMeasurementDisplayEntries(
+        enrichedEntries,
+        manualSensorMeasurementEntries.map((entry) =>
+          formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+        ),
+      ),
+    [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
   );
 
   // Canonical Action Response Memory (read-only). One grower response renders
@@ -2689,7 +2696,7 @@ export default function Timeline() {
                           const { sensorViewModel, reviewMessage, warningMessage } =
                             buildTimelineCardSensorSnapshotViewModel(
                               { sensor, useManualValidation },
-                              { validateManualCompatibility: true },
+                              { validateManualCompatibility: true, temperatureUnit },
                             );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0

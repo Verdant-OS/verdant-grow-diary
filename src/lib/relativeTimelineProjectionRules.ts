@@ -736,19 +736,16 @@ export interface RelativeTimelineHeaderView {
   compact: string;
 }
 
-const HEADER_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
 function formatHeaderDate(iso: string | null): string | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
   try {
-    return HEADER_DATE_FORMATTER.format(new Date(ms));
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(ms));
   } catch {
     return null;
   }

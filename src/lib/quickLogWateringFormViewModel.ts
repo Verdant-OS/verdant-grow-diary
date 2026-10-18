@@ -146,6 +146,26 @@ export const QUICK_LOG_WATER_VOLUME_MAX_ML = 50_000;
 export const QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE =
   "Applied volume is too large (max 50,000 ml). Check the number and save again." as const;
 
+export type WateringVolumeInputAssessment =
+  { ok: true; value: number } | { ok: false; reason: "missing" | "invalid" | "too_large" };
+
+/**
+ * One typed watering volume, parsed with the same plain-decimal grammar as
+ * the structured Water form (so `0x10` / `1e2` are invalid, not 16 / 100)
+ * and checked against the single-watering ceiling. Shared by entry points
+ * that do not go through buildWateringFormPayload (the legacy editor).
+ */
+export function assessWateringVolumeInput(
+  raw: string | null | undefined,
+): WateringVolumeInputAssessment {
+  const parsed = parseOptionalNumber(raw);
+  if (!parsed.ok) return { ok: false, reason: "invalid" };
+  if (parsed.value === null) return { ok: false, reason: "missing" };
+  if (parsed.value <= 0) return { ok: false, reason: "invalid" };
+  if (parsed.value > QUICK_LOG_WATER_VOLUME_MAX_ML) return { ok: false, reason: "too_large" };
+  return { ok: true, value: parsed.value };
+}
+
 export function buildWateringFormPayload(
   input: BuildWateringFormPayloadInput,
 ): BuildWateringFormPayloadResult {

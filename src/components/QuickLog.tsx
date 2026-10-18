@@ -125,7 +125,7 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
-  QUICK_LOG_WATER_VOLUME_MAX_ML,
+  assessWateringVolumeInput,
   QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
 } from "@/lib/quickLogWateringFormViewModel";
 import {
@@ -1504,13 +1504,12 @@ export default function QuickLog({
       return;
     }
     if (saveEventType === "watering") {
-      const raw = details.watering.trim();
-      const vol = Number(raw);
-      const tooLarge = Number.isFinite(vol) && vol > QUICK_LOG_WATER_VOLUME_MAX_ML;
-      if (!raw || !Number.isFinite(vol) || vol <= 0 || tooLarge) {
-        const message = tooLarge
-          ? QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE
-          : "Add a watering volume (ml) to save.";
+      const assessedVolume = assessWateringVolumeInput(details.watering);
+      if (!assessedVolume.ok) {
+        const message =
+          assessedVolume.reason === "too_large"
+            ? QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE
+            : "Add a watering volume (ml) to save.";
         setShowMore(true);
         setWateringError(message);
         setSaveError(message);

@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   QUICK_LOG_WATER_VOLUME_MAX_ML,
   QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+  assessWateringVolumeInput,
   buildWateringFormPayload,
   EMPTY_QUICKLOG_WATERING_FORM,
   wateringFormReasonToHelper,
@@ -124,6 +125,38 @@ describe("Quick Log water volume ceiling on the public-starter legacy path", () 
       const v = validatePublicQuickLogStarterInput({ ...starterInput, wateringVolumeRaw: raw });
       expect(v.fields, raw).toBeNull();
       expect(v.errors.wateringVolumeMl, raw).toBe(QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE);
+    }
+  });
+});
+
+describe("legacy watering volume uses the structured form's plain-decimal grammar", () => {
+  const legacyBase = {
+    eventType: "watering",
+    idempotencyKey: "quicklog-legacy-volume-grammar-key",
+    noteWithHardware: "",
+    plantId: "11111111-1111-1111-1111-111111111111",
+    plantTentId: "22222222-2222-2222-2222-222222222222",
+    details: { ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" },
+  };
+
+  it("assessWateringVolumeInput matches the form's outcomes", () => {
+    expect(assessWateringVolumeInput(" 500 ")).toEqual({ ok: true, value: 500 });
+    expect(assessWateringVolumeInput("50000")).toEqual({ ok: true, value: 50_000 });
+    expect(assessWateringVolumeInput("")).toEqual({ ok: false, reason: "missing" });
+    expect(assessWateringVolumeInput("50001")).toEqual({ ok: false, reason: "too_large" });
+    for (const raw of ["0x10", "1e2", "Infinity", "-5", "0", "abc"]) {
+      expect(assessWateringVolumeInput(raw), raw).toEqual({ ok: false, reason: "invalid" });
+    }
+  });
+
+  it("legacy adapter refuses hex and exponent volumes instead of reading them as numbers", () => {
+    for (const watering of ["0x10", "1e2"]) {
+      const r = buildLegacyQuickLogUnifiedPayload({
+        ...legacyBase,
+        details: { ...legacyBase.details, watering },
+      });
+      expect(r.ok, watering).toBe(false);
+      if (!r.ok) expect(r.reason).toBe("invalid_volume");
     }
   });
 });

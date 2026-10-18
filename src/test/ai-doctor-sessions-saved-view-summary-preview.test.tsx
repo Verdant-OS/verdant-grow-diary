@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
@@ -189,7 +189,7 @@ describe("Saved-view summary preview", () => {
     await screen.findByTestId(PREVIEW_TID);
     const clear = await screen.findByTestId("ai-doctor-sessions-index-clear-filters");
     fireEvent.click(clear);
-    expect(screen.queryByTestId(PREVIEW_TID)).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId(PREVIEW_TID)).toBeNull());
   });
 });
 

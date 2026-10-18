@@ -54,7 +54,11 @@ import {
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 import { SandboxCheckoutTestModeNote } from "@/components/SandboxCheckoutTestModeNote";
-import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
+import {
+  CHECKOUT_LIVE_FAQ_ID,
+  CHECKOUT_LIVE_FAQ_ITEM_VALUE,
+  resolvePricingFaqValueForHash,
+} from "@/lib/sandboxCheckoutTestModeNoteRules";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -223,6 +227,7 @@ export default function Pricing() {
   const recoveryRef = useRef<HTMLElement>(null);
   const creditPacksRef = useRef<HTMLElement>(null);
   const handledCreditPacksHashRef = useRef<string | null>(null);
+  const [openFaqItem, setOpenFaqItem] = useState<string>("");
   const {
     openCheckout,
     loading: checkoutLoading,
@@ -459,6 +464,45 @@ export default function Pricing() {
   }, [location.hash, preselectedCreditPack]);
 
   useEffect(() => {
+    const scrollToCheckoutLiveFaq = () => {
+      if (typeof document === "undefined") return;
+      const target = document.getElementById(CHECKOUT_LIVE_FAQ_ID);
+      if (!target || typeof target.scrollIntoView !== "function") return;
+      try {
+        target.scrollIntoView({
+          behavior: isReducedMotionPreferred() ? "auto" : "smooth",
+          block: "start",
+        });
+      } catch {
+        try {
+          target.scrollIntoView();
+        } catch {
+          // Presentation-only fallback; ignore in non-browser/jsdom environments.
+        }
+      }
+    };
+
+    const faqValue =
+      (typeof window !== "undefined"
+        ? resolvePricingFaqValueForHash(window.location.hash)
+        : null) ?? resolvePricingFaqValueForHash(location.hash);
+    if (faqValue) {
+      setOpenFaqItem(faqValue);
+      scrollToCheckoutLiveFaq();
+    }
+
+    if (typeof window === "undefined") return;
+    const handleHashChange = () => {
+      const nextFaqValue = resolvePricingFaqValueForHash(window.location.hash);
+      if (!nextFaqValue) return;
+      setOpenFaqItem(nextFaqValue);
+      scrollToCheckoutLiveFaq();
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [location.hash]);
+
+  useEffect(() => {
     if (!blockedReason) {
       // openCheckout clears blockedReason on a fresh attempt; drop the SKU
       // binding with it so a stale one can never keep a button labelled
@@ -617,14 +661,21 @@ export default function Pricing() {
 
       {/* Billing toggle */}
       <section className="px-6 pb-8 max-w-6xl mx-auto flex items-center justify-center gap-3">
-        <span
+        <button
+          type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "monthly" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
+          aria-pressed={billing === "monthly"}
+          onClick={() => {
+            setBilling("monthly");
+            setInterestPlan("pro_monthly");
+            trackPricingEvent("pricing_billing_toggle", { period: "monthly" });
+          }}
         >
           Monthly
-        </span>
+        </button>
         <button
           data-testid="billing-toggle"
           type="button"
@@ -646,18 +697,28 @@ export default function Pricing() {
             ].join(" ")}
           />
         </button>
-        <span
+        <button
+          type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "annual" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
+          aria-pressed={billing === "annual"}
+          onClick={() => {
+            setBilling("annual");
+            setInterestPlan("pro_annual");
+            trackPricingEvent("pricing_billing_toggle", { period: "annual" });
+          }}
         >
           Annual
-        </span>
+        </button>
       </section>
 
       <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
-        <SandboxCheckoutTestModeNote environment={checkoutEnvironment} />
+        <SandboxCheckoutTestModeNote
+          environment={checkoutEnvironment}
+          onCheckoutLiveClick={() => setOpenFaqItem(CHECKOUT_LIVE_FAQ_ITEM_VALUE)}
+        />
         <div
           data-testid="pricing-checkout-trust"
           data-checkout-state={checkoutTrustCopy.state}
@@ -1272,7 +1333,9 @@ export default function Pricing() {
           type="single"
           collapsible
           className="mt-6"
+          value={openFaqItem}
           onValueChange={(value) => {
+            setOpenFaqItem(value);
             if (value) trackPricingEvent("pricing_faq_opened", { item: value });
           }}
         >

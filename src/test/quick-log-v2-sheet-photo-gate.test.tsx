@@ -20,6 +20,9 @@ const diaryMaybeSingleMock = vi.fn();
 const diaryOwnerEqMock = vi.fn((..._args: unknown[]) => ({ maybeSingle: diaryMaybeSingleMock }));
 const diaryIdEqMock = vi.fn((..._args: unknown[]) => ({ eq: diaryOwnerEqMock }));
 const diarySelectMock = vi.fn((..._args: unknown[]) => ({ eq: diaryIdEqMock }));
+/** diary_entries photo_url fill: `update(patch).filter(...).select()`. */
+const updateCalls: Array<{ table: string; patch: Record<string, unknown>; filter: unknown[] }> = [];
+const diaryUpdateSelectMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -39,6 +42,12 @@ vi.mock("@/integrations/supabase/client", () => ({
         return diaryInsertMock(table, payload);
       },
       select: (...args: unknown[]) => diarySelectMock(table, ...args),
+      update: (patch: Record<string, unknown>) => ({
+        filter: (...filter: unknown[]) => {
+          updateCalls.push({ table, patch, filter });
+          return { select: () => diaryUpdateSelectMock() };
+        },
+      }),
     }),
   },
 }));
@@ -101,7 +110,12 @@ beforeEach(() => {
   diarySelectMock.mockClear();
   uploadCalls.length = 0;
   insertCalls.length = 0;
-  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
+  updateCalls.length = 0;
+  diaryUpdateSelectMock.mockReset().mockResolvedValue({ data: [{ id: "diary-1" }], error: null });
+  rpcMock.mockResolvedValue({
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
+    error: null,
+  });
   storageUploadMock.mockImplementation(async (_bucket: unknown, path: unknown) => ({
     data: { path: String(path) },
     error: null,
@@ -151,7 +165,7 @@ describe("QuickLogV2Sheet — photo attachment", () => {
     expect(library.value).toBe("");
   });
 
-  it("saves note plus library photo through diary-photos and companion diary entry", async () => {
+  it("saves note plus library photo in the single RPC write, with no companion insert", async () => {
     renderSheet();
     const library = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
     await pickFile(library, makeImage("library.jpg"));
@@ -166,24 +180,28 @@ describe("QuickLogV2Sheet — photo attachment", () => {
     await waitFor(() => {
       expect(uploadCalls).toHaveLength(1);
       expect(rpcMock).toHaveBeenCalledTimes(1);
-      expect(insertCalls).toHaveLength(1);
+      expect(updateCalls).toHaveLength(1);
     });
 
     expect(uploadCalls[0].bucket).toBe("diary-photos");
     expect(uploadCalls[0].path.startsWith("user-test-1/grow-1/")).toBe(true);
-    expect(insertCalls[0].table).toBe("diary_entries");
-    expect(insertCalls[0].payload.photo_url).toBe(uploadCalls[0].path);
-    expect(insertCalls[0].payload.grow_id).toBe("grow-1");
-    expect(insertCalls[0].payload.plant_id).toBe("plant-1");
-    expect(insertCalls[0].payload.tent_id).toBe("tent-1");
+    // Production QA 2026-10-14: a second diary_entries insert produced a twin
+    // "Photo attached" Timeline entry. The path now rides in p_details and the
+    // RPC's mirror row is the only diary row.
+    expect(insertCalls).toHaveLength(0);
+    const payload = rpcMock.mock.calls[0][1] as { p_details?: Record<string, unknown> };
+    expect(payload.p_details?.photo_url).toBe(uploadCalls[0].path);
+    expect(updateCalls[0].table).toBe("diary_entries");
+    expect(updateCalls[0].patch).toEqual({ photo_url: uploadCalls[0].path });
+    expect(updateCalls[0].filter).toEqual([
+      "details->>linked_grow_event_id",
+      "eq",
+      "77777777-7777-4777-8777-000000000001",
+    ]);
   });
 
-  it("marks a reconciled response loss as a saved photo instead of partial failure", async () => {
-    diaryInsertMock.mockRejectedValueOnce(new Error("response lost"));
-    diaryMaybeSingleMock.mockImplementationOnce(async () => ({
-      data: { id: insertCalls[0]?.payload.id as string },
-      error: null,
-    }));
+  it("reports the photo saved when the photo_url fill returns an error", async () => {
+    diaryUpdateSelectMock.mockResolvedValueOnce({ data: null, error: { message: "fence" } });
 
     renderSheet();
     const library = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
@@ -196,13 +214,14 @@ describe("QuickLogV2Sheet — photo attachment", () => {
     await waitFor(() => {
       expect(screen.getByTestId("qlv2-save-status")).toHaveTextContent("Log and photo saved");
     });
-    expect(diaryOwnerEqMock).toHaveBeenCalledWith("user_id", "user-test-1");
+    // details.photo_url is persisted by the RPC: never delete the object.
     expect(storageRemoveMock).not.toHaveBeenCalled();
+    expect(insertCalls).toHaveLength(0);
     expect(screen.queryByText(/attachment status uncertain/i)).toBeNull();
   });
 
-  it("keeps the committed log as partial success and retains the photo when reconciliation is unconfirmed", async () => {
-    diaryInsertMock.mockRejectedValueOnce(new Error("response lost"));
+  it("reports the photo saved and keeps the object when the photo_url fill throws", async () => {
+    diaryUpdateSelectMock.mockRejectedValueOnce(new Error("response lost"));
 
     renderSheet();
     const library = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
@@ -213,10 +232,10 @@ describe("QuickLogV2Sheet — photo attachment", () => {
     fireEvent.click(screen.getByTestId("qlv2-save"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("qlv2-save-status")).toHaveTextContent("Log saved");
-      expect(screen.getByText(/Log saved — attachment status uncertain/i)).toBeTruthy();
+      expect(screen.getByTestId("qlv2-save-status")).toHaveTextContent("Log and photo saved");
     });
-    expect(diaryOwnerEqMock).toHaveBeenCalledWith("user_id", "user-test-1");
     expect(storageRemoveMock).not.toHaveBeenCalled();
+    expect(insertCalls).toHaveLength(0);
+    expect(screen.queryByText(/attachment status uncertain/i)).toBeNull();
   });
 });

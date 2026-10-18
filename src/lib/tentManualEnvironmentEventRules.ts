@@ -58,6 +58,8 @@ export interface TentManualEnvChangeContextRow {
   value: number;
   source: typeof TENT_MANUAL_ENV_EVENT_SOURCE;
   tent_id: string;
+  /** The grow_events id, so same-instant saves are not merged into one snapshot. */
+  snapshot_id: string;
 }
 
 function finiteOrNull(v: NumericLike): number | null {
@@ -118,6 +120,7 @@ export function manualEnvironmentEventsToChangeContextRows(
         value,
         source: TENT_MANUAL_ENV_EVENT_SOURCE,
         tent_id: ev.tentId,
+        snapshot_id: ev.id,
       });
     }
   }
@@ -146,6 +149,41 @@ export function manualEnvironmentEventsToSnapshotRecords(
     });
   }
   return out;
+}
+
+/**
+ * The grow_events id a Quick Log diary companion mirrors, read from
+ * `details.linked_grow_event_id` or `details.grow_event_id` (the same two
+ * keys quicklog_save_manual matches). Null for any other diary row.
+ */
+export function diaryRowMirroredGrowEventId(details: unknown): string | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const d = details as Record<string, unknown>;
+  for (const k of ["linked_grow_event_id", "grow_event_id"]) {
+    const v = d[k];
+    if (typeof v === "string" && v.trim() !== "") return v.trim();
+  }
+  return null;
+}
+
+/**
+ * A Plant Quick Log save writes one grow_events row and a diary companion
+ * that keeps `details.manual_sensor_snapshot`, so both reads return the same
+ * reading. Drop the events a fetched diary companion already mirrors; the
+ * companion keeps its note and pH/EC, exactly as the timeline showed it
+ * before grow_events were read. Input order is preserved.
+ */
+export function dropEventsMirroredByDiaryRows<E extends { id: string }>(
+  events: ReadonlyArray<E>,
+  diaryRows: ReadonlyArray<{ details: unknown }>,
+): E[] {
+  const mirrored = new Set<string>();
+  for (const row of diaryRows) {
+    const id = diaryRowMirroredGrowEventId(row?.details);
+    if (id) mirrored.add(id);
+  }
+  if (mirrored.size === 0) return [...events];
+  return events.filter((ev) => !mirrored.has(ev.id));
 }
 
 /** The part of a React Query result the tent history read needs. */

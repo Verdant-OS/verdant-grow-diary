@@ -34,9 +34,21 @@ export interface ChangeContextReading {
   value: number | null | undefined;
   source?: string | null;
   tent_id?: string | null;
+  /**
+   * Optional identity of the save this row belongs to. Rows that carry one
+   * group by (ts, snapshot_id), so two saves at the same instant stay two
+   * snapshots. Rows without one (sensor_readings) group by ts as before.
+   */
+  snapshot_id?: string | null;
 }
 
 export interface ChangeContextSnapshot {
+  /**
+   * Stable, unique grouping key: the ISO ts, plus "#<snapshot_id>" when
+   * present. Always set by groupManualReadingsToSnapshots; optional so
+   * hand-built snapshots (ts-only) stay valid and fall back to ts.
+   */
+  key?: string;
   ts: string;
   metrics: Partial<Record<ChangeContextMetric, number>>;
 }
@@ -133,8 +145,11 @@ export function groupManualReadingsToSnapshots(
     if (t === null) continue;
     const v = toFiniteNumber(r.value);
     if (v === null) continue;
-    const key = new Date(t).toISOString();
-    const snap = buckets.get(key) ?? { ts: key, metrics: {} };
+    const iso = new Date(t).toISOString();
+    const snapshotId =
+      typeof r.snapshot_id === "string" && r.snapshot_id !== "" ? r.snapshot_id : null;
+    const key = snapshotId ? `${iso}#${snapshotId}` : iso;
+    const snap = buckets.get(key) ?? { key, ts: iso, metrics: {} };
     // First-write-wins per metric per snapshot — sensor_readings stores
     // one row per metric so duplicates would only come from upstream noise.
     if (snap.metrics[r.metric as ChangeContextMetric] === undefined) {
@@ -142,7 +157,13 @@ export function groupManualReadingsToSnapshots(
     }
     buckets.set(key, snap);
   }
-  return [...buckets.values()].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+  return [...buckets.values()].sort((a, b) => {
+    const dt = new Date(b.ts).getTime() - new Date(a.ts).getTime();
+    if (dt !== 0) return dt;
+    const ka = a.key ?? a.ts;
+    const kb = b.key ?? b.ts;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
 }
 
 function formatDelta(

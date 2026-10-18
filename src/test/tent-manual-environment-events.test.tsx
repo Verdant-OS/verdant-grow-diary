@@ -128,6 +128,7 @@ describe("tent manual environment events — rules", () => {
         value: 35,
         source: "manual",
         tent_id: TENT_ID,
+        snapshot_id: "ev-1",
       },
       {
         ts: "2026-10-14T10:00:00.000Z",
@@ -135,6 +136,7 @@ describe("tent manual environment events — rules", () => {
         value: 20,
         source: "manual",
         tent_id: TENT_ID,
+        snapshot_id: "ev-1",
       },
       {
         ts: "2026-10-14T10:00:00.000Z",
@@ -142,6 +144,7 @@ describe("tent manual environment events — rules", () => {
         value: 2.5,
         source: "manual",
         tent_id: TENT_ID,
+        snapshot_id: "ev-1",
       },
     ]);
   });
@@ -336,5 +339,102 @@ describe("tent manual environment events — Codex review on #2114", () => {
 
     await waitFor(() => expect(screen.getByTestId("probe-count").textContent).toBe("1"));
     expect(db.reads.filter((t) => t === "grow_events").length).toBe(readsBefore + 1);
+  });
+});
+
+import { useManualSnapshotTimelineCards } from "@/hooks/useManualSnapshotTimelineCards";
+import { buildManualSnapshotHistoryList } from "@/lib/manualSensorSnapshotHistoryListRules";
+
+function plantQuickLogCompanion(entryAt: string, linkedGrowEventId: string, id = "diary-1") {
+  return {
+    id,
+    plant_id: "plant-1",
+    tent_id: TENT_ID,
+    entry_at: entryAt,
+    note: "Plant Quick Log",
+    details: {
+      linked_grow_event_id: linkedGrowEventId,
+      manual_sensor_snapshot: { source: "manual", temp_f: 95, humidity_percent: 20 },
+    },
+  };
+}
+
+describe("tent manual snapshots — Codex re-review on #2114", () => {
+  function CardsProbe({ limit }: { limit?: number }) {
+    const r = useManualSnapshotTimelineCards({ kind: "tent", tentId: TENT_ID }, limit);
+    return (
+      <p data-testid="cards-probe" data-status={r.readStatus}>
+        {r.cards.map((c) => c.id).join(",")}
+      </p>
+    );
+  }
+
+  async function cardIds(): Promise<string[]> {
+    await waitFor(() =>
+      expect(screen.getByTestId("cards-probe").getAttribute("data-status")).toBe("success"),
+    );
+    const text = screen.getByTestId("cards-probe").textContent ?? "";
+    return text === "" ? [] : text.split(",");
+  }
+
+  it("renders one card for a Plant Quick Log save that returns from both reads", async () => {
+    const at = "2026-10-14T10:00:00.000Z";
+    db.byTable = {
+      diary_entries: [plantQuickLogCompanion(at, "ev-1")],
+      grow_events: [{ ...eventRow(at, "ev-1"), plant_id: "plant-1" }],
+    };
+    withProviders(<CardsProbe />);
+    expect(await cardIds()).toEqual(["diary-1"]);
+  });
+
+  it("keeps an environment event that no fetched diary row mirrors", async () => {
+    db.byTable = {
+      diary_entries: [plantQuickLogCompanion("2026-10-14T10:00:00.000Z", "ev-1")],
+      grow_events: [eventRow("2026-10-14T11:00:00.000Z", "ev-2")],
+    };
+    withProviders(<CardsProbe />);
+    expect(await cardIds()).toEqual(["ev-2", "diary-1"]);
+  });
+
+  it("re-applies the limit to the merged timeline", async () => {
+    db.byTable = {
+      diary_entries: [
+        plantQuickLogCompanion("2026-10-14T09:00:00.000Z", "other-a", "diary-a"),
+        plantQuickLogCompanion("2026-10-14T07:00:00.000Z", "other-b", "diary-b"),
+      ],
+      grow_events: [
+        eventRow("2026-10-14T10:00:00.000Z", "ev-a"),
+        eventRow("2026-10-14T08:00:00.000Z", "ev-b"),
+      ],
+    };
+    withProviders(<CardsProbe limit={2} />);
+    expect(await cardIds()).toEqual(["ev-a", "diary-a"]);
+  });
+
+  it("keeps two same-instant saves as two history snapshots with their own values", () => {
+    const at = "2026-10-14T10:00:00.000Z";
+    const events = parseTentManualEnvironmentEvents([
+      { ...eventRow(at, "ev-a"), environment_events: { temperature_c: 24, humidity_pct: 50 } },
+      { ...eventRow(at, "ev-b"), environment_events: { temperature_c: 26, humidity_pct: 60 } },
+    ]);
+    const rows = manualEnvironmentEventsToChangeContextRows(events);
+    const list = buildManualSnapshotHistoryList(rows, {
+      tentId: TENT_ID,
+      temperatureUnit: "celsius",
+    });
+    expect(list).toHaveLength(2);
+    expect(new Set(list.map((e) => e.key)).size).toBe(2);
+    const temps = list.map((e) => e.metrics.find((m) => m.key === "temperature_c")?.formatted);
+    expect(temps).toEqual(expect.arrayContaining(["24.0°C", "26.0°C"]));
+
+    render(
+      <TentManualSnapshotHistoryList
+        tentId={TENT_ID}
+        readings={rows}
+        readStatus="success"
+        onRetry={() => {}}
+      />,
+    );
+    expect(screen.getAllByTestId("tent-manual-snapshot-history-item")).toHaveLength(2);
   });
 });

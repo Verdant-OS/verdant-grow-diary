@@ -59,6 +59,8 @@ export interface HistoryInvalidChip {
 }
 
 export interface ManualSnapshotHistoryEntry {
+  /** Unique per snapshot (two saves may share a ts). */
+  key: string;
   ts: string;
   /** Valid (realism-passing) metric chips only. */
   metrics: HistoryMetricChip[];
@@ -192,6 +194,7 @@ export function buildManualSnapshotHistoryList(
     });
     const { metrics, invalidChips } = chipsFromSnapshot(snap, temperatureUnit);
     out.push({
+      key: snap.key ?? snap.ts,
       ts: snap.ts,
       metrics,
       invalidChips,

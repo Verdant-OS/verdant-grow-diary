@@ -23,7 +23,10 @@ import {
   type ManualSnapshotTimelineCard,
 } from "@/lib/manualSensorSnapshotViewModel";
 import { fetchTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
-import { manualEnvironmentEventsToSnapshotRecords } from "@/lib/tentManualEnvironmentEventRules";
+import {
+  dropEventsMirroredByDiaryRows,
+  manualEnvironmentEventsToSnapshotRecords,
+} from "@/lib/tentManualEnvironmentEventRules";
 import {
   normalizeTentManualSnapshotIds,
   scanLatestTentManualSnapshots,
@@ -109,11 +112,14 @@ export function useManualSnapshotTimelineCards(
         fetchTentManualSnapshotRows(scope.tentId, limit),
         fetchTentManualEnvironmentEvents(scope.tentId, limit),
       ]);
+      // One Plant Quick Log save returns from both reads; keep it once.
       const records = [
         ...diaryRowsToManualSnapshotRecords(rows),
-        ...manualEnvironmentEventsToSnapshotRecords(events),
+        ...manualEnvironmentEventsToSnapshotRecords(dropEventsMirroredByDiaryRows(events, rows)),
       ];
-      return selectManualSnapshotsForTimeline({ records, tentId: scope.tentId });
+      // Each read is limited on its own, so re-apply the limit to the merged,
+      // newest-first (id tie-broken) timeline.
+      return selectManualSnapshotsForTimeline({ records, tentId: scope.tentId }).slice(0, limit);
     },
   });
   return {

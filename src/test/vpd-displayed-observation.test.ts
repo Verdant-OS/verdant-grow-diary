@@ -26,7 +26,7 @@ describe("resolveDisplayedVpdObservation", () => {
     });
   });
 
-  it("ages a Quick Log fallback against now instead of the stability stale flag", () => {
+  it("ages a Quick Log fallback against now", () => {
     const twoDaysAgo = new Date(NOW_MS - 2 * 24 * 60 * 60 * 1000).toISOString();
     const aged = resolveDisplayedVpdObservation({
       snapshotVpd: null,
@@ -49,7 +49,7 @@ describe("resolveDisplayedVpdObservation", () => {
       snapshotCapturedAt: "2026-10-13T12:00:00.000Z",
       snapshotSource: "live",
       snapshotStale: true,
-      fallback: { ts: freshAt, vpd: 1.1, source: "manual", stale: true },
+      fallback: { ts: freshAt, vpd: 1.1, source: "manual", stale: false },
       nowMs: NOW_MS,
     });
     expect(fresh).toEqual({
@@ -58,6 +58,22 @@ describe("resolveDisplayedVpdObservation", () => {
       source: "manual",
       stale: false,
     });
+  });
+
+  it("keeps a fallback's persisted stale lineage even when it is recent", () => {
+    // Codex P1 at 1f55727a: a recent live row that persistence marked stale
+    // must never be presented as a current reading.
+    const freshAt = new Date(NOW_MS - 2 * 60 * 1000).toISOString();
+    expect(
+      resolveDisplayedVpdObservation({
+        snapshotVpd: null,
+        snapshotCapturedAt: "2026-10-15T11:50:00.000Z",
+        snapshotSource: "live",
+        snapshotStale: false,
+        fallback: { ts: freshAt, vpd: 1.1, source: "live", stale: true },
+        nowMs: NOW_MS,
+      }),
+    ).toEqual({ value: 1.1, capturedAt: freshAt, source: "live", stale: true });
   });
 
   it("treats a fallback without a timestamp as not current", () => {

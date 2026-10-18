@@ -116,8 +116,9 @@ export interface DisplayedVpdObservation {
   capturedAt: string | null;
   source: string | null;
   /**
-   * Current-reading freshness against `nowMs`. This is not the stability
-   * series `stale` flag, which only marks stored source/status lineage.
+   * True when the reading must not be presented as current: aged past its
+   * source window against `nowMs`, or (for a fallback) carrying persisted
+   * stale lineage from the stability series `stale` flag.
    */
   stale: boolean;
 }
@@ -145,7 +146,8 @@ function isStrictlyNewer(candidate: string | null, reference: string | null): bo
 /**
  * Header VPD keeps the stored snapshot when that snapshot observed VPD.
  * Otherwise it uses the newest shared series point, with that point's own
- * timestamp and source. Freshness is aged against `nowMs`. A series point
+ * timestamp and source. Freshness is aged against `nowMs`, and a fallback's
+ * persisted stale lineage (`fallback.stale`) always keeps it stale. A series point
  * can stay eligible for historical stability and still be too old to guide
  * the current header.
  *
@@ -190,7 +192,10 @@ export function resolveDisplayedVpdObservation(args: {
     value: fallbackValue,
     capturedAt,
     source,
-    stale: capturedAt === null || isStale(capturedAt, args.nowMs, undefined, source),
+    stale:
+      capturedAt === null ||
+      args.fallback.stale === true ||
+      isStale(capturedAt, args.nowMs, undefined, source),
   };
 }
 

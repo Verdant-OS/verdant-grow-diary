@@ -26,6 +26,12 @@ export const KNOWN_THIRD_PARTY_ORIGINS = {
     "https://www.google-analytics.com",
     "https://analytics.google.com",
   ],
+  /**
+   * Cloudflare injects this beacon on public documents. The policy is
+   * report-only, so the script still runs, and the browser logs the
+   * script-src miss as the console error on /pricing.
+   */
+  cloudflareInsights: ["https://static.cloudflareinsights.com"],
   lovableAuth: ["https://api.lovable.dev"],
   /** Error-report ingest (PR #1938 reporter). Report-only CSP; nothing is blocked either way. */
   sentryIngest: [
@@ -50,15 +56,25 @@ function joinSources(...groups: ReadonlyArray<ReadonlyArray<string>>): string {
  * the follow-up once violation reports are collected.
  */
 export function buildContentSecurityPolicyReportOnly(): string {
-  const { supabase, paddle, googleFonts, googleAnalytics, lovableAuth, sentryIngest } =
-    KNOWN_THIRD_PARTY_ORIGINS;
+  const {
+    supabase,
+    paddle,
+    googleFonts,
+    googleAnalytics,
+    lovableAuth,
+    sentryIngest,
+    cloudflareInsights,
+  } = KNOWN_THIRD_PARTY_ORIGINS;
   const directives: ReadonlyArray<[string, string]> = [
     ["default-src", "'self'"],
     ["base-uri", "'self'"],
     ["form-action", "'self'"],
     ["frame-ancestors", "'self'"],
     ["object-src", "'none'"],
-    ["script-src", joinSources(["'self'", "'unsafe-inline'"], paddle, googleAnalytics)],
+    [
+      "script-src",
+      joinSources(["'self'", "'unsafe-inline'"], paddle, googleAnalytics, cloudflareInsights),
+    ],
     ["style-src", joinSources(["'self'", "'unsafe-inline'"], [googleFonts[0]])],
     ["font-src", joinSources(["'self'", "data:"], [googleFonts[1]])],
     ["img-src", "'self' data: blob: https:"],

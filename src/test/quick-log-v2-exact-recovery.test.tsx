@@ -11,6 +11,9 @@ const rpcMock = vi.fn();
 const readbackMock = vi.fn();
 const selectMock = vi.fn();
 const eqMock = vi.fn();
+/** diary_entries photo_url fill (the fence-permitted companion update). */
+const updateMock = vi.fn();
+let settleUpdate: ((value: { data: unknown; error: unknown }) => void) | null = null;
 const fromMock = vi.fn();
 const toastSuccess = vi.fn();
 const telemetryMock = vi.fn();
@@ -231,7 +234,22 @@ beforeEach(() => {
       grow_id: "66666666-6666-4666-8666-666666666666",
     },
   ];
-  fromMock.mockImplementation(() => ({ select: selectMock }));
+  updateMock.mockReset();
+  settleUpdate = null;
+  fromMock.mockImplementation(() => ({
+    select: selectMock,
+    update: (patch: Record<string, unknown>) => ({
+      filter: (...args: unknown[]) => ({
+        select: () => {
+          updateMock(patch, args);
+          return new Promise<{ data: unknown; error: unknown }>((resolve) => {
+            if (settleUpdate === null) resolve({ data: [{ id: "diary-1" }], error: null });
+            else settleUpdate = resolve;
+          });
+        },
+      }),
+    }),
+  }));
   selectMock.mockImplementation(() => ({ eq: eqMock }));
   // Mirrors the real builder: the receipt readback passes its deadline signal.
   eqMock.mockImplementation(() => ({
@@ -1124,12 +1142,16 @@ describe("durable unresolved Note recovery", () => {
     retry();
 
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock.mock.calls[0][0]).toMatchObject({
-      growId: "66666666-6666-4666-8666-666666666666",
-      plantId: "33333333-3333-4333-8333-333333333333",
-      tentId: "88888888-8888-4888-8888-888888888888",
-    });
+    // The photo rides inside the single quicklog_save_manual write; the mirror
+    // row carries the verified lineage, so no companion insert is made.
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[1][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(updateMock).toHaveBeenCalledWith({ photo_url: uploadMock.mock.calls[0][0] }, [
+      "details->>linked_grow_event_id",
+      "eq",
+      confirmedEventId,
+    ]);
 
     fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
     expect(navigationMock).toHaveBeenCalledTimes(1);
@@ -1163,12 +1185,16 @@ describe("durable unresolved Note recovery", () => {
     });
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock.mock.calls[0][0]).toMatchObject({
-      growId: "66666666-6666-4666-8666-666666666666",
-      plantId: "33333333-3333-4333-8333-333333333333",
-      tentId: null,
-    });
+    // The photo rides inside the single quicklog_save_manual write; the mirror
+    // row carries the verified lineage, so no companion insert is made.
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[1][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(updateMock).toHaveBeenCalledWith({ photo_url: uploadMock.mock.calls[0][0] }, [
+      "details->>linked_grow_event_id",
+      "eq",
+      confirmedEventId,
+    ]);
     fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
     expect(navigationMock).toHaveBeenCalledTimes(1);
     expect(navigationMock.mock.calls[0][0].href).not.toContain("tentId=");
@@ -1232,12 +1258,16 @@ describe("durable unresolved Note recovery", () => {
     retry();
 
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock.mock.calls[0][0]).toMatchObject({
-      growId: "66666666-6666-4666-8666-666666666666",
-      plantId: "33333333-3333-4333-8333-333333333333",
-      tentId: "55555555-5555-4555-8555-555555555555",
-    });
+    // The photo rides inside the single quicklog_save_manual write; the mirror
+    // row carries the verified lineage, so no companion insert is made.
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[1][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(updateMock).toHaveBeenCalledWith({ photo_url: uploadMock.mock.calls[0][0] }, [
+      "details->>linked_grow_event_id",
+      "eq",
+      confirmedEventId,
+    ]);
 
     fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
     expect(navigationMock).toHaveBeenCalledTimes(1);
@@ -1523,16 +1553,9 @@ describe("durable unresolved Note recovery", () => {
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
   });
 
-  it("never starts video upload after account change during failed-photo cleanup", async () => {
+  it("never starts video upload after account change during the photo_url fill", async () => {
     rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: confirmedEventId }, error: null });
-    photoEntryMock.mockResolvedValue({ ok: false, message: "Photo entry rejected" });
-    let finish!: (value: unknown) => void;
-    removeMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
+    settleUpdate = () => {};
     const view = renderSheet();
     typeNote();
     fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
@@ -1544,14 +1567,15 @@ describe("durable unresolved Note recovery", () => {
       });
     });
     save();
-    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
     const pending = window.sessionStorage.getItem(pendingKey());
     expect(JSON.parse(pending!).attachments).toEqual({ photo: true, video: true });
     context.userId = ownerB;
     view.rerender();
-    await act(async () => finish({ error: null }));
+    await act(async () => settleUpdate!({ data: [{ id: "diary-1" }], error: null }));
     expect(uploadMock).toHaveBeenCalledTimes(1);
     expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(photoEntryMock).not.toHaveBeenCalled();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
@@ -1780,32 +1804,30 @@ describe("late successful media upload cleanup attempts", () => {
     save();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(rpcMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[0][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(updateMock).toHaveBeenCalledTimes(1);
     expect(videoEntryMock).toHaveBeenCalledTimes(1);
     expect(removeMock).not.toHaveBeenCalled();
     expect(toastSuccess).toHaveBeenCalled();
   });
 
-  it("does not add post-upload cleanup after an already-dispatched photo companion becomes ambiguous", async () => {
+  it("does not add post-upload cleanup after the photo_url fill fails under a changed account", async () => {
     rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: confirmedEventId }, error: null });
-    let finish!: (value: unknown) => void;
-    photoEntryMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
+    settleUpdate = () => {};
     const view = renderSheet();
     typeNote();
     attachPhoto();
     save();
-    await waitFor(() => expect(photoEntryMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
     const pending = window.sessionStorage.getItem(pendingKey());
     context.userId = ownerB;
     view.rerender();
-    await act(async () => finish({ ok: false, message: "insert response lost", ambiguous: true }));
+    await act(async () => settleUpdate!({ data: null, error: { message: "update lost" } }));
+    // details.photo_url is already persisted by the RPC: never delete the object.
     expect(removeMock).not.toHaveBeenCalled();
     expect(storageOps.calls.filter((call) => call.op === "remove")).toHaveLength(0);
+    expect(photoEntryMock).not.toHaveBeenCalled();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);

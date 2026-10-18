@@ -108,14 +108,21 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
 }));
 
 // Server-authoritative preflight (live-sensor-entitlement Edge function).
+// `evaluatedTentId` defaults to the scope the page asked for (a settled
+// decision for the current tent); a string overrides it.
 const serverGate = vi.hoisted(() => ({
   state: "denied" as string,
   result: null as Record<string, unknown> | null,
+  evaluatedTentId: undefined as string | null | undefined,
 }));
 vi.mock("@/hooks/useLiveSensorServerGate", () => ({
-  useLiveSensorServerGate: () => ({
+  useLiveSensorServerGate: (_surface: string, scope: Record<string, unknown> = {}) => ({
     state: serverGate.state,
     result: serverGate.result,
+    evaluatedTentId:
+      serverGate.evaluatedTentId === undefined
+        ? ((scope.tentId as string | null | undefined) ?? null)
+        : serverGate.evaluatedTentId,
     recheck: vi.fn(),
   }),
 }));
@@ -144,6 +151,7 @@ describe("Sensors page — EcoWitt testbench panel entitlement gate", () => {
     entitlementState.liveSensors = false;
     serverGate.state = "denied";
     serverGate.result = { ok: false, state: "denied", reason: "upgrade_required" };
+    serverGate.evaluatedTentId = undefined;
   });
 
   it("hides the testbench panel when the server preflight denies (Free plan)", () => {
@@ -180,6 +188,19 @@ describe("Sensors page — EcoWitt testbench panel entitlement gate", () => {
       expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
     },
   );
+
+  // Codex P2 / Copilot at 73d7314c: an allowed decision for another tent, or
+  // an unscoped one, must not mount the panel for the active tent.
+  it.each([
+    ["a different tent", "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70"],
+    ["no tent (unscoped)", null],
+  ])("hides the testbench panel when the allowed decision was for %s", (_label, evaluated) => {
+    serverGate.state = "allowed";
+    serverGate.result = ALLOWED_RESULT;
+    serverGate.evaluatedTentId = evaluated;
+    renderAt("/sensors");
+    expect(screen.queryByTestId("sensors-testbench-panel")).toBeNull();
+  });
 
   it("shows the testbench panel when the server preflight allows the active tent", () => {
     serverGate.state = "allowed";

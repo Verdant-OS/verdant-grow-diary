@@ -1,9 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { canMountLiveSensorSetup } from "@/lib/entitlements/liveSensorSetupAccess";
 
+const TENT = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
+const at = (serverGateState: string | null | undefined) => ({
+  serverGateState,
+  evaluatedTentId: TENT,
+  activeTentId: TENT,
+});
+
 describe("canMountLiveSensorSetup", () => {
-  it("mounts only for a completed, allowed server preflight with an active tent", () => {
-    expect(canMountLiveSensorSetup({ serverGateState: "allowed", hasActiveTent: true })).toBe(true);
+  it("mounts only for a completed, allowed server preflight for the active tent", () => {
+    expect(canMountLiveSensorSetup(at("allowed"))).toBe(true);
   });
 
   it.each([
@@ -16,17 +23,27 @@ describe("canMountLiveSensorSetup", () => {
     null,
     undefined,
   ])("fails closed for server gate state %s", (state) => {
-    expect(canMountLiveSensorSetup({ serverGateState: state, hasActiveTent: true })).toBe(false);
+    expect(canMountLiveSensorSetup(at(state))).toBe(false);
   });
 
   it("stays hidden without an active tent even when allowed", () => {
-    expect(canMountLiveSensorSetup({ serverGateState: "allowed", hasActiveTent: false })).toBe(
-      false,
-    );
+    expect(
+      canMountLiveSensorSetup({
+        serverGateState: "allowed",
+        evaluatedTentId: TENT,
+        activeTentId: null,
+      }),
+    ).toBe(false);
+    expect(
+      canMountLiveSensorSetup({
+        serverGateState: "allowed",
+        evaluatedTentId: "",
+        activeTentId: "",
+      }),
+    ).toBe(false);
   });
 
   it("is deterministic for identical input", () => {
-    const input = { serverGateState: "allowed", hasActiveTent: true };
-    expect(canMountLiveSensorSetup(input)).toBe(canMountLiveSensorSetup(input));
+    expect(canMountLiveSensorSetup(at("allowed"))).toBe(canMountLiveSensorSetup(at("allowed")));
   });
 });

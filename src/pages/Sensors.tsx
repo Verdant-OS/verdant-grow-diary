@@ -177,7 +177,8 @@ export default function Sensors() {
   });
   const canShowTestbench = canMountLiveSensorSetup({
     serverGateState: liveSensorGate.state,
-    hasActiveTent: activeTentId != null,
+    evaluatedTentId: liveSensorGate.evaluatedTentId,
+    activeTentId,
   });
 
   // Reconcile only after the authenticated tent query succeeds. A failed

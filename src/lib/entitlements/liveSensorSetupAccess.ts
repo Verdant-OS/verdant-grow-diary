@@ -10,17 +10,22 @@
  * `liveSensors: true` can still be rejected server-side with
  * `upgrade_required`.
  *
- * Fails closed: only a completed, successful preflight ("allowed") for an
- * active tent mounts the surface. Loading, denied, invalid_request,
- * network_error and any unknown state keep it hidden.
+ * Fails closed: only a completed, successful preflight ("allowed") that was
+ * evaluated for exactly the active tent mounts the surface. An unscoped
+ * decision, a decision for a previous tent, a pending recheck, denied,
+ * invalid_request, network_error and any unknown state keep it hidden.
  */
 export interface LiveSensorSetupMountInput {
   /** `useLiveSensorServerGate(...).state`. */
   serverGateState: string | null | undefined;
-  /** True only when a tent is selected and resolved. */
-  hasActiveTent: boolean;
+  /** `useLiveSensorServerGate(...).evaluatedTentId`: the tent the decision is for. */
+  evaluatedTentId: string | null | undefined;
+  /** The tent currently selected and resolved on the page, or null. */
+  activeTentId: string | null | undefined;
 }
 
 export function canMountLiveSensorSetup(input: LiveSensorSetupMountInput): boolean {
-  return input.hasActiveTent === true && input.serverGateState === "allowed";
+  if (input.serverGateState !== "allowed") return false;
+  if (typeof input.activeTentId !== "string" || input.activeTentId === "") return false;
+  return input.evaluatedTentId === input.activeTentId;
 }

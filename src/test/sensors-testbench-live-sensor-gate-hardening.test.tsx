@@ -102,7 +102,12 @@ const serverGate = vi.hoisted(() => ({
 vi.mock("@/hooks/useLiveSensorServerGate", () => ({
   useLiveSensorServerGate: (surface: string, scope: Record<string, unknown> = {}) => {
     serverGate.calls.push([surface, scope]);
-    return { state: serverGate.state, result: null, recheck: vi.fn() };
+    return {
+      state: serverGate.state,
+      result: null,
+      evaluatedTentId: (scope.tentId as string | null | undefined) ?? null,
+      recheck: vi.fn(),
+    };
   },
 }));
 

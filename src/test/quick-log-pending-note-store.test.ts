@@ -4,6 +4,7 @@ import {
   clearPendingQuickLogNote,
   markPendingQuickLogNoteHistoryCheck,
   readPendingQuickLogNote,
+  updatePendingQuickLogNotePayload,
   type PendingQuickLogNote,
 } from "@/lib/quickLogPendingNoteStore";
 
@@ -531,5 +532,65 @@ describe("Note history-review marker fallback when the full record cannot be rew
     spy.mockRestore();
     expect(window.sessionStorage.getItem(noteHistoryKey())).toBeNull();
     expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: original });
+  });
+});
+
+describe("updatePendingQuickLogNotePayload", () => {
+  it("rewrites the unchanged pending Note with the photo-bearing payload and returns the verified record", () => {
+    const record = validRecord({ attachments: { photo: true, video: false } });
+    expect(claimPendingQuickLogNote(record).status).toBe("claimed");
+
+    const payload = {
+      ...record.payload,
+      p_details: { ...record.payload.p_details, photo_url: "grow/leaf.jpg" },
+    };
+    const updated = updatePendingQuickLogNotePayload(record, payload);
+    if (updated.status !== "updated") throw new Error(`expected updated, got ${updated.status}`);
+
+    const stored = JSON.parse(window.sessionStorage.getItem(pendingKey())!) as PendingQuickLogNote;
+    expect(stored.payload.p_details).toEqual({ source: "manual", photo_url: "grow/leaf.jpg" });
+    expect(stored.payload.p_idempotency_key).toBe(record.payload.p_idempotency_key);
+    expect(updated.record).toEqual(stored);
+    // Same-key operations must now present the updated record, not the pre-upload one.
+    expect(claimPendingQuickLogNote(stored).status).toBe("claimed");
+    expect(clearPendingQuickLogNote(record)).toBe(false);
+    expect(clearPendingQuickLogNote(stored)).toBe(true);
+  });
+
+  it("refuses a payload that carries a different idempotency key", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    const other = { ...record.payload, p_idempotency_key: "another-note-key-12345678" };
+    expect(updatePendingQuickLogNotePayload(record, other)).toEqual({ status: "blocked" });
+    expect(JSON.parse(window.sessionStorage.getItem(pendingKey())!)).toEqual(record);
+  });
+
+  it("refuses when the stored record is not the caller's unchanged record", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    const stale = validRecord({ payload: { ...record.payload, p_note: "edited elsewhere" } });
+    expect(
+      updatePendingQuickLogNotePayload(stale, {
+        ...stale.payload,
+        p_details: { photo_url: "grow/leaf.jpg" },
+      }),
+    ).toEqual({ status: "blocked" });
+    expect(JSON.parse(window.sessionStorage.getItem(pendingKey())!)).toEqual(record);
+  });
+
+  it("reports blocked and leaves the journal unchanged when the write does not land", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("Storage quota exceeded");
+    });
+    expect(
+      updatePendingQuickLogNotePayload(record, {
+        ...record.payload,
+        p_details: { source: "manual", photo_url: "grow/leaf.jpg" },
+      }),
+    ).toEqual({ status: "blocked" });
+    vi.restoreAllMocks();
+    expect(JSON.parse(window.sessionStorage.getItem(pendingKey())!)).toEqual(record);
   });
 });

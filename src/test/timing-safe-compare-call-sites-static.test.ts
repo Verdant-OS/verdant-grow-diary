@@ -40,8 +40,8 @@ const CALL_SITES: Record<string, RegExp> = {
   "src/lib/ecowittRealIngestAuth.ts": /from "@\/lib\/timingSafeCompareRules"/,
   "supabase/functions/_shared/ecowittRealIngestAuth.ts":
     /from "\.\/lib\/lib\/timingSafeCompareRules\.ts"/,
-  "supabase/functions/paddle-webhook/verifyPaddleSignature.ts":
-    /from "\.\.\/_shared\/lib\/lib\/timingSafeCompareRules\.ts"/,
+  "supabase/functions/_shared/verifyPaddleSignature.ts":
+    /from "\.\/lib\/lib\/timingSafeCompareRules\.ts"/,
   "supabase/functions/send-transactional-email/contract.ts":
     /from "\.\.\/_shared\/lib\/lib\/timingSafeCompareRules\.ts"/,
   "supabase/functions/preview-transactional-email/index.ts":

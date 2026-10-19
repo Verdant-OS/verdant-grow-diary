@@ -1,8 +1,8 @@
 /**
- * #2028 Codex P2: Founder Lifetime is no longer sold. A stored
- * `founder_lifetime` checkout intent (saved before retirement, or carried by
- * an old link) must not open Paddle when the grower signs in: the hook's
- * resume path must hit the Founder refusal before any price lookup.
+ * #2028 Codex P2: Founder Lifetime is no longer sold. A `founder_lifetime`
+ * checkout intent saved before retirement must not open Paddle when the
+ * grower signs in: the resume path drops it before any price lookup, and a
+ * direct Founder checkout still hits the Founder refusal.
  */
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -38,7 +38,7 @@ vi.mock("@/lib/paddle", () => {
 });
 
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
-import { peekPlanIntent, savePlanIntent } from "@/lib/checkoutPlanIntent";
+import { CHECKOUT_PLAN_INTENT_STORAGE_KEY, savePlanIntent } from "@/lib/checkoutPlanIntent";
 import { FOUNDER_LIFETIME_CHECKOUT_REFUSAL } from "@/lib/founderLifetimeCheckoutGuard";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -56,14 +56,33 @@ beforeEach(() => {
 });
 
 describe("a stored Founder intent cannot reopen checkout", () => {
-  it("is consumed on sign-in and refused before any Paddle work", async () => {
-    expect(savePlanIntent("founder_lifetime")).toBe(true);
-    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+  it("cannot be saved any more", () => {
+    expect(savePlanIntent("founder_lifetime")).toBe(false);
+    expect(window.sessionStorage.getItem(CHECKOUT_PLAN_INTENT_STORAGE_KEY)).toBeNull();
+  });
+
+  it("drops a legacy stored Founder intent on sign-in without any Paddle work", async () => {
+    window.sessionStorage.setItem(
+      CHECKOUT_PLAN_INTENT_STORAGE_KEY,
+      JSON.stringify({ plan: "founder_lifetime", savedAt: Date.now() }),
+    );
+    renderHook(() => usePaddleCheckout(), { wrapper });
     await act(async () => {
       await Promise.resolve();
     });
 
-    expect(peekPlanIntent()).toBeNull();
+    expect(window.sessionStorage.getItem(CHECKOUT_PLAN_INTENT_STORAGE_KEY)).toBeNull();
+    expect(paddle.getPaddlePriceId).not.toHaveBeenCalled();
+    expect(paddle.initializePaddle).not.toHaveBeenCalled();
+    expect(paddleOpen).not.toHaveBeenCalled();
+  });
+
+  it("refuses a direct Founder checkout before any Paddle work", async () => {
+    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "founder_lifetime" });
+    });
+
     expect(result.current.blockedReason).toBe(FOUNDER_LIFETIME_CHECKOUT_REFUSAL);
     expect(paddle.getPaddlePriceId).not.toHaveBeenCalled();
     expect(paddle.initializePaddle).not.toHaveBeenCalled();

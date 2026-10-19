@@ -1,11 +1,13 @@
 /**
- * Warn when one Water entry is above 10,000 ml. The 1,000,000 ml ceiling
- * stays a hard validation failure in the watering payload builder.
+ * Warn when one Water entry is above 10,000 ml. The 50,000 ml single-watering
+ * ceiling (owner decision 2026-10-14, reaffirmed 2026-10-19 over the earlier
+ * 1,000,000 ml bound) stays a hard validation failure in the payload builder.
  * The warning names the entered amount. It is not a watering recommendation.
  */
 
 export const LARGE_WATER_AMOUNT_THRESHOLD_ML = 10_000;
-export const LARGE_WATER_AMOUNT_HARD_MAX_ML = 1_000_000;
+/** Single-watering ceiling; QUICK_LOG_WATER_VOLUME_MAX_ML is derived from this. */
+export const LARGE_WATER_AMOUNT_HARD_MAX_ML = 50_000;
 
 export const LARGE_WATER_AMOUNT_EDIT_LABEL = "Edit amount";
 export const LARGE_WATER_AMOUNT_CONFIRM_LABEL = "Confirm amount";
@@ -71,13 +73,17 @@ function compareMilliliters(raw: string, limitMl: number): number | null {
 }
 
 export type WaterVolumeTextAssessment =
-  { status: "missing" } | { status: "invalid" } | { status: "valid"; volumeMl: number };
+  | { status: "missing" }
+  | { status: "invalid" }
+  | { status: "too_large" }
+  | { status: "valid"; volumeMl: number };
 
 /**
  * Save-path classification of the Volume text, shared with the warning so both
  * read every entry the same way: text longer than the input cap is invalid, and
- * the 1,000,000 ml hard maximum is compared exactly, before any Number()
- * rounding can turn an entry above it into an accepted value.
+ * the 50,000 ml hard maximum is compared exactly, before any Number()
+ * rounding can turn an entry above it into an accepted value. An entry above
+ * the maximum is reported as too_large so callers can name the ceiling.
  */
 export function assessWaterVolumeText(raw: string | null | undefined): WaterVolumeTextAssessment {
   const trimmed = (raw ?? "").trim();
@@ -85,7 +91,7 @@ export function assessWaterVolumeText(raw: string | null | undefined): WaterVolu
   const rational = milliliterRational(trimmed);
   if (!rational || rational.negative || rational.numerator === 0n) return { status: "invalid" };
   if (compareMilliliters(trimmed, LARGE_WATER_AMOUNT_HARD_MAX_ML) === 1) {
-    return { status: "invalid" };
+    return { status: "too_large" };
   }
   const volumeMl = Number(trimmed);
   if (!Number.isFinite(volumeMl) || volumeMl <= 0) return { status: "invalid" };

@@ -638,6 +638,7 @@ export default function PlantDetail() {
               tentId={plant.tentId ?? null}
               tentName={tent?.name ?? null}
               growId={plant.growId ?? null}
+              plantId={plant.id}
             />
             <PlantRecentMoveCard plantId={plant.id} />
             <div className="grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">

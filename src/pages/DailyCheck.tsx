@@ -474,7 +474,9 @@ export default function DailyCheck() {
   // real save time, not the moment the React listener happened to run.
   useEffect(() => {
     function onEntry(e: Event) {
+      // Fires only after a confirmed save, plant- or tent-scoped.
       setArchivedPlantSubmitMessage(null);
+      void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
       const detail = (
         e as CustomEvent<{ createdAt?: string | number | Date; activityId?: string | null }>
       ).detail;
@@ -510,7 +512,7 @@ export default function DailyCheck() {
       window.removeEventListener("verdant:entry-created", onEntry);
       window.removeEventListener("verdant:sensor-reading-created", onSensor);
     };
-  }, [renderedStep]);
+  }, [queryClient, renderedStep]);
 
   // Sole-plant preselect fills the form when the URL names no plant. Post-submit
   // follows an explicit selector choice, including a cleared picker. An
@@ -806,10 +808,6 @@ export default function DailyCheck() {
           // that actually named a plant updates the memory; a tent-scoped save
           // leaves the previous record alone rather than clearing it.
           onSaveSuccess={(result) => {
-            // Only a confirmed save clears the archive banner and refreshes
-            // plants; a blocked save leaves the target and draft in place.
-            setArchivedPlantSubmitMessage(null);
-            void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
             if (!result.target.plantId) return;
             rememberRecentQuickLogTarget(
               {
@@ -820,6 +818,10 @@ export default function DailyCheck() {
               },
               user?.id ?? null,
             );
+            // Only a confirmed save clears the archive banner and refreshes
+            // plants; a blocked save leaves the target and draft in place.
+            setArchivedPlantSubmitMessage(null);
+            void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
           }}
         />
       </div>

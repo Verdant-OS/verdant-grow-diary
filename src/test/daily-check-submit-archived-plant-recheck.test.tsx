@@ -192,13 +192,20 @@ vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
       <button
         type="button"
         data-testid="mock-inline-activity-success"
-        onClick={() =>
+        onClick={() => {
+          // Like useQuickLogActivitySave: the event fires only after a
+          // confirmed save, then the section reports success.
+          window.dispatchEvent(
+            new CustomEvent("verdant:entry-created", {
+              detail: { createdAt: new Date().toISOString(), activityId: "note" },
+            }),
+          );
           onSaveSuccess?.({
             activityId: "note",
             target: { growId: "g1", tentId: "t1", plantId: null },
             growEventId: null,
-          })
-        }
+          });
+        }}
       >
         Inline saved
       </button>

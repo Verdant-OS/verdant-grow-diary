@@ -112,6 +112,10 @@ import { SOURCE_LABEL, formatValue, isSnapshotStale } from "@/lib/sensorSnapshot
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import AlertReasonText from "@/components/AlertReasonText";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import { mergeDashboardChartReadingsWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 
 import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
@@ -191,6 +195,7 @@ export default function Dashboard() {
   // evidence-only rows and the grouped projection contains no raw payload.
   const dashboardSensorRows = selectDashboardSensorEvidenceRows(rawReadings);
   const readings = groupDashboardSensorReadings(dashboardSensorRows);
+  const temperatureUnit = useTemperatureUnitPreference();
   // Per-tent sensor windows for the stability summary. Each tent gets its
   // own 200-row window so a busy tent cannot push another tent's VPD rows
   // out of a shared global cap. Read-only; no writes.
@@ -198,6 +203,32 @@ export default function Dashboard() {
   // column — only query real UUIDs; a non-UUID id cannot have rows, so its
   // absence is established (same guard as the Tents list).
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
+  const quickLogManualsIncomplete =
+    chartQuickLogManualQuery.isPending ||
+    chartQuickLogManualQuery.isError ||
+    chartQuickLogManualQuery.fetchStatus === "fetching";
+  const sensorReadingsIncomplete =
+    Boolean(dashboardReadingsQuery.isLoading) ||
+    Boolean((dashboardReadingsQuery as { isPending?: boolean }).isPending) ||
+    Boolean(dashboardReadingsQuery.isError) ||
+    Boolean((dashboardReadingsQuery as { isFetching?: boolean }).isFetching) ||
+    (dashboardReadingsQuery as { fetchStatus?: string }).fetchStatus === "fetching";
+  const exportIncomplete = quickLogManualsIncomplete || sensorReadingsIncomplete;
+  const quickLogManualReadings = chartQuickLogManualQuery.data ?? [];
+  const dashboardExportReadings = mergeDashboardChartReadingsWithQuickLogManuals(
+    readings as unknown as SensorReading[],
+    quickLogManualReadings,
+  );
+  // Pick the first tent that actually has readings so the chart isn't blank
+  // when tents[0] has none but other tents do. Falls back to tents[0] (or null).
+  const chartTent =
+    tents.find((t) => dashboardExportReadings.some((r) => r.tentId === t.id)) ?? tents[0] ?? null;
+  const chartTentName = chartTent?.name ?? "Tent";
+  const chartReadings = chartTent
+    ? dashboardExportReadings.filter((r) => r.tentId === chartTent.id)
+    : [];
+  const tentNamesById = Object.fromEntries(tents.map((t) => [t.id, t.name]));
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
     useSensorReadingsByTents(tentIds);
   // Freshness is time-relative: re-evaluate the snapshot strip's clock every
@@ -625,7 +656,7 @@ export default function Dashboard() {
               </Button>
             </div>
             {(() => {
-              const anyReading = latestPerTent.some((x) => !!x.last);
+              const anyReading = latestPerTent.some((x) => !!x.last) || chartReadings.length > 0;
               const hasPendingTentRead = tentIds.some(
                 (tentId) => sensorStatusByTent[tentId] === "loading",
               );
@@ -796,22 +827,6 @@ export default function Dashboard() {
                   )}
                   <div className="grid lg:grid-cols-3 gap-4">
                     {(() => {
-                      // Pick the first tent that actually has readings so the chart
-                      // isn't blank when tents[0] has none but other tents do.
-                      // Falls back to tents[0] (or null) so the label + empty state
-                      // still make sense.
-                      const chartTent =
-                        tents.find((t) =>
-                          (readings as unknown as SensorReading[]).some((r) => r.tentId === t.id),
-                        ) ??
-                        tents[0] ??
-                        null;
-                      const chartTentName = chartTent?.name ?? "Tent";
-                      const chartReadings = chartTent
-                        ? (readings as unknown as SensorReading[]).filter(
-                            (r) => r.tentId === chartTent.id,
-                          )
-                        : [];
                       const latest = chartReadings.slice(-1)[0];
                       return (
                         <div className="lg:col-span-2 glass rounded-2xl p-4">
@@ -866,7 +881,20 @@ export default function Dashboard() {
                                 testIdPrefix="dashboard-environment-ribbon"
                               />
                               <div className="mt-4">
-                                <SensorChart data={chartReadings} metric="temp" height={200} />
+                                <SensorChart
+                                  data={chartReadings}
+                                  exportData={dashboardExportReadings}
+                                  tentNamesById={tentNamesById}
+                                  exportDisabled={exportIncomplete}
+                                  exportDisabledReason={
+                                    chartQuickLogManualQuery.isError ||
+                                    dashboardReadingsQuery.isError
+                                      ? "Sensor or Quick Log history could not be checked — CSV export is disabled until all sources load."
+                                      : "Refreshing sensor and Quick Log history…"
+                                  }
+                                  metric="temp"
+                                  height={200}
+                                />
                               </div>
                             </>
                           )}
@@ -912,6 +940,7 @@ export default function Dashboard() {
                             tentRows as BuildTentSnapshotInput[],
                             envStage,
                             nowTick,
+                            { temperatureUnit },
                           );
                           // Pending/failed reads must not masquerade as established
                           // absence or as data. Non-UUID ids (mock-fallback tents)
@@ -1133,7 +1162,7 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <p className="text-sm font-medium">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{a.reason}</p>
+                <AlertReasonText reason={a.reason} className="text-xs text-muted-foreground" />
               </li>
             ))}
           </ul>
@@ -1653,6 +1682,7 @@ export default function Dashboard() {
                 quality,
                 targets: targetsCmp,
                 stage: alertContextStage,
+                now: nowTick,
               });
               // Candidates above are DISPLAY-scoped and stay source-aware, so a
               // manual reading current for 24h still shows its warning. Saving
@@ -1727,7 +1757,10 @@ export default function Dashboard() {
                               </Badge>
                               <span className="font-medium text-sm">{a.title}</span>
                             </div>
-                            <p className="text-xs text-muted-foreground">{a.reason}</p>
+                            <AlertReasonText
+                              reason={a.reason}
+                              className="text-xs text-muted-foreground"
+                            />
                             {scopedGrowId && (
                               <div className="mt-1">
                                 <Button

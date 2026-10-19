@@ -296,8 +296,6 @@ export default function PlantDetail() {
   const { openGroups, setGroupOpen, revealAndNavigate } = usePlantDetailDisclosureNavigation({
     plantId: plant?.id ?? null,
   });
-  const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
-  const photoStrip = usePlantDetailPhotoStripItems(plant?.id ?? null);
   // Same query key as PlantQuickStatusStrip, so this adds no request.
   const recentActivityQuery = usePlantRecentActivity(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
@@ -361,6 +359,17 @@ export default function PlantDetail() {
     plant: plant ?? null,
     contextTentId,
     contextGrowId,
+  });
+  // The photo lookup is an unbounded diary read plus private-photo signing.
+  // Only the active plant view renders the strip and hero fallback, so keep it
+  // off for loading, blocked, not-found and archived URLs. The strip reuses it.
+  const isActivePlantView = loadState === "ready" && !blockedView && !!plant;
+  const photoStrip = usePlantDetailPhotoStripItems(plant?.id ?? null, {
+    enabled: isActivePlantView,
+  });
+  // Same unbounded diary read, so the gallery count waits for the active view too.
+  const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null, {
+    enabled: isActivePlantView,
   });
 
   if (loadState === "loading") {
@@ -558,6 +567,7 @@ export default function PlantDetail() {
       >
         <PlantDetailPhotoStrip
           plantId={plant.id}
+          photoStrip={photoStrip}
           growId={plant.growId ?? null}
           onUploadPhoto={() => setQuickLogOpen(true)}
           onReviewPhoto={({ photoId, dateLabel, latestReview }) => {

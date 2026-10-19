@@ -26,7 +26,13 @@ import {
   type ChangeContextSnapshot,
   type ChangeContextSuppressedDelta,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
-import { classifyManualMetric } from "@/lib/sensorTruthRules";
+import {
+  classifyManualMetric,
+  isSoilEcMscmRealistic,
+  isSoilEcUnitMismatchSuspected,
+  TRUTH_REASON_CHIP,
+  type ManualMetricTruth,
+} from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
@@ -125,6 +131,23 @@ function formatMetricChip(
   }
 }
 
+/**
+ * Reservoir EC (mS/cm) uses the same plausibility bounds as soil EC but keeps
+ * its own label; every other metric uses the shared classifier.
+ */
+function classifyHistoryMetric(key: ChangeContextMetric, value: number): ManualMetricTruth {
+  if (key !== "reservoir_ec_ms_cm") return classifyManualMetric(key, value);
+  if (isSoilEcMscmRealistic(value)) return { valid: true };
+  if (isSoilEcUnitMismatchSuspected(value)) {
+    return {
+      valid: false,
+      chip: TRUTH_REASON_CHIP.unit_mismatch_suspected,
+      reasonCode: "unit_mismatch_suspected",
+    };
+  }
+  return { valid: false, chip: "Invalid reservoir EC" };
+}
+
 interface ChipsBreakdown {
   metrics: HistoryMetricChip[];
   invalidChips: HistoryInvalidChip[];
@@ -140,7 +163,7 @@ function chipsFromSnapshot(
   for (const key of HISTORY_METRIC_DISPLAY_ORDER) {
     const v = s.metrics[key];
     if (v === undefined) continue;
-    const truth = classifyManualMetric(key, v);
+    const truth = classifyHistoryMetric(key, v);
     if (!truth.valid) {
       invalidKeys.add(key);
       invalidChips.push({

@@ -52,6 +52,7 @@ const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
   soil_moisture_pct: "soil_moisture_pct",
   soil_ec_mscm: "soil_ec_mscm",
   reservoir_ph: "ph",
+  reservoir_ec_mscm: "reservoir_ec_mscm",
 };
 
 /** Map view-model reading fields to the correction metric namespace. */

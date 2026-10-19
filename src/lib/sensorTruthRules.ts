@@ -423,17 +423,6 @@ export function classifyManualMetric(
         chip: TRUTH_REASON_CHIP.invalid_soil_ec,
         reasonCode: "invalid_soil_ec",
       };
-    case "reservoir_ec_ms_cm":
-      // Same mS/cm plausibility as soil EC, with its own label.
-      if (isSoilEcMscmRealistic(value)) return VALID_TRUTH;
-      if (isSoilEcUnitMismatchSuspected(value)) {
-        return {
-          valid: false,
-          chip: TRUTH_REASON_CHIP.unit_mismatch_suspected,
-          reasonCode: "unit_mismatch_suspected",
-        };
-      }
-      return { valid: false, chip: "Invalid reservoir EC" };
     case "soil_temp_c":
       return isSoilTempCRealistic(value)
         ? VALID_TRUTH

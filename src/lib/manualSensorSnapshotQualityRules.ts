@@ -41,6 +41,8 @@ export interface ManualSensorSnapshotInput {
   readonly soil_moisture_pct?: number | null;
   readonly soil_ec_mscm?: number | null;
   readonly ph?: number | null;
+  /** Reservoir / nutrient-solution EC in mS/cm (a Quick Log diary `ec`). */
+  readonly reservoir_ec_mscm?: number | null;
 }
 
 export interface ManualSensorSnapshotQuality {
@@ -140,6 +142,7 @@ export function evaluateManualSensorSnapshotQuality(
     input.soil_moisture_pct,
     input.soil_ec_mscm,
     input.ph,
+    input.reservoir_ec_mscm,
   ].some((value) => typeof value === "number" && Number.isFinite(value));
 
   if (!hasPresentMetric) {
@@ -192,6 +195,16 @@ export function evaluateManualSensorSnapshotQuality(
     } else if (input.soil_ec_mscm > EC_SUSPICIOUS_MSCM_MAX) {
       invalidFields.push("soil_ec_mscm");
       reasons.push("Soil EC value looks like µS/cm reported as mS/cm.");
+    }
+  }
+
+  if (input.reservoir_ec_mscm != null && Number.isFinite(input.reservoir_ec_mscm)) {
+    if (input.reservoir_ec_mscm < 0) {
+      invalidFields.push("reservoir_ec_mscm");
+      reasons.push("Reservoir EC cannot be negative.");
+    } else if (input.reservoir_ec_mscm > EC_SUSPICIOUS_MSCM_MAX) {
+      invalidFields.push("reservoir_ec_mscm");
+      reasons.push("Reservoir EC value looks like µS/cm reported as mS/cm.");
     }
   }
 

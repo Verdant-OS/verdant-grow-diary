@@ -15,6 +15,7 @@ import { Environment, Paddle, EventName } from "npm:@paddle/paddle-node-sdk";
 import {
   PADDLE_DIRECT_CONFIG_REFUSED,
   PADDLE_GATEWAY_ORIGIN,
+  paddleClientPlan,
   performPaddleFetch,
   resolvePaddleTransport,
   type PaddleTransport,
@@ -51,19 +52,20 @@ function transportFor(env: PaddleEnv): Exclude<PaddleTransport, { mode: "refused
 
 export function getPaddleClient(env: PaddleEnv): Paddle {
   const transport = transportFor(env);
-  if (transport.mode === "direct") {
-    return new Paddle(transport.apiKey, { environment: Environment.sandbox });
+  const plan = paddleClientPlan(transport);
+  if (plan.mode === "direct") {
+    return new Paddle(plan.apiKey, { environment: Environment.sandbox });
+  } else {
+    const connectionApiKey = getConnectionApiKey(env);
+    const lovableApiKey = getEnv("LOVABLE_API_KEY");
+    return new Paddle(connectionApiKey, {
+      environment: GATEWAY_BASE_URL as unknown as Environment,
+      customHeaders: {
+        "X-Connection-Api-Key": connectionApiKey,
+        "Lovable-API-Key": lovableApiKey,
+      },
+    });
   }
-  const connectionApiKey = getConnectionApiKey(env);
-  const lovableApiKey = getEnv("LOVABLE_API_KEY");
-
-  return new Paddle(connectionApiKey, {
-    environment: GATEWAY_BASE_URL as unknown as Environment,
-    customHeaders: {
-      "X-Connection-Api-Key": connectionApiKey,
-      "Lovable-API-Key": lovableApiKey,
-    },
-  });
 }
 
 export async function gatewayFetch(

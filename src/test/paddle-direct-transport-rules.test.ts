@@ -204,6 +204,35 @@ describe("direct price lookup", () => {
   ])("returns null for %s", (_name, body) => {
     expect(extractDirectPriceId(body, "pro_monthly")).toBeNull();
   });
+
+  it("rejects an active price whose imported external id conflicts with custom_data", () => {
+    expect(
+      extractDirectPriceId(
+        {
+          data: {
+            id: "pri_conflict",
+            status: "active",
+            custom_data: { external_id: "pro_monthly" },
+            import_meta: { external_id: "pro_annual" },
+          },
+        },
+        "pro_monthly",
+      ),
+    ).toBeNull();
+    expect(
+      extractDirectPriceId(
+        {
+          data: {
+            id: "pri_agree",
+            status: "active",
+            custom_data: { external_id: "pro_monthly" },
+            import_meta: { external_id: "pro_monthly" },
+          },
+        },
+        "pro_monthly",
+      ),
+    ).toBe("pri_agree");
+  });
 });
 
 describe("applyDirectModeExternalIdFallback", () => {

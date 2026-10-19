@@ -30,7 +30,7 @@ import {
   type PaddleEnv,
 } from "../_shared/paddle.ts";
 import {
-  normalizeWebhookItemResources,
+  normalizeVerifiedPaddleEvent,
   priceExternalIdFromResolvedPrice,
 } from "../_shared/paddleDirectTransport.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
@@ -58,75 +58,6 @@ function safeParseJson(s: string): unknown {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-/** Alias only named provider fields; never recursively rewrite custom_data. */
-function aliasProviderFields(value: unknown, aliases: Record<string, string>): unknown {
-  if (!isRecord(value)) return value;
-  const result = { ...value };
-  for (const [wire, sdk] of Object.entries(aliases)) {
-    if (Object.prototype.hasOwnProperty.call(value, wire)) result[sdk] = value[wire];
-  }
-  return result;
-}
-
-/** Map verified Paddle wire fields to the processor's SDK-style shape. */
-function normalizeVerifiedPaddleEvent(
-  raw: unknown,
-  options?: { directMode?: boolean },
-): EventLikeWithId | null {
-  const directMode = options?.directMode === true;
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const eventId =
-    typeof o.eventId === "string"
-      ? o.eventId
-      : typeof o.event_id === "string"
-        ? o.event_id
-        : undefined;
-  const eventType =
-    typeof o.eventType === "string"
-      ? o.eventType
-      : typeof o.event_type === "string"
-        ? o.event_type
-        : undefined;
-  if (!eventType) return null;
-  const data = aliasProviderFields(o.data, {
-    customer_id: "customerId",
-    subscription_id: "subscriptionId",
-    custom_data: "customData",
-    current_billing_period: "currentBillingPeriod",
-    scheduled_change: "scheduledChange",
-    currency_code: "currencyCode",
-  });
-  if (isRecord(data)) {
-    data.currentBillingPeriod = aliasProviderFields(data.currentBillingPeriod, {
-      starts_at: "startsAt",
-      ends_at: "endsAt",
-    });
-    data.scheduledChange = aliasProviderFields(data.scheduledChange, {
-      effective_at: "effectiveAt",
-    });
-    if (Array.isArray(data.items)) {
-      data.items = normalizeWebhookItemResources(data.items, directMode);
-    }
-    // The existing confirmation helper also consumes SDK-style monetary fields.
-    if (isRecord(data.details)) {
-      data.details = {
-        ...data.details,
-        totals: aliasProviderFields(data.details.totals, {
-          grand_total: "grandTotal",
-          currency_code: "currencyCode",
-        }),
-      };
-    }
-  }
-  return {
-    ...(o as object),
-    eventId,
-    eventType,
-    data,
-  } as EventLikeWithId;
 }
 
 function mapVerifyFailure(reason: string): { status: number; body: string } {
@@ -394,7 +325,7 @@ Deno.serve(async (req) => {
   let result!: Awaited<ReturnType<typeof handleVerifiedEvent>>;
   try {
     const directMode = isPaddleDirectMode(env);
-    event = normalizeVerifiedPaddleEvent(verified.event, { directMode });
+    event = normalizeVerifiedPaddleEvent(verified.event, { directMode }) as EventLikeWithId | null;
     if (!event) {
       return new Response("invalid_event_shape", { status: 400 });
     }

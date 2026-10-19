@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  normalizeVerifiedPaddleEvent,
   normalizeWebhookItemResources,
   priceExternalIdFromResolvedPrice,
 } from "../../supabase/functions/_shared/paddleDirectTransport.ts";
@@ -60,6 +61,27 @@ describe("webhook custom_data.external_id normalization", () => {
     expect(wireItems[0]?.price).not.toHaveProperty("importMeta");
   });
 
+  it("runs the verified-event normalizer so a hardcoded directMode false would drop custom_data", () => {
+    const raw = {
+      event_id: "evt_direct",
+      event_type: "subscription.created",
+      data: {
+        id: "sub_1",
+        items: wireItems,
+      },
+    };
+    const direct = normalizeVerifiedPaddleEvent(raw, { directMode: true }) as {
+      data: { items: NormalizedItem[] };
+    };
+    const gateway = normalizeVerifiedPaddleEvent(raw, { directMode: false }) as {
+      data: { items: NormalizedItem[] };
+    };
+    expect(direct.data.items[0]?.price.importMeta).toEqual({ externalId: "pro_monthly" });
+    expect(direct.data.items[0]?.product.importMeta).toEqual({ externalId: "verdant_pro" });
+    expect(gateway.data.items[0]?.price.importMeta).toBeNull();
+    expect(gateway.data.items[0]?.product.importMeta).toBeNull();
+  });
+
   it("reads a resolved price customData.external_id only when directMode is on", () => {
     const price = {
       importMeta: null,
@@ -83,7 +105,7 @@ describe("payments-webhook calls the shared normalizer", () => {
   );
 
   it("passes directMode into item normalization and price external-id resolution", () => {
-    expect(WEBHOOK).toContain("normalizeWebhookItemResources(data.items, directMode)");
+    expect(WEBHOOK).toContain("normalizeVerifiedPaddleEvent(verified.event, { directMode })");
     expect(WEBHOOK).toContain("priceExternalIdFromResolvedPrice(priced, directMode)");
     expect(WEBHOOK).toContain("const directMode = isPaddleDirectMode(env)");
   });

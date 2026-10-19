@@ -10,7 +10,9 @@ import {
   PADDLE_GATEWAY_ORIGIN,
   PADDLE_SANDBOX_API_BASE,
   directPriceLookupPath,
+  paddleClientPlan,
   performPaddleFetch,
+  resolvePaddleTransport,
   type PaddleFetch,
 } from "../../supabase/functions/_shared/paddleDirectTransport.ts";
 
@@ -127,6 +129,19 @@ describe("paddle.ts uses the shared dispatch", () => {
     expect(SRC).toMatch(/export async function gatewayFetch/);
     expect(SRC).toMatch(/export function getPaddleClient/);
     expect(SRC).toContain("return performPaddleFetch(");
+    expect(SRC).toContain('if (plan.mode === "direct")');
+    expect(SRC).toContain("return new Paddle(plan.apiKey, { environment: Environment.sandbox })");
+    const directEnvMap = directEnv();
+    const directPlan = paddleClientPlan(
+      resolvePaddleTransport("sandbox", (name) => directEnvMap[name]) as {
+        mode: "direct";
+        apiKey: string;
+        base: string;
+      },
+    );
+    expect(directPlan).toEqual({ mode: "direct", apiKey: SANDBOX_KEY });
+    const gatewayPlan = paddleClientPlan({ mode: "gateway" });
+    expect(gatewayPlan).toEqual({ mode: "gateway" });
     expect(SRC).toContain('getEnv("LOVABLE_API_KEY")');
     expect(SRC).toContain('"X-Connection-Api-Key"');
     expect(SRC).toContain('"Lovable-API-Key"');

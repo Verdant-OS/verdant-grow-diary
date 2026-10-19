@@ -168,6 +168,64 @@ export function normalizeWebhookItemResources(items: unknown, directMode: boolea
   return applyDirectModeExternalIdFallback(normalized);
 }
 
+/** Map verified Paddle wire fields to the processor's SDK-style shape. */
+export function normalizeVerifiedPaddleEvent(
+  raw: unknown,
+  options?: { directMode?: boolean },
+): Record<string, unknown> | null {
+  const directMode = options?.directMode === true;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const eventId =
+    typeof o.eventId === "string"
+      ? o.eventId
+      : typeof o.event_id === "string"
+        ? o.event_id
+        : undefined;
+  const eventType =
+    typeof o.eventType === "string"
+      ? o.eventType
+      : typeof o.event_type === "string"
+        ? o.event_type
+        : undefined;
+  if (!eventType) return null;
+  const data = aliasProviderFields(o.data, {
+    customer_id: "customerId",
+    subscription_id: "subscriptionId",
+    custom_data: "customData",
+    current_billing_period: "currentBillingPeriod",
+    scheduled_change: "scheduledChange",
+    currency_code: "currencyCode",
+  });
+  if (isRecord(data)) {
+    data.currentBillingPeriod = aliasProviderFields(data.currentBillingPeriod, {
+      starts_at: "startsAt",
+      ends_at: "endsAt",
+    });
+    data.scheduledChange = aliasProviderFields(data.scheduledChange, {
+      effective_at: "effectiveAt",
+    });
+    if (Array.isArray(data.items)) {
+      data.items = normalizeWebhookItemResources(data.items, directMode);
+    }
+    if (isRecord(data.details)) {
+      data.details = {
+        ...data.details,
+        totals: aliasProviderFields(data.details.totals, {
+          grand_total: "grandTotal",
+          currency_code: "currencyCode",
+        }),
+      };
+    }
+  }
+  return {
+    ...o,
+    eventId,
+    eventType,
+    data,
+  };
+}
+
 export function priceExternalIdFromResolvedPrice(
   price: {
     importMeta?: { externalId?: string } | null;
@@ -180,12 +238,34 @@ export function priceExternalIdFromResolvedPrice(
   );
 }
 
+function importedExternalId(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const externalId = value.external_id ?? value.externalId;
+  return nonEmptyString(externalId) ? externalId : undefined;
+}
+
 export function extractDirectPriceId(body: unknown, requested: string): string | null {
   if (!isRecord(body) || !isRecord(body.data)) return null;
   if (body.data.status !== "active") return null;
   const customData = body.data.custom_data;
   if (!isRecord(customData) || customData.external_id !== requested) return null;
+  const imported =
+    importedExternalId(body.data.import_meta) ?? importedExternalId(body.data.importMeta);
+  if (imported !== undefined && imported !== requested) return null;
   return nonEmptyString(body.data.id) ? body.data.id : null;
+}
+
+/** Founder checkout stops before any price fetch when the cap is unproven or exhausted. */
+export function founderSlotCheckoutBlock(remaining: unknown): "ok" | "sold_out" {
+  if (typeof remaining !== "number" || remaining <= 0) return "sold_out";
+  return "ok";
+}
+
+export function paddleClientPlan(
+  transport: Exclude<PaddleTransport, { mode: "refused" }>,
+): { mode: "direct"; apiKey: string } | { mode: "gateway" } {
+  if (transport.mode === "direct") return { mode: "direct", apiKey: transport.apiKey };
+  return { mode: "gateway" };
 }
 
 export function externalIdFromCustomData(resource: unknown): string | undefined {

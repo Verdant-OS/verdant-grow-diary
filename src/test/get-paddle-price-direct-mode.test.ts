@@ -9,6 +9,7 @@ import {
   PADDLE_GATEWAY_ORIGIN,
   PADDLE_SANDBOX_API_BASE,
   extractDirectPriceId,
+  founderSlotCheckoutBlock,
   performPaddleFetch,
   priceLookupPath,
   type PaddleFetch,
@@ -93,6 +94,14 @@ describe("get-paddle-price direct and gateway requests", () => {
     expect(body?.data?.[0]?.id).toBe(PRICE_ID);
     expect(extractDirectPriceId(body, PLAN)).toBeNull();
   });
+
+  it("blocks founder checkout before a price fetch when no slots remain", () => {
+    expect(founderSlotCheckoutBlock(0)).toBe("sold_out");
+    expect(founderSlotCheckoutBlock(-1)).toBe("sold_out");
+    expect(founderSlotCheckoutBlock("3")).toBe("sold_out");
+    expect(founderSlotCheckoutBlock(undefined)).toBe("sold_out");
+    expect(founderSlotCheckoutBlock(3)).toBe("ok");
+  });
 });
 
 describe("get-paddle-price still calls the shared helpers", () => {
@@ -102,10 +111,13 @@ describe("get-paddle-price still calls the shared helpers", () => {
   );
 
   it("keeps sold-out ahead of gatewayFetch and uses the shared path and id helpers", () => {
-    const soldOutIdx = SRC.indexOf("plan_sold_out");
+    const soldOutIdx = SRC.indexOf('return json(409, { error: "plan_sold_out" })');
+    const blockIdx = SRC.indexOf("founderSlotCheckoutBlock(remaining)");
     const gatewayIdx = SRC.indexOf("await gatewayFetch(");
     expect(soldOutIdx).toBeGreaterThan(-1);
-    expect(gatewayIdx).toBeGreaterThan(soldOutIdx);
+    expect(blockIdx).toBeGreaterThan(-1);
+    expect(blockIdx).toBeLessThan(soldOutIdx);
+    expect(soldOutIdx).toBeLessThan(gatewayIdx);
     expect(SRC).toContain("priceLookupPath(direct, configuredId, requested)");
     expect(SRC).toContain("direct ? extractDirectPriceId(data, requested) : data?.data?.[0]?.id");
     expect(SRC).toContain("paddleId !== configuredId");

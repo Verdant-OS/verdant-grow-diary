@@ -1,7 +1,11 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { gatewayFetch, isPaddleDirectMode, type PaddleEnv } from "../_shared/paddle.ts";
-import { extractDirectPriceId, priceLookupPath } from "../_shared/paddleDirectTransport.ts";
+import {
+  extractDirectPriceId,
+  founderSlotCheckoutBlock,
+  priceLookupPath,
+} from "../_shared/paddleDirectTransport.ts";
 import {
   loadUnionEntitlementForUser,
   resolveRequiredServerBillingEnvironment,
@@ -240,7 +244,10 @@ Deno.serve(async (req) => {
         // Fail closed: if availability cannot be proven, no founder checkout.
         return json(503, { error: "price_resolution_unavailable" });
       }
-      if (typeof remaining !== "number" || remaining <= 0) {
+      if (
+        (typeof remaining !== "number" || remaining <= 0) &&
+        founderSlotCheckoutBlock(remaining) === "sold_out"
+      ) {
         logCatalogUnavailable({
           plan: requested,
           reason: "plan_sold_out",

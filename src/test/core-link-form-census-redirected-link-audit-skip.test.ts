@@ -17,15 +17,29 @@ import { describe, expect, it } from "vitest";
  * test.describe() to be called here" outside its runner, so Vitest cannot import the spec
  * to assert the redirected-route branch as a resolved value.
  */
-const CENSUS_SPEC_SOURCE = readFileSync(
+const CENSUS_SPEC_RAW = readFileSync(
   resolve(process.cwd(), "e2e/core-link-form-census.spec.ts"),
   "utf8",
+);
+
+// Match live code only, so a commented-out branch can't satisfy the fence.
+// Block comments are removed; a `//` comment is removed only where it starts
+// a line or follows whitespace, so URLs like "https://..." in strings survive.
+const CENSUS_SPEC_SOURCE = CENSUS_SPEC_RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+  /(^|\s)\/\/.*$/gm,
+  "$1",
 );
 
 describe("core census redirected-route link audit skip", () => {
   it("skips link audits on routes that redirect before the landing page", () => {
     expect(CENSUS_SPEC_SOURCE).toMatch(/const redirected = finalPath !==/);
-    expect(CENSUS_SPEC_SOURCE).toMatch(/redirected \? \[\] : await visibleLinkAudits/);
+    expect(CENSUS_SPEC_SOURCE).toMatch(
+      /const links = redirected \? \[\] : await visibleLinkAudits\(/,
+    );
     expect(CENSUS_SPEC_SOURCE).toMatch(/redirected \? finalPath : route\.path/);
+  });
+
+  it("never audits links unconditionally on a route that may have redirected", () => {
+    expect(CENSUS_SPEC_SOURCE).not.toMatch(/const links = await visibleLinkAudits\(/);
   });
 });

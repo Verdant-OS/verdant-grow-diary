@@ -25,7 +25,10 @@ vi.mock("@/integrations/supabase/client", () => ({
           data: table === "plants" ? [{ is_archived: harness.archived }] : [],
           error: null,
         }),
-        maybeSingle: async () => ({ data: null, error: null }),
+        maybeSingle: async () => ({
+          data: table === "plants" ? { is_archived: harness.archived } : null,
+          error: null,
+        }),
         insert: vi.fn(),
         update: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
       };
@@ -71,6 +74,18 @@ vi.mock("sonner", () => ({
 }));
 
 import QuickLog from "@/components/QuickLog";
+import { checkDailyCheckPlantArchiveBeforeSave } from "@/lib/dailyCheckPlantArchiveReadService";
+import { registerDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
+
+// Daily Check registers this guard while it is mounted; these tests mount the
+// writers directly, so they register the same real guard.
+let unregisterArchiveGuard = () => {};
+beforeEach(() => {
+  unregisterArchiveGuard = registerDailyCheckPlantArchiveSaveGuard(
+    checkDailyCheckPlantArchiveBeforeSave,
+  );
+});
+afterEach(() => unregisterArchiveGuard());
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 
 const MESSAGE = "This plant was archived. Pick another plant.";

@@ -23,16 +23,7 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { QueryClientContext } from "@tanstack/react-query";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +35,7 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
-import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
+import { activeDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -139,10 +130,6 @@ import {
   resolveGuidedSymptomStage,
   validateGuidedSymptomCheck,
 } from "@/lib/symptomCheckRules";
-
-function savedPlantArchiveDecision(plantId: string | null | undefined) {
-  return startSavedPlantArchiveDecision(plantId);
-}
 
 export interface QuickLogAllActivitiesSectionProps {
   growId: string | null | undefined;
@@ -337,9 +324,6 @@ export default function QuickLogAllActivitiesSection({
   const [guidedSymptomStageConfirmed, setGuidedSymptomStageConfirmed] = useState(false);
   const [guidedSymptomNoneObserved, setGuidedSymptomNoneObserved] = useState(false);
   const { user } = useAuth();
-  // Optional: many mounts of this section have no provider. The archive
-  // block still runs; list refresh happens only when a client is present.
-  const queryClient = useContext(QueryClientContext);
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
@@ -1045,11 +1029,10 @@ export default function QuickLogAllActivitiesSection({
     if (!acquired) return;
     localSaveInFlightRef.current = true;
     try {
-      const startedArchive = savedPlantArchiveDecision(record.input.plantId);
-      const archiveDecision = startedArchive.ready
-        ? startedArchive.decision
-        : await startedArchive.pending;
-      if (archiveDecision.block) {
+      const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+      const archiveDecision =
+        archiveGuard && record.input.plantId ? await archiveGuard(record.input.plantId) : null;
+      if (archiveDecision?.block) {
         setErrorReason(archiveDecision.message);
         setErrorForActivity(record.input.activityId);
         return;
@@ -1090,7 +1073,6 @@ export default function QuickLogAllActivitiesSection({
     onSaveEnd,
     onSaveStart,
     plantStage,
-    queryClient,
     restoreRejectedDraft,
     save,
     saveBlocked,
@@ -1265,11 +1247,10 @@ export default function QuickLogAllActivitiesSection({
     localSaveInFlightRef.current = true;
 
     try {
-      const startedArchive = savedPlantArchiveDecision(capturedTarget.plantId);
-      const archiveDecision = startedArchive.ready
-        ? startedArchive.decision
-        : await startedArchive.pending;
-      if (archiveDecision.block) {
+      const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+      const archiveDecision =
+        archiveGuard && capturedTarget.plantId ? await archiveGuard(capturedTarget.plantId) : null;
+      if (archiveDecision?.block) {
         setErrorReason(archiveDecision.message);
         setErrorForActivity(selected.id);
         return;
@@ -1570,7 +1551,6 @@ export default function QuickLogAllActivitiesSection({
     activityPersistenceBlockReason,
     activeEnvCheckTempUnit,
     onSaveSuccess,
-    queryClient,
     guidedSymptomCheck,
     guidedSymptomStage,
     guidedSymptomStageConfirmed,

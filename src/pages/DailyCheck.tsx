@@ -58,7 +58,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
-import { readDailyCheckPlantArchive } from "@/lib/dailyCheckPlantArchiveReadService";
+import {
+  checkDailyCheckPlantArchiveBeforeSave,
+  readDailyCheckPlantArchive,
+} from "@/lib/dailyCheckPlantArchiveReadService";
+import { registerDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import {
@@ -280,6 +284,13 @@ export default function DailyCheck() {
     [renderedPlantId, selectablePlants],
   );
   selectedPlantIdRef.current = selectedPlant?.id ?? "";
+
+  // Every Quick Log writer Daily Check opens re-reads the plant it is about
+  // to save, including the AppShell Water/Feed sheet.
+  useEffect(
+    () => registerDailyCheckPlantArchiveSaveGuard(checkDailyCheckPlantArchiveBeforeSave),
+    [],
+  );
 
   useEffect(() => {
     const onClickCapture = (event: MouseEvent) => {

@@ -1,58 +1,73 @@
 /**
- * A real plant-row reader that throws or rejects must block. A stub that
- * cannot read one row is not that reader and must not block.
+ * The Daily Check archive re-read fails closed. Only a row with a boolean
+ * `is_archived` decides the save; every other outcome blocks with the retry
+ * message.
  */
 import { describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
-  from: (() => ({})) as (table: string) => unknown,
+  maybeSingle: (() => Promise.resolve({ data: null, error: null })) as () => unknown,
+  eqArgs: [] as unknown[][],
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (table: string) => harness.from(table) },
+  supabase: {
+    from: (table: string) => {
+      if (table !== "plants") throw new Error(`unexpected table ${table}`);
+      return {
+        select: (columns: string) => {
+          expect(columns).toBe("is_archived");
+          return {
+            eq: (...args: unknown[]) => {
+              harness.eqArgs.push(args);
+              return { maybeSingle: () => harness.maybeSingle() };
+            },
+          };
+        },
+      };
+    },
+  },
 }));
 
-import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
-import { DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE } from "@/lib/dailyCheckPlantSelectionRules";
+import { checkDailyCheckPlantArchiveBeforeSave } from "@/lib/dailyCheckPlantArchiveReadService";
+import {
+  DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
+  DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE,
+} from "@/lib/dailyCheckPlantSelectionRules";
 
-describe("saved plant archive read", () => {
-  it("blocks when a real reader throws while reading the row", async () => {
-    const filter = {
-      eq: () => filter,
-      maybeSingle: () => Promise.reject(new Error("network")),
-      limit: () => {
-        throw new Error("network");
-      },
-    };
-    harness.from = () => ({
-      select: () => filter,
-      update: () => ({}),
-      delete: () => ({}),
-      upsert: () => ({}),
+const RETRY = { block: true, message: DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE };
+
+describe("checkDailyCheckPlantArchiveBeforeSave", () => {
+  it("allows an active plant and reads that exact plant", async () => {
+    harness.eqArgs = [];
+    harness.maybeSingle = () => Promise.resolve({ data: { is_archived: false }, error: null });
+    await expect(checkDailyCheckPlantArchiveBeforeSave("plant-1")).resolves.toEqual({
+      block: false,
     });
+    expect(harness.eqArgs).toEqual([["id", "plant-1"]]);
+  });
 
-    const started = startSavedPlantArchiveDecision("plant-1");
-    expect(started.ready).toBe(false);
-    if (started.ready) return;
-    await expect(started.pending).resolves.toEqual({
+  it("blocks an archived plant", async () => {
+    harness.maybeSingle = () => Promise.resolve({ data: { is_archived: true }, error: null });
+    await expect(checkDailyCheckPlantArchiveBeforeSave("plant-1")).resolves.toEqual({
       block: true,
-      message: DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE,
+      message: DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
     });
   });
 
-  it("does not block a stub that cannot read one plant row", () => {
-    const filter = {
-      eq: () => filter,
-      limit: async () => ({ data: [], error: null }),
-    };
-    harness.from = () => ({
-      select: () => filter,
-      update: () => ({}),
-    });
-
-    const started = startSavedPlantArchiveDecision("plant-1");
-    expect(started.ready).toBe(true);
-    if (!started.ready) return;
-    expect(started.decision).toEqual({ block: false });
+  it.each([
+    ["a rejected read", () => Promise.reject(new Error("network"))],
+    [
+      "a thrown read",
+      () => {
+        throw new Error("network");
+      },
+    ],
+    ["an error result", () => Promise.resolve({ data: null, error: { message: "unavailable" } })],
+    ["a missing row", () => Promise.resolve({ data: null, error: null })],
+    ["a non-boolean flag", () => Promise.resolve({ data: { is_archived: "false" }, error: null })],
+  ])("blocks on %s", async (_label, read) => {
+    harness.maybeSingle = read;
+    await expect(checkDailyCheckPlantArchiveBeforeSave("plant-1")).resolves.toEqual(RETRY);
   });
 });

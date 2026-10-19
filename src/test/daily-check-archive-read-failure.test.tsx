@@ -80,6 +80,18 @@ vi.mock("sonner", () => ({
 }));
 
 import QuickLog from "@/components/QuickLog";
+import { checkDailyCheckPlantArchiveBeforeSave } from "@/lib/dailyCheckPlantArchiveReadService";
+import { registerDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
+
+// Daily Check registers this guard while it is mounted; these tests mount the
+// writers directly, so they register the same real guard.
+let unregisterArchiveGuard = () => {};
+beforeEach(() => {
+  unregisterArchiveGuard = registerDailyCheckPlantArchiveSaveGuard(
+    checkDailyCheckPlantArchiveBeforeSave,
+  );
+});
+afterEach(() => unregisterArchiveGuard());
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 
 const RETRY = "Couldn't check whether this plant is archived. Try again.";

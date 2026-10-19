@@ -66,6 +66,26 @@ last_updated: 2026-10-16 18:19 UTC, by Codex
 limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Deferred ordering risk: cancellation updates acknowledge zero matched rows; stale subscription upserts have no occurred_at guard. No ordering/replay changes, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
 ```
 
+### FIX-2171-PLANT-CREATE-INSERT-ERROR
+
+```text
+TASK FIX-2171-PLANT-CREATE-INSERT-ERROR  priority: P2  status: OPEN
+goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the "not assessed" plants-list label; that is open PR #2140. Fixes #2171.
+branch: cursor/plant-create-insert-error-99b8
+base: verdant-grow-diary
+checkout: git fetch origin cursor/plant-create-insert-error-99b8 verdant-grow-diary && git switch cursor/plant-create-insert-error-99b8 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2192 (open, ready for review; not merged)
+head_sha: 71be93f03ec13e4ad9d8378a2c10f076f719dd52, remote observed 2026-10-19 17:32 UTC (close-out merges of deploy 722592527 and 26951e5ad plus the retry-clear fix 293005fb6). This files-list update follows it as its child; re-read the PR for the current exact head before resuming.
+state: review. Not merged, so this block stays OPEN; move it to Closed with the landing SHA when #2192 merges.
+next_action: Exact-head Codex review of PR #2192 at its current head, then independent review. No merge from this block.
+files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-failure-notice.test.ts; src/test/plant-create-insert-failure-notice.test.tsx; src/test/plant-create-retry-recovery-notice.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. The plants-list health label stays with #2140. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
+artifacts: PR #2192 body (RED/GREEN counts for the retry-clear fix); earlier toast-target fail-first 1 failed / 3 skipped before the notifications-region lookup, 10 passed / 0 failed after
+reviewer_seat: Blue Dream (CreatePlantDialog.tsx)
+claimed_by: Claude (close-out session), 2026-10-19 16:14 UTC (VER-216, Matthew 2026-10-19)
+last_updated: 2026-10-19 17:32 UTC, by Claude (close-out session)
+```
+
 ### QUICKLOG-EVENT-REQUEST-HASH-UTC
 
 ```text

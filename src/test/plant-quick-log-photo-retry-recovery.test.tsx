@@ -159,7 +159,10 @@ function choosePhotoAndNote() {
   fireEvent.change(screen.getByTestId("plant-quick-log-photo-library-input"), {
     target: {
       files: [
-        new File([new Uint8Array([1, 2, 3])], "leaf.png", { type: "image/png", lastModified: 123 }),
+        new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "leaf.png", {
+          type: "image/png",
+          lastModified: 123,
+        }),
       ],
     },
   });
@@ -239,7 +242,7 @@ describe("Plant Quick Log photo persistence through uncertain saves", () => {
     fireEvent.change(screen.getByTestId("plant-quick-log-photo-library-input"), {
       target: {
         files: [
-          new File([new Uint8Array([4, 5, 6])], "leaf.png", {
+          new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "leaf.png", {
             type: "image/png",
             lastModified: 123,
           }),

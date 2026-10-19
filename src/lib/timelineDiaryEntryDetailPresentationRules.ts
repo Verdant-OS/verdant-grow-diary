@@ -35,8 +35,12 @@ import {
   QUICK_LOG_DETAIL_FIELD_KEYS,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
-import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
+import { readDetailsLoggedAt } from "@/lib/quicklogManualDiagnosticsRules";
 
 /**
  * Top-level detail keys that must never render as a raw "key: value" chip,
@@ -49,6 +53,8 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "plant_id",
   "plant_name",
   "tent_id",
+  // Shown by the dedicated tent chip. A raw tent_name chip would repeat it.
+  "tent_name",
   "sensor",
   "sensor_snapshot",
   "manual_sensor_snapshot",
@@ -66,6 +72,12 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   // Redundant with the dedicated photo render, which reads the row-level
   // photo_url column directly.
   "photo_url",
+  // Written by the photo diary seam. Growers see a labeled local time and
+  // "Attached to", never the raw snake_case chip.
+  "logged_at",
+  "attached_to_action",
+  // Operator attestation blob. Never a grower-facing chip.
+  "manual_provenance",
 ]);
 
 /**
@@ -123,20 +135,197 @@ export function isFullySuppressedTimelineDetail(details: unknown, suppress = fal
  * null value is "not provided", never "feeding: null" (matching this
  * codebase's absence-stays-unknown doctrine).
  */
+export interface TimelineDiaryDetailPresentationOptions {
+  suppress?: boolean;
+  /** IANA zone for `logged_at`. Omitted uses the runtime local zone. */
+  timeZone?: string;
+  /** Test seam. When set, it replaces the local timestamp formatter. */
+  formatTimestamp?: (iso: string) => string | null;
+}
+
+function formatDiaryDetailTimestamp(iso: string, timeZone?: string): string | null {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      ...(timeZone ? { timeZone } : {}),
+    }).format(date);
+  } catch {
+    return null;
+  }
+}
+
+function friendlyAttachedAction(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed.length > 80) return null;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+const TYPED_ACTIVITY_ENVELOPES = ["watering", "feeding"] as const;
+
+const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
+  ph: "pH",
+  ec_ms_cm: "EC",
+  ec_in: "EC in",
+  ec_out: "EC out",
+  runoff_ml: "Runoff",
+  runoff_ph: "Runoff pH",
+  runoff_ec: "Runoff EC",
+  water_temp_c: "Water temperature",
+};
+
+function typedActivityScalar(
+  key: string,
+  value: unknown,
+  tempUnit: TemperatureUnitPreference,
+): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (key === "volume_ml" || key === "runoff_ml") return `${value} ml`;
+    if (key === "water_temp_c") {
+      const displayed = tempUnit === "fahrenheit" ? celsiusToFahrenheit(value) : value;
+      const shown = String(Math.round(displayed * 10) / 10);
+      return `${shown} ${tempUnit === "fahrenheit" ? "°F" : "°C"}`;
+    }
+    return String(value);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "" || trimmed === "default") return null;
+    return trimmed;
+  }
+  return null;
+}
+
+function typedProductText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const name = typeof record.name === "string" ? record.name.trim() : "";
+  const brand =
+    typeof record.brand === "string"
+      ? record.brand.trim()
+      : typeof record.nutrient_brand === "string"
+        ? record.nutrient_brand.trim()
+        : "";
+  const identity = name && brand ? `${name} (${brand})` : name || brand;
+  if (!identity) return null;
+  const amount =
+    typeof record.amount === "number" && Number.isFinite(record.amount) ? record.amount : null;
+  const unit = typeof record.unit === "string" ? record.unit.trim() : "";
+  if (amount != null && unit) return `${identity} ${amount} ${unit}`;
+  return identity;
+}
+
+function plainDetailValue(value: unknown): string | null {
+  if (typeof value === "string" || typeof value === "boolean") return String(value);
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const parts: string[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (trimmed === "") return null;
+      parts.push(trimmed);
+    } else if (typeof item === "number") {
+      if (!Number.isFinite(item)) return null;
+      parts.push(String(item));
+    } else if (typeof item === "boolean") {
+      parts.push(String(item));
+    } else {
+      return null;
+    }
+  }
+  return parts.join(", ");
+}
+
+function typedVolumeLabel(envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number]): string {
+  return envelope === "watering" ? "Water Volume" : "Feed Volume";
+}
+
+function typedActivityEnvelopeLines(
+  envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number],
+  value: unknown,
+  tempUnit: TemperatureUnitPreference,
+): QuickLogDetailDisplayLine[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const record = value as Record<string, unknown>;
+  const lines: QuickLogDetailDisplayLine[] = [];
+  for (const [key, child] of Object.entries(record)) {
+    if (key === "products" || key === "nutrients") {
+      const items = Array.isArray(child) ? child : [child];
+      const texts = items
+        .map((item) => typedProductText(item))
+        .filter((item): item is string => item != null);
+      if (texts.length > 0) {
+        lines.push({ key: `${envelope}.${key}`, label: "Products", value: texts.join(", ") });
+      }
+      continue;
+    }
+    const label =
+      key === "volume_ml" ? typedVolumeLabel(envelope) : TYPED_ACTIVITY_FIELD_LABELS[key];
+    const text = typedActivityScalar(key, child, tempUnit);
+    if (!label || !text) continue;
+    lines.push({ key: `${envelope}.${key}`, label, value: text });
+  }
+  return lines;
+}
+
+function withGrowerFacingDetailLines(
+  record: Record<string, unknown>,
+  lines: readonly QuickLogDetailDisplayLine[],
+  options: TimelineDiaryDetailPresentationOptions,
+): QuickLogDetailDisplayLine[] {
+  const next = [...lines];
+  if (typeof record.logged_at === "string" && !next.some((line) => line.key === "logged_at")) {
+    const reading = readDetailsLoggedAt({ logged_at: record.logged_at });
+    if (reading.parseable && reading.value) {
+      const formatted = options.formatTimestamp
+        ? options.formatTimestamp(reading.value)
+        : formatDiaryDetailTimestamp(reading.value, options.timeZone);
+      if (formatted) next.push({ key: "logged_at", label: "Logged at", value: formatted });
+    }
+  }
+  const attached = friendlyAttachedAction(record.attached_to_action);
+  if (attached && !next.some((line) => line.key === "attached_to_action")) {
+    next.push({ key: "attached_to_action", label: "Attached to", value: attached });
+  }
+  return next;
+}
+
 export function presentTimelineDiaryEntryDetails(
   details: unknown,
   tempUnit: TemperatureUnitPreference,
-  options: { suppress?: boolean } = {},
+  options: TimelineDiaryDetailPresentationOptions = {},
 ): TimelineDiaryEntryDetailPresentation {
   if (isFullySuppressedTimelineDetail(details, options.suppress)) return EMPTY_PRESENTATION;
 
-  const detailLines = describeQuickLogDetailsFromExtras(details, tempUnit);
-  const extra = Object.entries(detailsRecord(details))
+  const record = detailsRecord(details);
+  const detailLines = withGrowerFacingDetailLines(
+    record,
+    describeQuickLogDetailsFromExtras(details, tempUnit),
+    options,
+  );
+  for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
+    detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
+  }
+  const extra = Object.entries(record)
     .filter(
-      ([k, v]) =>
-        v != null && !HIDDEN_DIARY_DETAIL_KEYS.has(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
+      ([k]) =>
+        !HIDDEN_DIARY_DETAIL_KEYS.has(k) &&
+        !QUICK_LOG_DETAIL_FIELD_KEYS.has(k) &&
+        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]),
     )
-    .map(([k, v]) => [k, String(v)] as const);
+    .map(([k, v]) => {
+      const text = plainDetailValue(v);
+      return text == null ? null : ([k, text] as const);
+    })
+    .filter((entry): entry is readonly [string, string] => entry != null);
 
   return { detailLines, extra };
 }

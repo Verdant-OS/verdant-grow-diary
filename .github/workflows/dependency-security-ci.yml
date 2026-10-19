@@ -43,20 +43,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
-      # 1. bun.lock stays canonical. package-lock.json remains synchronized
-      #    only for the owned, dated npm-consumer transition contract.
+      # 1. bun.lock is canonical and the only lockfile. The npm compatibility
+      #    lock was retired on 2026-10-03; the policy forbids it.
       - name: Lockfile policy check
         run: bun run check:lockfile
-
-      - name: npm compatibility lock semantic check
-        run: bun run check:npm-lock-semantic
 
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
-      # 2. Dual Bun + npm compatibility-lock security scan. npm propagation
-      #    metadata is normalized to atomic advisories before the same exact,
-      #    expiring exception policy is applied to both sources.
+      # 2. Bun audit security scan with the exact, expiring exception policy.
       - name: Dependency security scan
         run: bun run check:deps
 

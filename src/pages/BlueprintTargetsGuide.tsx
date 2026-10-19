@@ -69,12 +69,18 @@ export default function BlueprintTargetsGuide() {
         <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm">
           <Link to="/guides" className="text-muted-foreground hover:text-foreground">
             All guides
           </Link>
           <Link to="/tools/vpd-calculator" className="text-muted-foreground hover:text-foreground">
             VPD calculator
+          </Link>
+          <Link
+            to="/tools/grow-help-toolkit"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Grow Help Toolkit
           </Link>
         </nav>
       </header>
@@ -162,6 +168,13 @@ export default function BlueprintTargetsGuide() {
               data-testid="blueprint-targets-vpd-link"
             >
               Try the VPD calculator
+            </Link>
+            <Link
+              to="/tools/grow-help-toolkit"
+              className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+              data-testid="blueprint-targets-grow-help-link"
+            >
+              Plan nutrients, light, and costs
             </Link>
           </div>
         </section>

@@ -1609,14 +1609,21 @@ describe("remote applied-schema runner safety", () => {
 describe("required-core-migrations workflow trust boundary", () => {
   const workflow = readFileSync(WORKFLOW_PATH, "utf8");
   const workflowConfig = loadYaml(workflow) as {
-    on: { push: { branches: string[] }; pull_request: unknown };
+    on: {
+      push: { branches: string[] };
+      pull_request: unknown;
+      workflow_dispatch: {
+        inputs: Record<
+          string,
+          { default?: string; options?: string[]; required?: boolean; type?: string }
+        >;
+      };
+    };
     jobs: Record<string, { if?: string; environment?: string; steps: { run?: string }[] }>;
   };
   const manifestStart = workflow.indexOf("  manifest-and-files:");
-  const sandboxStart = workflow.indexOf("  verify-sandbox:");
   const productionStart = workflow.indexOf("  verify-production:");
-  const manifestBlock = workflow.slice(manifestStart, sandboxStart);
-  const sandboxBlock = workflow.slice(sandboxStart, productionStart);
+  const manifestBlock = workflow.slice(manifestStart, productionStart);
   const productionBlock = workflow.slice(productionStart);
 
   it("reruns when any transitive Quick Log catalog dependency changes", () => {
@@ -1632,24 +1639,32 @@ describe("required-core-migrations workflow trust boundary", () => {
   it("gives pull requests one offline job with no remote secret or environment", () => {
     expect(workflow).toMatch(/\n {2}pull_request:\s*\n/);
     expect(manifestStart).toBeGreaterThan(0);
-    expect(sandboxStart).toBeGreaterThan(manifestStart);
+    expect(productionStart).toBeGreaterThan(manifestStart);
     expect(manifestBlock).not.toContain("secrets.");
     expect(manifestBlock).not.toMatch(/\n {4}environment:/);
     expect(manifestBlock).toContain("src/test/required-core-migrations-gate.test.ts");
   });
 
-  it("allows sandbox remote access only by manual dispatch from the deploy branch", () => {
-    expect(workflowConfig.jobs["verify-sandbox"].if).toBe(
-      "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}",
-    );
-    expect(sandboxBlock).not.toContain("github.event_name == 'push'");
-    expect(sandboxBlock).toContain(
-      "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox'",
-    );
-    expect(sandboxBlock).not.toContain("pull_request");
-    expect(sandboxBlock).toContain("environment: verdant-sandbox");
-    expect(sandboxBlock.match(/secrets\.SUPABASE_DB_URL_SANDBOX/g)).toHaveLength(2);
-    expect(sandboxBlock).not.toMatch(/SUPABASE_DB_URL:\s*\$\{\{\s*secrets\.SUPABASE_DB_URL\s*\}\}/);
+  it("has no sandbox database lane", () => {
+    expect(Object.keys(workflowConfig.jobs).sort()).toEqual([
+      "manifest-and-files",
+      "verify-production",
+    ]);
+    for (const job of Object.values(workflowConfig.jobs)) {
+      expect(job.environment).not.toBe("verdant-sandbox");
+    }
+    expect(workflow).not.toContain("SUPABASE_DB_URL_SANDBOX");
+  });
+
+  it("constrains manual dispatch to production with a typed LIVE confirmation", () => {
+    const inputs = workflowConfig.on.workflow_dispatch.inputs;
+    expect(inputs.target_env).toMatchObject({
+      default: "production",
+      required: true,
+      type: "choice",
+      options: ["production"],
+    });
+    expect(inputs.confirm_live).toMatchObject({ required: true, type: "string" });
   });
 
   it("keeps the manifest and focused tests offline on deploy pushes and pull requests", () => {
@@ -1669,8 +1684,8 @@ describe("required-core-migrations workflow trust boundary", () => {
 
   it("allows production remote access only by manual dispatch from the deploy branch", () => {
     expect(productionBlock).toContain("github.ref == 'refs/heads/verdant-grow-diary'");
-    expect(productionBlock).toContain(
-      "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production'",
+    expect(workflowConfig.jobs["verify-production"].if).toBe(
+      "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production' && inputs.confirm_live == 'LIVE' }}",
     );
     expect(productionBlock).not.toContain("github.event_name == 'push'");
     expect(productionBlock).not.toContain("pull_request");
@@ -1678,8 +1693,8 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(productionBlock).toContain("secrets.SUPABASE_DB_URL");
   });
 
-  it("keeps advisory drift warning-only without weakening either blocking core step", () => {
-    for (const remoteBlock of [sandboxBlock, productionBlock]) {
+  it("keeps advisory drift warning-only without weakening the blocking core step", () => {
+    for (const remoteBlock of [productionBlock]) {
       const blockingStart = remoteBlock.indexOf("- name: Verify blocking core schema");
       const advisoryStart = remoteBlock.indexOf("- name: Verify advisory schema");
       const publishStart = remoteBlock.indexOf("- name: Publish sanitized reports");

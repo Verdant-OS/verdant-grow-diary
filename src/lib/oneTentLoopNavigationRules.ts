@@ -153,6 +153,15 @@ export function resolveTimelineSensorHandoffIds(
   return { tentId: ownerTentId, plantId: selectedPlantId };
 }
 
+/**
+ * The Alerts page shows the loop card only when an alert is open.
+ * Zero, missing, or non-finite counts hide it so the page does not
+ * point at Action Queue with nothing to act on.
+ */
+export function showAlertsOneTentLoopNextStep(openAlertCount: number): boolean {
+  return Number.isFinite(openAlertCount) && openAlertCount > 0;
+}
+
 export function getNextLoopStep(current: OneTentLoopStep): OneTentLoopStep | null {
   const idx = ONE_TENT_LOOP_ORDER.indexOf(current);
   if (idx < 0) return null;
@@ -278,8 +287,10 @@ export function resolveOneTentLoopNextStep(
       if (actionId) return enable(base, `/actions/${actionId}`);
       return enable(base, actionsPath(normalizedGrowId));
     case "action-queue":
+      // A specific action opens its detail, which is a different page.
+      // The queue index is this step, so do not link back to /actions.
       if (actionId) return enable(base, `/actions/${actionId}`);
-      return enable(base, "/actions");
+      return base;
     default:
       return base;
   }

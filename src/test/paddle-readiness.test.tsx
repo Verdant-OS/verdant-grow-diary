@@ -34,7 +34,7 @@ const WEBHOOK_SRC = readRoot("supabase/functions/paddle-webhook/index.ts");
 // The signature-verification primitives were extracted into a shared module
 // that index.ts imports; the crypto assertions below scan the receiver +
 // verifier together so the guarantee holds whether the impl is inlined or shared.
-const VERIFIER_SRC = readRoot("supabase/functions/paddle-webhook/verifyPaddleSignature.ts");
+const VERIFIER_SRC = readRoot("supabase/functions/_shared/verifyPaddleSignature.ts");
 const WEBHOOK_VERIFY_SRC = WEBHOOK_SRC + "\n" + VERIFIER_SRC;
 const ENV_EXAMPLE = readRoot(".env.example");
 const BILLING_DOC = readRoot("docs/billing.md");

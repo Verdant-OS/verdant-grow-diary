@@ -108,7 +108,6 @@ import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
-  DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
   DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
   dailyCheckPlantArchiveRelationCanStart,
   startDailyCheckPlantArchiveDecision,
@@ -1539,7 +1538,7 @@ export default function QuickLog({
         : await startedArchive.pending;
       if (archiveDecision.block) {
         setSaveError(archiveDecision.message);
-        toast.error(DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE);
+        toast.error(archiveDecision.message);
         void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
         return;
       }

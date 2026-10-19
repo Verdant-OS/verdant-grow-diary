@@ -166,6 +166,10 @@ export const DAILY_CHECK_WHAT_COUNTS_HINT =
 export const DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE =
   "This plant was archived. Pick another plant.";
 
+/** Shown when the archive re-read fails, is empty, or is not a boolean flag. */
+export const DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE =
+  "Couldn't check whether this plant is archived. Try again.";
+
 /**
  * Plant-list cache key. Equal to `PLANTS_QUERY_KEY` in `use-plants`.
  * Daily Check imports it from here so a hook mock cannot drop the key.
@@ -212,7 +216,7 @@ export function dailyCheckArchiveCheckIsStale(
 
 /**
  * One plant-row read. A thrown client, a missing row, or a row without a
- * boolean archive flag is unreadable and does not block the save.
+ * boolean archive flag is unreadable. A settled unreadable read blocks the save.
  */
 export type DailyCheckPlantArchiveQuery = PromiseLike<{ data: unknown; error: unknown }>;
 
@@ -241,8 +245,9 @@ export function dailyCheckPlantArchiveRelationCanStart(relation: unknown): boole
 
 /**
  * Start an archive read without forcing a turn when the client cannot answer.
- * A thrown or non-thenable query is unreadable and does not block. A real
- * query stays pending until its row comes back.
+ * A thrown or non-thenable query never started a plant read, so it does not
+ * block. A real query stays pending until its row comes back, and a settled
+ * unreadable row blocks.
  */
 export function startDailyCheckPlantArchiveDecision(
   plantId: string | null | undefined,
@@ -297,12 +302,12 @@ export type DailyCheckPlantArchiveRead =
   | { readonly status: "archived" }
   | { readonly status: "unreadable" };
 
-/** Map one plant-row read. A missing row or a read error is not an archive proof. */
+/** Map one plant-row read. Only a boolean flag is archive proof. */
 export function classifyDailyCheckPlantArchiveRead(input: {
   readonly error: boolean;
-  readonly isArchived: boolean | null;
+  readonly isArchived: unknown;
 }): DailyCheckPlantArchiveRead {
-  if (input.error || input.isArchived === null) return { status: "unreadable" };
+  if (input.error || typeof input.isArchived !== "boolean") return { status: "unreadable" };
   return input.isArchived ? { status: "archived" } : { status: "active" };
 }
 
@@ -310,12 +315,15 @@ export function dailyCheckSubmitBlockForPlantArchive(read: DailyCheckPlantArchiv
   | { readonly block: false }
   | {
       readonly block: true;
-      readonly message: typeof DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE;
+      readonly message:
+        | typeof DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE
+        | typeof DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE;
     } {
   switch (read.status) {
     case "active":
-    case "unreadable":
       return { block: false };
+    case "unreadable":
+      return { block: true, message: DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE };
     case "archived":
       return { block: true, message: DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE };
     default: {

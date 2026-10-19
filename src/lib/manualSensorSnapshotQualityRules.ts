@@ -420,3 +420,55 @@ export function deriveCurrentSnapshotFromAiDoctorContext(
     ...(fields as ManualSensorSnapshotInput),
   };
 }
+
+/** Validation outcome a snapshot card already carries (manualSensorSnapshotRules). */
+export interface ManualSnapshotValidationSeverity {
+  readonly severity: "ok" | "warning" | "invalid";
+  readonly warnings: ReadonlyArray<string>;
+  readonly errors: ReadonlyArray<string>;
+}
+
+/**
+ * Fold the snapshot validator's verdict into a range-based quality result.
+ * The range evaluator only sees normalised values, so a value the validator
+ * flags (e.g. 45°F, warned as a likely °C/°F mismatch, is a range-valid
+ * 7.2°C) could otherwise read "Usable current reading" beside its own
+ * warning. Errors make the result invalid; warnings make a usable result
+ * need review. Either one removes current-room support. A worse existing
+ * result is never upgraded. Pure and deterministic.
+ */
+export function applySnapshotValidationSeverity(
+  evaluation: ManualSensorSnapshotQuality,
+  validation: ManualSnapshotValidationSeverity,
+  mode: "current" | "historical" = "current",
+): ManualSensorSnapshotQuality {
+  const hasErrors = validation.severity === "invalid" || validation.errors.length > 0;
+  const hasWarnings = validation.severity === "warning" || validation.warnings.length > 0;
+  if (!hasErrors && !hasWarnings) return evaluation;
+  const historical = mode === "historical";
+  if (hasErrors && (evaluation.quality === "usable" || evaluation.quality === "needs_review")) {
+    return {
+      ...evaluation,
+      quality: "invalid",
+      summary: historical ? "Historical invalid reading — review before use" : "Invalid reading",
+      reasons: [...validation.errors, ...evaluation.reasons],
+      canSupportAiDoctorCurrentContext: false,
+      canSupportActionSuggestionPreview: false,
+    };
+  }
+  if (evaluation.quality === "usable") {
+    return {
+      ...evaluation,
+      quality: "needs_review",
+      summary: historical ? "Historical reading needs review" : "Needs review",
+      reasons: [...validation.warnings, ...evaluation.reasons],
+      canSupportAiDoctorCurrentContext: false,
+      canSupportActionSuggestionPreview: false,
+    };
+  }
+  return {
+    ...evaluation,
+    canSupportAiDoctorCurrentContext: false,
+    canSupportActionSuggestionPreview: false,
+  };
+}

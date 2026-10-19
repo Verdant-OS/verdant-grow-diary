@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const GROW = "4cad3cae-1111-4000-8000-000000000001";
 const TENT = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
+const TENT_B = "6b2d7f1a-3c4e-4d6f-9a01-2b3c4d5e6f70";
 
 type PlantsQuery = {
   data: Array<Record<string, unknown>> | undefined;
@@ -32,25 +33,11 @@ const H = vi.hoisted(() => ({
   tentsPatch: {} as Record<string, unknown>,
   persistCalls: [] as unknown[],
   stabilityStages: [] as unknown[],
+  stabilityInputs: [] as unknown[][],
+  secondTent: false,
   stripStages: [] as unknown[],
   saveAlert: vi.fn(async () => ({ id: "alert-1" })),
 }));
-
-function plant(id: string, growId: string | null, stage: string) {
-  return {
-    id,
-    name: id,
-    strain: "",
-    tentId: TENT,
-    stage,
-    startedAt: "2026-09-01T00:00:00Z",
-    health: "unknown",
-    photo: "",
-    lastNote: "",
-    growId,
-    isArchived: false,
-  };
-}
 
 vi.mock("@/lib/environmentAlerts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/environmentAlerts")>()),
@@ -83,6 +70,7 @@ vi.mock("@/lib/environmentStabilityRules", async (importOriginal) => {
       ...args: Parameters<typeof actual.computeEnvironmentStability>
     ) => {
       H.stabilityStages.push(args[1]?.stage);
+      H.stabilityInputs.push([...(args[0] ?? [])]);
       return actual.computeEnvironmentStability(...args);
     },
   };
@@ -131,6 +119,20 @@ vi.mock("@/hooks/useGrowData", () => ({
               alertCount: 0,
               growId: GROW,
             },
+            ...(H.secondTent
+              ? [
+                  {
+                    id: TENT_B,
+                    name: "Second Tent",
+                    brand: "",
+                    size: "",
+                    stage: "veg",
+                    light: { on: false, schedule: "", wattage: 0 },
+                    alertCount: 0,
+                    growId: GROW,
+                  },
+                ]
+              : []),
           ]
         : [],
     isLoading: H.growStatus === "loading",
@@ -150,8 +152,8 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     refetch: vi.fn(),
   }),
   useSensorReadingsByTents: () => ({
-    byTent: { [TENT]: H.perTentRows },
-    statusByTent: { [TENT]: "success" },
+    byTent: { [TENT]: H.perTentRows, [TENT_B]: [] },
+    statusByTent: { [TENT]: "success", [TENT_B]: "success" },
     isLoading: false,
     isError: false,
   }),
@@ -268,6 +270,7 @@ vi.mock("@/components/DashboardZeroTentEmptyState", () => ({
 
 const M = vi.hoisted(() => ({
   args: [] as unknown[],
+  data: [] as unknown[],
   pending: false,
   error: false,
   refetch: vi.fn(() => Promise.resolve([])),
@@ -277,7 +280,7 @@ vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
   useSensorsQuickLogManualReadings: (tentId: unknown) => {
     M.args.push(tentId);
     return {
-      data: [],
+      data: M.data,
       isPending: M.pending,
       isLoading: M.pending,
       isError: M.error,
@@ -320,6 +323,9 @@ beforeEach(() => {
   H.tentsPatch = {};
   H.persistCalls.length = 0;
   H.stabilityStages.length = 0;
+  H.stabilityInputs.length = 0;
+  H.secondTent = false;
+  M.data = [];
   H.stripStages.length = 0;
   M.args = [];
   M.pending = false;
@@ -330,7 +336,7 @@ beforeEach(() => {
 describe("Dashboard strip discloses the Quick Log manual-history read (#2148 repair)", () => {
   it("control: a settled read shows no manual-history notice", () => {
     renderDashboard();
-    expect(M.args).toContain(TENT);
+    expect(M.args.some((arg) => Array.isArray(arg) && arg.includes(TENT))).toBe(true);
     expect(screen.queryByTestId("dashboard-manual-history-pending")).toBeNull();
     expect(screen.queryByTestId("dashboard-manual-history-error")).toBeNull();
   });
@@ -356,6 +362,46 @@ describe("Dashboard strip discloses the Quick Log manual-history read (#2148 rep
     expect(screen.getByTestId(`dashboard-env-snapshot-tent-${TENT}`)).toHaveAttribute(
       "aria-label",
       expect.stringContaining("Quick Log manual history unavailable"),
+    );
+  });
+
+  it("grades every tent with its own Quick Log manual VPD when the grow has two tents (Codex P1 at 1936029e)", () => {
+    H.secondTent = true;
+    const at = new Date(Date.now() - 2 * 60_000).toISOString();
+    M.data = [
+      {
+        ts: at,
+        capturedAt: at,
+        tentId: TENT_B,
+        temp: 24,
+        rh: 55,
+        vpd: 2.6,
+        co2: 0,
+        soil: 0,
+        observedMetrics: ["vpd"],
+        source: "manual",
+        status: "usable",
+      },
+    ];
+    renderDashboard();
+    const graded = H.stabilityInputs.flat() as Array<{ vpd?: number; source?: string }>;
+    expect(graded.some((r) => r.vpd === 2.6 && r.source === "manual")).toBe(true);
+    // The manual belongs to the second tent only; the first tent never grades it.
+    expect(
+      H.stabilityInputs.filter((inputs) =>
+        (inputs as Array<{ vpd?: number }>).some((r) => r.vpd === 2.6),
+      ).length,
+    ).toBeLessThanOrEqual(H.stabilityInputs.length / 2);
+  });
+
+  it("discloses a pending manual read for a multi-tent grow too", () => {
+    H.secondTent = true;
+    M.pending = true;
+    renderDashboard();
+    expect(screen.getByTestId("dashboard-manual-history-pending")).toBeVisible();
+    expect(screen.getByTestId(`dashboard-env-snapshot-tent-${TENT_B}`)).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("Quick Log manual history loading"),
     );
   });
 });

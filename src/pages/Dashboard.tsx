@@ -63,6 +63,7 @@ import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import {
   mergeVpdStabilityInputs,
+  quickLogManualsForTent,
   QUICK_LOG_MANUAL_HISTORY_COPY,
   resolveManualHistoryReadState,
   vpdStabilityInputsFromWideReadings,
@@ -186,13 +187,6 @@ export default function Dashboard() {
   const tentsQuery = useGrowTents(scopedGrowId);
   const plantsQuery = useGrowPlants(undefined, scopedGrowId);
   const { data: tents = [] } = tentsQuery;
-  const singleStripTentId = tents.length === 1 ? (tents[0]?.id ?? null) : null;
-  const stripManuals = useSensorsQuickLogManualReadings(singleStripTentId);
-  // Part of the strip's read state: a pending or failed manual-history read
-  // is disclosed beside the stored readings, never read as "no manual history".
-  const stripManualsReadState = singleStripTentId
-    ? resolveManualHistoryReadState(stripManuals)
-    : "ready";
   const { data: plants = [] } = plantsQuery;
   // Per-tent windows over this scope's tents; never the unscoped all-tents
   // read, which hit the Postgres statement timeout (QA 2026-09-24).
@@ -217,6 +211,12 @@ export default function Dashboard() {
   // absence is established (same guard as the Tents list).
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
   const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
+  // Every tent's strip grade uses this same multi-tent manual read (per-tent
+  // windows). A pending or failed read is disclosed beside the stored
+  // readings, never read as "no manual history".
+  const stripManuals = chartQuickLogManualQuery;
+  const stripManualsReadState =
+    tentIds.length > 0 ? resolveManualHistoryReadState(stripManuals) : "ready";
   const quickLogManualsIncomplete =
     chartQuickLogManualQuery.isPending ||
     chartQuickLogManualQuery.isError ||
@@ -445,10 +445,10 @@ export default function Dashboard() {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
-    const stabilityReadings =
-      t.id === singleStripTentId
-        ? mergeVpdStabilityInputs(rs, vpdStabilityInputsFromWideReadings(stripManuals.data ?? []))
-        : rs;
+    const stabilityReadings = mergeVpdStabilityInputs(
+      rs,
+      vpdStabilityInputsFromWideReadings(quickLogManualsForTent(stripManuals.data, t.id)),
+    );
     const envStage = resolveTentEnvironmentStage({
       tentId: t.id,
       tentGrowId: t.growId ?? null,
@@ -985,7 +985,7 @@ export default function Dashboard() {
                                     : "sensor refresh unavailable, no last loaded readings"
                                   : null;
                           const manualHistoryLabel =
-                            tent.id !== singleStripTentId || stripManualsReadState === "ready"
+                            !isUuid(tent.id) || stripManualsReadState === "ready"
                               ? null
                               : stripManualsReadState === "unavailable"
                                 ? QUICK_LOG_MANUAL_HISTORY_COPY.ariaUnavailable

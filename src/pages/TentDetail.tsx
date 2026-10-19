@@ -44,11 +44,10 @@ import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadMo
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { groupSensorReadingRows } from "@/lib/growAdapters";
-import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import {
   resolveDisplayedVpdObservation,
   resolveManualHistoryReadState,
-  vpdStabilityInputsFromWideReadings,
+  buildSharedVpdStabilityInputs,
 } from "@/lib/vpdStabilityInputRules";
 import QuickLogManualHistoryNotice from "@/components/QuickLogManualHistoryNotice";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
@@ -187,14 +186,10 @@ export default function TentDetail() {
   // returned, never for a bare route id (Codex security review on #2148).
   const quickLogManuals = useSensorsQuickLogManualReadings(tent?.id ?? null);
   const manualHistoryReadState = resolveManualHistoryReadState(quickLogManuals);
+  // Stored and manual inputs are built independently so a colliding manual
+  // never inherits the stored row's freshness or sibling metrics.
   const sharedVpdSeries = useMemo(
-    () =>
-      vpdStabilityInputsFromWideReadings(
-        mergeSensorsSeriesWithQuickLogManuals(
-          groupSensorReadingRows(readings),
-          quickLogManuals.data ?? [],
-        ),
-      ),
+    () => buildSharedVpdStabilityInputs(groupSensorReadingRows(readings), quickLogManuals.data),
     [readings, quickLogManuals.data],
   );
   const nowMs = useNowTick();

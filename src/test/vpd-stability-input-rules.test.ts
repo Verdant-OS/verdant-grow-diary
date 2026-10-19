@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { SensorReading } from "@/mock";
 import {
+  buildSharedVpdStabilityInputs,
   mergeVpdStabilityInputs,
+  quickLogManualsForTent,
   vpdStabilityInputsFromWideReadings,
 } from "@/lib/vpdStabilityInputRules";
+import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 
 function reading(overrides: Partial<SensorReading>): SensorReading {
   return {
@@ -175,5 +178,37 @@ describe("mergeVpdStabilityInputs matches observations by instant", () => {
       [{ ts: "2026-10-15T12:00:00Z", vpd: 1.0, source: "manual" }],
     );
     expect(merged.map((row) => row.vpd)).toEqual([1.0, 1.2, 1.1]);
+  });
+});
+
+describe("buildSharedVpdStabilityInputs (Codex P2 at 1936029e)", () => {
+  const at = "2026-10-15T12:00:00.000Z";
+  const storedStale = reading({
+    source: "live",
+    vpd: 1.0,
+    temp: 80,
+    freshness: { floor: "stale" } as SensorReading["freshness"],
+  });
+  const manual = reading({ vpd: 1.3, observedMetrics: ["vpd"], capturedAt: at, ts: at });
+
+  it("keeps a colliding manual VPD that the stored row's stale floor or invalid sibling would taint", () => {
+    // The old path merged the manual into the stored object first, so it
+    // inherited freshness.floor "stale" (and the invalid stored temperature).
+    const inherited = vpdStabilityInputsFromWideReadings(
+      mergeSensorsSeriesWithQuickLogManuals([storedStale], [manual]),
+    );
+    expect(inherited.some((r) => r.vpd === 1.3 && r.stale !== true)).toBe(false);
+    expect(buildSharedVpdStabilityInputs([storedStale], [manual])).toEqual([
+      { ts: at, vpd: 1.3, source: "manual", stale: false },
+    ]);
+  });
+});
+
+describe("quickLogManualsForTent (Codex P1 at 1936029e)", () => {
+  it("partitions a multi-tent manual read by tent", () => {
+    const a = reading({ tentId: "tent-a", vpd: 1.1 });
+    const b = reading({ tentId: "tent-b", vpd: 2.4 });
+    expect(quickLogManualsForTent([a, b], "tent-b")).toEqual([b]);
+    expect(quickLogManualsForTent(null, "tent-b")).toEqual([]);
   });
 });

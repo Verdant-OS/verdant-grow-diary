@@ -111,6 +111,30 @@ export function mergeVpdStabilityInputs(
   return Array.from(byInstant.values()).sort(compareNewestFirst);
 }
 
+/**
+ * Stored and Quick Log manual stability inputs, built independently and then
+ * merged (a manual at the same instant wins). A manual observation never
+ * inherits a colliding stored row's freshness floor or sibling metrics, so a
+ * valid manual VPD is not marked stale or rejected by stored-row metadata.
+ */
+export function buildSharedVpdStabilityInputs(
+  stored: readonly SensorReading[] | null | undefined,
+  manuals: readonly SensorReading[] | null | undefined,
+): StabilityReadingInput[] {
+  return mergeVpdStabilityInputs(
+    vpdStabilityInputsFromWideReadings(stored),
+    vpdStabilityInputsFromWideReadings(manuals),
+  );
+}
+
+/** Quick Log manual readings for one tent, from a multi-tent read. */
+export function quickLogManualsForTent(
+  manuals: readonly SensorReading[] | null | undefined,
+  tentId: string,
+): SensorReading[] {
+  return (manuals ?? []).filter((reading) => reading?.tentId === tentId);
+}
+
 export interface DisplayedVpdObservation {
   value: number | null;
   capturedAt: string | null;

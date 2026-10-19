@@ -31,6 +31,9 @@ describe("grow diary PDF source notes after canonicalization", () => {
     expect(row.label).toBe(canonical);
     expect(row.note).toBe(GROW_DIARY_PDF_SOURCE_NORMALIZED_NOTE);
     expect(row.note).not.toMatch(/preserved/i);
+    // Provenance can be generic ("External ingest"), so the note must not
+    // claim the original source is displayed.
+    expect(row.note).not.toMatch(/original source/i);
   });
 
   it("a stored canonical label still says it was preserved", () => {
@@ -43,6 +46,7 @@ describe("grow diary PDF source notes after canonicalization", () => {
     const model = sources([{ source: "pi_bridge", count: 1 }]);
     expect(model.safetyFooter).not.toMatch(/labels are preserved/i);
     expect(model.safetyFooter).toMatch(/canonical labels/);
+    expect(model.safetyFooter).not.toMatch(/original source/i);
     expect(model.safetyFooter).toMatch(/not treated as healthy/);
   });
 });

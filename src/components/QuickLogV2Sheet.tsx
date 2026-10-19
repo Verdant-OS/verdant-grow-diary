@@ -84,6 +84,11 @@ import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
+import {
+  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
+  dailyCheckSubmitBlockForPlantArchive,
+  readDailyCheckPlantArchiveFromLimit,
+} from "@/lib/dailyCheckPlantSelectionRules";
 import { useAuth } from "@/store/auth";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
@@ -1779,6 +1784,19 @@ function QuickLogV2SheetForOwner({
     if (!resolved.ok) {
       setLocalError("Choose a plant or tent before saving.");
       return;
+    }
+    if (resolved.plantId) {
+      const archivedPlantId = resolved.plantId;
+      const archiveDecision = dailyCheckSubmitBlockForPlantArchive(
+        await readDailyCheckPlantArchiveFromLimit(() =>
+          supabase.from("plants").select("is_archived").eq("id", archivedPlantId).limit(1),
+        ),
+      );
+      if (archiveDecision.block) {
+        setLocalError(archiveDecision.message);
+        void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
+        return;
+      }
     }
     const archivedSaveBlock = quickLogArchivedGrowActionBlock({
       growId: resolved.growId,

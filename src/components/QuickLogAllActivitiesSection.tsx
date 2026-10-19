@@ -24,6 +24,7 @@
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,20 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
+  dailyCheckSubmitBlockForPlantArchive,
+  readDailyCheckPlantArchiveFromLimit,
+} from "@/lib/dailyCheckPlantSelectionRules";
+
+async function savedPlantArchiveDecision(plantId: string | null | undefined) {
+  if (!plantId) return { block: false as const };
+  return dailyCheckSubmitBlockForPlantArchive(
+    await readDailyCheckPlantArchiveFromLimit(() =>
+      supabase.from("plants").select("is_archived").eq("id", plantId).limit(1),
+    ),
+  );
+}
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -323,6 +338,7 @@ export default function QuickLogAllActivitiesSection({
   const [guidedSymptomStageConfirmed, setGuidedSymptomStageConfirmed] = useState(false);
   const [guidedSymptomNoneObserved, setGuidedSymptomNoneObserved] = useState(false);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
@@ -1028,6 +1044,13 @@ export default function QuickLogAllActivitiesSection({
     if (!acquired) return;
     localSaveInFlightRef.current = true;
     try {
+      const archiveDecision = await savedPlantArchiveDecision(record.input.plantId);
+      if (archiveDecision.block) {
+        setErrorReason(archiveDecision.message);
+        setErrorForActivity(record.input.activityId);
+        void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
+        return;
+      }
       const result = await save(record.input);
       const stillCurrent =
         liveOwnerIdRef.current === record.ownerId &&
@@ -1064,6 +1087,7 @@ export default function QuickLogAllActivitiesSection({
     onSaveEnd,
     onSaveStart,
     plantStage,
+    queryClient,
     restoreRejectedDraft,
     save,
     saveBlocked,
@@ -1238,6 +1262,13 @@ export default function QuickLogAllActivitiesSection({
     localSaveInFlightRef.current = true;
 
     try {
+      const archiveDecision = await savedPlantArchiveDecision(capturedTarget.plantId);
+      if (archiveDecision.block) {
+        setErrorReason(archiveDecision.message);
+        setErrorForActivity(selected.id);
+        void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
+        return;
+      }
       const activityInput = {
         activityId: selected.id,
         growId: capturedTarget.growId,
@@ -1534,6 +1565,7 @@ export default function QuickLogAllActivitiesSection({
     activityPersistenceBlockReason,
     activeEnvCheckTempUnit,
     onSaveSuccess,
+    queryClient,
     guidedSymptomCheck,
     guidedSymptomStage,
     guidedSymptomStageConfirmed,
@@ -1736,6 +1768,7 @@ export default function QuickLogAllActivitiesSection({
                     pendingPersistenceGate?.allowed === false)
                 }
                 data-testid={`${testIdPrefix}-retry-original`}
+                data-daily-check-save-plant={activePendingActivity.input.plantId ?? ""}
               >
                 {saving || checkingMovedReceipt
                   ? "Checking…"
@@ -2194,6 +2227,7 @@ export default function QuickLogAllActivitiesSection({
                         !guidedSymptomStageConfirmed))
                   }
                   data-testid={`${testIdPrefix}-save`}
+                  data-daily-check-save-plant={plantId ?? ""}
                 >
                   {saving ? "Saving…" : "Save"}
                 </Button>

@@ -82,6 +82,8 @@ import {
   DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
   DAILY_CHECK_WHAT_COUNTS_HINT,
   classifyDailyCheckPlantArchiveRead,
+  dailyCheckArchiveCheckIsStale,
+  dailyCheckSavePlantId,
   dailyCheckSubmitBlockForPlantArchive,
   defaultDailyCheckPlantId,
   isDailyCheckSubmitSaveTestId,
@@ -295,17 +297,28 @@ export default function DailyCheck() {
     const onClickCapture = (event: MouseEvent) => {
       if (archiveReplayRef.current) return;
       const button = submitSaveButton(event.target);
-      const plantId = selectedPlantIdRef.current;
-      if (!button || !plantId) return;
+      if (!button) return;
+      const checkedPlantId = dailyCheckSavePlantId({
+        hintedPlantId: button.getAttribute("data-daily-check-save-plant"),
+        selectedPlantId: selectedPlantIdRef.current,
+      });
+      if (!checkedPlantId) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       void (async () => {
-        let read: DailyCheckPlantArchiveRead = { status: "unreadable" };
+        let read: DailyCheckPlantArchiveRead;
         try {
-          read = await readDailyCheckPlantArchive(plantId);
+          read = await readDailyCheckPlantArchive(checkedPlantId);
         } catch {
           read = { status: "unreadable" };
         }
+        const currentPlantId = dailyCheckSavePlantId({
+          hintedPlantId: button.isConnected
+            ? button.getAttribute("data-daily-check-save-plant")
+            : "",
+          selectedPlantId: selectedPlantIdRef.current,
+        });
+        if (dailyCheckArchiveCheckIsStale(checkedPlantId, currentPlantId)) return;
         const decision = dailyCheckSubmitBlockForPlantArchive(read);
         if (decision.block) {
           setArchivedPlantSubmitMessage(decision.message);
@@ -777,6 +790,7 @@ export default function DailyCheck() {
           // that actually named a plant updates the memory; a tent-scoped save
           // leaves the previous record alone rather than clearing it.
           onSaveSuccess={(result) => {
+            void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
             if (!result.target.plantId) return;
             rememberRecentQuickLogTarget(
               {

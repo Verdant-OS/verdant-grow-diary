@@ -77,6 +77,28 @@ describe("Quick Log water volume ceiling", () => {
       expect(quickLogReasonToOperatorMessage(r.reason)).toMatch(TOO_LARGE);
     }
   });
+
+  it("the V2 save payload compares the raw volume before Number() rounding", () => {
+    const resolved = { ok: true, targetType: "tent", targetId: "tent-1", growId: "grow-1" };
+    const build = (volumeMl: string) =>
+      buildQuickLogV2SavePayload({
+        resolved,
+        action: "water",
+        volumeMl,
+        note: "",
+        temperatureC: "",
+        humidityPct: "",
+        vpdKpa: "",
+        idempotencyKey: "idem-key-1234",
+      } as unknown as Parameters<typeof buildQuickLogV2SavePayload>[0]);
+    // Number("50000.000000000001") === 50000, so a post-parse check accepts it.
+    const justAbove = build("50000.000000000001");
+    expect(justAbove.ok).toBe(false);
+    if (!justAbove.ok) expect(justAbove.reason).toBe("volume_too_large");
+    const atCeiling = build("50000");
+    expect(atCeiling.ok).toBe(true);
+    if (atCeiling.ok) expect(atCeiling.payload.p_volume_ml).toBe(50_000);
+  });
 });
 
 describe("Quick Log water volume ceiling on the public-starter legacy path", () => {

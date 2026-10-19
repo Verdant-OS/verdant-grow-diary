@@ -87,6 +87,10 @@ let mountedPersistHookCount = 0;
 let activePersistWriteCount = 0;
 const globalInFlightSnapshotKeys = new Set<string>();
 const globalCreatedEventLoggedKeys = new Set<string>();
+// Mounted instances that skipped a candidate because another write held its
+// snapshot reservation. A failed write releases the reservation and notifies
+// them once so they retry; a successful write notifies no one (no duplicate).
+const reservationReleaseListeners = new Set<(snapKey: string) => void>();
 
 function maybeClearGlobalSnapshotReservations(): void {
   if (mountedPersistHookCount <= 0 && activePersistWriteCount <= 0) {
@@ -166,6 +170,8 @@ export function usePersistEnvironmentAlerts(
   // Bumped once when a future-dated observation reaches its eligibility
   // boundary, so the gate below is asked again with nothing else changed.
   const [eligibilityWake, setEligibilityWake] = useState(0);
+  // Bumped when a write this instance deferred to fails and frees its key.
+  const [reservationWake, setReservationWake] = useState(0);
 
   // Stable deps — recompute on snapshot ts / quality / targets identity.
   // Configured bounds are part of the targets key: persisted reasons quote
@@ -212,6 +218,12 @@ export function usePersistEnvironmentAlerts(
     // Reservations belong to this read until its request actually starts.
     // Release unstarted work on cleanup so a newer confirmed read can proceed.
     const pendingKeys = new Set<string>();
+    // Snapshot keys this run skipped because another write held them.
+    const blockedSnapshotKeys = new Set<string>();
+    const onReservationReleased = (snapKey: string) => {
+      if (!cancelled && blockedSnapshotKeys.has(snapKey)) setReservationWake((n) => n + 1);
+    };
+    reservationReleaseListeners.add(onReservationReleased);
 
     (async () => {
       // One decision clock per run. The gate below and the wake computed from
@@ -389,7 +401,11 @@ export function usePersistEnvironmentAlerts(
           }
         }
         if (existing.has(key) || (dirKey !== null && existingDirections.has(dirKey))) return false;
-        if (activeKeys.has(key) || globalInFlightSnapshotKeys.has(snapKey)) return false;
+        if (activeKeys.has(key)) return false;
+        if (globalInFlightSnapshotKeys.has(snapKey)) {
+          blockedSnapshotKeys.add(snapKey);
+          return false;
+        }
         activeKeys.add(key);
         pendingKeys.add(key);
         globalInFlightSnapshotKeys.add(snapKey);
@@ -467,6 +483,7 @@ export function usePersistEnvironmentAlerts(
           // Release the in-flight guard so a later real attempt can retry.
           activeKeys.delete(key);
           globalInFlightSnapshotKeys.delete(snapKey);
+          for (const notify of [...reservationReleaseListeners]) notify(snapKey);
           lastError = (err as Error).message ?? "insert failed";
         } finally {
           activePersistWriteCount -= 1;
@@ -485,6 +502,7 @@ export function usePersistEnvironmentAlerts(
 
     return () => {
       cancelled = true;
+      reservationReleaseListeners.delete(onReservationReleased);
       if (wakeId !== null) window.clearTimeout(wakeId);
       for (const key of pendingKeys) activeKeys.delete(key);
       pendingKeys.clear();
@@ -506,6 +524,7 @@ export function usePersistEnvironmentAlerts(
     stageProvided,
     tentKey,
     eligibilityWake,
+    reservationWake,
   ]);
 
   return state;

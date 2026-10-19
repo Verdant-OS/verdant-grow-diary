@@ -1,6 +1,8 @@
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { QuickLogResolvedTarget } from "./quickLogTargetIntegrityRules";
 import { isUuid } from "./isUuid";
+import type { UnreadableWaterRecoveryClear } from "./quickLogUnreadableWaterRecoveryRules";
+import { QUICK_LOG_WATER_VOLUME_MAX_ML } from "./quickLogWateringFormViewModel";
 import {
   starterWaterRecoveryKey,
   typedWaterRecoveryKey,
@@ -96,7 +98,15 @@ function validRecord(value: unknown, ownerId: string): value is PendingStarterWa
     p.p_idempotency_key.length > 200
   )
     return false;
-  if (typeof p.p_volume_ml !== "number" || !Number.isFinite(p.p_volume_ml) || p.p_volume_ml <= 0)
+  // Single-watering ceiling: every read, claim and write of the starter
+  // journal passes through here, so a pre-ceiling or edited record cannot be
+  // replayed to quicklog_save_manual by retryStarterWater.
+  if (
+    typeof p.p_volume_ml !== "number" ||
+    !Number.isFinite(p.p_volume_ml) ||
+    p.p_volume_ml <= 0 ||
+    p.p_volume_ml > QUICK_LOG_WATER_VOLUME_MAX_ML
+  )
     return false;
   if (!nullableString(p.p_note) || (p.p_note?.length ?? 0) > 5_000) return false;
   if (![p.p_temperature_c, p.p_humidity_pct, p.p_vpd_kpa].every(nullableNumber)) return false;
@@ -220,4 +230,32 @@ export async function reconcilePendingStarterWaterClear(
   const current = readPendingStarterWater(record.ownerId);
   if (current.status === "empty") return { status: "already_cleared" };
   return current;
+}
+
+/**
+ * The grower’s explicit "Check Timeline, then clear" escape. Under the owner
+ * recovery lock it removes only this owner’s starter Water key, and only when
+ * that key holds a record this build cannot read (for example one over the
+ * single-watering ceiling). It never replays the record, never removes a
+ * readable record, and never touches the typed journal or another owner’s key.
+ */
+export async function clearUnreadablePendingStarterWater(
+  ownerId: string | null | undefined,
+): Promise<UnreadableWaterRecoveryClear> {
+  try {
+    if (!id(ownerId)) return { status: "failed" };
+    const locks = window.navigator.locks;
+    if (!locks?.request) return { status: "failed" };
+    return await locks.request(waterRecoveryLockKey(ownerId), { mode: "exclusive" }, () => {
+      const current = readPendingStarterWater(ownerId);
+      if (current.status === "empty") return { status: "already_cleared" as const };
+      if (current.status === "pending") return { status: "readable" as const };
+      window.sessionStorage.removeItem(storageKey(ownerId));
+      return window.sessionStorage.getItem(storageKey(ownerId)) === null
+        ? { status: "cleared" as const }
+        : { status: "failed" as const };
+    });
+  } catch {
+    return { status: "failed" };
+  }
 }

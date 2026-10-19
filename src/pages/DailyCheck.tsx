@@ -16,7 +16,8 @@
  * Manual readings remain source = "manual". Handheld pH/EC/PPFD readings
  * remain QuickLog note text only. CO2 is context-only.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@/lib/react-router-compat";
 import {
   AlertTriangle,
@@ -57,6 +58,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
+import { supabase } from "@/integrations/supabase/client";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import {
@@ -77,10 +79,15 @@ import {
   type StepOutcome,
 } from "@/lib/dailyGrowCheckRules";
 import {
+  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
   DAILY_CHECK_WHAT_COUNTS_HINT,
+  classifyDailyCheckPlantArchiveRead,
+  dailyCheckSubmitBlockForPlantArchive,
   defaultDailyCheckPlantId,
+  isDailyCheckSubmitSaveTestId,
   resolveDailyCheckPlantSelection,
   resolveDailyCheckPostSubmitPlantId,
+  type DailyCheckPlantArchiveRead,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
@@ -155,8 +162,29 @@ function resolveCompatibleAssignedTentId(
   return assignedTent.id;
 }
 
+function submitSaveButton(target: EventTarget | null): HTMLButtonElement | null {
+  if (!(target instanceof Element)) return null;
+  const button = target.closest("button");
+  if (!(button instanceof HTMLButtonElement) || button.disabled) return null;
+  if (!isDailyCheckSubmitSaveTestId(button.getAttribute("data-testid"))) return null;
+  return button;
+}
+
+async function readDailyCheckPlantArchive(plantId: string): Promise<DailyCheckPlantArchiveRead> {
+  const { data, error } = await supabase
+    .from("plants")
+    .select("is_archived")
+    .eq("id", plantId)
+    .maybeSingle();
+  return classifyDailyCheckPlantArchiveRead({
+    error: Boolean(error),
+    isArchived: error || !data ? null : data.is_archived,
+  });
+}
+
 export default function DailyCheck() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
@@ -180,6 +208,9 @@ export default function DailyCheck() {
     null,
   );
   const [emptyManualWarning, setEmptyManualWarning] = useState(false);
+  const [archivedPlantSubmitMessage, setArchivedPlantSubmitMessage] = useState<string | null>(null);
+  const selectedPlantIdRef = useRef("");
+  const archiveReplayRef = useRef(false);
 
   const selectablePlants = useMemo(
     () => (urlGrowId ? plants.filter((plant) => plant.grow_id === urlGrowId) : plants),
@@ -258,6 +289,44 @@ export default function DailyCheck() {
     () => selectablePlants.find((plant) => plant.id === renderedPlantId) ?? null,
     [renderedPlantId, selectablePlants],
   );
+  selectedPlantIdRef.current = selectedPlant?.id ?? "";
+
+  useEffect(() => {
+    const onClickCapture = (event: MouseEvent) => {
+      if (archiveReplayRef.current) return;
+      const button = submitSaveButton(event.target);
+      const plantId = selectedPlantIdRef.current;
+      if (!button || !plantId) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void (async () => {
+        let read: DailyCheckPlantArchiveRead = { status: "unreadable" };
+        try {
+          read = await readDailyCheckPlantArchive(plantId);
+        } catch {
+          read = { status: "unreadable" };
+        }
+        const decision = dailyCheckSubmitBlockForPlantArchive(read);
+        if (decision.block) {
+          setArchivedPlantSubmitMessage(decision.message);
+          setPlantChoice("explicit");
+          setPlantId("");
+          await queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
+          return;
+        }
+        if (!button.isConnected) return;
+        archiveReplayRef.current = true;
+        try {
+          button.click();
+        } finally {
+          archiveReplayRef.current = false;
+        }
+      })();
+    };
+    document.addEventListener("click", onClickCapture, true);
+    return () => document.removeEventListener("click", onClickCapture, true);
+  }, [queryClient]);
+
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
   const activityTarget = resolveDailyCheckActivityTarget({
@@ -478,6 +547,7 @@ export default function DailyCheck() {
   );
 
   function handleSubmitSuccess(method: "note" | "sensor") {
+    void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
     toast.success(
       method === "note" ? DAILY_CHECK_NOTE_SAVED_TOAST : DAILY_CHECK_SENSOR_SAVED_TOAST,
     );
@@ -575,6 +645,17 @@ export default function DailyCheck() {
         <span className="min-w-0 break-words">{DAILY_CHECK_WHAT_COUNTS_HINT}</span>
       </p>
 
+      {archivedPlantSubmitMessage ? (
+        <div
+          role="status"
+          data-testid="daily-check-archived-plant-submit"
+          className="mb-4 flex items-start gap-2 rounded-lg border border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10 p-3 text-sm"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{archivedPlantSubmitMessage}</span>
+        </div>
+      ) : null}
+
       {/* Visible rejection banner when ?plantId= cannot be honored. */}
       {plantResolution.message && (
         <div
@@ -603,6 +684,7 @@ export default function DailyCheck() {
                   onValueChange={(value) => {
                     setPlantChoice("explicit");
                     setPlantId(value === "__none" ? "" : value);
+                    setArchivedPlantSubmitMessage(null);
                   }}
                 >
                   <SelectTrigger

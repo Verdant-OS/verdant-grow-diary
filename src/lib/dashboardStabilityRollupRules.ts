@@ -73,7 +73,7 @@ export function computeStabilityRollup(
     copy = `Set stage for ${stageUnknownCount} ${pluralTent(stageUnknownCount)}`;
     tone = "unavailable";
   } else if (unavailableCount > 0) {
-    copy = `${unavailableCount} ${pluralTent(unavailableCount)} unavailable`;
+    copy = `VPD stability unavailable for ${unavailableCount} ${pluralTent(unavailableCount)}`;
     tone = "unavailable";
   } else if (contextOnlyCount > 0) {
     copy = `${contextOnlyCount} ${pluralTent(contextOnlyCount)} context only`;

@@ -1,42 +1,113 @@
 /**
- * Static pins for get-paddle-price: the gateway lookup string stays
- * character-identical, and the direct sandbox path uses the pure helpers.
+ * Behavioral price lookup: the path helper and the shared fetch seam produce
+ * the sandbox URL in direct mode and the gateway URL otherwise.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  PADDLE_GATEWAY_ORIGIN,
+  PADDLE_SANDBOX_API_BASE,
+  extractDirectPriceId,
+  performPaddleFetch,
+  priceLookupPath,
+  type PaddleFetch,
+} from "../../supabase/functions/_shared/paddleDirectTransport.ts";
 
-const SRC = readFileSync(
-  resolve(process.cwd(), "supabase/functions/get-paddle-price/index.ts"),
-  "utf8",
-);
+const PRICE_ID = "pri_sandbox_pro_monthly";
+const PLAN = "pro_monthly";
 
-const GATEWAY_PATH = "`/prices?external_id=${encodeURIComponent(requested)}`";
-const GATEWAY_ID = "data?.data?.[0]?.id";
+function header(headers: HeadersInit | undefined, name: string): string | null {
+  if (!headers || headers instanceof Headers || Array.isArray(headers)) return null;
+  const record = headers as Record<string, string>;
+  const key = Object.keys(record).find(
+    (candidate) => candidate.toLowerCase() === name.toLowerCase(),
+  );
+  return key ? record[key] : null;
+}
 
-describe("get-paddle-price direct mode pins", () => {
-  it("keeps the gateway lookup path and the list-shaped id read", () => {
-    expect(SRC).toContain(GATEWAY_PATH);
-    expect(SRC).toContain(GATEWAY_ID);
-    expect(SRC).toContain(
-      "direct ? directPriceLookupPath(configuredId) : `/prices?external_id=${encodeURIComponent(requested)}`",
-    );
-    expect(SRC).toContain("direct ? extractDirectPriceId(data, requested) : data?.data?.[0]?.id");
+describe("get-paddle-price direct and gateway requests", () => {
+  it("requests https://sandbox-api.paddle.com/prices/<id> and reads the active price id", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl: PaddleFetch = async (input, init) => {
+      calls.push({ url: String(input), init });
+      return new Response(
+        JSON.stringify({
+          data: {
+            id: PRICE_ID,
+            status: "active",
+            custom_data: { external_id: PLAN },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    const path = priceLookupPath(true, PRICE_ID, PLAN);
+    const response = await performPaddleFetch({
+      env: "sandbox",
+      getEnv: (name) =>
+        ({
+          PADDLE_DIRECT_API_KEY: "pdl_sdbx_price_fixture",
+          PADDLE_API_BASE: PADDLE_SANDBOX_API_BASE,
+          PAYMENTS_ENVIRONMENT: "sandbox",
+          SUPABASE_URL: "https://fixture.invalid",
+        })[name],
+      path,
+      fetch: fetchImpl,
+      gatewayKeys: () => {
+        throw new Error("gateway keys must not be read in direct mode");
+      },
+    });
+    const body = await response.json();
+
+    expect(calls[0]?.url).toBe(`https://sandbox-api.paddle.com/prices/${PRICE_ID}`);
+    expect(header(calls[0]?.init?.headers, "Authorization")).toBe("Bearer pdl_sdbx_price_fixture");
+    expect(extractDirectPriceId(body, PLAN)).toBe(PRICE_ID);
   });
 
-  it("keeps the configured-id drift check", () => {
-    expect(SRC).toContain("paddleId !== configuredId");
-    expect(SRC).toMatch(/const configuredId = SERVER_PRICE_CONFIG\[requested\] \?\? ""/);
-  });
+  it("requests the gateway external_id URL and does not treat a list body as a direct price", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl: PaddleFetch = async (input, init) => {
+      calls.push({ url: String(input), init });
+      return new Response(JSON.stringify({ data: [{ id: PRICE_ID }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
 
-  it("keeps the sold-out pre-check ahead of gatewayFetch", () => {
+    const path = priceLookupPath(false, PRICE_ID, PLAN);
+    const response = await performPaddleFetch({
+      env: "sandbox",
+      getEnv: () => undefined,
+      path,
+      fetch: fetchImpl,
+      gatewayKeys: () => ({ connectionApiKey: "conn_key", lovableApiKey: "lovable_key" }),
+    });
+    const body = (await response.json()) as { data?: Array<{ id?: string }> };
+
+    expect(path).toBe(`/prices?external_id=${encodeURIComponent(PLAN)}`);
+    expect(calls[0]?.url).toBe(`${PADDLE_GATEWAY_ORIGIN}${path}`);
+    expect(header(calls[0]?.init?.headers, "Authorization")).toBeNull();
+    expect(header(calls[0]?.init?.headers, "X-Connection-Api-Key")).toBe("conn_key");
+    expect(body?.data?.[0]?.id).toBe(PRICE_ID);
+    expect(extractDirectPriceId(body, PLAN)).toBeNull();
+  });
+});
+
+describe("get-paddle-price still calls the shared helpers", () => {
+  const SRC = readFileSync(
+    resolve(process.cwd(), "supabase/functions/get-paddle-price/index.ts"),
+    "utf8",
+  );
+
+  it("keeps sold-out ahead of gatewayFetch and uses the shared path and id helpers", () => {
     const soldOutIdx = SRC.indexOf("plan_sold_out");
     const gatewayIdx = SRC.indexOf("await gatewayFetch(");
     expect(soldOutIdx).toBeGreaterThan(-1);
-    expect(gatewayIdx).toBeGreaterThan(-1);
-    expect(soldOutIdx).toBeLessThan(gatewayIdx);
-    expect(SRC).toContain("directPriceLookupPath");
-    expect(SRC).toContain("extractDirectPriceId");
-    expect(SRC).toContain("isPaddleDirectMode");
+    expect(gatewayIdx).toBeGreaterThan(soldOutIdx);
+    expect(SRC).toContain("priceLookupPath(direct, configuredId, requested)");
+    expect(SRC).toContain("direct ? extractDirectPriceId(data, requested) : data?.data?.[0]?.id");
+    expect(SRC).toContain("paddleId !== configuredId");
   });
 });

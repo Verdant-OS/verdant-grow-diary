@@ -29,7 +29,10 @@ import {
   isPaddleDirectMode,
   type PaddleEnv,
 } from "../_shared/paddle.ts";
-import { applyDirectModeExternalIdFallback } from "../_shared/paddleDirectTransport.ts";
+import {
+  normalizeWebhookItemResources,
+  priceExternalIdFromResolvedPrice,
+} from "../_shared/paddleDirectTransport.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
 import { insertPaddleEventLog } from "./eventLogInsert.ts";
 import { maybeSendPurchaseConfirmation } from "./sendPurchaseConfirmation.ts";
@@ -105,23 +108,7 @@ function normalizeVerifiedPaddleEvent(
       effective_at: "effectiveAt",
     });
     if (Array.isArray(data.items)) {
-      data.items = data.items.map((item) => {
-        if (!isRecord(item)) return item;
-        const normalized = { ...item };
-        for (const key of ["price", "product"]) {
-          const resource = aliasProviderFields(item[key], { import_meta: "importMeta" });
-          if (isRecord(resource)) {
-            resource.importMeta = aliasProviderFields(resource.importMeta, {
-              external_id: "externalId",
-            });
-          }
-          normalized[key] = resource;
-        }
-        return normalized;
-      });
-      if (directMode) {
-        data.items = applyDirectModeExternalIdFallback(data.items);
-      }
+      data.items = normalizeWebhookItemResources(data.items, directMode);
     }
     // The existing confirmation helper also consumes SDK-style monetary fields.
     if (isRecord(data.details)) {
@@ -245,10 +232,7 @@ function buildDeps(directMode: boolean): Deps {
           importMeta?: { externalId?: string } | null;
           customData?: { external_id?: string } | null;
         } | null;
-        const externalId =
-          priced?.importMeta?.externalId ??
-          (directMode ? priced?.customData?.external_id : null) ??
-          null;
+        const externalId = priceExternalIdFromResolvedPrice(priced, directMode);
         return { ok: true, externalId };
       } catch (e) {
         return { ok: false, error: String(e instanceof Error ? e.message : e) };

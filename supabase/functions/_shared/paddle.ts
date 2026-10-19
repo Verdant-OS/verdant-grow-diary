@@ -12,7 +12,13 @@
  * client just to fail-closed on a bad signature.
  */
 import { Environment, Paddle, EventName } from "npm:@paddle/paddle-node-sdk";
-import { resolvePaddleTransport, type PaddleTransport } from "./paddleDirectTransport.ts";
+import {
+  PADDLE_DIRECT_CONFIG_REFUSED,
+  PADDLE_GATEWAY_ORIGIN,
+  performPaddleFetch,
+  resolvePaddleTransport,
+  type PaddleTransport,
+} from "./paddleDirectTransport.ts";
 import { verifyPaddleWebhookSignature } from "./verifyPaddleSignature.ts";
 
 const getEnv = (key: string): string => {
@@ -29,7 +35,7 @@ export type PaddleEnv = "sandbox" | "live";
 export const PAYMENTS_WEBHOOK_MAX_AGE_SECONDS = 5 * 60;
 export const PAYMENTS_WEBHOOK_MAX_FUTURE_SKEW_SECONDS = 60;
 
-const GATEWAY_BASE_URL = "https://connector-gateway.lovable.dev/paddle";
+const GATEWAY_BASE_URL = PADDLE_GATEWAY_ORIGIN;
 
 export function getConnectionApiKey(env: PaddleEnv): string {
   return env === "sandbox" ? getEnv("PADDLE_SANDBOX_API_KEY") : getEnv("PADDLE_LIVE_API_KEY");
@@ -38,7 +44,7 @@ export function getConnectionApiKey(env: PaddleEnv): string {
 function transportFor(env: PaddleEnv): Exclude<PaddleTransport, { mode: "refused" }> {
   const transport = resolvePaddleTransport(env, (key) => Deno.env.get(key));
   if (transport.mode === "refused") {
-    throw new Error("paddle_direct_config_refused");
+    throw new Error(PADDLE_DIRECT_CONFIG_REFUSED);
   }
   return transport;
 }
@@ -65,27 +71,16 @@ export async function gatewayFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const transport = transportFor(env);
-  if (transport.mode === "direct") {
-    return fetch(`${transport.base}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${transport.apiKey}`,
-        ...init?.headers,
-      },
-    });
-  }
-  const connectionApiKey = getConnectionApiKey(env);
-  const lovableApiKey = getEnv("LOVABLE_API_KEY");
-  return fetch(`${GATEWAY_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Connection-Api-Key": connectionApiKey,
-      "Lovable-API-Key": lovableApiKey,
-      ...init?.headers,
-    },
+  return performPaddleFetch({
+    env,
+    getEnv: (key) => Deno.env.get(key),
+    path,
+    init,
+    fetch: (input, requestInit) => fetch(input, requestInit),
+    gatewayKeys: () => ({
+      connectionApiKey: getConnectionApiKey(env),
+      lovableApiKey: getEnv("LOVABLE_API_KEY"),
+    }),
   });
 }
 

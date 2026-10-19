@@ -7,6 +7,8 @@
  * rather than falling back to the gateway or to live Paddle.
  */
 export const PADDLE_SANDBOX_API_BASE = "https://sandbox-api.paddle.com";
+export const PADDLE_GATEWAY_ORIGIN = "https://connector-gateway.lovable.dev/paddle";
+export const PADDLE_DIRECT_CONFIG_REFUSED = "paddle_direct_config_refused";
 
 const PRODUCTION_SUPABASE_HOST = "knkwiiywfkbqznbxwqfh.supabase.co";
 
@@ -75,6 +77,107 @@ export function resolvePaddleTransport(
 
 export function directPriceLookupPath(configuredId: string): string {
   return `/prices/${encodeURIComponent(configuredId)}`;
+}
+
+export function gatewayPriceQueryPath(requested: string): string {
+  return `/prices?external_id=${encodeURIComponent(requested)}`;
+}
+
+/** Direct mode looks up one price id. Gateway mode keeps the external_id query. */
+export function priceLookupPath(direct: boolean, configuredId: string, requested: string): string {
+  return direct ? directPriceLookupPath(configuredId) : gatewayPriceQueryPath(requested);
+}
+
+export type PaddleGatewayKeys = {
+  connectionApiKey: string;
+  lovableApiKey: string;
+};
+
+export type PaddleFetch = (input: string, init?: RequestInit) => Promise<Response>;
+
+/**
+ * The only Paddle HTTP dispatch. Refused config throws and does not call fetch
+ * or the gateway key reader. Direct mode never reads gateway keys.
+ */
+export async function performPaddleFetch(args: {
+  env: "sandbox" | "live";
+  getEnv: (name: string) => string | undefined;
+  path: string;
+  init?: RequestInit;
+  fetch: PaddleFetch;
+  gatewayKeys: () => PaddleGatewayKeys;
+}): Promise<Response> {
+  const transport = resolvePaddleTransport(args.env, args.getEnv);
+  if (transport.mode === "refused") {
+    throw new Error(PADDLE_DIRECT_CONFIG_REFUSED);
+  }
+  if (transport.mode === "direct") {
+    return args.fetch(`${transport.base}${args.path}`, {
+      ...args.init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${transport.apiKey}`,
+        ...args.init?.headers,
+      },
+    });
+  }
+  const keys = args.gatewayKeys();
+  return args.fetch(`${PADDLE_GATEWAY_ORIGIN}${args.path}`, {
+    ...args.init,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Connection-Api-Key": keys.connectionApiKey,
+      "Lovable-API-Key": keys.lovableApiKey,
+      ...args.init?.headers,
+    },
+  });
+}
+
+/** Alias only named provider fields; never recursively rewrite custom_data. */
+function aliasProviderFields(value: unknown, aliases: Record<string, string>): unknown {
+  if (!isRecord(value)) return value;
+  const result = { ...value };
+  for (const [wire, sdk] of Object.entries(aliases)) {
+    if (Object.prototype.hasOwnProperty.call(value, wire)) result[sdk] = value[wire];
+  }
+  return result;
+}
+
+/**
+ * Webhook item normalization. custom_data.external_id is copied onto
+ * importMeta only when directMode is true. Gateway mode leaves that id off
+ * importMeta.
+ */
+export function normalizeWebhookItemResources(items: unknown, directMode: boolean): unknown {
+  if (!Array.isArray(items)) return items;
+  const normalized = items.map((item) => {
+    if (!isRecord(item)) return item;
+    const next = { ...item };
+    for (const key of ["price", "product"] as const) {
+      const resource = aliasProviderFields(item[key], { import_meta: "importMeta" });
+      if (isRecord(resource)) {
+        resource.importMeta = aliasProviderFields(resource.importMeta, {
+          external_id: "externalId",
+        });
+      }
+      next[key] = resource;
+    }
+    return next;
+  });
+  if (!directMode) return normalized;
+  return applyDirectModeExternalIdFallback(normalized);
+}
+
+export function priceExternalIdFromResolvedPrice(
+  price: {
+    importMeta?: { externalId?: string } | null;
+    customData?: { external_id?: string } | null;
+  } | null,
+  directMode: boolean,
+): string | null {
+  return (
+    price?.importMeta?.externalId ?? (directMode ? price?.customData?.external_id : null) ?? null
+  );
 }
 
 export function extractDirectPriceId(body: unknown, requested: string): string | null {

@@ -1,7 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { gatewayFetch, isPaddleDirectMode, type PaddleEnv } from "../_shared/paddle.ts";
-import { directPriceLookupPath, extractDirectPriceId } from "../_shared/paddleDirectTransport.ts";
+import { extractDirectPriceId, priceLookupPath } from "../_shared/paddleDirectTransport.ts";
 import {
   loadUnionEntitlementForUser,
   resolveRequiredServerBillingEnvironment,
@@ -278,10 +278,9 @@ Deno.serve(async (req) => {
       return json(502, { error: "price_resolution_unavailable" });
     }
 
-    // prettier-ignore
     const response = await gatewayFetch(
       environment,
-      direct ? directPriceLookupPath(configuredId) : `/prices?external_id=${encodeURIComponent(requested)}`,
+      priceLookupPath(direct, configuredId, requested),
     );
     if (!response.ok) {
       logCatalogUnavailable({

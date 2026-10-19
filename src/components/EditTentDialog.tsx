@@ -144,8 +144,9 @@ export default function EditTentDialog({ tent, trigger }: Props) {
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-3">
           <div>
-            <Label>Name</Label>
+            <Label htmlFor="edit-tent-name">Name</Label>
             <Input
+              id="edit-tent-name"
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -154,8 +155,9 @@ export default function EditTentDialog({ tent, trigger }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label>Size</Label>
+              <Label htmlFor="edit-tent-size">Size</Label>
               <Input
+                id="edit-tent-size"
                 value={form.size}
                 onChange={(e) => setForm({ ...form, size: e.target.value })}
                 placeholder="4x4"
@@ -163,8 +165,9 @@ export default function EditTentDialog({ tent, trigger }: Props) {
               />
             </div>
             <div>
-              <Label>Brand</Label>
+              <Label htmlFor="edit-tent-brand">Brand</Label>
               <Input
+                id="edit-tent-brand"
                 value={form.brand}
                 onChange={(e) => setForm({ ...form, brand: e.target.value })}
                 placeholder="Gorilla"
@@ -173,9 +176,9 @@ export default function EditTentDialog({ tent, trigger }: Props) {
             </div>
           </div>
           <div>
-            <Label>Stage</Label>
+            <Label htmlFor="edit-tent-stage">Stage</Label>
             <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-              <SelectTrigger data-testid="edit-tent-stage">
+              <SelectTrigger id="edit-tent-stage" aria-label="Stage" data-testid="edit-tent-stage">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -191,8 +194,9 @@ export default function EditTentDialog({ tent, trigger }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-2 items-end">
             <div>
-              <Label>Light schedule</Label>
+              <Label htmlFor="edit-tent-light-schedule">Light schedule</Label>
               <Input
+                id="edit-tent-light-schedule"
                 value={form.light_schedule}
                 onChange={(e) => setForm({ ...form, light_schedule: e.target.value })}
                 placeholder="18/6"
@@ -200,8 +204,9 @@ export default function EditTentDialog({ tent, trigger }: Props) {
               />
             </div>
             <div>
-              <Label>Wattage</Label>
+              <Label htmlFor="edit-tent-light-wattage">Wattage</Label>
               <Input
+                id="edit-tent-light-wattage"
                 type="number"
                 min="0"
                 value={form.light_wattage}

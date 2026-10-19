@@ -352,7 +352,12 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     const library = document.getElementById(
       "plant-quick-log-photo-library-input",
     ) as HTMLInputElement;
-    await pickFile(library, makeImage("gallery.png"));
+    await pickFile(
+      library,
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "gallery.png", {
+        type: "image/jpeg",
+      }),
+    );
 
     await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {

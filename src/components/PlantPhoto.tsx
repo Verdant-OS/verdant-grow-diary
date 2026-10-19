@@ -3,6 +3,8 @@ import { usePlantProfilePhotoSource } from "@/hooks/usePlantProfilePhotoSource";
 
 interface Props {
   src?: string | null;
+  /** Used only when the profile photo does not resolve to a display URL. */
+  fallbackSrc?: string | null;
   alt?: string;
   className?: string;
   iconClassName?: string;
@@ -21,6 +23,7 @@ interface Props {
  */
 export default function PlantPhoto({
   src,
+  fallbackSrc,
   alt = "",
   className,
   iconClassName,
@@ -29,6 +32,20 @@ export default function PlantPhoto({
   testId,
 }: Props) {
   const resolved = usePlantProfilePhotoSource(src);
+  const fallbackResolved = usePlantProfilePhotoSource(fallbackSrc);
+  if (!resolved.displayUrl && fallbackResolved.displayUrl) {
+    return (
+      <PlantPhotoView
+        src={fallbackResolved.displayUrl}
+        alt={alt}
+        className={className}
+        iconClassName={iconClassName}
+        caption={caption}
+        ctaLabel={ctaLabel}
+        testId={testId}
+      />
+    );
+  }
   return (
     <PlantPhotoView
       src={resolved.displayUrl}

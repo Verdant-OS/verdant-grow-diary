@@ -10,6 +10,7 @@ import {
 } from "@/lib/timelineChipCountRules";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { growTargetsRetryDelayMs } from "@/lib/growTargetsRetryRules";
+import { resolveAlertContextRefresh } from "@/lib/alertContextRefreshRules";
 
 const targetsRead = vi.hoisted(() => vi.fn());
 
@@ -101,6 +102,19 @@ describe("presentTimelineDiaryEntryDetails string volumes (Codex P2 at 222a7332)
     });
   });
 
+  it("labels a camelCase eventType feeding flat volume as Feed Volume (Codex P2 at 0139bb37)", () => {
+    const result = presentTimelineDiaryEntryDetails(
+      { eventType: "feeding", volume_ml: "750" },
+      "celsius",
+    );
+    expect(result.detailLines).toContainEqual({
+      key: "feeding.volume_ml",
+      label: "Feed Volume",
+      value: "750 ml",
+    });
+    expect(result.detailLines.find((l) => l.label === "Water Volume")).toBeUndefined();
+  });
+
   it("keeps unit-bearing volume text verbatim", () => {
     const result = presentTimelineDiaryEntryDetails(
       { event_type: "watering", watering_amount_ml: "2 L" },
@@ -108,6 +122,32 @@ describe("presentTimelineDiaryEntryDetails string volumes (Codex P2 at 222a7332)
     );
     const line = result.detailLines.find((l) => l.label === "Water Volume");
     expect(line?.value).toBe("2 L");
+  });
+});
+
+describe("resolveAlertContextRefresh", () => {
+  const stage = { title: "Humidity above stage range", reason: "Seedling 65%–75%." };
+  const configured = { title: "Humidity above target", reason: "Configured target 50–70%." };
+
+  it("refreshes a stage/default row to the configured-target wording in the same direction", () => {
+    expect(resolveAlertContextRefresh(stage, configured)).toEqual(configured);
+    expect(
+      resolveAlertContextRefresh(
+        { title: "VPD below default range", reason: "x" },
+        { title: "VPD below target", reason: "Configured target 0.8–1.2 kPa." },
+      ),
+    ).toEqual({ title: "VPD below target", reason: "Configured target 0.8–1.2 kPa." });
+  });
+
+  it("never rewrites across directions, in reverse, unchanged, or from blank input", () => {
+    expect(
+      resolveAlertContextRefresh(stage, { title: "Humidity below target", reason: "y" }),
+    ).toBeNull();
+    expect(resolveAlertContextRefresh(configured, stage)).toBeNull();
+    expect(resolveAlertContextRefresh(configured, configured)).toBeNull();
+    expect(
+      resolveAlertContextRefresh(stage, { title: "Humidity above target", reason: "" }),
+    ).toBeNull();
   });
 });
 

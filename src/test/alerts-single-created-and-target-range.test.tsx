@@ -15,6 +15,7 @@ import { dedupeAlertEventsForTimeline } from "@/lib/timelineChipCountRules";
 const alertsIo = vi.hoisted(() => ({
   list: vi.fn(),
   save: vi.fn(),
+  update: vi.fn(),
   log: vi.fn(),
   targetsState: {
     status: "loading" as "idle" | "loading" | "ok" | "unavailable",
@@ -45,6 +46,7 @@ vi.mock("@/lib/alerts", () => ({
   listAlerts: (...args: unknown[]) => alertsIo.list(...args),
   saveAlert: (...args: unknown[]) => alertsIo.save(...args),
   logAlertEvent: (...args: unknown[]) => alertsIo.log(...args),
+  updateOpenAlertContext: (...args: unknown[]) => alertsIo.update(...args),
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -76,6 +78,7 @@ beforeEach(() => {
   alertsIo.list.mockReset().mockResolvedValue([]);
   alertsIo.save.mockReset().mockResolvedValue({ id: "alert-1" });
   alertsIo.log.mockReset().mockResolvedValue({ id: "evt-1" });
+  alertsIo.update.mockReset().mockResolvedValue(undefined);
   alertsIo.targetsState = {
     status: "loading",
     targets: null,
@@ -502,5 +505,40 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
     const reasons = derived.map((d) => d.reason).join(" | ");
     expect(reasons).toContain("Observed 0°C");
     expect(reasons).not.toContain("-0°C");
+  });
+
+  it("refreshes an open stage-range alert's wording when configured targets replace the defaults, without inserting a second alert (Codex P2 at 0139bb37)", async () => {
+    alertsIo.list.mockResolvedValue([
+      {
+        id: "open-stage-rh",
+        metric: "rh",
+        source: "environment_alerts",
+        title: "Humidity above stage range",
+        reason: "Observed 85%; seedling stage range 65%–75%.",
+        tent_id: "tent-1",
+        status: "open",
+      },
+    ]);
+    alertsIo.targetsState = {
+      status: "ok",
+      targets: { rh: { min: 50, max: 70 } },
+      reload: vi.fn(),
+    };
+    render(
+      <AlertsAutoPersistForGrow
+        growId="grow-1"
+        stage="seedling"
+        plants={[{ grow_id: "grow-1", tent_id: "tent-1", stage: "seedling" }]}
+      />,
+    );
+    await waitFor(() => {
+      expect(alertsIo.update).toHaveBeenCalledTimes(1);
+    });
+    const [id, context] = alertsIo.update.mock.calls[0];
+    expect(id).toBe("open-stage-rh");
+    expect(context.title).toBe("Humidity above target");
+    expect(context.reason).toContain("50–70%");
+    expect(alertsIo.save.mock.calls.some(([p]) => p.metric === "rh")).toBe(false);
+    expect(deriveAlertWhyContext({ metric: "rh", ...context }).text).toContain("50–70%");
   });
 });

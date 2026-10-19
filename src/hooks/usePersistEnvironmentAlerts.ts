@@ -20,6 +20,7 @@
  *     via the returned state, never silently retried into automation.
  */
 import { useEffect, useRef, useState } from "react";
+import { resolveAlertContextRefresh } from "@/lib/alertContextRefreshRules";
 import type { SensorSnapshot, SensorSnapshotMetricRefKey } from "@/lib/sensorSnapshot";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
@@ -30,7 +31,7 @@ import {
   selectPersistableAlerts,
   snapshotPersistenceBlockReason,
 } from "@/lib/environmentAlertPersistence";
-import { listAlerts, saveAlert, logAlertEvent } from "@/lib/alerts";
+import { listAlerts, saveAlert, logAlertEvent, updateOpenAlertContext } from "@/lib/alerts";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 import { buildDiaryEntryEvidenceRefs } from "@/lib/diaryEntryEvidenceRefRules";
 import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEventRules";
@@ -265,17 +266,21 @@ export function usePersistEnvironmentAlerts(
       // 3. Load currently-open alerts for this grow and dedupe by rule key,
       //    scoped to the tent the breach was observed in.
       let openRows: {
+        id: string;
         metric: string | null;
         source: string | null;
         title: string;
+        reason: string;
         tent: string | null;
       }[] = [];
       try {
         const rows = await listAlerts({ growId, status: "open" });
         openRows = rows.map((r) => ({
+          id: typeof r.id === "string" ? r.id : "",
           metric: r.metric ?? null,
           source: r.source ?? null,
           title: r.title,
+          reason: r.reason ?? "",
           tent: r.tent_id ?? null,
         }));
       } catch (err) {
@@ -334,10 +339,18 @@ export function usePersistEnvironmentAlerts(
       );
 
       const existingDirections = new Set<string>();
+      const openRowByDirection = new Map<string, (typeof openRows)[number]>();
       for (const r of openRows) {
         const dirKey = thresholdDirectionKey(growId, r.tent, r.source ?? SOURCE, r.metric, r.title);
-        if (dirKey) existingDirections.add(dirKey);
+        if (dirKey) {
+          existingDirections.add(dirKey);
+          if (!openRowByDirection.has(dirKey)) openRowByDirection.set(dirKey, r);
+        }
       }
+      // A configured-target candidate blocked by an open stage/default-range
+      // row in the same direction refreshes that row's wording instead of
+      // inserting a second alert (the #2179 one-per-direction guard stays).
+      const contextRefreshes: { id: string; title: string; reason: string }[] = [];
 
       const toInsert = persistable.filter((a) => {
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
@@ -349,6 +362,13 @@ export function usePersistEnvironmentAlerts(
           typeof a.metric === "string" ? a.metric : null,
           a.title,
         );
+        if (!existing.has(key) && dirKey !== null) {
+          const openRow = openRowByDirection.get(dirKey);
+          const refresh = openRow ? resolveAlertContextRefresh(openRow, a) : null;
+          if (openRow?.id && refresh && !contextRefreshes.some((c) => c.id === openRow.id)) {
+            contextRefreshes.push({ id: openRow.id, ...refresh });
+          }
+        }
         if (existing.has(key) || (dirKey !== null && existingDirections.has(dirKey))) return false;
         if (activeKeys.has(key) || globalInFlightSnapshotKeys.has(snapKey)) return false;
         activeKeys.add(key);
@@ -358,6 +378,18 @@ export function usePersistEnvironmentAlerts(
         if (dirKey) existingDirections.add(dirKey);
         return true;
       });
+
+      for (const refresh of contextRefreshes) {
+        if (cancelled) return;
+        try {
+          await updateOpenAlertContext(refresh.id, {
+            title: refresh.title,
+            reason: refresh.reason,
+          });
+        } catch {
+          // Best effort: the open alert stays as it was; the next run retries.
+        }
+      }
 
       if (toInsert.length === 0) {
         if (!cancelled) {

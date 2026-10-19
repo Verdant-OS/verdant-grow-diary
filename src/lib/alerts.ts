@@ -156,6 +156,23 @@ export async function reopenAlert(id: string): Promise<AlertRow> {
   return data as unknown as AlertRow;
 }
 
+/**
+ * Refresh an open alert's wording (title + reason) when the grower's
+ * configured target replaces the stage/default range it was raised against.
+ * Status, timestamps and evidence refs are untouched. RLS enforces ownership;
+ * `.eq("status", "open")` keeps a closed alert's history unchanged.
+ */
+export async function updateOpenAlertContext(
+  id: string,
+  context: { title: string; reason: string },
+): Promise<void> {
+  const { error } = await alertsTable()
+    .update({ title: context.title, reason: context.reason })
+    .eq("id", id)
+    .eq("status", "open");
+  if (error) throw error;
+}
+
 /** Read a single alert by id. RLS enforces ownership. */
 export async function getAlertById(id: string): Promise<AlertRow | null> {
   const { data, error } = await alertsTable().select("*").eq("id", id).maybeSingle();

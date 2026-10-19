@@ -335,12 +335,12 @@ export function presentTimelineDiaryEntryDetails(
   for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
     detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
   }
+  // snake_case and legacy camelCase type keys, as the diary normalizer accepts.
   const rawEventType =
-    typeof record.event_type === "string"
-      ? record.event_type.trim().toLowerCase()
-      : typeof record.entry_type === "string"
-        ? record.entry_type.trim().toLowerCase()
-        : "";
+    [record.event_type, record.eventType, record.entry_type, record.entryType]
+      .find((v): v is string => typeof v === "string" && v.trim() !== "")
+      ?.trim()
+      .toLowerCase() ?? "";
   const flatVolumeEnvelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number] =
     rawEventType === "feeding" ? "feeding" : "watering";
   const hasVolumeLine = detailLines.some(

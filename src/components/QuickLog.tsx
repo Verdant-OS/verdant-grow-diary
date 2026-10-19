@@ -32,7 +32,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
+import { activeDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
@@ -1486,11 +1486,9 @@ export default function QuickLog({
       return;
     }
     const saveTarget = Object.freeze({ ...saveTargetResolution.target });
-    if (saveTarget.plantId) {
-      const startedArchive = startSavedPlantArchiveDecision(saveTarget.plantId);
-      const archiveDecision = startedArchive.ready
-        ? startedArchive.decision
-        : await startedArchive.pending;
+    const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+    if (archiveGuard && saveTarget.plantId) {
+      const archiveDecision = await archiveGuard(saveTarget.plantId);
       if (archiveDecision.block) {
         setSaveError(archiveDecision.message);
         toast.error(archiveDecision.message);

@@ -73,7 +73,7 @@ import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
-import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
+import { activeDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import { useAuth } from "@/store/auth";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
@@ -1722,12 +1722,9 @@ function QuickLogV2SheetForOwner({
       setLocalError("Choose a plant or tent before saving.");
       return;
     }
-    if (resolved.plantId) {
-      const archivedPlantId = resolved.plantId;
-      const startedArchive = startSavedPlantArchiveDecision(archivedPlantId);
-      const archiveDecision = startedArchive.ready
-        ? startedArchive.decision
-        : await startedArchive.pending;
+    const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+    if (archiveGuard && resolved.plantId) {
+      const archiveDecision = await archiveGuard(resolved.plantId);
       if (archiveDecision.block) {
         setLocalError(archiveDecision.message);
         return;

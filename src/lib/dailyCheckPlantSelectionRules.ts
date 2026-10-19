@@ -214,89 +214,6 @@ export function dailyCheckArchiveCheckIsStale(
   return checkedPlantId !== currentPlantId;
 }
 
-/**
- * One plant-row read. A thrown client, a missing row, or a row without a
- * boolean archive flag is unreadable. A settled unreadable read blocks the save.
- */
-export type DailyCheckPlantArchiveQuery = PromiseLike<{ data: unknown; error: unknown }>;
-
-/**
- * A diary-only test double exposes `select` but cannot read `plants`.
- * Calling that `select` is not a plant archive read. A real table client
- * exposes update/delete/upsert, or limit/maybeSingle, before select runs.
- */
-export function dailyCheckPlantArchiveRelationCanStart(relation: unknown): boolean {
-  if (!relation || typeof relation !== "object") return false;
-  const reader = relation as {
-    limit?: unknown;
-    maybeSingle?: unknown;
-    update?: unknown;
-    delete?: unknown;
-    upsert?: unknown;
-  };
-  return (
-    typeof reader.limit === "function" ||
-    typeof reader.maybeSingle === "function" ||
-    typeof reader.update === "function" ||
-    typeof reader.delete === "function" ||
-    typeof reader.upsert === "function"
-  );
-}
-
-/**
- * Start an archive read without forcing a turn when the client cannot answer.
- * A thrown or non-thenable query never started a plant read, so it does not
- * block. A real query stays pending until its row comes back, and a settled
- * unreadable row blocks.
- */
-export function startDailyCheckPlantArchiveDecision(
-  plantId: string | null | undefined,
-  startQuery: () => DailyCheckPlantArchiveQuery,
-):
-  | {
-      readonly ready: true;
-      readonly decision: ReturnType<typeof dailyCheckSubmitBlockForPlantArchive>;
-    }
-  | {
-      readonly ready: false;
-      readonly pending: Promise<ReturnType<typeof dailyCheckSubmitBlockForPlantArchive>>;
-    } {
-  if (!plantId) return { ready: true, decision: { block: false } };
-  try {
-    const pending = startQuery();
-    if (pending == null || typeof (pending as { then?: unknown }).then !== "function") {
-      return { ready: true, decision: { block: false } };
-    }
-    return {
-      ready: false,
-      pending: readDailyCheckPlantArchiveFromLimit(() => pending).then(
-        dailyCheckSubmitBlockForPlantArchive,
-      ),
-    };
-  } catch {
-    return { ready: true, decision: { block: false } };
-  }
-}
-
-export async function readDailyCheckPlantArchiveFromLimit(
-  query: () => DailyCheckPlantArchiveQuery,
-): Promise<DailyCheckPlantArchiveRead> {
-  try {
-    const { data, error } = await query();
-    const row = Array.isArray(data) ? data[0] : null;
-    const flag =
-      row && typeof row === "object" && "is_archived" in row
-        ? (row as { is_archived: unknown }).is_archived
-        : null;
-    return classifyDailyCheckPlantArchiveRead({
-      error: Boolean(error),
-      isArchived: error || typeof flag !== "boolean" ? null : flag,
-    });
-  } catch {
-    return { status: "unreadable" };
-  }
-}
-
 export type DailyCheckPlantArchiveRead =
   | { readonly status: "active" }
   | { readonly status: "archived" }
@@ -311,14 +228,18 @@ export function classifyDailyCheckPlantArchiveRead(input: {
   return input.isArchived ? { status: "archived" } : { status: "active" };
 }
 
-export function dailyCheckSubmitBlockForPlantArchive(read: DailyCheckPlantArchiveRead):
+export type DailyCheckPlantArchiveDecision =
   | { readonly block: false }
   | {
       readonly block: true;
       readonly message:
         | typeof DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE
         | typeof DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE;
-    } {
+    };
+
+export function dailyCheckSubmitBlockForPlantArchive(
+  read: DailyCheckPlantArchiveRead,
+): DailyCheckPlantArchiveDecision {
   switch (read.status) {
     case "active":
       return { block: false };

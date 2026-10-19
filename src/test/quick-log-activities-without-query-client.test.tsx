@@ -1,10 +1,14 @@
 /**
  * Activities section is mounted by tests that do not provide a QueryClient.
- * The archived-plant recheck must not require one just to render.
+ * The archived-plant recheck must not require one just to render, and only
+ * Daily Check registers it: other surfaces run no archive read.
  */
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { startDailyCheckPlantArchiveDecision } from "@/lib/dailyCheckPlantSelectionRules";
+import {
+  activeDailyCheckPlantArchiveSaveGuard,
+  registerDailyCheckPlantArchiveSaveGuard,
+} from "@/lib/dailyCheckPlantArchiveSaveGuard";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: vi.fn(), from: vi.fn(), storage: { from: vi.fn() } },
@@ -15,13 +19,18 @@ vi.mock("@/store/auth", () => ({
 
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 
-describe("startDailyCheckPlantArchiveDecision", () => {
-  it("stays ready and does not block when the plant query cannot start", () => {
-    const started = startDailyCheckPlantArchiveDecision("p1", () => {
-      throw new Error("no limit");
-    });
-    expect(started.ready).toBe(true);
-    if (started.ready) expect(started.decision).toEqual({ block: false });
+describe("Daily Check archive save guard registry", () => {
+  it("has no guard until Daily Check registers one, and clears only its own", async () => {
+    expect(activeDailyCheckPlantArchiveSaveGuard()).toBeNull();
+    const first = vi.fn(async () => ({ block: false }) as const);
+    const second = vi.fn(async () => ({ block: false }) as const);
+    const unregisterFirst = registerDailyCheckPlantArchiveSaveGuard(first);
+    expect(activeDailyCheckPlantArchiveSaveGuard()).toBe(first);
+    const unregisterSecond = registerDailyCheckPlantArchiveSaveGuard(second);
+    unregisterFirst();
+    expect(activeDailyCheckPlantArchiveSaveGuard()).toBe(second);
+    unregisterSecond();
+    expect(activeDailyCheckPlantArchiveSaveGuard()).toBeNull();
   });
 });
 

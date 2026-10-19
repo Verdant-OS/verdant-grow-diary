@@ -88,6 +88,9 @@ export default function SensorChart({
     [exportData, filteredData, range],
   );
 
+  // A timestamp without a finite value for this metric stays in the data as a
+  // null point, so the line breaks there instead of bridging a period with
+  // no measurement. The legend counts only the finite plotted points.
   const chartData = useMemo(() => {
     return filteredData.map((r) => {
       const raw = r[metric as keyof SensorReading] as number | null | undefined;
@@ -95,9 +98,13 @@ export default function SensorChart({
         metric === "temp" && typeof raw === "number"
           ? convertCelsiusForDisplay(raw, temperatureUnit)
           : raw;
-      return { ts: r.ts, value: v };
+      return { ts: r.ts, value: typeof v === "number" && Number.isFinite(v) ? v : null };
     });
   }, [filteredData, metric, temperatureUnit]);
+  const plottedPointCount = useMemo(
+    () => chartData.filter((point) => point.value !== null).length,
+    [chartData],
+  );
 
   const handleExport = () => {
     if (exportDisabled) return;
@@ -133,7 +140,7 @@ export default function SensorChart({
               className="inline-block h-2 w-2 rounded-full"
               style={{ background: axisMeta.color }}
             />
-            {legendLabel}
+            {legendLabel} · {plottedPointCount} {plottedPointCount === 1 ? "point" : "points"}
           </span>
           {!hideExportButton && (
             <button

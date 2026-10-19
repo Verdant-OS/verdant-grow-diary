@@ -60,6 +60,15 @@ import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRul
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import {
+  mergeVpdStabilityInputs,
+  quickLogManualsForTent,
+  QUICK_LOG_MANUAL_HISTORY_COPY,
+  resolveManualHistoryReadState,
+  vpdStabilityInputsFromWideReadings,
+} from "@/lib/vpdStabilityInputRules";
+import QuickLogManualHistoryNotice from "@/components/QuickLogManualHistoryNotice";
 import { useNowTick } from "@/hooks/useNowTick";
 import { describeCurrentStateStaleWindow } from "@/lib/sensorTruthCanon";
 import { isUuid } from "@/lib/isUuid";
@@ -113,7 +122,6 @@ import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import AlertReasonText from "@/components/AlertReasonText";
-import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { mergeDashboardChartReadingsWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 
 import { Button } from "@/components/ui/button";
@@ -203,6 +211,12 @@ export default function Dashboard() {
   // absence is established (same guard as the Tents list).
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
   const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
+  // Every tent's strip grade uses this same multi-tent manual read (per-tent
+  // windows). A pending or failed read is disclosed beside the stored
+  // readings, never read as "no manual history".
+  const stripManuals = chartQuickLogManualQuery;
+  const stripManualsReadState =
+    tentIds.length > 0 ? resolveManualHistoryReadState(stripManuals) : "ready";
   const quickLogManualsIncomplete =
     chartQuickLogManualQuery.isPending ||
     chartQuickLogManualQuery.isError ||
@@ -431,6 +445,10 @@ export default function Dashboard() {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
+    const stabilityReadings = mergeVpdStabilityInputs(
+      rs,
+      vpdStabilityInputsFromWideReadings(quickLogManualsForTent(stripManuals.data, t.id)),
+    );
     const envStage = resolveTentEnvironmentStage({
       tentId: t.id,
       tentGrowId: t.growId ?? null,
@@ -443,7 +461,7 @@ export default function Dashboard() {
       }),
       plants: plantsForStage,
     });
-    const stability = computeEnvironmentStability(rs, { stage: envStage });
+    const stability = computeEnvironmentStability(stabilityReadings, { stage: envStage });
     return {
       tent: t,
       envStage,
@@ -932,6 +950,14 @@ export default function Dashboard() {
                         })()}
                       </div>
 
+                      <QuickLogManualHistoryNotice
+                        state={stripManualsReadState}
+                        onRetry={() => {
+                          void stripManuals.refetch();
+                        }}
+                        testIdPrefix="dashboard-manual-history"
+                        className="mb-2"
+                      />
                       <div className="space-y-2.5">
                         {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
@@ -958,9 +984,16 @@ export default function Dashboard() {
                                     ? "sensor refresh unavailable, last loaded readings shown"
                                     : "sensor refresh unavailable, no last loaded readings"
                                   : null;
+                          const manualHistoryLabel =
+                            !isUuid(tent.id) || stripManualsReadState === "ready"
+                              ? null
+                              : stripManualsReadState === "unavailable"
+                                ? QUICK_LOG_MANUAL_HISTORY_COPY.ariaUnavailable
+                                : QUICK_LOG_MANUAL_HISTORY_COPY.ariaPending;
                           const ariaParts = [
                             tent.name,
                             sensorReadStatusLabel,
+                            manualHistoryLabel,
                             snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
                             snapView.hasReading
                               ? `last updated ${snapView.lastUpdatedDisplay}`

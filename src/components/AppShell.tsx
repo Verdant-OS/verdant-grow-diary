@@ -273,7 +273,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // Also wait for useRequireAuth (getUser) before mounting protected children
   // (#588): a stale cached session must not let pageContent fire authenticated
   // REST calls until the auth server revalidation settles.
-  if ((!hydrated || loading || authStatus === "loading") && authStatus !== "revalidation_failed")
+  // A failed revalidation skips the wait for auth, never the hydration render.
+  if (
+    (!hydrated || loading || authStatus === "loading") &&
+    (!hydrated || authStatus !== "revalidation_failed")
+  )
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…

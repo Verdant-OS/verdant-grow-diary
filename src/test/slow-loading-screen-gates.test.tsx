@@ -2,6 +2,7 @@
  * Full-page and inline gates that stay on Loading after the read has failed,
  * come back empty, or never settles.
  */
+import { renderToString } from "react-dom/server";
 import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { notifyManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -205,6 +206,29 @@ describe("app shell auth gate", () => {
     expect(screen.getByTestId("app-shell-revalidation-failed")).toBeInTheDocument();
     expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.queryByTestId("protected-child")).toBeNull();
+  });
+
+  it("still renders Loading… on the server and hydration pass when revalidation failed", () => {
+    io.authLoading = true;
+    const html = renderToString(
+      wrap(
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <Routes>
+            <Route
+              path="*"
+              element={
+                <AppShell>
+                  <div data-testid="protected-child">private</div>
+                </AppShell>
+              }
+            />
+          </Routes>
+        </MemoryRouter>,
+      ),
+    );
+    expect(html).toContain("Loading…");
+    expect(html).not.toContain("app-shell-revalidation-failed");
+    expect(html).not.toContain("protected-child");
   });
 });
 

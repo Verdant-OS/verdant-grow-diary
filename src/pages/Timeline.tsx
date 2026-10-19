@@ -445,17 +445,15 @@ export default function Timeline() {
   // active grow instead of creating a scope/read-key disagreement that can
   // leave the page waiting forever.
   const urlGrowId = rawUrlGrowId?.trim() || null;
-  const { hasInvalidScope } = resolveTimelineFetchScope({
+  // URL scope wins over the store's active grow; the rule also trims both ids,
+  // so the query and the read key always name the same grow.
+  const { activeGrowId, hasInvalidScope } = resolveTimelineFetchScope({
     urlGrowId,
     storeGrowId,
     growsLoading,
     growsError,
     isValidScopedGrow,
   });
-  // URL scope wins over the store's active grow. Same precedence as
-  // resolveTimelineFetchScope; kept here so the page states it directly.
-  const preferredGrowId = urlGrowId ?? storeGrowId;
-  const activeGrowId = hasInvalidScope ? null : preferredGrowId;
   const activeGrow = urlGrowId ? (isValidScopedGrow ? scopedGrow : null) : storeActiveGrow;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";

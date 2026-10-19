@@ -327,4 +327,34 @@ describe("timeline directory sensor refresh", () => {
     });
     expect(diaryReads()).toBe(beforeSettle);
   });
+
+  it("queries the diary with the trimmed store grow id the scope rule returns", async () => {
+    harness.growsState = {
+      activeGrow: GROW_A,
+      activeGrowId: " grow-a ",
+      grows: [GROW_A],
+      loading: false,
+      error: null,
+    };
+    harness.scopedGrowState = {
+      urlGrowId: null,
+      scopedGrow: null,
+      scopedGrowName: null,
+      isValidScopedGrow: false,
+      backHref: undefined,
+    };
+    render(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(diaryReads()).toBeGreaterThan(0);
+    });
+    const growIds = queries()
+      .filter((spec) => spec.table === "diary_entries")
+      .flatMap((spec) => spec.filters.filter((f) => f.column === "grow_id").map((f) => f.value));
+    expect(growIds.length).toBeGreaterThan(0);
+    expect(growIds.every((value) => value === "grow-a")).toBe(true);
+  });
 });

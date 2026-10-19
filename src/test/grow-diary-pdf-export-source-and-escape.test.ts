@@ -38,26 +38,39 @@ describe("grow diary PDF source labels and escaping", () => {
         count: 2,
         healthy: true,
         note: "Source label preserved from ingest.",
+        provenance: null,
       },
       {
-        label: "unknown",
+        label: "invalid",
         count: 4,
         healthy: false,
         note: "Flagged — not treated as current healthy data.",
+        provenance: null,
       },
+      // #2119: a bridge transport token is provenance, never a Source label.
+      // Without a canonical trust label it is invalid and stays not healthy.
       {
-        label: "bridge",
+        label: "invalid",
         count: 1,
         healthy: false,
-        note: "Source label preserved.",
+        note: "Flagged — not treated as current healthy data.",
+        provenance: "Bridge",
       },
       {
         label: "stale",
         count: 0,
         healthy: false,
         note: "Flagged — not treated as current healthy data.",
+        provenance: null,
       },
     ]);
+    const canonicalLabels = ["live", "manual", "csv", "demo", "stale", "invalid"];
+    for (const row of model.sensorSources) {
+      expect(canonicalLabels).toContain(row.label);
+    }
+    const html = buildGrowDiaryReportHtml(model);
+    expect(html).not.toMatch(/<span class="badge [a-z]+">bridge<\/span>/i);
+    expect(html).toContain("via Bridge");
     expect(model.events[0]?.when).toBe("not-a-date");
     expect(model.countsRows.find((row) => row.label === "Waterings")?.value).toBe("unavailable");
   });

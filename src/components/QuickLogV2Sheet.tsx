@@ -18,6 +18,7 @@ import {
   claimPendingQuickLogWatering,
   reconcilePendingQuickLogWateringClear,
   reconcilePendingQuickLogWateringHistoryDiscard,
+  clearUnreadablePendingQuickLogWatering,
   markPendingQuickLogWateringHistoryCheck,
   WATERING_RECOVERY_UNAVAILABLE,
   WATERING_RECOVERY_PENDING,
@@ -30,6 +31,16 @@ import {
   STARTER_WATER_RECOVERY_UNAVAILABLE,
 } from "@/lib/quickLogPendingStarterWaterStore";
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
+import {
+  mayClearUnreadableWaterRecovery,
+  unreadableWaterRecoveryOutcome,
+} from "@/lib/quickLogUnreadableWaterRecoveryRules";
+import {
+  QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER,
+} from "@/constants/quickLogWaterRecoveryCopy";
 import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
 import {
   feedingHistoryCheckMessage,
@@ -397,6 +408,11 @@ function QuickLogV2SheetForOwner({
   const [noteStorageFence, setNoteStorageFence] = useState(false);
   const confirmedNoteRecoveryRef = useRef<PendingQuickLogNote | null>(null);
   const [wateringStorageFence, setWateringStorageFence] = useState(false);
+  // The typed Water journal for this owner exists but cannot be read. Only the
+  // grower’s "Check Timeline, then clear" action resolves it; nothing replays.
+  const [wateringRecoveryUnreadable, setWateringRecoveryUnreadable] = useState(
+    () => Boolean(user?.id) && initialWateringRecovery.status === "blocked",
+  );
   const confirmedWateringRecoveryRef = useRef<PendingQuickLogWatering | null>(null);
   const [feedingStorageFence, setFeedingStorageFence] = useState(false);
   const confirmedFeedingRecoveryRef = useRef<PendingQuickLogFeeding | null>(null);
@@ -2032,6 +2048,7 @@ function QuickLogV2SheetForOwner({
       if (claim.status !== "claimed") {
         if (claim.status === "pending") restorePendingWatering(claim.record);
         else {
+          if (claim.status === "blocked") setWateringRecoveryUnreadable(true);
           if (!pendingWateringSubmission) wateringRetrySubmissionRef.current = null;
           else keepSubmissionLockedRef.current = true;
           setLocalError(
@@ -2044,6 +2061,7 @@ function QuickLogV2SheetForOwner({
       }
       exactWateringSubmission.recovery = claim.record;
       keepSubmissionLockedRef.current = true;
+      setWateringRecoveryUnreadable(false);
     }
     const releaseUnsentWatering = async () => {
       if (!exactWateringSubmission) return;
@@ -2209,6 +2227,7 @@ function QuickLogV2SheetForOwner({
       if (claim.status !== "claimed") {
         keepSubmissionLockedRef.current = true;
         setWateringRetryPending(true);
+        if (claim.status === "blocked") setWateringRecoveryUnreadable(true);
         setLocalError(
           claim.status === "other_pending"
             ? STARTER_WATER_RECOVERY_PENDING
@@ -2737,6 +2756,52 @@ function QuickLogV2SheetForOwner({
     // Explicit abandonment after history review, never a confirmed server receipt.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     handleLogAnother();
+  }
+
+  const unreadableWaterClearAllowed = mayClearUnreadableWaterRecovery({
+    blocked: wateringRecoveryUnreadable,
+    hasReadableRecord: false,
+    ownerId: user?.id,
+    inFlight: recoveryStorageFence || saving || feedingSaving || wateringSaving,
+  });
+  // The grower checked Timeline and clears an unreadable typed Water key. The
+  // stored record is never replayed, and an in-memory locked Water is dropped
+  // (new key) rather than resent; a readable record found instead goes to Retry.
+  async function handleClearUnreadableWatering() {
+    const ownerId = user?.id;
+    if (!ownerId || !unreadableWaterClearAllowed || saveInFlightRef.current) return;
+    const lifetime = noteLifetimeRef.current;
+    saveInFlightRef.current = true;
+    let outcome: ReturnType<typeof unreadableWaterRecoveryOutcome>;
+    try {
+      outcome = unreadableWaterRecoveryOutcome(
+        await clearUnreadablePendingQuickLogWatering(ownerId),
+      );
+    } finally {
+      saveInFlightRef.current = false;
+    }
+    if (!lifetime.active || noteLifetimeRef.current !== lifetime) return;
+    if (outcome === "still_blocked") {
+      setLocalError(QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED);
+      return;
+    }
+    setWateringRecoveryUnreadable(false);
+    const current = readPendingQuickLogWatering(ownerId);
+    if (current.status === "pending") {
+      restorePendingWatering(current.record);
+      return;
+    }
+    if (current.status === "blocked") {
+      setWateringRecoveryUnreadable(true);
+      setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+      return;
+    }
+    if (wateringRetrySubmissionRef.current) {
+      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      handleLogAnother();
+      return;
+    }
+    setLocalError(null);
   }
 
   function handleLogAnother() {
@@ -3674,6 +3739,32 @@ function QuickLogV2SheetForOwner({
             </p>
           )}
 
+          {wateringRecoveryUnreadable && !postSave && (
+            <div
+              data-testid="qlv2-watering-unreadable-recovery"
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 space-y-2 text-sm text-foreground"
+            >
+              <p>{QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER}</p>
+              <a
+                href={QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block underline"
+              >
+                {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+              </a>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid="qlv2-watering-clear-unreadable"
+                disabled={!unreadableWaterClearAllowed}
+                onClick={() => void handleClearUnreadableWatering()}
+              >
+                {QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL}
+              </Button>
+            </div>
+          )}
           {localError && (
             <div
               role="alert"

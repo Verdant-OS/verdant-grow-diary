@@ -20,7 +20,7 @@ function withForm(patch: Partial<QuickLogWateringFormState> = {}): QuickLogWater
 
 describe("buildWateringReview — validation parity", () => {
   it.each(["", "   ", "0", "-1", "not-a-number", "1e2", "0x10", "50001", "1000001"])(
-    "keeps preview in needs-input state for mapper-invalid volume %j",
+    "keeps preview in needs-input state for invalid or above-ceiling volume %j",
     (volumeMl) => {
       expect(buildWateringReview(withForm({ volumeMl })).needsInput).toBe(true);
     },

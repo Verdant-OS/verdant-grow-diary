@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { EMPTY_QUICKLOG_WATERING_FORM } from "@/lib/quickLogWateringFormViewModel";
+import {
+  EMPTY_QUICKLOG_WATERING_FORM,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "@/lib/quickLogWateringFormViewModel";
 import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
 
 const blankAir = { temperatureC: "", humidityPct: "", vpdKpa: "" };
@@ -32,7 +35,7 @@ describe("assessQuickLogWaterSaveGate", () => {
       temperatureUnit: "celsius",
     });
     expect(huge.blocksSave).toBe(true);
-    expect(huge.fields.volume).toMatch(/too large \(max 50,000 ml\)/);
+    expect(huge.fields.volume).toBe(QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE);
   });
 
   it("reports each bad air reading even when volume is also bad", () => {

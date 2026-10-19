@@ -6,9 +6,7 @@
  * No CTA, no upgrade link, no urgency language.
  */
 import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
-import { resolveAiDoctorEntitlementView } from "@/lib/aiDoctorEntitlementRules";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
-import { PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
 import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 export const AI_DOCTOR_FREE_PLAN_CREDIT_ALLOWANCE = FREE_CAPABILITIES.aiCreditsPerGrow ?? 3;
@@ -147,7 +145,11 @@ export interface AiDoctorSurfaceCreditInput {
   allowanceUsed?: number | null;
   /** Allowance-funded credits used in the current UTC month, when resolved. */
   monthlyUsed?: number | null;
-  /** Authoritative environment-scoped remaining pack credits, when resolved. */
+  /**
+   * Authoritative environment-scoped remaining pack credits, when resolved.
+   * `null`/omitted means unresolved: the pre-run badge is then labelled as the
+   * included allowance only, never as a total balance.
+   */
   packBalance?: number | null;
   /** True when the client allowance-used read failed. */
   allowanceReadFailed?: boolean;
@@ -194,6 +196,33 @@ function resolveValidDeniedCredit(
 }
 
 /**
+ * Resolves which allowance bucket the server will meter for this viewer, from
+ * the EFFECTIVE entitlement only (mirrors `ai_credit_spend`): verified staff
+ * use the 10,000 monthly ceiling; an effective monthly bucket (active Pro /
+ * Craft / Founder) uses `aiMonthlyCredits`; everything else — including a
+ * paused or expired Founder whose capabilities degraded to Free — uses the
+ * per-grow Free allowance. Display identity (`displayPlanId`) never selects a
+ * quota; Founder upsell suppression is handled elsewhere.
+ */
+export function resolveAiDoctorEffectiveMonthlyLimit(
+  entitlement: ResolvedEntitlement | null | undefined,
+): number | null {
+  if (entitlement?.isStaff === true) return AI_DOCTOR_STAFF_MONTHLY_CREDIT_ALLOWANCE;
+  const caps = entitlement?.capabilities;
+  const monthly = caps?.aiMonthlyCredits;
+  const perGrow = caps?.aiCreditsPerGrow;
+  if (
+    typeof monthly === "number" &&
+    Number.isFinite(monthly) &&
+    monthly > 0 &&
+    !(typeof perGrow === "number" && perGrow > 0)
+  ) {
+    return Math.floor(monthly);
+  }
+  return null;
+}
+
+/**
  * Resolves the pre-run / post-run credit remaining badge input and Free-plan
  * 3-credit allowance copy for AI Doctor surfaces.
  */
@@ -207,20 +236,20 @@ export function buildAiDoctorSurfaceCreditViewModel(
     };
   }
 
-  const viewer = resolveAiDoctorEntitlementView({
-    entitlement: input.entitlement ?? null,
-  });
-
-  const resolvedPackBalance =
+  const packBalanceResolved =
     typeof input.packBalance === "number" &&
     Number.isFinite(input.packBalance) &&
-    input.packBalance > 0
-      ? Math.floor(input.packBalance)
-      : 0;
+    input.packBalance >= 0;
+  const resolvedPackBalance = packBalanceResolved ? Math.floor(input.packBalance as number) : 0;
+  const packFields = packBalanceResolved
+    ? resolvedPackBalance > 0
+      ? { pack_balance: resolvedPackBalance }
+      : {}
+    : { allowance_only: true };
 
-  const isStaff = input.entitlement?.isStaff === true;
+  const monthlyLimit = resolveAiDoctorEffectiveMonthlyLimit(input.entitlement);
 
-  if (viewer.bypassesUpsell || isStaff) {
+  if (monthlyLimit !== null) {
     if (input.postSpendCredit) {
       return {
         creditRemaining: input.postSpendCredit,
@@ -234,16 +263,8 @@ export function buildAiDoctorSurfaceCreditViewModel(
         freePlanCreditCopy: null,
       };
     }
-    const capMonthly = input.entitlement?.capabilities?.aiMonthlyCredits;
-    const catalogMonthly = viewer.paidPlanId ? PLAN_CATALOG[viewer.paidPlanId].aiMonthlyCredits : 0;
-    const monthlyLimit = isStaff
-      ? AI_DOCTOR_STAFF_MONTHLY_CREDIT_ALLOWANCE
-      : typeof capMonthly === "number" && Number.isFinite(capMonthly) && capMonthly > 0
-        ? Math.floor(capMonthly)
-        : catalogMonthly;
     if (
       input.allowanceReadFailed !== true &&
-      monthlyLimit > 0 &&
       typeof input.monthlyUsed === "number" &&
       Number.isFinite(input.monthlyUsed) &&
       input.monthlyUsed >= 0
@@ -254,7 +275,7 @@ export function buildAiDoctorSurfaceCreditViewModel(
           remaining: Math.max(monthlyLimit - used, 0),
           scope: "per_month",
           scope_limit: monthlyLimit,
-          ...(resolvedPackBalance > 0 ? { pack_balance: resolvedPackBalance } : {}),
+          ...packFields,
         },
         freePlanCreditCopy: null,
       };
@@ -320,7 +341,7 @@ export function buildAiDoctorSurfaceCreditViewModel(
       remaining: Math.max(perGrowLimit - used, 0),
       scope: "per_grow",
       scope_limit: perGrowLimit,
-      ...(resolvedPackBalance > 0 ? { pack_balance: resolvedPackBalance } : {}),
+      ...packFields,
     },
     freePlanCreditCopy,
   };

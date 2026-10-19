@@ -56,7 +56,10 @@ import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useAiDoctorGrowCreditUsage } from "@/hooks/useAiDoctorGrowCreditUsage";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
-import { buildAiDoctorSurfaceCreditViewModel } from "@/lib/aiDoctorSurfaceCreditViewModel";
+import {
+  buildAiDoctorSurfaceCreditViewModel,
+  resolveAiDoctorEffectiveMonthlyLimit,
+} from "@/lib/aiDoctorSurfaceCreditViewModel";
 import {
   AI_DOCTOR_LOW_CREDIT_SURFACE,
   buildAiDoctorLowCreditTopUpViewModel,
@@ -463,9 +466,8 @@ function PlantDetailAiDoctorLiveReviewScope({
     lookupFailed: entitlementLookupFailed,
   } = useMyEntitlements();
   const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
-  const isStaff = entitlement?.isStaff === true;
+  const effectiveMonthlyLimit = resolveAiDoctorEffectiveMonthlyLimit(entitlement);
   const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
-  const monthlyAiCredits = entitlement?.capabilities?.aiMonthlyCredits ?? null;
   const {
     allowanceUsed: doctorAllowanceUsed,
     monthlyUsed: doctorMonthlyUsed,
@@ -475,10 +477,11 @@ function PlantDetailAiDoctorLiveReviewScope({
   } = useAiDoctorGrowCreditUsage({
     growId: growId ?? null,
     perGrowEnabled:
-      entitlementReady && !isStaff && typeof perGrowAiCredits === "number" && perGrowAiCredits > 0,
-    monthlyEnabled:
       entitlementReady &&
-      (isStaff || (typeof monthlyAiCredits === "number" && monthlyAiCredits > 0)),
+      effectiveMonthlyLimit === null &&
+      typeof perGrowAiCredits === "number" &&
+      perGrowAiCredits > 0,
+    monthlyEnabled: entitlementReady && effectiveMonthlyLimit !== null,
   });
   const surfaceCredit = useMemo(
     () =>

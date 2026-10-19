@@ -19,7 +19,10 @@ import { useAiDoctorGrowCreditUsage } from "@/hooks/useAiDoctorGrowCreditUsage";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
-import { buildAiDoctorSurfaceCreditViewModel } from "@/lib/aiDoctorSurfaceCreditViewModel";
+import {
+  buildAiDoctorSurfaceCreditViewModel,
+  resolveAiDoctorEffectiveMonthlyLimit,
+} from "@/lib/aiDoctorSurfaceCreditViewModel";
 import {
   DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY,
   partitionDoctorEntryOptionsByTent,
@@ -132,9 +135,8 @@ export default function AiDoctorStart() {
     lookupFailed: entitlementLookupFailed,
   } = useMyEntitlements();
   const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
-  const isStaff = entitlement?.isStaff === true;
+  const effectiveMonthlyLimit = resolveAiDoctorEffectiveMonthlyLimit(entitlement);
   const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
-  const monthlyAiCredits = entitlement?.capabilities?.aiMonthlyCredits ?? null;
   const singleGrowId =
     !growsLoading && !growsError && grows.length === 1 && typeof grows[0]?.id === "string"
       ? grows[0].id
@@ -143,10 +145,11 @@ export default function AiDoctorStart() {
   const creditUsage = useAiDoctorGrowCreditUsage({
     growId: creditGrowId,
     perGrowEnabled:
-      entitlementReady && !isStaff && typeof perGrowAiCredits === "number" && perGrowAiCredits > 0,
-    monthlyEnabled:
       entitlementReady &&
-      (isStaff || (typeof monthlyAiCredits === "number" && monthlyAiCredits > 0)),
+      effectiveMonthlyLimit === null &&
+      typeof perGrowAiCredits === "number" &&
+      perGrowAiCredits > 0,
+    monthlyEnabled: entitlementReady && effectiveMonthlyLimit !== null,
   });
   const surfaceCredit = useMemo(
     () =>

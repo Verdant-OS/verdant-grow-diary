@@ -61,6 +61,7 @@ const testState = vi.hoisted(() => ({
     expires_at: string | null;
   }>,
   grantsError: null as Record<string, unknown> | null,
+  ledgerMaxRows: null as number | null,
   plants: [] as Array<Record<string, unknown>>,
   tents: [] as Array<Record<string, unknown>>,
   grows: [] as Array<Record<string, unknown>>,
@@ -161,6 +162,49 @@ vi.mock("@/lib/funnelAnalytics", () => ({
   trackFunnelEvent: vi.fn(),
 }));
 
+// Ledger mock that honours the hook's eq filters, id order, range paging,
+// exact count, and an optional PostgREST max-rows cap (testState.ledgerMaxRows).
+function ledgerChain(
+  rowsSource: () => Promise<Array<Record<string, unknown>>> | Array<Record<string, unknown>>,
+  errorSource: () => unknown,
+) {
+  const filters: Array<[string, unknown]> = [];
+  let range: [number, number] | null = null;
+  const fieldFor = (column: string) => (column === "meta->>funded_by" ? "funded_by" : column);
+  const resolveResult = async () => {
+    const error = errorSource();
+    if (error) return { data: null, error, count: null };
+    const rows = await rowsSource();
+    const matched = rows.filter((row) =>
+      filters.every(([column, value]) => {
+        if (column === "user_id") return true;
+        const field = row[fieldFor(column)];
+        return field === undefined || field === value;
+      }),
+    );
+    const cap = testState.ledgerMaxRows ?? Number.POSITIVE_INFINITY;
+    const start = range ? range[0] : 0;
+    const requestedEnd = range ? range[1] + 1 : matched.length;
+    const end = Math.min(requestedEnd, start + cap);
+    return { data: matched.slice(start, end), error: null, count: matched.length };
+  };
+  const chain = {
+    select: () => chain,
+    eq: (column: string, value: unknown) => {
+      filters.push([column, value]);
+      return chain;
+    },
+    order: () => chain,
+    range: (from: number, to: number) => {
+      range = [from, to];
+      return chain;
+    },
+    then: (resolve: (val: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+      resolveResult().then(resolve, reject),
+  };
+  return chain;
+}
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
@@ -181,30 +225,19 @@ vi.mock("@/integrations/supabase/client", () => ({
         return query;
       }
       if (table === "ai_credit_spends") {
-        const chain = {
-          select: () => chain,
-          eq: () => chain,
-          then: (resolve: (val: unknown) => unknown) =>
-            (
-              testState.spendsPendingPromise ??
-              Promise.resolve({
-                data: testState.spendsData,
-                error: testState.spendsError,
-              })
-            ).then(resolve),
-        };
-        return chain;
+        return ledgerChain(
+          async () =>
+            (testState.spendsPendingPromise
+              ? (await testState.spendsPendingPromise).data
+              : testState.spendsData) as Array<Record<string, unknown>>,
+          () => testState.spendsError,
+        );
       }
       if (table === "ai_credit_grants") {
-        const chain = {
-          select: () => chain,
-          eq: () =>
-            Promise.resolve({
-              data: testState.grantsData,
-              error: testState.grantsError,
-            }),
-        };
-        return chain;
+        return ledgerChain(
+          () => testState.grantsData as Array<Record<string, unknown>>,
+          () => testState.grantsError,
+        );
       }
       return {
         select: () => ({
@@ -219,6 +252,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 import AiDoctorStart from "@/pages/AiDoctorStart";
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
 import { useSoilMoistureCalibrations } from "@/hooks/useSoilMoistureCalibrations";
+import { readCompleteAiCreditLedger } from "@/hooks/useAiDoctorGrowCreditUsage";
+import { buildAiDoctorSurfaceCreditViewModel } from "@/lib/aiDoctorSurfaceCreditViewModel";
 
 const snapshotCard = (when: string): ManualSnapshotTimelineCard =>
   ({
@@ -315,6 +350,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
     testState.spendsPendingPromise = null;
     testState.grantsData = [];
     testState.grantsError = null;
+    testState.ledgerMaxRows = null;
     testState.plants = [{ id: PLANT_ID, name: "QA Test", stage: "flower", tentId: TENT_A }];
     testState.tents = [{ id: TENT_A, name: "QA Test", grow_id: GROW_ID }];
     testState.grows = [{ id: GROW_ID, name: "QA Test" }];
@@ -390,7 +426,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-        "0 of 3 AI Doctor credits left for this grow",
+        "0 of 3 included AI Doctor credits left for this grow",
       ),
     );
     cleanup();
@@ -515,7 +551,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-        "3 of 3 AI Doctor credits left for this grow",
+        "3 of 3 included AI Doctor credits left for this grow",
       ),
     );
 
@@ -562,7 +598,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-        "98 of 100 AI Doctor credits left this month",
+        "98 of 100 included AI Doctor credits left this month",
       ),
     );
     expect(screen.queryByTestId("plant-ai-doctor-live-review-free-credit-note")).toBeNull();
@@ -578,7 +614,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
-        "98 of 100 AI Doctor credits left this month",
+        "98 of 100 included AI Doctor credits left this month",
       ),
     );
     expect(screen.queryByTestId("ai-doctor-start-free-credit-note")).toBeNull();
@@ -641,7 +677,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-        "0 of 3 AI Doctor credits left for this grow",
+        "0 of 3 included AI Doctor credits left for this grow",
       ),
     );
     expect(
@@ -681,7 +717,7 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-        "9880 of 10000 AI Doctor credits left this month",
+        "9880 of 10000 included AI Doctor credits left this month",
       ),
     );
     expect(screen.queryByTestId("plant-ai-doctor-live-review-free-credit-note")).toBeNull();
@@ -697,10 +733,188 @@ describe("PR #2193 review fixes (#2161 & #2009)", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
-        "9880 of 10000 AI Doctor credits left this month",
+        "9880 of 10000 included AI Doctor credits left this month",
       ),
     );
     expect(screen.queryByTestId("ai-doctor-start-free-credit-note")).toBeNull();
+  });
+
+  it("labels the pre-run balance as the included allowance when the pack balance is unresolved (Codex P2 PlantDetailAiDoctorLiveReview L492)", async () => {
+    // PAYMENTS_ENVIRONMENT unresolved: the pack pool cannot be read, so the
+    // badge must not present the exhausted allowance as the total balance.
+    testState.spendsData = [{ weight: 3, funded_by: "allowance", grow_id: GROW_ID }];
+    testState.grantsData = [{ credits: 50, environment: "live", expires_at: null }];
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "0 of 3 included AI Doctor credits left for this grow",
+      ),
+    );
+    expect(
+      screen.getByTestId("plant-ai-doctor-live-review-credit-remaining").textContent,
+    ).not.toContain("pack");
+    cleanup();
+
+    rtlRender(
+      <MemoryRouter initialEntries={["/doctor"]}>
+        <Routes>
+          <Route path="/doctor" element={<AiDoctorStart />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
+        "0 of 3 included AI Doctor credits left for this grow",
+      ),
+    );
+
+    // A resolved pack balance keeps the total-balance label.
+    expect(
+      buildAiDoctorSurfaceCreditViewModel({
+        entitlement: testState.entitlement as never,
+        allowanceUsed: 3,
+        packBalance: 0,
+      }).creditRemaining,
+    ).toEqual({ remaining: 0, scope: "per_grow", scope_limit: 3 });
+    expect(
+      buildAiDoctorSurfaceCreditViewModel({
+        entitlement: testState.entitlement as never,
+        allowanceUsed: 3,
+        packBalance: null,
+      }).creditRemaining,
+    ).toEqual({ remaining: 0, scope: "per_grow", scope_limit: 3, allowance_only: true });
+  });
+
+  it("counts pack-funded spends from every grow in the pack balance (Codex P2 useAiDoctorGrowCreditUsage L93)", async () => {
+    vi.stubEnv("PAYMENTS_ENVIRONMENT", "live");
+    testState.spendsData = [
+      { id: "s-1", weight: 3, funded_by: "allowance", grow_id: GROW_ID },
+      { id: "s-2", weight: 10, funded_by: "pack", grow_id: GROW_B, billing_environment: "live" },
+      { id: "s-3", weight: 2, funded_by: "allowance", grow_id: GROW_B },
+    ];
+    testState.grantsData = [{ credits: 50, environment: "live", expires_at: null }];
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "0 of 3 AI Doctor credits left for this grow · 40 pack credits available",
+      ),
+    );
+  });
+
+  it("pages every credit-ledger row past the PostgREST response cap and fails closed on a truncated ledger (Codex P2 useAiDoctorGrowCreditUsage L89)", async () => {
+    const now = new Date();
+    const currentPeriodKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    testState.entitlement = {
+      ...testState.entitlement,
+      capabilities: { ...FREE_CAPABILITIES, aiCreditsPerGrow: null, aiMonthlyCredits: 100 },
+      isStaff: true,
+    };
+    testState.ledgerMaxRows = 2;
+    testState.spendsData = [1, 2, 3, 4, 5].map((n) => ({
+      id: `m-${n}`,
+      weight: 1,
+      funded_by: "allowance",
+      period_key: currentPeriodKey,
+    }));
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "9995 of 10000 included AI Doctor credits left this month",
+      ),
+    );
+
+    // A short page before the exact count is reached is never a complete ledger.
+    const truncated = await readCompleteAiCreditLedger<{ id: string }>(async (from) =>
+      from === 0
+        ? { data: [{ id: "a" }], error: null, count: 3 }
+        : { data: [], error: null, count: 3 },
+    );
+    expect(truncated).toBeNull();
+    const missingCount = await readCompleteAiCreditLedger<{ id: string }>(async () => ({
+      data: [{ id: "a" }],
+      error: null,
+      count: null,
+    }));
+    expect(missingCount).toBeNull();
+    const overBudget = await readCompleteAiCreditLedger<{ id: string }>(
+      async (from) => ({ data: [{ id: `r-${from}` }], error: null, count: 10 }),
+      1,
+      3,
+    );
+    expect(overBudget).toBeNull();
+  });
+
+  it("uses the effective Free per-grow quota for a degraded Founder (Codex P2 aiDoctorSurfaceCreditViewModel L223)", async () => {
+    testState.entitlement = {
+      displayPlanId: "founder_lifetime",
+      effectivePlanId: "free",
+      status: "paused",
+      isActive: false,
+      capabilities: { ...FREE_CAPABILITIES },
+      degraded: true,
+      degradedReason: "paused",
+      isStaff: false,
+      source: "lovable_paddle_subscription",
+    };
+    testState.spendsData = [{ id: "s-1", weight: 1, funded_by: "allowance", grow_id: GROW_ID }];
+
+    renderWithQueryClient(
+      <PlantDetailAiDoctorLiveReview
+        plantId={PLANT_ID}
+        plant={strongPlant}
+        growId={GROW_ID}
+        tentId={TENT_A}
+        invoke={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
+        "2 of 3 included AI Doctor credits left for this grow",
+      ),
+    );
+    expect(screen.getByTestId("plant-ai-doctor-live-review-free-credit-note")).toHaveTextContent(
+      "Free plan includes 3 AI Doctor credits per grow.",
+    );
+
+    // A per_grow server denial is honoured, not discarded, for the degraded Founder.
+    expect(
+      buildAiDoctorSurfaceCreditViewModel({
+        entitlement: testState.entitlement as never,
+        deniedCredit: { scope: "per_grow", scope_limit: 3, remaining: 0, plan_id: "free" },
+      }).creditRemaining,
+    ).toEqual({ remaining: 0, scope: "per_grow", scope_limit: 3 });
   });
 
   it("propagates schema_unavailable to existing cached tent queries when a later tent reports PGRST205 (CodeRabbit Major #1)", async () => {

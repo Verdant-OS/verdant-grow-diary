@@ -41,6 +41,7 @@ const testState = vi.hoisted(() => ({
   spendsError: null as Record<string, unknown> | null,
   grantsData: [] as Array<{ credits: number | null; expires_at: string | null }>,
   grantsError: null as Record<string, unknown> | null,
+  ledgerMaxRows: null as number | null,
   plants: [] as Array<Record<string, unknown>>,
   tents: [] as Array<Record<string, unknown>>,
   grows: [] as Array<Record<string, unknown>>,
@@ -132,31 +133,63 @@ vi.mock("@/lib/funnelAnalytics", () => ({
   trackFunnelEvent: vi.fn(),
 }));
 
+// Ledger mock that honours the hook's eq filters, id order, range paging,
+// exact count, and an optional PostgREST max-rows cap (testState.ledgerMaxRows).
+function ledgerChain(
+  rowsSource: () => Promise<Array<Record<string, unknown>>> | Array<Record<string, unknown>>,
+  errorSource: () => unknown,
+) {
+  const filters: Array<[string, unknown]> = [];
+  let range: [number, number] | null = null;
+  const fieldFor = (column: string) => (column === "meta->>funded_by" ? "funded_by" : column);
+  const resolveResult = async () => {
+    const error = errorSource();
+    if (error) return { data: null, error, count: null };
+    const rows = await rowsSource();
+    const matched = rows.filter((row) =>
+      filters.every(([column, value]) => {
+        if (column === "user_id") return true;
+        const field = row[fieldFor(column)];
+        return field === undefined || field === value;
+      }),
+    );
+    const cap = testState.ledgerMaxRows ?? Number.POSITIVE_INFINITY;
+    const start = range ? range[0] : 0;
+    const requestedEnd = range ? range[1] + 1 : matched.length;
+    const end = Math.min(requestedEnd, start + cap);
+    return { data: matched.slice(start, end), error: null, count: matched.length };
+  };
+  const chain = {
+    select: () => chain,
+    eq: (column: string, value: unknown) => {
+      filters.push([column, value]);
+      return chain;
+    },
+    order: () => chain,
+    range: (from: number, to: number) => {
+      range = [from, to];
+      return chain;
+    },
+    then: (resolve: (val: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+      resolveResult().then(resolve, reject),
+  };
+  return chain;
+}
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
       if (table === "ai_credit_spends") {
-        const chain = {
-          select: () => chain,
-          eq: () => chain,
-          then: (resolve: (val: unknown) => unknown) =>
-            Promise.resolve({
-              data: testState.spendsData,
-              error: testState.spendsError,
-            }).then(resolve),
-        };
-        return chain;
+        return ledgerChain(
+          () => testState.spendsData as Array<Record<string, unknown>>,
+          () => testState.spendsError,
+        );
       }
       if (table === "ai_credit_grants") {
-        const chain = {
-          select: () => chain,
-          eq: () =>
-            Promise.resolve({
-              data: testState.grantsData,
-              error: testState.grantsError,
-            }),
-        };
-        return chain;
+        return ledgerChain(
+          () => testState.grantsData as Array<Record<string, unknown>>,
+          () => testState.grantsError,
+        );
       }
       return {
         select: () => ({
@@ -283,6 +316,7 @@ describe("AI Doctor surface credit balance and Free 3-credit text (#2161)", () =
     testState.spendsError = null;
     testState.grantsData = [];
     testState.grantsError = null;
+    testState.ledgerMaxRows = null;
     testState.plants = [{ id: PLANT_ID, name: "QA Test", stage: "flower", tentId: TENT_ID }];
     testState.tents = [{ id: TENT_ID, name: "QA Test", grow_id: GROW_ID }];
     testState.grows = [{ id: GROW_ID, name: "QA Test" }];
@@ -308,7 +342,7 @@ describe("AI Doctor surface credit balance and Free 3-credit text (#2161)", () =
     );
 
     const badgeBefore = await screen.findByTestId("plant-ai-doctor-live-review-credit-remaining");
-    expect(badgeBefore).toHaveTextContent("3 of 3 AI Doctor credits left for this grow");
+    expect(badgeBefore).toHaveTextContent("3 of 3 included AI Doctor credits left for this grow");
     const freeNoteBefore = screen.getByTestId("plant-ai-doctor-live-review-free-credit-note");
     expect(freeNoteBefore).toHaveTextContent("Free plan includes 3 AI Doctor credits per grow.");
 
@@ -317,7 +351,7 @@ describe("AI Doctor surface credit balance and Free 3-credit text (#2161)", () =
     const failure = await screen.findByTestId("plant-ai-doctor-live-review-failure");
     expect(failure).toHaveTextContent(AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY);
     expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-      "3 of 3 AI Doctor credits left for this grow",
+      "3 of 3 included AI Doctor credits left for this grow",
     );
     expect(screen.getByTestId("plant-ai-doctor-live-review-free-credit-note")).toHaveTextContent(
       "Free plan includes 3 AI Doctor credits per grow.",
@@ -346,7 +380,7 @@ describe("AI Doctor surface credit balance and Free 3-credit text (#2161)", () =
 
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-remaining")).toHaveTextContent(
-        "2 of 3 AI Doctor credits left for this grow",
+        "2 of 3 included AI Doctor credits left for this grow",
       ),
     );
     expect(screen.getByTestId("plant-ai-doctor-live-review-free-credit-note")).toHaveTextContent(
@@ -437,7 +471,7 @@ describe("AI Doctor surface credit balance and Free 3-credit text (#2161)", () =
     );
     await waitFor(() =>
       expect(screen.getByTestId("ai-doctor-start-credit-remaining")).toHaveTextContent(
-        "2 of 3 AI Doctor credits left for this grow",
+        "2 of 3 included AI Doctor credits left for this grow",
       ),
     );
   });

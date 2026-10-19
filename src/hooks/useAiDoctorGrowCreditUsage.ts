@@ -7,6 +7,15 @@
  * as AiDoctorStart) and QueryClient-backed views share the same calculation.
  * Read-only; RLS enforces ownership (`ai_credit_spends_select_own`,
  * `ai_credit_grants_select_own`).
+ *
+ * Each ledger read mirrors one `ai_credit_spend` aggregate and is paged to
+ * completion (exact count + stable `id` order), so a PostgREST response cap can
+ * never silently truncate a balance:
+ *  - per-grow allowance: spends on this grow;
+ *  - monthly allowance: spends in the current UTC `period_key`;
+ *  - pack pool: every pack-funded spend across ALL of the user's grows, plus
+ *    every grant row. Loaded only when the billing environment is resolved.
+ * A ledger that is incomplete or larger than the page budget hides the badge.
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +45,46 @@ export interface AiDoctorGrowCreditUsageResult {
   isError: boolean;
   refresh: () => void;
 }
+
+/** Rows requested per page; PostgREST may return fewer under its max-rows cap. */
+export const AI_CREDIT_LEDGER_PAGE_SIZE = 1000;
+/** Upper bound on pages per ledger read; beyond it the read fails closed. */
+export const AI_CREDIT_LEDGER_MAX_PAGES = 50;
+
+interface LedgerPageResult<T> {
+  data: T[] | null;
+  error: unknown;
+  count?: number | null;
+}
+
+/**
+ * Reads every row of a ledger by paging `[from, to]` ranges until the exact
+ * row count is reached. Returns `null` (fail closed) on any error, a missing
+ * count, a short page before the count is reached, or the page budget running
+ * out — a partial ledger is never treated as complete.
+ */
+export async function readCompleteAiCreditLedger<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<LedgerPageResult<T>>,
+  pageSize: number = AI_CREDIT_LEDGER_PAGE_SIZE,
+  maxPages: number = AI_CREDIT_LEDGER_MAX_PAGES,
+): Promise<T[] | null> {
+  const rows: T[] = [];
+  for (let page = 0; page < maxPages; page += 1) {
+    const from = rows.length;
+    const res = await fetchPage(from, from + pageSize - 1);
+    if (res.error) return null;
+    const total = res.count;
+    if (typeof total !== "number" || !Number.isFinite(total) || total < 0) return null;
+    const data = res.data ?? [];
+    rows.push(...data);
+    if (rows.length >= total) return rows.length === total ? rows : null;
+    if (data.length === 0) return null;
+  }
+  return null;
+}
+
+const SPEND_COLUMNS =
+  "id, grow_id, period_key, refund_of, weight, funded_by:meta->>funded_by, billing_environment:meta->>server_billing_environment";
 
 interface ScopedCreditUsageState {
   scopeKey: string | null;
@@ -81,26 +130,44 @@ export function useAiDoctorGrowCreditUsage(
     let cancelled = false;
     void (async () => {
       try {
-        const spendsQuery = supabase
-          .from("ai_credit_spends")
-          .select(
-            "id, grow_id, period_key, refund_of, weight, funded_by:meta->>funded_by, billing_environment:meta->>server_billing_environment",
-          )
-          .eq("user_id", userId);
-        const [spendsRes, grantsRes] = await Promise.all([
-          canLoadPerGrow && validGrowId && !canLoadMonthly
-            ? spendsQuery.eq("grow_id", validGrowId)
-            : spendsQuery,
+        const now = new Date();
+        const periodKey = formatAiCreditUtcPeriodKey(now);
+        const spendPage =
+          (scope: { column: string; value: string }) => (from: number, to: number) =>
+            supabase
+              .from("ai_credit_spends")
+              .select(SPEND_COLUMNS, { count: "exact" })
+              .eq("user_id", userId)
+              .eq(scope.column, scope.value)
+              .order("id", { ascending: true })
+              .range(from, to) as unknown as PromiseLike<LedgerPageResult<AiDoctorSpendRowLike>>;
+        const [perGrowRows, monthlyRows, packSpendRows, grantRows] = await Promise.all([
+          canLoadPerGrow && validGrowId
+            ? readCompleteAiCreditLedger(spendPage({ column: "grow_id", value: validGrowId }))
+            : Promise.resolve([] as AiDoctorSpendRowLike[]),
+          canLoadMonthly
+            ? readCompleteAiCreditLedger(spendPage({ column: "period_key", value: periodKey }))
+            : Promise.resolve([] as AiDoctorSpendRowLike[]),
           billingEnvironment
-            ? supabase
-                .from("ai_credit_grants")
-                .select("credits, environment, expires_at")
-                .eq("user_id", userId)
-            : Promise.resolve({ data: null, error: null }),
+            ? readCompleteAiCreditLedger(spendPage({ column: "meta->>funded_by", value: "pack" }))
+            : Promise.resolve([] as AiDoctorSpendRowLike[]),
+          billingEnvironment
+            ? readCompleteAiCreditLedger(
+                (from: number, to: number) =>
+                  supabase
+                    .from("ai_credit_grants")
+                    .select("id, credits, environment, expires_at", { count: "exact" })
+                    .eq("user_id", userId)
+                    .order("id", { ascending: true })
+                    .range(from, to) as unknown as PromiseLike<
+                    LedgerPageResult<AiDoctorGrantRowLike>
+                  >,
+              )
+            : Promise.resolve([] as AiDoctorGrantRowLike[]),
         ]);
 
         if (cancelled) return;
-        if (spendsRes.error || grantsRes.error) {
+        if (!perGrowRows || !monthlyRows || !packSpendRows || !grantRows) {
           setState({
             scopeKey: activeScopeKey,
             allowanceUsed: null,
@@ -110,19 +177,16 @@ export function useAiDoctorGrowCreditUsage(
           });
           return;
         }
-        const now = new Date();
-        const spendRows = (spendsRes.data ?? []) as ReadonlyArray<AiDoctorSpendRowLike>;
-        const grantRows = (grantsRes.data ?? []) as ReadonlyArray<AiDoctorGrantRowLike>;
         const usedPerGrow = canLoadPerGrow
-          ? sumAiDoctorAllowanceSpends(spendRows, validGrowId)
+          ? sumAiDoctorAllowanceSpends(perGrowRows, validGrowId)
           : null;
         const usedMonthly = canLoadMonthly
-          ? sumAiDoctorMonthlyAllowanceSpends(spendRows, formatAiCreditUtcPeriodKey(now))
+          ? sumAiDoctorMonthlyAllowanceSpends(monthlyRows, periodKey)
           : null;
         const packBalance = billingEnvironment
           ? computeAiCreditPackBalance({
               grantRows,
-              spendRows,
+              spendRows: packSpendRows,
               billingEnvironment,
               nowMs: now.getTime(),
             })

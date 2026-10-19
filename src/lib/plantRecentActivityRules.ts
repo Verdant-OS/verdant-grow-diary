@@ -105,8 +105,12 @@ function hasManualSensorSnapshot(entry: NormalizedDiaryEntry): boolean {
 
 function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow {
   const snap = entry.details.sensorSnapshot;
-  const snapshotAt = snap?.at ?? null;
-  const hasSnapshot = !!snap || hasManualSensorSnapshot(entry);
+  const manualPresent = hasManualSensorSnapshot(entry);
+  // A manual Quick Log snapshot has no `at`. Use the diary entry time so the
+  // existing isStale check can still mark an old reading stale. temp_f stays
+  // off sensorSnapshot.temp.
+  const snapshotAt = snap?.at ?? (manualPresent ? entry.createdAt : null);
+  const hasSnapshot = !!snap || manualPresent;
   const split = splitHardwareReadingsFromNote(entry.note);
   const identity = resolveQuickLogEventIdentity(entry);
   return {

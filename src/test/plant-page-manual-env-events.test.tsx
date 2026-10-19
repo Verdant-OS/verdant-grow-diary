@@ -446,3 +446,34 @@ describe("Codex re-review on #2115 — environment read state covers both reads"
     expect(await screen.findByText(/Unavailable/)).toBeInTheDocument();
   });
 });
+
+describe("Codex re-review on #2115 — implausible manual metrics", () => {
+  it("drops an event whose every metric fails the canonical validity guards", () => {
+    expect(
+      parsePlantManualEnvironmentEvents([
+        envRow({ environment_events: { temperature_c: 95, humidity_pct: 120, vpd_kpa: 15 } }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("keeps only the valid metrics of a mixed event, in every projection", () => {
+    const row = envRow({
+      environment_events: { temperature_c: 95, humidity_pct: 55, vpd_kpa: -1 },
+    });
+    const [ev] = parsePlantManualEnvironmentEvents([row]);
+    expect(ev).toMatchObject({ temperatureC: null, humidityPct: 55, vpdKpa: null });
+    expect(manualEnvironmentEventsToTentReadingRows([row]).map((r) => r.metric)).toEqual([
+      "humidity_pct",
+    ]);
+    const latest = latestManualReadingsFromEnvironmentEvents([row]);
+    expect(latest.temp_f).toBeNull();
+    expect(latest.humidity_percent?.value).toBe(55);
+  });
+
+  it("keeps boundary values the guards accept", () => {
+    const [ev] = parsePlantManualEnvironmentEvents([
+      envRow({ environment_events: { temperature_c: 60, humidity_pct: 100, vpd_kpa: 0 } }),
+    ]);
+    expect(ev).toMatchObject({ temperatureC: 60, humidityPct: 100, vpdKpa: 0 });
+  });
+});

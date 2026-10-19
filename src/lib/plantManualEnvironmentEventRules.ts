@@ -22,6 +22,16 @@
  */
 import type { LatestManualReading, ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
+import {
+  isHumidityValid,
+  isTemperatureValid,
+  isVpdValid,
+} from "@/lib/sensorReadingNormalizationRules";
+
+/** Keep a finite value only when the canonical sensor validity guard accepts it. */
+function validOrNull(v: number | null, isValid: (n: number | null) => boolean): number | null {
+  return v !== null && isValid(v) ? v : null;
+}
 
 export const PLANT_MANUAL_ENV_EVENT_SOURCE = "manual" as const;
 
@@ -99,7 +109,7 @@ function observedMs(iso: string | null | undefined): number | null {
 /**
  * Validate and normalise manual environment grow_events. Skips anything that
  * is not a live (non-deleted) manual environment row with a parseable time
- * and at least one finite value. Sorted newest first, id ascending on ties.
+ * and at least one finite value that passes the canonical validity guards. Sorted newest first, id ascending on ties.
  */
 export function parsePlantManualEnvironmentEvents(
   rows: ReadonlyArray<PlantManualEnvEventRow | null | undefined> | null | undefined,
@@ -114,9 +124,12 @@ export function parsePlantManualEnvironmentEvents(
     if (observedMs(row.occurred_at) === null) continue;
     const env = firstChild(row.environment_events);
     if (!env) continue;
-    const temperatureC = finiteOrNull(env.temperature_c);
-    const humidityPct = finiteOrNull(env.humidity_pct);
-    const vpdKpa = finiteOrNull(env.vpd_kpa);
+    // Same canonical guards the Sensors Quick Log series uses: an implausible
+    // value (e.g. a pre-band-guard historical row) is dropped, never shown or
+    // converted as a usable manual reading.
+    const temperatureC = validOrNull(finiteOrNull(env.temperature_c), isTemperatureValid);
+    const humidityPct = validOrNull(finiteOrNull(env.humidity_pct), isHumidityValid);
+    const vpdKpa = validOrNull(finiteOrNull(env.vpd_kpa), isVpdValid);
     if (temperatureC === null && humidityPct === null && vpdKpa === null) continue;
     out.push({
       id: row.id,

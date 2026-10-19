@@ -481,6 +481,8 @@ export default function Timeline() {
   const [diaryPhotoIds, setDiaryPhotoIds] = useState<ReadonlySet<string>>(
     () => EMPTY_TIMELINE_DIARY_PHOTO_IDS,
   );
+  // Newest storage path an edit asked to sign, per entry id.
+  const editPhotoSignRef = useRef(new Map<string, string>());
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
@@ -3238,6 +3240,29 @@ export default function Timeline() {
               ? applyTimelineDiaryPhotoEdit(diaryPhotoIds, before, patch.details, user)
               : null;
           if (photo) setDiaryPhotoIds(photo.photoIds);
+          const signPath = photo?.signStoragePath ?? null;
+          if (signPath) {
+            // The edit moved the photo to a new private path, so the old
+            // signed URL was cleared; sign the new one. A later edit of the
+            // same entry wins over this result.
+            editPhotoSignRef.current.set(patch.id, signPath);
+            void supabase.storage
+              .from("diary-photos")
+              .createSignedUrl(signPath, 3600)
+              .then(({ data }) => {
+                if (editPhotoSignRef.current.get(patch.id) !== signPath) return;
+                const url = data?.signedUrl;
+                if (!url) return;
+                setEntries((rows) =>
+                  rows.map((r) => (r.id === patch.id ? ({ ...r, photo_url: url } as Entry) : r)),
+                );
+              })
+              // An unsigned photo stays blank, as it would after a failed load.
+              .catch(() => undefined);
+          } else {
+            // Supersede any signing still in flight for this entry.
+            editPhotoSignRef.current.set(patch.id, "");
+          }
           setEntries((rows) =>
             rows.map((r) =>
               r.id === patch.id

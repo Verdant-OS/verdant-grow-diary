@@ -97,6 +97,8 @@ export interface TimelineDiaryPhotoEditResult {
   photo_url: string | null;
   photoReferenceSource: TimelineDiaryPhotoReferenceSource;
   photoIds: ReadonlySet<string>;
+  /** A new private storage path the caller must sign; null when none. */
+  signStoragePath: string | null;
 }
 
 /**
@@ -115,7 +117,12 @@ export function applyTimelineDiaryPhotoEdit(
 ): TimelineDiaryPhotoEditResult {
   const source = before.photoReferenceSource ?? null;
   if (source === "top") {
-    return { photo_url: before.photo_url, photoReferenceSource: "top", photoIds: current };
+    return {
+      photo_url: before.photo_url,
+      photoReferenceSource: "top",
+      photoIds: current,
+      signStoragePath: null,
+    };
   }
   const withId = (add: boolean): ReadonlySet<string> => {
     if (current.has(before.id) === add) return current;
@@ -129,7 +136,12 @@ export function applyTimelineDiaryPhotoEdit(
     { viewerUserId },
   );
   if (ref.kind === "external") {
-    return { photo_url: ref.url, photoReferenceSource: "details", photoIds: withId(true) };
+    return {
+      photo_url: ref.url,
+      photoReferenceSource: "details",
+      photoIds: withId(true),
+      signStoragePath: null,
+    };
   }
   if (ref.kind === "storage") {
     const prior =
@@ -144,9 +156,15 @@ export function applyTimelineDiaryPhotoEdit(
       photo_url: samePath ? before.photo_url : null,
       photoReferenceSource: "details",
       photoIds: withId(true),
+      signStoragePath: samePath ? null : ref.path,
     };
   }
-  return { photo_url: null, photoReferenceSource: null, photoIds: withId(false) };
+  return {
+    photo_url: null,
+    photoReferenceSource: null,
+    photoIds: withId(false),
+    signStoragePath: null,
+  };
 }
 
 /**

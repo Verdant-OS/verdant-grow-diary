@@ -30,6 +30,11 @@ const ALL_CLOSED: PlantDetailDisclosureOpenState = {
 
 /** How long a hash landing keeps correcting scroll while async cards above it mount. */
 const HASH_SCROLL_FOLLOW_MS = 3000;
+/**
+ * After the last smooth alignment starts, cancel listeners stay at most this long
+ * when `scrollend` never fires (older Safari, a no-op scroll, or an aligned target).
+ */
+export const HASH_SCROLL_CANCEL_CEILING_MS = 1200;
 
 function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () => void {
   if (
@@ -44,8 +49,9 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
   let observing = true;
   // The landing alignment and each resize correction start a smooth scroll that
   // can still be moving after observation ends. Listeners stay until that scroll
-  // finishes (scrollend) or the grower cancels it.
-  let scrollInFlight = true;
+  // finishes (scrollend), the ceiling elapses, or the grower cancels it.
+  let scrollInFlight = false;
+  let ceilingTimer: number | null = null;
 
   const removeInputListeners = () => {
     window.removeEventListener("wheel", stopOnUserInput);
@@ -56,10 +62,26 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
     window.removeEventListener("scrollend", onScrollFinished);
     document.removeEventListener("scrollend", onScrollFinished);
   };
+  const clearCeiling = () => {
+    if (ceilingTimer === null) return;
+    window.clearTimeout(ceilingTimer);
+    ceilingTimer = null;
+  };
   const releaseInputListenersIfIdle = () => {
     if (stopped || observing || scrollInFlight) return;
     stopped = true;
+    clearCeiling();
     removeInputListeners();
+  };
+  const noteSmoothScroll = () => {
+    scrollInFlight = true;
+    clearCeiling();
+    ceilingTimer = window.setTimeout(() => {
+      ceilingTimer = null;
+      if (stopped) return;
+      scrollInFlight = false;
+      releaseInputListenersIfIdle();
+    }, HASH_SCROLL_CANCEL_CEILING_MS);
   };
   const endObservation = () => {
     if (!observing) return;
@@ -69,6 +91,7 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
     releaseInputListenersIfIdle();
   };
   const onScrollFinished = () => {
+    clearCeiling();
     scrollInFlight = false;
     releaseInputListenersIfIdle();
   };
@@ -88,6 +111,7 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
     stopped = true;
     observing = false;
     scrollInFlight = false;
+    clearCeiling();
     observer.disconnect();
     window.clearTimeout(timer);
     removeInputListeners();
@@ -99,6 +123,7 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
     stopped = true;
     observing = false;
     scrollInFlight = false;
+    clearCeiling();
     observer.disconnect();
     window.clearTimeout(timer);
     removeInputListeners();
@@ -108,7 +133,7 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
     if (stopped || !observing) return;
     const target = document.getElementById(anchorId);
     if (!target) return;
-    scrollInFlight = true;
+    noteSmoothScroll();
     safelyFocusAndScroll(target);
   });
   observer.observe(document.documentElement);
@@ -122,6 +147,7 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
   window.addEventListener("pointerdown", stopOnUserInput, { passive: true });
   window.addEventListener("scrollend", onScrollFinished);
   document.addEventListener("scrollend", onScrollFinished);
+  noteSmoothScroll();
   return release;
 }
 

@@ -3,7 +3,10 @@ import type { PropsWithChildren } from "react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclosureNavigation";
+import {
+  HASH_SCROLL_CANCEL_CEILING_MS,
+  usePlantDetailDisclosureNavigation,
+} from "@/hooks/usePlantDetailDisclosureNavigation";
 
 /**
  * #2019: keep the brief automatic alignment while cards load, and stop it
@@ -211,6 +214,30 @@ describe("plant detail hash follow cancels on user interaction (#2019)", () => {
     grow(observers);
     flushFrames();
     expect(scrollIntoView).toHaveBeenCalledTimes(callsAfterClick);
+  });
+
+  it("drops cancel listeners after the scroll ceiling when scrollend never fires", () => {
+    const { observers, scrollIntoView } = startAlignment();
+    flushFrames();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    advance(2990);
+    grow(observers);
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+
+    // Past the follow deadline, still inside the ceiling: a click can cancel.
+    advance(20);
+    // No scrollend. The ceiling is measured from that resize.
+    advance(HASH_SCROLL_CANCEL_CEILING_MS);
+    act(() => {
+      plainTextNode().dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    });
+
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    const callsAfterCeiling = scrollIntoView.mock.calls.length;
+    grow(observers);
+    flushFrames();
+    expect(scrollIntoView).toHaveBeenCalledTimes(callsAfterCeiling);
   });
 
   it("does not run a pending scheduleNavigation frame after pointerdown on plain text", () => {

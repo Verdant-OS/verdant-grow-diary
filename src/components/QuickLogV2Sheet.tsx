@@ -86,6 +86,7 @@ import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
+  dailyCheckPlantArchiveRelationCanStart,
   startDailyCheckPlantArchiveDecision,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { useAuth } from "@/store/auth";
@@ -1786,9 +1787,13 @@ function QuickLogV2SheetForOwner({
     }
     if (resolved.plantId) {
       const archivedPlantId = resolved.plantId;
-      const startedArchive = startDailyCheckPlantArchiveDecision(archivedPlantId, () =>
-        supabase.from("plants").select("is_archived").eq("id", archivedPlantId).limit(1),
-      );
+      const startedArchive = startDailyCheckPlantArchiveDecision(archivedPlantId, () => {
+        const relation = supabase.from("plants");
+        if (!dailyCheckPlantArchiveRelationCanStart(relation)) {
+          throw new Error("plant archive read unavailable");
+        }
+        return relation.select("is_archived").eq("id", archivedPlantId).limit(1);
+      });
       const archiveDecision = startedArchive.ready
         ? startedArchive.decision
         : await startedArchive.pending;

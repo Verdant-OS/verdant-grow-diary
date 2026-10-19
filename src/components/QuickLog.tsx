@@ -110,6 +110,7 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
   DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
   DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
+  dailyCheckPlantArchiveRelationCanStart,
   startDailyCheckPlantArchiveDecision,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
@@ -1526,9 +1527,13 @@ export default function QuickLog({
     }
     const saveTarget = Object.freeze({ ...saveTargetResolution.target });
     if (saveTarget.plantId) {
-      const startedArchive = startDailyCheckPlantArchiveDecision(saveTarget.plantId, () =>
-        supabase.from("plants").select("is_archived").eq("id", saveTarget.plantId).limit(1),
-      );
+      const startedArchive = startDailyCheckPlantArchiveDecision(saveTarget.plantId, () => {
+        const relation = supabase.from("plants");
+        if (!dailyCheckPlantArchiveRelationCanStart(relation)) {
+          throw new Error("plant archive read unavailable");
+        }
+        return relation.select("is_archived").eq("id", saveTarget.plantId).limit(1);
+      });
       const archiveDecision = startedArchive.ready
         ? startedArchive.decision
         : await startedArchive.pending;

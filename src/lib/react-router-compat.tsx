@@ -272,6 +272,7 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
       resetScroll={preventScrollReset !== true}
+      {...(onClick !== undefined ? { onClick } : {})}
       {...rest}
       activeProps={{}}
       compatAriaCurrent={explicitAriaCurrent}

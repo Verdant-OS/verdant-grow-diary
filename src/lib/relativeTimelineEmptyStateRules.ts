@@ -39,6 +39,7 @@ export interface RelativeTimelineCtaEventDetail {
   tentId?: string;
   tentName?: string;
   eventType?: "observation" | "photo";
+  activityId?: "photo";
   suggestSnapshot?: boolean;
 }
 
@@ -150,6 +151,7 @@ export function buildRelativeTimelineEmptyState(
   if (plantId) {
     const photoDetail: RelativeTimelineCtaEventDetail = {
       eventType: "photo",
+      activityId: "photo",
       plantId,
     };
     if (growId) photoDetail.growId = growId;
@@ -170,7 +172,7 @@ export function buildRelativeTimelineEmptyState(
       label: "Upload photo",
       mode: "event",
       eventName: PLANT_QUICKLOG_PREFILL_EVENT,
-      eventDetail: { eventType: "photo" },
+      eventDetail: { eventType: "photo", activityId: "photo" },
       disabled: true,
       disabledReason: PHOTO_DISABLED_REASON,
     };

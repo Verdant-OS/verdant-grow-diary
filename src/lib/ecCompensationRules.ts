@@ -115,8 +115,12 @@ export function computeEcCompensation(input: EcCompensationInput): EcCompensatio
   }
 
   // Magnitude sanity — catches µS/cm-vs-mS/cm mix-ups before compensation.
+  // A negative reading is the wrong direction, not a value above the cap.
   const ecMax = EC_PLAUSIBLE_MAX[input.ecUnit];
-  if (input.ecValue < 0 || input.ecValue > ecMax) {
+  if (input.ecValue < 0) {
+    return blocked("suspicious_ec_magnitude", ["EC can't be negative."]);
+  }
+  if (input.ecValue > ecMax) {
     return blocked("suspicious_ec_magnitude", [
       `EC ${input.ecValue} ${input.ecUnit} exceeds plausible max ${ecMax}; possible unit mismatch`,
     ]);

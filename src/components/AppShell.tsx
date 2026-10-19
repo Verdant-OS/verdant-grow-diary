@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useManualSensorCorrectionRefresh } from "@/hooks/useManualSensorCorrectionRefresh";
 import { useHydrated } from "@/hooks/useHydrated";
+import { useSearchShortcut } from "@/hooks/useSearchShortcut";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   buildSignedOutRedirect,
@@ -24,6 +25,7 @@ import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
 import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
+import SearchShortcutHint from "./SearchShortcutHint";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
 import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
@@ -33,6 +35,10 @@ import {
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
+import {
+  QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
+  QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
+} from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { TentQuickLogTargetScope } from "@/components/TentQuickLogTargetScope";
@@ -158,26 +164,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     entitlement.effectivePlanId !== "free";
   useCheckoutReturnCompletionTracking(paidDestinationReady);
 
-  // Global ⌘K / Ctrl+K shortcut to open the search palette. Guarded so
-  // it does not steal keystrokes while the grower is typing in an input,
-  // textarea, or contenteditable surface.
-  useEffect(() => {
-    function isTypingTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      if (target.isContentEditable) return true;
-      const tag = target.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-    }
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        if (isTypingTarget(e.target)) return;
-        e.preventDefault();
-        setSearchOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useSearchShortcut(setSearchOpen);
 
   useEffect(() => {
     function onOpenV2(event: Event) {
@@ -378,7 +365,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   <Search className="h-4 w-4" />
                   <span className="hidden lg:inline">Search…</span>
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">
-                    ⌘K
+                    <SearchShortcutHint />
                   </kbd>
                 </button>
                 {/* Mobile-reachable search entry: the ⌘K composite button
@@ -437,14 +424,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           <main
             id="main-content"
             tabIndex={-1}
-            className="mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pb-9 md:pt-7 lg:px-10"
+            className={`mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pt-7 lg:px-10 ${QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS}`}
           >
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
-              <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
-                {pageContent}
-              </TentQuickLogTargetScope>
+              <div
+                data-testid="app-shell-page-content"
+                className={QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS}
+              >
+                <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
+                  {pageContent}
+                </TentQuickLogTargetScope>
+              </div>
             )}
             {/* In-flow legal footer: stays at the end of scrolled content
                 (never fixed), so the mobile FAB cannot clip it. */}

@@ -103,19 +103,25 @@ vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
       growEventId: string;
     }) => void;
   }) => (
-    <button
-      type="button"
-      data-testid="mock-inline-activity-success"
-      onClick={() =>
-        onSaveSuccess?.({
-          activityId: "note",
-          target: { growId: "g1", tentId: "t1", plantId: "P" },
-          growEventId: "event-1",
-        })
-      }
-    >
-      Inline saved
-    </button>
+    <>
+      {/* A save whose write is blocked: it never reports success. */}
+      <button type="button" data-testid="daily-check-all-activities-save">
+        Blocked save
+      </button>
+      <button
+        type="button"
+        data-testid="mock-inline-activity-success"
+        onClick={() =>
+          onSaveSuccess?.({
+            activityId: "note",
+            target: { growId: "g1", tentId: "t1", plantId: "P" },
+            growEventId: "event-1",
+          })
+        }
+      >
+        Inline saved
+      </button>
+    </>
   ),
 }));
 vi.mock("@/components/PlantStatusStrip", () => ({ default: () => <div /> }));
@@ -202,6 +208,16 @@ describe("Daily Check archive read follows the plant being saved", () => {
       await screen.findByText("This plant was archived. Pick another plant."),
     ).toBeInTheDocument();
     expect(saveInsert).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh plants when an activity save click never confirms a save", async () => {
+    const { invalidateQueries } = renderCheck();
+    fireEvent.click(screen.getByTestId("daily-check-all-activities-save"));
+    // Let the page preflight read and replay the click.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(invalidateQueries).not.toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["plants"] }),
+    );
   });
 
   it("refreshes the plant list after an inline activity save", async () => {

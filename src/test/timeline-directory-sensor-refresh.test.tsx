@@ -291,4 +291,40 @@ describe("timeline directory sensor refresh", () => {
 
     expect(diaryReads()).toBe(beforeSettle);
   });
+
+  it("starts the directory sensor read on settle without repeating the core read", async () => {
+    harness.growsState = {
+      activeGrow: null,
+      activeGrowId: null,
+      grows: [],
+      loading: true,
+      error: null,
+    };
+    harness.scopedGrowState = {
+      urlGrowId: "grow-a",
+      scopedGrow: null,
+      scopedGrowName: null,
+      isValidScopedGrow: false,
+      backHref: "/grows/grow-a",
+    };
+    render(<TimelineHarness />);
+    await waitFor(() => {
+      expect(diaryReads()).toBeGreaterThan(0);
+    });
+    // The directory scope is unknown while the grow list loads.
+    expect(directoryTentReads()).toBe(0);
+    const beforeSettle = diaryReads();
+
+    settleGrowList();
+    act(() => {
+      screen.getByTestId("refresh-harness").click();
+    });
+
+    // Waiting for the directory read proves every effect for the settled
+    // scope has run. The core diary read must still have been issued once.
+    await waitFor(() => {
+      expect(directoryTentReads()).toBeGreaterThan(0);
+    });
+    expect(diaryReads()).toBe(beforeSettle);
+  });
 });

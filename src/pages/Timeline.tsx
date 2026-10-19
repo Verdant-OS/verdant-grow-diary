@@ -445,13 +445,17 @@ export default function Timeline() {
   // active grow instead of creating a scope/read-key disagreement that can
   // leave the page waiting forever.
   const urlGrowId = rawUrlGrowId?.trim() || null;
-  const { activeGrowId, hasInvalidScope } = resolveTimelineFetchScope({
+  const { hasInvalidScope } = resolveTimelineFetchScope({
     urlGrowId,
     storeGrowId,
     growsLoading,
     growsError,
     isValidScopedGrow,
   });
+  // URL scope wins over the store's active grow. Same precedence as
+  // resolveTimelineFetchScope; kept here so the page states it directly.
+  const preferredGrowId = urlGrowId ?? storeGrowId;
+  const activeGrowId = hasInvalidScope ? null : preferredGrowId;
   const activeGrow = urlGrowId ? (isValidScopedGrow ? scopedGrow : null) : storeActiveGrow;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
@@ -919,10 +923,11 @@ export default function Timeline() {
         setPartialReadSources((current) => mergeTimelinePartialSources(current, [source]));
       };
       try {
-        const tentsResult = await supabase
-          .from("tents")
-          .select("id")
-          .eq("grow_id", directoryGrowId);
+        // The tent lookup is bounded too: a hung lookup would otherwise never
+        // reach the reading deadline below or mark the source partial.
+        const tentsResult = await withCriticalReadDeadline(
+          supabase.from("tents").select("id").eq("grow_id", directoryGrowId),
+        );
         if (!isCurrentRequest()) return;
         if (tentsResult.error || !Array.isArray(tentsResult.data)) {
           markPartial("manual_sensor_readings");

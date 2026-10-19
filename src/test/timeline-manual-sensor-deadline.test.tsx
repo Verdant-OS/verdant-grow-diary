@@ -1,7 +1,8 @@
 /**
  * A hung manual-sensor read must not look like a complete Timeline.
  * The directory loader is detached from the core supplemental tasks, so the
- * deadline has to mark the source partial on its own.
+ * deadline has to mark the source partial on its own, whether the tent lookup
+ * or the sensor-reading queries hang.
  */
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -183,6 +184,29 @@ afterEach(() => {
 
 describe("timeline manual sensor deadline", () => {
   it("marks manual sensors partial when the read never settles", async () => {
+    vi.useFakeTimers();
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-a"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.queryByTestId("timeline-partial-read-warning")).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+    });
+    expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
+  });
+
+  it("marks manual sensors partial when the directory tent lookup never settles", async () => {
+    harness.executeQuery.mockImplementation((spec: { table: string; columns: string | null }) => {
+      if (spec.table === "tents" && spec.columns === "id") return new Promise(() => {});
+      return { data: [], error: null, count: 0 };
+    });
     vi.useFakeTimers();
     render(
       <MemoryRouter initialEntries={["/timeline?growId=grow-a"]}>

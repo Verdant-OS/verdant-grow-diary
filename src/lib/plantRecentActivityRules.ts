@@ -79,10 +79,32 @@ function previewNote(note: string): string {
   return trimmed.slice(0, NOTE_PREVIEW_MAX - 1).trimEnd() + "…";
 }
 
+const MANUAL_SNAPSHOT_READING_KEYS = ["temp_f", "humidity_percent", "ph", "ec"] as const;
+
+function isPresentManualReading(value: unknown): boolean {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") return value.trim().length > 0;
+  return false;
+}
+
+/**
+ * Quick Log stores the reading on details.manual_sensor_snapshot, which
+ * collectExtras keeps. This is presence only: temp_f is not copied onto
+ * sensorSnapshot.temp, because that field has other consumers and this
+ * check does not establish their unit.
+ */
+function hasManualSensorSnapshot(entry: NormalizedDiaryEntry): boolean {
+  const raw = entry.details.extras?.manual_sensor_snapshot;
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const snap = raw as Record<string, unknown>;
+  if (snap.source !== "manual") return false;
+  return MANUAL_SNAPSHOT_READING_KEYS.some((key) => isPresentManualReading(snap[key]));
+}
+
 function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow {
   const snap = entry.details.sensorSnapshot;
   const snapshotAt = snap?.at ?? null;
-  const hasSnapshot = !!snap;
+  const hasSnapshot = !!snap || hasManualSensorSnapshot(entry);
   const split = splitHardwareReadingsFromNote(entry.note);
   const identity = resolveQuickLogEventIdentity(entry);
   return {

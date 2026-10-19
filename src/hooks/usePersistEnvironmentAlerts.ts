@@ -168,6 +168,9 @@ export function usePersistEnvironmentAlerts(
   const [eligibilityWake, setEligibilityWake] = useState(0);
 
   // Stable deps — recompute on snapshot ts / quality / targets identity.
+  // Configured bounds are part of the targets key: persisted reasons quote
+  // the configured range, so an edit that leaves a metric's low/high state
+  // unchanged must still re-run the effect and refresh the open alert.
   const tsKey = input.snapshot?.ts ?? "";
   const sourceKey = input.snapshot?.source ?? "unavailable";
   const diaryRefKey = input.snapshot?.diary_evidence_ref?.id ?? "";
@@ -175,7 +178,7 @@ export function usePersistEnvironmentAlerts(
   const targetsKey =
     input.targets?.status === "out_of_range"
       ? input.targets.metrics
-          .map((m) => `${m.metric}:${m.state}`)
+          .map((m) => `${m.metric}:${m.state}:${m.min ?? ""}:${m.max ?? ""}`)
           .sort()
           .join("|")
       : (input.targets?.status ?? "missing_targets");
@@ -348,8 +351,9 @@ export function usePersistEnvironmentAlerts(
         }
       }
       // A configured-target candidate blocked by an open stage/default-range
-      // row in the same direction refreshes that row's wording instead of
-      // inserting a second alert (the #2179 one-per-direction guard stays).
+      // row, or by an open configured-target row quoting an edited range, in
+      // the same direction refreshes that row's wording instead of inserting
+      // a second alert (the #2179 one-per-direction guard stays).
       const contextRefreshes: {
         id: string;
         title: string;
@@ -367,7 +371,9 @@ export function usePersistEnvironmentAlerts(
           typeof a.metric === "string" ? a.metric : null,
           a.title,
         );
-        if (!existing.has(key) && dirKey !== null) {
+        // Checked even when the exact rule key is already open: a target edit
+        // keeps the same title, so only the reason (its range) differs.
+        if (dirKey !== null) {
           const openRow = openRowByDirection.get(dirKey);
           const refresh = openRow ? resolveAlertContextRefresh(openRow, a) : null;
           // The refreshed reason quotes this candidate's observation, so it

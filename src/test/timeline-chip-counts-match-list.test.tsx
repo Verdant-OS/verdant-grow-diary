@@ -385,6 +385,11 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
           count,
         );
         expect(listedDiaryEntries()).toHaveLength(1);
+        // Codex P2 at 558d7ec3: the active All stages chip counts the same
+        // receipt-inclusive list that Measurements renders.
+        expect(chipCount("All stages"), "All stages under Measurements includes receipts").toBe(
+          listedEntries().length,
+        );
         expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
           "Detailed diary: showing 1 of 6 entries",
         );

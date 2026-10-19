@@ -589,4 +589,63 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
     expect(alertsIo.update).not.toHaveBeenCalled();
     expect(alertsIo.save.mock.calls.some(([p]) => p.metric === "rh")).toBe(false);
   });
+
+  it("re-runs persistence and refreshes the open configured-target alert when its configured bounds are edited (Codex P2 at a7a61a76)", async () => {
+    const observedAt = alertsIo.snapshotState.snapshot.ts;
+    if (!observedAt) throw new Error("fixture snapshot must carry a timestamp");
+    const snapshot: SensorSnapshot = {
+      ...alertsIo.snapshotState.snapshot,
+      rh: 85,
+      metric_refs: { rh: { id: RH_READING_B, captured_at: observedAt, source: "manual" } },
+    };
+    const before = { rh: { min: 50, max: 70 } };
+    const after = { rh: { min: 50, max: 75 } };
+    const openReason = buildEnvironmentAlerts({
+      snapshot,
+      quality: evaluateSensorQuality(snapshot),
+      targets: compareSnapshotToTargets(snapshot, before),
+      includeConfiguredRangeInTargetBreachReason: true,
+    }).find((a) => a.metric === "rh")?.reason;
+    expect(openReason).toContain("50–70%");
+    alertsIo.list.mockResolvedValue([
+      {
+        id: "open-configured-rh",
+        metric: "rh",
+        source: "environment_alerts",
+        title: "Humidity above target",
+        reason: openReason,
+        tent_id: "tent-1",
+        status: "open",
+      },
+    ]);
+    const input = (targets: typeof before): PersistEnvironmentAlertsInput => ({
+      growId: "grow-1",
+      tentId: "tent-1",
+      enabled: true,
+      snapshot,
+      quality: evaluateSensorQuality(snapshot),
+      targets: compareSnapshotToTargets(snapshot, targets),
+    });
+
+    const hook = renderHook((props) => usePersistEnvironmentAlerts(props), {
+      initialProps: input(before),
+    });
+    await waitFor(() => expect(alertsIo.list).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 30));
+    // Same snapshot, same range: nothing to refresh.
+    expect(alertsIo.update).not.toHaveBeenCalled();
+
+    // The grower raises the maximum; RH stays high, so only the bounds move.
+    hook.rerender(input(after));
+    await waitFor(() => expect(alertsIo.update).toHaveBeenCalledTimes(1));
+    const [id, context] = alertsIo.update.mock.calls[0];
+    expect(id).toBe("open-configured-rh");
+    expect(context.title).toBe("Humidity above target");
+    expect(context.reason).toContain("50–75%");
+    expect(context.originating_timeline_events).toEqual([
+      expect.objectContaining({ id: RH_READING_B, type: "sensor_snapshot" }),
+    ]);
+    expect(alertsIo.save.mock.calls.some(([p]) => p.metric === "rh")).toBe(false);
+    hook.unmount();
+  });
 });

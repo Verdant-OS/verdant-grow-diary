@@ -151,6 +151,51 @@ describe("resolveAlertContextRefresh", () => {
   });
 });
 
+describe("resolveAlertContextRefresh after a configured target edit (Codex P2 at a7a61a76)", () => {
+  const open = {
+    title: "Humidity above target",
+    reason: "Humidity is above the configured maximum. Observed 85% (configured target 50–70%).",
+  };
+
+  it("refreshes an open configured-target row when the quoted configured range changed", () => {
+    const edited = {
+      title: "Humidity above target",
+      reason: "Humidity is above the configured maximum. Observed 85% (configured target 50–75%).",
+    };
+    expect(resolveAlertContextRefresh(open, edited)).toEqual(edited);
+    // A legacy configured-target row with no quoted range gains the range.
+    expect(
+      resolveAlertContextRefresh(
+        { title: open.title, reason: "Humidity is above the configured maximum." },
+        edited,
+      ),
+    ).toEqual(edited);
+  });
+
+  it("never rewrites for a new reading against the same range, across directions, or without a range", () => {
+    expect(
+      resolveAlertContextRefresh(open, {
+        title: "Humidity above target",
+        reason:
+          "Humidity is above the configured maximum. Observed 88% (configured target 50–70%).",
+      }),
+    ).toBeNull();
+    expect(
+      resolveAlertContextRefresh(open, {
+        title: "Humidity below target",
+        reason:
+          "Humidity is below the configured minimum. Observed 40% (configured target 50–75%).",
+      }),
+    ).toBeNull();
+    expect(
+      resolveAlertContextRefresh(open, {
+        title: "Humidity above target",
+        reason: "Humidity is above the configured maximum.",
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("growTargetsRetryDelayMs", () => {
   it("backs off and then stops", () => {
     expect(growTargetsRetryDelayMs(0)).toBe(5_000);

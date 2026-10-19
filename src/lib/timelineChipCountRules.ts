@@ -29,6 +29,19 @@ export function timelineDiaryRowsForChipCounts<T extends { id: string }>(rows: r
 }
 
 /**
+ * Rows the stage chips (All stages and each stage) count. Under Measurements
+ * the list includes synthetic sensor receipts, so the stage chips count them
+ * too; under every other event chip they count diary rows only.
+ */
+export function timelineStageChipRows<T extends { id: string }>(
+  eventFilter: string,
+  diaryRows: readonly T[],
+  listRows: readonly T[],
+): readonly T[] {
+  return eventFilter === "measurement" ? listRows : diaryRows;
+}
+
+/**
  * Measurements chip: diary measurement rows, plus each visible synthetic
  * sensor receipt. Other chips do not use this total.
  */

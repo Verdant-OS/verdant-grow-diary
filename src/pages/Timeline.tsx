@@ -136,6 +136,7 @@ import {
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
   timelineMeasurementChipCount,
+  timelineStageChipRows,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
 import {
@@ -1366,21 +1367,28 @@ export default function Timeline() {
     [evidenceFilteredEntries],
   );
 
+  // Under Measurements the list carries sensor receipts, so the stage chips
+  // count them too (timelineStageChipRows); otherwise diary rows only.
+  const stageChipEntries = useMemo(
+    () => timelineStageChipRows(eventFilter, diaryChipEntries, evidenceFilteredEntries),
+    [eventFilter, diaryChipEntries, evidenceFilteredEntries],
+  );
+
   const chipStageCounts = useMemo(() => {
     const m: Record<string, number> = {};
-    diaryChipEntries.forEach((e) => {
+    stageChipEntries.forEach((e) => {
       if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter)) return;
       const stage = resolveTimelineDiaryEntryStage(e);
       if (stage) m[stage] = (m[stage] || 0) + 1;
     });
     return m;
-  }, [diaryChipEntries, eventFilter, diaryPhotoIds]);
+  }, [stageChipEntries, eventFilter, diaryPhotoIds]);
 
   const chipAllStagesCount = useMemo(() => {
-    if (eventFilter === "all") return diaryChipEntries.length;
-    return diaryChipEntries.filter((e) => entryKinds(e, diaryPhotoIds).includes(eventFilter))
+    if (eventFilter === "all") return stageChipEntries.length;
+    return stageChipEntries.filter((e) => entryKinds(e, diaryPhotoIds).includes(eventFilter))
       .length;
-  }, [diaryChipEntries, eventFilter, diaryPhotoIds]);
+  }, [stageChipEntries, eventFilter, diaryPhotoIds]);
 
   const eventCounts = useMemo(() => {
     const stageMatchedDiary =

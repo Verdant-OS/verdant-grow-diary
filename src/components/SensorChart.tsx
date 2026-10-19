@@ -128,9 +128,9 @@ export default function SensorChart({
   >;
   const id = `grad-${metric}`;
   return (
-    <div className="w-full">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <div className="w-full min-w-0 overflow-hidden">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span
             data-testid="sensor-chart-legend"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -166,7 +166,7 @@ export default function SensorChart({
             role="radiogroup"
             aria-label="Chart time range"
             data-testid="sensor-chart-range-selector"
-            className="flex gap-1"
+            className="flex flex-wrap gap-1"
           >
             {SENSOR_CHART_TIME_RANGES.map((r) => {
               const selected = r.value === range;

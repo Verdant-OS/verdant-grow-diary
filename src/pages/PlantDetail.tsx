@@ -482,7 +482,7 @@ export default function PlantDetail() {
     isArchived: plant.isArchived,
   });
   return (
-    <div>
+    <div className="min-w-0 max-w-full">
       <QuickLogV2Fab defaultTargetKey={`plant:${plant.id}`} />
       <Button asChild variant="ghost" size="sm" className="mb-3">
         <Link to={plantsPath()}>

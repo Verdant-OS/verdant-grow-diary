@@ -549,7 +549,7 @@ export default function Dashboard() {
   // Non-landmark container: AppShell already owns the <main> landmark around
   // the route Outlet, so the page root must not nest another.
   return (
-    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+    <div className="min-w-0 max-w-full space-y-4 md:space-y-6" data-testid="dashboard-root">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -1879,9 +1879,9 @@ export default function Dashboard() {
           >
             Recent activity
           </h2>
-          <div className="grid lg:grid-cols-2 gap-4 mt-2">
-            <section className="glass rounded-2xl p-4" aria-label="Recent activity">
-              <div className="flex items-center justify-between mb-3">
+          <div className="grid min-w-0 lg:grid-cols-2 gap-4 mt-2">
+            <section className="min-w-0 glass rounded-2xl p-4" aria-label="Recent activity">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="font-display font-semibold">Recent Activity</h2>
                 <Link
                   to={timelinePath(scopedGrowId)}
@@ -1916,7 +1916,7 @@ export default function Dashboard() {
                         <Badge variant="outline" className="text-[10px] uppercase">
                           {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
                         </Badge>
-                        <span className="text-xs truncate">{item.title}</span>
+                        <span className="min-w-0 text-xs truncate">{item.title}</span>
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(item.ts), {
                             addSuffix: true,
@@ -1938,7 +1938,7 @@ export default function Dashboard() {
             </section>
 
             <section
-              className="glass rounded-2xl p-4"
+              className="min-w-0 glass rounded-2xl p-4"
               aria-label="Pending actions"
               data-testid="dashboard-approval-queue-section"
             >
@@ -1995,7 +1995,7 @@ export default function Dashboard() {
                           <Badge variant="outline" className="text-[10px] uppercase">
                             {a.risk_level} risk
                           </Badge>
-                          <span className="text-xs font-medium truncate">
+                          <span className="min-w-0 text-xs font-medium truncate">
                             {sanitizeActionCopy(a.suggested_change)}
                           </span>
                           <span className="ml-auto text-xs text-muted-foreground">

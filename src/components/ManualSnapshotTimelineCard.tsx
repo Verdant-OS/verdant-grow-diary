@@ -12,7 +12,6 @@
  */
 import { useMemo } from "react";
 import { useNowTick } from "@/hooks/useNowTick";
-import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "@/constants/sensorTiming";
 import { Link } from "@/lib/react-router-compat";
 import { Gauge, AlertTriangle, XCircle, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +29,7 @@ import { buildManualSensorProvenanceLabels } from "@/lib/manualSensorProvenanceR
 import {
   applySnapshotValidationSeverity,
   evaluateManualSensorSnapshotQuality,
+  isManualSnapshotCurrent,
   type ManualSensorSnapshotInput,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
@@ -122,12 +122,10 @@ export default function ManualSnapshotTimelineCard({
   // older ones are historical review (production QA 2026-10-14: a snapshot
   // saved seconds earlier read "Historical review reading").
   const nowMs = useNowTick();
-  const isCurrentWindow = useMemo(() => {
-    const capturedMs = Date.parse(card.capturedAt);
-    if (!Number.isFinite(capturedMs)) return false;
-    const ageMs = nowMs - capturedMs;
-    return ageMs >= 0 && ageMs <= MANUAL_SNAPSHOT_CURRENT_STALE_HOURS * 3_600_000;
-  }, [card.capturedAt, nowMs]);
+  const isCurrentWindow = useMemo(
+    () => isManualSnapshotCurrent(card.capturedAt, nowMs),
+    [card.capturedAt, nowMs],
+  );
 
   const quality = useMemo(() => {
     const fields: Record<string, number> = {};

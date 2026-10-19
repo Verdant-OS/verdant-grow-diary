@@ -472,3 +472,21 @@ export function applySnapshotValidationSeverity(
     canSupportActionSuggestionPreview: false,
   };
 }
+
+/** Tolerated client clock skew for a snapshot stamped slightly in the future. */
+export const MANUAL_SNAPSHOT_FUTURE_SKEW_MS = 5 * 60_000;
+
+/**
+ * True when a manual snapshot is inside the current window: at most
+ * MANUAL_SNAPSHOT_CURRENT_STALE_HOURS old, and no more than five minutes in
+ * the future (client clock skew). An unparseable timestamp is never current.
+ */
+export function isManualSnapshotCurrent(capturedAt: string, nowMs: number): boolean {
+  const capturedMs = Date.parse(capturedAt);
+  if (!Number.isFinite(capturedMs) || !Number.isFinite(nowMs)) return false;
+  const ageMs = nowMs - capturedMs;
+  return (
+    ageMs >= -MANUAL_SNAPSHOT_FUTURE_SKEW_MS &&
+    ageMs <= MANUAL_SNAPSHOT_CURRENT_STALE_HOURS * 3_600_000
+  );
+}

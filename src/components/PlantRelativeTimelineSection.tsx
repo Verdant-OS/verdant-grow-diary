@@ -199,7 +199,7 @@ function TimelineRow({
             {detail.categoryLabel}
           </Badge>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {item.plantDay !== null && (
             <span data-testid="relative-timeline-plant-day">Plant day {item.plantDay}</span>
           )}

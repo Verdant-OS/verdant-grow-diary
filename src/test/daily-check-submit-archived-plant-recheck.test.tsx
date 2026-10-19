@@ -3,6 +3,7 @@
  * diary save. A plant archived in another tab can still sit in the cached
  * usePlants list. The preferred outcome is to block that save.
  */
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,9 +90,30 @@ vi.mock("@/hooks/useScopedGrow", () => ({
     backHref: undefined,
   }),
 }));
-vi.mock("@/components/ManualSensorReadingCard", () => ({
-  default: () => <div />,
-}));
+vi.mock("@/components/ManualSensorReadingCard", () => {
+  function MockManualSensorReadingCard() {
+    const [reviewOpen, setReviewOpen] = useState(false);
+    return (
+      <div data-testid="mock-manual-card">
+        <button type="button" data-testid="manual-reading-save" onClick={() => setReviewOpen(true)}>
+          Review snapshot
+        </button>
+        {reviewOpen ? (
+          <button
+            type="button"
+            data-testid="manual-sensor-review-confirm"
+            onClick={() => {
+              saveInsert("diary_entries");
+            }}
+          >
+            Confirm manual snapshot
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+  return { default: MockManualSensorReadingCard };
+});
 vi.mock("@/components/QuickLog", () => ({
   default: ({ open, onCreated }: { open?: boolean; onCreated?: () => void }) => (
     <div data-testid="mock-quicklog" data-open={open ? "1" : "0"}>
@@ -165,6 +187,16 @@ function plantHref(): string | null {
   if (!plant) return null;
   const link = plant.tagName === "A" ? plant : plant.querySelector("a");
   return link?.getAttribute("href") ?? null;
+}
+
+async function openManualSnapshotReview() {
+  await choosePlant(/Plant P/);
+  fireEvent.click(screen.getByTestId("daily-grow-check-start"));
+  fireEvent.click(screen.getByTestId("daily-grow-check-next"));
+  expect(screen.getByText(/Step 3 · Add Manual Sensor Snapshot/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("manual-reading-save"));
+  expect(await screen.findByTestId("manual-sensor-review-confirm")).toBeInTheDocument();
+  expect(saveInsert).not.toHaveBeenCalled();
 }
 
 async function reachQuickLogSave() {
@@ -245,6 +277,32 @@ describe("Daily Check submit re-checks an archived plant", () => {
     expect(invalidateQueries).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ["plants"] }),
     );
+  });
+
+  it("blocks the sensor confirm after the plant is archived during review", async () => {
+    renderCheck();
+    await openManualSnapshotReview();
+    plantArchive.byId.P = true;
+
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+
+    expect(saveInsert).not.toHaveBeenCalled();
+    expect(await screen.findByText(ARCHIVED_PLANT_MESSAGE)).toBeInTheDocument();
+    expect(saveInsert).not.toHaveBeenCalled();
+  });
+
+  it("still confirms a manual snapshot when the plant is not archived", async () => {
+    renderCheck();
+    await openManualSnapshotReview();
+    plantArchive.byId.P = false;
+
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+
+    await waitFor(() => {
+      expect(saveInsert).toHaveBeenCalledTimes(1);
+    });
+    expect(saveInsert).toHaveBeenCalledWith("diary_entries");
+    expect(screen.queryByText(ARCHIVED_PLANT_MESSAGE)).not.toBeInTheDocument();
   });
 
   it("still saves a plant that is not archived and keeps View Plant", async () => {

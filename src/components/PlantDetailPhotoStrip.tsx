@@ -10,7 +10,10 @@
 import { Link } from "@/lib/react-router-compat";
 import { Image as ImageIcon, Upload, AlertCircle, ClipboardCheck } from "lucide-react";
 
-import { usePlantDetailPhotoStripItems } from "@/hooks/usePlantDetailPhotoStripItems";
+import {
+  usePlantDetailPhotoStripItems,
+  type PlantDetailPhotoStripLookup,
+} from "@/hooks/usePlantDetailPhotoStripItems";
 import type { PhotoDiagnosisLatestReview } from "@/lib/photoDiagnosisNoteRules";
 import { Button } from "@/components/ui/button";
 import { logsPath } from "@/lib/routes";
@@ -31,6 +34,11 @@ interface PlantDetailPhotoStripProps {
    * strip remains read-only and never writes a diary record itself.
    */
   onReviewPhoto?: (target: PlantDetailPhotoReviewTarget) => void;
+  /**
+   * The parent's photo lookup for this plant. When given, the strip renders it
+   * and keeps its own lookup disabled, so one page mounts one diary/photo read.
+   */
+  photoStrip?: PlantDetailPhotoStripLookup;
 }
 
 export interface PlantDetailPhotoReviewTarget {
@@ -46,8 +54,10 @@ export default function PlantDetailPhotoStrip({
   growId,
   onUploadPhoto,
   onReviewPhoto,
+  photoStrip,
 }: PlantDetailPhotoStripProps) {
-  const { diary, display, items, hasPlantContext } = usePlantDetailPhotoStripItems(plantId);
+  const ownLookup = usePlantDetailPhotoStripItems(plantId, { enabled: !photoStrip });
+  const { diary, display, items, hasPlantContext } = photoStrip ?? ownLookup;
   const { isLoading, isPending, isFetching, fetchStatus, isError, refetch, data: rawDiary } = diary;
   const {
     isResolvingPrivatePhotos,

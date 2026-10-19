@@ -119,7 +119,8 @@ export function lightFixturePpfReadiness(light: LightInputs): GrowHelpReadinessR
       missing.push("ppfPerFixture");
     }
   } else {
-    if (!isPresentNumber(light.actualWattsPerFixture) || light.actualWattsPerFixture < 0) {
+    // ppfEstimated requires strictly positive watts; 0 W cannot produce a PPF.
+    if (!isPresentNumber(light.actualWattsPerFixture) || light.actualWattsPerFixture <= 0) {
       missing.push("actualWattsPerFixture");
     }
     if (!isPresentNumber(light.efficacy) || light.efficacy <= 0) {

@@ -134,6 +134,7 @@ import { writeFeedingTypedEvent, type FeedingTypedEventInput } from "@/lib/write
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
 import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
+import { assessQuickLogSensorSnapshotGate } from "@/lib/quickLogSensorSnapshotGateRules";
 import {
   assessLargeWaterAmount,
   confirmLargeWaterAmount,
@@ -217,29 +218,21 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
 import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import {
-  fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
-
-const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+import { typedTemperatureToCelsiusInput } from "@/lib/quickLogTypedTemperatureRules";
 
 /**
  * Convert a grower-typed temperature string (entered in the active
  * preference unit) into a canonical-°C string. Called EXACTLY ONCE per
  * save attempt, at the payload-build seam, on the raw typed value — the
  * built payload (including the locked watering retry submission) already
- * holds °C and is never re-converted. Blank stays blank and non-numeric
- * text passes through unchanged so the existing validators keep rejecting
- * it with their original reasons.
+ * holds °C and is never re-converted. The conversion itself is the shared
+ * pure helper the sensor snapshot gate also uses, so they cannot drift.
  */
 function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
-  if (unit !== "fahrenheit") return raw;
-  const trimmed = raw.trim();
-  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return raw;
-  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+  return typedTemperatureToCelsiusInput(raw, unit);
 }
 
 interface Props {
@@ -933,7 +926,25 @@ function QuickLogV2SheetForOwner({
       wateringForm,
     ],
   );
-  const waterFieldMessage = retryPending ? null : (waterSaveGate?.footerMessage ?? null);
+  // Every other snapshot-bearing action (Feed has no snapshot fields) gets the
+  // same render-time band check; Save still goes through the one payload
+  // builder and quicklog_save_manual, which stay authoritative.
+  const snapshotGate = useMemo(
+    () =>
+      form.action !== "water" && form.action !== "feed"
+        ? assessQuickLogSensorSnapshotGate({
+            temperatureInput: form.temperatureC,
+            humidityInput: form.humidityPct,
+            vpdInput: form.vpdKpa,
+            temperatureUnit: manualEntryUnit,
+          })
+        : null,
+    [form.action, form.temperatureC, form.humidityPct, form.vpdKpa, manualEntryUnit],
+  );
+  const sensorFieldErrors = waterSaveGate?.fields ?? snapshotGate?.fields ?? {};
+  const waterFieldMessage = retryPending
+    ? null
+    : (waterSaveGate?.footerMessage ?? snapshotGate?.footerMessage ?? null);
   const largeWaterAssessment =
     form.action === "water" && !retryPending
       ? assessLargeWaterAmount({
@@ -3517,10 +3528,8 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.temperatureC}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.temperature) || undefined}
-                    aria-describedby={
-                      waterSaveGate?.fields.temperature ? "qlv2-temp-error" : undefined
-                    }
+                    aria-invalid={Boolean(sensorFieldErrors.temperature) || undefined}
+                    aria-describedby={sensorFieldErrors.temperature ? "qlv2-temp-error" : undefined}
                     onChange={(e) => {
                       const next = e.target.value;
                       if (form.temperatureC.trim() === "" && next.trim() !== "") {
@@ -3531,14 +3540,14 @@ function QuickLogV2SheetForOwner({
                       setField("temperatureC", next);
                     }}
                   />
-                  {waterSaveGate?.fields.temperature && !retryPending && (
+                  {sensorFieldErrors.temperature && !retryPending && (
                     <p
                       id="qlv2-temp-error"
                       data-testid="qlv2-temp-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.temperature}
+                      {sensorFieldErrors.temperature}
                     </p>
                   )}
                 </div>
@@ -3549,18 +3558,18 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.humidityPct}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.humidity) || undefined}
-                    aria-describedby={waterSaveGate?.fields.humidity ? "qlv2-rh-error" : undefined}
+                    aria-invalid={Boolean(sensorFieldErrors.humidity) || undefined}
+                    aria-describedby={sensorFieldErrors.humidity ? "qlv2-rh-error" : undefined}
                     onChange={(e) => setField("humidityPct", e.target.value)}
                   />
-                  {waterSaveGate?.fields.humidity && !retryPending && (
+                  {sensorFieldErrors.humidity && !retryPending && (
                     <p
                       id="qlv2-rh-error"
                       data-testid="qlv2-rh-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.humidity}
+                      {sensorFieldErrors.humidity}
                     </p>
                   )}
                 </div>
@@ -3571,18 +3580,18 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.vpdKpa}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.vpd) || undefined}
-                    aria-describedby={waterSaveGate?.fields.vpd ? "qlv2-vpd-error" : undefined}
+                    aria-invalid={Boolean(sensorFieldErrors.vpd) || undefined}
+                    aria-describedby={sensorFieldErrors.vpd ? "qlv2-vpd-error" : undefined}
                     onChange={(e) => setField("vpdKpa", e.target.value)}
                   />
-                  {waterSaveGate?.fields.vpd && !retryPending && (
+                  {sensorFieldErrors.vpd && !retryPending && (
                     <p
                       id="qlv2-vpd-error"
                       data-testid="qlv2-vpd-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.vpd}
+                      {sensorFieldErrors.vpd}
                     </p>
                   )}
                 </div>

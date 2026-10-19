@@ -217,6 +217,29 @@ export function dailyCheckArchiveCheckIsStale(
 export type DailyCheckPlantArchiveQuery = PromiseLike<{ data: unknown; error: unknown }>;
 
 /**
+ * A diary-only test double exposes `select` but cannot read `plants`.
+ * Calling that `select` is not a plant archive read. A real table client
+ * exposes update/delete/upsert, or limit/maybeSingle, before select runs.
+ */
+export function dailyCheckPlantArchiveRelationCanStart(relation: unknown): boolean {
+  if (!relation || typeof relation !== "object") return false;
+  const reader = relation as {
+    limit?: unknown;
+    maybeSingle?: unknown;
+    update?: unknown;
+    delete?: unknown;
+    upsert?: unknown;
+  };
+  return (
+    typeof reader.limit === "function" ||
+    typeof reader.maybeSingle === "function" ||
+    typeof reader.update === "function" ||
+    typeof reader.delete === "function" ||
+    typeof reader.upsert === "function"
+  );
+}
+
+/**
  * Start an archive read without forcing a turn when the client cannot answer.
  * A thrown or non-thenable query is unreadable and does not block. A real
  * query stays pending until its row comes back.

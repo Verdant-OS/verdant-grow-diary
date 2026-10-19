@@ -321,10 +321,11 @@ export default function DailyCheck() {
         if (dailyCheckArchiveCheckIsStale(checkedPlantId, currentPlantId)) return;
         const decision = dailyCheckSubmitBlockForPlantArchive(read);
         if (decision.block) {
+          // Leave the open editor mounted. Clearing the page plant, or
+          // refreshing the active-only list, unmounts Quick Log and the
+          // snapshot review and drops the typed draft. A different dialog
+          // target must not clear the page selection either.
           setArchivedPlantSubmitMessage(decision.message);
-          setPlantChoice("explicit");
-          setPlantId("");
-          await queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
           return;
         }
         if (!button.isConnected) return;
@@ -338,7 +339,7 @@ export default function DailyCheck() {
     };
     document.addEventListener("click", onClickCapture, true);
     return () => document.removeEventListener("click", onClickCapture, true);
-  }, [queryClient]);
+  }, []);
 
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";

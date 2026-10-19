@@ -46,6 +46,7 @@ import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
+  dailyCheckPlantArchiveRelationCanStart,
   startDailyCheckPlantArchiveDecision,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import {
@@ -144,13 +145,16 @@ import {
 } from "@/lib/symptomCheckRules";
 
 function savedPlantArchiveDecision(plantId: string | null | undefined) {
-  return startDailyCheckPlantArchiveDecision(plantId, () =>
-    supabase
-      .from("plants")
+  return startDailyCheckPlantArchiveDecision(plantId, () => {
+    const relation = supabase.from("plants");
+    if (!dailyCheckPlantArchiveRelationCanStart(relation)) {
+      throw new Error("plant archive read unavailable");
+    }
+    return relation
       .select("is_archived")
       .eq("id", plantId ?? "")
-      .limit(1),
-  );
+      .limit(1);
+  });
 }
 
 export interface QuickLogAllActivitiesSectionProps {

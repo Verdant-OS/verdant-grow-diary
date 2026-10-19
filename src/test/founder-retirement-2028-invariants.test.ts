@@ -12,6 +12,13 @@ import {
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
+import {
+  resolvePricingCreditPackPreselect,
+  resolvePricingPlanPreselect,
+} from "@/lib/pricingPlanPreselect";
+import { buildCheckoutPlanReturnPath } from "@/lib/checkoutPlanIntent";
+import { resolveCheckoutCancelRecovery } from "@/lib/checkoutCancelRecoveryRules";
+import { isFounderLifetimeCheckoutSku } from "@/lib/founderLifetimeCheckoutGuard";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
@@ -43,5 +50,49 @@ describe("#2028 Founder page retirement", () => {
     const llms = read("public/llms.txt");
     expect(llms).not.toMatch(/founder lifetime/i);
     expect(llms).not.toMatch(/\]\(\/founder/);
+  });
+
+  describe("an old Founder query cannot reopen checkout", () => {
+    const FOUNDER_QUERY_VALUES = ["founder_lifetime", "founder-lifetime", "FOUNDER_LIFETIME"];
+
+    it("keeps attribution on the redirect but never preselects a Founder plan on /pricing", () => {
+      const decision = resolveHostRouting({
+        pathname: "/founder",
+        search: "?plan=founder_lifetime&utm_source=founder_share",
+      });
+      expect(decision).toMatchObject({
+        status: 308,
+        location: "/pricing?plan=founder_lifetime&utm_source=founder_share",
+      });
+      for (const value of FOUNDER_QUERY_VALUES) {
+        expect(resolvePricingPlanPreselect(value)).toEqual({ plan: null, billing: null });
+        expect(resolvePricingCreditPackPreselect(value)).toBeNull();
+      }
+    });
+
+    it("drops a Founder plan from the signed-in return path", () => {
+      expect(
+        buildCheckoutPlanReturnPath({
+          pathname: "/pricing",
+          search: "?plan=founder_lifetime&utm_source=founder_share",
+          plan: undefined,
+        }),
+      ).toBe("/pricing?utm_source=founder_share");
+    });
+
+    it("does not recover a Founder plan after a cancelled checkout", () => {
+      for (const value of FOUNDER_QUERY_VALUES) {
+        const recovery = resolveCheckoutCancelRecovery(`?plan=${value}`);
+        expect(recovery.planId).toBeNull();
+        expect(recovery.pricingPath).toBe("/pricing");
+      }
+    });
+
+    it("refuses every Founder SKU spelling, including a resumed stored intent", () => {
+      for (const value of [...FOUNDER_QUERY_VALUES, " founder_lifetime "]) {
+        expect(isFounderLifetimeCheckoutSku(value)).toBe(true);
+      }
+      expect(isFounderLifetimeCheckoutSku("pro_annual")).toBe(false);
+    });
   });
 });

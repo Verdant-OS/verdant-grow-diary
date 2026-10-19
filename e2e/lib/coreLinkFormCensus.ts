@@ -421,6 +421,7 @@ export function visibleLinkByHrefSelector(href: string): string {
 const READ_ONLY_EDGE_FUNCTIONS = new Set([
   "environment-summary-report-entitlement",
   "founder-slots-remaining",
+  "live-sensor-entitlement",
   "premium-export-entitlement",
 ]);
 

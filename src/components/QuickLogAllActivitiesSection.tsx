@@ -44,7 +44,6 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
-import { DAILY_CHECK_PLANTS_LIST_QUERY_KEY } from "@/lib/dailyCheckPlantSelectionRules";
 import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
 import {
   createQuickLogPhotoDiaryEntry,
@@ -1035,7 +1034,6 @@ export default function QuickLogAllActivitiesSection({
       if (archiveDecision.block) {
         setErrorReason(archiveDecision.message);
         setErrorForActivity(record.input.activityId);
-        void queryClient?.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
         return;
       }
       const result = await save(record.input);
@@ -1256,7 +1254,6 @@ export default function QuickLogAllActivitiesSection({
       if (archiveDecision.block) {
         setErrorReason(archiveDecision.message);
         setErrorForActivity(selected.id);
-        void queryClient?.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
         return;
       }
       const activityInput = {

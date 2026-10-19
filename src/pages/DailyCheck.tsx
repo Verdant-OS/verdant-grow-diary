@@ -58,7 +58,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
-import { supabase } from "@/integrations/supabase/client";
+import { readDailyCheckPlantArchive } from "@/lib/dailyCheckPlantArchiveReadService";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import {
@@ -81,7 +81,6 @@ import {
 import {
   DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
   DAILY_CHECK_WHAT_COUNTS_HINT,
-  classifyDailyCheckPlantArchiveRead,
   dailyCheckArchiveCheckIsStale,
   dailyCheckSavePlantId,
   dailyCheckSubmitBlockForPlantArchive,
@@ -170,18 +169,6 @@ function submitSaveButton(target: EventTarget | null): HTMLButtonElement | null 
   if (!(button instanceof HTMLButtonElement) || button.disabled) return null;
   if (!isDailyCheckSubmitSaveTestId(button.getAttribute("data-testid"))) return null;
   return button;
-}
-
-async function readDailyCheckPlantArchive(plantId: string): Promise<DailyCheckPlantArchiveRead> {
-  const { data, error } = await supabase
-    .from("plants")
-    .select("is_archived")
-    .eq("id", plantId)
-    .maybeSingle();
-  return classifyDailyCheckPlantArchiveRead({
-    error: Boolean(error),
-    isArchived: error || !data ? null : data.is_archived,
-  });
 }
 
 export default function DailyCheck() {

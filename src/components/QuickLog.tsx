@@ -104,7 +104,6 @@ import { matchesReviewedPublicStarterDraftRevision } from "@/lib/publicQuickLogH
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
-import { DAILY_CHECK_PLANTS_LIST_QUERY_KEY } from "@/lib/dailyCheckPlantSelectionRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   STARTER_WATER_RECOVERY_CLEAR_FAILED,
@@ -1495,7 +1494,6 @@ export default function QuickLog({
       if (archiveDecision.block) {
         setSaveError(archiveDecision.message);
         toast.error(archiveDecision.message);
-        void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
         return;
       }
     }

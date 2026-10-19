@@ -162,6 +162,9 @@ function observationTimestamp(ts: StabilityReadingInput["ts"] | null | undefined
   return null;
 }
 
+/** Fallback sources that may stand in for a current header reading. */
+const CURRENT_FALLBACK_SOURCES: ReadonlySet<string> = new Set(["live", "manual"]);
+
 function isStrictlyNewer(candidate: string | null, reference: string | null): boolean {
   if (candidate === null || reference === null) return false;
   return new Date(candidate).getTime() > new Date(reference).getTime();
@@ -171,7 +174,8 @@ function isStrictlyNewer(candidate: string | null, reference: string | null): bo
  * Header VPD keeps the stored snapshot when that snapshot observed VPD.
  * Otherwise it uses the newest shared series point, with that point's own
  * timestamp and source. Freshness is aged against `nowMs`, and a fallback's
- * persisted stale lineage (`fallback.stale`) always keeps it stale. A series point
+ * persisted stale lineage (`fallback.stale`) always keeps it stale, as does a
+ * source other than live or manual (CSV and other history). A series point
  * can stay eligible for historical stability and still be too old to guide
  * the current header.
  *
@@ -216,9 +220,13 @@ export function resolveDisplayedVpdObservation(args: {
     value: fallbackValue,
     capturedAt,
     source,
+    // Only live and manual observations may read as a current reading. CSV
+    // imports and any other historical source stay usable for stability
+    // history but are never a healthy current-state cue.
     stale:
       capturedAt === null ||
       args.fallback.stale === true ||
+      !CURRENT_FALLBACK_SOURCES.has((source ?? "").trim().toLowerCase()) ||
       isStale(capturedAt, args.nowMs, undefined, source),
   };
 }

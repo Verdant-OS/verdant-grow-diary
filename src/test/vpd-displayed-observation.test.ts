@@ -60,6 +60,31 @@ describe("resolveDisplayedVpdObservation", () => {
     });
   });
 
+  it("never lets a recent CSV or other historical fallback read as current (Codex P1 at 5211eb07)", () => {
+    const freshAt = new Date(NOW_MS - 2 * 60 * 1000).toISOString();
+    const base = {
+      snapshotVpd: null,
+      snapshotCapturedAt: "2026-10-15T11:50:00.000Z",
+      snapshotSource: "live",
+      snapshotStale: false,
+      nowMs: NOW_MS,
+    };
+    for (const source of ["csv", "demo", null]) {
+      const shown = resolveDisplayedVpdObservation({
+        ...base,
+        fallback: { ts: freshAt, vpd: 1.1, source, stale: false },
+      });
+      expect(shown.value).toBe(1.1);
+      expect(shown.stale).toBe(true);
+    }
+    expect(
+      resolveDisplayedVpdObservation({
+        ...base,
+        fallback: { ts: freshAt, vpd: 1.1, source: "live", stale: false },
+      }).stale,
+    ).toBe(false);
+  });
+
   it("keeps a fallback's persisted stale lineage even when it is recent", () => {
     // Codex P1 at 1f55727a: a recent live row that persistence marked stale
     // must never be presented as a current reading.

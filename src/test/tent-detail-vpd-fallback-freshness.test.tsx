@@ -207,6 +207,23 @@ describe("Tent detail fallback VPD freshness", () => {
     expect(screen.queryByTestId("tent-detail-vpd-stale")).toBeNull();
     expect(screen.getByTestId("tent-detail-vpd-source")).toHaveTextContent("Manual reading");
   });
+
+  it("never shows a recent CSV fallback VPD as a healthy current reading (Codex P1 at 5211eb07)", () => {
+    const tempTs = new Date(NOW.getTime() - 20 * 60 * 1000).toISOString();
+    const vpdTs = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+    state.rows = [
+      { metric: "temperature_c", value: 24, ts: tempTs, captured_at: tempTs, source: "live" },
+    ];
+    state.manuals = [{ ...manualVpd(vpdTs), source: "csv" }];
+    mount();
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent(
+      "historical, stale reading",
+    );
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).not.toHaveTextContent(
+      "In Veg VPD range. VPD targets",
+    );
+    expect(screen.getByTestId("tent-detail-vpd-stale")).toBeVisible();
+  });
 });
 
 // Repair of #2148 review findings.

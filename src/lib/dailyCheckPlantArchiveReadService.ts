@@ -10,25 +10,43 @@ type PlantArchiveFilter = {
   maybeSingle?: () => PromiseLike<{ data: unknown; error: unknown }>;
 };
 
+const PLANT_ARCHIVE_READ_FAILED = { data: null, error: { message: "plant archive read failed" } };
+
 /**
  * Re-read `plants.is_archived` for the plant a Quick Log save will write.
  * The read lives here so presenters do not call `supabase.from`.
  *
- * A Postgrest filter can `limit` and `maybeSingle`. A generic chain that
- * only stubs `limit` with an empty list is not a plant-row read; throwing
- * leaves that save allowed. A settled error, empty row, or non-boolean flag
- * still blocks inside the decision helper.
+ * A test stub that cannot `maybeSingle` one row never started a plant read,
+ * so the caller leaves that save allowed. A real filter can both `limit`
+ * and `maybeSingle`. Any throw or rejection from that read resolves as an
+ * error, which the decision helper blocks.
  */
 export function startSavedPlantArchiveDecision(plantId: string | null | undefined) {
   return startDailyCheckPlantArchiveDecision(plantId, () => {
-    const relation = supabase.from("plants");
+    let relation: { select?: (columns: string) => PlantArchiveFilter };
+    try {
+      relation = supabase.from("plants");
+    } catch {
+      return Promise.resolve(PLANT_ARCHIVE_READ_FAILED);
+    }
     if (!dailyCheckPlantArchiveRelationCanStart(relation)) {
       throw new Error("plant archive read unavailable");
     }
-    const filtered = (relation.select("is_archived") as PlantArchiveFilter).eq("id", plantId ?? "");
-    if (typeof filtered.maybeSingle !== "function" || typeof filtered.limit !== "function") {
+    const selected = relation.select?.("is_archived");
+    const filtered = selected?.eq?.("id", plantId ?? "");
+    if (
+      !filtered ||
+      typeof filtered.maybeSingle !== "function" ||
+      typeof filtered.limit !== "function"
+    ) {
       throw new Error("plant archive read unavailable");
     }
-    return filtered.limit(1);
+    const limit = filtered.limit.bind(filtered);
+    return Promise.resolve()
+      .then(() => limit(1))
+      .then(
+        (result) => result ?? PLANT_ARCHIVE_READ_FAILED,
+        () => PLANT_ARCHIVE_READ_FAILED,
+      );
   });
 }

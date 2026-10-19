@@ -117,6 +117,11 @@ function emptyForm(tentId: string) {
   };
 }
 
+/** Physical key identity; falls back to event.key when event.code is unavailable. */
+function physicalKeyId(event: KeyboardEvent): string {
+  return event.code || event.key;
+}
+
 export default function CreatePlantDialog({
   trigger,
   defaultTentId,
@@ -239,6 +244,33 @@ export default function CreatePlantDialog({
   const createInFlightRef = useRef(false);
   const suppressTentSelectSubmitRef = useRef(false);
   const closedAfterSubmitRef = useRef(false);
+  const releaseReopenGuardRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => releaseReopenGuardRef.current?.(), []);
+  // Keys physically held right now, keyed by physical key (event.code): event.key
+  // changes with Shift/dead keys between keydown and keyup and would leave
+  // phantom entries. A save usually resolves after the keyup of the submitting key,
+  // and a guard armed then would swallow the next genuine activation of
+  // New plant (Codex P2 at 885e48b8).
+  const heldKeysRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const held = heldKeysRef.current;
+    const onKeyDown = (event: KeyboardEvent) => {
+      held.add(physicalKeyId(event));
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      held.delete(physicalKeyId(event));
+    };
+    const onBlur = () => held.clear();
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onBlur);
+      held.clear();
+    };
+  }, []);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
   });
@@ -350,11 +382,44 @@ export default function CreatePlantDialog({
     }
   }
 
-  function handleDialogCloseAutoFocus(event: Event) {
-    if (closedAfterSubmitRef.current) {
+  // After a successful create, let Radix return focus to the New plant trigger
+  // (keyboard users keep their place) but keep the reopen guard armed until the
+  // submitting gesture ends: a held or trailing key must not reopen the dialog
+  // empty. It is released once every key held at close is up (in any order),
+  // on the next pointerdown, or on window blur (keyups elsewhere are lost).
+  // When no key is held at close (pointer submit, or a keyboard save that
+  // resolved after keyup), the gesture has already ended, so the guard is
+  // released immediately.
+  function handleDialogCloseAutoFocus(_event: Event) {
+    if (!closedAfterSubmitRef.current) return;
+    releaseReopenGuardRef.current?.();
+    const held = heldKeysRef.current;
+    if (held.size === 0) {
       closedAfterSubmitRef.current = false;
-      event.preventDefault();
+      return;
     }
+    const release = () => {
+      closedAfterSubmitRef.current = false;
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("pointerdown", release, true);
+      window.removeEventListener("blur", release);
+      releaseReopenGuardRef.current = null;
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      held.delete(physicalKeyId(event));
+      if (held.size === 0) release();
+    };
+    releaseReopenGuardRef.current = release;
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("pointerdown", release, true);
+    window.addEventListener("blur", release);
+  }
+
+  // Closing the listbox arms the same-turn submit guard too: reselecting the
+  // already-selected tent does not fire onValueChange (Radix keeps the value).
+  function handleTentSelectOpenChange(next: boolean) {
+    if (!next) armTentSelectSubmitGuard();
+    setTentSelectOpen(next);
   }
 
   function handleOpenChange(next: boolean) {
@@ -927,7 +992,7 @@ export default function CreatePlantDialog({
               </div>
               <Select
                 open={tentSelectOpen}
-                onOpenChange={setTentSelectOpen}
+                onOpenChange={handleTentSelectOpenChange}
                 value={form.tent_id}
                 onValueChange={onTentSelect}
               >

@@ -2,14 +2,60 @@ export type CursorCloudAgentEnvironment = {
   install: string;
 };
 
-const BUN_BOOTSTRAP_MARKER = "command -v bun";
-const BUN_INSTALLER_MARKER = "curl -fsSL https://bun.sh/install | bash";
-const NODE_MODULES_GUARD_MARKER = "if [ ! -d node_modules ]; then";
-const BLOCK_END_MARKER = "\nfi";
-const BUN_FROZEN_INSTALL_MARKER = "bun install --frozen-lockfile";
-const PLAYWRIGHT_INSTALL_MARKER = "bunx playwright install chromium";
-const BUN_PATH_SYMLINK_MARKER = 'sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun';
-const BUNX_PATH_SYMLINK_MARKER = 'sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx';
+// Every contract line is matched as a whole trimmed line, never as a substring,
+// so a comment or a changed condition cannot satisfy it.
+const PIPEFAIL_LINE = "set -euo pipefail";
+const BUN_BOOTSTRAP_CONDITION = "if ! command -v bun >/dev/null 2>&1; then";
+const BUN_INSTALLER_LINE = "curl -fsSL https://bun.sh/install | bash";
+const BUN_PATH_SYMLINK_LINE = 'sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun';
+const BUNX_PATH_SYMLINK_LINE = 'sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx';
+const NODE_MODULES_GUARD_CONDITION = "if [ ! -d node_modules ]; then";
+const BUN_FROZEN_INSTALL_LINE = "bun install --frozen-lockfile";
+const PLAYWRIGHT_INSTALL_LINE = "bunx playwright install chromium";
+const ANY_BUN_INSTALL = /\bbun\s+(?:install|i|add)\b/;
+
+type InstallScriptItem =
+  { kind: "command"; line: string } | { kind: "if"; condition: string; body: string[] };
+
+function toInstallLines(install: string): string[] {
+  return install
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/**
+ * Parses the flat `if <cond>; then … fi` shape the install script uses. Any other
+ * control flow (nesting, else/elif, a stray fi, an unclosed block) is rejected
+ * rather than interpreted, so the contract never guesses what bash would run.
+ */
+function parseInstallScriptItems(lines: readonly string[]): InstallScriptItem[] {
+  const items: InstallScriptItem[] = [];
+  let open: { condition: string; body: string[] } | null = null;
+  for (const line of lines) {
+    const isIf = /^if\b/.test(line);
+    const isFi = line === "fi";
+    const isOtherControl = /^(?:else|elif|then|fi|case|esac|while|until|for|do|done)\b/.test(line);
+    if (isIf) {
+      if (open || !line.endsWith("; then")) {
+        throw new Error("cursor_cloud_agent_install_unsupported_control_flow");
+      }
+      open = { condition: line, body: [] };
+    } else if (isFi) {
+      if (!open) throw new Error("cursor_cloud_agent_install_unsupported_control_flow");
+      items.push({ kind: "if", condition: open.condition, body: open.body });
+      open = null;
+    } else if (isOtherControl) {
+      throw new Error("cursor_cloud_agent_install_unsupported_control_flow");
+    } else if (open) {
+      open.body.push(line);
+    } else {
+      items.push({ kind: "command", line });
+    }
+  }
+  if (open) throw new Error("cursor_cloud_agent_install_unsupported_control_flow");
+  return items;
+}
 
 export function parseCursorCloudAgentEnvironment(raw: string): CursorCloudAgentEnvironment {
   let parsed: unknown;
@@ -34,10 +80,12 @@ export function parseCursorCloudAgentEnvironment(raw: string): CursorCloudAgentE
 
 /**
  * Validates the Cursor Cloud Agent bootstrap install script contract.
- * Fails closed when Bun is not provisioned before the frozen lockfile step.
+ * Fails closed when Bun is not provisioned before the frozen lockfile step, or
+ * when the frozen install can run with node_modules already provisioned.
  */
 export function assertCursorCloudAgentInstallScript(install: string): void {
-  if (!install.includes("set -euo pipefail")) {
+  const lines = toInstallLines(install);
+  if (lines[0] !== PIPEFAIL_LINE) {
     throw new Error("cursor_cloud_agent_install_missing_pipefail");
   }
 
@@ -45,9 +93,15 @@ export function assertCursorCloudAgentInstallScript(install: string): void {
     throw new Error("cursor_cloud_agent_install_uses_npx");
   }
 
-  const bootstrapIndex = install.indexOf(BUN_BOOTSTRAP_MARKER);
-  const frozenIndex = install.indexOf(BUN_FROZEN_INSTALL_MARKER);
-  const playwrightIndex = install.indexOf(PLAYWRIGHT_INSTALL_MARKER);
+  // A comment can carry contract text without running it (for example
+  // `if true; then # if [ ! -d node_modules ]; then`). The script needs none.
+  if (lines.some((line) => line.startsWith("#") || /\s#/.test(line))) {
+    throw new Error("cursor_cloud_agent_install_has_comment");
+  }
+
+  const bootstrapIndex = lines.indexOf(BUN_BOOTSTRAP_CONDITION);
+  const frozenIndex = lines.indexOf(BUN_FROZEN_INSTALL_LINE);
+  const playwrightIndex = lines.indexOf(PLAYWRIGHT_INSTALL_LINE);
 
   if (bootstrapIndex < 0) {
     throw new Error("cursor_cloud_agent_install_missing_bun_bootstrap");
@@ -63,41 +117,58 @@ export function assertCursorCloudAgentInstallScript(install: string): void {
     throw new Error("cursor_cloud_agent_install_bun_bootstrap_after_frozen_lockfile");
   }
 
-  if (!install.includes(BUN_PATH_SYMLINK_MARKER) || !install.includes(BUNX_PATH_SYMLINK_MARKER)) {
+  const symlinkIndex = lines.indexOf(BUN_PATH_SYMLINK_LINE);
+  const bunxSymlinkIndex = lines.indexOf(BUNX_PATH_SYMLINK_LINE);
+  if (symlinkIndex < 0 || bunxSymlinkIndex < 0) {
     throw new Error("cursor_cloud_agent_install_missing_bun_path_symlinks");
   }
-
-  const symlinkIndex = install.indexOf(BUN_PATH_SYMLINK_MARKER);
-  if (symlinkIndex >= frozenIndex) {
+  if (Math.max(symlinkIndex, bunxSymlinkIndex) >= frozenIndex) {
     throw new Error("cursor_cloud_agent_install_symlinks_after_frozen_lockfile");
   }
 
+  const items = parseInstallScriptItems(lines);
+
   // The symlinks point at $HOME/.bun/bin, which exists only when this script ran
   // the Bun installer. A Bun found elsewhere (for example /usr/local/bin) must be
-  // left alone, so both links belong inside the bootstrap block, after the
-  // installer and before the block's closing `fi`.
-  const installerIndex = install.indexOf(BUN_INSTALLER_MARKER);
-  const bootstrapEndIndex = install.indexOf(BLOCK_END_MARKER, bootstrapIndex);
-  const bunxSymlinkIndex = install.indexOf(BUNX_PATH_SYMLINK_MARKER);
+  // left alone, so both links live only inside the bootstrap block, after the
+  // installer.
+  const bootstrapBlocks = items.filter(
+    (item): item is Extract<InstallScriptItem, { kind: "if" }> =>
+      item.kind === "if" && item.condition === BUN_BOOTSTRAP_CONDITION,
+  );
+  const bootstrapBody = bootstrapBlocks.length === 1 ? bootstrapBlocks[0].body : null;
+  const symlinkLines = [BUN_PATH_SYMLINK_LINE, BUNX_PATH_SYMLINK_LINE];
   if (
-    installerIndex < bootstrapIndex ||
-    bootstrapEndIndex < 0 ||
-    Math.min(symlinkIndex, bunxSymlinkIndex) < installerIndex ||
-    Math.max(symlinkIndex, bunxSymlinkIndex) > bootstrapEndIndex
+    !bootstrapBody ||
+    bootstrapBody[0] !== BUN_INSTALLER_LINE ||
+    symlinkLines.some(
+      (link) =>
+        bootstrapBody.indexOf(link) < 1 || lines.filter((line) => line === link).length !== 1,
+    )
   ) {
     throw new Error("cursor_cloud_agent_install_symlinks_outside_bun_bootstrap");
   }
 
   // Pre-provisioned dependencies are used as-is (AGENTS.md, Cursor Cloud notes):
-  // the frozen install runs only when node_modules is absent, so a registry or
-  // network failure cannot abort an otherwise usable build under set -e.
-  const guardIndex = install.indexOf(NODE_MODULES_GUARD_MARKER);
-  const guardEndIndex = guardIndex < 0 ? -1 : install.indexOf(BLOCK_END_MARKER, guardIndex);
-  if (guardIndex < 0 || guardIndex > frozenIndex || guardEndIndex < frozenIndex) {
+  // the frozen install runs only inside an exact `node_modules` absence guard,
+  // and no other dependency install runs anywhere, so a registry or network
+  // failure cannot abort an otherwise usable build under set -e.
+  const guardIndex = items.findIndex(
+    (item) =>
+      item.kind === "if" &&
+      item.condition === NODE_MODULES_GUARD_CONDITION &&
+      item.body.length === 1 &&
+      item.body[0] === BUN_FROZEN_INSTALL_LINE,
+  );
+  const installLineCount = lines.filter((line) => ANY_BUN_INSTALL.test(line)).length;
+  if (guardIndex < 0 || installLineCount !== 1) {
     throw new Error("cursor_cloud_agent_install_frozen_lockfile_not_guarded");
   }
 
-  if (playwrightIndex <= frozenIndex) {
+  const playwrightItemIndex = items.findIndex(
+    (item) => item.kind === "command" && item.line === PLAYWRIGHT_INSTALL_LINE,
+  );
+  if (playwrightItemIndex <= guardIndex) {
     throw new Error("cursor_cloud_agent_install_playwright_before_dependencies");
   }
 }

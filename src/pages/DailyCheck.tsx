@@ -213,6 +213,7 @@ export default function DailyCheck() {
   const [archivedPlantSubmitMessage, setArchivedPlantSubmitMessage] = useState<string | null>(null);
   const selectedPlantIdRef = useRef("");
   const archiveReplayRef = useRef(false);
+  const archivePreflightRef = useRef(false);
 
   const selectablePlants = useMemo(
     () => (urlGrowId ? plants.filter((plant) => plant.grow_id === urlGrowId) : plants),
@@ -305,39 +306,48 @@ export default function DailyCheck() {
       if (!checkedPlantId) return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      // A second click while the read is in flight must not start another
+      // preflight. Replaying both would hit manual-reading-save again after
+      // review is open and save without the confirm button.
+      if (archivePreflightRef.current) return;
+      archivePreflightRef.current = true;
       void (async () => {
-        let read: DailyCheckPlantArchiveRead;
         try {
-          read = await readDailyCheckPlantArchive(checkedPlantId);
-        } catch {
-          read = { status: "unreadable" };
-        }
-        const currentPlantId = dailyCheckSavePlantId({
-          hintedPlantId: button.isConnected
-            ? button.getAttribute("data-daily-check-save-plant")
-            : "",
-          selectedPlantId: selectedPlantIdRef.current,
-        });
-        if (dailyCheckArchiveCheckIsStale(checkedPlantId, currentPlantId)) return;
-        const decision = dailyCheckSubmitBlockForPlantArchive(read);
-        if (decision.block) {
-          // Leave the open editor mounted. Clearing the page plant, or
-          // refreshing the active-only list, unmounts Quick Log and the
-          // snapshot review and drops the typed draft. A different dialog
-          // target must not clear the page selection either.
-          setArchivedPlantSubmitMessage(decision.message);
-          return;
-        }
-        // This click re-read the plant it will save. A pass makes the
-        // earlier archive banner stale, including when the same plant was
-        // restored or only the dialog target changed.
-        setArchivedPlantSubmitMessage(null);
-        if (!button.isConnected) return;
-        archiveReplayRef.current = true;
-        try {
-          button.click();
+          let read: DailyCheckPlantArchiveRead;
+          try {
+            read = await readDailyCheckPlantArchive(checkedPlantId);
+          } catch {
+            read = { status: "unreadable" };
+          }
+          const currentPlantId = dailyCheckSavePlantId({
+            hintedPlantId: button.isConnected
+              ? button.getAttribute("data-daily-check-save-plant")
+              : "",
+            selectedPlantId: selectedPlantIdRef.current,
+          });
+          if (dailyCheckArchiveCheckIsStale(checkedPlantId, currentPlantId)) return;
+          const decision = dailyCheckSubmitBlockForPlantArchive(read);
+          if (decision.block) {
+            // Leave the open editor mounted. Clearing the page plant, or
+            // refreshing the active-only list, unmounts Quick Log and the
+            // snapshot review and drops the typed draft. A different dialog
+            // target must not clear the page selection either.
+            setArchivedPlantSubmitMessage(decision.message);
+            return;
+          }
+          // This click re-read the plant it will save. A pass makes the
+          // earlier archive banner stale, including when the same plant was
+          // restored or only the dialog target changed.
+          setArchivedPlantSubmitMessage(null);
+          if (!button.isConnected) return;
+          archiveReplayRef.current = true;
+          try {
+            button.click();
+          } finally {
+            archiveReplayRef.current = false;
+          }
         } finally {
-          archiveReplayRef.current = false;
+          archivePreflightRef.current = false;
         }
       })();
     };

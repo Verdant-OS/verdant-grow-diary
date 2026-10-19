@@ -135,6 +135,10 @@ function safeSlug(s: string): string {
   );
 }
 
+/** Note for a sensor source printed under its canonical name instead of the stored alias. */
+export const GROW_DIARY_PDF_SOURCE_NORMALIZED_NOTE =
+  "Source label normalized to its canonical name; original source shown separately.";
+
 export function buildGrowDiaryReportFilename(growName: string, now: Date): string {
   return `verdant-grow-diary-${safeSlug(growName)}-${localDate(now)}.pdf`;
 }
@@ -187,15 +191,20 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
     const src = canon.canonical;
     const healthy = HEALTHY_SOURCES.has(src);
     const flagged = FLAGGED_SOURCES.has(src);
+    // An alias such as pi_bridge, user or import is printed under its canonical
+    // name, so the note must not claim the stored label was kept as-is.
+    const relabeled = canon.rawToken !== null && canon.rawToken !== src;
     return {
       label: src,
       count: Math.max(0, Math.floor(s.count) || 0),
       healthy,
       note: flagged
         ? "Flagged — not treated as current healthy data."
-        : healthy
-          ? "Source label preserved from ingest."
-          : "Source label preserved.",
+        : relabeled
+          ? GROW_DIARY_PDF_SOURCE_NORMALIZED_NOTE
+          : healthy
+            ? "Source label preserved from ingest."
+            : "Source label preserved.",
       provenance: canon.provenanceLabel,
     };
   });
@@ -226,7 +235,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
     chartsUnavailableNote,
     isEmpty,
     safetyFooter:
-      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor source labels are preserved; stale/invalid/demo readings are not treated as healthy.",
+      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor sources are shown under their canonical labels, with the original source noted separately when it differs; stale/invalid/demo readings are not treated as healthy.",
   };
 }
 

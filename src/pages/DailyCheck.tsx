@@ -328,6 +328,10 @@ export default function DailyCheck() {
           setArchivedPlantSubmitMessage(decision.message);
           return;
         }
+        // This click re-read the plant it will save. A pass makes the
+        // earlier archive banner stale, including when the same plant was
+        // restored or only the dialog target changed.
+        setArchivedPlantSubmitMessage(null);
         if (!button.isConnected) return;
         archiveReplayRef.current = true;
         try {
@@ -462,6 +466,7 @@ export default function DailyCheck() {
   // real save time, not the moment the React listener happened to run.
   useEffect(() => {
     function onEntry(e: Event) {
+      setArchivedPlantSubmitMessage(null);
       const detail = (
         e as CustomEvent<{ createdAt?: string | number | Date; activityId?: string | null }>
       ).detail;
@@ -480,6 +485,7 @@ export default function DailyCheck() {
       // Manual sensor snapshot success — counts as today's check and
       // shows the same source-aware confirmation card. Drives the
       // `manual` step outcome when the grower is on that step.
+      setArchivedPlantSubmitMessage(null);
       const detail = (e as CustomEvent<{ createdAt?: string | number | Date }>).detail;
       const raw = detail?.createdAt;
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
@@ -561,6 +567,7 @@ export default function DailyCheck() {
   );
 
   function handleSubmitSuccess(method: "note" | "sensor") {
+    setArchivedPlantSubmitMessage(null);
     void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
     toast.success(
       method === "note" ? DAILY_CHECK_NOTE_SAVED_TOAST : DAILY_CHECK_SENSOR_SAVED_TOAST,
@@ -791,6 +798,7 @@ export default function DailyCheck() {
           // that actually named a plant updates the memory; a tent-scoped save
           // leaves the previous record alone rather than clearing it.
           onSaveSuccess={(result) => {
+            setArchivedPlantSubmitMessage(null);
             void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
             if (!result.target.plantId) return;
             rememberRecentQuickLogTarget(

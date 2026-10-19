@@ -8,7 +8,9 @@
  * Read-only. Not used for alerts, actions, AI Doctor, or device control.
  */
 import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
+import { isHumidityValid, isTemperatureValid } from "@/lib/sensorReadingNormalizationRules";
 import { STALE_THRESHOLD_MS, isStale } from "@/lib/sensorSnapshot";
+import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
 import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
@@ -82,25 +84,42 @@ function previewNote(note: string): string {
 const MANUAL_SNAPSHOT_READING_KEYS = ["temp_f", "humidity_percent", "ph", "ec"] as const;
 
 /**
- * Same predicate as deriveLatestManualReadings: a finite number.
- * Strings such as "NaN" or "oops" are not readings.
+ * Temperature and humidity use the same bands as
+ * snapshotFromManualSensorSnapshot. pH and EC have no band there.
+ * Strings and non-finite numbers are not readings.
  */
-function isPresentManualReading(value: unknown): boolean {
-  return typeof value === "number" && Number.isFinite(value);
+function isAcceptedManualReading(
+  key: (typeof MANUAL_SNAPSHOT_READING_KEYS)[number],
+  value: unknown,
+): boolean {
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  switch (key) {
+    case "temp_f":
+      return isTemperatureValid(fahrenheitToCelsius(value));
+    case "humidity_percent":
+      return isHumidityValid(value);
+    case "ph":
+    case "ec":
+      return true;
+    default: {
+      const unexpected: never = key;
+      return unexpected;
+    }
+  }
 }
 
 /**
  * Quick Log stores the reading on details.manual_sensor_snapshot, which
- * collectExtras keeps. This is presence only: temp_f is not copied onto
- * sensorSnapshot.temp, because that field has other consumers and this
- * check does not establish their unit.
+ * collectExtras keeps. temp_f is not copied onto sensorSnapshot.temp.
+ * Temperature and humidity must fall inside the bands
+ * snapshotFromManualSensorSnapshot already uses.
  */
 function hasManualSensorSnapshot(entry: NormalizedDiaryEntry): boolean {
   const raw = entry.details.extras?.manual_sensor_snapshot;
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return false;
   const snap = raw as Record<string, unknown>;
   if (snap.source !== "manual") return false;
-  return MANUAL_SNAPSHOT_READING_KEYS.some((key) => isPresentManualReading(snap[key]));
+  return MANUAL_SNAPSHOT_READING_KEYS.some((key) => isAcceptedManualReading(key, snap[key]));
 }
 
 function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow {

@@ -27,6 +27,18 @@ describe("plants.health drop healthy default", () => {
     expect(sql).not.toMatch(/UPDATE\s+public\.plants/i);
   });
 
+  it("documents both unassessed representations, NULL and the explicit 'unknown', in the column comment", () => {
+    const comment = sql.match(/COMMENT ON COLUMN public\.plants\.health IS\s*'((?:[^']|'')*)';/);
+    expect(comment).not.toBeNull();
+    const text = comment![1];
+    expect(text).toMatch(/healthy \| watch \| issue/);
+    expect(text).toMatch(/\bNULL\b/);
+    expect(text).toMatch(/\bunknown\b/);
+    expect(text).not.toMatch(/NULL means not assessed\./);
+    expect(text).toMatch(/There is no default\./);
+    expect(text).toMatch(/Never derived from sensors or AI\./);
+  });
+
   it("requires 20260924120000 to be delivered first and does not advertise the reverse order", () => {
     const raw = readFileSync(resolve(process.cwd(), MIGRATION), "utf8");
     const thisVersion = MIGRATION.split("/").pop()!.slice(0, 14);

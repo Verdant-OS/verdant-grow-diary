@@ -55,6 +55,6 @@ ALTER TABLE public.plants ALTER COLUMN health DROP NOT NULL;
 ALTER TABLE public.plants ALTER COLUMN health DROP DEFAULT;
 
 COMMENT ON COLUMN public.plants.health IS
-  'Grower-assessed plant health: healthy | watch | issue. NULL means not assessed. There is no default. Never derived from sensors or AI.';
+  'Grower-assessed plant health: healthy | watch | issue. Not assessed is stored as NULL or as the explicit value unknown, which Create and Edit Plant write and existing rows keep. There is no default. Never derived from sensors or AI.';
 
 COMMIT;

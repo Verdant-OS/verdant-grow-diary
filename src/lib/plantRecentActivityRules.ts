@@ -8,7 +8,7 @@
  * Read-only. Not used for alerts, actions, AI Doctor, or device control.
  */
 import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
-import { isStale } from "@/lib/sensorSnapshot";
+import { STALE_THRESHOLD_MS, isStale } from "@/lib/sensorSnapshot";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
 import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
@@ -106,10 +106,11 @@ function hasManualSensorSnapshot(entry: NormalizedDiaryEntry): boolean {
 function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow {
   const snap = entry.details.sensorSnapshot;
   const manualPresent = hasManualSensorSnapshot(entry);
-  // A manual Quick Log snapshot has no `at`. Use the diary entry time so the
-  // existing isStale check can still mark an old reading stale. temp_f stays
-  // off sensorSnapshot.temp.
-  const snapshotAt = snap?.at ?? (manualPresent ? entry.createdAt : null);
+  // A manual Quick Log snapshot has no `at`. Use the diary entry time.
+  // Pass source "manual" so isStale uses the 24-hour window, not the
+  // 15-minute live default. temp_f stays off sensorSnapshot.temp.
+  const manualClock = manualPresent && !snap?.at;
+  const snapshotAt = snap?.at ?? (manualClock ? entry.createdAt : null);
   const hasSnapshot = !!snap || manualPresent;
   const split = splitHardwareReadingsFromNote(entry.note);
   const identity = resolveQuickLogEventIdentity(entry);
@@ -128,7 +129,12 @@ function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow
     hasPhoto: !!entry.photoUrl,
     hasSnapshot,
     snapshotAt,
-    snapshotStale: hasSnapshot && snapshotAt ? isStale(snapshotAt, now) : false,
+    snapshotStale:
+      hasSnapshot && snapshotAt
+        ? manualClock
+          ? isStale(snapshotAt, now, STALE_THRESHOLD_MS, "manual")
+          : isStale(snapshotAt, now)
+        : false,
     // QuickLog does not currently persist a source label on the snapshot.
     // We never invent one — leave null unless future writers store it.
     snapshotSourceLabel: null,

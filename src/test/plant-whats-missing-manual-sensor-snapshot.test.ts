@@ -63,7 +63,7 @@ describe("What's Missing manual sensor snapshot (#2173 S)", () => {
     const [activity] = buildPlantRecentActivity([row], { plantId: PLANT_ID, now: NOW });
     expect(activity?.hasSnapshot).toBe(true);
     expect(activity?.snapshotAt).toBe(CAPTURED_AT);
-    expect(activity?.snapshotStale).toBe(true);
+    expect(activity?.snapshotStale).toBe(false);
 
     const signals = derivePlantDetailActivitySignals(PLANT_ID, false, [row]);
     expect(signals?.hasSensorSnapshot).toBe(true);
@@ -195,6 +195,24 @@ describe("What's Missing manual sensor snapshot (#2173 S)", () => {
     expect(activity?.hasSnapshot).toBe(true);
     expect(activity?.snapshotStale).toBe(true);
     expect(activity?.snapshotAt).toBe(oldAt);
+    expect(activity?.snapshotSourceLabel).toBeNull();
+  });
+
+  it.each([
+    ["inside the 24-hour manual window", 23 * 60 * 60 * 1000, false],
+    ["past the 24-hour manual window", 25 * 60 * 60 * 1000, true],
+  ] as const)("marks a manual snapshot %s", (_label, ageMs, stale) => {
+    const at = new Date(NOW - ageMs).toISOString();
+    const details = buildQuickLogDetails({
+      plantId: PLANT_ID,
+      sensors: { ec: "", temp: "75", humidity: "", ph: "" },
+    });
+    const row = { ...diaryRow(details, `ql-${ageMs}`), created_at: at, occurred_at: at };
+    const [activity] = buildPlantRecentActivity([row], { plantId: PLANT_ID, now: NOW });
+
+    expect(activity?.hasSnapshot).toBe(true);
+    expect(activity?.snapshotAt).toBe(at);
+    expect(activity?.snapshotStale).toBe(stale);
     expect(activity?.snapshotSourceLabel).toBeNull();
   });
 });

@@ -424,6 +424,7 @@ export default function DailyCheck() {
     renderedPlantId,
     resolutionStatus: plantResolution.status,
     routePlantId: routePlant?.id ?? null,
+    selectablePlantIds: selectablePlants.map((plant) => plant.id),
   });
   const postSubmitActions = useMemo(
     () =>

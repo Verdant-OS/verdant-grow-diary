@@ -118,7 +118,7 @@ function AlertRowItem({
       data-severity={row.severity}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span
             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${severityClass(row.severity)}`}
             data-testid="plant-assigned-tent-alert-severity"
@@ -143,7 +143,7 @@ function AlertRowItem({
             {row.status}
           </Badge>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1 min-w-0">
           {doctorHref && creditGate?.intercept ? (
             // Honest interception: this grow's free AI Doctor allotment is
             // spent, so the review section could only show the server-side
@@ -285,8 +285,8 @@ export default function PlantAssignedTentAlertsPanel({
 
   return (
     <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-base flex items-center gap-2">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+        <CardTitle className="text-base flex flex-wrap items-center gap-2 min-w-0">
           <Bell className="h-4 w-4" /> Tent Alerts
           {tentName ? (
             <span className="text-xs font-normal text-muted-foreground">· {tentName}</span>

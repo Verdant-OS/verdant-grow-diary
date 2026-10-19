@@ -479,7 +479,13 @@ export default function AiDoctorSessionsIndex() {
 
   const applySavedView = (id: string) => {
     setSelectedSavedViewId(id);
-    if (!id) return;
+    // "Apply a saved view…" clears the applied view. Keeping its filters would
+    // let the built-in auto-match re-select it, so the select could never
+    // return to the empty option.
+    if (!id) {
+      clearFilters();
+      return;
+    }
     const view = isBuiltInSavedViewId(id)
       ? findBuiltInSavedView(id)
       : findSavedView(savedViews, id);

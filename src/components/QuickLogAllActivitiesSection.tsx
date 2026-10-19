@@ -44,11 +44,8 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
-  dailyCheckPlantArchiveRelationCanStart,
-  startDailyCheckPlantArchiveDecision,
-} from "@/lib/dailyCheckPlantSelectionRules";
+import { DAILY_CHECK_PLANTS_LIST_QUERY_KEY } from "@/lib/dailyCheckPlantSelectionRules";
+import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -145,16 +142,7 @@ import {
 } from "@/lib/symptomCheckRules";
 
 function savedPlantArchiveDecision(plantId: string | null | undefined) {
-  return startDailyCheckPlantArchiveDecision(plantId, () => {
-    const relation = supabase.from("plants");
-    if (!dailyCheckPlantArchiveRelationCanStart(relation)) {
-      throw new Error("plant archive read unavailable");
-    }
-    return relation
-      .select("is_archived")
-      .eq("id", plantId ?? "")
-      .limit(1);
-  });
+  return startSavedPlantArchiveDecision(plantId);
 }
 
 export interface QuickLogAllActivitiesSectionProps {

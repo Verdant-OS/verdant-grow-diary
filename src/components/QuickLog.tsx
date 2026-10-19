@@ -32,6 +32,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
@@ -103,11 +104,7 @@ import { matchesReviewedPublicStarterDraftRevision } from "@/lib/publicQuickLogH
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
-import {
-  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
-  dailyCheckPlantArchiveRelationCanStart,
-  startDailyCheckPlantArchiveDecision,
-} from "@/lib/dailyCheckPlantSelectionRules";
+import { DAILY_CHECK_PLANTS_LIST_QUERY_KEY } from "@/lib/dailyCheckPlantSelectionRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   STARTER_WATER_RECOVERY_CLEAR_FAILED,
@@ -1491,13 +1488,7 @@ export default function QuickLog({
     }
     const saveTarget = Object.freeze({ ...saveTargetResolution.target });
     if (saveTarget.plantId) {
-      const startedArchive = startDailyCheckPlantArchiveDecision(saveTarget.plantId, () => {
-        const relation = supabase.from("plants");
-        if (!dailyCheckPlantArchiveRelationCanStart(relation)) {
-          throw new Error("plant archive read unavailable");
-        }
-        return relation.select("is_archived").eq("id", saveTarget.plantId).limit(1);
-      });
+      const startedArchive = startSavedPlantArchiveDecision(saveTarget.plantId);
       const archiveDecision = startedArchive.ready
         ? startedArchive.decision
         : await startedArchive.pending;

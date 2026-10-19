@@ -19,6 +19,10 @@ import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage"
 import { buildLegacyQuickLogUnifiedPayload } from "@/lib/legacyQuickLogUnifiedSave";
 import { validatePublicQuickLogStarterInput } from "@/lib/publicQuickLogStarterRules";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
+import {
+  buildWateringVolumeDefaults,
+  formatWateringVolumeMlForPrefill,
+} from "@/lib/wateringVolumeDefaultsViewModel";
 
 const TOO_LARGE = /too large \(max 50,000 ml\)/i;
 
@@ -209,5 +213,44 @@ describe("legacy Quick Log validation preview uses the same ceiling and grammar"
         watering,
       ).toBe(true);
     }
+  });
+});
+
+describe("historical watering defaults respect the ceiling", () => {
+  const entry = (id: string, entryAt: string, ml: number) => ({
+    id,
+    grow_id: "grow-1",
+    tent_id: "tent-1",
+    plant_id: "plant-1",
+    event_type: "watering",
+    entry_at: entryAt,
+    note: "",
+    details: { event_type: "watering", watering_amount_ml: ml },
+  });
+
+  it("does not format a volume above 50,000 ml as a prefill", () => {
+    expect(formatWateringVolumeMlForPrefill(50_000)).toBe("50000");
+    expect(formatWateringVolumeMlForPrefill(50_001)).toBeNull();
+    expect(formatWateringVolumeMlForPrefill(1_000_000)).toBeNull();
+  });
+
+  it("skips an oversized latest watering and uses the newest in-range one", () => {
+    const r = buildWateringVolumeDefaults({
+      rawEntries: [
+        entry("old-ok", "2026-06-01T12:00:00.000Z", 800),
+        entry("latest-oversized", "2026-06-10T12:00:00.000Z", 1_000_000),
+      ],
+      plantId: "plant-1",
+    });
+    expect(r.defaults).toEqual({ volumeMl: "800" });
+    expect(r.sourceEntryId).toBe("old-ok");
+  });
+
+  it("offers no default when the only history is oversized", () => {
+    const r = buildWateringVolumeDefaults({
+      rawEntries: [entry("only", "2026-06-10T12:00:00.000Z", 60_000)],
+      plantId: "plant-1",
+    });
+    expect(r.defaults).toBeNull();
   });
 });

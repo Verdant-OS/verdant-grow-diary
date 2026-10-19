@@ -364,6 +364,18 @@ function plantQuickLogCompanion(entryAt: string, linkedGrowEventId: string, id =
   };
 }
 
+/**
+ * The environment sibling a sensor-bearing Plant Quick Log save writes: the
+ * adapter sends an empty VPD and quicklog_save_manual stores it as passed.
+ */
+function plantQuickLogSibling(occurredAt: string, id: string) {
+  return {
+    ...eventRow(occurredAt, id),
+    plant_id: "plant-1",
+    environment_events: { temperature_c: 35, humidity_pct: 20, vpd_kpa: null },
+  };
+}
+
 describe("tent manual snapshots — Codex re-review on #2114", () => {
   function CardsProbe({ limit }: { limit?: number }) {
     const r = useManualSnapshotTimelineCards({ kind: "tent", tentId: TENT_ID }, limit);
@@ -390,7 +402,7 @@ describe("tent manual snapshots — Codex re-review on #2114", () => {
     const at = "2026-10-14T10:00:00.000Z";
     db.byTable = {
       diary_entries: [plantQuickLogCompanion(at, "parent-1")],
-      grow_events: [{ ...eventRow(at, "env-1"), plant_id: "plant-1" }],
+      grow_events: [plantQuickLogSibling(at, "env-1")],
     };
     withProviders(<CardsProbe />);
     expect(await cardIds()).toEqual(["diary-1"]);
@@ -412,7 +424,7 @@ describe("tent manual snapshots — Codex re-review on #2114", () => {
     delete (unlinked.details as Record<string, unknown>).linked_grow_event_id;
     db.byTable = {
       diary_entries: [unlinked],
-      grow_events: [{ ...eventRow(at, "env-3"), plant_id: "plant-1" }],
+      grow_events: [plantQuickLogSibling(at, "env-3")],
     };
     withProviders(<CardsProbe />);
     expect(await cardIds()).toEqual(["diary-1", "env-3"]);
@@ -493,7 +505,7 @@ describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves
       // Mirror records 95°F / 20% (the sibling env-1 stores 35°C / 20%).
       diary_entries: [plantQuickLogCompanion(at, "parent-1")],
       grow_events: [
-        { ...eventRow(at, "env-1"), plant_id: "plant-1" },
+        plantQuickLogSibling(at, "env-1"),
         {
           ...eventRow(at, "env-2"),
           plant_id: "plant-1",
@@ -522,8 +534,8 @@ describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves
 
   it("two identical saves at one instant, each with its mirror, collapse one each", () => {
     const events = parseTentManualEnvironmentEvents([
-      { ...eventRow(at, "env-a"), plant_id: "plant-1" },
-      { ...eventRow(at, "env-b"), plant_id: "plant-1" },
+      plantQuickLogSibling(at, "env-a"),
+      plantQuickLogSibling(at, "env-b"),
     ]);
     const kept = dropEventsMirroredByDiaryRows(events, [
       plantQuickLogCompanion(at, "parent-a", "diary-a"),
@@ -546,7 +558,18 @@ describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves
         plant_id: "plant-1",
         environment_events: { temperature_c: 35, humidity_pct: null, vpd_kpa: null },
       },
-      { ...eventRow(at, "env-b"), plant_id: "plant-1" },
+      plantQuickLogSibling(at, "env-b"),
+    ]);
+    const kept = dropEventsMirroredByDiaryRows(events, [plantQuickLogCompanion(at, "parent-1")]);
+    expect(kept.map((e) => e.id)).toEqual(["env-a"]);
+  });
+
+  it("does not claim a same-reading event that carries VPD the Plant Quick Log never sends", () => {
+    // Codex 4318537251: env-a (lower id) is another manual save with the same
+    // temperature/RH plus VPD; env-b is the mirror's real, VPD-null sibling.
+    const events = parseTentManualEnvironmentEvents([
+      { ...eventRow(at, "env-a"), plant_id: "plant-1" },
+      plantQuickLogSibling(at, "env-b"),
     ]);
     const kept = dropEventsMirroredByDiaryRows(events, [plantQuickLogCompanion(at, "parent-1")]);
     expect(kept.map((e) => e.id)).toEqual(["env-a"]);

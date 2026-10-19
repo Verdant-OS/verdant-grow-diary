@@ -208,6 +208,9 @@ const MIRROR_RH_TOLERANCE = 0.05;
  * least one metric is comparable. A partial overlap is a different save.
  */
 function eventMatchesMirrorValues(ev: TentManualEnvironmentEvent, details: unknown): boolean {
+  // The Plant Quick Log adapter always sends an empty VPD and the RPC stores
+  // it as passed, so a real sibling never carries VPD.
+  if (ev.vpdKpa !== null) return false;
   let compared = 0;
   const tempF = snapshotNumber(details, "temp_f");
   if ((tempF === null) !== (ev.temperatureC === null)) return false;

@@ -11,6 +11,11 @@ import { describe, expect, it } from "vitest";
  * source: it proves the construct exists, it does not verify configuration. The
  * resolved redirect values are pinned in
  * src/test/core-link-form-census-onboarding-redirect.test.ts.
+ *
+ * @source-scan-justified: e2e/core-link-form-census.spec.ts calls `test.describe` from
+ * @playwright/test at module load, and Playwright throws "Playwright Test did not expect
+ * test.describe() to be called here" outside its runner, so Vitest cannot import the spec
+ * to assert the redirected-route branch as a resolved value.
  */
 const CENSUS_SPEC_SOURCE = readFileSync(
   resolve(process.cwd(), "e2e/core-link-form-census.spec.ts"),

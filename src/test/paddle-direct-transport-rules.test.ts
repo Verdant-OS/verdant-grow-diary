@@ -264,7 +264,7 @@ describe("applyDirectModeExternalIdFallback", () => {
     expect(externalIdFromCustomData(null)).toBeUndefined();
   });
 
-  it("fills only absent importMeta and keeps an existing importMeta.externalId", () => {
+  it("prefers custom_data.external_id over a conflicting importMeta.externalId", () => {
     const items = [
       {
         price: { id: "pri_new", custom_data: { external_id: "pro_monthly" }, extra: "keep" },
@@ -301,8 +301,8 @@ describe("applyDirectModeExternalIdFallback", () => {
     expect(result[0]?.note).toBe("item");
     expect(items[0]?.price).not.toHaveProperty("importMeta");
 
-    expect(result[1]?.price.importMeta).toEqual({ externalId: "pro_annual", note: "stay" });
-    expect(result[1]?.product.importMeta).toEqual({ externalId: "verdant_pro" });
+    expect(result[1]?.price.importMeta).toEqual({ externalId: "pro_monthly", note: "stay" });
+    expect(result[1]?.product.importMeta).toEqual({ externalId: "other_product" });
 
     expect(result[2]?.price.importMeta).toEqual({ externalId: "founder_lifetime" });
     expect(result[2]?.product).toEqual({ id: "prod_blank" });

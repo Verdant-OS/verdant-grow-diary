@@ -51,7 +51,7 @@ describe("webhook custom_data.external_id normalization", () => {
 
     expect(direct[0]?.price.importMeta).toEqual({ externalId: "pro_monthly" });
     expect(direct[0]?.product.importMeta).toEqual({ externalId: "verdant_pro" });
-    expect(direct[1]?.price.importMeta).toMatchObject({ externalId: "pro_annual" });
+    expect(direct[1]?.price.importMeta).toMatchObject({ externalId: "pro_monthly" });
     expect(direct[0]?.price.custom_data).toEqual({ external_id: "pro_monthly" });
 
     expect(gateway[0]?.price.importMeta).toBeNull();
@@ -91,8 +91,23 @@ describe("webhook custom_data.external_id normalization", () => {
     expect(priceExternalIdFromResolvedPrice(price, false)).toBeNull();
     expect(
       priceExternalIdFromResolvedPrice(
-        { importMeta: { externalId: "pro_annual" }, customData: { external_id: "pro_monthly" } },
+        {
+          importMeta: { externalId: "9b95b0b8-e10f-441a-862e-1936a6d818ab" },
+          customData: { external_id: "founder_lifetime" },
+        },
         true,
+      ),
+    ).toBe("founder_lifetime");
+    expect(
+      priceExternalIdFromResolvedPrice(
+        { importMeta: { externalId: "9b95b0b8-e10f-441a-862e-1936a6d818ab" } },
+        true,
+      ),
+    ).toBeNull();
+    expect(
+      priceExternalIdFromResolvedPrice(
+        { importMeta: { externalId: "pro_annual" }, customData: { external_id: "pro_monthly" } },
+        false,
       ),
     ).toBe("pro_annual");
   });
@@ -107,6 +122,8 @@ describe("payments-webhook calls the shared normalizer", () => {
   it("passes directMode into item normalization and price external-id resolution", () => {
     expect(WEBHOOK).toContain("normalizeVerifiedPaddleEvent(verified.event, { directMode })");
     expect(WEBHOOK).toContain("priceExternalIdFromResolvedPrice(priced, directMode)");
-    expect(WEBHOOK).toContain("const directMode = isPaddleDirectMode(env)");
+    expect(WEBHOOK).toContain('const directMode = billingMode.mode === "direct"');
+    expect(WEBHOOK).toContain("webhookBillingMode(env, (key) => Deno.env.get(key))");
+    expect(WEBHOOK).toContain("paddle_direct_config_refused");
   });
 });

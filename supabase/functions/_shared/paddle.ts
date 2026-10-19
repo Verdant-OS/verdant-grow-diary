@@ -50,21 +50,30 @@ function transportFor(env: PaddleEnv): Exclude<PaddleTransport, { mode: "refused
   return transport;
 }
 
+function gatewayPaddleClient(env: PaddleEnv): Paddle {
+  const connectionApiKey = getConnectionApiKey(env);
+  const lovableApiKey = getEnv("LOVABLE_API_KEY");
+  return new Paddle(connectionApiKey, {
+    environment: GATEWAY_BASE_URL as unknown as Environment,
+    customHeaders: {
+      "X-Connection-Api-Key": connectionApiKey,
+      "Lovable-API-Key": lovableApiKey,
+    },
+  });
+}
+
+/** Gateway client. Does not consult direct-mode config. */
+export function getGatewayPaddleClient(env: PaddleEnv): Paddle {
+  return gatewayPaddleClient(env);
+}
+
 export function getPaddleClient(env: PaddleEnv): Paddle {
   const transport = transportFor(env);
   const plan = paddleClientPlan(transport);
   if (plan.mode === "direct") {
     return new Paddle(plan.apiKey, { environment: Environment.sandbox });
   } else {
-    const connectionApiKey = getConnectionApiKey(env);
-    const lovableApiKey = getEnv("LOVABLE_API_KEY");
-    return new Paddle(connectionApiKey, {
-      environment: GATEWAY_BASE_URL as unknown as Environment,
-      customHeaders: {
-        "X-Connection-Api-Key": connectionApiKey,
-        "Lovable-API-Key": lovableApiKey,
-      },
-    });
+    return gatewayPaddleClient(env);
   }
 }
 

@@ -5,6 +5,8 @@
  * Both direct vars unset means the Lovable gateway path (production today).
  * If either var is present, direct mode was intended: validate it and refuse
  * rather than falling back to the gateway or to live Paddle.
+ * The webhook is the exception: a direct variable on production must not
+ * take that endpoint down. See webhookBillingMode.
  */
 export const PADDLE_SANDBOX_API_BASE = "https://sandbox-api.paddle.com";
 export const PADDLE_GATEWAY_ORIGIN = "https://connector-gateway.lovable.dev/paddle";
@@ -73,6 +75,27 @@ export function resolvePaddleTransport(
   }
 
   return { mode: "direct", apiKey, base: rawBase };
+}
+
+/**
+ * Webhook transport. Checkout still refuses a bad direct config.
+ * A live notification, a non-sandbox payments environment, or the production
+ * project falls back to the gateway so one direct variable cannot 500 every
+ * event. Any other refusal is a clear reject, not an internal failure.
+ */
+export function webhookBillingMode(
+  env: "sandbox" | "live",
+  getEnv: (name: string) => string | undefined,
+): { mode: "direct" } | { mode: "gateway" } | { mode: "reject"; reason: PaddleDirectRefusal } {
+  const transport = resolvePaddleTransport(env, getEnv);
+  if (transport.mode === "direct" || transport.mode === "gateway") {
+    return { mode: transport.mode };
+  }
+  const onProductionProject = supabaseHostname(getEnv("SUPABASE_URL")) === PRODUCTION_SUPABASE_HOST;
+  if (onProductionProject || env !== "sandbox" || getEnv("PAYMENTS_ENVIRONMENT") !== "sandbox") {
+    return { mode: "gateway" };
+  }
+  return { mode: "reject", reason: transport.reason };
 }
 
 export function directPriceLookupPath(configuredId: string): string {
@@ -230,12 +253,16 @@ export function priceExternalIdFromResolvedPrice(
   price: {
     importMeta?: { externalId?: string } | null;
     customData?: { external_id?: string } | null;
+    custom_data?: { external_id?: string } | null;
   } | null,
   directMode: boolean,
 ): string | null {
-  return (
-    price?.importMeta?.externalId ?? (directMode ? price?.customData?.external_id : null) ?? null
-  );
+  if (directMode) {
+    // custom_data.external_id is the plan slug. import_meta is the source id.
+    return externalIdFromCustomData(price) ?? null;
+  }
+  const imported = price?.importMeta?.externalId;
+  return nonEmptyString(imported) ? imported : null;
 }
 
 export function extractDirectPriceId(body: unknown, requested: string): string | null {
@@ -270,15 +297,55 @@ export function externalIdFromCustomData(resource: unknown): string | undefined 
 
 function resourceWithDirectExternalId(resource: unknown): unknown {
   if (!isRecord(resource)) return resource;
-  const importMeta = resource.importMeta;
-  const existing = isRecord(importMeta) ? importMeta.externalId : undefined;
-  if (nonEmptyString(existing)) return resource;
   const externalId = externalIdFromCustomData(resource);
   if (!externalId) return resource;
-  return { ...resource, importMeta: { externalId } };
+  const importMeta = isRecord(resource.importMeta) ? resource.importMeta : {};
+  if (isRecord(resource.importMeta) && importMeta.externalId === externalId) return resource;
+  return { ...resource, importMeta: { ...importMeta, externalId } };
 }
 
-/** Fill absent price/product importMeta.externalId from custom data. */
+/** Paddle id of a subscription item that has a price and no product external id. */
+export function directPriceOnlyProductId(item: unknown): string | null {
+  if (!isRecord(item) || !isRecord(item.price)) return null;
+  const product = item.product;
+  if (
+    isRecord(product) &&
+    isRecord(product.importMeta) &&
+    nonEmptyString(product.importMeta.externalId)
+  ) {
+    return null;
+  }
+  const raw = item.price.product_id ?? item.price.productId;
+  return nonEmptyString(raw) ? raw : null;
+}
+
+/**
+ * Copy a catalog product's custom_data.external_id onto the item.
+ * A product name or source import id is not a plan product id.
+ */
+export function attachCatalogProductExternalId(item: unknown, catalogProduct: unknown): boolean {
+  if (!isRecord(item) || !directPriceOnlyProductId(item)) return false;
+  const externalId = externalIdFromCustomData(catalogProduct);
+  if (!externalId) return false;
+  const product = isRecord(item.product) ? item.product : {};
+  const importMeta = isRecord(product.importMeta) ? product.importMeta : {};
+  const price = isRecord(item.price) ? item.price : undefined;
+  const productId = price
+    ? nonEmptyString(price.product_id)
+      ? price.product_id
+      : nonEmptyString(price.productId)
+        ? price.productId
+        : undefined
+    : undefined;
+  item.product = {
+    ...product,
+    id: nonEmptyString(product.id) ? product.id : productId,
+    importMeta: { ...importMeta, externalId },
+  };
+  return true;
+}
+
+/** Prefer custom_data.external_id on price and product importMeta. */
 export function applyDirectModeExternalIdFallback<T>(items: T): T {
   if (!Array.isArray(items)) return items;
   return items.map((item) => {

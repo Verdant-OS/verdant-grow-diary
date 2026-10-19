@@ -26,12 +26,15 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   verifyPaymentsWebhookRequest,
   getPaddleClient,
-  isPaddleDirectMode,
+  getGatewayPaddleClient,
   type PaddleEnv,
 } from "../_shared/paddle.ts";
 import {
+  attachCatalogProductExternalId,
+  directPriceOnlyProductId,
   normalizeVerifiedPaddleEvent,
   priceExternalIdFromResolvedPrice,
+  webhookBillingMode,
 } from "../_shared/paddleDirectTransport.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
 import { insertPaddleEventLog } from "./eventLogInsert.ts";
@@ -72,6 +75,25 @@ function mapVerifyFailure(reason: string): { status: number; body: string } {
     return { status: 400, body: reason };
   }
   return { status: 401, body: reason };
+}
+
+function webhookPaddleClient(env: PaddleEnv) {
+  const billing = webhookBillingMode(env, (key) => Deno.env.get(key));
+  if (billing.mode === "direct") return getPaddleClient(env);
+  return getGatewayPaddleClient(env);
+}
+
+async function attachDirectCatalogProducts(event: EventLikeWithId, env: PaddleEnv): Promise<void> {
+  const data = event.data as { items?: unknown[] } | undefined;
+  if (!data || !Array.isArray(data.items)) return;
+  let client: ReturnType<typeof webhookPaddleClient> | null = null;
+  for (const item of data.items) {
+    const productId = directPriceOnlyProductId(item);
+    if (!productId) continue;
+    client ??= webhookPaddleClient(env);
+    const catalog = await client.products.get(productId);
+    attachCatalogProductExternalId(item, catalog);
+  }
 }
 
 function buildDeps(directMode: boolean): Deps {
@@ -155,7 +177,7 @@ function buildDeps(directMode: boolean): Deps {
       // Env-aware: uses sandbox/live credentials via getPaddleClient(env),
       // so no hardcoded pri_... ids are baked into the code.
       try {
-        const paddle = getPaddleClient(env);
+        const paddle = webhookPaddleClient(env);
         const price = await paddle.prices.get(paddlePriceId);
         // Paddle SDK camelCases → importMeta.externalId. Direct sandbox catalog
         // rows carry the plan id on customData instead of import_meta.
@@ -237,7 +259,7 @@ function buildDeps(directMode: boolean): Deps {
       if (error) return { ok: false, error: `candidate_query:${error.message}` };
       const rows = (data ?? []) as Array<{ paddle_subscription_id: string }>;
       if (rows.length === 0) return { ok: true, canceled: 0 };
-      const paddle = getPaddleClient(environment);
+      const paddle = webhookPaddleClient(environment);
       let canceled = 0;
       const failures: string[] = [];
       for (const row of rows) {
@@ -321,13 +343,22 @@ Deno.serve(async (req) => {
     return new Response(body, { status });
   }
 
+  const billingMode = webhookBillingMode(env, (key) => Deno.env.get(key));
+  if (billingMode.mode === "reject") {
+    console.error("payments-webhook direct config refused", { reason: billingMode.reason });
+    return new Response("paddle_direct_config_refused", { status: 503 });
+  }
+  const directMode = billingMode.mode === "direct";
+
   let event!: EventLikeWithId;
   let result!: Awaited<ReturnType<typeof handleVerifiedEvent>>;
   try {
-    const directMode = isPaddleDirectMode(env);
     event = normalizeVerifiedPaddleEvent(verified.event, { directMode }) as EventLikeWithId | null;
     if (!event) {
       return new Response("invalid_event_shape", { status: 400 });
+    }
+    if (directMode) {
+      await attachDirectCatalogProducts(event, env);
     }
     result = await handleVerifiedEvent(
       buildDeps(directMode),

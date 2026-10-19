@@ -32,6 +32,8 @@ export const TONIGHT_TENT_HOME_COPY = {
   lastLogLoading: "Checking last log…",
   log: "Log",
   demo: "Demo",
+  /** Shown under a VPD value derived from temperature and RH, never under a stored reading. */
+  calculatedVpd: "Calculated from temperature and RH",
   chooseHeading: "Choose a tent",
   chooseBody: "Several tents could be tonight's tent. Open the one you want to check.",
 } as const;
@@ -145,6 +147,8 @@ export interface TonightMetricView {
   sourceLabel: string | null;
   capturedAt: string | null;
   ageText: string | null;
+  /** True only for VPD derived from temperature and RH (no stored vpd_kpa). */
+  calculated: boolean;
 }
 
 /** Allowed clock skew before a capture time counts as "in the future". */
@@ -157,6 +161,8 @@ interface Candidate {
   epochMs: number;
   /** 0 = sensor row, 1 = diary-inclusive snapshot; deterministic tie-break. */
   origin: 0 | 1;
+  /** Set only on a VPD candidate derived from temperature and RH. */
+  calculated?: true;
 }
 
 /** Snapshot sources map onto the canonical vocabulary; "unavailable" carries no reading. */
@@ -242,12 +248,36 @@ function calculatedVpdCandidate(
   }
 
   const older = temp.epochMs <= rh.epochMs ? temp : rh;
-  const source = temp.source === rh.source ? temp.source : older.source;
-  const vpd = calculateVpdKpa({ tempC: temp.value, rhPercent: rh.value });
-  if (vpd == null) {
-    return { value: 0, source: "invalid", at: older.at, epochMs: older.epochMs, origin: 0 };
-  }
-  return { value: vpd, source, at: older.at, epochMs: older.epochMs, origin: 0 };
+  const source = compositeVpdSource(temp.source, rh.source);
+  if (source == null) return null;
+  const when = {
+    at: older.at,
+    epochMs: older.epochMs,
+    origin: 0 as const,
+    calculated: true as const,
+  };
+  // RH pinned at 0% or 100% is a stuck sensor, not a reading (same guard as the Environment ribbon).
+  const vpd = rhIsPinned(rh.value)
+    ? null
+    : calculateVpdKpa({ tempC: temp.value, rhPercent: rh.value });
+  if (vpd == null) return { value: 0, source: "invalid", ...when };
+  return { value: vpd, source, ...when };
+}
+
+function rhIsPinned(rh: number): boolean {
+  return rh <= 0 || rh >= 100;
+}
+
+/**
+ * Provenance of a value derived from two inputs. Same source → that source.
+ * A live sensor pair where one input aged out → stale. Any other mix (live with
+ * manual, CSV with demo, …) has no honest single label, so no value is derived.
+ */
+function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | null {
+  if (a === b) return a;
+  const pair = new Set([a, b]);
+  if (pair.has("live") && pair.has("stale")) return "stale";
+  return null;
 }
 
 /**
@@ -323,6 +353,7 @@ export function buildTonightTentMetrics(input: {
         sourceLabel: null,
         capturedAt: null,
         ageText: null,
+        calculated: false,
       };
     }
 
@@ -341,6 +372,7 @@ export function buildTonightTentMetrics(input: {
       sourceLabel: sensorSourceLabel(source),
       capturedAt: best.at,
       ageText: formatAgeLabel(Math.max(0, ageMs)),
+      calculated: best.calculated === true,
     };
   });
 }

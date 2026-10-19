@@ -112,6 +112,14 @@ export default function TonightTentHomeCard(props: {
                 {metric.ageText ? ` · ${metric.ageText}` : ""}
               </dd>
             )}
+            {metric.calculated && (
+              <dd
+                className="mt-0.5 text-[11px] leading-tight text-muted-foreground"
+                data-testid={`tonight-tent-home-metric-${metric.key}-calculated`}
+              >
+                {COPY.calculatedVpd}
+              </dd>
+            )}
           </div>
         ))}
       </dl>

@@ -12,6 +12,37 @@ export const PADDLE_SANDBOX_API_BASE = "https://sandbox-api.paddle.com";
 export const PADDLE_GATEWAY_ORIGIN = "https://connector-gateway.lovable.dev/paddle";
 export const PADDLE_DIRECT_CONFIG_REFUSED = "paddle_direct_config_refused";
 
+/**
+ * Explicit current override of AGENTS.md:72-77 for this module.
+ * Cheeko via Verdante on 2026-10-19 approved keeping this env-gated sandbox
+ * transport (11:11 CDT, amend that section in a later docs PR; 11:23 CDT,
+ * option A execute; 11:30 CDT, "Yes to all three"). Both direct variables
+ * unset stays on the Lovable gateway. This is not a customer or production
+ * environment, and the docs amendment is a separate PR.
+ */
+export const DIRECT_SANDBOX_TRANSPORT_OVERRIDE = {
+  agentsSection: "72-77",
+  approvedBy: "Cheeko via Verdante",
+  approvedOn: "2026-10-19",
+  keepsDirectSandboxTransport: true,
+  productionPathWhenUnset: "gateway",
+} as const;
+
+const PRODUCT_CATALOG_EVENT_TYPES = new Set([
+  "subscription.created",
+  "subscription.updated",
+  "subscription.activated",
+  "subscription.resumed",
+  "subscription.trialing",
+  "subscription.past_due",
+  "subscription.paused",
+]);
+
+/** Cancellation and one-time events do not need a product catalog read. */
+export function directEventEnrichesProductCatalog(eventType: unknown): boolean {
+  return typeof eventType === "string" && PRODUCT_CATALOG_EVENT_TYPES.has(eventType);
+}
+
 const PRODUCTION_SUPABASE_HOST = "knkwiiywfkbqznbxwqfh.supabase.co";
 
 export const PADDLE_DIRECT_REFUSAL_REASONS = [

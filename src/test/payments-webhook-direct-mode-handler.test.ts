@@ -105,26 +105,58 @@ describe("direct-mode payments-webhook handler", () => {
     });
   });
 
-  it("resolves a live price lookup through the gateway when a direct variable is set", async () => {
+  it("resolves a price lookup through the gateway when a direct variable is set on the production project", async () => {
     const h = harness({
       env: {
-        PADDLE_DIRECT_API_KEY: "pdl_live_should_not_take_the_webhook_down",
-        PADDLE_API_BASE: "https://api.paddle.com",
-        PADDLE_LIVE_API_KEY: "fixture-only-live-key",
+        ...DIRECT_SANDBOX_ENV,
+        SUPABASE_URL: PRODUCTION_SUPABASE_URL,
       },
     });
 
-    expect(
-      await h.deliver(transaction(null), {
-        environment: "live",
-        secret: LIVE_WEBHOOK_SECRET,
-      }),
-    ).toEqual({ code: 200, status: "processed:grant_credit_pack" });
+    expect(await h.deliver(transaction(null))).toEqual({
+      code: 200,
+      status: "processed:grant_credit_pack",
+    });
     expect(h.lookups).toEqual(["pri_fixture"]);
     expect(h.rpcCalls[0]).toMatchObject({
       name: "grant_lovable_credit_pack",
-      args: { p_environment: "live", p_credits: 50 },
+      args: { p_environment: "sandbox", p_credits: 50 },
     });
+  });
+
+  it("records a price-only cancellation without calling the product catalog", async () => {
+    const h = harness({
+      env: DIRECT_SANDBOX_ENV,
+      productsGet: () => {
+        throw new Error("catalog unavailable");
+      },
+    });
+    h.subscriptions.set("sub_fixture", {
+      paddle_subscription_id: "sub_fixture",
+      environment: "sandbox",
+      status: "active",
+    });
+
+    expect(
+      await h.deliver(
+        subscription("subscription.canceled", {
+          status: "canceled",
+          current_billing_period: null,
+          scheduled_change: { action: "cancel", effective_at: "2026-11-16T00:00:00Z" },
+          items: [
+            {
+              price: {
+                id: "pri_fixture",
+                product_id: "pro_fixture",
+                custom_data: { external_id: "pro_monthly" },
+              },
+            },
+          ],
+        }),
+      ),
+    ).toEqual({ code: 200, status: "processed:update_subscription" });
+    expect(h.productLookups).toEqual([]);
+    expect(h.subscriptions.get("sub_fixture")).toMatchObject({ status: "canceled" });
   });
 
   it("keeps the gateway path when a direct variable is set on the production project", async () => {

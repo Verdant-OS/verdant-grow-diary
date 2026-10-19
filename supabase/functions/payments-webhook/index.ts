@@ -31,6 +31,7 @@ import {
 } from "../_shared/paddle.ts";
 import {
   attachCatalogProductExternalId,
+  directEventEnrichesProductCatalog,
   directPriceOnlyProductId,
   normalizeVerifiedPaddleEvent,
   priceExternalIdFromResolvedPrice,
@@ -357,7 +358,7 @@ Deno.serve(async (req) => {
     if (!event) {
       return new Response("invalid_event_shape", { status: 400 });
     }
-    if (directMode) {
+    if (directMode && directEventEnrichesProductCatalog(event.eventType)) {
       await attachDirectCatalogProducts(event, env);
     }
     result = await handleVerifiedEvent(

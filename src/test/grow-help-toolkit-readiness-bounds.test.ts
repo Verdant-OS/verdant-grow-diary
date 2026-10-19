@@ -15,6 +15,7 @@ import {
   shouldExportInjectorPlan,
 } from "@/lib/growHelpToolkitReadiness";
 import { createDefaultGrowHelpToolkitState } from "@/lib/growHelpToolkitState";
+import { resolveFixturePpf } from "@/lib/lightCalc";
 
 describe("Grow Help Toolkit readiness boundaries", () => {
   it("returns the generic input message when a calculator throws a non-Error", () => {
@@ -54,7 +55,32 @@ describe("Grow Help Toolkit readiness boundaries", () => {
       actualWattsPerFixture: 0,
       efficacy: 2.7,
     };
-    expect(lightFixturePpfReadiness(watts).ready).toBe(true);
+    // #2074: the PPF estimate requires strictly positive watts, so readiness must too.
+    expect(lightFixturePpfReadiness(watts).ready).toBe(false);
+    expect(lightFixturePpfReadiness(watts).missing).toEqual(["actualWattsPerFixture"]);
+    expect(() =>
+      resolveFixturePpf({
+        mode: "watts",
+        ppfMicromolesPerSecond: 0,
+        actualWatts: 0,
+        efficacyMicromolesPerJoule: 2.7,
+      }),
+    ).toThrow();
+    for (const actualWattsPerFixture of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(lightFixturePpfReadiness({ ...watts, actualWattsPerFixture }).missing).toEqual([
+        "actualWattsPerFixture",
+      ]);
+    }
+    const smallestReady = { ...watts, actualWattsPerFixture: 0.001 };
+    expect(lightFixturePpfReadiness(smallestReady).ready).toBe(true);
+    expect(
+      resolveFixturePpf({
+        mode: "watts",
+        ppfMicromolesPerSecond: 0,
+        actualWatts: smallestReady.actualWattsPerFixture,
+        efficacyMicromolesPerJoule: smallestReady.efficacy,
+      }).ppf,
+    ).toBeGreaterThan(0);
     expect(
       lightFixturePpfReadiness({ ...watts, actualWattsPerFixture: -1, efficacy: 0 }).missing,
     ).toEqual(["actualWattsPerFixture", "efficacy"]);

@@ -155,6 +155,35 @@ describe("#2192 plant create retry and recovery", () => {
     });
   });
 
+  it("clears the previous failure when a retry is stopped before any write", async () => {
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "P0001", message: "invalid plant health: unknown" },
+    });
+
+    await typeNameAndSubmit("QA Test");
+    expect(await within(dialog()).findByRole("alert")).toHaveTextContent(
+      PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
+    );
+
+    // The retry is refused before any insert because no safe save id can be
+    // made. The old rejection no longer describes this attempt.
+    vi.mocked(globalThis.crypto.randomUUID).mockReturnValueOnce(
+      "not-a-uuid" as ReturnType<typeof crypto.randomUUID>,
+    );
+    fireEvent.click(screen.getByTestId("plant-create-submit"));
+
+    const toaster = await screen.findByRole("region", { name: /notifications/i });
+    expect(
+      await within(toaster).findByText(
+        "Verdant could not start a safe plant save. Refresh and try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("create-plant-save-error")).not.toBeInTheDocument();
+    expect(singleMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("create-plant-name")).toHaveValue("QA Test");
+  });
+
   it("keeps the unconfirmed-create notice visible when close is requested", async () => {
     singleMock.mockResolvedValue({
       data: null,

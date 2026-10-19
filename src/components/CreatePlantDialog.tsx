@@ -431,6 +431,9 @@ export default function CreatePlantDialog({
       toast.error("Refresh this page before trying to create another plant.");
       return;
     }
+    // A retry has begun: the last failure no longer describes this attempt,
+    // even when a pre-write check below stops it before any insert.
+    setSaveError(null);
     if (formBlocked || !targetGrowId) {
       if (binding.toastMessage) toast.error(binding.toastMessage);
       else if (suppliedTent.blockSubmit) toast.error(suppliedTent.title);
@@ -470,7 +473,6 @@ export default function CreatePlantDialog({
 
     handoffSuppressedRef.current = false;
     createInFlightRef.current = true;
-    setSaveError(null);
     setBusy(true);
     try {
       const trimmedStrain = form.strain.trim();

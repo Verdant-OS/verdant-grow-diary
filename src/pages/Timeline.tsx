@@ -1860,7 +1860,7 @@ export default function Timeline() {
             data-testid="timeline-stage-progression-scroll"
             tabIndex={0}
           >
-            <ol className="grid min-w-[34rem] grid-cols-6 gap-2">
+            <ol className="grid grid-cols-3 gap-2 sm:min-w-[34rem] sm:grid-cols-6">
               {STAGES.map((s, i) => {
                 const count = stageCounts[s.value] || 0;
                 const isCurrent = i === currentStageIdx;

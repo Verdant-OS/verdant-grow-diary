@@ -84,7 +84,6 @@ import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
-import { DAILY_CHECK_PLANTS_LIST_QUERY_KEY } from "@/lib/dailyCheckPlantSelectionRules";
 import { startSavedPlantArchiveDecision } from "@/lib/dailyCheckPlantArchiveReadService";
 import { useAuth } from "@/store/auth";
 import { usePlants } from "@/hooks/use-plants";
@@ -1790,7 +1789,6 @@ function QuickLogV2SheetForOwner({
         : await startedArchive.pending;
       if (archiveDecision.block) {
         setLocalError(archiveDecision.message);
-        void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
         return;
       }
     }

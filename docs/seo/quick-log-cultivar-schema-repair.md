@@ -101,6 +101,10 @@ silently counted as repaired.
 Existing protected `src/test/static-public-seo-documents.test.ts` explicitly
 expects SoftwareApplication on `/quick-log`. Updating that assertion needs
 specific owner approval. No unlock or edit is performed by this task.
+The protected validator's `validators.SoftwareApplication` warning also treats
+offers and aggregateRating as alternatives and misses an app that has offers
+but no rating/review. Any correction to that check needs its own specific
+approval and new cases covering both missing-field combinations.
 
 ## Implementation and validation
 
@@ -125,7 +129,23 @@ or unlocked. The old shape fails the new domain assertion, not a setup error.
   public Quick Log safety coverage.
 - Scoped ESLint, strict scorer report and diff whitespace check: PASS.
 - Full `bun run typecheck`: PASS (exit 0).
-- Production build/postbuild validators: NOT_MEASURED, pending committed tree.
+- Production `bun run build` at clean implementation commit
+  `5e0d1c10194d9ede3b1ca69ec34b5ad78fe1e911`: PASS (exit 0), including
+  normal prebuild provenance checks and every SEO postbuild validator.
+  JSON-LD validator: 383 blocks across 77 HTML documents, 1 existing Quick Log
+  app-eligibility warning. That warning remains part of the owner handoff.
+- Official-vocabulary domain check on resolved route metadata: 50 JSON-LD
+  blocks / 270 typed nodes, 10 baseline mismatches reduced to 0, 0 unknown
+  properties. All 50 reported trait pairs, ten canonicals, noindex directives,
+  titles and other route-local schema match the captured live baseline.
+  This focused domain check is not a complete validator or Google eligibility
+  verdict. Vocabulary SHA-256:
+  `0a4b8c4c910fc831ec8695196510973390906a5ee34dc6b862dfec4d21a12f74`.
+- Repeated the focused vocabulary audit on actual emitted
+  `dist/cultivars/<slug>/index.html`: 10 HTML files / 70 JSON-LD blocks /
+  350 typed nodes, 0 domain issues / 0 unknown properties / 0 parse errors.
+  Every canonical, noindex directive and trait matches the original live
+  capture; route-local schema equals the tested resolved metadata.
 - Full repository suite: NOT_MEASURED; the bounded related suite is reported.
 - Codex peer review: no findings; not independent acceptance.
 - Hosted final-head CI and Critical Mass acceptance: NOT_MEASURED.
@@ -135,7 +155,16 @@ results `/tmp/verdant-seo-{red,green,focused}.json`. Production SHA-256 before:
 `586bb55fa59c75758bfb094b60690e946d67abddd030e92c3a23c681e5c9a343`;
 after: `c2385da97aceecc820eb898e558ab40eec29af7099a0a873461f91e17f65cc1a`.
 The RED and GREEN receipts use the same test assertions; later Prettier changes
-only format the new test. Exact final-head checks belong in the draft PR body.
+only format the new test. The implementation commit's builder matches the
+after hash above; its test SHA-256 is
+`39c961e377b44693aa86b9270abbc4a8b195ea1b6c11332bdc35dc1d9d35d257`.
+Build log: `/tmp/verdant-seo-build.log`; focused vocabulary report:
+`/tmp/verdant-seo-fixed-domain/REPORT.md` and `validation.json`.
+Emitted-artifact evidence: `/tmp/verdant-seo-built-domain/REPORT.md` and
+`validation.json`, with exact HTML copies and hashes.
+Build-generated `public/version.json` and `src/generated/buildInfo.ts` were
+restored to HEAD after the build; no generated stamp is part of this PR.
+Exact final-head checks belong in the draft PR body.
 
 Status: cultivar source repair verified locally; Quick Log handed to Claude.
 Next owner: Critical Mass for acceptance via normal routing; Claude for the

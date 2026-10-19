@@ -54,15 +54,15 @@ branch: codex/seo-10225273-schema
 base: verdant-grow-diary at c0ce65cb37498d346f46ec5d0a5a6c2f21a8da9a
 checkout: git switch codex/seo-10225273-schema && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2259 (draft opened before implementation)
-head_sha: initial packet bf606435a69ceed5fc65bf7acf4cf7a0273e252f; implementation commit follows; fetch current PR head before resuming
-state: Reproduced on current source and public markup, both deploy/live c0ce65cb3. Shared builder repaired: about contains cultivar Thing plus PropertyValue topics, preserving exact traits and noindex. New regressions RED23 FAIL before edit, GREEN23 PASS; related9 files103 PASS/0 FAIL/0 SKIP. Scoped lint/scorer/diff and full typecheck PASS; build pending a committed tree. Codex peer review no findings, not acceptance. Authenticated GitHub access works.
-next_action: Complete typecheck/build, push the implementation normally, then obtain final-head CI and Critical Mass acceptance. Stay draft.
+head_sha: implementation 5e0d1c10194d9ede3b1ca69ec34b5ad78fe1e911; receipt-only commit follows; fetch current PR head before resuming
+state: Reproduced on current source and public markup, both deploy/live c0ce65cb3. Shared builder repaired: about contains cultivar Thing plus PropertyValue topics, preserving exact traits and noindex. New regressions RED23 FAIL before edit, GREEN23 PASS; related9 files103 PASS/0 FAIL/0 SKIP. Scoped lint/scorer/diff and full typecheck PASS. Clean committed production build/postbuild PASS at 5e0d1c101: 383 JSON-LD blocks77 HTML,1 existing Quick Log warning. Focused official-vocabulary audit:270 typed nodes,10 baseline domain mismatches to0,50 trait pairs preserved; emitted10 HTML/70 blocks/350 typed nodes also0 domain issues. Codex peer review no findings, not acceptance. Authenticated GitHub access works.
+next_action: Verify the normal push and final draft head, then obtain final-head CI and Critical Mass acceptance. Claude takes the precise Quick Log handoff in the evidence doc; no competing implementation. Stay draft.
 files: src/lib/seoStructuredData.ts (only production file); new src/test/cultivar-schema-domain-regression.test.tsx; docs/seo/quick-log-cultivar-schema-repair.md; docs/agents/HANDOFF_LOG.md (only this task block).
 blockers: Quick Log static markup is Claude-owned (#2023/#2028); removing its local SoftwareApplication also requires specific approval for an existing protected static test. Protected validator remains unchanged. Shared fleet registry unavailable; inspected 89 open PRs, no shared-builder overlap observed. No production changes or live-fix proof.
-artifacts: docs/seo/quick-log-cultivar-schema-repair.md; /tmp/verdant-seo-live/ raw HTTP captures; /tmp/verdant-seo-{red,green,focused}.{log,json} (local only).
+artifacts: docs/seo/quick-log-cultivar-schema-repair.md; /tmp/verdant-seo-live/ raw HTTP captures; /tmp/verdant-seo-{red,green,focused}.{log,json}; /tmp/verdant-seo-build.log; /tmp/verdant-seo-fixed-domain/ (local only).
 reviewer_seat: Critical Mass; independent acceptance NOT_MEASURED, Codex is author.
 claimed_by: Codex, 2026-10-19 22:34 UTC (Matthew's direct assignment; no GitHub claim comment because CURRENT_STATE requires separate comment approval)
-last_updated: 2026-10-19 22:39 UTC, by Codex
+last_updated: 2026-10-19 22:41 UTC, by Codex
 limits: No edits to Claude branches, staticPublicSeoDocuments.ts, cultivarDetailSeo.ts, CultivarPage.tsx, sitemap, protected tests/validators, content/long descriptions, secrets, security settings or Search Console. No merge, ready, enqueue, deploy or production writes. Cultivar noindex/quality holds remain.
 ```
 

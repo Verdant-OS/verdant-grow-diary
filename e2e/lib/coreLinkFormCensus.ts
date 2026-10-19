@@ -55,7 +55,6 @@ export const PRIVILEGED_ROUTE_PREFIXES = [
 ] as const;
 
 export const PUBLIC_CORE_CENSUS_ROUTES = [
-  { path: "/welcome", label: "Welcome", fieldPolicy: "audit-only" },
   { path: "/auth", label: "Authentication", fieldPolicy: "fill-safe-fields" },
   { path: "/pricing", label: "Pricing", fieldPolicy: "audit-only" },
   { path: "/founder", label: "Founder Lifetime", fieldPolicy: "fill-safe-fields" },

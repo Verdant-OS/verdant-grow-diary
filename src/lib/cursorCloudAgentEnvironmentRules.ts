@@ -3,6 +3,9 @@ export type CursorCloudAgentEnvironment = {
 };
 
 const BUN_BOOTSTRAP_MARKER = "command -v bun";
+const BUN_INSTALLER_MARKER = "curl -fsSL https://bun.sh/install | bash";
+const NODE_MODULES_GUARD_MARKER = "if [ ! -d node_modules ]; then";
+const BLOCK_END_MARKER = "\nfi";
 const BUN_FROZEN_INSTALL_MARKER = "bun install --frozen-lockfile";
 const PLAYWRIGHT_INSTALL_MARKER = "bunx playwright install chromium";
 const BUN_PATH_SYMLINK_MARKER = 'sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun';
@@ -67,6 +70,31 @@ export function assertCursorCloudAgentInstallScript(install: string): void {
   const symlinkIndex = install.indexOf(BUN_PATH_SYMLINK_MARKER);
   if (symlinkIndex >= frozenIndex) {
     throw new Error("cursor_cloud_agent_install_symlinks_after_frozen_lockfile");
+  }
+
+  // The symlinks point at $HOME/.bun/bin, which exists only when this script ran
+  // the Bun installer. A Bun found elsewhere (for example /usr/local/bin) must be
+  // left alone, so both links belong inside the bootstrap block, after the
+  // installer and before the block's closing `fi`.
+  const installerIndex = install.indexOf(BUN_INSTALLER_MARKER);
+  const bootstrapEndIndex = install.indexOf(BLOCK_END_MARKER, bootstrapIndex);
+  const bunxSymlinkIndex = install.indexOf(BUNX_PATH_SYMLINK_MARKER);
+  if (
+    installerIndex < bootstrapIndex ||
+    bootstrapEndIndex < 0 ||
+    Math.min(symlinkIndex, bunxSymlinkIndex) < installerIndex ||
+    Math.max(symlinkIndex, bunxSymlinkIndex) > bootstrapEndIndex
+  ) {
+    throw new Error("cursor_cloud_agent_install_symlinks_outside_bun_bootstrap");
+  }
+
+  // Pre-provisioned dependencies are used as-is (AGENTS.md, Cursor Cloud notes):
+  // the frozen install runs only when node_modules is absent, so a registry or
+  // network failure cannot abort an otherwise usable build under set -e.
+  const guardIndex = install.indexOf(NODE_MODULES_GUARD_MARKER);
+  const guardEndIndex = guardIndex < 0 ? -1 : install.indexOf(BLOCK_END_MARKER, guardIndex);
+  if (guardIndex < 0 || guardIndex > frozenIndex || guardEndIndex < frozenIndex) {
+    throw new Error("cursor_cloud_agent_install_frozen_lockfile_not_guarded");
   }
 
   if (playwrightIndex <= frozenIndex) {

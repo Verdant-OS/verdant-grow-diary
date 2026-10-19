@@ -22,10 +22,12 @@ describe("assertCursorCloudAgentInstallScript", () => {
     "set -euo pipefail",
     "if ! command -v bun >/dev/null 2>&1; then",
     "  curl -fsSL https://bun.sh/install | bash",
+    '  sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun',
+    '  sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx',
     "fi",
-    'sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun',
-    'sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx',
-    "bun install --frozen-lockfile",
+    "if [ ! -d node_modules ]; then",
+    "  bun install --frozen-lockfile",
+    "fi",
     "bunx playwright install chromium",
   ].join("\n");
 
@@ -40,6 +42,35 @@ describe("assertCursorCloudAgentInstallScript", () => {
     );
     expect(() => assertCursorCloudAgentInstallScript(reversed)).toThrow(
       "cursor_cloud_agent_install_bun_bootstrap_after_frozen_lockfile",
+    );
+  });
+
+  it("rejects symlinks created outside the Bun bootstrap block (Bun installed elsewhere)", () => {
+    const unconditional = [
+      "set -euo pipefail",
+      "if ! command -v bun >/dev/null 2>&1; then",
+      "  curl -fsSL https://bun.sh/install | bash",
+      "fi",
+      'sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun',
+      'sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx',
+      "if [ ! -d node_modules ]; then",
+      "  bun install --frozen-lockfile",
+      "fi",
+      "bunx playwright install chromium",
+    ].join("\n");
+    expect(() => assertCursorCloudAgentInstallScript(unconditional)).toThrow(
+      "cursor_cloud_agent_install_symlinks_outside_bun_bootstrap",
+    );
+  });
+
+  it("rejects an unguarded frozen install that reinstalls provisioned node_modules", () => {
+    const unguarded = validInstall.replace(
+      "if [ ! -d node_modules ]; then\n  bun install --frozen-lockfile\nfi",
+      "bun install --frozen-lockfile",
+    );
+    expect(unguarded).not.toContain("node_modules");
+    expect(() => assertCursorCloudAgentInstallScript(unguarded)).toThrow(
+      "cursor_cloud_agent_install_frozen_lockfile_not_guarded",
     );
   });
 

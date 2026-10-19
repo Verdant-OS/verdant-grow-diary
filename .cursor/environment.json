@@ -1,3 +1,3 @@
 {
-  "install": "set -euo pipefail\nif ! command -v bun >/dev/null 2>&1; then\n  curl -fsSL https://bun.sh/install | bash\nfi\nsudo ln -sfn \"$HOME/.bun/bin/bun\" /usr/local/bin/bun\nsudo ln -sfn \"$HOME/.bun/bin/bunx\" /usr/local/bin/bunx\nbun install --frozen-lockfile\nbunx playwright install chromium\n"
+  "install": "set -euo pipefail\nif ! command -v bun >/dev/null 2>&1; then\n  curl -fsSL https://bun.sh/install | bash\n  sudo ln -sfn \"$HOME/.bun/bin/bun\" /usr/local/bin/bun\n  sudo ln -sfn \"$HOME/.bun/bin/bunx\" /usr/local/bin/bunx\nfi\nif [ ! -d node_modules ]; then\n  bun install --frozen-lockfile\nfi\nbunx playwright install chromium\n"
 }

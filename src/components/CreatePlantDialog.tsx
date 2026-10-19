@@ -237,6 +237,8 @@ export default function CreatePlantDialog({
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
+  const suppressTentSelectSubmitRef = useRef(false);
+  const closedAfterSubmitRef = useRef(false);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
   });
@@ -333,8 +335,30 @@ export default function CreatePlantDialog({
     !canWriteCreateGrowId(targetGrowId) ||
     tentBlocksWrite;
 
+  function armTentSelectSubmitGuard() {
+    suppressTentSelectSubmitRef.current = true;
+    queueMicrotask(() => {
+      suppressTentSelectSubmitRef.current = false;
+    });
+  }
+
+  function stopSelectEnterKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Enter") {
+      armTentSelectSubmitGuard();
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  function handleDialogCloseAutoFocus(event: Event) {
+    if (closedAfterSubmitRef.current) {
+      closedAfterSubmitRef.current = false;
+      event.preventDefault();
+    }
+  }
+
   function handleOpenChange(next: boolean) {
-    if (next && createOutcomeUnknown) return;
+    if (next && (createOutcomeUnknown || closedAfterSubmitRef.current)) return;
     // The insert may already be durable, so closing cannot cancel it. Let the
     // grower dismiss a stalled refresh, but suppress the later Quick Log
     // handoff so closing never causes a delayed navigation surprise.
@@ -351,6 +375,7 @@ export default function CreatePlantDialog({
   }
 
   function onTentSelect(v: string) {
+    armTentSelectSubmitGuard();
     if (v === "none") {
       setForm((current) => ({ ...current, tent_id: "none" }));
       setExplicitCompatiblePick(false);
@@ -383,7 +408,8 @@ export default function CreatePlantDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || createInFlightRef.current) return;
+    if (busy || createInFlightRef.current || tentSelectOpen || suppressTentSelectSubmitRef.current)
+      return;
     if (!hasTrimmedRequiredIdentity(form.name)) return;
     if (!user) {
       toast.error("Not signed in");
@@ -569,6 +595,8 @@ export default function CreatePlantDialog({
       setNestedTents([]);
       setPendingNestedTentId(null);
       setNestedTentCreatorMounted(false);
+      setTentSelectOpen(false);
+      closedAfterSubmitRef.current = true;
       setOpen(false);
       if (onCreated) onCreated(confirmed.row);
     } finally {
@@ -581,6 +609,7 @@ export default function CreatePlantDialog({
       <DialogTrigger asChild>
         {trigger ?? (
           <Button
+            type="button"
             size="sm"
             className="gradient-leaf text-primary-foreground gap-1"
             disabled={createOutcomeUnknown}
@@ -589,7 +618,10 @@ export default function CreatePlantDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]">
+      <DialogContent
+        className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]"
+        onCloseAutoFocus={handleDialogCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle className="font-display">New plant</DialogTitle>
         </DialogHeader>
@@ -827,10 +859,10 @@ export default function CreatePlantDialog({
             <div>
               <Label>Stage</Label>
               <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                <SelectTrigger>
+                <SelectTrigger type="button">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                   {STAGES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
@@ -845,10 +877,10 @@ export default function CreatePlantDialog({
                 value={form.plant_type}
                 onValueChange={(v) => setForm({ ...form, plant_type: v })}
               >
-                <SelectTrigger data-testid="create-plant-type-select">
+                <SelectTrigger type="button" data-testid="create-plant-type-select">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                   <SelectItem value="unknown">Not sure</SelectItem>
                   <SelectItem value="autoflower">Autoflower</SelectItem>
                   <SelectItem value="photoperiod">Photoperiod</SelectItem>
@@ -899,10 +931,10 @@ export default function CreatePlantDialog({
                 value={form.tent_id}
                 onValueChange={onTentSelect}
               >
-                <SelectTrigger data-testid="create-plant-tent-select">
+                <SelectTrigger type="button" data-testid="create-plant-tent-select">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                   {plantCreateAllowsTentless({
                     suppliedTentId: defaultTentId,
                     requireTent,
@@ -944,10 +976,10 @@ export default function CreatePlantDialog({
                       setForm({ ...form, health: plantHealthFromSelectValue(v) })
                     }
                   >
-                    <SelectTrigger data-testid="create-plant-health">
+                    <SelectTrigger type="button" data-testid="create-plant-health">
                       <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                       <SelectItem value={PLANT_HEALTH_NOT_ASSESSED_OPTION}>
                         {PLANT_HEALTH_NOT_ASSESSED_LABEL}
                       </SelectItem>
@@ -971,6 +1003,7 @@ export default function CreatePlantDialog({
               </div>
             </details>
             <Button
+              type="submit"
               disabled={
                 busy ||
                 formBlocked ||

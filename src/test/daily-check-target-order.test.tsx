@@ -588,9 +588,13 @@ describe("DailyCheck target selector order and exact-target truth", () => {
       expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
     );
     for (const [props] of quickLogRenderMock.mock.calls) {
-      expect(props).toMatchObject({ open: true });
       expect(props.prefill).toMatchObject({ plantId: "p-assigned", tentId: "t2" });
     }
+    // Renders before the commit still show the committed sensor state (closed);
+    // once open, QuickLog never closes again.
+    const opens = quickLogRenderMock.mock.calls.map(([props]) => props.open);
+    expect(opens.at(-1)).toBe(true);
+    expect(opens.slice(opens.indexOf(true))).not.toContain(false);
   });
 
   it("keeps local plant selection working while route identity is unchanged", async () => {

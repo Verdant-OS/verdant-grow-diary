@@ -6,7 +6,7 @@
  * mapper never derives a watering schedule, target, diagnosis, or dryback.
  */
 
-import { resolveEcPpm500Pair } from "./ecPpm500PairRules";
+import { isExplicitNegativeDecimal, resolveEcPpm500Pair } from "./ecPpm500PairRules";
 import {
   ROOT_ZONE_DRAINAGE_OBSERVATIONS,
   ROOT_ZONE_MANUAL_OBSERVATION_DETAILS_KEY,
@@ -19,6 +19,7 @@ import {
   type RootZonePotWeightFeel,
 } from "./rootZoneManualObservationRules";
 import { isHumidityValid, isTemperatureValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { assessWaterVolumeText } from "./quickLogWaterVolumeWarningRules";
 import type {
   QuickLogWateringManualSnapshot,
   WateringTypedEventInput,
@@ -82,6 +83,8 @@ export type WateringFormFailureReason =
   | "volume_ml:invalid"
   | "numeric:invalid"
   | "numeric:out_of_range"
+  | "ec:negative"
+  | "runoff_ec:negative"
   | "ec_ppm:mismatch"
   | "manual_observation:invalid"
   | "observed_at:invalid"
@@ -135,7 +138,9 @@ function metricInRange(value: number | null, min: number, max: number): boolean 
 }
 
 export function isWateringFormPristine(form: QuickLogWateringFormState): boolean {
-  return Object.values(form).every((value) => value === "");
+  return (Object.keys(form) as (keyof QuickLogWateringFormState)[]).every(
+    (key) => form[key] === "",
+  );
 }
 
 export function buildWateringFormPayload(
@@ -149,12 +154,11 @@ export function buildWateringFormPayload(
     return { ok: false, reason: "idempotency_key:invalid" };
   }
 
-  const parsedVolume = parseOptionalNumber(input.form.volumeMl);
-  if (!parsedVolume.ok) return { ok: false, reason: "volume_ml:invalid" };
-  if (parsedVolume.value === null) return { ok: false, reason: "volume_ml:missing" };
-  if (parsedVolume.value <= 0 || parsedVolume.value > 1_000_000) {
-    return { ok: false, reason: "volume_ml:invalid" };
-  }
+  // Same bounded, exact classification as the large-water warning, so an entry
+  // the warning cannot evaluate, or one above 1,000,000 ml, never saves.
+  const parsedVolume = assessWaterVolumeText(input.form.volumeMl);
+  if (parsedVolume.status === "missing") return { ok: false, reason: "volume_ml:missing" };
+  if (parsedVolume.status === "invalid") return { ok: false, reason: "volume_ml:invalid" };
 
   const optionalFields = [
     ["ph", input.form.ph, 0, 14],
@@ -179,6 +183,12 @@ export function buildWateringFormPayload(
     [input.form.runoffEc, input.form.runoffPpm, "runoff_ec"],
   ] as const;
   for (const [ec, ppm, payloadKey] of ecPairs) {
+    if (isExplicitNegativeDecimal(ec)) {
+      return {
+        ok: false,
+        reason: payloadKey === "ec_ms_cm" ? "ec:negative" : "runoff_ec:negative",
+      };
+    }
     const resolved = resolveEcPpm500Pair(ec, ppm);
     if (resolved.status === "invalid") return { ok: false, reason: "numeric:invalid" };
     if (resolved.status === "mismatch") return { ok: false, reason: "ec_ppm:mismatch" };
@@ -250,7 +260,7 @@ export function buildWateringFormPayload(
     plant_id: input.plantId ?? null,
     occurred_at: occurredAt,
     note: note === "" ? null : note,
-    volume_ml: parsedVolume.value,
+    volume_ml: parsedVolume.volumeMl,
     ...parsedMetrics,
     sensor_snapshot:
       hasSensorMetrics && occurredAt
@@ -278,6 +288,10 @@ export function wateringFormReasonToHelper(reason: WateringFormFailureReason | s
       return "EC and PPM must match the 500 scale. Re-enter either value.";
     case "numeric:invalid":
       return "Optional measurements must be plain numbers or left blank.";
+    case "ec:negative":
+      return "EC can't be negative.";
+    case "runoff_ec:negative":
+      return "Runoff EC can't be negative.";
     case "numeric:out_of_range":
       return "One or more measurements are outside Verdant's accepted sensor bands.";
     case "manual_observation:invalid":

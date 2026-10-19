@@ -214,8 +214,44 @@ export function dailyCheckArchiveCheckIsStale(
  * One plant-row read. A thrown client, a missing row, or a row without a
  * boolean archive flag is unreadable and does not block the save.
  */
+export type DailyCheckPlantArchiveQuery = PromiseLike<{ data: unknown; error: unknown }>;
+
+/**
+ * Start an archive read without forcing a turn when the client cannot answer.
+ * A thrown or non-thenable query is unreadable and does not block. A real
+ * query stays pending until its row comes back.
+ */
+export function startDailyCheckPlantArchiveDecision(
+  plantId: string | null | undefined,
+  startQuery: () => DailyCheckPlantArchiveQuery,
+):
+  | {
+      readonly ready: true;
+      readonly decision: ReturnType<typeof dailyCheckSubmitBlockForPlantArchive>;
+    }
+  | {
+      readonly ready: false;
+      readonly pending: Promise<ReturnType<typeof dailyCheckSubmitBlockForPlantArchive>>;
+    } {
+  if (!plantId) return { ready: true, decision: { block: false } };
+  try {
+    const pending = startQuery();
+    if (pending == null || typeof (pending as { then?: unknown }).then !== "function") {
+      return { ready: true, decision: { block: false } };
+    }
+    return {
+      ready: false,
+      pending: readDailyCheckPlantArchiveFromLimit(() => pending).then(
+        dailyCheckSubmitBlockForPlantArchive,
+      ),
+    };
+  } catch {
+    return { ready: true, decision: { block: false } };
+  }
+}
+
 export async function readDailyCheckPlantArchiveFromLimit(
-  query: () => PromiseLike<{ data: unknown; error: unknown }>,
+  query: () => DailyCheckPlantArchiveQuery,
 ): Promise<DailyCheckPlantArchiveRead> {
   try {
     const { data, error } = await query();

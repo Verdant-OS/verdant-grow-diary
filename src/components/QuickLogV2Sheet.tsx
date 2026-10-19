@@ -86,8 +86,7 @@ import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
-  dailyCheckSubmitBlockForPlantArchive,
-  readDailyCheckPlantArchiveFromLimit,
+  startDailyCheckPlantArchiveDecision,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { useAuth } from "@/store/auth";
 import { usePlants } from "@/hooks/use-plants";
@@ -1787,11 +1786,12 @@ function QuickLogV2SheetForOwner({
     }
     if (resolved.plantId) {
       const archivedPlantId = resolved.plantId;
-      const archiveDecision = dailyCheckSubmitBlockForPlantArchive(
-        await readDailyCheckPlantArchiveFromLimit(() =>
-          supabase.from("plants").select("is_archived").eq("id", archivedPlantId).limit(1),
-        ),
+      const startedArchive = startDailyCheckPlantArchiveDecision(archivedPlantId, () =>
+        supabase.from("plants").select("is_archived").eq("id", archivedPlantId).limit(1),
       );
+      const archiveDecision = startedArchive.ready
+        ? startedArchive.decision
+        : await startedArchive.pending;
       if (archiveDecision.block) {
         setLocalError(archiveDecision.message);
         void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });

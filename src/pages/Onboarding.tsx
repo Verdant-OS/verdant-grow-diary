@@ -28,6 +28,8 @@ import {
 } from "@/lib/startScreenPreferences";
 import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
 import { Sprout } from "lucide-react";
+
+export const ONBOARDING_GROWS_LOADING_COPY = "Loading your grows…";
 import {
   buildStarterQuickLogPrefill,
   STARTER_SETUP_BUTTON_LABEL,
@@ -80,8 +82,20 @@ export default function Onboarding() {
     headingRef.current?.focus();
   }, []);
 
-  if (loading || growsLoading) return null;
+  if (loading) return null;
+  if (growsLoading) {
+    return (
+      <div
+        className="min-h-dvh flex items-center justify-center px-6"
+        role="status"
+        data-testid="onboarding-grows-loading"
+      >
+        <p className="text-sm text-muted-foreground">{ONBOARDING_GROWS_LOADING_COPY}</p>
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/auth" replace />;
+  if (grows.length >= 1) return <Navigate to={routeForStartScreen("dashboard")} replace />;
 
   function go(c: StartScreenChoice, save: boolean) {
     if (save && user) setStartScreenChoice(user.id, c);

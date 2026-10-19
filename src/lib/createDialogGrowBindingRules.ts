@@ -35,6 +35,16 @@ function trimId(value: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
+/** Postgres uuid equality is case-insensitive. This path matches that. */
+export function createGrowIdsEqual(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const a = trimId(left)?.toLowerCase() ?? null;
+  const b = trimId(right)?.toLowerCase() ?? null;
+  return a !== null && a === b;
+}
+
 const UUID_LIKE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function exactlyOneById<T extends { id: string }>(id: string, rows: readonly T[]): T | null {
@@ -386,7 +396,7 @@ export function evaluateSuppliedTentBinding(input: {
     };
   }
 
-  if (tentGrow !== target) {
+  if (!createGrowIdsEqual(tentGrow, target)) {
     return {
       kind: "mismatch",
       tentId: supplied,
@@ -527,7 +537,7 @@ export function evaluateTentGrowCompatibility(input: {
     };
   }
 
-  if (tentGrow !== target) {
+  if (!createGrowIdsEqual(tentGrow, target)) {
     return {
       kind: "mismatch",
       compatible: false,
@@ -578,6 +588,46 @@ export function resolveInitialPlantTentId(input: {
   });
 
   return supplied.kind === "ready" ? tentId : "none";
+}
+
+export interface CreatePlantTentOption {
+  id: string;
+  grow_id?: string | null;
+}
+
+/**
+ * Tents offered in New plant. Grow ids are compared case-insensitively:
+ * Postgres uuid equality is case-insensitive, and the Plants page loads tents
+ * with that equality, so a case-only mismatch must not drop a tent the page
+ * already shows. Duplicate ids stay omitted.
+ */
+export function selectCreatePlantTents<T extends CreatePlantTentOption>(
+  rows: readonly T[],
+  targetGrowId: string | null | undefined,
+): T[] {
+  const target = trimId(targetGrowId)?.toLowerCase() ?? null;
+  if (!target) return [];
+  return rows.filter((tent) => {
+    const id = tent.id.trim().toLowerCase();
+    if (!id) return false;
+    const grow = trimId(tent.grow_id)?.toLowerCase() ?? null;
+    if (grow !== target) return false;
+    return rows.filter((candidate) => candidate.id.trim().toLowerCase() === id).length === 1;
+  });
+}
+
+/**
+ * "No tents yet" is a claim that the settled read found zero tents for this
+ * setup. An in-flight or failed read, or a dropdown that already lists a tent,
+ * must not say the grower still has to create one.
+ */
+export function plantCreateNoTentsHintVisible(input: {
+  selectableTentCount: number;
+  tentsSettled: boolean;
+  tentsReadFailed: boolean;
+}): boolean {
+  if (!input.tentsSettled || input.tentsReadFailed) return false;
+  return input.selectableTentCount === 0;
 }
 
 export function plantCreateAllowsTentless(input: {

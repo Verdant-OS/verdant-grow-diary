@@ -28,6 +28,7 @@ import {
 } from "@/lib/manualSensorSnapshotChangeContextRules";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 /** Deterministic display order for the per-snapshot metric chips. */
 export const HISTORY_METRIC_DISPLAY_ORDER: ChangeContextMetric[] = [
@@ -88,10 +89,17 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   reservoir_ph: "pH",
 };
 
-function formatMetricChip(key: ChangeContextMetric, value: number): HistoryMetricChip | null {
+function formatMetricChip(
+  key: ChangeContextMetric,
+  value: number,
+  temperatureUnit: TemperatureUnitPreference = "fahrenheit",
+): HistoryMetricChip | null {
   if (!Number.isFinite(value)) return null;
   switch (key) {
     case "temperature_c": {
+      if (temperatureUnit === "celsius") {
+        return { key, label: "Temp", formatted: `${value.toFixed(1)}°C` };
+      }
       const f = tempFFromC(value);
       if (f === null || !Number.isFinite(f)) return null;
       return { key, label: "Temp", formatted: `${f.toFixed(1)}°F` };
@@ -116,7 +124,10 @@ interface ChipsBreakdown {
   invalidChips: HistoryInvalidChip[];
 }
 
-function chipsFromSnapshot(s: ChangeContextSnapshot): ChipsBreakdown {
+function chipsFromSnapshot(
+  s: ChangeContextSnapshot,
+  temperatureUnit: TemperatureUnitPreference,
+): ChipsBreakdown {
   const metrics: HistoryMetricChip[] = [];
   const invalidChips: HistoryInvalidChip[] = [];
   const invalidKeys = new Set<ChangeContextMetric>();
@@ -133,7 +144,7 @@ function chipsFromSnapshot(s: ChangeContextSnapshot): ChipsBreakdown {
       });
       continue;
     }
-    const chip = formatMetricChip(key, v);
+    const chip = formatMetricChip(key, v, temperatureUnit);
     if (chip) metrics.push(chip);
   }
   // VPD depends on temp + rh; if either was invalid, also flag VPD as
@@ -157,10 +168,15 @@ function chipsFromSnapshot(s: ChangeContextSnapshot): ChipsBreakdown {
  */
 export function buildManualSnapshotHistoryList(
   rows: ReadonlyArray<ChangeContextReading>,
-  opts: { tentId: string | null | undefined; limit?: number },
+  opts: {
+    tentId: string | null | undefined;
+    limit?: number;
+    temperatureUnit?: TemperatureUnitPreference;
+  },
 ): ManualSnapshotHistoryEntry[] {
   if (!opts.tentId) return [];
   const limit = clampLimit(opts.limit);
+  const temperatureUnit = opts.temperatureUnit ?? "fahrenheit";
   const snapshots = groupManualReadingsToSnapshots(rows, { tentId: opts.tentId });
   if (snapshots.length === 0) return [];
 
@@ -169,8 +185,12 @@ export function buildManualSnapshotHistoryList(
   for (let i = 0; i < sliced.length; i++) {
     const snap = sliced[i];
     const prev = snapshots[i + 1] ?? null;
-    const ctx = buildManualSnapshotChangeContext({ latest: snap, previous: prev });
-    const { metrics, invalidChips } = chipsFromSnapshot(snap);
+    const ctx = buildManualSnapshotChangeContext({
+      latest: snap,
+      previous: prev,
+      temperatureUnit,
+    });
+    const { metrics, invalidChips } = chipsFromSnapshot(snap, temperatureUnit);
     out.push({
       ts: snap.ts,
       metrics,

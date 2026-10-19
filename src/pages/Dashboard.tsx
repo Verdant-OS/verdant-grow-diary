@@ -60,6 +60,15 @@ import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRul
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import {
+  mergeVpdStabilityInputs,
+  quickLogManualsForTent,
+  QUICK_LOG_MANUAL_HISTORY_COPY,
+  resolveManualHistoryReadState,
+  vpdStabilityInputsFromWideReadings,
+} from "@/lib/vpdStabilityInputRules";
+import QuickLogManualHistoryNotice from "@/components/QuickLogManualHistoryNotice";
 import { useNowTick } from "@/hooks/useNowTick";
 import { describeCurrentStateStaleWindow } from "@/lib/sensorTruthCanon";
 import { isUuid } from "@/lib/isUuid";
@@ -111,6 +120,9 @@ import { SOURCE_LABEL, formatValue, isSnapshotStale } from "@/lib/sensorSnapshot
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import AlertReasonText from "@/components/AlertReasonText";
+import { mergeDashboardChartReadingsWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 
 import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
@@ -190,6 +202,7 @@ export default function Dashboard() {
   // evidence-only rows and the grouped projection contains no raw payload.
   const dashboardSensorRows = selectDashboardSensorEvidenceRows(rawReadings);
   const readings = groupDashboardSensorReadings(dashboardSensorRows);
+  const temperatureUnit = useTemperatureUnitPreference();
   // Per-tent sensor windows for the stability summary. Each tent gets its
   // own 200-row window so a busy tent cannot push another tent's VPD rows
   // out of a shared global cap. Read-only; no writes.
@@ -197,6 +210,38 @@ export default function Dashboard() {
   // column — only query real UUIDs; a non-UUID id cannot have rows, so its
   // absence is established (same guard as the Tents list).
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
+  // Every tent's strip grade uses this same multi-tent manual read (per-tent
+  // windows). A pending or failed read is disclosed beside the stored
+  // readings, never read as "no manual history".
+  const stripManuals = chartQuickLogManualQuery;
+  const stripManualsReadState =
+    tentIds.length > 0 ? resolveManualHistoryReadState(stripManuals) : "ready";
+  const quickLogManualsIncomplete =
+    chartQuickLogManualQuery.isPending ||
+    chartQuickLogManualQuery.isError ||
+    chartQuickLogManualQuery.fetchStatus === "fetching";
+  const sensorReadingsIncomplete =
+    Boolean(dashboardReadingsQuery.isLoading) ||
+    Boolean((dashboardReadingsQuery as { isPending?: boolean }).isPending) ||
+    Boolean(dashboardReadingsQuery.isError) ||
+    Boolean((dashboardReadingsQuery as { isFetching?: boolean }).isFetching) ||
+    (dashboardReadingsQuery as { fetchStatus?: string }).fetchStatus === "fetching";
+  const exportIncomplete = quickLogManualsIncomplete || sensorReadingsIncomplete;
+  const quickLogManualReadings = chartQuickLogManualQuery.data ?? [];
+  const dashboardExportReadings = mergeDashboardChartReadingsWithQuickLogManuals(
+    readings as unknown as SensorReading[],
+    quickLogManualReadings,
+  );
+  // Pick the first tent that actually has readings so the chart isn't blank
+  // when tents[0] has none but other tents do. Falls back to tents[0] (or null).
+  const chartTent =
+    tents.find((t) => dashboardExportReadings.some((r) => r.tentId === t.id)) ?? tents[0] ?? null;
+  const chartTentName = chartTent?.name ?? "Tent";
+  const chartReadings = chartTent
+    ? dashboardExportReadings.filter((r) => r.tentId === chartTent.id)
+    : [];
+  const tentNamesById = Object.fromEntries(tents.map((t) => [t.id, t.name]));
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
     useSensorReadingsByTents(tentIds);
   // Freshness is time-relative: re-evaluate the snapshot strip's clock every
@@ -268,7 +313,13 @@ export default function Dashboard() {
 
   // First-run activation is relationship-aware. Independent grow/tent/plant
   // counts cannot prove that a usable One-Tent chain exists.
-  const { grows, activeGrowId, loading: growsLoading, error: growsError } = useGrows();
+  const {
+    grows,
+    activeGrowId,
+    loading: growsLoading,
+    error: growsError,
+    refresh: refreshGrows,
+  } = useGrows();
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
@@ -394,6 +445,10 @@ export default function Dashboard() {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
+    const stabilityReadings = mergeVpdStabilityInputs(
+      rs,
+      vpdStabilityInputsFromWideReadings(quickLogManualsForTent(stripManuals.data, t.id)),
+    );
     const envStage = resolveTentEnvironmentStage({
       tentId: t.id,
       tentGrowId: t.growId ?? null,
@@ -406,7 +461,7 @@ export default function Dashboard() {
       }),
       plants: plantsForStage,
     });
-    const stability = computeEnvironmentStability(rs, { stage: envStage });
+    const stability = computeEnvironmentStability(stabilityReadings, { stage: envStage });
     return {
       tent: t,
       envStage,
@@ -420,7 +475,7 @@ export default function Dashboard() {
   const recentAlerts =
     openAlertsView.kind === "known" ? persistedAlertsState.alerts.slice(0, 3) : [];
 
-  if (tentsQuery.isError || plantsQuery.isError) {
+  if (tentsQuery.isError || plantsQuery.isError || growsError) {
     return (
       <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
         <GrowBreadcrumbs
@@ -439,6 +494,7 @@ export default function Dashboard() {
           testId="dashboard-grow-data-error"
           onRetry={() => {
             void Promise.all([tentsQuery.refetch(), plantsQuery.refetch()]);
+            if (growsError) void refreshGrows();
           }}
         />
       </div>
@@ -446,6 +502,7 @@ export default function Dashboard() {
   }
 
   if (
+    growsLoading ||
     tentsQuery.isPending ||
     plantsQuery.isPending ||
     tentsQuery.isLoading ||
@@ -492,7 +549,7 @@ export default function Dashboard() {
   // Non-landmark container: AppShell already owns the <main> landmark around
   // the route Outlet, so the page root must not nest another.
   return (
-    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+    <div className="min-w-0 max-w-full space-y-4 md:space-y-6" data-testid="dashboard-root">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -560,6 +617,10 @@ export default function Dashboard() {
       <DashboardDataSourceDisclosure
         scopedGrowId={scopedGrowId}
         hasAnyData={tents.length > 0 || plants.length > 0}
+        hasGrow={grows.length > 0}
+        onRetry={() => {
+          void Promise.all([tentsQuery.refetch(), plantsQuery.refetch()]);
+        }}
         snapshotSource={sensorState.status === "ok" ? sensorState.snapshot.source : undefined}
       />
 
@@ -612,7 +673,7 @@ export default function Dashboard() {
               </Button>
             </div>
             {(() => {
-              const anyReading = latestPerTent.some((x) => !!x.last);
+              const anyReading = latestPerTent.some((x) => !!x.last) || chartReadings.length > 0;
               const hasPendingTentRead = tentIds.some(
                 (tentId) => sensorStatusByTent[tentId] === "loading",
               );
@@ -783,22 +844,6 @@ export default function Dashboard() {
                   )}
                   <div className="grid lg:grid-cols-3 gap-4">
                     {(() => {
-                      // Pick the first tent that actually has readings so the chart
-                      // isn't blank when tents[0] has none but other tents do.
-                      // Falls back to tents[0] (or null) so the label + empty state
-                      // still make sense.
-                      const chartTent =
-                        tents.find((t) =>
-                          (readings as unknown as SensorReading[]).some((r) => r.tentId === t.id),
-                        ) ??
-                        tents[0] ??
-                        null;
-                      const chartTentName = chartTent?.name ?? "Tent";
-                      const chartReadings = chartTent
-                        ? (readings as unknown as SensorReading[]).filter(
-                            (r) => r.tentId === chartTent.id,
-                          )
-                        : [];
                       const latest = chartReadings.slice(-1)[0];
                       return (
                         <div className="lg:col-span-2 glass rounded-2xl p-4">
@@ -853,7 +898,20 @@ export default function Dashboard() {
                                 testIdPrefix="dashboard-environment-ribbon"
                               />
                               <div className="mt-4">
-                                <SensorChart data={chartReadings} metric="temp" height={200} />
+                                <SensorChart
+                                  data={chartReadings}
+                                  exportData={dashboardExportReadings}
+                                  tentNamesById={tentNamesById}
+                                  exportDisabled={exportIncomplete}
+                                  exportDisabledReason={
+                                    chartQuickLogManualQuery.isError ||
+                                    dashboardReadingsQuery.isError
+                                      ? "Sensor or Quick Log history could not be checked — CSV export is disabled until all sources load."
+                                      : "Refreshing sensor and Quick Log history…"
+                                  }
+                                  metric="temp"
+                                  height={200}
+                                />
                               </div>
                             </>
                           )}
@@ -892,6 +950,14 @@ export default function Dashboard() {
                         })()}
                       </div>
 
+                      <QuickLogManualHistoryNotice
+                        state={stripManualsReadState}
+                        onRetry={() => {
+                          void stripManuals.refetch();
+                        }}
+                        testIdPrefix="dashboard-manual-history"
+                        className="mb-2"
+                      />
                       <div className="space-y-2.5">
                         {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
@@ -899,6 +965,7 @@ export default function Dashboard() {
                             tentRows as BuildTentSnapshotInput[],
                             envStage,
                             nowTick,
+                            { temperatureUnit },
                           );
                           // Pending/failed reads must not masquerade as established
                           // absence or as data. Non-UUID ids (mock-fallback tents)
@@ -917,9 +984,16 @@ export default function Dashboard() {
                                     ? "sensor refresh unavailable, last loaded readings shown"
                                     : "sensor refresh unavailable, no last loaded readings"
                                   : null;
+                          const manualHistoryLabel =
+                            !isUuid(tent.id) || stripManualsReadState === "ready"
+                              ? null
+                              : stripManualsReadState === "unavailable"
+                                ? QUICK_LOG_MANUAL_HISTORY_COPY.ariaUnavailable
+                                : QUICK_LOG_MANUAL_HISTORY_COPY.ariaPending;
                           const ariaParts = [
                             tent.name,
                             sensorReadStatusLabel,
+                            manualHistoryLabel,
                             snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
                             snapView.hasReading
                               ? `last updated ${snapView.lastUpdatedDisplay}`
@@ -1120,7 +1194,7 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <p className="text-sm font-medium">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{a.reason}</p>
+                <AlertReasonText reason={a.reason} className="text-xs text-muted-foreground" />
               </li>
             ))}
           </ul>
@@ -1636,6 +1710,7 @@ export default function Dashboard() {
                 quality,
                 targets: targetsCmp,
                 stage: alertContextStage,
+                now: nowTick,
               });
               // Candidates above are DISPLAY-scoped and stay source-aware, so a
               // manual reading current for 24h still shows its warning. Saving
@@ -1710,7 +1785,10 @@ export default function Dashboard() {
                               </Badge>
                               <span className="font-medium text-sm">{a.title}</span>
                             </div>
-                            <p className="text-xs text-muted-foreground">{a.reason}</p>
+                            <AlertReasonText
+                              reason={a.reason}
+                              className="text-xs text-muted-foreground"
+                            />
                             {scopedGrowId && (
                               <div className="mt-1">
                                 <Button
@@ -1801,9 +1879,9 @@ export default function Dashboard() {
           >
             Recent activity
           </h2>
-          <div className="grid lg:grid-cols-2 gap-4 mt-2">
-            <section className="glass rounded-2xl p-4" aria-label="Recent activity">
-              <div className="flex items-center justify-between mb-3">
+          <div className="grid min-w-0 lg:grid-cols-2 gap-4 mt-2">
+            <section className="min-w-0 glass rounded-2xl p-4" aria-label="Recent activity">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="font-display font-semibold">Recent Activity</h2>
                 <Link
                   to={timelinePath(scopedGrowId)}
@@ -1838,7 +1916,7 @@ export default function Dashboard() {
                         <Badge variant="outline" className="text-[10px] uppercase">
                           {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
                         </Badge>
-                        <span className="text-xs truncate">{item.title}</span>
+                        <span className="min-w-0 text-xs truncate">{item.title}</span>
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(item.ts), {
                             addSuffix: true,
@@ -1860,7 +1938,7 @@ export default function Dashboard() {
             </section>
 
             <section
-              className="glass rounded-2xl p-4"
+              className="min-w-0 glass rounded-2xl p-4"
               aria-label="Pending actions"
               data-testid="dashboard-approval-queue-section"
             >
@@ -1917,7 +1995,7 @@ export default function Dashboard() {
                           <Badge variant="outline" className="text-[10px] uppercase">
                             {a.risk_level} risk
                           </Badge>
-                          <span className="text-xs font-medium truncate">
+                          <span className="min-w-0 text-xs font-medium truncate">
                             {sanitizeActionCopy(a.suggested_change)}
                           </span>
                           <span className="ml-auto text-xs text-muted-foreground">

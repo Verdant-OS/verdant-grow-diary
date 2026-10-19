@@ -48,6 +48,13 @@ one batch to the production project:
 
 Each has a `DO $preflight$` guard that fails closed if applied out of order.
 
+Later forward migration, applied after the four above:
+
+- `supabase/migrations/20261003020000_referral_referrer_monthly_cap.sql`: redefines
+  `convert_referral` so a referrer earns the 10-credit reward for at most 10 conversions per
+  UTC month per environment. Over the cap the referee still gets 10, and the referral row
+  records `referrer_credits = 0` with `meta.referrer_reward = 'capped'`.
+
 ---
 
 ## 3. Create the Paddle products — SANDBOX first, then LIVE

@@ -1,5 +1,3 @@
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   resolveQuickLogSensorSnapshotForAi,
   type QuickLogSensorAcquisitionRow,
@@ -12,6 +10,49 @@ import {
   isConfirmedAiDoctorCreditRefund,
   parseAiDoctorResultAttachment,
 } from "../_shared/aiDoctorCreditReplayRules.ts";
+import {
+  buildGeminiDirectChatRequest,
+  lookupGeminiDirectRoute,
+  readGeminiDirectApiKey,
+  resolveGeminiDirectChat,
+} from "../_shared/geminiDirectChat.ts";
+import {
+  buildGeminiInlineImagePart,
+  downloadSignedStorageObject,
+  isAllowedSignedPhotoUrl,
+} from "../_shared/geminiInlineImage.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-retry-count",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+};
+
+type AiCoachCreateClient = (
+  url: string,
+  key: string,
+  options?: Record<string, unknown>,
+) => {
+  auth: { getUser(): Promise<{ data: { user: { id: string } | null } | null }> };
+  rpc(
+    name: string,
+    params?: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: unknown }>;
+  from(table: string): unknown;
+};
+
+type AiCoachRuntimeClient = {
+  auth: { getUser(): Promise<{ data: { user: { id: string } | null } | null }> };
+  rpc(name: string, params?: Record<string, unknown>): Promise<{ data: any; error: any }>;
+  from(table: string): any;
+};
+
+export type AiCoachHandlerDeps = {
+  createClient?: AiCoachCreateClient;
+  photoTimeoutMs?: number;
+  providerTimeoutMs?: number;
+};
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -147,6 +188,12 @@ function readCoachMessageContent(value: unknown): string | null {
 // S2: server-pinned tier/feature. Escalation is deferred.
 const FEATURE = "ai_coach";
 const MODEL_TIER = "standard";
+const coachRoute = lookupGeminiDirectRoute(FEATURE, MODEL_TIER);
+if (!coachRoute.ok) {
+  throw new Error("ai-coach standard Gemini route is not configured");
+}
+const GATEWAY_URL = coachRoute.url;
+const COACH_MODEL = coachRoute.geminiModelId;
 
 const EMPTY_ANALYSIS = {
   summary: "No diary entries yet — log a note, photo, or sensor snapshot to get a real diagnosis.",
@@ -198,7 +245,7 @@ function parseAiCoachBody(value: unknown, supabaseUrl: string): Body | null {
       return null;
     }
     const allowedPhotoPrefix = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/sign/`;
-    if (!raw.photoUrl.startsWith(allowedPhotoPrefix)) return null;
+    if (!isAllowedSignedPhotoUrl(raw.photoUrl, allowedPhotoPrefix)) return null;
     photoUrl = raw.photoUrl;
   }
 
@@ -252,7 +299,10 @@ async function settleResultPersistence<T>(operation: PromiseLike<T>): Promise<T>
   }
 }
 
-Deno.serve(async (req) => {
+export async function handleAiCoachRequest(
+  req: Request,
+  deps: AiCoachHandlerDeps = {},
+): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // After the spend RPC starts, an unexpected error is ambiguous: the ledger
   // may have committed. A same-key replay must resolve it instead of charging
@@ -261,6 +311,14 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "unauthorized" }, 401);
+    const supabaseSpecifier = "npm:@supabase/supabase-js@2";
+    const createClient = (deps.createClient ??
+      (await import(/* @vite-ignore */ supabaseSpecifier))
+        .createClient) as unknown as AiCoachCreateClient as unknown as (
+      url: string,
+      key: string,
+      options?: Record<string, unknown>,
+    ) => AiCoachRuntimeClient;
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -285,8 +343,15 @@ Deno.serve(async (req) => {
     const body = parseAiCoachBody(requestBody, creditSupabaseUrl);
     if (!body) return calmFailure("shape");
 
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) return json({ error: "AI not configured" }, 500);
+    const geminiKey = readGeminiDirectApiKey(Deno.env);
+    const geminiResolution = resolveGeminiDirectChat({
+      feature: FEATURE,
+      tier: MODEL_TIER,
+      apiKey: geminiKey,
+    });
+    if (!geminiResolution.ok || geminiKey === null) {
+      return json({ error: "AI not configured" }, 500);
+    }
 
     const creditSupabase = createClient(creditSupabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -599,50 +664,80 @@ Rules for diagnosis (structured view, approval-first):
 
     const userContent: Array<Record<string, unknown>> = [];
     // parseAiCoachBody already constrained photoUrl to this project's signed
-    // Storage path before any credit spend.
-    if (body.photoUrl) userContent.push({ type: "image_url", image_url: { url: body.photoUrl } });
+    // Storage path before any credit spend. Gemini rejects that HTTPS URL, so
+    // the bytes are inlined after the spend id exists.
+    if (body.photoUrl) {
+      const photoController = new AbortController();
+      const photoTimer = setTimeout(
+        () => photoController.abort(),
+        deps.photoTimeoutMs ?? PROVIDER_TIMEOUT_MS,
+      );
+      try {
+        const downloaded = await downloadSignedStorageObject({
+          photoUrl: body.photoUrl,
+          allowedPrefix: `${creditSupabaseUrl}/storage/v1/object/sign/`,
+          signal: photoController.signal,
+        });
+        if (!downloaded.ok) {
+          return failureAfterRefund(spendId, `photo_${downloaded.reason}`, "invalid");
+        }
+        const inline = buildGeminiInlineImagePart(downloaded.bytes);
+        if (!inline.ok) {
+          return failureAfterRefund(spendId, `photo_${inline.reason}`, "invalid");
+        }
+        userContent.push(inline.part);
+      } finally {
+        clearTimeout(photoTimer);
+      }
+    }
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });
 
     const providerController = new AbortController();
-    const providerTimer = setTimeout(() => providerController.abort(), PROVIDER_TIMEOUT_MS);
-    let r: Response;
+    const providerTimer = setTimeout(
+      () => providerController.abort(),
+      deps.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS,
+    );
+    let data: unknown;
     try {
-      r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
+      const providerRequest = buildGeminiDirectChatRequest({
+        apiKey: geminiKey,
+        geminiModelId: COACH_MODEL,
         signal: providerController.signal,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+        body: {
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: system },
             { role: "user", content: userContent },
           ],
-        }),
+        },
       });
+      const r = await fetch(GATEWAY_URL, providerRequest);
+      if (r.status === 429) {
+        console.log("ai-coach status=upstream_credit_exhausted http=200");
+        return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
+      }
+      if (r.status === 402) {
+        console.log("ai-coach status=upstream_credit_exhausted http=200");
+        return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
+      }
+      if (!r.ok) {
+        return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
+      }
+      const readProviderBody = r.json.bind(r);
+      r.json = () => readJsonUntilAbort(r, providerController.signal, readProviderBody);
+      try {
+        data = await r.json();
+      } catch {
+        if (providerController.signal.aborted) {
+          return failureAfterRefund(spendId, "upstream_network", "timeout");
+        }
+        return failureAfterRefund(spendId, "upstream_parse", "parse");
+      }
     } catch {
       return failureAfterRefund(spendId, "upstream_network", "timeout");
     } finally {
       clearTimeout(providerTimer);
-    }
-
-    if (r.status === 429) {
-      return failureAfterRefund(spendId, "upstream_429", "http");
-    }
-    if (r.status === 402) {
-      console.log("ai-coach status=upstream_credit_exhausted http=200");
-      return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
-    }
-    if (!r.ok) {
-      return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
-    }
-
-    let data: unknown;
-    try {
-      data = await r.json();
-    } catch {
-      return failureAfterRefund(spendId, "upstream_parse", "parse");
     }
 
     const raw = readCoachMessageContent(data);
@@ -712,7 +807,44 @@ Rules for diagnosis (structured view, approval-first):
     console.log("ai-coach status=unexpected");
     return calmFailure(creditSpendMayExist ? "result_pending" : "http");
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve((req) => handleAiCoachRequest(req));
+}
+
+function providerAbortError(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+function readJsonUntilAbort(
+  response: Response,
+  signal: AbortSignal,
+  read: () => Promise<unknown> = () => response.json(),
+): Promise<unknown> {
+  if (signal.aborted) {
+    response.body?.cancel().catch(() => undefined);
+    return Promise.reject(providerAbortError());
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (settle: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      settle();
+    };
+    const onAbort = () => {
+      response.body?.cancel().catch(() => undefined);
+      finish(() => reject(providerAbortError()));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    read().then(
+      (value) => finish(() => resolve(value)),
+      (error) => finish(() => reject(error)),
+    );
+  });
+}
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {

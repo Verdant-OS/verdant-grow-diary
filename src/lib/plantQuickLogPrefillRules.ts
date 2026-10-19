@@ -11,6 +11,8 @@
  * manually.
  */
 
+import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
+
 export type PlantQuickLogPrefillEventType = "observation" | "environment";
 
 export interface PlantQuickLogPrefillInput<
@@ -23,6 +25,11 @@ export interface PlantQuickLogPrefillInput<
   tentName?: string | null;
   /** Activity to preselect. Defaults to a neutral observation. */
   eventType?: TEventType;
+  /**
+   * Shared Quick Log activity. Omitted for the plain Note handoff so existing
+   * payloads stay unchanged. Selection is presentation only.
+   */
+  activityId?: QuickLogActivityId;
 }
 
 export interface PlantQuickLogPrefill<
@@ -39,6 +46,8 @@ export interface PlantQuickLogPrefill<
   suggestSnapshot: true;
   /** Optional draft note text to prefill into the QuickLog note field. */
   note?: string;
+  /** Shared Quick Log activity, when the caller asked for one. */
+  activityId?: QuickLogActivityId;
 }
 
 export const PLANT_QUICKLOG_PREFILL_EVENT = "verdant:open-quicklog" as const;
@@ -59,5 +68,6 @@ export function buildPlantQuickLogPrefill<
     tentName: input.tentName ?? null,
     eventType: (input.eventType ?? "observation") as TEventType,
     suggestSnapshot: true,
+    ...(input.activityId ? { activityId: input.activityId } : {}),
   };
 }

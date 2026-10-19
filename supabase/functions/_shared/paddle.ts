@@ -12,6 +12,7 @@
  * client just to fail-closed on a bad signature.
  */
 import { Environment, Paddle, EventName } from "npm:@paddle/paddle-node-sdk";
+import { resolvePaddleTransport, type PaddleTransport } from "./paddleDirectTransport.ts";
 import { verifyPaddleWebhookSignature } from "./verifyPaddleSignature.ts";
 
 const getEnv = (key: string): string => {
@@ -34,7 +35,19 @@ export function getConnectionApiKey(env: PaddleEnv): string {
   return env === "sandbox" ? getEnv("PADDLE_SANDBOX_API_KEY") : getEnv("PADDLE_LIVE_API_KEY");
 }
 
+function transportFor(env: PaddleEnv): Exclude<PaddleTransport, { mode: "refused" }> {
+  const transport = resolvePaddleTransport(env, (key) => Deno.env.get(key));
+  if (transport.mode === "refused") {
+    throw new Error("paddle_direct_config_refused");
+  }
+  return transport;
+}
+
 export function getPaddleClient(env: PaddleEnv): Paddle {
+  const transport = transportFor(env);
+  if (transport.mode === "direct") {
+    return new Paddle(transport.apiKey, { environment: Environment.sandbox });
+  }
   const connectionApiKey = getConnectionApiKey(env);
   const lovableApiKey = getEnv("LOVABLE_API_KEY");
 
@@ -52,6 +65,17 @@ export async function gatewayFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
+  const transport = transportFor(env);
+  if (transport.mode === "direct") {
+    return fetch(`${transport.base}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${transport.apiKey}`,
+        ...init?.headers,
+      },
+    });
+  }
   const connectionApiKey = getConnectionApiKey(env);
   const lovableApiKey = getEnv("LOVABLE_API_KEY");
   return fetch(`${GATEWAY_BASE_URL}${path}`, {
@@ -63,6 +87,10 @@ export async function gatewayFetch(
       ...init?.headers,
     },
   });
+}
+
+export function isPaddleDirectMode(env: PaddleEnv): boolean {
+  return transportFor(env).mode === "direct";
 }
 
 export function getWebhookSecret(env: PaddleEnv): string {

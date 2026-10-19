@@ -26,8 +26,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   verifyPaymentsWebhookRequest,
   getPaddleClient,
+  isPaddleDirectMode,
   type PaddleEnv,
 } from "../_shared/paddle.ts";
+import { applyDirectModeExternalIdFallback } from "../_shared/paddleDirectTransport.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
 import { insertPaddleEventLog } from "./eventLogInsert.ts";
 import { maybeSendPurchaseConfirmation } from "./sendPurchaseConfirmation.ts";
@@ -66,7 +68,11 @@ function aliasProviderFields(value: unknown, aliases: Record<string, string>): u
 }
 
 /** Map verified Paddle wire fields to the processor's SDK-style shape. */
-function normalizeVerifiedPaddleEvent(raw: unknown): EventLikeWithId | null {
+function normalizeVerifiedPaddleEvent(
+  raw: unknown,
+  options?: { directMode?: boolean },
+): EventLikeWithId | null {
+  const directMode = options?.directMode === true;
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const eventId =
@@ -113,6 +119,9 @@ function normalizeVerifiedPaddleEvent(raw: unknown): EventLikeWithId | null {
         }
         return normalized;
       });
+      if (directMode) {
+        data.items = applyDirectModeExternalIdFallback(data.items);
+      }
     }
     // The existing confirmation helper also consumes SDK-style monetary fields.
     if (isRecord(data.details)) {
@@ -147,7 +156,7 @@ function mapVerifyFailure(reason: string): { status: number; body: string } {
   return { status: 401, body: reason };
 }
 
-function buildDeps(): Deps {
+function buildDeps(directMode: boolean): Deps {
   const sb = getSupabase();
   return {
     async insertEventReceived({ paddle_event_id, audit, payload }) {
@@ -230,10 +239,16 @@ function buildDeps(): Deps {
       try {
         const paddle = getPaddleClient(env);
         const price = await paddle.prices.get(paddlePriceId);
-        // Paddle SDK camelCases → importMeta.externalId
+        // Paddle SDK camelCases → importMeta.externalId. Direct sandbox catalog
+        // rows carry the plan id on customData instead of import_meta.
+        const priced = price as {
+          importMeta?: { externalId?: string } | null;
+          customData?: { external_id?: string } | null;
+        } | null;
         const externalId =
-          (price as { importMeta?: { externalId?: string } | null } | null)?.importMeta
-            ?.externalId ?? null;
+          priced?.importMeta?.externalId ??
+          (directMode ? priced?.customData?.external_id : null) ??
+          null;
         return { ok: true, externalId };
       } catch (e) {
         return { ok: false, error: String(e instanceof Error ? e.message : e) };
@@ -391,15 +406,16 @@ Deno.serve(async (req) => {
     return new Response(body, { status });
   }
 
-  const event = normalizeVerifiedPaddleEvent(verified.event);
-  if (!event) {
-    return new Response("invalid_event_shape", { status: 400 });
-  }
-
-  let result;
+  let event!: EventLikeWithId;
+  let result!: Awaited<ReturnType<typeof handleVerifiedEvent>>;
   try {
+    const directMode = isPaddleDirectMode(env);
+    event = normalizeVerifiedPaddleEvent(verified.event, { directMode });
+    if (!event) {
+      return new Response("invalid_event_shape", { status: 400 });
+    }
     result = await handleVerifiedEvent(
-      buildDeps(),
+      buildDeps(directMode),
       event,
       env,
       new Date(),

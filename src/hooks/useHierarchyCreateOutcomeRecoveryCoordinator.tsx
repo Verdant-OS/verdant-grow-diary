@@ -1,14 +1,20 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getHierarchyCreateOutcomeRecoveryRuntimeEpoch,
   adoptLegacyHierarchyCreateOutcomeRecoveryAttempts,
   clearHierarchyCreateOutcomeRecoveryAttempt,
+  decideHierarchyCreateOutcomeAbsence,
   getHierarchyCreateOutcomeRecoveryAttempts,
   getHierarchyCreateOutcomeRecoveryRevision,
+  hierarchyCreateOutcomeRecoveryKey,
+  hierarchyCreateOutcomeRecoveryNotice,
   markHierarchyCreateOutcomeRecoveryAttemptReconciled,
+  shouldRecheckHierarchyCreateOutcomeRecovery,
   subscribeHierarchyCreateOutcomeRecovery,
+  unmarkHierarchyCreateOutcomeRecoveryAttemptReconciled,
+  type HierarchyCreateOutcomeRecoveryRecord,
 } from "@/lib/hierarchyCreateOutcomeRecovery";
 import {
   confirmHierarchyCreateAttemptRow,
@@ -167,12 +173,25 @@ export function HierarchyCreateOutcomeRecoveryCoordinator({
   if (ownerLifetimeRef.current.ownerId !== ownerId) {
     ownerLifetimeRef.current = { ownerId, active: false };
   }
-  useSyncExternalStore(
+  const revision = useSyncExternalStore(
     subscribeHierarchyCreateOutcomeRecovery,
     getHierarchyCreateOutcomeRecoveryRevision,
     getHierarchyCreateOutcomeRecoveryRevision,
   );
   const attempts = getHierarchyCreateOutcomeRecoveryAttempts(ownerId);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [recheckGeneration, setRecheckGeneration] = useState(0);
+  const retryableRef = useRef(new Map<string, HierarchyCreateAttempt>());
+  const inFlightRef = useRef(new Map<string, HierarchyCreateAttempt>());
+  const releasedAbsentEntityRef = useRef<HierarchyCreateAttempt["entity"] | null>(null);
+  const recheckPendingRef = useRef(false);
+  const seenOwnerRef = useRef(ownerId);
+  if (seenOwnerRef.current !== ownerId) {
+    seenOwnerRef.current = ownerId;
+    releasedAbsentEntityRef.current = null;
+    retryableRef.current.clear();
+    recheckPendingRef.current = false;
+  }
 
   useEffect(() => {
     if (!ownerId || !attempts.some((record) => record.runtimeEpoch === null)) return;
@@ -200,35 +219,155 @@ export function HierarchyCreateOutcomeRecoveryCoordinator({
     };
   }, [ownerId]);
 
-  useEffect(() => {
-    if (!ownerId) return;
+  const requestRecheck = useCallback(() => {
+    recheckPendingRef.current = true;
+    if (retryableRef.current.size === 0) return;
+    recheckPendingRef.current = false;
+    for (const attempt of retryableRef.current.values()) {
+      unmarkHierarchyCreateOutcomeRecoveryAttemptReconciled(attempt);
+    }
+    retryableRef.current.clear();
+    setRecheckGeneration((generation) => generation + 1);
+  }, []);
 
+  useEffect(() => {
+    if (!ownerId || typeof window === "undefined") return;
+
+    const onOnline = () => {
+      if (shouldRecheckHierarchyCreateOutcomeRecovery("online", document.visibilityState)) {
+        requestRecheck();
+      }
+    };
+    const onVisibilityChange = () => {
+      if (
+        shouldRecheckHierarchyCreateOutcomeRecovery("visibilitychange", document.visibilityState)
+      ) {
+        requestRecheck();
+      }
+    };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [ownerId, requestRecheck]);
+
+  useEffect(() => {
+    if (!ownerId) {
+      setNotice(null);
+      return;
+    }
+
+    let cancelled = false;
+    const inFlight = inFlightRef.current;
     const isCurrentOwner = () => {
+      if (cancelled) return false;
       const lifetime = ownerLifetimeRef.current;
       return lifetime.active && lifetime.ownerId === ownerId;
     };
+    const priorAttempts = (records: readonly HierarchyCreateOutcomeRecoveryRecord[]) => {
+      const epoch = getHierarchyCreateOutcomeRecoveryRuntimeEpoch();
+      return records.filter(
+        (record) => record.runtimeEpoch !== null && record.runtimeEpoch !== epoch,
+      );
+    };
+    const publishNotice = () => {
+      if (!isCurrentOwner()) return;
+      const open = priorAttempts(getHierarchyCreateOutcomeRecoveryAttempts(ownerId));
+      if (open.length === 0) {
+        if (getHierarchyCreateOutcomeRecoveryAttempts(ownerId).length > 0) {
+          releasedAbsentEntityRef.current = null;
+        }
+        const absentEntity = releasedAbsentEntityRef.current;
+        setNotice(
+          absentEntity ? hierarchyCreateOutcomeRecoveryNotice("absent", absentEntity) : null,
+        );
+        return;
+      }
+      const unreachable = open.find((record) =>
+        retryableRef.current.has(hierarchyCreateOutcomeRecoveryKey(record.attempt)),
+      );
+      const checking = open.find((record) =>
+        inFlight.has(hierarchyCreateOutcomeRecoveryKey(record.attempt)),
+      );
+      const entity = (unreachable ?? checking ?? open[0]).attempt.entity;
+      const phase = unreachable ? "unavailable" : checking ? "checking" : "paused";
+      setNotice(hierarchyCreateOutcomeRecoveryNotice(phase, entity));
+    };
 
-    for (const record of attempts) {
+    const open = priorAttempts(getHierarchyCreateOutcomeRecoveryAttempts(ownerId));
+    for (const record of open) {
       // Same-runtime records (including legacy records adopted above) must
       // remain locked. Only an earlier page runtime is eligible to reconcile.
-      if (
-        record.runtimeEpoch === null ||
-        record.runtimeEpoch === getHierarchyCreateOutcomeRecoveryRuntimeEpoch() ||
-        !markHierarchyCreateOutcomeRecoveryAttemptReconciled(record.attempt)
-      ) {
-        continue;
-      }
+      const key = hierarchyCreateOutcomeRecoveryKey(record.attempt);
+      if (!markHierarchyCreateOutcomeRecoveryAttemptReconciled(record.attempt)) continue;
+      retryableRef.current.delete(key);
+      inFlight.set(key, record.attempt);
 
-      void recoverPreviousRuntimeHierarchyCreateAttempt({
-        attempt: record.attempt,
-        ownerId,
-        isCurrentOwner,
-        reconcile: (attempt) => reconcileHierarchyCreateAttempt(supabase, attempt),
-        refreshVisibleList,
-        clear: clearHierarchyCreateOutcomeRecoveryAttempt,
-      });
+      void (async () => {
+        const reconciliation = await reconcileHierarchyCreateAttempt(supabase, record.attempt);
+        if (!isCurrentOwner()) return;
+        const decision = decideHierarchyCreateOutcomeAbsence(reconciliation.status);
+        if (decision === "release_absent") {
+          // The confirmed-receipt helper keeps a not_found fence. Absence is
+          // a finished read, so this coordinator releases that exact attempt.
+          releasedAbsentEntityRef.current = record.attempt.entity;
+          inFlight.delete(key);
+          const cleared = clearHierarchyCreateOutcomeRecoveryAttempt(record.attempt);
+          if (!isCurrentOwner()) return;
+          if (!cleared) {
+            releasedAbsentEntityRef.current = null;
+            unmarkHierarchyCreateOutcomeRecoveryAttemptReconciled(record.attempt);
+            retryableRef.current.set(key, record.attempt);
+            publishNotice();
+            if (recheckPendingRef.current) requestRecheck();
+            return;
+          }
+          publishNotice();
+          return;
+        }
+        if (decision === "retry_later") {
+          inFlight.delete(key);
+          retryableRef.current.set(key, record.attempt);
+          if (!isCurrentOwner()) return;
+          publishNotice();
+          if (recheckPendingRef.current) requestRecheck();
+          return;
+        }
+        inFlight.delete(key);
+        const released = await recoverPreviousRuntimeHierarchyCreateAttempt({
+          attempt: record.attempt,
+          ownerId,
+          isCurrentOwner,
+          reconcile: async () => reconciliation,
+          refreshVisibleList,
+          clear: clearHierarchyCreateOutcomeRecoveryAttempt,
+        });
+        if (!isCurrentOwner()) return;
+        if (released) releasedAbsentEntityRef.current = null;
+        publishNotice();
+      })();
     }
-  }, [attempts, ownerId, refreshVisibleList]);
+    publishNotice();
 
-  return null;
+    return () => {
+      cancelled = true;
+      for (const attempt of inFlight.values()) {
+        unmarkHierarchyCreateOutcomeRecoveryAttemptReconciled(attempt);
+      }
+      inFlight.clear();
+    };
+  }, [ownerId, refreshVisibleList, requestRecheck, recheckGeneration, revision]);
+
+  if (!notice) return null;
+  return (
+    <p
+      role="status"
+      data-testid="hierarchy-create-outcome-recovery-notice"
+      className="mx-4 mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-foreground"
+    >
+      {notice}
+    </p>
+  );
 }

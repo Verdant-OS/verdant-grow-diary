@@ -477,3 +477,32 @@ describe("Codex re-review on #2115 — implausible manual metrics", () => {
     expect(ev).toMatchObject({ temperatureC: 60, humidityPct: 100, vpdKpa: 0 });
   });
 });
+
+describe("Codex re-review on #2115 — Quick Log wins over manual sensor rows", () => {
+  const AT = "2026-10-14T12:00:00+00:00";
+  const quickLog = () =>
+    manualEnvironmentEventsToTentReadingRows([
+      envRow({ environment_events: { temperature_c: 25.56, humidity_pct: null, vpd_kpa: null } }),
+    ]);
+
+  it("shows the Quick Log value, not an older manual sensor value, at the same metric and time", () => {
+    const sensor = [
+      { ts: AT, captured_at: AT, metric: "temperature_c", value: 21, source: "manual" },
+      { ts: AT, captured_at: AT, metric: "humidity_pct", value: 50, source: "manual" },
+    ];
+    const merged = mergePlantTentReadingsWithManualEvents(sensor, quickLog());
+    expect(merged.filter((r) => r.metric === "temperature_c").map((r) => r.value)).toEqual([25.56]);
+    // The non-colliding manual sensor metric stays.
+    expect(merged.find((r) => r.metric === "humidity_pct")?.value).toBe(50);
+    const snap = snapshotFromReadings(merged as never);
+    expect(snap?.temp).toBe(25.56);
+    expect(snap?.source).toBe("manual");
+  });
+
+  it("collapses an identical manual sensor row to one row", () => {
+    const [ql] = quickLog();
+    const merged = mergePlantTentReadingsWithManualEvents([{ ...ql }], [ql]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].value).toBe(25.56);
+  });
+});

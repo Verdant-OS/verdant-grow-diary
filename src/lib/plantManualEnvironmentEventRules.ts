@@ -190,24 +190,29 @@ function rowObservedMs(row: PlantManualEnvReadingRow): number | null {
  * explicitly in favour of the Quick Log manual row (as the Sensors series
  * does): readers that take the first row per metric at the latest time show
  * the manual value under the manual label, never a live/CSV value beside a
- * manual source. A manual row that duplicates a manual sensor row (same metric,
- * same observation time) is dropped. With no manual rows the input array is
- * returned unchanged.
+ * manual source. When a manual sensor_readings row shares a metric and
+ * observation time with a Quick Log row, the Quick Log row wins and the
+ * sensor row is dropped (identical values collapse to one row; differing
+ * values never show the older sensor value), matching
+ * mergeSensorsSeriesWithQuickLogManuals on the Sensors page. With no manual
+ * rows the input array is returned unchanged.
  */
 export function mergePlantTentReadingsWithManualEvents<T extends PlantManualEnvReadingRow>(
   sensorRows: ReadonlyArray<T>,
   manualRows: ReadonlyArray<PlantManualEnvReadingRow>,
 ): T[] {
   if (manualRows.length === 0) return sensorRows as T[];
-  const existing = new Set(
-    sensorRows
-      .filter((r) => r.source === PLANT_MANUAL_ENV_EVENT_SOURCE)
-      .map((r) => `${r.metric}|${rowObservedMs(r)}`),
-  );
-  const pending = manualRows.filter((r) => !existing.has(`${r.metric}|${rowObservedMs(r)}`));
+  const quickLogKeys = new Set(manualRows.map((r) => `${r.metric}|${rowObservedMs(r)}`));
+  const pending = manualRows;
   const out: T[] = [];
   let i = 0;
   for (const sensor of sensorRows) {
+    if (
+      sensor.source === PLANT_MANUAL_ENV_EVENT_SOURCE &&
+      quickLogKeys.has(`${sensor.metric}|${rowObservedMs(sensor)}`)
+    ) {
+      continue;
+    }
     const sensorMs = rowObservedMs(sensor) ?? -Infinity;
     while (i < pending.length && (rowObservedMs(pending[i]) as number) >= sensorMs) {
       out.push(pending[i] as T);

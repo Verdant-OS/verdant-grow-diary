@@ -33,13 +33,12 @@ import {
 } from "@/lib/plantStartDateRules";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
-  PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
   PLANT_HEALTH_NOT_ASSESSED_LABEL,
   PLANT_HEALTH_NOT_ASSESSED_OPTION,
   buildPlantHealthCreateInsert,
-  isPlantHealthClearRejected,
   plantHealthFromSelectValue,
 } from "@/lib/plantHealthRules";
+import { plantCreateFailureMessage } from "@/lib/plantCreateFailureNotice";
 import {
   primeConfirmedPlantCaches,
   reaffirmConfirmedPlantCacheMeta,
@@ -241,6 +240,7 @@ export default function CreatePlantDialog({
 
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const createInFlightRef = useRef(false);
   const suppressTentSelectSubmitRef = useRef(false);
   const closedAfterSubmitRef = useRef(false);
@@ -367,6 +367,13 @@ export default function CreatePlantDialog({
     !canWriteCreateGrowId(targetGrowId) ||
     tentBlocksWrite;
 
+  function outsideCreateDialogTarget(target: EventTarget | null): boolean {
+    return (
+      target instanceof Element &&
+      Boolean(target.closest("[data-sonner-toaster], [data-sonner-toast]"))
+    );
+  }
+
   function armTentSelectSubmitGuard() {
     suppressTentSelectSubmitRef.current = true;
     queueMicrotask(() => {
@@ -423,13 +430,18 @@ export default function CreatePlantDialog({
   }
 
   function handleOpenChange(next: boolean) {
+    // The recovery explanation lives in this dialog, and the trigger cannot
+    // reopen it while the outcome is unknown. Closing would hide that notice.
+    if (!next && createOutcomeUnknown) return;
     if (next && (createOutcomeUnknown || closedAfterSubmitRef.current)) return;
     // The insert may already be durable, so closing cannot cancel it. Let the
     // grower dismiss a stalled refresh, but suppress the later Quick Log
     // handoff so closing never causes a delayed navigation surprise.
     if (!next && busy) handoffSuppressedRef.current = true;
     setOpen(next);
+    if (next) setSaveError(null);
     if (!next) {
+      setSaveError(null);
       setExplicitCompatiblePick(false);
       setForm(emptyForm(initialTentId));
       setNestedTents([]);
@@ -484,6 +496,9 @@ export default function CreatePlantDialog({
       toast.error("Refresh this page before trying to create another plant.");
       return;
     }
+    // A retry has begun: the last failure no longer describes this attempt,
+    // even when a pre-write check below stops it before any insert.
+    setSaveError(null);
     if (formBlocked || !targetGrowId) {
       if (binding.toastMessage) toast.error(binding.toastMessage);
       else if (suppliedTent.blockSubmit) toast.error(suppliedTent.title);
@@ -578,8 +593,11 @@ export default function CreatePlantDialog({
       }
 
       if (!confirmed && needsReconciliation) {
+        const notice =
+          "Verdant could not confirm whether this plant was saved. Refresh before adding another.";
         if (mountedRef.current) {
           setBusy(false);
+          setSaveError(notice);
         }
         recordUnknownCreateOutcome({
           entity: "plant",
@@ -588,26 +606,18 @@ export default function CreatePlantDialog({
           growId: targetGrowId,
           tentId: validation.value.tent_id ?? null,
         });
-        toast.error(
-          "Verdant could not confirm whether this plant was saved. Refresh before adding another.",
-        );
+        toast.error(notice);
         return;
       }
       if (error && !confirmed) {
-        if (mountedRef.current) setBusy(false);
-        const message =
-          typeof error === "object" &&
-          error &&
-          typeof (error as { message?: unknown }).message === "string"
-            ? (error as { message: string }).message
-            : "Plant could not be created";
         // Before 20260924120000 the trigger rejects "unknown" and nothing is
         // written; the form stays open so the grower can pick a health value.
-        toast.error(
-          isPlantHealthClearRejected(message)
-            ? PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE
-            : message,
-        );
+        const notice = plantCreateFailureMessage(error);
+        if (mountedRef.current) {
+          setBusy(false);
+          setSaveError(notice);
+        }
+        toast.error(notice);
         return;
       }
       // The insert is now durable. Record that fact before any cache refresh can
@@ -652,7 +662,10 @@ export default function CreatePlantDialog({
       }
       const stillMounted = mountedRef.current;
       const handoffSuppressed = handoffSuppressedRef.current;
-      if (stillMounted) setBusy(false);
+      if (stillMounted) {
+        setBusy(false);
+        setSaveError(null);
+      }
       toast.success("Plant created");
       if (!stillMounted || handoffSuppressed) return;
       setForm(emptyForm(initialTentId));
@@ -685,6 +698,18 @@ export default function CreatePlantDialog({
       </DialogTrigger>
       <DialogContent
         className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]"
+        onFocusOutside={(event) => {
+          // Disabling the focused submit button moves focus to the document.
+          // That is not the grower leaving the form.
+          if (busy || saveError || outsideCreateDialogTarget(event.target)) {
+            event.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          // The error toast sits outside this dialog. Pressing it must not
+          // count as leaving, or the form the grower just filled is cleared.
+          if (outsideCreateDialogTarget(event.target)) event.preventDefault();
+        }}
         onCloseAutoFocus={handleDialogCloseAutoFocus}
       >
         <DialogHeader>
@@ -1067,6 +1092,15 @@ export default function CreatePlantDialog({
                 </div>
               </div>
             </details>
+            {saveError ? (
+              <p
+                role="alert"
+                data-testid="create-plant-save-error"
+                className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
+                {saveError}
+              </p>
+            ) : null}
             <Button
               type="submit"
               disabled={

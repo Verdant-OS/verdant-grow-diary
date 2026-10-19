@@ -114,10 +114,21 @@ import {
   TYPED_WATER_RECOVERY_PENDING,
   claimPendingStarterWater,
   canPersistStarterWaterRecovery,
+  clearUnreadablePendingStarterWater,
   reconcilePendingStarterWaterClear,
   readPendingStarterWater,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
+import {
+  mayClearUnreadableWaterRecovery,
+  unreadableWaterRecoveryOutcome,
+} from "@/lib/quickLogUnreadableWaterRecoveryRules";
+import {
+  QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER,
+} from "@/constants/quickLogWaterRecoveryCopy";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
@@ -125,6 +136,10 @@ import {
   ORDINARY_LEGACY_WATERING_BLOCKED_COPY,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
+import {
+  assessWateringVolumeInput,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "@/lib/quickLogWateringFormViewModel";
 import {
   ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY,
   isArchivedGrowId,
@@ -1510,10 +1525,12 @@ export default function QuickLog({
       return;
     }
     if (saveEventType === "watering") {
-      const raw = details.watering.trim();
-      const vol = Number(raw);
-      if (!raw || !Number.isFinite(vol) || vol <= 0) {
-        const message = "Add a watering volume (ml) to save.";
+      const assessedVolume = assessWateringVolumeInput(details.watering);
+      if (!assessedVolume.ok) {
+        const message =
+          assessedVolume.reason === "too_large"
+            ? QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE
+            : "Add a watering volume (ml) to save.";
         setShowMore(true);
         setWateringError(message);
         setSaveError(message);
@@ -1928,6 +1945,43 @@ export default function QuickLog({
       setBusy(false);
       setInFlightSaveContext(null);
     }
+  }
+
+  // The grower checked Timeline and clears an unreadable starter Water key.
+  // Nothing is replayed; a readable record found instead goes back to Retry.
+  async function clearUnreadableStarterWater() {
+    const ownerId = user?.id;
+    if (
+      !ownerId ||
+      !mayClearUnreadableWaterRecovery({
+        blocked: starterWaterStorageBlocked,
+        hasReadableRecord: starterWaterPending !== null,
+        ownerId,
+        inFlight: saveInFlightRef.current || saveLocked,
+      })
+    )
+      return;
+    saveInFlightRef.current = true;
+    let outcome: ReturnType<typeof unreadableWaterRecoveryOutcome>;
+    try {
+      outcome = unreadableWaterRecoveryOutcome(await clearUnreadablePendingStarterWater(ownerId));
+    } finally {
+      saveInFlightRef.current = false;
+    }
+    if (outcome === "still_blocked") {
+      setSaveError(QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED);
+      return;
+    }
+    const current = readPendingStarterWater(ownerId);
+    setStarterWaterPending(current.status === "pending" ? current.record : null);
+    setStarterWaterStorageBlocked(current.status === "blocked");
+    setSaveError(
+      current.status === "pending"
+        ? STARTER_WATER_RECOVERY_PENDING
+        : current.status === "blocked"
+          ? STARTER_WATER_RECOVERY_UNAVAILABLE
+          : null,
+    );
   }
 
   async function retryStarterWater() {
@@ -4036,6 +4090,30 @@ export default function QuickLog({
                     onClick={() => void retryStarterWater()}
                   >
                     Retry original Watering
+                  </Button>
+                </>
+              )}
+              {starterWaterStorageBlocked && !starterWaterPending && (
+                <>
+                  <p data-testid="quick-log-starter-water-unreadable-helper">
+                    {QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER}
+                  </p>
+                  <a
+                    href={QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block underline"
+                  >
+                    {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-testid="quick-log-starter-water-clear-unreadable"
+                    disabled={saveLocked}
+                    onClick={() => void clearUnreadableStarterWater()}
+                  >
+                    {QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL}
                   </Button>
                 </>
               )}

@@ -7,10 +7,10 @@ import {
 } from "@/lib/quickLogWaterVolumeWarningRules";
 
 describe("large water amount warning boundaries", () => {
-  it("does not offer confirmation above the 1,000,000 ml hard ceiling", () => {
-    expect(largeWaterConfirmationKey("1000001", "ml")).toBeNull();
+  it("does not offer confirmation above the 50,000 ml hard ceiling", () => {
+    expect(largeWaterConfirmationKey("50001", "ml")).toBeNull();
     const assessment = assessLargeWaterAmount({
-      amount: "1000001",
+      amount: "50001",
       unit: "ml",
       confirmedKey: null,
     });
@@ -20,13 +20,13 @@ describe("large water amount warning boundaries", () => {
 
   it("still warns at the hard ceiling when it remains above 10,000 ml", () => {
     const assessment = assessLargeWaterAmount({
-      amount: "1000000",
+      amount: "50000",
       unit: "ml",
       confirmedKey: null,
     });
     expect(assessment.warns).toBe(true);
     expect(assessment.needsConfirmation).toBe(true);
-    expect(assessment.volumeMl).toBe(1_000_000);
+    expect(assessment.volumeMl).toBe(50_000);
   });
 
   it("parses trimmed non-negative decimals and rejects invalid signs", () => {

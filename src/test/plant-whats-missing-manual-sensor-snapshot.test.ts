@@ -141,4 +141,44 @@ describe("What's Missing manual sensor snapshot (#2173 S)", () => {
     expect(arrayPayload.activity?.hasSnapshot).toBe(false);
     expect(arrayPayload.signals?.hasSensorSnapshot).toBe(false);
   });
+
+  it("counts a finite number-typed manual reading", () => {
+    const numeric = snapshotPresence(
+      {
+        event_type: "quick_log",
+        plant_id: PLANT_ID,
+        manual_sensor_snapshot: {
+          temp_f: 75,
+          humidity_percent: null,
+          ph: null,
+          ec: null,
+          source: "manual",
+          manual_provenance: buildManualSensorProvenance(),
+        },
+      },
+      "ql-finite",
+    );
+    expect(numeric.activity?.hasSnapshot).toBe(true);
+    expect(numeric.signals?.hasSensorSnapshot).toBe(true);
+  });
+
+  it.each(["NaN", "oops", ""] as const)("does not count a malformed manual reading %j", (bad) => {
+    const malformed = snapshotPresence(
+      {
+        event_type: "quick_log",
+        plant_id: PLANT_ID,
+        manual_sensor_snapshot: {
+          temp_f: bad,
+          humidity_percent: null,
+          ph: null,
+          ec: null,
+          source: "manual",
+          manual_provenance: buildManualSensorProvenance(),
+        },
+      },
+      `ql-bad-${bad || "empty"}`,
+    );
+    expect(malformed.activity?.hasSnapshot).toBe(false);
+    expect(malformed.signals?.hasSensorSnapshot).toBe(false);
+  });
 });

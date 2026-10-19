@@ -81,10 +81,12 @@ function previewNote(note: string): string {
 
 const MANUAL_SNAPSHOT_READING_KEYS = ["temp_f", "humidity_percent", "ph", "ec"] as const;
 
+/**
+ * Same predicate as deriveLatestManualReadings: a finite number.
+ * Strings such as "NaN" or "oops" are not readings.
+ */
 function isPresentManualReading(value: unknown): boolean {
-  if (typeof value === "number") return Number.isFinite(value);
-  if (typeof value === "string") return value.trim().length > 0;
-  return false;
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 /**

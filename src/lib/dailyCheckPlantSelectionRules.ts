@@ -193,6 +193,46 @@ export function isDailyCheckSubmitSaveTestId(
   return (DAILY_CHECK_SUBMIT_SAVE_TEST_IDS as readonly string[]).includes(testId);
 }
 
+/** The plant named on the save control wins. Otherwise Daily Check's selection is used. */
+export function dailyCheckSavePlantId(input: {
+  readonly hintedPlantId: string | null | undefined;
+  readonly selectedPlantId: string;
+}): string {
+  const hinted = input.hintedPlantId?.trim() ?? "";
+  return hinted || input.selectedPlantId;
+}
+
+/** A read is stale when the plant that would be saved changed while it was in flight. */
+export function dailyCheckArchiveCheckIsStale(
+  checkedPlantId: string,
+  currentPlantId: string,
+): boolean {
+  return checkedPlantId !== currentPlantId;
+}
+
+/**
+ * One plant-row read. A thrown client, a missing row, or a row without a
+ * boolean archive flag is unreadable and does not block the save.
+ */
+export async function readDailyCheckPlantArchiveFromLimit(
+  query: () => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<DailyCheckPlantArchiveRead> {
+  try {
+    const { data, error } = await query();
+    const row = Array.isArray(data) ? data[0] : null;
+    const flag =
+      row && typeof row === "object" && "is_archived" in row
+        ? (row as { is_archived: unknown }).is_archived
+        : null;
+    return classifyDailyCheckPlantArchiveRead({
+      error: Boolean(error),
+      isArchived: error || typeof flag !== "boolean" ? null : flag,
+    });
+  } catch {
+    return { status: "unreadable" };
+  }
+}
+
 export type DailyCheckPlantArchiveRead =
   | { readonly status: "active" }
   | { readonly status: "archived" }

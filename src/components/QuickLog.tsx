@@ -103,6 +103,12 @@ import { matchesReviewedPublicStarterDraftRevision } from "@/lib/publicQuickLogH
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import {
+  DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
+  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
+  dailyCheckSubmitBlockForPlantArchive,
+  readDailyCheckPlantArchiveFromLimit,
+} from "@/lib/dailyCheckPlantSelectionRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   STARTER_WATER_RECOVERY_CLEAR_FAILED,
@@ -1485,6 +1491,19 @@ export default function QuickLog({
       return;
     }
     const saveTarget = Object.freeze({ ...saveTargetResolution.target });
+    if (saveTarget.plantId) {
+      const archiveDecision = dailyCheckSubmitBlockForPlantArchive(
+        await readDailyCheckPlantArchiveFromLimit(() =>
+          supabase.from("plants").select("is_archived").eq("id", saveTarget.plantId).limit(1),
+        ),
+      );
+      if (archiveDecision.block) {
+        setSaveError(archiveDecision.message);
+        toast.error(DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE);
+        void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
+        return;
+      }
+    }
     const saveDraftHandoffKey = draftHandoffKey;
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
@@ -3862,6 +3881,7 @@ export default function QuickLog({
                 !!savedTarget
               }
               data-testid="quick-log-save"
+              data-daily-check-save-plant={resolvedTarget?.plantId ?? ""}
               className="gradient-leaf text-primary-foreground"
             >
               {busy || childSaveBusy ? (

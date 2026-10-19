@@ -17,6 +17,7 @@ import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterComp
 import type { RawGrowEventRow } from "@/lib/quickLogGroupedTimelineRowAdapter";
 import {
   collectSensorsQuickLogManualReadings,
+  collectSensorsQuickLogManualReadingsForTents,
   type SensorsQuickLogDiaryRow,
 } from "@/lib/sensorsQuickLogManualSeriesRules";
 import type { SensorReading } from "@/mock";
@@ -28,8 +29,24 @@ const GROW_EVENT_SELECT =
 
 const DIARY_SELECT = "id, tent_id, entry_at, details";
 
-export function buildSensorsQuickLogManualReadingsQueryKey(tentId: string | null | undefined) {
-  return [SENSORS_QL_MANUAL_READINGS_QUERY_PREFIX, "sensors-ql-manuals", tentId ?? "none"] as const;
+export function buildSensorsQuickLogManualReadingsQueryKey(
+  tentScope: string | readonly (string | null | undefined)[] | null | undefined,
+) {
+  if (Array.isArray(tentScope)) {
+    const ids = Array.from(
+      new Set(tentScope.filter((id): id is string => typeof id === "string" && isUuid(id))),
+    ).sort();
+    return [
+      SENSORS_QL_MANUAL_READINGS_QUERY_PREFIX,
+      "sensors-ql-manuals",
+      ids.length > 0 ? ids.join(",") : "none",
+    ] as const;
+  }
+  return [
+    SENSORS_QL_MANUAL_READINGS_QUERY_PREFIX,
+    "sensors-ql-manuals",
+    (tentScope as string | null | undefined) ?? "none",
+  ] as const;
 }
 
 async function fetchManualEvents(tentId: string): Promise<RawGrowEventRow[]> {
@@ -60,34 +77,63 @@ async function fetchManualDiary(tentId: string): Promise<SensorsQuickLogDiaryRow
   return data as SensorsQuickLogDiaryRow[];
 }
 
-export function useSensorsQuickLogManualReadings(tentId?: string | null) {
+export function useSensorsQuickLogManualReadings(
+  tentScope?: string | readonly (string | null | undefined)[] | null,
+) {
   const { user } = useAuth();
   const nowMs = useNowTick();
-  const enabled = Boolean(user) && isUuid(tentId);
-  const queryKey = [...buildSensorsQuickLogManualReadingsQueryKey(tentId), user?.id ?? "anon"];
+  const isMultiTent = Array.isArray(tentScope);
+  const validTentIds = useMemo(
+    () =>
+      isMultiTent
+        ? Array.from(
+            new Set(tentScope.filter((id): id is string => typeof id === "string" && isUuid(id))),
+          ).sort()
+        : isUuid(tentScope as string | null | undefined)
+          ? [tentScope as string]
+          : [],
+    [isMultiTent, tentScope],
+  );
+  const enabled = Boolean(user) && validTentIds.length > 0;
+  const queryKey = [...buildSensorsQuickLogManualReadingsQueryKey(tentScope), user?.id ?? "anon"];
   const events = useQuery({
     queryKey: [...queryKey, "events"],
     enabled,
     retry: false,
-    queryFn: () => fetchManualEvents(tentId!),
+    queryFn: async () => {
+      if (!isMultiTent) return fetchManualEvents(validTentIds[0]!);
+      const perTent = await Promise.all(validTentIds.map((id) => fetchManualEvents(id)));
+      return perTent.flat();
+    },
   });
   const diary = useQuery({
     queryKey: [...queryKey, "diary"],
     enabled,
     retry: false,
-    queryFn: () => fetchManualDiary(tentId!),
+    queryFn: async () => {
+      if (!isMultiTent) return fetchManualDiary(validTentIds[0]!);
+      const perTent = await Promise.all(validTentIds.map((id) => fetchManualDiary(id)));
+      return perTent.flat();
+    },
   });
   const data = useMemo<SensorReading[]>(
     () =>
       enabled
-        ? collectSensorsQuickLogManualReadings({
-            tentId,
-            growEvents: events.data,
-            diaryEntries: diary.data,
-            now: new Date(nowMs),
-          })
+        ? isMultiTent
+          ? collectSensorsQuickLogManualReadingsForTents({
+              tentIds: validTentIds,
+              growEvents: events.data,
+              diaryEntries: diary.data,
+              now: new Date(nowMs),
+            })
+          : collectSensorsQuickLogManualReadings({
+              tentId: validTentIds[0],
+              growEvents: events.data,
+              diaryEntries: diary.data,
+              now: new Date(nowMs),
+            })
         : [],
-    [enabled, tentId, events.data, diary.data, nowMs],
+    [enabled, isMultiTent, validTentIds, events.data, diary.data, nowMs],
   );
   return {
     data,

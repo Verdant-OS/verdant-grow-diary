@@ -782,6 +782,15 @@ export default function DailyCheck() {
           only for eligible selected-plant stages and fails closed otherwise. */}
       <div
         className={`mb-4 w-full min-w-0${renderedStep === "select" && guard.ok ? " pb-16" : ""}`}
+        onClickCapture={(event) => {
+          const button = event.target instanceof Element ? event.target.closest("button") : null;
+          const testId = button?.getAttribute("data-testid") ?? "";
+          if (!/save$|retry-original$|activity-success/.test(testId)) return;
+          // Tent-scoped saves return before the memory call below. Clearing
+          // and refreshing here still covers that success.
+          setArchivedPlantSubmitMessage(null);
+          void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
+        }}
       >
         <QuickLogAllActivitiesSection
           growId={growId}
@@ -798,8 +807,6 @@ export default function DailyCheck() {
           // that actually named a plant updates the memory; a tent-scoped save
           // leaves the previous record alone rather than clearing it.
           onSaveSuccess={(result) => {
-            setArchivedPlantSubmitMessage(null);
-            void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
             if (!result.target.plantId) return;
             rememberRecentQuickLogTarget(
               {

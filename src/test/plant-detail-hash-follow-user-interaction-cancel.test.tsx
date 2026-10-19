@@ -189,6 +189,30 @@ describe("plant detail hash follow cancels on user interaction (#2019)", () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(callsAfterInteraction);
   });
 
+  it("stops a smooth scroll started just before the follow deadline when plain text is clicked", () => {
+    const { observers, scrollIntoView } = startAlignment();
+    flushFrames();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    advance(2990);
+    grow(observers);
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+
+    advance(20);
+    act(() => {
+      plainTextNode().dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    });
+
+    expect
+      .soft(window.scrollTo)
+      .toHaveBeenCalledWith(expect.objectContaining({ top: window.scrollY, behavior: "instant" }));
+
+    const callsAfterClick = scrollIntoView.mock.calls.length;
+    grow(observers);
+    flushFrames();
+    expect(scrollIntoView).toHaveBeenCalledTimes(callsAfterClick);
+  });
+
   it("does not run a pending scheduleNavigation frame after pointerdown on plain text", () => {
     const { scrollIntoView } = startAlignment();
     expect(frames).toHaveLength(1);

@@ -41,21 +41,38 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
   }
 
   let stopped = false;
-  const teardown = () => {
-    if (stopped) return;
-    stopped = true;
-    observer.disconnect();
-    window.clearTimeout(timer);
+  let observing = true;
+  // The landing alignment and each resize correction start a smooth scroll that
+  // can still be moving after observation ends. Listeners stay until that scroll
+  // finishes (scrollend) or the grower cancels it.
+  let scrollInFlight = true;
+
+  const removeInputListeners = () => {
     window.removeEventListener("wheel", stopOnUserInput);
     window.removeEventListener("touchmove", stopOnUserInput);
     window.removeEventListener("touchstart", stopOnUserInput);
     window.removeEventListener("keydown", stopOnUserInput);
     window.removeEventListener("pointerdown", stopOnUserInput);
+    window.removeEventListener("scrollend", onScrollFinished);
+    document.removeEventListener("scrollend", onScrollFinished);
   };
-  const stopOnUserInput = () => {
-    if (stopped) return;
-    teardown();
-    onUserInput?.();
+  const releaseInputListenersIfIdle = () => {
+    if (stopped || observing || scrollInFlight) return;
+    stopped = true;
+    removeInputListeners();
+  };
+  const endObservation = () => {
+    if (!observing) return;
+    observing = false;
+    observer.disconnect();
+    window.clearTimeout(timer);
+    releaseInputListenersIfIdle();
+  };
+  const onScrollFinished = () => {
+    scrollInFlight = false;
+    releaseInputListenersIfIdle();
+  };
+  const haltInFlightScroll = () => {
     try {
       window.scrollTo({
         top: window.scrollY,
@@ -66,14 +83,36 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
       window.scrollTo(window.scrollX, window.scrollY);
     }
   };
+  const stopOnUserInput = () => {
+    if (stopped) return;
+    stopped = true;
+    observing = false;
+    scrollInFlight = false;
+    observer.disconnect();
+    window.clearTimeout(timer);
+    removeInputListeners();
+    onUserInput?.();
+    haltInFlightScroll();
+  };
+  const release = () => {
+    if (stopped) return;
+    stopped = true;
+    observing = false;
+    scrollInFlight = false;
+    observer.disconnect();
+    window.clearTimeout(timer);
+    removeInputListeners();
+  };
 
   const observer = new ResizeObserver(() => {
-    if (stopped) return;
+    if (stopped || !observing) return;
     const target = document.getElementById(anchorId);
-    if (target) safelyFocusAndScroll(target);
+    if (!target) return;
+    scrollInFlight = true;
+    safelyFocusAndScroll(target);
   });
   observer.observe(document.documentElement);
-  const timer = window.setTimeout(teardown, HASH_SCROLL_FOLLOW_MS);
+  const timer = window.setTimeout(endObservation, HASH_SCROLL_FOLLOW_MS);
   window.addEventListener("wheel", stopOnUserInput, { passive: true });
   window.addEventListener("touchmove", stopOnUserInput, { passive: true });
   window.addEventListener("touchstart", stopOnUserInput, { passive: true });
@@ -81,7 +120,9 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
   // Section-nav and quick-action buttons navigate without changing the hash,
   // so a pointer press is the grower taking over from the landing hash.
   window.addEventListener("pointerdown", stopOnUserInput, { passive: true });
-  return teardown;
+  window.addEventListener("scrollend", onScrollFinished);
+  document.addEventListener("scrollend", onScrollFinished);
+  return release;
 }
 
 interface PlantDetailDisclosureState {

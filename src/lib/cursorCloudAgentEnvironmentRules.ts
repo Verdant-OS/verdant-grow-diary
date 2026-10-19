@@ -14,6 +14,24 @@ const BUN_FROZEN_INSTALL_LINE = "bun install --frozen-lockfile";
 const PLAYWRIGHT_INSTALL_LINE = "bunx playwright install chromium";
 const ANY_BUN_INSTALL = /\bbun\s+(?:install|i|add)\b/;
 
+/**
+ * The one accepted script, line for line. The checks below name the specific
+ * defect; this final comparison rejects anything they do not enumerate, such
+ * as a command that removes node_modules before the provisioned-dependency guard.
+ */
+export const CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES = Object.freeze([
+  PIPEFAIL_LINE,
+  BUN_BOOTSTRAP_CONDITION,
+  BUN_INSTALLER_LINE,
+  BUN_PATH_SYMLINK_LINE,
+  BUNX_PATH_SYMLINK_LINE,
+  "fi",
+  NODE_MODULES_GUARD_CONDITION,
+  BUN_FROZEN_INSTALL_LINE,
+  "fi",
+  PLAYWRIGHT_INSTALL_LINE,
+]);
+
 type InstallScriptItem =
   { kind: "command"; line: string } | { kind: "if"; condition: string; body: string[] };
 
@@ -170,5 +188,12 @@ export function assertCursorCloudAgentInstallScript(install: string): void {
   );
   if (playwrightItemIndex <= guardIndex) {
     throw new Error("cursor_cloud_agent_install_playwright_before_dependencies");
+  }
+
+  if (
+    lines.length !== CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES.length ||
+    lines.some((line, i) => line !== CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES[i])
+  ) {
+    throw new Error("cursor_cloud_agent_install_not_canonical");
   }
 }

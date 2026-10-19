@@ -45,6 +45,27 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEO-10225273-SCHEMA
+
+```text
+TASK SEO-10225273-SCHEMA  priority: P2  status: OPEN
+goal: Repair the reproduced cultivar Thing.additionalProperty schema domain defect; hand Quick Log app rich-result eligibility to Claude without overlapping #2023/#2028.
+branch: codex/seo-10225273-schema
+base: verdant-grow-diary at c0ce65cb37498d346f46ec5d0a5a6c2f21a8da9a
+checkout: git switch codex/seo-10225273-schema && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: NOT_MEASURED (initial packet; draft will be opened before production implementation)
+head_sha: initial source c0ce65cb37498d346f46ec5d0a5a6c2f21a8da9a; fetch current PR head before resuming
+state: Reproduced on current source and public markup, both deploy/live c0ce65cb3. New regressions and production repair pending. Authenticated GitHub access works in this environment.
+next_action: Open the bounded draft, capture new regression RED, then repair only the shared schema builder and record GREEN.
+files: src/lib/seoStructuredData.ts (only production file); new src/test/cultivar-schema-domain-regression.test.ts; docs/seo/quick-log-cultivar-schema-repair.md; docs/agents/HANDOFF_LOG.md (only this task block).
+blockers: Quick Log static markup is Claude-owned (#2023/#2028); removing its local SoftwareApplication also requires specific approval for an existing protected static test. Protected validator remains unchanged. Shared fleet registry unavailable; inspected 89 open PRs, no shared-builder overlap observed. No production changes or live-fix proof.
+artifacts: docs/seo/quick-log-cultivar-schema-repair.md; /tmp/verdant-seo-live/ raw HTTP captures and extracted schema (local only).
+reviewer_seat: Critical Mass; independent acceptance NOT_MEASURED, Codex is author.
+claimed_by: Codex, 2026-10-19 22:34 UTC (Matthew's direct assignment; no GitHub claim comment because CURRENT_STATE requires separate comment approval)
+last_updated: 2026-10-19 22:34 UTC, by Codex
+limits: No edits to Claude branches, staticPublicSeoDocuments.ts, cultivarDetailSeo.ts, CultivarPage.tsx, sitemap, protected tests/validators, content/long descriptions, secrets, security settings or Search Console. No merge, ready, enqueue, deploy or production writes. Cultivar noindex/quality holds remain.
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text

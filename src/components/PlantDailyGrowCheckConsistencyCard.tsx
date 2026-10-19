@@ -270,7 +270,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
                   {d.label}
                 </span>
                 <span
-                  className="text-[10px] font-medium truncate max-w-full"
+                  className="text-[10px] font-medium leading-tight max-w-full [overflow-wrap:anywhere]"
                   data-testid="plant-daily-grow-check-method-breakdown-day-label"
                 >
                   {label}

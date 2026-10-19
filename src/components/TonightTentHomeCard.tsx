@@ -108,7 +108,7 @@ export default function TonightTentHomeCard(props: {
             className="min-w-0 rounded-xl border border-border/50 p-2.5 sm:p-3"
           >
             <dt className="truncate text-xs text-muted-foreground">{metric.label}</dt>
-            <dd className="mt-1 truncate text-base font-semibold tabular-nums sm:text-lg">
+            <dd className="mt-1 text-base font-semibold leading-tight tabular-nums [overflow-wrap:anywhere] sm:text-lg">
               {formatMetricValue(metric)}
             </dd>
             {metric.sourceLabel && (

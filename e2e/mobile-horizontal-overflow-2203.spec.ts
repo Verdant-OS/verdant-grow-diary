@@ -315,7 +315,11 @@ async function mockSignedInSupabase(page: Page) {
   await page.route(/\/functions\/v1\//, (route) =>
     route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
   );
-  await page.route(/google-analytics\.com|googletagmanager\.com/, (route) => route.abort());
+  // Match analytics by hostname, not by a substring anywhere in the URL.
+  await page.route(
+    (url) => /(^|\.)(google-analytics\.com|googletagmanager\.com)$/.test(url.hostname),
+    (route) => route.abort(),
+  );
 }
 
 async function acceptReconsentGateIfShown(page: Page) {

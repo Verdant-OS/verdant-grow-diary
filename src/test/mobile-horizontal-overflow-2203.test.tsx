@@ -2,6 +2,12 @@
  * Behavioral and rendered regression tests for issue #2203:
  * Mobile (375px): Timeline, Plant and Dashboard pages overflow horizontally.
  *
+ * jsdom performs no CSS layout, so these tests pin the rendered class contract
+ * per component. The real-layout proof is
+ * `e2e/mobile-horizontal-overflow-2203.spec.ts`: it renders all three routes at
+ * 375x812 in Chromium and asserts document and page-root
+ * `scrollWidth <= clientWidth`.
+ *
  * Covers the specific overflow surfaces reproduced at 375x812:
  * 1. Timeline:
  *    - CultivationCalendarMonthGrid positions its horizontal scroller and day cells
@@ -19,15 +25,14 @@
  *    - PlantDetailHarvestWatchCard wraps its `Next inspection` CTA button text inside
  *      narrow cards (`whitespace-normal min-w-0 max-w-full`).
  *    - PlantDailyGrowCheckConsistencyCard 7-day breakdown cells use `min-w-0` and
- *      truncate day method labels so 7 columns stay within 375px.
+ *      wrap day method labels so 7 columns stay within 375px and the full
+ *      method stays readable on touch screens.
  * 3. Dashboard:
  *    - SensorChart wraps its header/legend/CSV export and range selector (`flex-wrap`)
  *      instead of forcing the chart card to ~409px.
- *    - TonightTentHomeCard metric tiles use `min-w-0` and `truncate` so 3-column metrics
- *      do not overflow at 375px.
+ *    - TonightTentHomeCard metric tiles use `min-w-0`; labels truncate but sensor
+ *      values wrap, so 3-column metrics fit 375px without hiding a reading or unit.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -413,7 +418,7 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
     expect(badgesGroup?.className).toContain("flex-wrap");
   });
 
-  it("wraps PlantDetailHarvestWatchCard Next inspection CTA and truncates PlantDailyGrowCheckConsistencyCard 7-day cells", async () => {
+  it("wraps PlantDetailHarvestWatchCard Next inspection CTA and wraps PlantDailyGrowCheckConsistencyCard 7-day method labels", async () => {
     const plantUuid = "33333333-3333-4333-8333-333333333333";
     const tentUuid = "22222222-2222-4222-8222-222222222222";
     const growUuid = "11111111-1111-4111-8111-111111111111";
@@ -469,7 +474,9 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
       const methodLabel = within(cell).getByTestId(
         "plant-daily-grow-check-method-breakdown-day-label",
       );
-      expect(methodLabel.className).toContain("truncate");
+      // The full method stays visible on touch screens: it wraps, never truncates.
+      expect(methodLabel.className).not.toContain("truncate");
+      expect(methodLabel.className).toContain("[overflow-wrap:anywhere]");
       expect(methodLabel.className).toContain("max-w-full");
     }
   });
@@ -541,21 +548,7 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
     expect(metaRow?.className).toContain("flex-wrap");
   });
 
-  it("pins Dashboard, PlantDetail, and Timeline page shells to min-w-0 max-w-full (#2203)", () => {
-    const root = resolve(__dirname, "..");
-    const dashboard = readFileSync(resolve(root, "pages/Dashboard.tsx"), "utf8");
-    const plantDetail = readFileSync(resolve(root, "pages/PlantDetail.tsx"), "utf8");
-    const timeline = readFileSync(resolve(root, "pages/Timeline.tsx"), "utf8");
-
-    expect(dashboard).toContain('data-testid="dashboard-root"');
-    expect(dashboard).toContain('className="min-w-0 max-w-full space-y-4 md:space-y-6"');
-
-    expect(plantDetail).toContain('className="min-w-0 max-w-full"');
-
-    expect(timeline).toContain('className="min-w-0 max-w-full overflow-x-clip"');
-  });
-
-  it("constrains TonightTentHomeCard 3-column metric tiles with min-w-0 and truncate at 375px", () => {
+  it("constrains TonightTentHomeCard 3-column metric tiles with min-w-0 and wraps values at 375px", () => {
     renderWithProviders(
       <TonightTentHomeCard
         selection={{
@@ -620,7 +613,9 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
       const dt = tile.querySelector("dt");
       const dd = tile.querySelector("dd");
       expect(dt?.className).toContain("truncate");
-      expect(dd?.className).toContain("truncate");
+      // A sensor reading and its unit are never cut off; the value wraps.
+      expect(dd?.className).not.toContain("truncate");
+      expect(dd?.className).toContain("[overflow-wrap:anywhere]");
     }
   });
 });

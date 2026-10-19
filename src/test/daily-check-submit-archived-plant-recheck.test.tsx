@@ -28,7 +28,10 @@ type Plant = {
 
 const plantsRef = vi.hoisted(() => ({ plants: [] as Plant[] }));
 const saveInsert = vi.hoisted(() => vi.fn());
-const plantArchive = vi.hoisted(() => ({ byId: {} as Record<string, boolean> }));
+const plantArchive = vi.hoisted(() => ({
+  byId: {} as Record<string, boolean>,
+  mode: "row" as "row" | "error" | "empty" | "shape",
+}));
 
 const ARCHIVED_PLANT_MESSAGE = DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE;
 
@@ -41,13 +44,20 @@ vi.mock("@/integrations/supabase/client", () => {
         if (column === "id") state.id = value;
         return builder;
       },
-      maybeSingle: async () => ({
-        data: {
-          id: state.id,
-          is_archived: plantArchive.byId[state.id] === true,
-        },
-        error: null,
-      }),
+      maybeSingle: async () => {
+        if (plantArchive.mode === "error") return { data: null, error: { message: "unavailable" } };
+        if (plantArchive.mode === "empty") return { data: null, error: null };
+        if (plantArchive.mode === "shape") {
+          return { data: { id: state.id, is_archived: "yes" }, error: null };
+        }
+        return {
+          data: {
+            id: state.id,
+            is_archived: plantArchive.byId[state.id] === true,
+          },
+          error: null,
+        };
+      },
     };
     return builder;
   }
@@ -280,17 +290,29 @@ describe("daily check archived-plant submit decision", () => {
     ).toEqual({ block: false });
   });
 
-  it("does not treat a missing or failed read as an archive", () => {
+  it("blocks a failed, missing, or unexpected archive read and asks for a retry", () => {
+    const retry = {
+      block: true,
+      message: "Couldn't check whether this plant is archived. Try again.",
+    };
     expect(
       dailyCheckSubmitBlockForPlantArchive(
         classifyDailyCheckPlantArchiveRead({ error: true, isArchived: null }),
-      ).block,
-    ).toBe(false);
+      ),
+    ).toEqual(retry);
     expect(
       dailyCheckSubmitBlockForPlantArchive(
         classifyDailyCheckPlantArchiveRead({ error: false, isArchived: null }),
-      ).block,
-    ).toBe(false);
+      ),
+    ).toEqual(retry);
+    expect(
+      dailyCheckSubmitBlockForPlantArchive(
+        classifyDailyCheckPlantArchiveRead({
+          error: false,
+          isArchived: "yes" as unknown as null,
+        }),
+      ),
+    ).toEqual(retry);
   });
 
   it("recognizes the Daily Check save controls and ignores other buttons", () => {
@@ -311,6 +333,7 @@ describe("Daily Check submit re-checks an archived plant", () => {
   beforeEach(() => {
     plantsRef.plants = [plantP, plantQ];
     plantArchive.byId = {};
+    plantArchive.mode = "row";
     saveInsert.mockClear();
     const proto = window.HTMLElement.prototype;
     proto.scrollIntoView = () => {};
@@ -393,6 +416,29 @@ describe("Daily Check submit re-checks an archived plant", () => {
     expect(saveInsert).not.toHaveBeenCalled();
     expect(await screen.findByText(ARCHIVED_PLANT_MESSAGE)).toBeInTheDocument();
     expect(saveInsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks confirm when the archive read fails and clears that warning after a later allowed save", async () => {
+    renderCheck();
+    await openManualSnapshotReview();
+    plantArchive.mode = "error";
+
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+
+    expect(await screen.findByTestId("daily-check-archived-plant-submit")).toHaveTextContent(
+      "Couldn't check whether this plant is archived. Try again.",
+    );
+    expect(saveInsert).not.toHaveBeenCalled();
+    expect(screen.getByTestId("manual-sensor-review-confirm")).toBeInTheDocument();
+
+    plantArchive.mode = "row";
+    plantArchive.byId.P = false;
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+
+    await waitFor(() => {
+      expect(saveInsert).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByTestId("daily-check-archived-plant-submit")).not.toBeInTheDocument();
   });
 
   it("still confirms a manual snapshot when the plant is not archived", async () => {

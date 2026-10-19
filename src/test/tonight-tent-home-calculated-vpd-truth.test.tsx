@@ -8,6 +8,7 @@ import {
   TONIGHT_TENT_HOME_COPY,
   type TonightMetricView,
   type TonightSensorRow,
+  type TonightSnapshotInput,
 } from "@/lib/tonightTentHomeViewModel";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
@@ -47,20 +48,37 @@ describe("Tonight tent calculated VPD — mixed-source provenance", () => {
   it("does not label VPD live from an older live temperature and newer manual RH", () => {
     const vpd = vpdOf([row("temperature_c", 24, "live", 5), row("humidity_pct", 55, "manual", 1)]);
     expect(vpd.source).not.toBe("live");
-    expect(vpd.state).toBe("missing");
+    expect(vpd.state).toBe("unavailable");
     expect(vpd.value).toBeNull();
   });
 
   it("does not label VPD manual or live from an older manual temperature and newer live RH", () => {
     const vpd = vpdOf([row("temperature_c", 24, "manual", 5), row("humidity_pct", 55, "live", 1)]);
     expect(vpd.source).toBeNull();
-    expect(vpd.state).toBe("missing");
+    expect(vpd.state).toBe("unavailable");
   });
 
   it("does not label a same-time live temperature and manual RH pair live", () => {
     const vpd = vpdOf([row("temperature_c", 24, "live", 3), row("humidity_pct", 55, "manual", 3)]);
     expect(vpd.source).not.toBe("live");
     expect(vpd.value).toBeNull();
+    expect(vpd.state).toBe("unavailable");
+  });
+
+  it("skips a newer mixed-source same-time pair for an older compatible pair", () => {
+    const vpd = vpdOf([
+      row("temperature_c", 24, "live", 3),
+      row("humidity_pct", 55, "manual", 3),
+      row("temperature_c", 22, "manual", 20),
+      row("humidity_pct", 60, "manual", 20),
+    ]);
+    expect(vpd).toMatchObject({
+      state: "value",
+      source: "manual",
+      value: calculateVpdKpa({ tempC: 22, rhPercent: 60 }),
+      capturedAt: minutesAgo(20),
+      calculated: true,
+    });
   });
 
   it("labels a live pair stale when one input aged past the live window", () => {
@@ -73,6 +91,73 @@ describe("Tonight tent calculated VPD — mixed-source provenance", () => {
       state: "value",
       source: "stale",
       value: calculateVpdKpa({ tempC: 24, rhPercent: 55 }),
+      calculated: true,
+    });
+  });
+});
+
+describe("Tonight tent calculated VPD — aggregate snapshot provenance", () => {
+  // Per-tent rows failed; only the diary-inclusive snapshot answered. A readings
+  // snapshot labels every metric with one aggregate source, so same-time live
+  // temperature + manual RH arrives as source "manual" for both.
+  const at = minutesAgo(2);
+  function vpdFromSnapshot(
+    extra: Partial<NonNullable<TonightSnapshotInput["snapshot"]>>,
+  ): TonightMetricView {
+    return buildTonightTentMetrics({
+      rows: [],
+      rowsRead: { status: "error" },
+      snapshot: {
+        status: "ok",
+        snapshot: { source: "manual", ts: at, temp: 24, rh: 55, vpd: null, ...extra },
+      },
+      now: NOW,
+    }).find((m) => m.key === "vpd")!;
+  }
+
+  it("does not derive a 'Manual reading' VPD from a snapshot whose rows mixed live and manual", () => {
+    const vpd = vpdFromSnapshot({
+      metric_refs: {
+        temp: { id: "r-temp", captured_at: at, source: "live" },
+        rh: { id: "r-rh", captured_at: at, source: "manual" },
+      },
+    });
+    expect(vpd).toMatchObject({
+      state: "unavailable",
+      value: null,
+      source: null,
+      sourceLabel: null,
+      calculated: false,
+    });
+  });
+
+  it("does not derive VPD from an aggregate snapshot with no per-metric provenance", () => {
+    expect(vpdFromSnapshot({})).toMatchObject({
+      state: "unavailable",
+      value: null,
+      calculated: false,
+    });
+  });
+
+  it("derives VPD when per-metric refs prove both inputs share the snapshot source", () => {
+    const vpd = vpdFromSnapshot({
+      metric_refs: {
+        temp: { id: "r-temp", captured_at: at, source: "manual" },
+        rh: { id: "r-rh", captured_at: at, source: "manual" },
+      },
+    });
+    expect(vpd).toMatchObject({
+      state: "value",
+      source: "manual",
+      value: calculateVpdKpa({ tempC: 24, rhPercent: 55 }),
+      calculated: true,
+    });
+  });
+
+  it("derives VPD from a single diary record", () => {
+    expect(vpdFromSnapshot({ source: "diary" })).toMatchObject({
+      state: "value",
+      source: "manual",
       calculated: true,
     });
   });

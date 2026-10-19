@@ -236,9 +236,7 @@ describe("CreatePlantDialog tent selection and submit safety", () => {
     expect(tentTrigger).toHaveTextContent("Tent A");
     expect(insertMock).not.toHaveBeenCalled();
 
-    // Submit by keyboard and keep Enter held until after the dialog closes.
-    screen.getByTestId("plant-create-submit").focus();
-    await user.keyboard("{Enter>}");
+    await user.click(screen.getByTestId("plant-create-submit"));
 
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
@@ -253,6 +251,37 @@ describe("CreatePlantDialog tent selection and submit safety", () => {
       expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
     });
     expect(await screen.findByText("Plant created")).toBeVisible();
+    // Focus returns to the New plant trigger after a successful create (Matthew approved
+    // 2026-10-19; Codex P2 on e992f91d0). The held-key guard keeps a trailing key from
+    // reopening the dialog empty.
+    expect(newPlantTrigger).toHaveFocus();
+    expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the reopen guard while the submitting Enter is still held after the dialog closes", async () => {
+    const user = userEvent.setup();
+    renderDialog({ initiallyOpen: false });
+
+    const newPlantTrigger = screen.getByRole("button", { name: /New plant/i });
+    await user.click(newPlantTrigger);
+
+    await screen.findByTestId("create-plant-form");
+    await user.type(screen.getByTestId("create-plant-name"), "Blue Dream");
+
+    const tentTrigger = screen.getByTestId("create-plant-tent-select");
+    await user.click(tentTrigger);
+    await user.click(await screen.findByRole("option", { name: "Tent A" }));
+
+    // Submit by keyboard and keep Enter held until after the dialog closes.
+    screen.getByTestId("plant-create-submit").focus();
+    await user.keyboard("{Enter>}");
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+    });
     // Codex P2 at 84e6874b: keyboard users get focus back on the New plant trigger,
     // and a trailing key from the submitting gesture (held Enter before keyup) must
     // not reopen the dialog empty.

@@ -527,6 +527,7 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
       reload: vi.fn(),
     };
     const observedAt = alertsIo.snapshotState.snapshot.ts;
+    if (!observedAt) throw new Error("fixture snapshot must carry a timestamp");
     alertsIo.snapshotState = {
       ...alertsIo.snapshotState,
       snapshot: {

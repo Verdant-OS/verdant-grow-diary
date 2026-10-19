@@ -19,10 +19,7 @@ type DiaryRow = TentManualMirrorDiaryRow & { id: string };
 const TENT = "tent-1";
 const PLANT = "plant-1";
 
-function read<T>(
-  data: T[] | undefined,
-  status: "pending" | "error" | "success" = "success",
-) {
+function read<T>(data: T[] | undefined, status: "pending" | "error" | "success" = "success") {
   const refetch = vi.fn<() => unknown>();
   return { status, isFetching: false, data, refetch } satisfies TentHistorySourceRead<T>;
 }

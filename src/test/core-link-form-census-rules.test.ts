@@ -665,6 +665,7 @@ describe("core link and form census rules", () => {
     "status",
     "environment-summary-report-entitlement",
     "founder-slots-remaining",
+    "live-sensor-entitlement",
     "premium-export-entitlement",
   ])("classifies the read-only edge function %s without weakening the mutation fence", (name) => {
     expect(isReadOnlyEdgeFunction(name)).toBe(true);

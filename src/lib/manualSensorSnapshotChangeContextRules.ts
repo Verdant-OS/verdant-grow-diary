@@ -16,7 +16,13 @@
  *    future / pen-entered snapshots benefit without a schema change.
  */
 
-import { classifyManualMetric } from "@/lib/sensorTruthRules";
+import {
+  classifyManualMetric,
+  isSoilEcMscmRealistic,
+  isSoilEcUnitMismatchSuspected,
+  TRUTH_REASON_CHIP,
+  type ManualMetricTruth,
+} from "@/lib/sensorTruthRules";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 export type ChangeContextMetric =
@@ -241,6 +247,28 @@ function formatDelta(
 }
 
 /**
+ * Truth check for one change-context metric. Reservoir EC (mS/cm) uses the
+ * same plausibility bounds as soil EC with its own label; it lives here, not
+ * in the edge-mirrored sensorTruthRules. Every other metric uses the shared
+ * classifier.
+ */
+export function classifyChangeContextMetric(
+  key: ChangeContextMetric,
+  value: number,
+): ManualMetricTruth {
+  if (key !== "reservoir_ec_ms_cm") return classifyManualMetric(key, value);
+  if (isSoilEcMscmRealistic(value)) return { valid: true };
+  if (isSoilEcUnitMismatchSuspected(value)) {
+    return {
+      valid: false,
+      chip: TRUTH_REASON_CHIP.unit_mismatch_suspected,
+      reasonCode: "unit_mismatch_suspected",
+    };
+  }
+  return { valid: false, chip: "Invalid reservoir EC" };
+}
+
+/**
  * Build the change-context summary between the latest snapshot and the
  * previous one. Either argument may be null. Returns `firstSnapshot=true`
  * when no comparable previous snapshot is available.
@@ -264,8 +292,8 @@ export function buildManualSnapshotChangeContext(input: {
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
     // Per-metric truth filter: if either side is impossible, suppress the
     // delta and emit a reason chip instead of a fabricated swing.
-    const aTruth = classifyManualMetric(key, a);
-    const bTruth = classifyManualMetric(key, b);
+    const aTruth = classifyChangeContextMetric(key, a);
+    const bTruth = classifyChangeContextMetric(key, b);
     if (!aTruth.valid || !bTruth.valid) {
       const chip = (aTruth.chip ?? bTruth.chip) as string;
       const side: ChangeContextSuppressedDelta["side"] =

@@ -66,6 +66,8 @@ vi.mock("@/hooks/useGrowTargets", () => ({
   useGrowTargets: () => alertsIo.targetsState,
 }));
 
+const RH_READING_B = "bbbbbbbb-1111-4222-8333-444444444444";
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -524,6 +526,14 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
       targets: { rh: { min: 50, max: 70 } },
       reload: vi.fn(),
     };
+    const observedAt = alertsIo.snapshotState.snapshot.ts;
+    alertsIo.snapshotState = {
+      ...alertsIo.snapshotState,
+      snapshot: {
+        ...alertsIo.snapshotState.snapshot,
+        metric_refs: { rh: { id: RH_READING_B, captured_at: observedAt, source: "manual" } },
+      },
+    };
     render(
       <AlertsAutoPersistForGrow
         growId="grow-1"
@@ -538,7 +548,44 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
     expect(id).toBe("open-stage-rh");
     expect(context.title).toBe("Humidity above target");
     expect(context.reason).toContain("50–70%");
+    // Codex P1 at 40bd0cf0: the refreshed reason quotes this snapshot's RH, so
+    // the same write carries this snapshot's evidence ref.
+    expect(context.originating_timeline_events).toEqual([
+      expect.objectContaining({ id: RH_READING_B, type: "sensor_snapshot" }),
+    ]);
     expect(alertsIo.save.mock.calls.some(([p]) => p.metric === "rh")).toBe(false);
     expect(deriveAlertWhyContext({ metric: "rh", ...context }).text).toContain("50–70%");
+  });
+
+  it("does not refresh an open alert's reason when the new observation has no evidence ref (Codex P1 at 40bd0cf0)", async () => {
+    alertsIo.list.mockResolvedValue([
+      {
+        id: "open-stage-rh",
+        metric: "rh",
+        source: "environment_alerts",
+        title: "Humidity above stage range",
+        reason: "Observed 85%; seedling stage range 65%–75%.",
+        tent_id: "tent-1",
+        status: "open",
+      },
+    ]);
+    alertsIo.targetsState = {
+      status: "ok",
+      targets: { rh: { min: 50, max: 70 } },
+      reload: vi.fn(),
+    };
+    render(
+      <AlertsAutoPersistForGrow
+        growId="grow-1"
+        stage="seedling"
+        plants={[{ grow_id: "grow-1", tent_id: "tent-1", stage: "seedling" }]}
+      />,
+    );
+    await waitFor(() => {
+      expect(alertsIo.list).toHaveBeenCalled();
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(alertsIo.update).not.toHaveBeenCalled();
+    expect(alertsIo.save.mock.calls.some(([p]) => p.metric === "rh")).toBe(false);
   });
 });

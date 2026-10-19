@@ -157,20 +157,36 @@ export async function reopenAlert(id: string): Promise<AlertRow> {
 }
 
 /**
- * Refresh an open alert's wording (title + reason) when the grower's
- * configured target replaces the stage/default range it was raised against.
- * Status, timestamps and evidence refs are untouched. RLS enforces ownership;
+ * Refresh an open alert's context when the grower's configured target
+ * replaces the stage/default range it was raised against. The new reason
+ * describes the candidate's observation, so the evidence refs are replaced
+ * with that observation's refs in the same write: the reason and its
+ * evidence always describe the same reading. With no usable refs nothing is
+ * written (the row keeps its original, consistent reason and evidence).
+ * Status and timestamps are untouched. RLS enforces ownership;
  * `.eq("status", "open")` keeps a closed alert's history unchanged.
+ * Returns whether a write was attempted.
  */
 export async function updateOpenAlertContext(
   id: string,
-  context: { title: string; reason: string },
-): Promise<void> {
+  context: {
+    title: string;
+    reason: string;
+    originating_timeline_events: readonly OriginatingTimelineEventInput[] | null | undefined;
+  },
+): Promise<boolean> {
+  const refs = normalizeOriginatingTimelineEvents(context.originating_timeline_events);
+  if (refs.length === 0) return false;
   const { error } = await alertsTable()
-    .update({ title: context.title, reason: context.reason })
+    .update({
+      title: context.title,
+      reason: context.reason,
+      originating_timeline_events: refs as unknown as never,
+    })
     .eq("id", id)
     .eq("status", "open");
   if (error) throw error;
+  return true;
 }
 
 /** Read a single alert by id. RLS enforces ownership. */

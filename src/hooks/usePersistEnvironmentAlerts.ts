@@ -350,7 +350,12 @@ export function usePersistEnvironmentAlerts(
       // A configured-target candidate blocked by an open stage/default-range
       // row in the same direction refreshes that row's wording instead of
       // inserting a second alert (the #2179 one-per-direction guard stays).
-      const contextRefreshes: { id: string; title: string; reason: string }[] = [];
+      const contextRefreshes: {
+        id: string;
+        title: string;
+        reason: string;
+        refs: OriginatingTimelineEventRef[];
+      }[] = [];
 
       const toInsert = persistable.filter((a) => {
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
@@ -365,8 +370,16 @@ export function usePersistEnvironmentAlerts(
         if (!existing.has(key) && dirKey !== null) {
           const openRow = openRowByDirection.get(dirKey);
           const refresh = openRow ? resolveAlertContextRefresh(openRow, a) : null;
-          if (openRow?.id && refresh && !contextRefreshes.some((c) => c.id === openRow.id)) {
-            contextRefreshes.push({ id: openRow.id, ...refresh });
+          // The refreshed reason quotes this candidate's observation, so it
+          // carries this candidate's evidence refs; without refs it is skipped.
+          const refs = refresh ? resolveEnvironmentAlertEvidenceRefs(a, input.snapshot) : [];
+          if (
+            openRow?.id &&
+            refresh &&
+            refs.length > 0 &&
+            !contextRefreshes.some((c) => c.id === openRow.id)
+          ) {
+            contextRefreshes.push({ id: openRow.id, ...refresh, refs });
           }
         }
         if (existing.has(key) || (dirKey !== null && existingDirections.has(dirKey))) return false;
@@ -385,6 +398,7 @@ export function usePersistEnvironmentAlerts(
           await updateOpenAlertContext(refresh.id, {
             title: refresh.title,
             reason: refresh.reason,
+            originating_timeline_events: refresh.refs,
           });
         } catch {
           // Best effort: the open alert stays as it was; the next run retries.

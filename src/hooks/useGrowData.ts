@@ -243,16 +243,16 @@ export function useGrowTents(growId?: string): UseQueryResult<Tent[]> {
     queryKey: buildPrivateGrowQueryKey(ownerId, ["tents", growId ?? "all"]),
     retry: false,
     queryFn: () =>
-      withCriticalReadDeadline(
-        withSourceMeta({
-          scope: "tents",
-          ownerId,
-          key,
-          run: () => fetchTents(growId),
-          emptyValue: () => [] as Tent[],
-          isEmpty: isArrEmpty,
-        }),
-      ),
+      withSourceMeta({
+        scope: "tents",
+        ownerId,
+        key,
+        // The deadline sits inside run so a timeout is recorded as a failed read
+        // and a response that arrives later cannot record rows.
+        run: () => withCriticalReadDeadline(fetchTents(growId)),
+        emptyValue: () => [] as Tent[],
+        isEmpty: isArrEmpty,
+      }),
   });
 }
 
@@ -301,16 +301,16 @@ export function useGrowPlants(
     ]),
     retry: false,
     queryFn: () =>
-      withCriticalReadDeadline(
-        withSourceMeta({
-          scope: "plants",
-          ownerId,
-          key,
-          run: () => fetchPlants(tentId, growId, { includeArchived }),
-          emptyValue: () => [] as Plant[],
-          isEmpty: isArrEmpty,
-        }),
-      ),
+      withSourceMeta({
+        scope: "plants",
+        ownerId,
+        key,
+        // The deadline sits inside run so a timeout is recorded as a failed read
+        // and a response that arrives later cannot record rows.
+        run: () => withCriticalReadDeadline(fetchPlants(tentId, growId, { includeArchived })),
+        emptyValue: () => [] as Plant[],
+        isEmpty: isArrEmpty,
+      }),
   });
 }
 

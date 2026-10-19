@@ -39,6 +39,7 @@ export const HISTORY_METRIC_DISPLAY_ORDER: ChangeContextMetric[] = [
   "soil_moisture_pct",
   "soil_ec_ms_cm",
   "reservoir_ph",
+  "reservoir_ec_ms_cm",
 ];
 
 export const DEFAULT_HISTORY_LIMIT = 5;
@@ -89,6 +90,7 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   soil_moisture_pct: "Soil",
   soil_ec_ms_cm: "Soil EC",
   reservoir_ph: "pH",
+  reservoir_ec_ms_cm: "Reservoir EC",
 };
 
 function formatMetricChip(
@@ -118,6 +120,8 @@ function formatMetricChip(
       return { key, label: "Soil EC", formatted: `${value.toFixed(2)} mS/cm` };
     case "reservoir_ph":
       return { key, label: "pH", formatted: value.toFixed(2) };
+    case "reservoir_ec_ms_cm":
+      return { key, label: "Reservoir EC", formatted: `${value.toFixed(2)} mS/cm` };
   }
 }
 

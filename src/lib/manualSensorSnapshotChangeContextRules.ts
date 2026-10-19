@@ -26,7 +26,8 @@ export type ChangeContextMetric =
   | "co2_ppm"
   | "soil_moisture_pct"
   | "soil_ec_ms_cm"
-  | "reservoir_ph";
+  | "reservoir_ph"
+  | "reservoir_ec_ms_cm";
 
 export interface ChangeContextReading {
   ts: string | number | Date | null | undefined;
@@ -94,6 +95,7 @@ const DISPLAY_ORDER: ChangeContextMetric[] = [
   "soil_moisture_pct",
   "soil_ec_ms_cm",
   "reservoir_ph",
+  "reservoir_ec_ms_cm",
 ];
 
 const METRIC_LABEL: Record<ChangeContextMetric, string> = {
@@ -104,6 +106,7 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   soil_moisture_pct: "Soil",
   soil_ec_ms_cm: "Soil EC",
   reservoir_ph: "pH",
+  reservoir_ec_ms_cm: "Reservoir EC",
 };
 
 const KNOWN_METRICS: ReadonlySet<string> = new Set(DISPLAY_ORDER);
@@ -223,6 +226,12 @@ function formatDelta(
       delta = Math.round((latest - previous) * 100) / 100;
       label = "pH";
       formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
+      break;
+    }
+    case "reservoir_ec_ms_cm": {
+      delta = Math.round((latest - previous) * 100) / 100;
+      label = "Reservoir EC";
+      formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)} mS/cm`;
       break;
     }
   }

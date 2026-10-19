@@ -32,6 +32,7 @@ import TentManualSnapshotHistoryList, {
   type ManualSnapshotHistoryReading,
 } from "@/components/TentManualSnapshotHistoryList";
 import { useTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+import { useTentManualDiarySnapshots } from "@/hooks/useTentManualDiarySnapshots";
 import { buildTentManualHistoryRead } from "@/lib/tentManualEnvironmentEventRules";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
@@ -184,13 +185,16 @@ export default function TentDetail() {
   const allPlants = plantListRead.plants;
   const sensorReadings = useSensorReadings(id);
   const { data: readings = [] } = sensorReadings;
-  // Quick Log V2 manual snapshots are grow_events, never sensor_readings.
-  const manualEvents = useTentManualEnvironmentEvents(id);
-  // Both reads gate the history: a pending or failed grow_events read must not
-  // let the list declare an empty or complete history.
+  // Quick Log V2 manual snapshots are grow_events and diary snapshots, never
+  // sensor_readings. Read only for the owner-verified tent, not the route id.
+  const manualEvents = useTentManualEnvironmentEvents(tent?.id ?? null);
+  const manualDiarySnapshots = useTentManualDiarySnapshots(tent?.id ?? null);
+  // Every read gates the history: a pending or failed read must not let the
+  // list declare an empty or complete history.
   const manualHistoryRead = buildTentManualHistoryRead<ManualSnapshotHistoryReading>({
     sensor: sensorReadings,
     manual: manualEvents,
+    diary: manualDiarySnapshots,
   });
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);

@@ -54,11 +54,14 @@ export interface TentManualEnvironmentEvent {
 /** Change-context row shape consumed by the manual snapshot history list. */
 export interface TentManualEnvChangeContextRow {
   ts: string;
-  metric: "temperature_c" | "humidity_pct" | "vpd_kpa";
+  metric: "temperature_c" | "humidity_pct" | "vpd_kpa" | "reservoir_ph" | "reservoir_ec_ms_cm";
   value: number;
   source: typeof TENT_MANUAL_ENV_EVENT_SOURCE;
   tent_id: string;
-  /** The grow_events id, so same-instant saves are not merged into one snapshot. */
+  /**
+   * The grow_events id (or diary_entries id for a diary snapshot), so
+   * same-instant saves are not merged into one snapshot.
+   */
   snapshot_id: string;
 }
 
@@ -300,24 +303,71 @@ export interface TentManualHistoryReadView<S> {
 export function buildTentManualHistoryRead<S>(input: {
   sensor: TentHistorySourceRead<S>;
   manual: TentHistorySourceRead<TentManualEnvironmentEvent>;
+  /** Quick Log diary snapshots; a pH/EC-only save exists only here. */
+  diary?: TentHistorySourceRead<TentManualHistoryDiaryRow>;
 }): TentManualHistoryReadView<S> {
-  const { sensor, manual } = input;
-  const readStatus =
-    sensor.status === "error" || manual.status === "error"
-      ? "error"
-      : sensor.status === "pending" || manual.status === "pending"
-        ? "pending"
-        : "success";
+  const { sensor, manual, diary } = input;
+  const reads = diary ? [sensor, manual, diary] : [sensor, manual];
+  const readStatus = reads.some((r) => r.status === "error")
+    ? "error"
+    : reads.some((r) => r.status === "pending")
+      ? "pending"
+      : "success";
+  const diaryRows = diary?.data ?? [];
   return {
     readings: [
       ...(sensor.data ?? []),
-      ...manualEnvironmentEventsToChangeContextRows(manual.data ?? []),
+      ...manualEnvironmentEventsToChangeContextRows(
+        dropEventsMirroredByDiaryRows(manual.data ?? [], diaryRows),
+      ),
+      ...diarySnapshotsToChangeContextRows(diaryRows),
     ],
     readStatus,
-    isFetching: sensor.isFetching || manual.isFetching,
+    isFetching: reads.some((r) => r.isFetching),
     onRetry: () => {
-      void sensor.refetch();
-      void manual.refetch();
+      for (const r of reads) void r.refetch();
     },
   };
+}
+
+/** A fetched diary row whose `details.manual_sensor_snapshot` may feed the history. */
+export interface TentManualHistoryDiaryRow extends TentManualMirrorDiaryRow {
+  id: string;
+}
+
+/**
+ * Project Quick Log diary snapshots into history rows. The persisted shape is
+ * `temp_f`, `humidity_percent`, `ph`, `ec`; `ec` is reservoir EC in mS/cm
+ * (manualSnapshotDiaryAdapter), never soil EC. Values stay as entered so the
+ * history list's realism check can flag a bad one.
+ */
+export function diarySnapshotsToChangeContextRows(
+  rows: ReadonlyArray<TentManualHistoryDiaryRow | null | undefined>,
+): TentManualEnvChangeContextRow[] {
+  const out: TentManualEnvChangeContextRow[] = [];
+  for (const row of rows) {
+    if (!row || typeof row.id !== "string" || !row.id) continue;
+    if (typeof row.tent_id !== "string" || !row.tent_id) continue;
+    if (typeof row.entry_at !== "string" || !Number.isFinite(Date.parse(row.entry_at))) continue;
+    if (!hasManualSensorSnapshot(row.details)) continue;
+    const tempF = snapshotNumber(row.details, "temp_f");
+    const metrics: Array<[TentManualEnvChangeContextRow["metric"], number | null]> = [
+      ["temperature_c", tempF === null ? null : ((tempF - 32) * 5) / 9],
+      ["humidity_pct", snapshotNumber(row.details, "humidity_percent")],
+      ["reservoir_ph", snapshotNumber(row.details, "ph")],
+      ["reservoir_ec_ms_cm", snapshotNumber(row.details, "ec")],
+    ];
+    for (const [metric, value] of metrics) {
+      if (value === null) continue;
+      out.push({
+        ts: row.entry_at,
+        metric,
+        value,
+        source: TENT_MANUAL_ENV_EVENT_SOURCE,
+        tent_id: row.tent_id,
+        snapshot_id: row.id,
+      });
+    }
+  }
+  return out;
 }

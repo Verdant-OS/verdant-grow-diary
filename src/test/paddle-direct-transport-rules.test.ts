@@ -205,12 +205,28 @@ describe("direct price lookup", () => {
     expect(extractDirectPriceId(body, "pro_monthly")).toBeNull();
   });
 
-  it("rejects an active price whose imported external id conflicts with custom_data", () => {
+  it("accepts a source import id and still rejects a custom_data plan conflict", () => {
     expect(
       extractDirectPriceId(
         {
           data: {
-            id: "pri_conflict",
+            id: "pri_imported",
+            status: "active",
+            custom_data: { external_id: "pro_monthly" },
+            import_meta: {
+              external_id: "9b95b0b8-e10f-441a-862e-1936a6d818ab",
+              imported_from: "paddle_classic",
+            },
+          },
+        },
+        "pro_monthly",
+      ),
+    ).toBe("pri_imported");
+    expect(
+      extractDirectPriceId(
+        {
+          data: {
+            id: "pri_imported_plan_shaped",
             status: "active",
             custom_data: { external_id: "pro_monthly" },
             import_meta: { external_id: "pro_annual" },
@@ -218,20 +234,20 @@ describe("direct price lookup", () => {
         },
         "pro_monthly",
       ),
-    ).toBeNull();
+    ).toBe("pri_imported_plan_shaped");
     expect(
       extractDirectPriceId(
         {
           data: {
-            id: "pri_agree",
+            id: "pri_wrong_plan",
             status: "active",
-            custom_data: { external_id: "pro_monthly" },
-            import_meta: { external_id: "pro_monthly" },
+            custom_data: { external_id: "pro_annual" },
+            import_meta: { external_id: "9b95b0b8-e10f-441a-862e-1936a6d818ab" },
           },
         },
         "pro_monthly",
       ),
-    ).toBe("pri_agree");
+    ).toBeNull();
   });
 });
 

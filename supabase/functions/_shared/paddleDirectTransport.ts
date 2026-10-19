@@ -238,20 +238,12 @@ export function priceExternalIdFromResolvedPrice(
   );
 }
 
-function importedExternalId(value: unknown): string | undefined {
-  if (!isRecord(value)) return undefined;
-  const externalId = value.external_id ?? value.externalId;
-  return nonEmptyString(externalId) ? externalId : undefined;
-}
-
 export function extractDirectPriceId(body: unknown, requested: string): string | null {
   if (!isRecord(body) || !isRecord(body.data)) return null;
   if (body.data.status !== "active") return null;
   const customData = body.data.custom_data;
+  // import_meta.external_id is the source-provider record id, not the plan slug.
   if (!isRecord(customData) || customData.external_id !== requested) return null;
-  const imported =
-    importedExternalId(body.data.import_meta) ?? importedExternalId(body.data.importMeta);
-  if (imported !== undefined && imported !== requested) return null;
   return nonEmptyString(body.data.id) ? body.data.id : null;
 }
 

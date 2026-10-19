@@ -499,6 +499,9 @@ export default function Timeline() {
     [],
   );
   const [supplementalLoading, setSupplementalLoading] = useState(false);
+  // The detached directory sensor read is linked context too: until it
+  // settles, the page must not read as complete.
+  const [directorySensorsLoading, setDirectorySensorsLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
   const readRequestIdRef = useRef(0);
   const directorySensorGenerationRef = useRef(0);
@@ -922,6 +925,7 @@ export default function Timeline() {
         if (!isCurrentRequest()) return;
         setPartialReadSources((current) => mergeTimelinePartialSources(current, [source]));
       };
+      setDirectorySensorsLoading(true);
       try {
         // The tent lookup is bounded too: a hung lookup would otherwise never
         // reach the reading deadline below or mark the source partial.
@@ -1003,6 +1007,13 @@ export default function Timeline() {
         markPartial("manual_sensor_readings");
         setManualSensorMeasurementEntries([]);
         setManualSensorHistoryLimited(false);
+      } finally {
+        // Only the newest directory read owns the pending flag. A read made
+        // obsolete by a newer core request still settles under its deadline
+        // and clears it if nothing newer started.
+        if (sensorGeneration === directorySensorGenerationRef.current) {
+          setDirectorySensorsLoading(false);
+        }
       }
     }
   }, [activeGrowId, activeReadKey, directoryGrowId, timelineDateRangeBounds, user]);
@@ -1652,7 +1663,7 @@ export default function Timeline() {
     coreRead,
     evidenceCount: recentLaneRawEntries.length + manualSensorMeasurementEntries.length,
     hasAppliedDateBounds: Boolean(effectiveStartDate || effectiveEndDate),
-    supplementalLoading,
+    supplementalLoading: supplementalLoading || directorySensorsLoading,
     partialSources: partialReadSources,
   });
   const isDateWindowEmpty = pageReadView.kind === "ready_empty_date_window";

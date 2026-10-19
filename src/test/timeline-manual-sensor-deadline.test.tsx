@@ -224,4 +224,70 @@ describe("timeline manual sensor deadline", () => {
     });
     expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
   });
+  it("keeps linked context loading until a hung manual-sensor read settles", async () => {
+    vi.useFakeTimers();
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-a"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // Core supplemental reads have settled; the detached sensor read has not.
+    expect(screen.getByTestId("timeline-linked-context-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-partial-read-warning")).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+    });
+    expect(screen.queryByTestId("timeline-linked-context-loading")).toBeNull();
+    expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
+  });
+
+  it("keeps linked context loading while the directory tent lookup is pending", async () => {
+    harness.executeQuery.mockImplementation((spec: { table: string; columns: string | null }) => {
+      if (spec.table === "tents" && spec.columns === "id") return new Promise(() => {});
+      return { data: [], error: null, count: 0 };
+    });
+    vi.useFakeTimers();
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-a"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId("timeline-linked-context-loading")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+    });
+    expect(screen.queryByTestId("timeline-linked-context-loading")).toBeNull();
+    expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
+  });
+
+  it("clears linked context loading once the manual-sensor read settles", async () => {
+    harness.executeQuery.mockImplementation((spec: { table: string; columns: string | null }) => {
+      if (spec.table === "tents" && spec.columns === "id") {
+        return { data: [{ id: "tent-1" }], error: null };
+      }
+      return { data: [], error: null, count: 0 };
+    });
+    vi.useFakeTimers();
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-a"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.queryByTestId("timeline-linked-context-loading")).toBeNull();
+    expect(screen.queryByTestId("timeline-partial-read-warning")).toBeNull();
+  });
 });

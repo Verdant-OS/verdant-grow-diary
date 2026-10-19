@@ -134,6 +134,11 @@ import { writeFeedingTypedEvent, type FeedingTypedEventInput } from "@/lib/write
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
 import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
+import { assessQuickLogSensorSnapshotGate } from "@/lib/quickLogSensorSnapshotGateRules";
+import {
+  assessLargeWaterAmount,
+  confirmLargeWaterAmount,
+} from "@/lib/quickLogWaterVolumeWarningRules";
 import {
   EMPTY_QUICKLOG_WATERING_FORM,
   WATERING_SAVE_FAILURE_MESSAGE,
@@ -213,29 +218,21 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
 import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import {
-  fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
-
-const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+import { typedTemperatureToCelsiusInput } from "@/lib/quickLogTypedTemperatureRules";
 
 /**
  * Convert a grower-typed temperature string (entered in the active
  * preference unit) into a canonical-°C string. Called EXACTLY ONCE per
  * save attempt, at the payload-build seam, on the raw typed value — the
  * built payload (including the locked watering retry submission) already
- * holds °C and is never re-converted. Blank stays blank and non-numeric
- * text passes through unchanged so the existing validators keep rejecting
- * it with their original reasons.
+ * holds °C and is never re-converted. The conversion itself is the shared
+ * pure helper the sensor snapshot gate also uses, so they cannot drift.
  */
 function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
-  if (unit !== "fahrenheit") return raw;
-  const trimmed = raw.trim();
-  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return raw;
-  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+  return typedTemperatureToCelsiusInput(raw, unit);
 }
 
 interface Props {
@@ -516,6 +513,15 @@ function QuickLogV2SheetForOwner({
   const [wateringForm, setWateringForm] = useState<QuickLogWateringFormState>(
     initialWateringForm?.wateringForm ?? EMPTY_QUICKLOG_WATERING_FORM,
   );
+  const largeWaterSessionRef = useRef<{ inFlight: boolean; confirmedKey: string | null }>({
+    inFlight: false,
+    confirmedKey: null,
+  });
+  const [largeWaterConfirmedKey, setLargeWaterConfirmedKey] = useState<string | null>(null);
+  const clearLargeWaterConfirmation = () => {
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
   const [maturityEvidenceForm, setMaturityEvidenceForm] =
     useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
@@ -920,7 +926,33 @@ function QuickLogV2SheetForOwner({
       wateringForm,
     ],
   );
-  const waterFieldMessage = retryPending ? null : (waterSaveGate?.footerMessage ?? null);
+  // Every other snapshot-bearing action (Feed has no snapshot fields) gets the
+  // same render-time band check; Save still goes through the one payload
+  // builder and quicklog_save_manual, which stay authoritative.
+  const snapshotGate = useMemo(
+    () =>
+      form.action !== "water" && form.action !== "feed"
+        ? assessQuickLogSensorSnapshotGate({
+            temperatureInput: form.temperatureC,
+            humidityInput: form.humidityPct,
+            vpdInput: form.vpdKpa,
+            temperatureUnit: manualEntryUnit,
+          })
+        : null,
+    [form.action, form.temperatureC, form.humidityPct, form.vpdKpa, manualEntryUnit],
+  );
+  const sensorFieldErrors = waterSaveGate?.fields ?? snapshotGate?.fields ?? {};
+  const waterFieldMessage = retryPending
+    ? null
+    : (waterSaveGate?.footerMessage ?? snapshotGate?.footerMessage ?? null);
+  const largeWaterAssessment =
+    form.action === "water" && !retryPending
+      ? assessLargeWaterAmount({
+          amount: wateringForm.volumeMl,
+          unit: "ml",
+          confirmedKey: largeWaterConfirmedKey,
+        })
+      : null;
   const criticalContentMissing = isQuickLogV2CriticalContentMissing({
     action: form.action,
     note: form.note,
@@ -989,6 +1021,9 @@ function QuickLogV2SheetForOwner({
           selectedTargetMissing,
           volumeMissing,
           waterFieldMessage,
+          largeWaterMessage: largeWaterAssessment?.needsConfirmation
+            ? largeWaterAssessment.message
+            : null,
           criticalContentMissing,
           saving: saving || feedingSaving || wateringSaving,
         });
@@ -1051,6 +1086,7 @@ function QuickLogV2SheetForOwner({
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
@@ -1267,6 +1303,7 @@ function QuickLogV2SheetForOwner({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setWateringVolumeDefaultsApplied(false);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
@@ -1585,15 +1622,32 @@ function QuickLogV2SheetForOwner({
     );
   }
 
+  const releaseUnstartedLargeWaterConfirm = () => {
+    if (saveInFlightRef.current) return;
+    if (
+      !largeWaterSessionRef.current.inFlight &&
+      largeWaterSessionRef.current.confirmedKey === null
+    ) {
+      return;
+    }
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
+
   const handleSave = async () => {
-    if (recoveryStorageFence || historyCheckRequiredRef.current) return;
+    if (recoveryStorageFence || historyCheckRequiredRef.current) {
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
     const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     if (photoValidationInFlightRef.current) {
       setLocalError("Wait for the photo check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     // Synchronous re-entry guard: prevents a rapid double-click from
@@ -1605,7 +1659,19 @@ function QuickLogV2SheetForOwner({
         postSaveShown: postSave !== null,
       })
     ) {
+      releaseUnstartedLargeWaterConfirm();
       return;
+    }
+    if (form.action === "water" && !wateringRetrySubmissionRef.current) {
+      const largeWater = assessLargeWaterAmount({
+        amount: wateringForm.volumeMl,
+        unit: "ml",
+        confirmedKey: largeWaterSessionRef.current.confirmedKey,
+      });
+      if (largeWater.needsConfirmation) {
+        releaseUnstartedLargeWaterConfirm();
+        return;
+      }
     }
     // Freeze every supported submission before the first await, using the
     // same synchronous guard as Water. Local validation releases this lock.
@@ -1621,6 +1687,10 @@ function QuickLogV2SheetForOwner({
     try {
       await runHandleSave();
     } finally {
+      largeWaterSessionRef.current = {
+        ...largeWaterSessionRef.current,
+        inFlight: false,
+      };
       if (lifetime.active) {
         saveInFlightRef.current = false;
         if (lockSubmission) {
@@ -2689,6 +2759,7 @@ function QuickLogV2SheetForOwner({
     feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
     wateringTempEntryUnitRef.current = null;
+    clearLargeWaterConfirmation();
     setWateringRetryPending(false);
     setFailedWaterPhotoUpload(false);
     setWaterPhotoOmitted(false);
@@ -3189,11 +3260,28 @@ function QuickLogV2SheetForOwner({
                   } else if (nextWaterTempC === "") {
                     wateringTempEntryUnitRef.current = null;
                   }
+                  if (next.volumeMl !== wateringForm.volumeMl) {
+                    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+                    setLargeWaterConfirmedKey(null);
+                  }
                   setWateringForm(next);
                   setLocalError(null);
                 }}
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
                 volumeError={retryPending ? null : (waterSaveGate?.fields.volume ?? null)}
+                confirmedLargeWaterKey={largeWaterConfirmedKey}
+                onConfirmLargeWater={(confirmationKey) => {
+                  const next = confirmLargeWaterAmount(
+                    largeWaterSessionRef.current,
+                    confirmationKey,
+                  );
+                  largeWaterSessionRef.current = {
+                    inFlight: next.inFlight,
+                    confirmedKey: next.confirmedKey,
+                  };
+                  setLargeWaterConfirmedKey(next.confirmedKey);
+                  if (next.save) void handleSave();
+                }}
               />
               {wateringRetryPending && (
                 <div
@@ -3440,10 +3528,8 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.temperatureC}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.temperature) || undefined}
-                    aria-describedby={
-                      waterSaveGate?.fields.temperature ? "qlv2-temp-error" : undefined
-                    }
+                    aria-invalid={Boolean(sensorFieldErrors.temperature) || undefined}
+                    aria-describedby={sensorFieldErrors.temperature ? "qlv2-temp-error" : undefined}
                     onChange={(e) => {
                       const next = e.target.value;
                       if (form.temperatureC.trim() === "" && next.trim() !== "") {
@@ -3454,14 +3540,14 @@ function QuickLogV2SheetForOwner({
                       setField("temperatureC", next);
                     }}
                   />
-                  {waterSaveGate?.fields.temperature && !retryPending && (
+                  {sensorFieldErrors.temperature && !retryPending && (
                     <p
                       id="qlv2-temp-error"
                       data-testid="qlv2-temp-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.temperature}
+                      {sensorFieldErrors.temperature}
                     </p>
                   )}
                 </div>
@@ -3472,18 +3558,18 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.humidityPct}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.humidity) || undefined}
-                    aria-describedby={waterSaveGate?.fields.humidity ? "qlv2-rh-error" : undefined}
+                    aria-invalid={Boolean(sensorFieldErrors.humidity) || undefined}
+                    aria-describedby={sensorFieldErrors.humidity ? "qlv2-rh-error" : undefined}
                     onChange={(e) => setField("humidityPct", e.target.value)}
                   />
-                  {waterSaveGate?.fields.humidity && !retryPending && (
+                  {sensorFieldErrors.humidity && !retryPending && (
                     <p
                       id="qlv2-rh-error"
                       data-testid="qlv2-rh-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.humidity}
+                      {sensorFieldErrors.humidity}
                     </p>
                   )}
                 </div>
@@ -3494,18 +3580,18 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.vpdKpa}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.vpd) || undefined}
-                    aria-describedby={waterSaveGate?.fields.vpd ? "qlv2-vpd-error" : undefined}
+                    aria-invalid={Boolean(sensorFieldErrors.vpd) || undefined}
+                    aria-describedby={sensorFieldErrors.vpd ? "qlv2-vpd-error" : undefined}
                     onChange={(e) => setField("vpdKpa", e.target.value)}
                   />
-                  {waterSaveGate?.fields.vpd && !retryPending && (
+                  {sensorFieldErrors.vpd && !retryPending && (
                     <p
                       id="qlv2-vpd-error"
                       data-testid="qlv2-vpd-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.vpd}
+                      {sensorFieldErrors.vpd}
                     </p>
                   )}
                 </div>
@@ -3768,6 +3854,7 @@ function QuickLogV2SheetForOwner({
                       (selectedTargetStale && !retryPending) ||
                       (criticalContentMissing && !retryPending) ||
                       (Boolean(waterFieldMessage) && !retryPending) ||
+                      Boolean(largeWaterAssessment?.needsConfirmation) ||
                       Boolean(archivedGrowActionBlock)
                     }
                     aria-describedby="qlv2-save-helper"
@@ -3797,6 +3884,7 @@ function getSaveHelperMessage(input: {
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
   waterFieldMessage: string | null;
+  largeWaterMessage?: string | null;
   criticalContentMissing: boolean;
   saving: boolean;
 }): string {
@@ -3806,6 +3894,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.waterFieldMessage) return input.waterFieldMessage;
+  if (input.largeWaterMessage) return input.largeWaterMessage;
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";

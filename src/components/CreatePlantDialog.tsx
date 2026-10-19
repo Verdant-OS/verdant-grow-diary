@@ -117,7 +117,7 @@ function emptyForm(tentId: string) {
   };
 }
 
-/** Physical key identity; falls back to `key` when `code` is unavailable. */
+/** Physical key identity; falls back to event.key when event.code is unavailable. */
 function physicalKeyId(event: KeyboardEvent): string {
   return event.code || event.key;
 }
@@ -246,9 +246,9 @@ export default function CreatePlantDialog({
   const closedAfterSubmitRef = useRef(false);
   const releaseReopenGuardRef = useRef<(() => void) | null>(null);
   useEffect(() => () => releaseReopenGuardRef.current?.(), []);
-  // Keys physically held right now, keyed by physical key (`code`): `key`
+  // Keys physically held right now, keyed by physical key (event.code): event.key
   // changes with Shift/dead keys between keydown and keyup and would leave
-  // phantom entries. A save usually resolves after the submitting key's keyup,
+  // phantom entries. A save usually resolves after the keyup of the submitting key,
   // and a guard armed then would swallow the next genuine activation of
   // New plant (Codex P2 at 885e48b8).
   const heldKeysRef = useRef<Set<string>>(new Set());

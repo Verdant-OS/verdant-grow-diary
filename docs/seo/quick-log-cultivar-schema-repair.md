@@ -24,7 +24,10 @@ JSON-LD and canonicalized to `/quick-log`; the synthetic URL is not claimed to
 be one of the exact 18 Ahrefs URLs. No UTM values appeared in their JSON-LD.
 All ten cultivar pages retained self canonicals and `noindex, follow`.
 Raw captures and extracted JSON-LD: `/tmp/verdant-seo-live/` (local evidence,
-not a durable repository artifact).
+not a durable repository artifact). Page responses did not expose immutable
+per-response revision headers; the bracketing version samples cannot rule
+out mixed serving. The live defect matches this crawl category, but the
+undisclosed October 14 property cannot be attributed definitively to it.
 
 The affected cultivar slugs are `blue-cookies`, `sour-stomper`,
 `lemon-cherry-gelato`, `sour-diesel`, `do-si-dos`, `gg4`, `blue-dream`,
@@ -44,7 +47,9 @@ The production allowlist is only `src/lib/seoStructuredData.ts`. New regression
 files and this receipt are allowed. Existing tests and
 `scripts/validate-jsonld-rich-results.mjs` are protected and remain unchanged.
 The current validator accepts the invalid nested property, so its pass alone
-does not prove schema.org domain validity.
+does not prove schema.org domain validity. The repair preserves every trait
+as a topic of the reference page; it does not assert custom property edges
+from the cultivar Thing or promise Google rich-result eligibility.
 
 ## Ownership and Quick Log handoff
 
@@ -97,8 +102,45 @@ Existing protected `src/test/static-public-seo-documents.test.ts` explicitly
 expects SoftwareApplication on `/quick-log`. Updating that assertion needs
 specific owner approval. No unlock or edit is performed by this task.
 
-## Validation status
+## Implementation and validation
 
-This initial packet precedes production implementation. New failing-then-passing
-regression evidence and exact-head results will be added after verification.
-No live repair or Ahrefs re-crawl has been measured.
+Draft [#2259](https://github.com/Verdant-OS/verdant-grow-diary/pull/2259) was
+opened at documentation-only commit
+`bf606435a69ceed5fc65bf7acf4cf7a0273e252f` before implementation. The only
+production change is the shared builder's `about` value: cultivar Thing first,
+followed by the existing filtered PropertyValue entries. Both static metadata
+and the client effect already use it; neither caller was edited.
+
+New `src/test/cultivar-schema-domain-regression.test.tsx` exercises every one
+of the ten affected static and hydrated outputs, exact trait/alias parity,
+canonical/noindex holds, effect cleanup, blank traits, empty evidence,
+determinism and safe serialization. No tracked test or validator was edited
+or unlocked. The old shape fails the new domain assertion, not a setup error.
+
+- Baseline at `c0ce65cb3`: 4 existing files, 36 PASS / 0 FAIL.
+- RED at `bf606435a` before the production edit: 23 FAIL / 0 PASS.
+- GREEN with the repaired builder: 23 PASS / 0 FAIL / 0 SKIP.
+- Related suite: 9 files, 103 PASS / 0 FAIL / 0 SKIP, including the new 23,
+  existing cultivar static/client metadata, validator, app offer-truth and
+  public Quick Log safety coverage.
+- Scoped ESLint, strict scorer report and diff whitespace check: PASS.
+- Full `bun run typecheck`: PASS (exit 0).
+- Production build/postbuild validators: NOT_MEASURED, pending committed tree.
+- Full repository suite: NOT_MEASURED; the bounded related suite is reported.
+- Codex peer review: no findings; not independent acceptance.
+- Hosted final-head CI and Critical Mass acceptance: NOT_MEASURED.
+
+Local receipts: `/tmp/verdant-seo-{baseline,red,green,focused}.log`; machine
+results `/tmp/verdant-seo-{red,green,focused}.json`. Production SHA-256 before:
+`586bb55fa59c75758bfb094b60690e946d67abddd030e92c3a23c681e5c9a343`;
+after: `c2385da97aceecc820eb898e558ab40eec29af7099a0a873461f91e17f65cc1a`.
+The RED and GREEN receipts use the same test assertions; later Prettier changes
+only format the new test. Exact final-head checks belong in the draft PR body.
+
+Status: cultivar source repair verified locally; Quick Log handed to Claude.
+Next owner: Critical Mass for acceptance via normal routing; Claude for the
+Quick Log decision and protected-test approval. No live repair, production
+browser validation, complete Google Rich Results Test or Ahrefs re-crawl has
+been measured. No merge, ready, enqueue, publish or deployment is authorized.
+Rollback is a normal reviewed revert of the shared builder change; it restores
+the known invalid property and therefore is not recommended as a fix.

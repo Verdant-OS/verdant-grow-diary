@@ -1,18 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import PaywallCta from "@/components/PaywallCta";
-
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(", ");
 
 describe("PaywallCta primary CTA is one focusable link", () => {
   function renderCta(onPrimaryCtaClick?: () => void) {
@@ -34,8 +25,6 @@ describe("PaywallCta primary CTA is one focusable link", () => {
   it("does not nest a button inside the See plans link", async () => {
     const onPrimaryCtaClick = vi.fn();
     const { container, vm } = renderCta(onPrimaryCtaClick);
-    const root = container.querySelector('[data-testid="paywall-cta"]');
-    expect(root).not.toBeNull();
 
     expect(
       container.querySelectorAll(
@@ -43,17 +32,18 @@ describe("PaywallCta primary CTA is one focusable link", () => {
       ).length,
     ).toBe(0);
 
-    const labelled = [...(root?.querySelectorAll(FOCUSABLE_SELECTOR) ?? [])].filter(
-      (element) => (element.textContent ?? "").trim() === vm.primaryCtaLabel,
-    );
-    expect(labelled).toHaveLength(1);
-    const control = labelled[0];
-    expect(control?.tagName).toBe("A");
+    const control = within(screen.getByTestId("paywall-cta")).getByRole("link", {
+      name: vm.primaryCtaLabel,
+    });
     expect(control).toHaveAttribute("data-testid", "paywall-cta-link");
     expect(control).toHaveAttribute("href", vm.primaryCtaHref);
+    expect(control).toBeInstanceOf(HTMLAnchorElement);
+    if (!(control instanceof HTMLAnchorElement)) {
+      throw new Error("primary CTA is not an anchor");
+    }
 
     const user = userEvent.setup();
-    await user.click(control as HTMLElement);
+    await user.click(control);
     expect(onPrimaryCtaClick).toHaveBeenCalledTimes(1);
   });
 });

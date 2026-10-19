@@ -536,4 +536,39 @@ describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves
       ]),
     ).toEqual([]);
   });
+
+  it("does not claim a partially overlapping event that lacks a metric the mirror recorded", () => {
+    // Mirror records 95°F AND 20% RH. env-a (lower id) is a separate
+    // temperature-only 35°C save; env-b is the mirror's real sibling.
+    const events = parseTentManualEnvironmentEvents([
+      {
+        ...eventRow(at, "env-a"),
+        plant_id: "plant-1",
+        environment_events: { temperature_c: 35, humidity_pct: null, vpd_kpa: null },
+      },
+      { ...eventRow(at, "env-b"), plant_id: "plant-1" },
+    ]);
+    const kept = dropEventsMirroredByDiaryRows(events, [plantQuickLogCompanion(at, "parent-1")]);
+    expect(kept.map((e) => e.id)).toEqual(["env-a"]);
+  });
+
+  it("does not claim an event carrying a metric the mirror did not record", () => {
+    const tempOnlyMirror = {
+      ...plantQuickLogCompanion(at, "parent-1"),
+      details: {
+        linked_grow_event_id: "parent-1",
+        manual_sensor_snapshot: { source: "manual", temp_f: 95, humidity_percent: null },
+      },
+    };
+    const events = parseTentManualEnvironmentEvents([
+      { ...eventRow(at, "env-a"), plant_id: "plant-1" },
+      {
+        ...eventRow(at, "env-b"),
+        plant_id: "plant-1",
+        environment_events: { temperature_c: 35, humidity_pct: null, vpd_kpa: null },
+      },
+    ]);
+    const kept = dropEventsMirroredByDiaryRows(events, [tempOnlyMirror]);
+    expect(kept.map((e) => e.id)).toEqual(["env-a"]);
+  });
 });

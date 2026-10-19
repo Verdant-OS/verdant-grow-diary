@@ -201,18 +201,22 @@ const MIRROR_TEMP_F_TOLERANCE = 0.15;
 const MIRROR_RH_TOLERANCE = 0.05;
 
 /**
- * True when the event carries the same readings the mirror recorded: every
- * metric present on both sides agrees (°C converted to °F) and at least one
- * metric is comparable.
+ * True when the event carries exactly the readings the mirror recorded: the
+ * mirror and the event have the same temperature and humidity metrics
+ * present (the save adapter parses both from one input, so a real sibling
+ * always does), every present metric agrees (°C converted to °F), and at
+ * least one metric is comparable. A partial overlap is a different save.
  */
 function eventMatchesMirrorValues(ev: TentManualEnvironmentEvent, details: unknown): boolean {
   let compared = 0;
   const tempF = snapshotNumber(details, "temp_f");
+  if ((tempF === null) !== (ev.temperatureC === null)) return false;
   if (tempF !== null && ev.temperatureC !== null) {
     compared += 1;
     if (Math.abs((ev.temperatureC * 9) / 5 + 32 - tempF) > MIRROR_TEMP_F_TOLERANCE) return false;
   }
   const rh = snapshotNumber(details, "humidity_percent");
+  if ((rh === null) !== (ev.humidityPct === null)) return false;
   if (rh !== null && ev.humidityPct !== null) {
     compared += 1;
     if (Math.abs(ev.humidityPct - rh) > MIRROR_RH_TOLERANCE) return false;

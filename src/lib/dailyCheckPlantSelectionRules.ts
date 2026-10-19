@@ -161,3 +161,65 @@ export function defaultDailyCheckPlantId(input: {
  */
 export const DAILY_CHECK_WHAT_COUNTS_HINT =
   "A Daily Grow Check can be a quick plant note or a current-tent manual sensor snapshot.";
+
+/** Shown when submit re-reads the selected plant and it is archived. */
+export const DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE =
+  "This plant was archived. Pick another plant.";
+
+/**
+ * Plant-list cache key. Equal to `PLANTS_QUERY_KEY` in `use-plants`.
+ * Daily Check imports it from here so a hook mock cannot drop the key.
+ */
+export const DAILY_CHECK_PLANTS_LIST_QUERY_KEY = ["plants"] as const;
+
+/**
+ * Save controls Daily Check renders. The page re-reads `plants.is_archived`
+ * before these run. Other buttons on the page are not submit.
+ */
+export const DAILY_CHECK_SUBMIT_SAVE_TEST_IDS = [
+  "quick-log-save",
+  "daily-check-all-activities-save",
+  "manual-reading-save",
+] as const;
+
+export type DailyCheckSubmitSaveTestId = (typeof DAILY_CHECK_SUBMIT_SAVE_TEST_IDS)[number];
+
+export function isDailyCheckSubmitSaveTestId(
+  testId: string | null | undefined,
+): testId is DailyCheckSubmitSaveTestId {
+  if (!testId) return false;
+  return (DAILY_CHECK_SUBMIT_SAVE_TEST_IDS as readonly string[]).includes(testId);
+}
+
+export type DailyCheckPlantArchiveRead =
+  | { readonly status: "active" }
+  | { readonly status: "archived" }
+  | { readonly status: "unreadable" };
+
+/** Map one plant-row read. A missing row or a read error is not an archive proof. */
+export function classifyDailyCheckPlantArchiveRead(input: {
+  readonly error: boolean;
+  readonly isArchived: boolean | null;
+}): DailyCheckPlantArchiveRead {
+  if (input.error || input.isArchived === null) return { status: "unreadable" };
+  return input.isArchived ? { status: "archived" } : { status: "active" };
+}
+
+export function dailyCheckSubmitBlockForPlantArchive(read: DailyCheckPlantArchiveRead):
+  | { readonly block: false }
+  | {
+      readonly block: true;
+      readonly message: typeof DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE;
+    } {
+  switch (read.status) {
+    case "active":
+    case "unreadable":
+      return { block: false };
+    case "archived":
+      return { block: true, message: DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE };
+    default: {
+      const neverRead: never = read;
+      return neverRead;
+    }
+  }
+}

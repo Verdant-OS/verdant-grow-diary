@@ -1,0 +1,272 @@
+/**
+ * #2015 step 5: Daily Check submit must re-read the selected plant before the
+ * diary save. A plant archived in another tab can still sit in the cached
+ * usePlants list. The preferred outcome is to block that save.
+ */
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "@/lib/react-router-compat";
+import {
+  DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
+  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
+  DAILY_CHECK_SUBMIT_SAVE_TEST_IDS,
+  classifyDailyCheckPlantArchiveRead,
+  dailyCheckSubmitBlockForPlantArchive,
+  isDailyCheckSubmitSaveTestId,
+} from "@/lib/dailyCheckPlantSelectionRules";
+
+type Plant = {
+  id: string;
+  name: string;
+  strain: string | null;
+  grow_id: string;
+  tent_id: string;
+  is_archived: boolean;
+};
+
+const plantsRef = vi.hoisted(() => ({ plants: [] as Plant[] }));
+const saveInsert = vi.hoisted(() => vi.fn());
+const plantArchive = vi.hoisted(() => ({ byId: {} as Record<string, boolean> }));
+
+const ARCHIVED_PLANT_MESSAGE = DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE;
+
+vi.mock("@/integrations/supabase/client", () => {
+  function plantsRead() {
+    const state = { id: "" };
+    const builder = {
+      select: () => builder,
+      eq: (column: string, value: string) => {
+        if (column === "id") state.id = value;
+        return builder;
+      },
+      maybeSingle: async () => ({
+        data: {
+          id: state.id,
+          is_archived: plantArchive.byId[state.id] === true,
+        },
+        error: null,
+      }),
+    };
+    return builder;
+  }
+
+  return {
+    supabase: {
+      from: (table: string) => {
+        if (table === "plants") return plantsRead();
+        return {
+          insert: (...args: unknown[]) => {
+            saveInsert(...args);
+            return Promise.resolve({ data: null, error: null });
+          },
+        };
+      },
+      rpc: (...args: unknown[]) => {
+        saveInsert(...args);
+        return Promise.resolve({ data: null, error: null });
+      },
+    },
+  };
+});
+
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: [{ id: "t1", name: "Tent A", grow_id: "g1" }],
+    isLoading: false,
+  }),
+}));
+vi.mock("@/hooks/use-plants", () => ({
+  PLANTS_QUERY_KEY: ["plants"],
+  usePlants: () => ({ data: plantsRef.plants, isLoading: false }),
+}));
+vi.mock("@/hooks/useScopedGrow", () => ({
+  useScopedGrow: () => ({
+    urlGrowId: null,
+    scopedGrow: null,
+    scopedGrowName: null,
+    isValidScopedGrow: false,
+    backHref: undefined,
+  }),
+}));
+vi.mock("@/components/ManualSensorReadingCard", () => ({
+  default: () => <div />,
+}));
+vi.mock("@/components/QuickLog", () => ({
+  default: ({ open, onCreated }: { open?: boolean; onCreated?: () => void }) => (
+    <div data-testid="mock-quicklog" data-open={open ? "1" : "0"}>
+      <button
+        type="button"
+        data-testid="quick-log-save"
+        onClick={() => {
+          saveInsert("diary_entries");
+          window.dispatchEvent(
+            new CustomEvent("verdant:entry-created", {
+              detail: { createdAt: "2026-10-19T15:00:00.000Z", activityId: "note" },
+            }),
+          );
+          onCreated?.();
+        }}
+      >
+        Save
+      </button>
+    </div>
+  ),
+}));
+vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
+  default: () => <div data-testid="daily-check-all-activities" />,
+}));
+vi.mock("@/components/PlantStatusStrip", () => ({ default: () => <div /> }));
+vi.mock("@/components/PlantAssignedTentAlertsPanel", () => ({ default: () => <div /> }));
+vi.mock("@/components/PlantAssignedTentActionsPanel", () => ({ default: () => <div /> }));
+vi.mock("@/components/DailyGrowCheckOnboardingCard", () => ({ default: () => <div /> }));
+
+import DailyCheck from "@/pages/DailyCheck";
+
+const plantP: Plant = {
+  id: "P",
+  name: "Plant P",
+  strain: null,
+  grow_id: "g1",
+  tent_id: "t1",
+  is_archived: false,
+};
+const plantQ: Plant = {
+  id: "Q",
+  name: "Other",
+  strain: null,
+  grow_id: "g1",
+  tent_id: "t1",
+  is_archived: false,
+};
+
+function renderCheck() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const invalidateQueries = vi.spyOn(qc, "invalidateQueries");
+  const view = render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={["/daily-check"]}>
+        <DailyCheck />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  return { ...view, invalidateQueries };
+}
+
+async function choosePlant(name: RegExp) {
+  const trigger = screen.getByTestId("daily-grow-check-plant-select");
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("option", { name }));
+}
+
+function plantHref(): string | null {
+  const plant = screen.queryByTestId("daily-grow-check-post-submit-plant");
+  if (!plant) return null;
+  const link = plant.tagName === "A" ? plant : plant.querySelector("a");
+  return link?.getAttribute("href") ?? null;
+}
+
+async function reachQuickLogSave() {
+  await choosePlant(/Plant P/);
+  fireEvent.click(screen.getByTestId("daily-grow-check-start"));
+  fireEvent.click(screen.getByTestId("daily-grow-check-next"));
+  fireEvent.click(screen.getByTestId("daily-grow-check-skip-manual"));
+  expect(screen.getByText(/Step 4 · Quick Log/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("daily-grow-check-open-quicklog"));
+  expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1");
+}
+
+describe("daily check archived-plant submit decision", () => {
+  it("blocks only a row that is archived", () => {
+    expect(
+      dailyCheckSubmitBlockForPlantArchive(
+        classifyDailyCheckPlantArchiveRead({ error: false, isArchived: true }),
+      ),
+    ).toEqual({ block: true, message: "This plant was archived. Pick another plant." });
+    expect(
+      dailyCheckSubmitBlockForPlantArchive(
+        classifyDailyCheckPlantArchiveRead({ error: false, isArchived: false }),
+      ),
+    ).toEqual({ block: false });
+  });
+
+  it("does not treat a missing or failed read as an archive", () => {
+    expect(
+      dailyCheckSubmitBlockForPlantArchive(
+        classifyDailyCheckPlantArchiveRead({ error: true, isArchived: null }),
+      ).block,
+    ).toBe(false);
+    expect(
+      dailyCheckSubmitBlockForPlantArchive(
+        classifyDailyCheckPlantArchiveRead({ error: false, isArchived: null }),
+      ).block,
+    ).toBe(false);
+  });
+
+  it("recognizes the Daily Check save controls and ignores other buttons", () => {
+    for (const testId of DAILY_CHECK_SUBMIT_SAVE_TEST_IDS) {
+      expect(isDailyCheckSubmitSaveTestId(testId)).toBe(true);
+    }
+    expect(isDailyCheckSubmitSaveTestId("daily-grow-check-start")).toBe(false);
+    expect(isDailyCheckSubmitSaveTestId(null)).toBe(false);
+  });
+
+  it("invalidates the same plant-list key usePlants publishes", async () => {
+    const actual = await vi.importActual<typeof import("@/hooks/use-plants")>("@/hooks/use-plants");
+    expect(DAILY_CHECK_PLANTS_LIST_QUERY_KEY).toEqual(actual.PLANTS_QUERY_KEY);
+  });
+});
+
+describe("Daily Check submit re-checks an archived plant", () => {
+  beforeEach(() => {
+    plantsRef.plants = [plantP, plantQ];
+    plantArchive.byId = {};
+    saveInsert.mockClear();
+    const proto = window.HTMLElement.prototype;
+    proto.scrollIntoView = () => {};
+    proto.hasPointerCapture = () => false;
+    proto.releasePointerCapture = () => {};
+    proto.setPointerCapture = () => {};
+  });
+
+  it("blocks the diary save and tells the grower to pick another plant", async () => {
+    const { invalidateQueries } = renderCheck();
+    await reachQuickLogSave();
+    plantArchive.byId.P = true;
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    expect(saveInsert).not.toHaveBeenCalled();
+    expect(await screen.findByText(ARCHIVED_PLANT_MESSAGE)).toBeInTheDocument();
+    expect(saveInsert).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("daily-grow-check-post-submit-plant")).not.toBeInTheDocument();
+    expect(screen.getByTestId("daily-grow-check-choose")).toHaveAttribute("data-plant-id", "");
+    expect(invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["plants"] }),
+    );
+  });
+
+  it("still saves a plant that is not archived and keeps View Plant", async () => {
+    const { invalidateQueries } = renderCheck();
+    await reachQuickLogSave();
+    plantArchive.byId.P = false;
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() => {
+      expect(saveInsert).toHaveBeenCalledTimes(1);
+    });
+    expect(saveInsert).toHaveBeenCalledWith("diary_entries");
+    expect(screen.queryByText(ARCHIVED_PLANT_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.getByTestId("daily-grow-check-post-submit-plant")).toHaveTextContent(
+      "View Plant",
+    );
+    expect(plantHref()).toBe("/plants/P");
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ["plants"] }),
+      );
+    });
+  });
+});

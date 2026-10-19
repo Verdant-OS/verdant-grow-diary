@@ -189,6 +189,37 @@ function hasManualSensorSnapshot(details: unknown): boolean {
   return !!snap && typeof snap === "object" && (snap as { source?: unknown }).source === "manual";
 }
 
+function snapshotNumber(details: unknown, key: string): number | null {
+  const snap = (details as { manual_sensor_snapshot?: Record<string, unknown> })
+    .manual_sensor_snapshot;
+  const v = snap?.[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/** 0.01 °C storage rounding is 0.018 °F; humidity is stored as typed. */
+const MIRROR_TEMP_F_TOLERANCE = 0.15;
+const MIRROR_RH_TOLERANCE = 0.05;
+
+/**
+ * True when the event carries the same readings the mirror recorded: every
+ * metric present on both sides agrees (°C converted to °F) and at least one
+ * metric is comparable.
+ */
+function eventMatchesMirrorValues(ev: TentManualEnvironmentEvent, details: unknown): boolean {
+  let compared = 0;
+  const tempF = snapshotNumber(details, "temp_f");
+  if (tempF !== null && ev.temperatureC !== null) {
+    compared += 1;
+    if (Math.abs((ev.temperatureC * 9) / 5 + 32 - tempF) > MIRROR_TEMP_F_TOLERANCE) return false;
+  }
+  const rh = snapshotNumber(details, "humidity_percent");
+  if (rh !== null && ev.humidityPct !== null) {
+    compared += 1;
+    if (Math.abs(ev.humidityPct - rh) > MIRROR_RH_TOLERANCE) return false;
+  }
+  return compared > 0;
+}
+
 /**
  * A sensor-bearing Plant Quick Log save writes a parent action grow_event, a
  * sibling `environment` grow_event, and a diary mirror that keeps
@@ -198,9 +229,9 @@ function hasManualSensorSnapshot(details: unknown): boolean {
  * entry_at, and the repo already treats that exact (tent, plant, instant)
  * triple as the environment-sibling identity (connectedOneTentActivationRules).
  *
- * So an environment event is dropped when a fetched, linked Quick Log mirror
- * carrying a manual snapshot shares its (tent_id, plant_id, instant). The
- * mirror card is kept, with its note and pH/EC, exactly as the timeline
+ * So a fetched, linked Quick Log mirror carrying a manual snapshot claims the
+ * one environment event that shares its (tent_id, plant_id, instant) and its
+ * readings. The mirror card is kept, with its note and pH/EC, exactly as the timeline
  * showed it before grow_events were read. An event whose id the mirror links
  * directly is also dropped. Input order is preserved.
  */
@@ -208,22 +239,33 @@ export function dropEventsMirroredByDiaryRows<E extends TentManualEnvironmentEve
   events: ReadonlyArray<E>,
   diaryRows: ReadonlyArray<TentManualMirrorDiaryRow | null | undefined>,
 ): E[] {
-  const linkedIds = new Set<string>();
-  const siblingKeys = new Set<string>();
+  // Each mirror claims at most ONE environment event: the one it links by
+  // id, else the one same-(tent, plant, instant) event whose readings match
+  // its snapshot (lowest id on an exact tie). Another manual save at the
+  // same instant is never dropped, and a mismatch drops nothing.
+  const claimed = new Set<string>();
+  const byId = [...events].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   for (const row of diaryRows) {
     if (!row) continue;
     const linked = diaryRowMirroredGrowEventId(row.details);
     if (!linked || !hasManualSensorSnapshot(row.details)) continue;
-    linkedIds.add(linked);
+    const direct = byId.find((ev) => ev.id === linked && !claimed.has(ev.id));
+    if (direct) {
+      claimed.add(direct.id);
+      continue;
+    }
     const key = siblingKey(row.tent_id, row.plant_id, row.entry_at);
-    if (key) siblingKeys.add(key);
+    if (!key) continue;
+    const sibling = byId.find(
+      (ev) =>
+        !claimed.has(ev.id) &&
+        siblingKey(ev.tentId, ev.plantId, ev.occurredAt) === key &&
+        eventMatchesMirrorValues(ev, row.details),
+    );
+    if (sibling) claimed.add(sibling.id);
   }
-  if (linkedIds.size === 0) return [...events];
-  return events.filter((ev) => {
-    if (linkedIds.has(ev.id)) return false;
-    const key = siblingKey(ev.tentId, ev.plantId, ev.occurredAt);
-    return !(key && siblingKeys.has(key));
-  });
+  if (claimed.size === 0) return [...events];
+  return events.filter((ev) => !claimed.has(ev.id));
 }
 
 /** The part of a React Query result the tent history read needs. */

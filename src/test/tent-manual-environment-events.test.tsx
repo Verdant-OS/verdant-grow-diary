@@ -64,6 +64,7 @@ function eventRow(occurredAt: string, id = "ev-1") {
 
 import {
   buildTentManualHistoryRead,
+  dropEventsMirroredByDiaryRows,
   manualEnvironmentEventsToChangeContextRows,
   manualEnvironmentEventsToSnapshotRecords,
   parseTentManualEnvironmentEvents,
@@ -466,5 +467,73 @@ describe("tent manual snapshots — Codex re-review on #2114", () => {
       />,
     );
     expect(screen.getAllByTestId("tent-manual-snapshot-history-item")).toHaveLength(2);
+  });
+});
+
+describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves)", () => {
+  function CardsProbe2() {
+    const r = useManualSnapshotTimelineCards({ kind: "tent", tentId: TENT_ID });
+    return (
+      <p data-testid="cards-probe-2" data-status={r.readStatus}>
+        {r.cards.map((c) => c.id).join(",")}
+      </p>
+    );
+  }
+  async function ids(): Promise<string[]> {
+    await waitFor(() =>
+      expect(screen.getByTestId("cards-probe-2").getAttribute("data-status")).toBe("success"),
+    );
+    const text = screen.getByTestId("cards-probe-2").textContent ?? "";
+    return text === "" ? [] : text.split(",");
+  }
+  const at = "2026-10-14T10:00:00.000Z";
+
+  it("drops only the mirror's own sibling and keeps another manual save at the same instant", async () => {
+    db.byTable = {
+      // Mirror records 95°F / 20% (the sibling env-1 stores 35°C / 20%).
+      diary_entries: [plantQuickLogCompanion(at, "parent-1")],
+      grow_events: [
+        { ...eventRow(at, "env-1"), plant_id: "plant-1" },
+        {
+          ...eventRow(at, "env-2"),
+          plant_id: "plant-1",
+          environment_events: { temperature_c: 24, humidity_pct: 60, vpd_kpa: 1.2 },
+        },
+      ],
+    };
+    withProviders(<CardsProbe2 />);
+    expect(await ids()).toEqual(["diary-1", "env-2"]);
+  });
+
+  it("drops nothing when no same-instant event carries the mirror's readings", async () => {
+    db.byTable = {
+      diary_entries: [plantQuickLogCompanion(at, "parent-1")],
+      grow_events: [
+        {
+          ...eventRow(at, "env-3"),
+          plant_id: "plant-1",
+          environment_events: { temperature_c: 24, humidity_pct: 60, vpd_kpa: 1.2 },
+        },
+      ],
+    };
+    withProviders(<CardsProbe2 />);
+    expect(await ids()).toEqual(["diary-1", "env-3"]);
+  });
+
+  it("two identical saves at one instant, each with its mirror, collapse one each", () => {
+    const events = parseTentManualEnvironmentEvents([
+      { ...eventRow(at, "env-a"), plant_id: "plant-1" },
+      { ...eventRow(at, "env-b"), plant_id: "plant-1" },
+    ]);
+    const kept = dropEventsMirroredByDiaryRows(events, [
+      plantQuickLogCompanion(at, "parent-a", "diary-a"),
+    ]);
+    expect(kept.map((e) => e.id)).toEqual(["env-b"]);
+    expect(
+      dropEventsMirroredByDiaryRows(events, [
+        plantQuickLogCompanion(at, "parent-a", "diary-a"),
+        plantQuickLogCompanion(at, "parent-b", "diary-b"),
+      ]),
+    ).toEqual([]);
   });
 });

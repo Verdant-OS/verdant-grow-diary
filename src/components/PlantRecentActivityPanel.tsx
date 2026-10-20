@@ -142,7 +142,7 @@ function EntryRow({
         </ul>
       ) : null}
       {row.notePreview ? (
-        <p className="mt-2 text-sm leading-snug">{localizeReadingAtTimestamps(row.notePreview)}</p>
+        <p className="mt-2 text-sm leading-snug">{row.notePreview}</p>
       ) : !row.hasHardwareReadings && detailLines.length === 0 ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
       ) : null}
@@ -190,13 +190,20 @@ function EntryRow({
   );
 }
 
+function withLocalReadingTimestamp<T>(row: T): T {
+  const note = (row as { note?: unknown })?.note;
+  return typeof note === "string" ? { ...row, note: localizeReadingAtTimestamps(note) } : row;
+}
+
 export default function PlantRecentActivityPanel({ plantId, plantName }: Props) {
   const enabled = !!plantId;
   const temperatureUnit = useTemperatureUnitPreference();
   const { data, isLoading, isError, isFetching, refetch, isPending, fetchStatus } =
     usePlantRecentActivity(plantId);
   const rawRows = enabled ? enrichPlantFeedingDiaryRows(data ?? []) : [];
-  const rows = buildPlantRecentActivity(rawRows, {
+  // Localize "Reading at <ISO>." on the full note: the rules layer clips the
+  // preview at 140 characters, which can split the timestamp.
+  const rows = buildPlantRecentActivity(rawRows.map(withLocalReadingTimestamp), {
     plantId: plantId ?? null,
   });
   // Structured activity detail (e.g. training technique) is recovered from the

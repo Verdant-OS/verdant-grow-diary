@@ -56,8 +56,8 @@ vi.mock("@/hooks/usePlantRecentActivity", () => ({
         plant_id: "p1",
         entry_type: "note",
         entry_at: "2026-10-15T16:05:00.000Z",
-        // Short enough to stay inside the 140-character note preview.
-        note: `Approved: Lower humidity. Observed 70%. Reading at ${ISO}.`,
+        // The raw timestamp straddles the 140-character preview cut (Codex P1).
+        note: `Action approved: Lower humidity. Humidity is above the flower target range. Observed 70% (flower range 40%–50%). Reading at ${ISO}.`,
         details: { kind: "action_queue_trace", trace_kind: "approved" },
       },
     ],
@@ -120,8 +120,9 @@ describe("plant page recent activity", () => {
         <PlantRecentActivityPanel plantId="p1" plantName="Plant A" />
       </MemoryRouter>,
     );
-    expect(document.body.textContent).toContain("Approved: Lower humidity.");
+    expect(document.body.textContent).toContain("Action approved: Lower humidity.");
     expect(document.body.textContent).toContain("Reading at");
     expect(document.body.textContent).not.toContain(ISO);
+    expect(document.body.textContent).not.toContain("2026-10-15T");
   });
 });

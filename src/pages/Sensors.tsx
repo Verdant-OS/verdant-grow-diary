@@ -64,6 +64,8 @@ import { EcowittIngestAuditProofPanel } from "@/components/EcowittIngestAuditPro
 import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
 import { isUsableGrowSensorReading } from "@/lib/growSensorEvidenceRules";
 import { useHasRole } from "@/hooks/useHasRole";
+import { useLiveSensorServerGate } from "@/hooks/useLiveSensorServerGate";
+import { canMountLiveSensorSetup } from "@/lib/entitlements/liveSensorSetupAccess";
 import { canShowSensorOperatorDiagnostics } from "@/lib/sensorOperatorAccessRules";
 import {
   buildSensorsRequiredTentGate,
@@ -166,6 +168,18 @@ export default function Sensors() {
     [quickLogManualQuery.data, clockedTentReadings],
   );
   const operatorRole = useHasRole("operator");
+  // Live-sensor setup surface: mounted only after the server-authoritative
+  // live-sensor-entitlement preflight allows it for this tent. That preflight
+  // resolves the same canonical subscription as mint-bridge-token and the
+  // ingest functions; the client entitlement hook's staff lift is not used.
+  const liveSensorGate = useLiveSensorServerGate("live_sensor_stream", {
+    tentId: activeTentId ?? null,
+  });
+  const canShowTestbench = canMountLiveSensorSetup({
+    serverGateState: liveSensorGate.state,
+    evaluatedTentId: liveSensorGate.evaluatedTentId,
+    activeTentId,
+  });
 
   // Reconcile only after the authenticated tent query succeeds. A failed
   // first attempt must not consume the URL intent: its retry can still prove
@@ -925,7 +939,7 @@ export default function Sensors() {
           sensorReadingsStatus={defaultManualTentId ? trendReadingsStatus : "success"}
         />
       </div>
-      {selectedTent && activeTentId && (
+      {canShowTestbench && selectedTent && activeTentId && (
         <div className="mt-4 max-w-2xl">
           <SensorsTestbenchPanel tentId={activeTentId} tentName={selectedTent.name ?? null} />
         </div>

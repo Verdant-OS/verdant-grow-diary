@@ -38,6 +38,7 @@ const DEAD_LINK_PATTERNS = [
 const STATIC_ASSET_EXTENSIONS = new Set([
   ".avif",
   ".css",
+  ".csv",
   ".gif",
   ".ico",
   ".jpeg",

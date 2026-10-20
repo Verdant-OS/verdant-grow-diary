@@ -163,6 +163,10 @@ same pager, so neither has a cap of its own:
   timestamp then goes to the canonical comparator, which picks the winner. The query ending also stops it, and so
   does a hard bound of 5 pages per source (250 diary rows, 1,000 grow events). It never stops at the 24-hour manual
   age limit: an older terminal record is returned and ages to `stale` like any other (CVP-22).
+- **A bound that interrupts a tie fails closed.** If the 5-page bound is reached after a terminal record is found but
+  before its timestamp tie is complete, the comparator never sees a partial tie: that source contributes no manual
+  candidate and the result is `unavailable` with reason `read_failed`, whatever else the partial set holds. A
+  missing tied candidate (a tent-level or an invalid one) could otherwise outrank what was read.
 - **Value filters only make pages denser.** The diary filter above, and for grow events an
   `environment_events!inner ( temperature_c, humidity_pct, vpd_kpa )` embed with
   `.or("vpd_kpa.not.is.null,and(temperature_c.not.is.null,humidity_pct.not.is.null)", { referencedTable: "environment_events" })`,
@@ -170,9 +174,9 @@ same pager, so neither has a cap of its own:
   unfiltered pages return the same winner and `evidenceRef` within the bound. `uncertainty`: the build confirms
   `!inner` filtering against the hosted PostgREST before enabling it; without it, the pager runs on unfiltered pages.
 
-Known limit, stated rather than built for: more records read before the stop condition holds than the 5-page bound
-(skipped records, or a larger tie on one timestamp) hide an older or tied terminal record. It is then
-missed, never shown as healthy. **The unavailable reason has its own read.** The chart's capped history cannot supply it: 50 newer ordinary diary
+Known limit, stated rather than built for: more than 5 pages of skipped records (no VPD-capable keys, or future-dated)
+hide an older terminal record. It is then missed, never shown as healthy. A tie cut by the bound is not this limit;
+it fails closed as above. **The unavailable reason has its own read.** The chart's capped history cannot supply it: 50 newer ordinary diary
 entries, or 200 newer grow events, hide an incomplete manual reading from that query just as they hid evidence from
 the old resolver read. So when the pager ends with no terminal record, the resolver runs one more query per source,
 newest first with `limit(1)`, for any manual record holding a temperature or an RH
@@ -502,6 +506,7 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-40  | The newest manual record is a `manual_sensor_snapshot` with a complete in-band pair and `source` missing (also: `"pi_bridge"`, `"abc"`, and the recognised alias `"quick_log"`); an older valid manual pair exists                                                                                                                         | The record is projected with its `rawSource`; the result is `invalid`, not the older value; no claim and no healthy cue                                                                                                                                                                             |
 | CVP-41  | A temperature-only manual diary row, then 60 newer ordinary diary entries, no other manual evidence (also: a temperature-only grow event, then 250 newer events holding neither metric)                                                                                                                                                    | The reason is `no_derivable_pair`, not `no_reading`; when the extra read fails, `read_failed`                                                                                                                                                                                                       |
 | CVP-42  | The only manual evidence is a temperature-only record dated 5 minutes in the future (diary and grow event alike)                                                                                                                                                                                                                           | The reason is `no_reading`, not `no_derivable_pair`; the future record changes nothing                                                                                                                                                                                                              |
+| CVP-43  | 260 diary rows share the newest `entry_at` (the bound is 250), plant-level first by `id`, with a tent-level row and an RH-pinned row past row 250                                                                                                                                                                                          | The read stops at the bound mid-tie; the result is `unavailable` with reason `read_failed`, never the plant-level value; no claim and no healthy cue                                                                                                                                                |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

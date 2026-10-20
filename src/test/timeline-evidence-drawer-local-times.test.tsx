@@ -48,7 +48,7 @@ describe("Timeline evidence drawer local times (QA 2026-10-20 bug 5)", () => {
   it("proves TZ=UTC, then shows the entry time as a local date and time", () => {
     expect(new Date(2026, 9, 15, 15, 54, 0, 0).toISOString()).toBe("2026-10-15T15:54:00.000Z");
     const vm = renderDrawer();
-    expect(vm.occurredAt).toBe(ENTRY_AT);
+    expect(vm?.occurredAt).toBe(ENTRY_AT);
     const drawer = screen.getByTestId("timeline-evidence-drawer");
     expect(drawer.textContent).toContain("Oct 15, 2026, 3:54 PM");
   });

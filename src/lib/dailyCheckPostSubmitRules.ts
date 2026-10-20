@@ -14,6 +14,7 @@
  */
 import { formatHarvestSavedBreakdownDetail } from "@/lib/harvestDetailsRules";
 import { withGrowId } from "@/lib/routes";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 export const DAILY_CHECK_SUCCESS_TITLE = "Today's check was logged";
 export const DAILY_CHECK_SUCCESS_BODY =
@@ -316,6 +317,14 @@ export const DAILY_CHECK_SAVED_BREAKDOWN_TITLE = "What was saved";
 export const DAILY_CHECK_SAVED_ITEM_NOTE_LABEL = "Plant note";
 export const DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL =
   "Manual snapshot — saved as manual, not live sensor data";
+
+/**
+ * Unit line under the Daily Check manual snapshot form. It must name the
+ * grower's display unit, the same one the form's own "Entered in" hint uses.
+ */
+export function dailyCheckManualSnapshotUnitNote(_unit: TemperatureUnitPreference): string {
+  return "Temperature uses °F.";
+}
 
 /**
  * Recognized saved-source keys. v1b adds `harvest` — Harvest is a real

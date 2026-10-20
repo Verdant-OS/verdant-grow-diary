@@ -133,5 +133,6 @@ export function getRemoveButtonAriaLabel(isPhoto: boolean, plantName?: string | 
  * removed. `null` means the count is unknown and stays unknown.
  */
 export function diaryEntriesTotalAfterRemoval(total: number | null): number | null {
-  return total;
+  if (total === null) return null;
+  return Math.max(0, total - 1);
 }

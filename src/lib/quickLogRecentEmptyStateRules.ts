@@ -18,9 +18,11 @@ export const QUICK_LOG_RECENT_EMPTY_COPY = {
   },
 } as const;
 
-export function quickLogRecentEmptyCopy(_dateFiltered: boolean): {
+export function quickLogRecentEmptyCopy(dateFiltered: boolean): {
   title: string;
   help: string;
 } {
-  return QUICK_LOG_RECENT_EMPTY_COPY.unfiltered;
+  return dateFiltered
+    ? QUICK_LOG_RECENT_EMPTY_COPY.dateFiltered
+    : QUICK_LOG_RECENT_EMPTY_COPY.unfiltered;
 }

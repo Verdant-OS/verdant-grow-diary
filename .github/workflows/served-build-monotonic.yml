@@ -1,0 +1,53 @@
+name: Served build monotonic check
+
+# Post-deploy alert for production moving BACKWARD to an older build (incident #2123).
+# Reads public build metadata (https://verdantgrowdiary.com/version.json) and git ancestry
+# on the deploy branch only. It never deploys, never writes to production and uses no
+# secrets. A FAIL fails this job: that failure is the alert.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: served-build-monotonic
+  cancel-in-progress: false
+
+jobs:
+  served-build-monotonic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the deploy branch with full history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: verdant-grow-diary
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Restore the last accepted served SHA
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .served-build/previous.sha
+          key: served-build-sha-${{ github.run_id }}
+          restore-keys: served-build-sha-
+
+      - name: Check the served build only moves forward
+        run: >-
+          node scripts/check-served-build-monotonic.mjs
+          --previous-file .served-build/previous.sha
+          --write-file .served-build/previous.sha
+
+      - name: Save the accepted served SHA
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .served-build/previous.sha
+          key: served-build-sha-${{ github.run_id }}

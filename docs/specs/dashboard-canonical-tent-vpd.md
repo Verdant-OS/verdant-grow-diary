@@ -139,9 +139,13 @@ then the order and the limit. With `!inner`, an event whose embedded row fails t
 parent result, so the 200-row limit counts only events that can yield a VPD. `uncertainty`: the build confirms
 this against the hosted PostgREST version with CVP-34 before relying on it; if `!inner` filtering is unavailable, it
 pages newest-first in 200-row pages until it finds the first usable event, whatever its age, or the query ends, with
-a hard bound of 5 pages (1,000 events). It never stops at the 24-hour manual age limit: an older usable event is
-returned and ages to `stale` like any other (CVP-22), so the fallback returns exactly what the filtered query would,
-up to the bound. Known limit, stated rather than built for: more than 1,000 consecutive unusable events hide an older
+a hard bound of 5 pages (1,000 events). It does not stop at that event: it keeps reading until it has every usable
+event that shares its `occurred_at`, across a page boundary if need be, and hands them all to the canonical
+comparator, so a tie resolves exactly as it would on the filtered query's results. Both reads order by
+`occurred_at` descending, then `id` ascending, and the fallback pages by that keyset (`occurred_at`, `id`), never by
+offset, so a row cannot be skipped or repeated between pages. It never stops at the 24-hour manual age limit: an
+older usable event is returned and ages to `stale` like any other (CVP-22), so the fallback returns exactly what the
+filtered query would, up to the bound. Known limit, stated rather than built for: more than 1,000 consecutive unusable events hide an older
 usable one, which is then missed, never shown as healthy. As with the diary read, `no_derivable_pair` reads the unfiltered grow-event history the chart already loads,
 and the existing consumers' query stays byte-for-byte unchanged.
 
@@ -447,6 +451,7 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-32  | A current stored VPD in an older `environment_check`, then 60 newer manual rows each holding only a temperature or only an RH                                                                                                                                                                                                              | The resolver still gets the stored VPD; with no stored VPD at all, the reason is `no_derivable_pair`, not `no_reading`                                                                                                                                                                                                        |
 | CVP-33  | A derived pair whose temperature comes from a sensor row and whose RH comes from the snapshot's `metric_refs.rh`, and the reverse; a derived pair from a diary snapshot with `diary_evidence_ref`; each tied on `capturedAt` with a stored VPD row, inputs shuffled                                                                        | Same winner whatever the input order; the pair's `evidenceRef` is `pair:<row id>+<metric ref id>`, `pair:<metric ref id>+<row id>` or `pair:diary:<id>+diary:<id>`                                                                                                                                                            |
 | CVP-34  | A current manual `grow_events` stored VPD or complete temperature + RH pair, then 200 newer manual `environment` events each holding only a temperature, only an RH, or neither                                                                                                                                                            | The resolver still gets the older usable event, through the filtered query and through the paging fallback alike, and returns it as `stale` when it is older than 24 hours; with none at all, the reason is `no_derivable_pair` when an incomplete event exists, `no_reading` when none does; the chart's series is unchanged |
+| CVP-35  | On the paging fallback, two usable manual events share the newest usable `occurred_at`, one as the last row of a page and one as the first row of the next, inputs shuffled                                                                                                                                                                | The fallback reads both and the comparator picks the same winner, with the same `evidenceRef`, as the filtered query does                                                                                                                                                                                                     |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

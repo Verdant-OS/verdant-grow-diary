@@ -44,9 +44,9 @@ import {
   buildBreadcrumbListJsonLd,
   buildCultivarCollectionJsonLd,
   buildFaqPageJsonLd,
-  buildSoftwareApplicationJsonLd,
   buildWebPageJsonLd,
 } from "../seoStructuredData";
+import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
@@ -601,11 +601,8 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
         description: PUBLIC_QUICK_LOG_STARTER_COPY.seoDescription,
         url: `${VERDANT_SITE_ORIGIN}/quick-log`,
       }),
-      buildSoftwareApplicationJsonLd({
-        name: "Verdant Grow Diary",
-        description: PUBLIC_QUICK_LOG_STARTER_COPY.seoDescription,
-        url: `${VERDANT_SITE_ORIGIN}/quick-log`,
-      }),
+      // The sitewide app node, not a second offer-less "Verdant Grow Diary".
+      SITE_SOFTWARE_APPLICATION_JSON_LD,
       buildFaqPageJsonLd({
         pageUrl: `${VERDANT_SITE_ORIGIN}/quick-log`,
         questions: PUBLIC_QUICK_LOG_STARTER_COPY.faq,

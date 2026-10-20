@@ -123,6 +123,7 @@ import {
 import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
 import { useActionEvidenceVerification } from "@/hooks/useActionEvidenceVerification";
 import { useGrows } from "@/store/grows";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -740,7 +741,7 @@ export default function ActionDetail() {
           {sanitizeActionCopy(row.suggested_change)}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {sanitizeActionCopy(stripBackPointerTokens(row.reason))}
+          {localizeReadingAtTimestamps(sanitizeActionCopy(stripBackPointerTokens(row.reason)))}
         </p>
         {isAiDoctorDerived(row) &&
           (() => {

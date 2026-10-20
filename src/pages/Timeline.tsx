@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { STAGES } from "@/lib/grow";
 import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
@@ -3093,7 +3094,7 @@ export default function Timeline() {
                                   }
                                 }}
                               >
-                                {e.note}
+                                {localizeReadingAtTimestamps(e.note)}
                               </p>
                               {lightingGuideByEntryId.has(e.id) ? (
                                 <div
@@ -3510,7 +3511,7 @@ export default function Timeline() {
           });
           return {
             id: row.id,
-            note: row.note,
+            note: localizeReadingAtTimestamps(row.note),
             photo_url: row.photo_url,
             stage: resolveTimelineDiaryEntryStage(row),
             entry_at: row.entry_at,
@@ -3652,7 +3653,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
             )}
             {e.action?.reason && (
               <p className="text-xs text-muted-foreground mt-1">
-                {stripBackPointerTokens(e.action.reason)}
+                {localizeReadingAtTimestamps(stripBackPointerTokens(e.action.reason))}
               </p>
             )}
             {e.note && <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>}

@@ -53,6 +53,7 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { formatActionReasonForDisplay } from "@/lib/actionQueueRowView";
 import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
 import { pickSoleLoadedId } from "@/lib/oneTentLoopHandoffIds";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
@@ -537,7 +538,7 @@ export function useGrowDetailData(): UseGrowDetailData {
             kind: "action_event",
             ts: e.created_at,
             title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
-            detail: e.note ?? parent?.reason ?? null,
+            detail: e.note ?? formatActionReasonForDisplay(parent?.reason),
             href: `/actions/${e.action_queue_id}`,
           };
         });

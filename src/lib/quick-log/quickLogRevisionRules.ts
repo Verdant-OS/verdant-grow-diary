@@ -1,4 +1,5 @@
 import { LARGE_WATER_AMOUNT_HARD_MAX_ML } from "@/lib/quickLogWaterVolumeWarningRules";
+import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import {
   isHumidityValid,
   isTemperatureValid,
@@ -382,8 +383,12 @@ function sensorFromDetails(
   const metrics = snapshot && isPlainObject(snapshot.metrics) ? snapshot.metrics : snapshot;
   if (!metrics) return null;
   const sensor: QuickLogCorrectionSensorValues = {};
-  const temperature = finiteOrNull(metrics.temperature_c);
-  const humidity = finiteOrNull(metrics.humidity_pct);
+  // PlantQuickLog V2 persists manual_sensor_snapshot as temp_f / humidity_percent.
+  const tempF = finiteOrNull(metrics.temp_f);
+  const temperature =
+    finiteOrNull(metrics.temperature_c) ??
+    (tempF === null ? null : Math.round(fahrenheitToCelsius(tempF) * 10) / 10);
+  const humidity = finiteOrNull(metrics.humidity_pct) ?? finiteOrNull(metrics.humidity_percent);
   const vpd = finiteOrNull(metrics.vpd_kpa);
   if (temperature !== null) sensor.temperature_c = temperature;
   if (humidity !== null) sensor.humidity_pct = humidity;
@@ -509,10 +514,11 @@ export function correctionValuesForTimelineDiaryEntry(
   const details = isPlainObject(entry?.details) ? entry.details : null;
   if (!details) return null;
   const linkedId = nonEmpty(details.linked_grow_event_id);
-  // PlantQuickLog V2 writes its diary companion as a "quick_log" envelope
-  // linked to an observation root; resolve that root like an observation row.
-  const isQuickLogEnvelope = details.event_type === "quick_log" && linkedId !== null;
-  if (details.event_type !== "observation" && !isQuickLogEnvelope) return null;
+  // Quick Log V2 diary companions link to their spine root: PlantQuickLog
+  // stamps event_type "quick_log", the Fast Check sheet stamps none. Resolve
+  // any linked companion through that root, like an observation row.
+  const isLinkedEnvelope = details.event_type !== "observation" && linkedId !== null;
+  if (details.event_type !== "observation" && !isLinkedEnvelope) return null;
   const entryAt = entry?.entry_at;
   if (typeof entryAt !== "string") return null;
   const entryMs = Date.parse(entryAt);
@@ -522,7 +528,7 @@ export function correctionValuesForTimelineDiaryEntry(
   if (linkedId) {
     const root = rows.find((row) => row.id === linkedId);
     // Only an observation root accepts sensor corrections server-side.
-    if (isQuickLogEnvelope && root?.event_type !== "observation") return null;
+    if (isLinkedEnvelope && root?.event_type !== "observation") return null;
     const rootCreatedAt = root && typeof root.created_at === "string" ? root.created_at : null;
     if (root && rootCreatedAt) {
       const companion = rows.find(

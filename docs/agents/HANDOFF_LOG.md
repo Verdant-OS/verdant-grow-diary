@@ -134,26 +134,6 @@ claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:57 UTC
 last_updated: 2026-10-16 14:33 CT, by Claude (close-out session)
 ```
 
-### QUICKLOG-CORRECTION-EDITABLE-VALUES
-
-```text
-TASK QUICKLOG-CORRECTION-EDITABLE-VALUES  priority: P2  status: OPEN
-goal: Make the Correct this Quick Log dialog edit volume, dose, or sensor values for that entry type, and keep the original value in the correction history. Keep the Wrong value reason. Do not follow closed #2116.
-branch: cursor/quicklog-correction-editable-values-fc1d
-base: verdant-grow-diary
-checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118 (draft)
-head_sha: 434e20457ac68a8efc225571ba41f56ca54b789e (before the 2026-10-20 base merge)
-state: pushed draft. Base merged 2026-10-20 (only HANDOFF_LOG conflicted). No merge to base.
-next_action: required CI at the base-merge head, then an independent exact-head review (Codex, Blue Dream or Critical Mass). Stay draft.
-files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; src/test/timeline-first-page-linked-roots.test.tsx; src/test/timeline-supplemental-root-sensor-siblings.test.tsx; src/test/timeline-load-older-sensor-siblings.test.tsx; src/test/quicklog-feeding-correction-volume.test.tsx; src/test/quicklog-feeding-correction-volume-context.test.ts; src/test/quicklog-correction-environment-link-match.test.ts; src/test/ci-pr-concurrency.test.ts; scripts/prove-quicklog-correction-owner-fence.mjs; scripts/prove-quicklog-correction-measured-values.mjs; scripts/assert-required-core-migrations-applied.mjs; .github/workflows/ci.yml; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
-blockers: Graft re-review of 3ccd9a9474065e7d1eb1bbd727acb7b4e867de8e is pending CI. The locked PG15 harness matches base. No merge.
-artifacts: PR body
-reviewer_seat: Graft one-time exact-head after required CI is green. Blue Dream (.tsx). Critical Mass (rules, tests, migration).
-claimed_by: claude, 2026-10-20 02:02 UTC (PR #2118 claim comment; Cheeko VER-216 assignment)
-last_updated: 2026-10-20 02:10 UTC, by Claude (VER-216 close-out)
-```
-
 ### PR2072-M7-SERVED-REVISION
 
 ```text
@@ -256,6 +236,26 @@ last_updated: 2026-10-06 16:05 CT, by Claude
 ```
 
 ## Closed
+
+### QUICKLOG-CORRECTION-EDITABLE-VALUES
+
+```text
+TASK QUICKLOG-CORRECTION-EDITABLE-VALUES  priority: P2  status: CLOSED
+goal: Make the Correct this Quick Log dialog edit volume, dose, or sensor values for that entry type, and keep the original value in the correction history. Keep the Wrong value reason. Do not follow closed #2116.
+branch: cursor/quicklog-correction-editable-values-fc1d
+base: verdant-grow-diary
+checkout: none; merged. Start new work from origin/verdant-grow-diary.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118
+head_sha: e732a157d387d38d9ac76b71b1ed6208d9145744, the final head of #2118 (32 files).
+state: #2118 squash-merged through the merge queue on 2026-10-20 ~18:55 UTC from head e732a157 as 48b6134462bf3b2a04046c82af646fdfc1da5b8f on verdant-grow-diary (sole parent 0f9d1a5ce). Migration 20261014210000_quicklog_correction_editable_values.sql is NOT applied to production; applying it is Matthew's separate decision. NOT deployed: live /version.json still reports c0ce65cb. Production acceptance NOT_MEASURED.
+next_action: CLOSED for the repository change. Production migration apply and publish only on Matthew's separate explicit yes; then signed-in verification on the disposable QA account.
+files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; src/test/timeline-first-page-linked-roots.test.tsx; src/test/timeline-supplemental-root-sensor-siblings.test.tsx; src/test/timeline-load-older-sensor-siblings.test.tsx; src/test/quicklog-feeding-correction-volume.test.tsx; src/test/quicklog-feeding-correction-volume-context.test.ts; src/test/quicklog-correction-environment-link-match.test.ts; src/test/ci-pr-concurrency.test.ts; scripts/prove-quicklog-correction-owner-fence.mjs; scripts/prove-quicklog-correction-measured-values.mjs; scripts/assert-required-core-migrations-applied.mjs; .github/workflows/ci.yml; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
+blockers: none for the merged change. Production migration apply and publish not approved.
+artifacts: PR #2118 body (unlock receipts); merge commit 48b6134462bf3b2a04046c82af646fdfc1da5b8f
+reviewer_seat: Codex exact-head review. Matthew decided on 2026-10-20 (~18:33 UTC, VER-216) that a clean Codex review replaces the Graft half of the Oct 15 12:38 PM CT receipt condition.
+claimed_by: claude, 2026-10-20 18:40 UTC
+last_updated: 2026-10-20 19:05 UTC, by Claude (VER-216 close-out; block closed after merge, follow-up to Codex r4328730607)
+```
 
 ### FIX-2033-LOCKFILE-POLICY-INNGEST
 

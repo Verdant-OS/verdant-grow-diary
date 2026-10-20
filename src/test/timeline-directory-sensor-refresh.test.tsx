@@ -357,4 +357,51 @@ describe("timeline directory sensor refresh", () => {
     expect(growIds.length).toBeGreaterThan(0);
     expect(growIds.every((value) => value === "grow-a")).toBe(true);
   });
+
+  it("reads the directory once for a new grow scope, after its core read commits", async () => {
+    const GROW_B = { ...GROW_A, id: "grow-b", name: "Current Run B" };
+    harness.growsState = {
+      activeGrow: GROW_A,
+      activeGrowId: "grow-a",
+      grows: [GROW_A, GROW_B],
+      loading: false,
+      error: null,
+    };
+    harness.scopedGrowState = {
+      urlGrowId: null,
+      scopedGrow: null,
+      scopedGrowName: null,
+      isValidScopedGrow: false,
+      backHref: undefined,
+    };
+    const tentReadsFor = (growId: string) =>
+      queries().filter(
+        (spec) =>
+          spec.table === "tents" &&
+          spec.columns === "id" &&
+          spec.filters.some((filter) => filter.column === "grow_id" && filter.value === growId),
+      ).length;
+    const view = render(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(tentReadsFor("grow-a")).toBe(1);
+    });
+
+    harness.growsState = { ...harness.growsState, activeGrow: GROW_B, activeGrowId: "grow-b" };
+    view.rerender(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(tentReadsFor("grow-b")).toBeGreaterThan(0);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(tentReadsFor("grow-b")).toBe(1);
+  });
 });

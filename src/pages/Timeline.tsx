@@ -1136,10 +1136,14 @@ export default function Timeline() {
   useEffect(() => {
     load();
   }, [load]);
+  // A scope change rebuilds loadDirectorySensors before its core read commits.
+  // Wait for that commit's epoch bump instead of reading the directory twice.
+  const coreCommittedForActiveScope =
+    coreRead.status === "success" && coreRead.readKey === activeReadKey;
   useEffect(() => {
-    if (directorySensorEpoch === 0) return;
+    if (directorySensorEpoch === 0 || !coreCommittedForActiveScope) return;
     void loadDirectorySensors();
-  }, [directorySensorEpoch, loadDirectorySensors]);
+  }, [coreCommittedForActiveScope, directorySensorEpoch, loadDirectorySensors]);
   useEffect(
     () =>
       subscribeManualSensorCorrections(ownerId, () => {

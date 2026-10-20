@@ -46,7 +46,7 @@ describe("Light planner wall draw in watts mode (#2256)", () => {
 
     expect(wattsField()).toHaveAttribute("aria-invalid", "true");
     expect(
-      screen.getByText("Actual wall draw per fixture must be between 0.1 and 100000."),
+      screen.getByText("Actual wall draw per fixture must be greater than 0."),
     ).toBeInTheDocument();
     expect(screen.getByText(/Required in this mode/)).toBeInTheDocument();
     expect(screen.queryByText(/Optional for PPF math/)).not.toBeInTheDocument();
@@ -55,6 +55,15 @@ describe("Light planner wall draw in watts mode (#2256)", () => {
 
   it("shows the estimated-PPF result at 300 W", () => {
     render(<Harness initial={inputsFor("watts", 300)} />);
+
+    expect(wattsField()).toHaveAttribute("aria-invalid", "false");
+    // Native constraints agree: no step mismatch for a whole-watt value.
+    expect((wattsField() as HTMLInputElement).validity.valid).toBe(true);
+    expect(screen.getByText("PPF estimated from watts × efficacy")).toBeInTheDocument();
+  });
+
+  it("accepts any value above 0 W, matching the readiness rule", () => {
+    render(<Harness initial={inputsFor("watts", 0.001)} />);
 
     expect(wattsField()).toHaveAttribute("aria-invalid", "false");
     expect(screen.getByText("PPF estimated from watts × efficacy")).toBeInTheDocument();

@@ -458,7 +458,8 @@ export default function LightCalculatorTab({
                 label="Actual wall draw per fixture"
                 value={inputs.actualWattsPerFixture}
                 onChange={(actualWattsPerFixture) => onChange({ ...inputs, actualWattsPerFixture })}
-                min={inputs.ppfMode === "watts" ? 0.1 : 0}
+                min={0}
+                minExclusive={inputs.ppfMode === "watts"}
                 max={100000}
                 step={1}
                 unit="W"

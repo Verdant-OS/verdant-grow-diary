@@ -3117,7 +3117,7 @@ export default function Timeline() {
           });
           return {
             id: row.id,
-            note: row.note,
+            note: localizeReadingAtTimestamps(row.note),
             photo_url: row.photo_url,
             stage: resolveTimelineDiaryEntryStage(row),
             entry_at: row.entry_at,

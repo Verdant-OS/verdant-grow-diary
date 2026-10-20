@@ -239,7 +239,7 @@ describe("dependency security Phase A resolution floors", () => {
       "fast-uri": "3.1.8",
       "form-data": "4.0.6",
       "js-yaml": "4.3.2",
-      hono: "4.13.7",
+      hono: "4.13.11",
       qs: "6.16.0",
       nanoid: "3.3.18",
       undici: "6.28.1",

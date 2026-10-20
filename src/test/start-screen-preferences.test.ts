@@ -98,7 +98,14 @@ describe("startScreenPreferences", () => {
     expect(routeForStartScreen("timeline")).toBe("/timeline");
     expect(routeForStartScreen("dashboard")).toBe("/");
     expect(routeForStartScreen("onboarding")).toBe("/onboarding");
-    expect(routeForStartScreen("welcome")).toBe("/welcome");
+  });
+
+  it("reads a legacy welcome preference back as Dashboard and routes it to /", () => {
+    setLocalStorageItemForTest("verdant:startScreen:user-legacy", "welcome");
+    const choice = getStartScreenChoice("user-legacy");
+    expect(choice).toBe("dashboard");
+    expect(routeForStartScreen(choice!)).toBe("/");
+    expect(START_SCREEN_OPTIONS.map((o) => o.key)).not.toContain("welcome");
   });
 
   it("consumes the one-shot Quick Log intent and preserves unrelated query params", () => {

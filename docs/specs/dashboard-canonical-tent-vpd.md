@@ -25,10 +25,17 @@ pipelines.
 
 | Widget (test id)                                             | Source today                                                                                                                                                                 | Plant-level manuals |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| Tonight tent card (`TonightTentHomeCard`)                    | `buildTonightTentMetrics` over `readingsByTent[homeTent]` and `useLatestSensorSnapshot(growId, [tentId])` (`Dashboard.tsx` ~332-355). Stored `vpd_kpa`, else temp+RH derived | No                  |
+| Tonight tent card (`TonightTentHomeCard`)                    | `buildTonightTentMetrics` over `readingsByTent[homeTent]` and `useLatestSensorSnapshot(growId, [tentId])` (`Dashboard.tsx` ~332-355). Stored `vpd_kpa`, else temp+RH derived | Latest only (a)     |
 | Tent strip chip (`dashboard-env-snapshot-metric-<tent>-vpd`) | `buildTentSnapshotView(tentRows)` (`dashboardEnvironmentSnapshotViewModel.ts`), stored rows only                                                                             | No                  |
-| Latest Environment card, VPD row                             | `sensorState.snapshot.vpd` from `useLatestSensorSnapshot(growId, selectedTentIds)` (`Dashboard.tsx` ~1374), raw; unverified rows included                                    | No                  |
-| Stage-aware VPD card (`dashboard-stage-aware-vpd`)           | `dashboardHealthSnapshot.vpd` (verified-only filter of the same snapshot) through `classifyVpdAgainstStage` (`Dashboard.tsx` ~1654); shows `—` when filtered out             | No                  |
+| Latest Environment card, VPD row                             | `sensorState.snapshot.vpd` from `useLatestSensorSnapshot(growId, selectedTentIds)` (`Dashboard.tsx` ~1374), raw; unverified rows included                                    | Latest only (a)     |
+| Stage-aware VPD card (`dashboard-stage-aware-vpd`)           | `dashboardHealthSnapshot.vpd` (live/manual-only filter of the same snapshot) through `classifyVpdAgainstStage` (`Dashboard.tsx` ~1654); shows `—` when filtered out          | Latest only (a)     |
+
+(a) `established fact`: `useLatestSensorSnapshot` already reads tent-scoped diary rows, including a plant Quick
+Log's `details.manual_sensor_snapshot` (converted by `snapshotFromManualSensorSnapshot`). Rows with a null or
+foreign `tent_id` are dropped (`isDiaryRowInTentScope`). So a plant-level reading attributed to the tent can reach
+these widgets, but only as the single newest diary snapshot, competing with stored rows. It never reaches them as
+the full manual history the strip stability summary reads. The resolver's `manuals` input below is that full
+history; the bounded snapshot path stays as one more candidate.
 
 Two more VPD surfaces are history, not a current value: the 24-hour `EnvironmentRibbon` series and the 7-day
 trend average/range (`trendsState`). The strip stability summary reads `quickLogManualsForTent(stripManuals.data,
@@ -91,12 +98,21 @@ interface CanonicalTentVpd {
   unavailableReason: "no_reading" | "no_derivable_pair" | "read_failed" | null;
   /** Record that produced the value: a sensor row id, a diary id, or a manual reading id. */
   evidenceRef: string | null;
+  /** True when the latest read of any input failed and the value comes from earlier, cached data. */
+  refreshFailed: boolean;
 }
 ```
 
-`loading` is only for a first read that has not returned. A failed read with earlier data keeps the earlier
-value and says the refresh failed, as the Tonight card already does. A failed read with no data is `unavailable`
-with reason `read_failed`, never "no reading".
+`loading` is only for a first read that has not returned. A failed read with no data is `unavailable` with
+reason `read_failed`, never "no reading".
+
+**Refresh failure with cached data: a deliberate change from the Tonight card.** Today `buildTonightTentMetrics`
+treats `refresh_error` like `error` and empties the stored rows (`tonightTentHomeViewModel.ts:374`). The resolver
+instead keeps the last successfully read rows and manual readings that the caller still holds: React Query keeps
+`data` when a refetch fails. It picks among them with the same guards, returns that value with
+`refreshFailed: true`, and every consumer shows the value with the existing "Sensor refresh unavailable — last
+loaded readings shown." line. Live readings in that cached set still age to `stale` against `now`. `error` with
+no cached data stays `read_failed`.
 
 ## Consumers
 
@@ -113,11 +129,18 @@ Doctor. Those are history or other pages. A follow-up can point them at the reso
 
 ### Stage classification
 
-The stage-aware card keeps calling `classifyVpdAgainstStage`, with one guard from the trust contract (VPD-02):
-a value whose `basis` is `air_estimate` never gets an in-target or out-of-target claim. It shows the value,
-"Calculated from temperature and RH", and "no target claim from an estimate". A `stored` value is classified
-as it is today. This spec does not tighten stored-value classification; that waits for the trust contract's
-deferred calibration slice.
+The stage-aware card keeps calling `classifyVpdAgainstStage`, behind two guards. Both must pass before any
+in-target or out-of-target claim:
+
+1. **Source fence, kept from today.** Only `source` `live` or `manual` may be classified. That is the rule in
+   `isDashboardSnapshotEligibleForHealthyCues` (`dashboardSensorEvidenceRules.ts`), applied to the resolver
+   result instead of the snapshot. `csv`, `demo`, `stale` and `invalid` values are shown with their source label
+   and "context only, no target claim", never classified.
+2. **Basis fence, from the trust contract (VPD-02).** A value whose `basis` is `air_estimate` is never
+   classified. It shows the value, "Calculated from temperature and RH", and "no target claim from an estimate".
+
+A `stored` live or manual value is classified as it is today. This spec does not tighten that further; that
+waits for the trust contract's deferred calibration slice.
 
 ### One unavailable state
 
@@ -167,18 +190,20 @@ No schema, RLS, migration, edge function, Action Queue or dependency change. Exi
 
 Each test is shown failing on the deploy branch before the build, with the count in the PR body.
 
-| ID     | Given                                                                       | Then                                                                                             |
-| ------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| CVP-01 | One tent; older tent-level stored VPD; newer plant-level manual temp and RH | Tonight card, strip chip, Latest Environment and stage card show the same derived value and time |
-| CVP-02 | One tent; tent-level manual temp and RH only, no stored VPD                 | All four show the same derived value, labelled "Calculated from temperature and RH"              |
-| CVP-03 | One tent; no reading at all                                                 | All four show the one `no_reading` line; no "Missing", `—` or a value anywhere                   |
-| CVP-04 | Newer temperature and RH without VPD after an older stored VPD (#2268 case) | Card, strip and ribbon's latest point agree                                                      |
-| CVP-05 | RH pinned at 100%                                                           | All four show invalid; none shows a healthy cue                                                  |
-| CVP-06 | Temperature from one record, RH from a different record                     | No derived value; `no_derivable_pair` everywhere                                                 |
-| CVP-07 | Derived value inside the stage band                                         | Stage card shows the value but no in-target claim                                                |
-| CVP-08 | Two tents selected, newest reading in tent B                                | Latest Environment names tent B and matches tent B's strip chip                                  |
-| CVP-09 | Sensor read fails with no earlier data                                      | `read_failed` line, not `no_reading`                                                             |
-| CVP-10 | Same input rendered twice with the same `now`                               | Identical output (deterministic)                                                                 |
+| ID     | Given                                                                       | Then                                                                                                   |
+| ------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| CVP-01 | One tent; older tent-level stored VPD; newer plant-level manual temp and RH | Tonight card, strip chip, Latest Environment and stage card show the same derived value and time       |
+| CVP-02 | One tent; tent-level manual temp and RH only, no stored VPD                 | All four show the same derived value, labelled "Calculated from temperature and RH"                    |
+| CVP-03 | One tent; no reading at all                                                 | All four show the one `no_reading` line; no "Missing", `—` or a value anywhere                         |
+| CVP-04 | Newer temperature and RH without VPD after an older stored VPD (#2268 case) | Card, strip and ribbon's latest point agree                                                            |
+| CVP-05 | RH pinned at 100%                                                           | All four show invalid; none shows a healthy cue                                                        |
+| CVP-06 | Temperature from one record, RH from a different record                     | No derived value; `no_derivable_pair` everywhere                                                       |
+| CVP-07 | Derived value inside the stage band                                         | Stage card shows the value but no in-target claim                                                      |
+| CVP-08 | Two tents selected, newest reading in tent B                                | Latest Environment names tent B and matches tent B's strip chip                                        |
+| CVP-09 | Sensor read fails with no earlier data                                      | `read_failed` line, not `no_reading`                                                                   |
+| CVP-10 | Same input rendered twice with the same `now`                               | Identical output (deterministic)                                                                       |
+| CVP-11 | A value loaded, then the next refresh fails (`refresh_error`)               | All four keep that value with `refreshFailed`, show the refresh line; a live value still ages to stale |
+| CVP-12 | Newest value is a stored `csv`, `demo` or `stale` VPD inside the stage band | Stage card shows the value and source label, no in-target or out-of-target claim                       |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

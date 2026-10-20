@@ -111,9 +111,15 @@ the strip stability summary) stay byte-for-byte as they are.
 (`useSensorsQuickLogManualReadings.ts` ~68-72) takes the newest 50 `diary_entries` for the tent with no filter. The
 projection (`sensorsQuickLogManualSeriesRules.ts` ~162-172) recognises a manual reading in either of two envelopes:
 `details.manual_sensor_snapshot`, falling back to `details.environment_check`. So 50 newer ordinary diary entries
-can hide a still-current manual reading. The resolver's diary read keeps both envelopes before the cap:
-`.or("details->manual_sensor_snapshot.not.is.null,details->environment_check.not.is.null")`, then the order and the
-limit. The filter needs no schema change. If the build would change what the existing chart and strip consumers
+can hide a still-current manual reading. An envelope alone is not enough either: an `environment_check` holding only a
+note, water temperature or EC, or a `manual_sensor_snapshot` holding only pH or EC, is rejected by the projection
+(`sensorSnapshot.ts` ~510-515 and ~560-570 need an air metric), so 50 of those would crowd out an older air reading
+the same way. The resolver's diary read therefore filters on the air-metric keys each projection accepts, before the
+cap: `.or("details->manual_sensor_snapshot->temp_f.not.is.null,details->manual_sensor_snapshot->humidity_percent.not.is.null,details->environment_check->temp_c.not.is.null,details->environment_check->humidity_pct.not.is.null,details->environment_check->vpd_kpa.not.is.null")`,
+then the order and the limit. Known limit, stated rather than built for: a key that is present but out of band is
+admitted by the filter and then rejected by the projection, so more than 50 consecutive out-of-band air rows could still
+hide an older valid one. That needs 50 invalid saves in a row, and the reading is then not shown as healthy, only
+missed. The filter needs no schema change. If the build would change what the existing chart and strip consumers
 receive, it adds the filter only to the query the new projection reads, so they stay byte-for-byte unchanged.
 
 **Pairing rules, stated against today's code.**
@@ -137,6 +143,12 @@ interface CanonicalTentVpd {
   value: number | null;
   /** Canonical vocabulary: live | manual | csv | demo | stale | invalid. Null unless a reading exists. */
   source: SensorSource | null;
+  /**
+   * The winning candidate's source before display normalisation. Tonight maps a generic diary
+   * `sensor_snapshot` (`snapshotFromDiary`, source "diary") to "manual" for display; this keeps "diary".
+   * The source fence reads this field, never `source`.
+   */
+  originSource: string | null;
   sourceLabel: string | null;
   capturedAt: string | null;
   /** "stored" = a recorded vpd_kpa; "air_estimate" = derived from temperature and RH under the pairing rules. */
@@ -239,9 +251,11 @@ Those are history or other pages. A follow-up can point them at the resolver.
 The stage-aware card keeps calling `classifyVpdAgainstStage`, behind two guards. Both must pass before any
 in-target or out-of-target claim:
 
-1. **Source fence, kept from today.** Only `source` `live` or `manual` may be classified. That is the rule in
-   `isDashboardSnapshotEligibleForHealthyCues` (`dashboardSensorEvidenceRules.ts`), applied to the resolver
-   result instead of the snapshot. `csv`, `demo`, `stale` and `invalid` values are shown with their source label
+1. **Source fence, kept from today.** Only an `originSource` of `live` or `manual` may be classified. That is the
+   rule in `isDashboardSnapshotEligibleForHealthyCues` (`dashboardSensorEvidenceRules.ts`), applied to the resolver
+   result instead of the snapshot. It reads `originSource`, not the display `source`: Tonight normalises a generic
+   diary snapshot's `diary` to `manual` (`tonightTentHomeViewModel.ts` ~187), and today's Dashboard rejects that raw
+   `diary` source, so a diary-origin value stays context only. `csv`, `demo`, `stale` and `invalid` values are shown with their source label
    and "context only, no target claim", never classified.
 2. **Basis fence, from the trust contract (VPD-02).** A value whose `basis` is `air_estimate` is never
    classified. It shows the value, "Calculated from temperature and RH", and "no target claim from an estimate".
@@ -364,6 +378,8 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-25  | Per-tent snapshot is `csv` (temp, RH, VPD) and a newer stored `manual` VPD from history wins                                                                                                                                  | Target Comparison status and reasons come from the manual VPD only; the `csv` temperature and RH add nothing to the aggregate                                                        |
 | CVP-26  | A tent has a current manual reading, then 60 newer ordinary diary entries with no `manual_sensor_snapshot`                                                                                                                    | The resolver still gets the manual reading and uses it; the 50-row cap applies only after the evidence filter                                                                        |
 | CVP-27  | A manual reading exists only in `details.environment_check`, then 60 newer ordinary diary entries                                                                                                                             | The resolver still gets it through the `environment_check` fallback; the filter keeps both envelopes                                                                                 |
+| CVP-28  | Newest value is a stored VPD from a generic diary `sensor_snapshot` (`snapshotFromDiary`, source `diary`) inside the band                                                                                                     | Shown with its label, `originSource: "diary"`; no in-target claim on the stage card or in Target Comparison, as today                                                                |
+| CVP-29  | An air reading in an older `environment_check`, then 60 newer `environment_check` rows holding only a note or EC                                                                                                              | The resolver still gets the air reading; rows without an air metric never reach the cap                                                                                              |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

@@ -12,6 +12,7 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: null, loading: false }) }));
@@ -40,6 +41,20 @@ describe("/quick-log static structured data", () => {
     const apps = quickLogNodes().filter((n) => n["@type"] === "SoftwareApplication");
     expect(apps).toEqual([SITE_SOFTWARE_APPLICATION_JSON_LD]);
     expect(apps.every((n) => !("aggregateRating" in n) && !("review" in n))).toBe(true);
+  });
+});
+
+describe("/quick-log composed SSR head", () => {
+  it("leaves the sitewide app node to the root head, so it appears once", () => {
+    // The root route's head() always emits SITE_SOFTWARE_APPLICATION_JSON_LD.
+    const routeNodes = staticRouteHead("/quick-log").scripts.map(
+      (script) => JSON.parse(script.children) as Node,
+    );
+    const composed = [SITE_SOFTWARE_APPLICATION_JSON_LD as Node, ...routeNodes];
+    expect(composed.filter((n) => n["@type"] === "SoftwareApplication")).toHaveLength(1);
+    expect(routeNodes.map((n) => n["@type"])).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage"]),
+    );
   });
 });
 

@@ -244,3 +244,8 @@ export function timelineEntryCountsAsPhoto(
   if (entry.photo_url) return true;
   return diaryPhotoIds.has(entry.id);
 }
+
+/** True when a diary entry carries grower-written note text (not just whitespace). */
+export function timelineEntryHasNoteText(note: unknown): boolean {
+  return typeof note === "string" && note.trim().length > 0;
+}

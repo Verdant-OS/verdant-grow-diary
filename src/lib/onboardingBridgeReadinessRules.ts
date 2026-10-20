@@ -17,6 +17,6 @@ export interface OnboardingBridgeReadsState {
   plantsLoading: boolean | undefined;
 }
 
-export function isOnboardingBridgeCountReady(_state: OnboardingBridgeReadsState): boolean {
-  return true;
+export function isOnboardingBridgeCountReady(state: OnboardingBridgeReadsState): boolean {
+  return state.growsLoading !== true && state.tentsLoading !== true && state.plantsLoading !== true;
 }

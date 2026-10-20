@@ -151,6 +151,11 @@ same pager, so neither has a cap of its own:
 - **Order and paging.** Newest first by a keyset: (`entry_at` descending, `id` ascending) for diary rows, and
   (`occurred_at` descending, `id` ascending) for grow events. Pages are 50 diary rows or 200 grow events, and never
   use an offset, so no row is skipped or repeated.
+- **Only active rows, on every query.** Every diary query the resolver runs (each pager page, the probe row and the
+  reason query) goes through `selectWithRetractionCompat` with `.is("retracted_at", null)`, as
+  `useLatestSensorSnapshot.ts` and `useSensorsQuickLogManualReadings.ts` do today. Every grow-event query keeps
+  `.eq("is_deleted", false)`. A retracted or deleted record is never a candidate, never terminal evidence, and never
+  a reason row, so a newer tombstone cannot hide or replace an older active reading (CVP-45).
 - **Which records stop the read.** The read skips only two kinds of record: one with no VPD-capable keys (no
   stored VPD, and no temperature and RH on the same record), and one dated more than 60 s in the future
   (`FUTURE_SKEW_MS`), which the resolver drops anyway. Every other record is terminal evidence, whether its values
@@ -178,11 +183,16 @@ same pager, so neither has a cap of its own:
   unfiltered pages return the same winner and `evidenceRef` within the bound. `uncertainty`: the build confirms
   `!inner` filtering against the hosted PostgREST before enabling it; without it, the pager runs on unfiltered pages.
 
-Known limit, stated rather than built for: more than 5 pages of skipped records (no VPD-capable keys, or future-dated)
-hide an older terminal record. It is then missed, never shown as healthy. A tie cut by the bound is not this limit;
-it fails closed as above. **The unavailable reason has its own read.** The chart's capped history cannot supply it: 50 newer ordinary diary
+- **A bound reached before any terminal record also fails closed.** If the 5-page bound is reached and every row
+  read was skipped (no VPD-capable keys, or future-dated), the source's newest terminal record is unknown: it may be
+  an invalid or current manual reading just past the bound. That source then contributes no manual candidate and
+  the result is `unavailable` with reason `read_failed`, whatever another input holds, so an older live row can
+  never win and earn a target claim because the manual read ran out (CVP-46). Only the query ending with no
+  terminal record means the source has none.
+
+**The unavailable reason has its own read.** The chart's capped history cannot supply it: 50 newer ordinary diary
 entries, or 200 newer grow events, hide an incomplete manual reading from that query just as they hid evidence from
-the old resolver read. So when the pager ends with no terminal record, the resolver runs one more query per source,
+the old resolver read. So when the query ends with no terminal record (a bound reached first is `read_failed`, above), the resolver runs one more query per source,
 newest first with `limit(1)`, for any manual record holding a temperature or an RH
 (`environment_events` `temperature_c` or `humidity_pct` not null; in a diary row, either key in either envelope). Both queries apply the
 pager's own time guard, `entry_at` or `occurred_at` <= `now + FUTURE_SKEW_MS`, so a record the resolver would drop
@@ -512,6 +522,8 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-42  | The only manual evidence is a temperature-only record dated 5 minutes in the future (diary and grow event alike)                                                                                                                                                                                                                           | The reason is `no_reading`, not `no_derivable_pair`; the future record changes nothing                                                                                                                                                                                                              |
 | CVP-43  | 260 diary rows share the newest `entry_at` (the bound is 250), plant-level first by `id`, with a tent-level row and an RH-pinned row past row 250                                                                                                                                                                                          | The read stops at the bound mid-tie; the result is `unavailable` with reason `read_failed`, never the plant-level value; no claim and no healthy cue                                                                                                                                                |
 | CVP-44  | Exactly 250 diary rows share the newest `entry_at` (the tie ends at the bound), the next row is older; also 251 tied rows                                                                                                                                                                                                                  | 250: the probe row is older, so the tie is complete and the comparator's winner is shown; 251: the probe row is tied, so `unavailable`/`read_failed`. The probe row is never a candidate                                                                                                            |
+| CVP-45  | The newest VPD-capable diary entry is retracted (`retracted_at` set), and the newest VPD-capable grow event has `is_deleted = true`; each has an older active reading behind it                                                                                                                                                            | Neither tombstone is a candidate, terminal record or reason row; the older active readings are what the comparator sees. The retraction-compat fallback path gives the same result                                                                                                                  |
+| CVP-46  | 260 diary rows in a row are future-dated or have no VPD-capable keys (the bound is 250); an invalid manual reading sits past row 250; a stored live row from another input is current and in range                                                                                                                                         | The read reaches the bound with no terminal record, so `unavailable`/`read_failed`: the live row does not win and gets no in-target claim. With the skipped run at 240 rows, the invalid reading is found and shown as invalid                                                                      |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

@@ -97,9 +97,22 @@ async function attachDirectCatalogProducts(event: EventLikeWithId, env: PaddleEn
   }
 }
 
-function buildDeps(directMode: boolean): Deps {
+function buildDeps(directMode: boolean, env: PaddleEnv): Deps {
   const sb = getSupabase();
   return {
+    ...(directMode
+      ? {
+          async enrichEvent(event: EventLikeWithId) {
+            if (!directEventEnrichesProductCatalog(event.eventType)) return { ok: true as const };
+            try {
+              await attachDirectCatalogProducts(event, env);
+              return { ok: true as const };
+            } catch (e) {
+              return { ok: false as const, error: String(e instanceof Error ? e.message : e) };
+            }
+          },
+        }
+      : {}),
     async insertEventReceived({ paddle_event_id, audit, payload }) {
       const row = {
         paddle_event_id,
@@ -358,11 +371,8 @@ Deno.serve(async (req) => {
     if (!event) {
       return new Response("invalid_event_shape", { status: 400 });
     }
-    if (directMode && directEventEnrichesProductCatalog(event.eventType)) {
-      await attachDirectCatalogProducts(event, env);
-    }
     result = await handleVerifiedEvent(
-      buildDeps(directMode),
+      buildDeps(directMode, env),
       event,
       env,
       new Date(),

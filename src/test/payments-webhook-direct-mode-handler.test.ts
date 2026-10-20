@@ -196,4 +196,58 @@ describe("direct-mode payments-webhook handler", () => {
     expect(h.subscriptions.size).toBe(0);
     expect(h.events.size).toBe(0);
   });
+
+  // #2252 Codex r4320245615: a failing catalog read must not lose the event.
+  it("records the event as failed before a catalog failure and asks for a retry", async () => {
+    const h = harness({
+      env: DIRECT_SANDBOX_ENV,
+      productsGet: () => {
+        throw new Error("catalog unavailable");
+      },
+    });
+
+    expect((await h.deliver(priceOnlySubscription())).code).toBe(500);
+    expect(h.events.get("evt_subscription.created")).toMatchObject({
+      processing_status: "failed",
+      processed_ok: false,
+    });
+    expect(String(h.events.get("evt_subscription.created")?.last_error)).toContain(
+      "catalog_lookup_failed",
+    );
+    expect(h.subscriptions.size).toBe(0);
+  });
+
+  it("processes the recorded event on retry after a catalog failure, then stays idempotent", async () => {
+    let calls = 0;
+    const h = harness({
+      env: DIRECT_SANDBOX_ENV,
+      productsGet: () => {
+        calls += 1;
+        if (calls === 1) throw new Error("catalog unavailable");
+        return { id: "pro_fixture", customData: { external_id: "verdant_pro" } };
+      },
+    });
+
+    expect((await h.deliver(priceOnlySubscription())).code).toBe(500);
+    expect(await h.deliver(priceOnlySubscription())).toEqual({
+      code: 200,
+      status: "processed:upsert_subscription",
+    });
+    expect(h.events.get("evt_subscription.created")).toMatchObject({
+      processing_status: "processed",
+    });
+    expect(h.subscriptions.get("sub_fixture")).toMatchObject({
+      user_id: USER_ID,
+      price_id: "pro_monthly",
+      product_id: "verdant_pro",
+    });
+
+    const writes = h.writes.length;
+    expect(await h.deliver(priceOnlySubscription())).toEqual({
+      code: 200,
+      status: "duplicate_processed",
+    });
+    expect(h.writes.length).toBe(writes);
+    expect(h.productLookups).toEqual(["pro_fixture", "pro_fixture"]);
+  });
 });

@@ -113,6 +113,12 @@ export interface Deps {
   upsertCustomer?(row: CustomerRow): Promise<IoResult>;
   markEvent(paddle_event_id: string, patch: MarkPatch): Promise<IoResult>;
   /**
+   * Direct-mode catalog enrichment. Runs only after the durable 'received'
+   * insert, so a failing catalog read leaves an audit row; an error marks the
+   * event 'failed' and returns 500 so Paddle retries (a failed row reprocesses).
+   */
+  enrichEvent?(event: EventLikeWithId): Promise<IoResult>;
+  /**
    * Reverse-lookup a Paddle internal price id (`pri_...`) into the
    * human-readable `importMeta.externalId` (e.g. `"founder_lifetime"`).
    * Called for one-time `transaction.completed` events where the event
@@ -291,6 +297,21 @@ export async function handleVerifiedEvent(
       return { httpStatus: 200, reason: `duplicate_${prior}` };
     }
     // Retryable/missing rows and approved refund replays → reprocess.
+  }
+
+  // 1b) Catalog enrichment only after the event is durably recorded.
+  if (deps.enrichEvent) {
+    const enriched = await deps.enrichEvent(event);
+    if ("error" in enriched) {
+      const err = `catalog_lookup_failed:${redactError(enriched.error)}`;
+      await deps.markEvent(paddleEventId, {
+        processing_status: "failed",
+        processed_ok: false,
+        skip_reason: null,
+        last_error: err,
+      });
+      return { httpStatus: 500, reason: err };
+    }
   }
 
   // 2) Resolve transaction price external id if needed.

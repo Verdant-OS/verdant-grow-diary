@@ -109,11 +109,12 @@ the strip stability summary) stay byte-for-byte as they are.
 
 **The diary row cap must not crowd out manual evidence.** Today `fetchManualDiary`
 (`useSensorsQuickLogManualReadings.ts` ~68-72) takes the newest 50 `diary_entries` for the tent with no filter. The
-projection only recognises a manual reading by `details.manual_sensor_snapshot`, so 50 newer ordinary diary entries
-hide a still-current manual reading. The resolver's diary read filters for that evidence before the cap:
-`.not("details->manual_sensor_snapshot", "is", null)`, then the order and the limit. The filter needs no schema
-change. If the build would change what the existing chart and strip consumers receive, it adds the filter only to
-the query the new projection reads, so they stay byte-for-byte unchanged.
+projection (`sensorsQuickLogManualSeriesRules.ts` ~162-172) recognises a manual reading in either of two envelopes:
+`details.manual_sensor_snapshot`, falling back to `details.environment_check`. So 50 newer ordinary diary entries
+can hide a still-current manual reading. The resolver's diary read keeps both envelopes before the cap:
+`.or("details->manual_sensor_snapshot.not.is.null,details->environment_check.not.is.null")`, then the order and the
+limit. The filter needs no schema change. If the build would change what the existing chart and strip consumers
+receive, it adds the filter only to the query the new projection reads, so they stay byte-for-byte unchanged.
 
 **Pairing rules, stated against today's code.**
 
@@ -312,19 +313,19 @@ follows its input kind: a sensor-row pair keeps today's fixed origin 0, and a ma
 
 ## File-level plan
 
-| File                                                  | Change                                                                                                   |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `src/lib/canonicalTentVpdRules.ts` (new)              | Resolver, moved from the Tonight view model, plus the `manuals` input                                    |
-| `src/lib/tonightTentHomeViewModel.ts`                 | VPD reads the resolver; temperature and RH unchanged                                                     |
-| `src/lib/dashboardEnvironmentSnapshotViewModel.ts`    | `buildTentSnapshotView` takes the resolver result for VPD                                                |
-| `src/pages/Dashboard.tsx`                             | Build one resolver result per tent and pass it to each consumer                                          |
-| `src/lib/sensorsQuickLogManualSeriesRules.ts`         | Add the `QuickLogManualReading` projection; existing one unchanged                                       |
-| `src/hooks/useSensorsQuickLogManualReadings.ts`       | Select the record id and `plant_id`; filter diary rows to `manual_sensor_snapshot` before the 50-row cap |
-| `src/hooks/useLatestSensorSnapshot.ts`                | Opt-in `keepDataOnRefreshError`; default behaviour unchanged                                             |
-| `src/hooks/useLatestSensorSnapshotsByTent.ts` (new)   | Per-tent snapshots via `useQueries`, for the resolver                                                    |
-| `src/constants/dashboardVpdCopy.ts` (new)             | The three unavailable lines and the estimate line                                                        |
-| `src/test/canonical-tent-vpd-rules.test.ts` (new)     | Resolver unit tests                                                                                      |
-| `src/test/dashboard-vpd-single-source.test.tsx` (new) | Renders `Dashboard` and compares every VPD widget                                                        |
+| File                                                  | Change                                                                                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/canonicalTentVpdRules.ts` (new)              | Resolver, moved from the Tonight view model, plus the `manuals` input                                                           |
+| `src/lib/tonightTentHomeViewModel.ts`                 | VPD reads the resolver; temperature and RH unchanged                                                                            |
+| `src/lib/dashboardEnvironmentSnapshotViewModel.ts`    | `buildTentSnapshotView` takes the resolver result for VPD                                                                       |
+| `src/pages/Dashboard.tsx`                             | Build one resolver result per tent and pass it to each consumer                                                                 |
+| `src/lib/sensorsQuickLogManualSeriesRules.ts`         | Add the `QuickLogManualReading` projection; existing one unchanged                                                              |
+| `src/hooks/useSensorsQuickLogManualReadings.ts`       | Select the record id and `plant_id`; filter diary rows to `manual_sensor_snapshot` or `environment_check` before the 50-row cap |
+| `src/hooks/useLatestSensorSnapshot.ts`                | Opt-in `keepDataOnRefreshError`; default behaviour unchanged                                                                    |
+| `src/hooks/useLatestSensorSnapshotsByTent.ts` (new)   | Per-tent snapshots via `useQueries`, for the resolver                                                                           |
+| `src/constants/dashboardVpdCopy.ts` (new)             | The three unavailable lines and the estimate line                                                                               |
+| `src/test/canonical-tent-vpd-rules.test.ts` (new)     | Resolver unit tests                                                                                                             |
+| `src/test/dashboard-vpd-single-source.test.tsx` (new) | Renders `Dashboard` and compares every VPD widget                                                                               |
 
 No schema, RLS, migration, edge function, Action Queue or dependency change. Existing tests that pin the old
 "Missing" or `—` strings are renegotiated in the same commit as the behaviour change, each named in the PR body.
@@ -362,6 +363,7 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-24  | Newest candidate is a `csv` VPD, then a `demo` VPD, each 2 hours old                                                                                                                                                          | Shown with its own `csv` / `demo` label, never relabelled `stale`; no target claim                                                                                                   |
 | CVP-25  | Per-tent snapshot is `csv` (temp, RH, VPD) and a newer stored `manual` VPD from history wins                                                                                                                                  | Target Comparison status and reasons come from the manual VPD only; the `csv` temperature and RH add nothing to the aggregate                                                        |
 | CVP-26  | A tent has a current manual reading, then 60 newer ordinary diary entries with no `manual_sensor_snapshot`                                                                                                                    | The resolver still gets the manual reading and uses it; the 50-row cap applies only after the evidence filter                                                                        |
+| CVP-27  | A manual reading exists only in `details.environment_check`, then 60 newer ordinary diary entries                                                                                                                             | The resolver still gets it through the `environment_check` fallback; the filter keeps both envelopes                                                                                 |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

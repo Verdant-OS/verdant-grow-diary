@@ -21,6 +21,7 @@ import {
 } from "@/constants/csvValidationRanges";
 
 import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "../constants/sensorTiming";
+import { isSoilEcMscmRealistic, isSoilEcUnitMismatchSuspected } from "@/lib/sensorTruthRules";
 /** Default staleness threshold for "current" room confidence. */
 export { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS };
 /** Realistic VPD window for indoor grow rooms (kPa). */
@@ -202,9 +203,13 @@ export function evaluateManualSensorSnapshotQuality(
     if (input.reservoir_ec_mscm < 0) {
       invalidFields.push("reservoir_ec_mscm");
       reasons.push("Reservoir EC cannot be negative.");
-    } else if (input.reservoir_ec_mscm > EC_SUSPICIOUS_MSCM_MAX) {
+    } else if (isSoilEcUnitMismatchSuspected(input.reservoir_ec_mscm)) {
       invalidFields.push("reservoir_ec_mscm");
       reasons.push("Reservoir EC value looks like µS/cm reported as mS/cm.");
+    } else if (!isSoilEcMscmRealistic(input.reservoir_ec_mscm)) {
+      // Same bounds as the history list and change-context deltas.
+      invalidFields.push("reservoir_ec_mscm");
+      reasons.push("Reservoir EC is outside the realistic range.");
     }
   }
 

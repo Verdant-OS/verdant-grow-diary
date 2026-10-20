@@ -34,4 +34,12 @@ describe("manual snapshot quality counts reservoir EC", () => {
     expect(q.quality).toBe("invalid");
     expect(q.invalidFields).toContain("reservoir_ec_mscm");
   });
+
+  it("marks a reservoir EC above the presentation range invalid, matching the history list", () => {
+    for (const value of [10, 20]) {
+      const q = evaluate(value);
+      expect(q.quality).toBe("invalid");
+      expect(q.invalidFields).toContain("reservoir_ec_mscm");
+    }
+  });
 });

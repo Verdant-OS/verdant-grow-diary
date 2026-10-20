@@ -67,6 +67,8 @@ describe("public bundle Paddle token scan", () => {
     ["preceded by a hyphen", (t: string) => `"x-${t}"`],
     ["preceded by a dot (property access)", (t: string) => `obj.${t}`],
     ["followed by a dot", (t: string) => `"${t}.x"`],
+    ["preceded by $ (identifier)", (t: string) => `var $${t}=1`],
+    ["followed by $ (identifier)", (t: string) => `var ${t}$=1`],
   ])("does not count the committed token when it is %s", (_label, wrap) => {
     expect(
       evaluatePublicPaddleBundle({ canonicalToken: LIVE_TOKEN, bundle: wrap(LIVE_TOKEN) }),
@@ -100,6 +102,15 @@ describe("public bundle Paddle token scan — mixed tokens", () => {
         bundle: `{VITE_PAYMENTS_CLIENT_TOKEN:"${LIVE_TOKEN}",VITE_PADDLE_CLIENT_TOKEN:"${TEST_TOKEN}"}`,
       }),
     ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_present" });
+  });
+
+  it("ignores token-shaped runs inside $-prefixed identifiers (Codex P2 on #2230 at f64bfb82)", () => {
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: LIVE_TOKEN,
+        bundle: `"${LIVE_TOKEN}";var $${OTHER_LIVE_TOKEN}=1;var $${TEST_TOKEN}=2;var ${TEST_TOKEN}$=3`,
+      }),
+    ).toEqual({ ok: true });
   });
 
   it("ignores test_ runs that are not standalone sandbox tokens", () => {

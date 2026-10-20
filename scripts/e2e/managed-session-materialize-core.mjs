@@ -329,14 +329,15 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
 // `live_` plus exactly 27 letters/digits. Ordinary app identifiers that start
 // with `live_` (`live_confirmed`, snake_case names, shorter or longer runs)
 // are not tokens. Standalone means the same neighbour set is excluded on both
-// sides: a letter, digit, `_`, `.` or `-` next to the token (`x-${token}`,
-// `obj.${token}`, `${token}.x`) makes it part of a larger value.
+// sides: a letter, digit, `_`, `$`, `.` or `-` next to the token (`x-${token}`,
+// `obj.${token}`, `${token}.x`, a `$`-prefixed identifier) makes it part of a
+// larger value.
 const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
-  /(?:^|[^A-Za-z0-9_.-])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_.-])/g;
+  /(?:^|[^A-Za-z0-9_$.-])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_$.-])/g;
 // A standalone sandbox client token (same shape and boundaries). A production
 // bundle must carry none: a live bundle with any sandbox token is mixed.
 const PADDLE_SANDBOX_TOKEN_STANDALONE_PATTERN =
-  /(?:^|[^A-Za-z0-9_.-])test_[A-Za-z0-9]{27}(?![A-Za-z0-9_.-])/;
+  /(?:^|[^A-Za-z0-9_$.-])test_[A-Za-z0-9]{27}(?![A-Za-z0-9_$.-])/;
 
 /**
  * Compare the bounded deployed entry bundle with the committed production

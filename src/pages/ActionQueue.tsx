@@ -160,6 +160,7 @@ import {
 } from "@/lib/actionQueueUrlStateRules";
 
 import { Input } from "@/components/ui/input";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -1657,7 +1658,9 @@ export default function ActionQueue() {
                           </div>
                           <p className="text-sm mt-1">{sanitizeActionCopy(row.suggested_change)}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {sanitizeActionCopy(stripBackPointerTokens(row.reason))}
+                            {localizeReadingAtTimestamps(
+                              sanitizeActionCopy(stripBackPointerTokens(row.reason)),
+                            )}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <AiDoctorSessionLink row={row} />

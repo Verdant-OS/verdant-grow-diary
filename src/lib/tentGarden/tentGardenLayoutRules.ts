@@ -36,7 +36,7 @@ const DEFAULT_POT_RADIUS = 0.2;
 
 export function parseTentSize(size: string | null | undefined): { width: number; depth: number } | null {
   if (!size || typeof size !== "string") return null;
-  const cleaned = size.toLowerCase().replace(/['"\s]/g, "").replace("cm", "");
+  const cleaned = size.toLowerCase().replace(/['\"\s]/g, "").replace("cm", "");
   const match = cleaned.match(/^(\d+(?:\.\d+)?)[x×](\d+(?:\.\d+)?)$/);
   if (!match) return null;
   const w = parseFloat(match[1]);
@@ -54,21 +54,14 @@ function gridDimensions(n: number): { cols: number; rows: number } {
   return { cols, rows };
 }
 
-export function potsOverlap(
-  a: { position: Point; radius: number },
-  b: { position: Point; radius: number }
-): boolean {
+export function potsOverlap(a: { position: Point; radius: number }, b: { position: Point; radius: number }): boolean {
   const dx = a.position.x - b.position.x;
   const dy = a.position.y - b.position.y;
   const minDist = a.radius + b.radius;
   return dx * dx + dy * dy < minDist * minDist - 1e-9;
 }
 
-export function clampToTent(
-  position: Point,
-  radius: number,
-  footprint: { width: number; depth: number }
-): Point {
+export function clampToTent(position: Point, radius: number, footprint: { width: number; depth: number }): Point {
   const halfW = footprint.width / 2;
   const halfD = footprint.depth / 2;
   return {
@@ -77,10 +70,7 @@ export function clampToTent(
   };
 }
 
-export function placePlants(
-  plants: PlantForLayout[],
-  tent: TentForLayout
-): { placements: PotPlacement[]; footprint: Footprint } {
+export function placePlants(plants: PlantForLayout[], tent: TentForLayout): { placements: PotPlacement[]; footprint: Footprint } {
   const sorted = [...plants].sort((a, b) => {
     const byDate = a.created_at.localeCompare(b.created_at);
     return byDate !== 0 ? byDate : a.id.localeCompare(b.id);
@@ -89,12 +79,7 @@ export function placePlants(
   const parsed = parseTentSize(tent.size);
   let footprint: Footprint;
   if (parsed) {
-    footprint = {
-      width: parsed.width,
-      depth: parsed.depth,
-      isApproximate: false,
-      message: null,
-    };
+    footprint = { width: parsed.width, depth: parsed.depth, isApproximate: false, message: null };
   } else {
     const n = Math.max(sorted.length, 1);
     const { cols, rows } = gridDimensions(n);
@@ -121,22 +106,14 @@ export function placePlants(
     const rawY = (row + 0.5 - rows / 2) * cellD;
     const radius = DEFAULT_POT_RADIUS;
     const clamped = clampToTent({ x: rawX, y: rawY }, radius, footprint);
-    placements.push({
-      plantId: plant.id,
-      position: clamped,
-      potRadius: radius,
-    });
+    placements.push({ plantId: plant.id, position: clamped, potRadius: radius });
   }
 
   for (let i = 0; i < placements.length; i++) {
     for (let j = 0; j < i; j++) {
       if (potsOverlap(placements[i], placements[j])) {
         placements[i].position.x += 0.01 * (i - j);
-        placements[i].position = clampToTent(
-          placements[i].position,
-          placements[i].potRadius,
-          footprint
-        );
+        placements[i].position = clampToTent(placements[i].position, placements[i].potRadius, footprint);
       }
     }
   }

@@ -134,6 +134,26 @@ claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:57 UTC
 last_updated: 2026-10-16 14:33 CT, by Claude (close-out session)
 ```
 
+### QUICKLOG-CORRECTION-EDITABLE-VALUES
+
+```text
+TASK QUICKLOG-CORRECTION-EDITABLE-VALUES  priority: P2  status: OPEN
+goal: Make the Correct this Quick Log dialog edit volume, dose, or sensor values for that entry type, and keep the original value in the correction history. Keep the Wrong value reason. Do not follow closed #2116.
+branch: cursor/quicklog-correction-editable-values-fc1d
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118 (draft)
+head_sha: 434e20457ac68a8efc225571ba41f56ca54b789e (before the 2026-10-20 base merge)
+state: pushed draft. Base merged 2026-10-20 (only HANDOFF_LOG conflicted). No merge to base.
+next_action: required CI at the base-merge head, then an independent exact-head review (Codex, Blue Dream or Critical Mass). Stay draft.
+files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; src/test/timeline-first-page-linked-roots.test.tsx; src/test/timeline-supplemental-root-sensor-siblings.test.tsx; src/test/timeline-load-older-sensor-siblings.test.tsx; src/test/quicklog-feeding-correction-volume.test.tsx; src/test/quicklog-feeding-correction-volume-context.test.ts; src/test/quicklog-correction-environment-link-match.test.ts; src/test/ci-pr-concurrency.test.ts; scripts/prove-quicklog-correction-owner-fence.mjs; scripts/prove-quicklog-correction-measured-values.mjs; scripts/assert-required-core-migrations-applied.mjs; .github/workflows/ci.yml; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
+blockers: Graft re-review of 3ccd9a9474065e7d1eb1bbd727acb7b4e867de8e is pending CI. The locked PG15 harness matches base. No merge.
+artifacts: PR body
+reviewer_seat: Graft one-time exact-head after required CI is green. Blue Dream (.tsx). Critical Mass (rules, tests, migration).
+claimed_by: claude, 2026-10-20 02:02 UTC (PR #2118 claim comment; Cheeko VER-216 assignment)
+last_updated: 2026-10-20 02:10 UTC, by Claude (VER-216 close-out)
+```
+
 ### PR2072-M7-SERVED-REVISION
 
 ```text

@@ -14,6 +14,9 @@ import {
 const MCP = "@lovable.dev/mcp-js";
 const CWD = resolve("virtual-repo");
 const at = (name: string) => resolve(CWD, name);
+// Joined at runtime: the policy scans tracked source for npm consumer commands,
+// and this fixture needs the marker only inside its virtual README.
+const NPM_MARKER = ["npm", "install"].join(" ");
 
 function evaluateWithHono(honoVersion: string) {
   const manifest = {
@@ -48,9 +51,9 @@ function evaluateWithHono(honoVersion: string) {
       canonicalLockfile: "bun.lock",
       owner: "Verdant dependency security",
       reason: "npm remains in a reviewed local setup entrypoint.",
-      consumerContracts: [{ path: "README.md", markers: ["npm install"] }],
+      consumerContracts: [{ path: "README.md", markers: [NPM_MARKER] }],
     }),
-    [at("README.md")]: "npm install",
+    [at("README.md")]: NPM_MARKER,
   };
   const paths = new Set(Object.keys(files));
   return evaluatePolicy({

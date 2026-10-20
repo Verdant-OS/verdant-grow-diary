@@ -100,6 +100,8 @@ describe("blank observation record download data", () => {
     const copy = JSON.stringify(guide);
     expect(copy).not.toMatch(/not a download|no download/i);
     expect(copy).toContain("printable PDF");
+    // The title may name a PDF only because the PDF ships with the page.
+    expect(guide.title).toMatch(/Printable PDF and CSV/);
   });
 
   it("links the app and checklist guides to the template page, not straight to files", () => {

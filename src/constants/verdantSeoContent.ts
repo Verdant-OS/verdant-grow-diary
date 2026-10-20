@@ -918,7 +918,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "grow-journal-template",
-    title: "Grow journal template you can use right now | Verdant Grow Diary",
+    title: "Grow Journal Template: Free Printable PDF and CSV | Verdant",
     h1: "A grow journal template that fits in 30 seconds",
     description:
       "A practical grow journal template: plant, entry type, stage, note, and one number when it matters. Use it in your browser with no account, or download a blank CSV or printable PDF record.",

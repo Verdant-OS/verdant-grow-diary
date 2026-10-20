@@ -2811,9 +2811,13 @@ function QuickLogV2SheetForOwner({
     setPostSave(null);
     setLocalError(null);
     setSaveStatus("");
+    // Keep the activity as well as the target (#2172): a grower logging a
+    // second Feed should land on the Feed form. The cleared feeding form and
+    // defaults flag below let the post-save recipe prefill apply again.
     setForm((prev) => ({
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
+      action: prev.action,
     }));
     setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;

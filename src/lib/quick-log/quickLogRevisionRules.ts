@@ -449,7 +449,11 @@ export function correctionValuePropsFromDiaryDetails(
     eventType === "environment_check" ||
     eventType === "manual_sensor_snapshot"
   ) {
-    return { kind: "sensor", sensor: sensorFromDetails(details) };
+    // The correction RPC writes sensor values into sensor_snapshot.metrics.
+    // An Environment Check keeps its readings only in details.environment_check,
+    // so blank fields here would save a revision that changes nothing.
+    const sensor = sensorFromDetails(details);
+    return sensor ? { kind: "sensor", sensor } : null;
   }
   // V2 Fast Check stores the action as an observation and the measurements
   // on the environment companion. Timeline merge keeps those metrics on the

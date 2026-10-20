@@ -106,7 +106,8 @@ function draftSensor(
   values: QuickLogCorrectionValueContext | null | undefined,
   key: keyof QuickLogCorrectionSensorValues,
 ): string {
-  const value = values?.kind === "sensor" ? values.sensor?.[key] : undefined;
+  const value =
+    values?.kind === "sensor" || values?.kind === "watering" ? values.sensor?.[key] : undefined;
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
 }
 
@@ -218,6 +219,10 @@ function RevisionControls({
   const [noteDraft, setNoteDraft] = useState<string>(currentNote ?? "");
   const [timeDraft, setTimeDraft] = useState<string>(toDatetimeLocalValue(currentOccurredAt));
   const [plantDraft, setPlantDraft] = useState<string>(currentPlantId ?? "");
+  // A watering log saved with readings corrects its volume and readings together.
+  const editsSensor =
+    correctionValues?.kind === "sensor" ||
+    (correctionValues?.kind === "watering" && correctionValues.sensor != null);
   const [volumeDraft, setVolumeDraft] = useState<string>(volumeDraftFrom(correctionValues));
   const [doseDraft, setDoseDraft] = useState<string>(
     correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
@@ -329,7 +334,7 @@ function RevisionControls({
         changes.doseAmount = parsed;
       }
     }
-    if (correctionValues?.kind === "sensor") {
+    if (editsSensor && correctionValues) {
       const sensor: QuickLogCorrectionSensorValues = {};
       const original = correctionValues.sensor ?? {};
       const temperature = temperatureDraft.trim() === "" ? undefined : Number(temperatureDraft);
@@ -474,7 +479,7 @@ function RevisionControls({
                 />
               </label>
             )}
-            {correctionValues?.kind === "sensor" && (
+            {editsSensor && (
               <div className="space-y-2">
                 <label className="block text-xs text-muted-foreground">
                   Temperature (°C)

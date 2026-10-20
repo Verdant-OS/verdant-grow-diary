@@ -408,24 +408,31 @@ export function correctionValuesForTimelineAction(
   },
   readings?: ReadonlyArray<{ field: string; value: number }>,
 ): QuickLogCorrectionValueContext | null {
+  const sensor = sensorFromReadings(readings);
   if (action.kind === "water") {
-    return {
-      kind: "watering",
-      volumeMl:
-        typeof action.volumeMl === "number" && Number.isFinite(action.volumeMl)
-          ? action.volumeMl
-          : null,
-    };
+    const volumeMl =
+      typeof action.volumeMl === "number" && Number.isFinite(action.volumeMl)
+        ? action.volumeMl
+        : null;
+    // A watering log saved with readings has an environment sibling; the
+    // dialog corrects the volume and those readings together.
+    return sensor ? { kind: "watering", volumeMl, sensor } : { kind: "watering", volumeMl };
   }
   const fromEvidence = correctionValuePropsFromDiaryDetails(action.aiDoctorPhase1Evidence?.details);
   if (fromEvidence?.kind === "feeding") return fromEvidence;
+  return sensor ? { kind: "sensor", sensor } : null;
+}
+
+function sensorFromReadings(
+  readings: ReadonlyArray<{ field: string; value: number }> | undefined,
+): QuickLogCorrectionSensorValues | null {
   const sensor: QuickLogCorrectionSensorValues = {};
   for (const reading of readings ?? []) {
     if (reading.field === "air_temp_c") sensor.temperature_c = reading.value;
     if (reading.field === "humidity_pct") sensor.humidity_pct = reading.value;
     if (reading.field === "vpd_kpa") sensor.vpd_kpa = reading.value;
   }
-  return Object.keys(sensor).length > 0 ? { kind: "sensor", sensor } : null;
+  return Object.keys(sensor).length > 0 ? sensor : null;
 }
 
 export function correctionValuePropsFromDiaryDetails(

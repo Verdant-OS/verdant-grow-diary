@@ -27,6 +27,7 @@ import {
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
+import { formatSnapshotCapturedAt } from "@/lib/alertReasonDisplayRules";
 
 interface Props {
   viewModel: TimelineEvidenceDetailViewModel | null;
@@ -114,7 +115,7 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
           {vm.occurredAt && (
             <p className="text-[11px] text-muted-foreground mt-1 inline-flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {vm.occurredAt}
+              {formatSnapshotCapturedAt(vm.occurredAt)}
             </p>
           )}
         </header>
@@ -175,7 +176,7 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
             <Row label="Plant" value={vm.plantLabel} icon={<Leaf className="h-3 w-3" />} />
           )}
           {vm.tentLabel && <Row label="Tent" value={vm.tentLabel} />}
-          {vm.remindAt && <Row label="Reminder" value={vm.remindAt} />}
+          {vm.remindAt && <Row label="Reminder" value={formatSnapshotCapturedAt(vm.remindAt)} />}
         </dl>
 
         {vm.note.trim() && (
@@ -209,7 +210,7 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
               </div>
               {vm.maturityEvidence.observedAt && (
                 <p className="mb-2 text-[11px] text-violet-100/80">
-                  Observed {vm.maturityEvidence.observedAt}
+                  Observed {formatSnapshotCapturedAt(vm.maturityEvidence.observedAt)}
                 </p>
               )}
               {vm.maturityEvidence.advisoryOnly && (
@@ -278,7 +279,7 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
                 </div>
                 {vm.sensor.capturedAt && (
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    Captured {vm.sensor.capturedAt}
+                    Captured {formatSnapshotCapturedAt(vm.sensor.capturedAt)}
                   </p>
                 )}
               </section>

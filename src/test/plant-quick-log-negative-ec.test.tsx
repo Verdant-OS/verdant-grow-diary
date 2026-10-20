@@ -59,6 +59,10 @@ describe("plantQuickLogEcError", () => {
   it("names a negative EC and accepts blank, zero and positive values", () => {
     expect(plantQuickLogEcError("-1")).toBe(PLANT_QUICK_LOG_NEGATIVE_EC_MESSAGE);
     expect(plantQuickLogEcError(" -0.5 ")).toBe(PLANT_QUICK_LOG_NEGATIVE_EC_MESSAGE);
+    // Codex r4327342150 / Copilot r4327357681: exponent forms parse negative too.
+    expect(plantQuickLogEcError("-1e2")).toBe(PLANT_QUICK_LOG_NEGATIVE_EC_MESSAGE);
+    expect(plantQuickLogEcError("-1e0")).toBe(PLANT_QUICK_LOG_NEGATIVE_EC_MESSAGE);
+    expect(plantQuickLogEcError("1e0")).toBeNull();
     expect(plantQuickLogEcError("")).toBeNull();
     expect(plantQuickLogEcError("0")).toBeNull();
     expect(plantQuickLogEcError("1.8")).toBeNull();
@@ -76,7 +80,21 @@ describe("PlantQuickLog negative EC (#2159)", () => {
     expect(ec).toHaveAttribute("aria-invalid", "true");
     expect(ec.getAttribute("aria-describedby")).toBe(message.id);
 
-    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+    const save = screen.getByTestId("plant-quick-log-save");
+    expect(save).toBeDisabled();
+    // Copilot r4327357765: submit the form directly so the handleSave guard,
+    // not only the disabled button, is what refuses the save.
+    fireEvent.submit(save.closest("form")!);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a negative EC written in exponent notation", async () => {
+    renderSheet();
+    const ec = screen.getByTestId("plant-quick-log-ec");
+    fireEvent.change(ec, { target: { value: "-1e2" } });
+    expect(screen.getByText(PLANT_QUICK_LOG_NEGATIVE_EC_MESSAGE)).toBeInTheDocument();
+    fireEvent.submit(ec.closest("form")!);
     await new Promise((r) => setTimeout(r, 20));
     expect(saveMock).not.toHaveBeenCalled();
   });

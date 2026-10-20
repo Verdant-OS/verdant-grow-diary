@@ -458,12 +458,16 @@ export default function LightCalculatorTab({
                 label="Actual wall draw per fixture"
                 value={inputs.actualWattsPerFixture}
                 onChange={(actualWattsPerFixture) => onChange({ ...inputs, actualWattsPerFixture })}
-                min={0}
+                min={inputs.ppfMode === "watts" ? 0.1 : 0}
                 max={100000}
                 step={1}
                 unit="W"
                 required={inputs.ppfMode === "watts"}
-                help="Optional for PPF math; required for energy cost. Never use HID-equivalent watts."
+                help={
+                  inputs.ppfMode === "watts"
+                    ? "Required in this mode: PPF is estimated from these watts × efficacy. Never use HID-equivalent watts."
+                    : "Optional for PPF math; required for energy cost. Never use HID-equivalent watts."
+                }
               />
             </div>
           </CardContent>

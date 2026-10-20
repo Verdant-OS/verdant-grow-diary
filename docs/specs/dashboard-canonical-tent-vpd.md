@@ -146,7 +146,7 @@ interface CanonicalTentVpd {
   /**
    * The winning candidate's source before display normalisation. Tonight maps a generic diary
    * `sensor_snapshot` (`snapshotFromDiary`, source "diary") to "manual" for display; this keeps "diary".
-   * The source fence reads this field, never `source`.
+   * The source fence requires both this field and the post-aging `source` to be live or manual.
    */
   originSource: string | null;
   sourceLabel: string | null;
@@ -251,9 +251,11 @@ Those are history or other pages. A follow-up can point them at the resolver.
 The stage-aware card keeps calling `classifyVpdAgainstStage`, behind two guards. Both must pass before any
 in-target or out-of-target claim:
 
-1. **Source fence, kept from today.** Only an `originSource` of `live` or `manual` may be classified. That is the
-   rule in `isDashboardSnapshotEligibleForHealthyCues` (`dashboardSensorEvidenceRules.ts`), applied to the resolver
-   result instead of the snapshot. It reads `originSource`, not the display `source`: Tonight normalises a generic
+1. **Source fence, kept from today.** A value may be classified only when **both** its `originSource` and its
+   post-aging `source` are `live` or `manual`. That is the rule in `isDashboardSnapshotEligibleForHealthyCues`
+   (`dashboardSensorEvidenceRules.ts`), applied to the resolver result instead of the snapshot. The post-aging
+   `source` check keeps an expired reading out: aging changes `source` to `stale` but leaves `originSource` as it
+   was. The `originSource` check keeps a diary reading out: Tonight normalises a generic
    diary snapshot's `diary` to `manual` (`tonightTentHomeViewModel.ts` ~187), and today's Dashboard rejects that raw
    `diary` source, so a diary-origin value stays context only. `csv`, `demo`, `stale` and `invalid` values are shown with their source label
    and "context only, no target claim", never classified.
@@ -380,6 +382,7 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-27  | A manual reading exists only in `details.environment_check`, then 60 newer ordinary diary entries                                                                                                                             | The resolver still gets it through the `environment_check` fallback; the filter keeps both envelopes                                                                                 |
 | CVP-28  | Newest value is a stored VPD from a generic diary `sensor_snapshot` (`snapshotFromDiary`, source `diary`) inside the band                                                                                                     | Shown with its label, `originSource: "diary"`; no in-target claim on the stage card or in Target Comparison, as today                                                                |
 | CVP-29  | An air reading in an older `environment_check`, then 60 newer `environment_check` rows holding only a note or EC                                                                                                              | The resolver still gets the air reading; rows without an air metric never reach the cap                                                                                              |
+| CVP-30  | A manual reading 25 hours old and a live reading 20 minutes old, each inside the band                                                                                                                                         | Both age to `source: "stale"` with `originSource` unchanged; neither is classified, no in-target claim                                                                               |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

@@ -32,6 +32,7 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   postcss: "8.5.18",
   "fast-uri": "3.1.8",
   "form-data": "4.0.6",
+  "follow-redirects": "1.16.1",
   "js-yaml": "4.3.2",
   qs: "6.16.0",
   ajv: "6.15.0",

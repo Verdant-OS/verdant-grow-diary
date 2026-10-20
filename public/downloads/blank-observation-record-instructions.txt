@@ -1,0 +1,15 @@
+Blank observation record
+
+These are local records, not automatic Verdant imports.
+
+Save a copy of blank-observation-record.csv or print blank-observation-record.pdf.
+In the CSV, keep the header and use one row per record; duplicate the blank row
+as needed. In the PDF, use one sheet per record.
+
+Enter the date, local time and time zone as recorded. Choose your own record
+identifier. Write the observation in your own words. Use photo/file reference
+for a local filename or file location, and source/reference for a document or
+other reference. Use follow-up note for any later note about the same record.
+
+Leave unknown details blank. Keep your copy and any referenced files together
+in your own records. Opening or editing these files does not save them in Verdant.

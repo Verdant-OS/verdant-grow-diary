@@ -182,7 +182,11 @@ from that snapshot is unchanged too.
 
 The card's whole comparison is rebuilt, not only its VPD row. Otherwise `result.status`, `headline` and `reasons`
 would still come from the snapshot's VPD while the row shows the canonical value. The build calls
-`compareSnapshotToTargets` with a copy of the snapshot in which `vpd` is replaced:
+`compareSnapshotToTargets` with a copy of the chosen tent's **eligible** snapshot,
+`dashboardSnapshotForHealthyCues(snapshot)` (`dashboardSensorEvidenceRules.ts` ~149), in which `vpd` is replaced.
+That is the same live/manual filter today's card applies (`Dashboard.tsx` ~311), so a `csv`, `sim`, `demo` or
+`unverified` snapshot's temperature, RH and other metrics never drive the status, headline or reasons, even when a
+newer eligible manual VPD from history wins. The `vpd` replacement is:
 
 - **Eligible canonical value** (`state: "value"`, `source` `live` or `manual`, `basis` `stored`): `vpd` is the
   canonical value, so the status, headline and reasons judge the same VPD the row shows.
@@ -190,7 +194,8 @@ would still come from the snapshot's VPD while the row shows the canonical value
   adds nothing to the aggregate status, headline or reasons. The VPD row still shows the canonical value or the
   unavailable line, with "no target claim" and its source label.
 
-When the snapshot is empty (`source: "unavailable"`), `compareSnapshotToTargets` returns `unavailable` at once
+When the eligible snapshot is `null` (filtered out as context-only) or empty (`source: "unavailable"`),
+`compareSnapshotToTargets` returns `unavailable` at once
 (`environmentTargetComparison.ts` ~81), so copying it would drop an eligible canonical value. This happens in the
 manual-only case, where the value comes from `manuals` alone. Then the comparison input is a minimal snapshot built
 from the canonical result: `source`, `captured_at` and `tent_id` from the result, `vpd` the canonical value, and
@@ -269,10 +274,13 @@ Each one exists in `tonightTentHomeViewModel.ts` at `be03e2657` and has tests. T
   must have compatible sources (`compositeVpdSource`). The pairing rules above set what may pair with what.
 - Pinned RH (0% or 100%) makes the derived value invalid (`rhIsPinned`).
 - Readings more than 60 s in the future are dropped (`FUTURE_SKEW_MS`).
-- Every candidate is aged by its own source with `isCurrentStateStale(capturedAt, { now, source })`
-  (`sensorTruthCanon.ts`). That means 15 minutes for `live` and 24 hours for `manual`
-  (`MANUAL_CURRENT_STATE_STALE_MS`). This covers manual history as well as live rows. An expired reading becomes
-  `stale`: still shown, never healthy, never classified. The full manual history makes this newly reachable;
+- Every `live` or `manual` candidate is aged by its own source with
+  `isCurrentStateStale(capturedAt, { now, source })` (`sensorTruthCanon.ts`). That means 15 minutes for `live` and
+  24 hours for `manual` (`MANUAL_CURRENT_STATE_STALE_MS`). This covers manual history as well as live rows. An
+  expired one becomes `stale`: still shown, never healthy, never classified. `csv`, `demo` and other context-only
+  candidates are **not** relabelled `stale`: `isCurrentStateStale` would apply the 15-minute live window to them
+  (`sensorTruthCanon.ts` ~96-103) and the relabel would hide their mandatory provenance. They keep their own label
+  and are never classified anyway. The full manual history makes this newly reachable;
   without it, an old manual value would pass both classification fences indefinitely.
 - Unknown sources become `invalid` and are never shown as a value.
 - A same-capture temperature and RH pair newer than every stored VPD replaces the stored VPD (#2268, #2271).
@@ -343,6 +351,8 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-21  | Chosen tent B is in veg, but `scopedGrow.stage` is late flower, or one of B's plants is in flower                                                                                                                             | Stage card classifies against B's resolved context (the more advanced stage), the same as a one-tent selection of B today                                                            |
 | CVP-22  | Newest candidate is a manual reading 25 hours old, inside the stage band                                                                                                                                                      | Shown as `stale` with its age; no in-target or out-of-target claim on the stage card or in Target Comparison                                                                         |
 | CVP-23  | Manual-only data, empty diary snapshot, eligible stored `manual` VPD inside the band                                                                                                                                          | Target Comparison status follows the canonical VPD (not `unavailable`); temperature and RH rows stay unavailable                                                                     |
+| CVP-24  | Newest candidate is a `csv` VPD, then a `demo` VPD, each 2 hours old                                                                                                                                                          | Shown with its own `csv` / `demo` label, never relabelled `stale`; no target claim                                                                                                   |
+| CVP-25  | Per-tent snapshot is `csv` (temp, RH, VPD) and a newer stored `manual` VPD from history wins                                                                                                                                  | Target Comparison status and reasons come from the manual VPD only; the `csv` temperature and RH add nothing to the aggregate                                                        |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

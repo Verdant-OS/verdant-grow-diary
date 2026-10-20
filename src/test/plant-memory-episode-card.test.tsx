@@ -4,7 +4,7 @@
  * mandatory uncertainty note, and never uses causal language.
  */
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { PlantMemoryEpisodeCard } from "../components/PlantMemoryEpisodeCard";
 import { NextRunPlaybook } from "../components/NextRunPlaybook";
@@ -19,7 +19,7 @@ const T0 = Date.parse("2026-07-01T12:00:00Z");
 const iso = (ms: number) => new Date(T0 + ms).toISOString();
 const HOUR = 60 * 60 * 1000;
 
-function episode(outcome?: string, decision?: string) {
+function episode(outcome?: string, decision?: string, reason = "RH high") {
   const action: EpisodeActionInput = {
     id: "act-1",
     grow_id: "grow-1",
@@ -29,7 +29,7 @@ function episode(outcome?: string, decision?: string) {
     action_type: "environment",
     target_metric: "humidity",
     suggested_change: "Lower RH a few points",
-    reason: "RH high",
+    reason,
     status: "completed",
     completed_at: iso(0),
   };
@@ -165,6 +165,20 @@ describe("PlantMemoryEpisodeCard", () => {
     );
     expect(container.textContent ?? "").not.toMatch(CAUSAL);
     expect(container.textContent ?? "").not.toMatch(/%\s*(confidence|effective)/i);
+  });
+  it("shows a copied alert reason's Reading at timestamp in local time, not raw ISO", () => {
+    const ISO_READING = "2026-10-15T15:54:26.221+00:00";
+    render(
+      <MemoryRouter>
+        <PlantMemoryEpisodeCard
+          episode={episode("improved", undefined, `Humidity is high. Reading at ${ISO_READING}.`)}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("episode-section-action-trigger"));
+    const reason = screen.getByText(/Humidity is high\. Reading at/);
+    expect(reason.textContent).not.toContain(ISO_READING);
+    expect(reason.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 });
 

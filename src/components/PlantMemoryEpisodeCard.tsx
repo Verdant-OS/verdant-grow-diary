@@ -20,6 +20,7 @@ import { PlantMemoryEpisodeEvidence } from "@/components/PlantMemoryEpisodeEvide
 import { PlantMemoryEpisodeTimeline } from "@/components/PlantMemoryEpisodeTimeline";
 import { LearningDecisionDialog } from "@/components/LearningDecisionDialog";
 import { saveRunLearningDecision } from "@/lib/plantMemoryEpisodeService";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import {
   EPISODE_STATE_LABELS,
   EVIDENCE_WINDOW_LABELS,
@@ -92,7 +93,7 @@ export function PlantMemoryEpisodeCard({ episode, onDecisionSaved }: PlantMemory
               {episode.action.reason ? (
                 <div className="sm:col-span-2">
                   <dt className="text-muted-foreground">Reason</dt>
-                  <dd>{episode.action.reason}</dd>
+                  <dd>{localizeReadingAtTimestamps(episode.action.reason)}</dd>
                 </div>
               ) : null}
             </dl>

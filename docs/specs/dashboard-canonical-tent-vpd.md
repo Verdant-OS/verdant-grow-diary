@@ -254,7 +254,8 @@ differs decides. Input or backend order never decides.
    manual reading `id`.
 
 Two tent-level manual readings, two plant-level ones, and every mix of origins are covered by these keys. A
-derived pair takes its `capturedAt` and origin from its older input, as `calculatedVpdCandidate` does today.
+derived pair takes its `capturedAt` from its older input, as `calculatedVpdCandidate` does today. Its origin
+follows its input kind: a sensor-row pair keeps today's fixed origin 0, and a manual same-record pair is origin 2.
 
 ## File-level plan
 

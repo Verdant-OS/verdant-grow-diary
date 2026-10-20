@@ -566,6 +566,9 @@ function QuickLogV2SheetForOwner({
   const [videoChecking, setVideoChecking] = useState(false);
   const [photoChecking, setPhotoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  // The recipe the one-shot prefill wrote, so a target change can tell an
+  // untouched prefill (re-derive for the new plant) from grower edits (keep).
+  const appliedFeedingDefaultsRef = useRef<QuickLogFeedingFormState | null>(null);
   const [feedingDefaultsRefetchAfterByPlant, setFeedingDefaultsRefetchAfterByPlant] = useState<
     Record<string, number>
   >({});
@@ -884,6 +887,23 @@ function QuickLogV2SheetForOwner({
     [recentFeedingsQ.data, resolvedContext.plantId],
   );
 
+  // #2172 / VER-195: a target change must not carry plant A's prefilled recipe
+  // into plant B. An untouched prefill is cleared so B's own defaults (or none)
+  // apply; a recipe the grower edited is theirs and stays.
+  const feedingDefaultsPlantRef = useRef(resolvedContext.plantId);
+  useEffect(() => {
+    if (feedingDefaultsPlantRef.current === resolvedContext.plantId) return;
+    feedingDefaultsPlantRef.current = resolvedContext.plantId;
+    const applied = appliedFeedingDefaultsRef.current;
+    if (!feedingDefaultsApplied || !applied) return;
+    const untouched =
+      JSON.stringify({ ...feedingForm, note: "" }) === JSON.stringify({ ...applied, note: "" });
+    if (!untouched) return;
+    appliedFeedingDefaultsRef.current = null;
+    setFeedingForm((previous) => ({ ...EMPTY_QUICKLOG_FEEDING_FORM, note: previous.note }));
+    setFeedingDefaultsApplied(false);
+  }, [resolvedContext.plantId, feedingDefaultsApplied, feedingForm]);
+
   const recentWateringsQ = useRecentWateringsForVolumeDefaults({
     plantId: resolvedContext.plantId,
   }) as { data?: unknown[] };
@@ -1199,10 +1219,9 @@ function QuickLogV2SheetForOwner({
     // example a selected Better/Same/Worse response) must neither block those
     // defaults nor be overwritten by them.
     if (!isFeedingFormPristine({ ...feedingForm, note: "" })) return;
-    setFeedingForm((previous) => ({
-      ...applyFeedingDefaultsToForm(feedingDefaults),
-      note: previous.note,
-    }));
+    const applied = applyFeedingDefaultsToForm(feedingDefaults);
+    appliedFeedingDefaultsRef.current = applied;
+    setFeedingForm((previous) => ({ ...applied, note: previous.note }));
     setFeedingDefaultsApplied(true);
   }, [
     open,

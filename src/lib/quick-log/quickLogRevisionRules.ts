@@ -503,16 +503,22 @@ export function correctionValuesForTimelineDiaryEntry(
   const fromDetails = correctionValuePropsFromDiaryDetails(entry?.details);
   if (fromDetails) return fromDetails;
   const details = isPlainObject(entry?.details) ? entry.details : null;
-  if (!details || details.event_type !== "observation") return null;
+  if (!details) return null;
+  const linkedId = nonEmpty(details.linked_grow_event_id);
+  // PlantQuickLog V2 writes its diary companion as a "quick_log" envelope
+  // linked to an observation root; resolve that root like an observation row.
+  const isQuickLogEnvelope = details.event_type === "quick_log" && linkedId !== null;
+  if (details.event_type !== "observation" && !isQuickLogEnvelope) return null;
   const entryAt = entry?.entry_at;
   if (typeof entryAt !== "string") return null;
   const entryMs = Date.parse(entryAt);
   if (!Number.isFinite(entryMs)) return null;
   const plantId = entry?.plant_id ?? null;
-  const linkedId = nonEmpty(details.linked_grow_event_id);
   const rows = growEvents ?? [];
   if (linkedId) {
     const root = rows.find((row) => row.id === linkedId);
+    // Only an observation root accepts sensor corrections server-side.
+    if (isQuickLogEnvelope && root?.event_type !== "observation") return null;
     const rootCreatedAt = root && typeof root.created_at === "string" ? root.created_at : null;
     if (root && rootCreatedAt) {
       const companion = rows.find(

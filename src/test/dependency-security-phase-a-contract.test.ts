@@ -157,7 +157,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["fast-uri", [3, 1, 8] as const],
     ["form-data", [4, 0, 6] as const],
     ["js-yaml", [4, 3, 2] as const],
-    ["hono", [4, 13, 5] as const],
+    ["hono", [4, 13, 11] as const],
     ["qs", [6, 16, 0] as const],
     ["ajv", [6, 15, 0] as const],
     ["picomatch", [2, 3, 2] as const],

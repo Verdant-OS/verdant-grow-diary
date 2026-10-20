@@ -27,7 +27,7 @@ const REQUIRED_LOCKFILES = Object.freeze(["bun.lock"]);
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.31.0",
-  hono: "4.13.7",
+  hono: "4.13.11",
   vite: "6.4.3",
   postcss: "8.5.18",
   "fast-uri": "3.1.8",

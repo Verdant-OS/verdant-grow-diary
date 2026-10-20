@@ -323,6 +323,20 @@ describe("Tonight tent calculated VPD — newer temperature/RH than stored VPD (
     expect(vpd).toMatchObject({ value: 0.9, calculated: false });
   });
 
+  it("overrides with a live pair that aged past the live window (shown as stale)", () => {
+    const at = new Date(NOW.getTime() - LIVE_CURRENT_STATE_STALE_MS - 5 * 60_000).toISOString();
+    const vpd = vpdOf([
+      storedVpd,
+      rowAt("temperature_c", fToC(80), "live", at),
+      rowAt("humidity_pct", 50, "live", at),
+    ]);
+    expect(vpd).toMatchObject({
+      source: "stale",
+      value: calculateVpdKpa({ tempC: fToC(80), rhPercent: 50 }),
+      calculated: true,
+    });
+  });
+
   it("does not combine a newer mixed-source pair; the stored VPD stays", () => {
     const at = secondsAgo(3);
     const vpd = vpdOf([

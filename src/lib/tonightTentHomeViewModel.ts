@@ -327,12 +327,18 @@ function calculatedVpdCandidate(
   };
 }
 
-function isDisplayedCandidate(used: Candidate, displayed: Candidate | undefined): boolean {
+/** Compares after the same freshness normalization the pair went through (live past the window → stale). */
+function isDisplayedCandidate(
+  used: Candidate,
+  displayed: Candidate | undefined,
+  nowMs: number,
+): boolean {
+  const shown = displayed ? usableCandidate(displayed, nowMs) : null;
   return (
-    displayed != null &&
-    used.epochMs === displayed.epochMs &&
-    used.value === displayed.value &&
-    used.source === displayed.source
+    shown != null &&
+    used.epochMs === shown.epochMs &&
+    used.value === shown.value &&
+    used.source === shown.source
   );
 }
 
@@ -419,8 +425,8 @@ export function buildTonightTentMetrics(input: {
   } else if (
     derived.kind === "derived" &&
     derived.paired &&
-    isDisplayedCandidate(derived.inputs.temp, byKey.get("temp")![0]) &&
-    isDisplayedCandidate(derived.inputs.rh, byKey.get("rh")![0]) &&
+    isDisplayedCandidate(derived.inputs.temp, byKey.get("temp")![0], nowMs) &&
+    isDisplayedCandidate(derived.inputs.rh, byKey.get("rh")![0], nowMs) &&
     derived.candidate.epochMs > vpdCandidates[0].epochMs
   ) {
     // #2268: when the temperature and RH the card shows are one capture newer

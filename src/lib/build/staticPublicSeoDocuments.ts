@@ -272,6 +272,7 @@ function buildStaticGuideHubBodyFallback(): string {
     '<main id="static-guide-fallback"><article data-guide-directory="true">',
     "<h1>The Verdant grower guide</h1>",
     "<p>Plant memory. Sensor truth. Grower-approved decisions. These guides cover diary practice, lighting, sensor context, and cautious troubleshooting. Verdant suggests; the grower decides. Verdant cannot touch your equipment.</p>",
+    '<p>New to a term like VPD, PPFD, or EC? Check the <a href="/glossary">Cultivation glossary</a>.</p>',
     "<section><h2>Grower guides</h2><ul>",
     guideLinks,
     '</ul></section><section><h2>Stage-aware care checklist</h2><p>Use a stage-based reference for watering, nutrients, environment, and harvest tasks. Cultivars move at different speeds, so the checklist follows the plant rather than a calendar.</p><p><a href="/guides/grow-stage-care-guide">Open the grow-stage care guide</a></p></section>',

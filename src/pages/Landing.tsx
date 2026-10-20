@@ -410,6 +410,13 @@ export default function Landing({ canonicalPath = "/", trackPageView = true }: L
             Verdant Grow Diary is currently in early build. Join the beta list or reach out about
             read-only hardware integrations. Grower stays in control. No blind automation.
           </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Serious grower, breeder, or grower-educator? The{" "}
+            <Link to="/creator-beta" className="font-medium text-primary hover:underline">
+              Creator and breeder beta
+            </Link>{" "}
+            is a controlled beta with a written demo walkthrough.
+          </p>
         </div>
         <LeadCaptureForm />
       </section>

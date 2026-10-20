@@ -62,6 +62,13 @@ export default function GuidesIndex() {
           — into one plant timeline with source-labeled sensor snapshots and cautious AI support.
           Verdant suggests; the grower decides. Verdant cannot touch your equipment.
         </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          New to a term like VPD, PPFD, or EC? Check the{" "}
+          <Link to="/glossary" className="font-medium text-primary hover:underline">
+            Cultivation glossary
+          </Link>
+          .
+        </p>
       </section>
 
       <section className="px-6 pb-16 max-w-3xl mx-auto">

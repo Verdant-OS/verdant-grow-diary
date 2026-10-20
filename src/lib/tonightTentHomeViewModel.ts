@@ -240,7 +240,10 @@ function newestFirst(a: Candidate, b: Candidate): number {
 }
 
 type CalculatedVpd =
-  { kind: "no_inputs" } | { kind: "underivable" } | { kind: "derived"; candidate: Candidate };
+  | { kind: "no_inputs" }
+  | { kind: "underivable" }
+  /** `paired`: temperature and RH share one capture time. */
+  | { kind: "derived"; candidate: Candidate; paired: boolean };
 
 function usableSorted(candidates: readonly Candidate[], nowMs: number): Candidate[] {
   return candidates
@@ -250,7 +253,8 @@ function usableSorted(candidates: readonly Candidate[], nowMs: number): Candidat
 }
 
 /**
- * VPD from temperature and RH when no stored vpd_kpa exists.
+ * VPD from temperature and RH, used when no stored vpd_kpa exists or when a
+ * same-capture pair is newer than every stored one.
  * Only inputs whose own source is proven are used. The newest same-time pair
  * with compatible sources wins over a newer unpaired reading. Otherwise the
  * latest proven temperature and RH are used, and the result is dated to the
@@ -273,6 +277,7 @@ function calculatedVpdCandidate(
 
   let temp = provenTemps[0];
   let rh = provenRhs[0];
+  let paired = false;
   for (const candidateTemp of provenTemps) {
     const matchingRh = provenRhs.find(
       (candidateRh) =>
@@ -282,6 +287,7 @@ function calculatedVpdCandidate(
     if (matchingRh) {
       temp = candidateTemp;
       rh = matchingRh;
+      paired = true;
       break;
     }
   }
@@ -300,8 +306,10 @@ function calculatedVpdCandidate(
   const vpd = rhIsPinned(rh.value)
     ? null
     : calculateVpdKpa({ tempC: temp.value, rhPercent: rh.value });
-  if (vpd == null) return { kind: "derived", candidate: { value: 0, source: "invalid", ...when } };
-  return { kind: "derived", candidate: { value: vpd, source, ...when } };
+  if (vpd == null) {
+    return { kind: "derived", candidate: { value: 0, source: "invalid", ...when }, paired };
+  }
+  return { kind: "derived", candidate: { value: vpd, source, ...when }, paired };
 }
 
 function rhIsPinned(rh: number): boolean {
@@ -323,7 +331,8 @@ function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | nu
 /**
  * Newest finite candidate per metric, each keeping its own source and capture
  * time. A newer RH-only record never renews temperature. VPD with no stored
- * reading is calculated from temperature and RH (same capture time first).
+ * reading is calculated from temperature and RH (same capture time first); a
+ * same-capture pair newer than every stored VPD also replaces it (#2268).
  */
 export function buildTonightTentMetrics(input: {
   rows: readonly TonightSensorRow[] | null | undefined;
@@ -379,10 +388,18 @@ export function buildTonightTentMetrics(input: {
 
   const vpdCandidates = byKey.get("vpd")!;
   let vpdUnderivable = false;
+  const derived = calculatedVpdCandidate(byKey.get("temp")!, byKey.get("rh")!, nowMs);
   if (vpdCandidates.length === 0) {
-    const derived = calculatedVpdCandidate(byKey.get("temp")!, byKey.get("rh")!, nowMs);
     if (derived.kind === "derived") vpdCandidates.push(derived.candidate);
     vpdUnderivable = derived.kind === "underivable";
+  } else if (
+    derived.kind === "derived" &&
+    derived.paired &&
+    derived.candidate.epochMs > vpdCandidates[0].epochMs
+  ) {
+    // #2268: a same-capture temperature/RH reading newer than every stored VPD
+    // replaces it, so an hours-old VPD is never paired with a new reading.
+    vpdCandidates.unshift(derived.candidate);
   }
 
   return METRICS.map(({ key, label }) => {

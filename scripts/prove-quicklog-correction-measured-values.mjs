@@ -276,6 +276,98 @@ $obs$;
 rollback;
 `;
 
+const VOLUME_CAP_SQL = `
+begin;
+insert into public.grow_events(id, user_id, event_type, source, note)
+values
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1', '${OWNER}', 'watering', 'manual', 'water cap'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2', '${OWNER}', 'feeding', 'manual', 'feed cap');
+insert into public.diary_entries(id, user_id, note, details)
+values
+  ('ffffffff-ffff-4fff-8fff-fffffffffff1', '${OWNER}', 'water cap',
+    '{"event_type":"watering","linked_grow_event_id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1","watering":{"volume_ml":500}}'),
+  ('ffffffff-ffff-4fff-8fff-fffffffffff2', '${OWNER}', 'feed cap',
+    '{"event_type":"feeding","linked_grow_event_id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2","feeding":{"volume_ml":200,"products":[{"name":"Grow","amount":2,"unit":"ml"}]}}');
+insert into public.watering_events(event_id, user_id, volume_ml)
+values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1', '${OWNER}', 500);
+insert into public.feeding_events(event_id, user_id, volume_ml, products)
+values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2', '${OWNER}', 200, '[{"name":"Grow","amount":2,"unit":"ml"}]');
+do $cap$
+declare
+  v_result jsonb;
+begin
+  v_result := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":50001}'::jsonb,
+    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1', null, null);
+  if coalesce(v_result ->> 'ok', '') <> 'false' or v_result ->> 'reason' <> 'invalid_changes' then
+    raise exception 'watering correction above 50000 ml was not rejected: %', v_result;
+  end if;
+  if (select volume_ml from public.watering_events
+       where event_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1') is distinct from 500 then
+    raise exception 'rejected watering correction changed the volume';
+  end if;
+  if exists (select 1 from public.quicklog_entry_revisions
+              where grow_event_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1') then
+    raise exception 'rejected watering correction appended a revision';
+  end if;
+  v_result := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":50000}'::jsonb,
+    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1', null, null);
+  if coalesce(v_result ->> 'ok', '') <> 'true' then
+    raise exception 'watering correction at 50000 ml failed: %', v_result;
+  end if;
+  if (select volume_ml from public.watering_events
+       where event_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1') is distinct from 50000 then
+    raise exception 'watering volume was not updated to 50000 ml';
+  end if;
+  v_result := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":1000000}'::jsonb,
+    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2', null, null);
+  if coalesce(v_result ->> 'ok', '') <> 'true' then
+    raise exception 'feeding correction at 1000000 ml failed: %', v_result;
+  end if;
+  if (select volume_ml from public.feeding_events
+       where event_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2') is distinct from 1000000 then
+    raise exception 'feeding volume was not updated to 1000000 ml';
+  end if;
+end
+$cap$;
+rollback;
+`;
+
+const ENVIRONMENT_CHECK_SQL = `
+begin;
+insert into public.grow_events(id, user_id, event_type, source, note)
+values ('99999999-9999-4999-8999-999999999991', '${OWNER}', 'environment_check', 'manual', 'env check');
+insert into public.diary_entries(id, user_id, note, details)
+values (
+  '88888888-8888-4888-8888-888888888881', '${OWNER}', 'env check',
+  '{"event_type":"environment_check","linked_grow_event_id":"99999999-9999-4999-8999-999999999991","environment_check":{"temperature_c":24,"humidity_pct":55}}'
+);
+do $envcheck$
+declare
+  v_result jsonb;
+begin
+  v_result := public.quicklog_correct_entry(
+    'wrong_value', '{"sensor_values":{"temperature_c":26}}'::jsonb,
+    '99999999-9999-4999-8999-999999999991', null, null);
+  if coalesce(v_result ->> 'ok', '') <> 'false' or v_result ->> 'reason' <> 'unsupported_change' then
+    raise exception 'Environment Check sensor correction was not rejected: %', v_result;
+  end if;
+  if exists (select 1 from public.quicklog_entry_revisions
+              where grow_event_id = '99999999-9999-4999-8999-999999999991') then
+    raise exception 'rejected Environment Check sensor correction appended a revision';
+  end if;
+  if (select details from public.diary_entries
+       where id = '88888888-8888-4888-8888-888888888881')
+     is distinct from '{"event_type":"environment_check","linked_grow_event_id":"99999999-9999-4999-8999-999999999991","environment_check":{"temperature_c":24,"humidity_pct":55}}'::jsonb then
+    raise exception 'rejected Environment Check sensor correction changed the diary row';
+  end if;
+end
+$envcheck$;
+rollback;
+`;
+
 function pgArgs() {
   const args = [];
   if (process.env.PGHOST) args.push("-h", process.env.PGHOST);
@@ -339,8 +431,10 @@ function main() {
   if (row !== expected) throw new Error(`editable_values_fingerprint:mismatch ${row}`);
   psql(DB, MEASURED_CORRECTION_PROOF_SQL);
   psql(DB, OBSERVATION_COMPANION_SQL);
+  psql(DB, VOLUME_CAP_SQL);
+  psql(DB, ENVIRONMENT_CHECK_SQL);
   console.log(
-    "measured correction proof: watering, feeding, sensor, and observation companion passed",
+    "measured correction proof: watering, feeding, sensor, observation companion, volume caps, and Environment Check rejection passed",
   );
   spawnSync("dropdb", [...pgArgs(), "--if-exists", DB], { encoding: "utf8" });
 }

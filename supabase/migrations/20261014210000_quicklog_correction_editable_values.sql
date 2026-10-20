@@ -5,9 +5,9 @@
 -- object into that ledger and writes the new value on the live row.
 -- Cheeko approved this migration at 4:54 PM CT on 2026-10-14. No table, column, policy, or grant change.
 --
--- Bounds match the merged writers: volume > 0 and <= 1000000 ml; dose >= 0 and
--- <= 1000000; temperature -10..60 C; humidity 0..100; VPD 0..10 kPa.
--- The unmerged 50000 ml watering cap (#2110) is not applied.
+-- Bounds: watering volume > 0 and <= 50000 ml (LARGE_WATER_AMOUNT_HARD_MAX_ML);
+-- feeding volume > 0 and <= 1000000 ml; dose >= 0 and <= 1000000; temperature
+-- -10..60 C; humidity 0..100; VPD 0..10 kPa.
 
 BEGIN;
 
@@ -47,6 +47,29 @@ BEGIN
   IF p_has_sensor
      AND p_event_type NOT IN ('environment', 'environment_check', 'manual_sensor_snapshot')
      AND NOT (p_event_type = 'observation' AND COALESCE(cardinality(p_env_ids), 0) > 0) THEN
+    RETURN jsonb_build_object('reason', 'unsupported_change');
+  END IF;
+  -- Environment Check readings live only in details.environment_check. With no
+  -- sensor_snapshot, no manual_sensor_snapshot and no owned environment row,
+  -- the sensor writes below change nothing, so reject instead of appending
+  -- an empty revision.
+  IF p_has_sensor
+     AND NOT EXISTS (
+       SELECT 1 FROM public.environment_events e
+        WHERE e.user_id = p_uid
+          AND e.event_id = ANY (COALESCE(p_env_ids, '{}'::uuid[]) || ARRAY[p_grow_event_id])
+     )
+     AND EXISTS (
+       SELECT 1 FROM public.diary_entries d
+        WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+          AND jsonb_typeof(d.details -> 'environment_check') = 'object'
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM public.diary_entries d
+        WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+          AND (jsonb_typeof(d.details -> 'sensor_snapshot') = 'object'
+               OR jsonb_typeof(d.details -> 'manual_sensor_snapshot') = 'object')
+     ) THEN
     RETURN jsonb_build_object('reason', 'unsupported_change');
   END IF;
   IF p_has_dose THEN
@@ -518,6 +541,10 @@ BEGIN
 
 
     IF v_has_volume OR v_has_dose OR v_has_sensor THEN
+      -- Watering volume matches LARGE_WATER_AMOUNT_HARD_MAX_ML (50000 ml).
+      IF v_has_volume AND v_spine.event_type = 'watering' AND v_volume > 50000 THEN
+        RETURN jsonb_build_object('ok', false, 'reason', 'invalid_changes');
+      END IF;
       v_measured := public.quicklog_correction_apply_measured_values(
         uid, v_spine.event_type, v_spine.id, v_diary_ids, v_env_ids,
         v_has_volume, v_volume, v_has_dose, v_dose, v_has_sensor, v_sensor
@@ -594,6 +621,10 @@ BEGIN
 
 
     IF v_has_volume OR v_has_dose OR v_has_sensor THEN
+      -- Watering volume matches LARGE_WATER_AMOUNT_HARD_MAX_ML (50000 ml).
+      IF v_has_volume AND COALESCE(v_diary.details ->> 'event_type', '') = 'watering' AND v_volume > 50000 THEN
+        RETURN jsonb_build_object('ok', false, 'reason', 'invalid_changes');
+      END IF;
       v_measured := public.quicklog_correction_apply_measured_values(
         uid, COALESCE(v_diary.details ->> 'event_type', ''), NULL, ARRAY[v_diary.id], '{}'::uuid[],
         v_has_volume, v_volume, v_has_dose, v_dose, v_has_sensor, v_sensor

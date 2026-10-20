@@ -166,8 +166,18 @@ Every other consumer of the hook keeps today's behaviour, and its existing tests
 | Target Comparison, VPD row | resolver for the same tent as the Latest Environment card | same value. A target claim only under the same two fences as the stage card                   |
 
 The Target Comparison card (`Dashboard.tsx` ~1566-1635, `compareSnapshotToTargets`) renders a VPD row read
-straight from the snapshot. Only its VPD row moves to the resolver. Its temperature and RH rows are unchanged.
-The separate alert-persistence input built from that snapshot is unchanged too.
+straight from the snapshot. Its temperature and RH rows are unchanged. The separate alert-persistence input built
+from that snapshot is unchanged too.
+
+The card's whole comparison is rebuilt, not only its VPD row. Otherwise `result.status`, `headline` and `reasons`
+would still come from the snapshot's VPD while the row shows the canonical value. The build calls
+`compareSnapshotToTargets` with a copy of the snapshot in which `vpd` is replaced:
+
+- **Eligible canonical value** (`state: "value"`, `source` `live` or `manual`, `basis` `stored`): `vpd` is the
+  canonical value, so the status, headline and reasons judge the same VPD the row shows.
+- **Any other result** (context-only source, `air_estimate`, invalid or unavailable): `vpd` is `null`, so VPD
+  adds nothing to the aggregate status, headline or reasons. The VPD row still shows the canonical value or the
+  unavailable line, with "no target claim" and its source label.
 
 ### Choosing the tent for the multi-tent cards
 
@@ -180,8 +190,13 @@ can leave the snapshot empty. So the Latest Environment, stage and Target Compar
 2. Several tents selected: compute the resolver result for each selected tent. Among results whose `state` is
    `value`, pick the newest `capturedAt`. Break ties by the tent's position in the Dashboard tent list, then by
    tent id, ascending. The card names the chosen tent.
-3. No selected tent has a value: show one unavailable line. Use `read_failed` if any selected tent's read failed
-   with no cached data, otherwise `no_derivable_pair` if any tent has that reason, otherwise `no_reading`.
+3. No selected tent has a value: apply this precedence, first match wins:
+   1. Any selected tent is `loading`: show `loading`. The read has not finished, so nothing is known to be
+      absent yet.
+   2. Any selected tent is `invalid`: show invalid for that tent and name it. If several are invalid, use the
+      tie-break from step 2. It never renders as healthy and is never reported as absent.
+   3. Otherwise show one unavailable line: `read_failed` if any selected tent's read failed with no cached data,
+      else `no_derivable_pair` if any tent has that reason, else `no_reading`.
 
 Out of scope and unchanged: the ribbon and chart series, the 7-day trend average and range, the strip stability
 summary (it already counts plant-level rows), the Tents list, Tent Detail, `/sensors`, alerts and AI Doctor.
@@ -253,24 +268,26 @@ No schema, RLS, migration, edge function, Action Queue or dependency change. Exi
 
 Each test is shown failing on the deploy branch before the build, with the count in the PR body.
 
-| ID      | Given                                                                                                          | Then                                                                                                   |
-| ------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| CVP-01  | One tent; older tent-level stored VPD; newer plant-level manual temp and RH                                    | Tonight card, strip chip, Latest Environment and stage card show the same derived value and time       |
-| CVP-02  | One tent; tent-level manual temp and RH only, no stored VPD                                                    | All four show the same derived value, labelled "Calculated from temperature and RH"                    |
-| CVP-03  | One tent; no reading at all                                                                                    | All four show the one `no_reading` line; no "Missing", `—` or a value anywhere                         |
-| CVP-04  | Newer temperature and RH without VPD after an older stored VPD (#2268 case)                                    | Card, strip and ribbon's latest point agree                                                            |
-| CVP-05  | RH pinned at 100%                                                                                              | All four show invalid; none shows a healthy cue                                                        |
-| CVP-06  | Manual temperature in one reading, manual RH in a different reading (or a manual temperature with a sensor RH) | No derived value from that pair; `no_derivable_pair` when nothing else qualifies                       |
-| CVP-06b | Sensor temperature row and sensor RH row, compatible sources, different capture times                          | Unchanged from today: derived value, aged by the older input (existing test ~84-95 stays green)        |
-| CVP-07  | Derived value inside the stage band                                                                            | Stage card shows the value but no in-target claim                                                      |
-| CVP-08  | Two tents selected, newest reading in tent B                                                                   | Latest Environment names tent B and matches tent B's strip chip                                        |
-| CVP-09  | Sensor read fails with no earlier data                                                                         | `read_failed` line, not `no_reading`                                                                   |
-| CVP-10  | Same input rendered twice with the same `now`                                                                  | Identical output (deterministic)                                                                       |
-| CVP-11  | A value loaded, then the next refresh fails (`refresh_error`)                                                  | All four keep that value with `refreshFailed`, show the refresh line; a live value still ages to stale |
-| CVP-12  | Newest value is a stored `csv`, `demo` or `stale` VPD inside the stage band                                    | Stage card shows the value and source label, no in-target or out-of-target claim                       |
-| CVP-13  | Value came only from a diary snapshot, then the snapshot query errors                                          | The value stays with `refreshFailed`; other `useLatestSensorSnapshot` consumers unchanged              |
-| CVP-14  | Two tents selected: empty snapshot, manual-only data, or equal-time readings in both                           | Selection rule picks deterministically, names the tent; Target Comparison VPD matches it               |
-| CVP-15  | Plant-level reading with the same `capturedAt` as a tent-level one                                             | Tent-level wins; `evidenceRef` names its record id                                                     |
+| ID      | Given                                                                                                              | Then                                                                                                                                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CVP-01  | One tent; older tent-level stored VPD; newer plant-level manual temp and RH                                        | Tonight card, strip chip, Latest Environment and stage card show the same derived value and time                                                                                     |
+| CVP-02  | One tent; tent-level manual temp and RH only, no stored VPD                                                        | All four show the same derived value, labelled "Calculated from temperature and RH"                                                                                                  |
+| CVP-03  | One tent; no reading at all                                                                                        | All four show the one `no_reading` line; no "Missing", `—` or a value anywhere                                                                                                       |
+| CVP-04  | Newer temperature and RH without VPD after an older stored VPD (#2268 case)                                        | Card, strip and ribbon's latest point agree                                                                                                                                          |
+| CVP-05  | RH pinned at 100%                                                                                                  | All four show invalid; none shows a healthy cue                                                                                                                                      |
+| CVP-06  | Manual temperature in one reading, manual RH in a different reading (or a manual temperature with a sensor RH)     | No derived value from that pair; `no_derivable_pair` when nothing else qualifies                                                                                                     |
+| CVP-06b | Sensor temperature row and sensor RH row, compatible sources, different capture times                              | Unchanged from today: derived value, aged by the older input (existing test ~84-95 stays green)                                                                                      |
+| CVP-07  | Derived value inside the stage band                                                                                | Stage card shows the value but no in-target claim                                                                                                                                    |
+| CVP-08  | Two tents selected, newest reading in tent B                                                                       | Latest Environment names tent B and matches tent B's strip chip                                                                                                                      |
+| CVP-09  | Sensor read fails with no earlier data                                                                             | `read_failed` line, not `no_reading`                                                                                                                                                 |
+| CVP-10  | Same input rendered twice with the same `now`                                                                      | Identical output (deterministic)                                                                                                                                                     |
+| CVP-11  | A value loaded, then the next refresh fails (`refresh_error`)                                                      | All four keep that value with `refreshFailed`, show the refresh line; a live value still ages to stale                                                                               |
+| CVP-12  | Newest value is a stored `csv`, `demo` or `stale` VPD inside the stage band                                        | Stage card shows the value and source label, no in-target or out-of-target claim                                                                                                     |
+| CVP-13  | Value came only from a diary snapshot, then the snapshot query errors                                              | The value stays with `refreshFailed`; other `useLatestSensorSnapshot` consumers unchanged                                                                                            |
+| CVP-14  | Two tents selected: empty snapshot, manual-only data, or equal-time readings in both                               | Selection rule picks deterministically, names the tent; Target Comparison VPD matches it                                                                                             |
+| CVP-15  | Plant-level reading with the same `capturedAt` as a tent-level one                                                 | Tent-level wins; `evidenceRef` names its record id                                                                                                                                   |
+| CVP-16  | Two tents selected, no value: one tent `loading`, the other `invalid`; then both settled, one `invalid`            | Shows `loading` first; after settling, shows invalid naming the tent, never `no_reading`                                                                                             |
+| CVP-17  | Snapshot VPD differs from the canonical VPD; then the canonical value is `air_estimate`, then a stored `csv` value | Target Comparison status, headline and reasons follow the canonical value in the first case; VPD adds nothing to the aggregate in the other two, and the row shows "no target claim" |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

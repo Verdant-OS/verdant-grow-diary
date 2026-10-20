@@ -325,19 +325,19 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
   }
 }
 
-// Bundle scans match only Paddle's exact live client-token shape: a standalone
-// `live_` plus exactly 27 letters/digits. Ordinary app identifiers that start
-// with `live_` (`live_confirmed`, snake_case names, shorter or longer runs)
-// are not tokens. Standalone means the same neighbour set is excluded on both
-// sides: a letter, digit, `_`, `$`, `.` or `-` next to the token (`x-${token}`,
-// `obj.${token}`, `${token}.x`, a `$`-prefixed identifier) makes it part of a
+// Bundle scans match only Paddle's exact live client-token shape, and only as a
+// whole string literal: `live_` plus exactly 27 letters/digits, wrapped in one
+// matching `'`, `"` or backtick pair. Ordinary app identifiers that start with
+// `live_` (`live_confirmed`, snake_case names, shorter or longer runs) are not
+// tokens, and neither is a token-shaped identifier or property name
+// (`const ${token}=1`, `obj.${token}`, `$${token}`): Paddle is initialised with a
+// string, so only a string literal can be the deployed credential. Anything
+// inside the quotes besides the token (`"x-${token}"`, `"${token}b"`) makes it a
 // larger value.
-const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN =
-  /(?:^|[^A-Za-z0-9_$.-])(live_[A-Za-z0-9]{27})(?![A-Za-z0-9_$.-])/g;
-// A standalone sandbox client token (same shape and boundaries). A production
-// bundle must carry none: a live bundle with any sandbox token is mixed.
-const PADDLE_SANDBOX_TOKEN_STANDALONE_PATTERN =
-  /(?:^|[^A-Za-z0-9_$.-])test_[A-Za-z0-9]{27}(?![A-Za-z0-9_$.-])/;
+const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN = /(["'`])(live_[A-Za-z0-9]{27})\1/g;
+// A sandbox client token as a whole string literal (same shape and quoting). A
+// production bundle must carry none: a live bundle with any sandbox token is mixed.
+const PADDLE_SANDBOX_TOKEN_STANDALONE_PATTERN = /(["'`])test_[A-Za-z0-9]{27}\1/;
 
 /**
  * Compare the bounded deployed entry bundle with the committed production
@@ -367,13 +367,13 @@ export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
   }
   let foundCanonical = false;
   for (const match of bundle.matchAll(PADDLE_LIVE_TOKEN_GLOBAL_PATTERN)) {
-    if (match[1] !== canonicalToken) {
+    if (match[2] !== canonicalToken) {
       return { ok: false, reason: "public_paddle_live_token_mismatch" };
     }
     foundCanonical = true;
   }
-  // Presence comes from the same boundary-aware scan, never a substring check:
-  // `${canonicalToken}b` is a malformed 28-character value, not the token.
+  // Presence comes from the same string-literal scan, never a substring check:
+  // `"${canonicalToken}b"` is a malformed 28-character value, not the token.
   if (!foundCanonical) {
     return { ok: false, reason: "public_paddle_live_token_missing" };
   }

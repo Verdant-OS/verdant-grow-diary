@@ -519,13 +519,13 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(
       evaluatePublicPaddleBundle({
         canonicalToken: liveToken,
-        bundle: `public bundle ${liveToken}`,
+        bundle: `public bundle "${liveToken}"`,
       }),
     ).toEqual({ ok: true });
     expect(
       evaluatePublicPaddleBundle({
         canonicalToken: liveToken,
-        bundle: `${liveToken} ${otherLive}`,
+        bundle: `"${liveToken}" "${otherLive}"`,
       }),
     ).toEqual({ ok: false, reason: "public_paddle_live_token_mismatch" });
     expect(

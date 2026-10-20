@@ -113,6 +113,32 @@ describe("public bundle Paddle token scan — mixed tokens", () => {
     ).toEqual({ ok: true });
   });
 
+  it("does not count token-shaped identifiers or property names (Codex P2 on #2230 at 71c3c6de)", () => {
+    for (const bundle of [
+      `const ${LIVE_TOKEN}=1`,
+      `obj.${LIVE_TOKEN}`,
+      `{${LIVE_TOKEN}:1}`,
+      `function ${LIVE_TOKEN}(){}`,
+    ]) {
+      expect(evaluatePublicPaddleBundle({ canonicalToken: LIVE_TOKEN, bundle })).toEqual({
+        ok: false,
+        reason: "public_paddle_live_token_missing",
+      });
+    }
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: LIVE_TOKEN,
+        bundle: `"${LIVE_TOKEN}";const ${OTHER_LIVE_TOKEN}=1;var ${TEST_TOKEN}=2`,
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects a mismatched-quote run as a token", () => {
+    expect(
+      evaluatePublicPaddleBundle({ canonicalToken: LIVE_TOKEN, bundle: `"${LIVE_TOKEN}'` }),
+    ).toEqual({ ok: false, reason: "public_paddle_live_token_missing" });
+  });
+
   it("ignores test_ runs that are not standalone sandbox tokens", () => {
     expect(
       evaluatePublicPaddleBundle({

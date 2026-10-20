@@ -4,6 +4,9 @@
  */
 export const PLANT_QUICK_LOG_NEGATIVE_EC_MESSAGE = "EC can't be negative." as const;
 
+/** Save-button helper while the EC error blocks the save, so it never reads "Ready to save". */
+export const PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER = "Fix the EC reading before saving." as const;
+
 /**
  * The inline EC error for raw input, or null when the value may be saved.
  * Judged on the parsed number, as the save path parses it, so exponent forms

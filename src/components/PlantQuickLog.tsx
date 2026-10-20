@@ -37,7 +37,10 @@ import {
   parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
-import { plantQuickLogEcError } from "@/lib/plantQuickLogSensorInputRules";
+import {
+  PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER,
+  plantQuickLogEcError,
+} from "@/lib/plantQuickLogSensorInputRules";
 import {
   computeChronologyDelta,
   type ChronologyDelta,
@@ -354,13 +357,15 @@ export default function PlantQuickLog({
         ? "Saving this log to the timeline…"
         : !hasAnyContent
           ? "Tap what changed, add a photo, or add a manual reading."
-          : hasPlantResponseCheck
-            ? "Ready to save this plant response follow-up."
-            : hasPhoto
-              ? "Ready to save this photo and log to the timeline."
-              : hasManualReadings
-                ? "Ready to save these manual readings to the timeline."
-                : "Ready to save what changed to the timeline.";
+          : ecError
+            ? PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER
+            : hasPlantResponseCheck
+              ? "Ready to save this plant response follow-up."
+              : hasPhoto
+                ? "Ready to save this photo and log to the timeline."
+                : hasManualReadings
+                  ? "Ready to save these manual readings to the timeline."
+                  : "Ready to save what changed to the timeline.";
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);

@@ -507,6 +507,26 @@ function sensorFromEnvironmentChild(
   return Object.keys(sensor).length > 0 ? sensor : null;
 }
 
+/** Readings on the manual environment row saved in the same request as `root`. */
+function sensorFromExactEnvironmentSibling(
+  root: TimelineEnvironmentSibling,
+  rows: readonly TimelineEnvironmentSibling[],
+): QuickLogCorrectionSensorValues | null {
+  if (typeof root.created_at !== "string") return null;
+  const companion = rows.find(
+    (row) =>
+      row.id !== root.id &&
+      row.event_type === "environment" &&
+      row.source === "manual" &&
+      row.created_at === root.created_at,
+  );
+  if (!companion) return null;
+  const child = Array.isArray(companion.environment_events)
+    ? companion.environment_events[0]
+    : companion.environment_events;
+  return sensorFromEnvironmentChild(child);
+}
+
 /**
  * Timeline diary cards for a V2 Fast Check keep the note on the observation
  * row. The temperature, humidity, and VPD live on the same-instant manual
@@ -517,10 +537,18 @@ export function correctionValuesForTimelineDiaryEntry(
   growEvents?: readonly TimelineEnvironmentSibling[],
 ): QuickLogCorrectionValueContext | null {
   const fromDetails = correctionValuePropsFromDiaryDetails(entry?.details);
-  if (fromDetails) return fromDetails;
   const details = isPlainObject(entry?.details) ? entry.details : null;
+  const linkedId = details ? nonEmpty(details.linked_grow_event_id) : null;
+  if (fromDetails?.kind === "watering" && linkedId) {
+    // A watering log saved with readings has an exact manual environment
+    // sibling (same created_at as its root). Tied backdated waterings share an
+    // occurred_at, so only that exact sibling may supply the readings.
+    const root = (growEvents ?? []).find((row) => row.id === linkedId);
+    const sensor = root ? sensorFromExactEnvironmentSibling(root, growEvents ?? []) : null;
+    return sensor ? { ...fromDetails, sensor } : fromDetails;
+  }
+  if (fromDetails) return fromDetails;
   if (!details) return null;
-  const linkedId = nonEmpty(details.linked_grow_event_id);
   // Quick Log V2 diary companions link to their spine root: PlantQuickLog
   // stamps event_type "quick_log", the Fast Check sheet stamps none. Resolve
   // any linked companion through that root, like an observation row.
@@ -536,20 +564,8 @@ export function correctionValuesForTimelineDiaryEntry(
     const root = rows.find((row) => row.id === linkedId);
     // Only an observation root accepts sensor corrections server-side.
     if (isLinkedEnvelope && root?.event_type !== "observation") return null;
-    const rootCreatedAt = root && typeof root.created_at === "string" ? root.created_at : null;
-    if (root && rootCreatedAt) {
-      const companion = rows.find(
-        (row) =>
-          row.id !== root.id &&
-          row.event_type === "environment" &&
-          row.source === "manual" &&
-          row.created_at === rootCreatedAt,
-      );
-      if (!companion) return null;
-      const child = Array.isArray(companion.environment_events)
-        ? companion.environment_events[0]
-        : companion.environment_events;
-      const sensor = sensorFromEnvironmentChild(child);
+    if (root && typeof root.created_at === "string") {
+      const sensor = sensorFromExactEnvironmentSibling(root, rows);
       return sensor ? { kind: "sensor", sensor } : null;
     }
     // A persisted link whose root is not loaded yet (or failed to load) must

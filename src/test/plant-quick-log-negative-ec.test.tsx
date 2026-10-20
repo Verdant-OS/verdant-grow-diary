@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
 import {
+  PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER,
   PLANT_QUICK_LOG_NEGATIVE_EC_MESSAGE,
   plantQuickLogEcError,
 } from "@/lib/plantQuickLogSensorInputRules";
@@ -87,6 +88,15 @@ describe("PlantQuickLog negative EC (#2159)", () => {
     fireEvent.submit(save.closest("form")!);
     await new Promise((r) => setTimeout(r, 20));
     expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("does not tell the grower a blocked save is ready (Codex r4328518826)", () => {
+    renderSheet();
+    fireEvent.change(screen.getByTestId("plant-quick-log-ec"), { target: { value: "-1" } });
+    const save = screen.getByTestId("plant-quick-log-save");
+    const helper = document.getElementById(save.getAttribute("aria-describedby")!);
+    expect(helper).toHaveTextContent(PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER);
+    expect(helper?.textContent).not.toMatch(/Ready to save/);
   });
 
   it("refuses a negative EC written in exponent notation", async () => {

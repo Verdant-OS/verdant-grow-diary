@@ -190,6 +190,13 @@ would still come from the snapshot's VPD while the row shows the canonical value
   adds nothing to the aggregate status, headline or reasons. The VPD row still shows the canonical value or the
   unavailable line, with "no target claim" and its source label.
 
+When the snapshot is empty (`source: "unavailable"`), `compareSnapshotToTargets` returns `unavailable` at once
+(`environmentTargetComparison.ts` ~81), so copying it would drop an eligible canonical value. This happens in the
+manual-only case, where the value comes from `manuals` alone. Then the comparison input is a minimal snapshot built
+from the canonical result: `source`, `captured_at` and `tent_id` from the result, `vpd` the canonical value, and
+temperature, RH and every other metric `null`. Only VPD can then drive the status. Temperature and RH stay
+unavailable, as they are today with an empty snapshot.
+
 ### Choosing the tent for the multi-tent cards
 
 `established fact`: `snapshot.tent_id` is null whenever the newest contributing rows disagree on a tent
@@ -225,12 +232,15 @@ in-target or out-of-target claim:
 2. **Basis fence, from the trust contract (VPD-02).** A value whose `basis` is `air_estimate` is never
    classified. It shows the value, "Calculated from temperature and RH", and "no target claim from an estimate".
 
-**The stage comes from the chosen tent.** The value is classified against the stage of the tent the selection
-rule picked, not the cross-tent `alertContextStage` (`Dashboard.tsx` ~267-275), which takes the most advanced
+**The stage comes from the chosen tent's context.** The value is classified against the resolved stage of the
+tent the selection rule picked, not the cross-tent `alertContextStage` (`Dashboard.tsx` ~267-275), which takes the most advanced
 stage across every selected tent. Resolve it with the same function in a one-tent scope:
 `resolveAlertContextStage({ growStage: scopedGrow.stage, tentStages: [chosenTent.stage], plantStages:
 resolveSelectedTentPlantStages(plants, scopedGrow.id, tents, [chosenTent.id]) })`. With one tent selected this
-equals today's value. With several, tent B's VPD is never judged against tent A's band. `alertContextStage`
+equals today's value. That resolver still takes the most advanced of the grow, that tent and that tent's plants. That
+is deliberate and unchanged: a stale `grows.stage` must not drive outdated bands (`Dashboard.tsx` ~260-266). So the
+expected stage is the chosen tent's resolved grow/tent/plant context, not the bare tent badge. With several tents,
+tent B's VPD is never judged against tent A's stage or tent A's plants. `alertContextStage`
 itself stays unchanged for Environment Alerts and alert persistence. Target Comparison reads grow targets
 (`useGrowTargets`), not a stage, so it is unaffected.
 
@@ -259,7 +269,11 @@ Each one exists in `tonightTentHomeViewModel.ts` at `be03e2657` and has tests. T
   must have compatible sources (`compositeVpdSource`). The pairing rules above set what may pair with what.
 - Pinned RH (0% or 100%) makes the derived value invalid (`rhIsPinned`).
 - Readings more than 60 s in the future are dropped (`FUTURE_SKEW_MS`).
-- Live readings past `LIVE_CURRENT_STATE_STALE_MS` become `stale`, still shown, never healthy.
+- Every candidate is aged by its own source with `isCurrentStateStale(capturedAt, { now, source })`
+  (`sensorTruthCanon.ts`). That means 15 minutes for `live` and 24 hours for `manual`
+  (`MANUAL_CURRENT_STATE_STALE_MS`). This covers manual history as well as live rows. An expired reading becomes
+  `stale`: still shown, never healthy, never classified. The full manual history makes this newly reachable;
+  without it, an old manual value would pass both classification fences indefinitely.
 - Unknown sources become `invalid` and are never shown as a value.
 - A same-capture temperature and RH pair newer than every stored VPD replaces the stored VPD (#2268, #2271).
 - Ties break deterministically, using the one comparator below.
@@ -325,7 +339,10 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-17  | Snapshot VPD differs from the canonical VPD; then the canonical value is `air_estimate`, then a stored `csv` value                                                                                                            | Target Comparison status, headline and reasons follow the canonical value in the first case; VPD adds nothing to the aggregate in the other two, and the row shows "no target claim" |
 | CVP-18  | Two tents selected, each with evidence only in its own diary snapshot                                                                                                                                                         | Each tent's resolver result uses its own snapshot; the selection rule picks the newer; neither tent's value is attributed to the other                                               |
 | CVP-19  | A stored `live` VPD inside the stage band                                                                                                                                                                                     | Stage card and Target Comparison show the in-target claim with the "not calibration-verified" label                                                                                  |
-| CVP-20  | Two tents selected: tent A in late flower, tent B in veg with the newer stored `live` VPD, inside B's veg band and outside A's band                                                                                           | Stage card names tent B and classifies against B's veg band; Environment Alerts still use the cross-tent stage                                                                       |
+| CVP-20  | Two tents selected: tent A in late flower, tent B in veg with the newer stored `live` VPD, inside B's veg band and outside A's band                                                                                           | Stage card names tent B and classifies against B's resolved context (veg); Environment Alerts still use the cross-tent stage                                                         |
+| CVP-21  | Chosen tent B is in veg, but `scopedGrow.stage` is late flower, or one of B's plants is in flower                                                                                                                             | Stage card classifies against B's resolved context (the more advanced stage), the same as a one-tent selection of B today                                                            |
+| CVP-22  | Newest candidate is a manual reading 25 hours old, inside the stage band                                                                                                                                                      | Shown as `stale` with its age; no in-target or out-of-target claim on the stage card or in Target Comparison                                                                         |
+| CVP-23  | Manual-only data, empty diary snapshot, eligible stored `manual` VPD inside the band                                                                                                                                          | Target Comparison status follows the canonical VPD (not `unavailable`); temperature and RH rows stay unavailable                                                                     |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

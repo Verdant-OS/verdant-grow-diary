@@ -222,7 +222,10 @@ import {
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
 import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
-import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
+import {
+  diaryEntriesTotalAfterRemoval,
+  isLinkedQuickLogDiaryDetails,
+} from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
   diaryEntryMatchesHighlight,
@@ -3076,6 +3079,7 @@ export default function Timeline() {
                                         setEntries((rows) =>
                                           rows.filter((r) => r.id !== removedId),
                                         );
+                                        setEntriesTotal(diaryEntriesTotalAfterRemoval);
                                       }}
                                     />
                                   </>

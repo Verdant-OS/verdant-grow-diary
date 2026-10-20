@@ -127,3 +127,11 @@ export function getRemoveButtonAriaLabel(isPhoto: boolean, plantName?: string | 
   const name = typeof plantName === "string" ? plantName.trim() : "";
   return name.length > 0 ? `${base} for ${name}` : base;
 }
+
+/**
+ * Server row count for the Detailed diary header after one loaded entry is
+ * removed. `null` means the count is unknown and stays unknown.
+ */
+export function diaryEntriesTotalAfterRemoval(total: number | null): number | null {
+  return total;
+}

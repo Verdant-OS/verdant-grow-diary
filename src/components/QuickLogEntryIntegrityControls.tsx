@@ -320,6 +320,7 @@ function RevisionControls({
       const parsed = Number(volumeDraft);
       if (volumeDraft.trim() !== "" && parsed !== correctionValues.volumeMl) {
         changes.volumeMl = parsed;
+        changes.volumeKind = correctionValues.kind;
       }
     }
     if (correctionValues?.kind === "feeding") {

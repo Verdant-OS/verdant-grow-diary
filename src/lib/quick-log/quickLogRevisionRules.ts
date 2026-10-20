@@ -1,3 +1,4 @@
+import { LARGE_WATER_AMOUNT_HARD_MAX_ML } from "@/lib/quickLogWaterVolumeWarningRules";
 import {
   isHumidityValid,
   isTemperatureValid,
@@ -213,8 +214,10 @@ export function isRetractedDiaryRow(row: RetractableDiaryRowLike | null | undefi
   return typeof row?.retracted_at === "string" && row.retracted_at.length > 0;
 }
 
-/** Merged writer bound. The open 50,000 ml cap (#2110) is not applied here. */
+/** Merged writer bound, still used for feeding volume (Quick Log Feed allows 1,000,000 ml). */
 export const QUICKLOG_CORRECTION_VOLUME_MAX_ML = 1_000_000;
+/** A watering correction uses the Quick Log single-watering ceiling (#2110). */
+export const QUICKLOG_CORRECTION_WATERING_VOLUME_MAX_ML = LARGE_WATER_AMOUNT_HARD_MAX_ML;
 /** Merged feeding product amount bound in root-zone observation rules. */
 export const QUICKLOG_CORRECTION_DOSE_MAX = 1_000_000;
 
@@ -239,6 +242,8 @@ export interface QuickLogCorrectionChanges {
   targetType?: "plant" | "tent";
   targetId?: string;
   volumeMl?: number;
+  /** Which entry the volume belongs to; a watering volume is capped lower. Not sent. */
+  volumeKind?: "watering" | "feeding";
   doseAmount?: number;
   sensorValues?: QuickLogCorrectionSensorValues;
 }
@@ -289,7 +294,9 @@ export function validateQuickLogCorrection(
     changes.target_id = input.targetId;
   }
   if (input.volumeMl !== undefined) {
-    if (!isCorrectionVolumeMl(input.volumeMl)) return { ok: false, reason: "invalid_changes" };
+    if (!isCorrectionVolumeMl(input.volumeMl, input.volumeKind)) {
+      return { ok: false, reason: "invalid_changes" };
+    }
     changes.volume_ml = input.volumeMl;
   }
   if (input.doseAmount !== undefined) {
@@ -307,13 +314,15 @@ export function validateQuickLogCorrection(
   return { ok: true, changes };
 }
 
-function isCorrectionVolumeMl(value: unknown): value is number {
-  return (
-    typeof value === "number" &&
-    Number.isFinite(value) &&
-    value > 0 &&
-    value <= QUICKLOG_CORRECTION_VOLUME_MAX_ML
-  );
+function isCorrectionVolumeMl(
+  value: unknown,
+  kind: QuickLogCorrectionChanges["volumeKind"],
+): value is number {
+  const max =
+    kind === "watering"
+      ? QUICKLOG_CORRECTION_WATERING_VOLUME_MAX_ML
+      : QUICKLOG_CORRECTION_VOLUME_MAX_ML;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= max;
 }
 
 function isCorrectionDoseAmount(value: unknown): value is number {

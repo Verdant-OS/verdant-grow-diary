@@ -225,6 +225,15 @@ in-target or out-of-target claim:
 2. **Basis fence, from the trust contract (VPD-02).** A value whose `basis` is `air_estimate` is never
    classified. It shows the value, "Calculated from temperature and RH", and "no target claim from an estimate".
 
+**The stage comes from the chosen tent.** The value is classified against the stage of the tent the selection
+rule picked, not the cross-tent `alertContextStage` (`Dashboard.tsx` ~267-275), which takes the most advanced
+stage across every selected tent. Resolve it with the same function in a one-tent scope:
+`resolveAlertContextStage({ growStage: scopedGrow.stage, tentStages: [chosenTent.stage], plantStages:
+resolveSelectedTentPlantStages(plants, scopedGrow.id, tents, [chosenTent.id]) })`. With one tent selected this
+equals today's value. With several, tent B's VPD is never judged against tent A's band. `alertContextStage`
+itself stays unchanged for Environment Alerts and alert persistence. Target Comparison reads grow targets
+(`useGrowTargets`), not a stage, so it is unaffected.
+
 A `stored` live or manual value is classified as it is today, and every such claim carries the label "not
 calibration-verified" (owner decision 3). This spec does not add the trust contract's calibration, placement or
 leaf-temperature checks; that waits for the contract's deferred calibration slice.
@@ -316,6 +325,7 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-17  | Snapshot VPD differs from the canonical VPD; then the canonical value is `air_estimate`, then a stored `csv` value                                                                                                            | Target Comparison status, headline and reasons follow the canonical value in the first case; VPD adds nothing to the aggregate in the other two, and the row shows "no target claim" |
 | CVP-18  | Two tents selected, each with evidence only in its own diary snapshot                                                                                                                                                         | Each tent's resolver result uses its own snapshot; the selection rule picks the newer; neither tent's value is attributed to the other                                               |
 | CVP-19  | A stored `live` VPD inside the stage band                                                                                                                                                                                     | Stage card and Target Comparison show the in-target claim with the "not calibration-verified" label                                                                                  |
+| CVP-20  | Two tents selected: tent A in late flower, tent B in veg with the newer stored `live` VPD, inside B's veg band and outside A's band                                                                                           | Stage card names tent B and classifies against B's veg band; Environment Alerts still use the cross-tent stage                                                                       |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

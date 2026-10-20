@@ -100,8 +100,21 @@ interface QuickLogManualReading {
   tempC: number | null;
   rh: number | null;
   vpdKpa: number | null;
+  /**
+   * The record's own source label, unvalidated: `grow_events.source`, or `details.manual_sensor_snapshot.source`.
+   * `environment_check` carries no source field and is manual by its envelope, so it is `"manual"`. Null when the
+   * record has none.
+   */
+  rawSource: string | null;
 }
 ```
+
+**The projection keeps provenance it cannot vouch for.** `established fact`: today `snapshotFromManualSensorSnapshot`
+(`sensorSnapshot.ts` ~560) returns null unless `source === "manual"`, so a complete pair under an unknown source
+silently disappears. The new projection instead emits every record whose keys are VPD-capable, with `rawSource` as
+stored. The resolver classifies it with `classifyCurrentStateSource`: anything that is not `manual` (missing,
+unrecognised, or a sensor label on a manual record) becomes an `invalid` candidate, so unknown telemetry is shown
+as invalid, never as a claim-eligible manual value, and the pager stops there like any other terminal record.
 
 The build adds this as a second projection beside the existing one, and adds `plant_id` and the id to the query
 behind `useSensorsQuickLogManualReadings`. The existing `SensorReading` projection and its consumers (the chart,
@@ -119,10 +132,8 @@ record. The resolver's diary read therefore filters for rows that can yield a VP
 `environment_check.vpd_kpa`, or a complete same-record temperature and RH pair in either envelope (a
 `manual_sensor_snapshot` carries no VPD):
 `.or("details->environment_check->vpd_kpa.not.is.null,and(details->environment_check->temp_c.not.is.null,details->environment_check->humidity_pct.not.is.null),and(details->manual_sensor_snapshot->temp_f.not.is.null,details->manual_sensor_snapshot->humidity_percent.not.is.null)")`,
-as a page densifier for the shared manual evidence pager below, never as a cap. The `no_derivable_pair` reason still
-has its evidence: the unfiltered manual history the chart already loads (the existing `SensorReading` projection) is
-read for it, so a newest manual reading holding only a temperature or only an RH still yields `no_derivable_pair`,
-not `no_reading`. The filter needs no schema change, and it is added only to the query the new projection reads, so
+as a page densifier for the shared manual evidence pager below, never as a cap. The `no_derivable_pair` reason has
+its own evidence read, described under the pager. The filter needs no schema change, and it is added only to the query the new projection reads, so
 the existing chart and strip consumers stay byte-for-byte unchanged.
 
 **Today's grow-event cap has the same gap.** `established fact`: `fetchManualEvents`
@@ -158,8 +169,14 @@ same pager, so neither has a cap of its own:
 
 Known limit, stated rather than built for: more records read before the stop condition holds than the 5-page bound
 (skipped records, or a larger tie on one timestamp) hide an older or tied terminal record. It is then
-missed, never shown as healthy. `no_derivable_pair` reads the unfiltered manual history the chart already loads, and
-the existing consumers' queries stay byte-for-byte unchanged.
+missed, never shown as healthy. **The unavailable reason has its own read.** The chart's capped history cannot supply it: 50 newer ordinary diary
+entries, or 200 newer grow events, hide an incomplete manual reading from that query just as they hid evidence from
+the old resolver read. So when the pager ends with no terminal record, the resolver runs one more query per source,
+newest first with `limit(1)`, for any manual record holding a temperature or an RH
+(`environment_events` `temperature_c` or `humidity_pct` not null; in a diary row, either key in either envelope). If
+either returns a row, the reason is `no_derivable_pair`; otherwise it is `no_reading`. Both queries are bounded,
+ordered and filtered server-side, so no cap can hide the evidence. A failed read of either is `read_failed`, never
+`no_reading`. the existing consumers' queries stay byte-for-byte unchanged.
 
 **Pairing rules, stated against today's code.**
 
@@ -472,6 +489,8 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-37  | More than 50 VPD-capable diary rows share the newest `entry_at`, with a tent-level row after 50 plant-level ones, inputs shuffled                                                                                                                                                                                                          | The pager reads the whole tie across the page boundary; the comparator picks the tent-level row, with the same `evidenceRef` whatever the backend order                                                                                                                                             |
 | CVP-38  | The newest manual record is a complete pair with RH at 100% (also: an out-of-band temperature); an older valid manual pair exists                                                                                                                                                                                                          | The read stops at the newest record; the result is `invalid`, not the older value; no healthy cue                                                                                                                                                                                                   |
 | CVP-39  | One snapshot holds a stored VPD and a temperature and RH at the same capture time, in the band; also a stored sensor-row VPD tied with a derived row + row pair                                                                                                                                                                            | The stored VPD wins on both ties, keeps `basis: "stored"` and its in-target claim; the derived estimate is not shown                                                                                                                                                                                |
+| CVP-40  | The newest manual record is a `manual_sensor_snapshot` with a complete in-band pair and `source` missing (also: `"pi_bridge"`, also: `"abc"`); an older valid manual pair exists                                                                                                                                                           | The record is projected with its `rawSource`; the result is `invalid`, not the older value; no claim and no healthy cue                                                                                                                                                                             |
+| CVP-41  | A temperature-only manual diary row, then 60 newer ordinary diary entries, no other manual evidence (also: a temperature-only grow event, then 250 newer events holding neither metric)                                                                                                                                                    | The reason is `no_derivable_pair`, not `no_reading`; when the extra read fails, `read_failed`                                                                                                                                                                                                       |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

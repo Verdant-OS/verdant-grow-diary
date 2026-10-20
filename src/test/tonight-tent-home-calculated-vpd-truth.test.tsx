@@ -307,6 +307,22 @@ describe("Tonight tent calculated VPD — newer temperature/RH than stored VPD (
     expect(vpd).toMatchObject({ value: 0.9, calculated: false });
   });
 
+  it("never uses an older same-capture pair beside newer unpaired displayed inputs", () => {
+    // History: stored VPD 3h ago; a paired 70°F/60% capture 1h ago; then newer
+    // temperature and RH at different times. The card shows the newest temp/RH,
+    // so a VPD calculated from the older pair must not replace the stored one.
+    const pairAt = minutesAgo(60);
+    const vpd = vpdOf([
+      storedVpd,
+      rowAt("temperature_c", fToC(70), "manual", pairAt),
+      rowAt("humidity_pct", 60, "manual", pairAt),
+      rowAt("temperature_c", fToC(80), "manual", minutesAgo(2)),
+      rowAt("humidity_pct", 50, "manual", minutesAgo(1)),
+    ]);
+    expect(vpd.value).not.toBe(calculateVpdKpa({ tempC: fToC(70), rhPercent: 60 }));
+    expect(vpd).toMatchObject({ value: 0.9, calculated: false });
+  });
+
   it("does not combine a newer mixed-source pair; the stored VPD stays", () => {
     const at = secondsAgo(3);
     const vpd = vpdOf([

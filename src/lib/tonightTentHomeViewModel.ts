@@ -242,8 +242,13 @@ function newestFirst(a: Candidate, b: Candidate): number {
 type CalculatedVpd =
   | { kind: "no_inputs" }
   | { kind: "underivable" }
-  /** `paired`: temperature and RH share one capture time. */
-  | { kind: "derived"; candidate: Candidate; paired: boolean };
+  /** `paired`: temperature and RH share one capture time; `inputs`: the pair used. */
+  | {
+      kind: "derived";
+      candidate: Candidate;
+      paired: boolean;
+      inputs: { temp: Candidate; rh: Candidate };
+    };
 
 function usableSorted(candidates: readonly Candidate[], nowMs: number): Candidate[] {
   return candidates
@@ -307,9 +312,28 @@ function calculatedVpdCandidate(
     ? null
     : calculateVpdKpa({ tempC: temp.value, rhPercent: rh.value });
   if (vpd == null) {
-    return { kind: "derived", candidate: { value: 0, source: "invalid", ...when }, paired };
+    return {
+      kind: "derived",
+      candidate: { value: 0, source: "invalid", ...when },
+      paired,
+      inputs: { temp, rh },
+    };
   }
-  return { kind: "derived", candidate: { value: vpd, source, ...when }, paired };
+  return {
+    kind: "derived",
+    candidate: { value: vpd, source, ...when },
+    paired,
+    inputs: { temp, rh },
+  };
+}
+
+function isDisplayedCandidate(used: Candidate, displayed: Candidate | undefined): boolean {
+  return (
+    displayed != null &&
+    used.epochMs === displayed.epochMs &&
+    used.value === displayed.value &&
+    used.source === displayed.source
+  );
 }
 
 function rhIsPinned(rh: number): boolean {
@@ -395,10 +419,13 @@ export function buildTonightTentMetrics(input: {
   } else if (
     derived.kind === "derived" &&
     derived.paired &&
+    isDisplayedCandidate(derived.inputs.temp, byKey.get("temp")![0]) &&
+    isDisplayedCandidate(derived.inputs.rh, byKey.get("rh")![0]) &&
     derived.candidate.epochMs > vpdCandidates[0].epochMs
   ) {
-    // #2268: a same-capture temperature/RH reading newer than every stored VPD
-    // replaces it, so an hours-old VPD is never paired with a new reading.
+    // #2268: when the temperature and RH the card shows are one capture newer
+    // than every stored VPD, that pair's calculated VPD replaces the stored one.
+    // An older pair is never used beside newer displayed inputs.
     vpdCandidates.unshift(derived.candidate);
   }
 

@@ -79,12 +79,23 @@ describe("Copilot follow-up: editor values", () => {
           },
         },
         [
+          // #2118 Codex r4326795521: a linked observation resolves its readings
+          // through its loaded spine root, never a borrowed same-time sibling.
+          {
+            id: "bf0a684e-a96e-472c-af8f-e38a54a8332c",
+            event_type: "observation",
+            source: "manual",
+            plant_id: "plant-a",
+            occurred_at: "2026-07-25T13:03:28.000Z",
+            created_at: "2026-07-25T13:03:28.123456+00:00",
+          },
           {
             id: "env-sibling",
             event_type: "environment",
             source: "manual",
             plant_id: "plant-a",
             occurred_at: "2026-07-25T13:03:28.000Z",
+            created_at: "2026-07-25T13:03:28.123456+00:00",
             environment_events: { temperature_c: 24, humidity_pct: 55, vpd_kpa: 1.1 },
           },
         ],

@@ -545,6 +545,9 @@ export function correctionValuesForTimelineDiaryEntry(
       const sensor = sensorFromEnvironmentChild(child);
       return sensor ? { kind: "sensor", sensor } : null;
     }
+    // A persisted link whose root is not loaded yet (or failed to load) must
+    // not borrow a same-time sibling; only unlinked legacy rows use the matcher.
+    return null;
   }
   for (const row of rows) {
     if (row.event_type !== "environment" || row.source !== "manual") continue;

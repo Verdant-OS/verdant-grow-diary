@@ -37,7 +37,15 @@ DECLARE
   v_env_rows JSONB;
   v_target_ids UUID[];
   v_updated INTEGER;
+  v_watering_with_env BOOLEAN;
 BEGIN
+  -- A watering Quick Log saved with readings has a manual environment sibling.
+  -- Its sensor values are correctable only through an owned environment row.
+  v_watering_with_env := p_event_type = 'watering' AND EXISTS (
+    SELECT 1 FROM public.environment_events e
+     WHERE e.user_id = p_uid
+       AND e.event_id = ANY (COALESCE(p_env_ids, '{}'::uuid[]))
+  );
   IF p_has_volume AND p_event_type NOT IN ('watering', 'feeding') THEN
     RETURN jsonb_build_object('reason', 'unsupported_change');
   END IF;
@@ -46,7 +54,8 @@ BEGIN
   END IF;
   IF p_has_sensor
      AND p_event_type NOT IN ('environment', 'environment_check', 'manual_sensor_snapshot')
-     AND NOT (p_event_type = 'observation' AND COALESCE(cardinality(p_env_ids), 0) > 0) THEN
+     AND NOT (p_event_type = 'observation' AND COALESCE(cardinality(p_env_ids), 0) > 0)
+     AND NOT v_watering_with_env THEN
     RETURN jsonb_build_object('reason', 'unsupported_change');
   END IF;
   -- Environment Check readings live only in details.environment_check. With no
@@ -224,7 +233,8 @@ BEGIN
 
   IF p_has_sensor THEN
     IF p_event_type NOT IN ('environment', 'environment_check', 'manual_sensor_snapshot')
-       AND NOT (p_event_type = 'observation' AND COALESCE(cardinality(p_env_ids), 0) > 0) THEN
+       AND NOT (p_event_type = 'observation' AND COALESCE(cardinality(p_env_ids), 0) > 0)
+       AND NOT v_watering_with_env THEN
       RETURN jsonb_build_object('reason', 'unsupported_change');
     END IF;
     v_target_ids := COALESCE(p_env_ids, '{}'::uuid[]);

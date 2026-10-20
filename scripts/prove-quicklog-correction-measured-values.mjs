@@ -368,6 +368,86 @@ $envcheck$;
 rollback;
 `;
 
+// A watering Quick Log saved with temperature/RH/VPD writes a watering root
+// plus a manual environment sibling. One correction updates both; without an
+// owned environment sibling, sensor values on a watering root stay rejected.
+const WATERING_SENSOR_SQL = `
+begin;
+insert into public.grow_events(id, user_id, event_type, source, note, created_at)
+values
+  ('12121212-1212-4121-8121-121212121211', '${OWNER}', 'watering', 'manual', 'water + readings', '2026-07-26 09:00:00+00'),
+  ('12121212-1212-4121-8121-121212121212', '${OWNER}', 'environment', 'manual', null, '2026-07-26 09:00:00+00'),
+  ('12121212-1212-4121-8121-121212121213', '${OWNER}', 'watering', 'manual', 'water only', '2026-07-26 10:00:00+00');
+insert into public.diary_entries(id, user_id, note, details)
+values
+  ('34343434-3434-4343-8343-343434343431', '${OWNER}', 'water + readings',
+    '{"event_type":"watering","linked_grow_event_id":"12121212-1212-4121-8121-121212121211","watering":{"volume_ml":500}}'),
+  ('34343434-3434-4343-8343-343434343433', '${OWNER}', 'water only',
+    '{"event_type":"watering","linked_grow_event_id":"12121212-1212-4121-8121-121212121213","watering":{"volume_ml":400}}');
+insert into public.watering_events(event_id, user_id, volume_ml)
+values
+  ('12121212-1212-4121-8121-121212121211', '${OWNER}', 500),
+  ('12121212-1212-4121-8121-121212121213', '${OWNER}', 400);
+insert into public.environment_events(event_id, user_id, temperature_c, humidity_pct, vpd_kpa)
+values ('12121212-1212-4121-8121-121212121212', '${OWNER}', 24, 55, 1.1);
+do $watersensor$
+declare
+  v_result jsonb;
+  v_prev jsonb;
+  v_new jsonb;
+begin
+  v_result := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":750,"sensor_values":{"temperature_c":26,"humidity_pct":60}}'::jsonb,
+    '12121212-1212-4121-8121-121212121211', null, null);
+  if coalesce(v_result ->> 'ok', '') <> 'true' then
+    raise exception 'combined watering + sensor correction failed: %', v_result;
+  end if;
+  if (select volume_ml from public.watering_events
+       where event_id = '12121212-1212-4121-8121-121212121211') is distinct from 750 then
+    raise exception 'combined correction did not update the watering volume';
+  end if;
+  if (select temperature_c from public.environment_events
+       where event_id = '12121212-1212-4121-8121-121212121212') is distinct from 26
+     or (select humidity_pct from public.environment_events
+       where event_id = '12121212-1212-4121-8121-121212121212') is distinct from 60 then
+    raise exception 'combined correction did not update the environment sibling';
+  end if;
+  if (select count(*) from public.quicklog_entry_revisions
+       where grow_event_id = '12121212-1212-4121-8121-121212121211') <> 1 then
+    raise exception 'combined correction did not append exactly one revision';
+  end if;
+  select previous_state, new_state into v_prev, v_new from public.quicklog_entry_revisions
+   where grow_event_id = '12121212-1212-4121-8121-121212121211';
+  if (v_prev ->> 'volume_ml')::numeric is distinct from 500
+     or (v_prev #>> '{environment_events,0,temperature_c}')::numeric is distinct from 24
+     or (v_prev #>> '{environment_events,0,humidity_pct}')::numeric is distinct from 55 then
+    raise exception 'combined correction history lost an original value: %', v_prev;
+  end if;
+  if (v_new ->> 'volume_ml')::numeric is distinct from 750
+     or (v_new #>> '{sensor_values,temperature_c}')::numeric is distinct from 26
+     or (v_new #>> '{sensor_values,humidity_pct}')::numeric is distinct from 60 then
+    raise exception 'combined correction history lost a new value: %', v_new;
+  end if;
+
+  v_result := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":600,"sensor_values":{"temperature_c":26}}'::jsonb,
+    '12121212-1212-4121-8121-121212121213', null, null);
+  if coalesce(v_result ->> 'ok', '') <> 'false' or v_result ->> 'reason' <> 'unsupported_change' then
+    raise exception 'watering sensor correction without an owned environment sibling was not rejected: %', v_result;
+  end if;
+  if (select volume_ml from public.watering_events
+       where event_id = '12121212-1212-4121-8121-121212121213') is distinct from 400 then
+    raise exception 'rejected watering sensor correction changed the volume';
+  end if;
+  if exists (select 1 from public.quicklog_entry_revisions
+              where grow_event_id = '12121212-1212-4121-8121-121212121213') then
+    raise exception 'rejected watering sensor correction appended a revision';
+  end if;
+end
+$watersensor$;
+rollback;
+`;
+
 function pgArgs() {
   const args = [];
   if (process.env.PGHOST) args.push("-h", process.env.PGHOST);
@@ -433,8 +513,9 @@ function main() {
   psql(DB, OBSERVATION_COMPANION_SQL);
   psql(DB, VOLUME_CAP_SQL);
   psql(DB, ENVIRONMENT_CHECK_SQL);
+  psql(DB, WATERING_SENSOR_SQL);
   console.log(
-    "measured correction proof: watering, feeding, sensor, observation companion, volume caps, and Environment Check rejection passed",
+    "measured correction proof: watering, feeding, sensor, observation companion, watering with readings, volume caps, and Environment Check rejection passed",
   );
   spawnSync("dropdb", [...pgArgs(), "--if-exists", DB], { encoding: "utf8" });
 }

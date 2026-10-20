@@ -26,6 +26,7 @@ import {
 } from "@/lib/quickLogActivityDetailFields";
 import { enrichPlantFeedingDiaryRows } from "@/lib/plantFeedingDisplayRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -141,7 +142,7 @@ function EntryRow({
         </ul>
       ) : null}
       {row.notePreview ? (
-        <p className="mt-2 text-sm leading-snug">{row.notePreview}</p>
+        <p className="mt-2 text-sm leading-snug">{localizeReadingAtTimestamps(row.notePreview)}</p>
       ) : !row.hasHardwareReadings && detailLines.length === 0 ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
       ) : null}

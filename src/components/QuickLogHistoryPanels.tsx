@@ -247,7 +247,9 @@ function Row({
           data-testid="quicklog-history-note-summary"
         >
           <p className="text-sm font-medium text-muted-foreground">Note</p>
-          <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">{row.noteBody}</p>
+          <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap [overflow-wrap:anywhere]">
+            {row.noteBody}
+          </p>
         </div>
       ) : row.photoUrl ? (
         <p

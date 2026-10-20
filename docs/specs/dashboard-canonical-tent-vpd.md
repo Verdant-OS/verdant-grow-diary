@@ -114,9 +114,14 @@ projection (`sensorsQuickLogManualSeriesRules.ts` ~162-172) recognises a manual 
 can hide a still-current manual reading. An envelope alone is not enough either: an `environment_check` holding only a
 note, water temperature or EC, or a `manual_sensor_snapshot` holding only pH or EC, is rejected by the projection
 (`sensorSnapshot.ts` ~510-515 and ~560-570 need an air metric), so 50 of those would crowd out an older air reading
-the same way. The resolver's diary read therefore filters on the air-metric keys each projection accepts, before the
-cap: `.or("details->manual_sensor_snapshot->temp_f.not.is.null,details->manual_sensor_snapshot->humidity_percent.not.is.null,details->environment_check->temp_c.not.is.null,details->environment_check->humidity_pct.not.is.null,details->environment_check->vpd_kpa.not.is.null")`,
-then the order and the limit. Known limit, stated rather than built for: a key that is present but out of band is
+the same way, and so would 50 rows holding a temperature alone or an RH alone, since a manual pair must come from one
+record. The resolver's diary read therefore filters, before the cap, for rows that can yield a VPD: a stored
+`environment_check.vpd_kpa`, or a complete same-record temperature and RH pair in either envelope (a
+`manual_sensor_snapshot` carries no VPD):
+`.or("details->environment_check->vpd_kpa.not.is.null,and(details->environment_check->temp_c.not.is.null,details->environment_check->humidity_pct.not.is.null),and(details->manual_sensor_snapshot->temp_f.not.is.null,details->manual_sensor_snapshot->humidity_percent.not.is.null)")`,
+then the order and the limit. The `no_derivable_pair` reason still has its evidence: the unfiltered manual history the
+chart already loads (the existing `SensorReading` projection) is read for it, so a newest manual reading holding only
+a temperature or only an RH still yields `no_derivable_pair`, not `no_reading`. Known limit, stated rather than built for: a key that is present but out of band is
 admitted by the filter and then rejected by the projection, so more than 50 consecutive out-of-band air rows could still
 hide an older valid one. That needs 50 invalid saves in a row, and the reading is then not shown as healthy, only
 missed. The filter needs no schema change. If the build would change what the existing chart and strip consumers
@@ -144,9 +149,9 @@ interface CanonicalTentVpd {
   /** Canonical vocabulary: live | manual | csv | demo | stale | invalid. Null unless a reading exists. */
   source: SensorSource | null;
   /**
-   * The winning candidate's source before display normalisation. Tonight maps a generic diary
-   * `sensor_snapshot` (`snapshotFromDiary`, source "diary") to "manual" for display; this keeps "diary".
-   * The source fence requires both this field and the post-aging `source` to be live or manual.
+   * The winning candidate's raw source before display normalisation, e.g. "pi_bridge", "manual", "diary".
+   * Tonight maps a generic diary `sensor_snapshot` (`snapshotFromDiary`, source "diary") to "manual" for
+   * display; this keeps "diary". Read only through `isCanonicalVpdClaimEligible` below.
    */
   originSource: string | null;
   sourceLabel: string | null;
@@ -155,7 +160,10 @@ interface CanonicalTentVpd {
   basis: "stored" | "air_estimate" | null;
   /** Why there is no value, for the one unavailable copy line. */
   unavailableReason: "no_reading" | "no_derivable_pair" | "read_failed" | null;
-  /** Record that produced the value: a sensor row id, a diary id, or a manual reading id. */
+  /**
+   * Record that produced the value: a sensor row id, `pair:<temp id>+<rh id>`, a manual reading id, or
+   * `diary:<diary_entries.id>` for a generic diary `sensor_snapshot`.
+   */
   evidenceRef: string | null;
   /** True when the latest read of any input failed and the value comes from earlier, cached data. */
   refreshFailed: boolean;
@@ -209,8 +217,8 @@ That is the same live/manual filter today's card applies (`Dashboard.tsx` ~311),
 `unverified` snapshot's temperature, RH and other metrics never drive the status, headline or reasons, even when a
 newer eligible manual VPD from history wins. The `vpd` replacement is:
 
-- **Eligible canonical value** (`state: "value"`, `source` `live` or `manual`, `basis` `stored`): `vpd` is the
-  canonical value, so the status, headline and reasons judge the same VPD the row shows.
+- **Eligible canonical value** (`isCanonicalVpdClaimEligible(result)`, the same predicate as the stage card):
+  `vpd` is the canonical value, so the status, headline and reasons judge the same VPD the row shows.
 - **Any other result** (context-only source, `air_estimate`, invalid or unavailable): `vpd` is `null`, so VPD
   adds nothing to the aggregate status, headline or reasons. The VPD row still shows the canonical value or the
   unavailable line, with "no target claim" and its source label.
@@ -251,16 +259,35 @@ Those are history or other pages. A follow-up can point them at the resolver.
 The stage-aware card keeps calling `classifyVpdAgainstStage`, behind two guards. Both must pass before any
 in-target or out-of-target claim:
 
-1. **Source fence, kept from today.** A value may be classified only when **both** its `originSource` and its
-   post-aging `source` are `live` or `manual`. That is the rule in `isDashboardSnapshotEligibleForHealthyCues`
-   (`dashboardSensorEvidenceRules.ts`), applied to the resolver result instead of the snapshot. The post-aging
-   `source` check keeps an expired reading out: aging changes `source` to `stale` but leaves `originSource` as it
-   was. The `originSource` check keeps a diary reading out: Tonight normalises a generic
-   diary snapshot's `diary` to `manual` (`tonightTentHomeViewModel.ts` ~187), and today's Dashboard rejects that raw
-   `diary` source, so a diary-origin value stays context only. `csv`, `demo`, `stale` and `invalid` values are shown with their source label
+1. **Source fence, kept from today.** Applied through the one predicate below. It is the rule in
+   `isDashboardSnapshotEligibleForHealthyCues` (`dashboardSensorEvidenceRules.ts`), applied to the resolver result
+   instead of the snapshot. The post-aging `source` check keeps an expired reading out: aging changes `source` to
+   `stale` but leaves `originSource` as it was. The origin check keeps a diary reading out: Tonight normalises a
+   generic diary snapshot's `diary` to `manual` (`tonightTentHomeViewModel.ts` ~187), and today's Dashboard rejects
+   that raw `diary` source, so a diary-origin value stays context only. `csv`, `demo`, `stale` and `invalid` values are shown with their source label
    and "context only, no target claim", never classified.
 2. **Basis fence, from the trust contract (VPD-02).** A value whose `basis` is `air_estimate` is never
    classified. It shows the value, "Calculated from temperature and RH", and "no target claim from an estimate".
+
+**One claim predicate for every consumer.** The stage card and the Target Comparison card both decide eligibility
+through one pure function, so neither can drift from the other:
+
+```ts
+// src/lib/canonicalTentVpdRules.ts
+export function isCanonicalVpdClaimEligible(r: CanonicalTentVpd): boolean {
+  const origin = classifyCurrentStateSource(r.originSource); // sensorTruthCanon.ts
+  return (
+    r.state === "value" &&
+    (origin === "live" || origin === "manual") && // trusted live aliases such as pi_bridge count as live; "diary" does not
+    (r.source === "live" || r.source === "manual") && // post-aging: an expired reading is "stale"
+    r.basis === "stored"
+  );
+}
+```
+
+The origin check goes through the existing `classifyCurrentStateSource`, not a literal string test, so every
+sanctioned live alias that today's Dashboard admits (for example `pi_bridge`, which `normalizeSensorSource` and
+`snapshotFromReadings` classify as `live`) keeps its claim, while `diary` stays excluded.
 
 **The stage comes from the chosen tent's context.** The value is classified against the resolved stage of the
 tent the selection rule picked, not the cross-tent `alertContextStage` (`Dashboard.tsx` ~267-275), which takes the most advanced
@@ -329,19 +356,20 @@ follows its input kind: a sensor-row pair keeps today's fixed origin 0, and a ma
 
 ## File-level plan
 
-| File                                                  | Change                                                                                                                          |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/canonicalTentVpdRules.ts` (new)              | Resolver, moved from the Tonight view model, plus the `manuals` input                                                           |
-| `src/lib/tonightTentHomeViewModel.ts`                 | VPD reads the resolver; temperature and RH unchanged                                                                            |
-| `src/lib/dashboardEnvironmentSnapshotViewModel.ts`    | `buildTentSnapshotView` takes the resolver result for VPD                                                                       |
-| `src/pages/Dashboard.tsx`                             | Build one resolver result per tent and pass it to each consumer                                                                 |
-| `src/lib/sensorsQuickLogManualSeriesRules.ts`         | Add the `QuickLogManualReading` projection; existing one unchanged                                                              |
-| `src/hooks/useSensorsQuickLogManualReadings.ts`       | Select the record id and `plant_id`; filter diary rows to `manual_sensor_snapshot` or `environment_check` before the 50-row cap |
-| `src/hooks/useLatestSensorSnapshot.ts`                | Opt-in `keepDataOnRefreshError`; default behaviour unchanged                                                                    |
-| `src/hooks/useLatestSensorSnapshotsByTent.ts` (new)   | Per-tent snapshots via `useQueries`, for the resolver                                                                           |
-| `src/constants/dashboardVpdCopy.ts` (new)             | The three unavailable lines and the estimate line                                                                               |
-| `src/test/canonical-tent-vpd-rules.test.ts` (new)     | Resolver unit tests                                                                                                             |
-| `src/test/dashboard-vpd-single-source.test.tsx` (new) | Renders `Dashboard` and compares every VPD widget                                                                               |
+| File                                                  | Change                                                                                                                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/canonicalTentVpdRules.ts` (new)              | Resolver, moved from the Tonight view model, plus the `manuals` input                                                                                                                   |
+| `src/lib/tonightTentHomeViewModel.ts`                 | VPD reads the resolver; temperature and RH unchanged                                                                                                                                    |
+| `src/lib/dashboardEnvironmentSnapshotViewModel.ts`    | `buildTentSnapshotView` takes the resolver result for VPD                                                                                                                               |
+| `src/pages/Dashboard.tsx`                             | Build one resolver result per tent and pass it to each consumer                                                                                                                         |
+| `src/lib/sensorsQuickLogManualSeriesRules.ts`         | Add the `QuickLogManualReading` projection; existing one unchanged                                                                                                                      |
+| `src/hooks/useSensorsQuickLogManualReadings.ts`       | Select the record id and `plant_id`; filter diary rows to `manual_sensor_snapshot` or `environment_check` before the 50-row cap                                                         |
+| `src/lib/sensorSnapshot.ts` (+ its `_shared` mirror)  | `snapshotFromDiary` takes an optional `{ diaryEntryId }`, as `snapshotFromEnvironmentCheck` does, and sets `diary_evidence_ref`; regenerate the edge mirror with the repo's sync script |
+| `src/hooks/useLatestSensorSnapshot.ts`                | Opt-in `keepDataOnRefreshError`; pass the diary row id to `snapshotFromDiary`; default behaviour otherwise unchanged                                                                    |
+| `src/hooks/useLatestSensorSnapshotsByTent.ts` (new)   | Per-tent snapshots via `useQueries`, for the resolver                                                                                                                                   |
+| `src/constants/dashboardVpdCopy.ts` (new)             | The three unavailable lines and the estimate line                                                                                                                                       |
+| `src/test/canonical-tent-vpd-rules.test.ts` (new)     | Resolver unit tests                                                                                                                                                                     |
+| `src/test/dashboard-vpd-single-source.test.tsx` (new) | Renders `Dashboard` and compares every VPD widget                                                                                                                                       |
 
 No schema, RLS, migration, edge function, Action Queue or dependency change. Existing tests that pin the old
 "Missing" or `—` strings are renegotiated in the same commit as the behaviour change, each named in the PR body.
@@ -380,9 +408,11 @@ Each test is shown failing on the deploy branch before the build, with the count
 | CVP-25  | Per-tent snapshot is `csv` (temp, RH, VPD) and a newer stored `manual` VPD from history wins                                                                                                                                  | Target Comparison status and reasons come from the manual VPD only; the `csv` temperature and RH add nothing to the aggregate                                                        |
 | CVP-26  | A tent has a current manual reading, then 60 newer ordinary diary entries with no `manual_sensor_snapshot`                                                                                                                    | The resolver still gets the manual reading and uses it; the 50-row cap applies only after the evidence filter                                                                        |
 | CVP-27  | A manual reading exists only in `details.environment_check`, then 60 newer ordinary diary entries                                                                                                                             | The resolver still gets it through the `environment_check` fallback; the filter keeps both envelopes                                                                                 |
-| CVP-28  | Newest value is a stored VPD from a generic diary `sensor_snapshot` (`snapshotFromDiary`, source `diary`) inside the band                                                                                                     | Shown with its label, `originSource: "diary"`; no in-target claim on the stage card or in Target Comparison, as today                                                                |
+| CVP-28  | Newest value is a stored VPD from a generic diary `sensor_snapshot` (`snapshotFromDiary`, source `diary`) inside the band                                                                                                     | Shown with its label, `originSource: "diary"`, `evidenceRef: "diary:<id>"`; no claim on the stage card or in Target Comparison, as today                                             |
 | CVP-29  | An air reading in an older `environment_check`, then 60 newer `environment_check` rows holding only a note or EC                                                                                                              | The resolver still gets the air reading; rows without an air metric never reach the cap                                                                                              |
 | CVP-30  | A manual reading 25 hours old and a live reading 20 minutes old, each inside the band                                                                                                                                         | Both age to `source: "stale"` with `originSource` unchanged; neither is classified, no in-target claim                                                                               |
+| CVP-31  | A current stored `pi_bridge` VPD inside the band                                                                                                                                                                              | `originSource: "pi_bridge"` classifies as live; the stage card and Target Comparison keep the in-target claim, as today                                                              |
+| CVP-32  | A current stored VPD in an older `environment_check`, then 60 newer manual rows each holding only a temperature or only an RH                                                                                                 | The resolver still gets the stored VPD; with no stored VPD at all, the reason is `no_derivable_pair`, not `no_reading`                                                               |
 
 Production check after a release, on the disposable QA account only (never the KEEP account or a customer):
 repeat the VER-189 repro (manual temperature and RH for the only tent, then plant-level) and confirm one VPD

@@ -25,6 +25,7 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { formatActionReasonForDisplay } from "@/lib/actionQueueRowView";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export async function fetchDashboardDiaryRows(growId: string) {
@@ -165,7 +166,7 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
             kind: "action_event",
             ts: e.created_at,
             title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
-            detail: e.note ?? parent?.reason ?? null,
+            detail: e.note ?? formatActionReasonForDisplay(parent?.reason),
             href: `/actions/${e.action_queue_id}`,
           };
         });

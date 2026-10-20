@@ -26,7 +26,7 @@ const REQUIRED_LOCKFILES = Object.freeze(["bun.lock"]);
 // retiring that lock removes no security floor.
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
-  "@modelcontextprotocol/sdk": "1.31.0",
+  "@modelcontextprotocol/sdk": "1.32.0",
   hono: "4.13.11",
   vite: "8.2.4",
   "launch-editor": "2.14.2",

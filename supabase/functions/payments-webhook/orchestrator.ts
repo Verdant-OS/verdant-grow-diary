@@ -119,6 +119,14 @@ export interface Deps {
    */
   enrichEvent?(event: EventLikeWithId): Promise<IoResult>;
   /**
+   * Rewrites the audit row's external ids when enrichment replaced the
+   * non-authoritative ones captured at the 'received' insert.
+   */
+  updateEventAudit?(
+    paddle_event_id: string,
+    ids: { price_external_id: string | null; product_external_id: string | null },
+  ): Promise<IoResult>;
+  /**
    * Reverse-lookup a Paddle internal price id (`pri_...`) into the
    * human-readable `importMeta.externalId` (e.g. `"founder_lifetime"`).
    * Called for one-time `transaction.completed` events where the event
@@ -311,6 +319,27 @@ export async function handleVerifiedEvent(
         last_error: err,
       });
       return { httpStatus: 500, reason: err };
+    }
+    const enrichedAudit = auditFields(event, env);
+    if (
+      deps.updateEventAudit &&
+      (enrichedAudit.price_external_id !== audit.price_external_id ||
+        enrichedAudit.product_external_id !== audit.product_external_id)
+    ) {
+      const updated = await deps.updateEventAudit(paddleEventId, {
+        price_external_id: enrichedAudit.price_external_id,
+        product_external_id: enrichedAudit.product_external_id,
+      });
+      if ("error" in updated) {
+        const err = `event_audit_update_failed:${redactError(updated.error)}`;
+        await deps.markEvent(paddleEventId, {
+          processing_status: "failed",
+          processed_ok: false,
+          skip_reason: null,
+          last_error: err,
+        });
+        return { httpStatus: 500, reason: err };
+      }
     }
   }
 

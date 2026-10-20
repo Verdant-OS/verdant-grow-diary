@@ -177,6 +177,14 @@ function buildDeps(directMode: boolean, env: PaddleEnv): Deps {
       if (error) return { ok: false, error: error.message };
       return { ok: true };
     },
+    async updateEventAudit(paddle_event_id, ids) {
+      const { error } = await sb
+        .from("lovable_paddle_events")
+        .update(ids)
+        .eq("paddle_event_id", paddle_event_id);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
     async markEvent(paddle_event_id, patch) {
       const { error } = await sb
         .from("lovable_paddle_events")

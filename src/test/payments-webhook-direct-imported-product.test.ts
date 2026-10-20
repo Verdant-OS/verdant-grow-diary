@@ -55,6 +55,9 @@ describe("direct-mode webhook with an imported product", () => {
       status: "processed:upsert_subscription",
     });
     expect(h.productLookups).toEqual(["pro_fixture"]);
+    expect(h.events.get("evt_subscription.created")).toMatchObject({
+      product_external_id: "verdant_pro",
+    });
     expect(h.subscriptions.get("sub_fixture")).toMatchObject({
       user_id: USER_ID,
       price_id: "pro_monthly",
@@ -76,6 +79,7 @@ describe("direct-mode webhook with an imported product", () => {
       status: "skipped:missing_product_external_id",
     });
     expect(h.productLookups).toEqual(["pro_fixture"]);
+    expect(h.events.get("evt_subscription.created")?.product_external_id).toBeNull();
     expect(h.writes).toEqual([]);
     expect(h.subscriptions.size).toBe(0);
   });

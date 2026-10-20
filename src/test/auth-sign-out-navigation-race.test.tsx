@@ -358,10 +358,12 @@ describe("explicit sign-out owns navigation through the committed public destina
 
     await waitFor(() => expect(authLoader).toHaveBeenCalled());
     await flushOldContinuations();
-    // No initial resolved location exists yet. The still-mounted protected
-    // shell must not turn its first /auth?redirectTo=... request into /auth.
+    // /auth has not committed yet. The still-mounted protected shell must not
+    // turn its first /auth?redirectTo=... request into /auth. (TanStack
+    // >= 1.170.41 records the initial location as resolved while the redirect
+    // is held; older versions left it undefined.)
     expect(router.state.status).toBe("pending");
-    expect(router.state.resolvedLocation).toBeUndefined();
+    expect(router.state.resolvedLocation?.pathname).not.toBe("/auth");
     expect(router.state.location.search.redirectTo).toBe(destination);
     expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();

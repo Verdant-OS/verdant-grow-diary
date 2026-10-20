@@ -119,6 +119,7 @@ import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayR
 import {
   completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
+  formatTimelineManualSensorReceiptForUnit,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
@@ -1126,8 +1127,14 @@ export default function Timeline() {
   );
 
   const displayEntries = useMemo(
-    () => mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),
-    [entries, manualSensorMeasurementEntries],
+    () =>
+      mergeTimelineMeasurementDisplayEntries(
+        entries,
+        manualSensorMeasurementEntries.map((entry) =>
+          formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+        ),
+      ),
+    [entries, manualSensorMeasurementEntries, temperatureUnit],
   );
 
   const eventCounts = useMemo(() => {
@@ -1717,7 +1724,7 @@ export default function Timeline() {
   }
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full overflow-x-clip">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -1818,11 +1825,11 @@ export default function Timeline() {
           </div>
           <div
             aria-label="Grow stage progression"
-            className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin"
+            className="-mx-1 min-w-0 max-w-full overflow-x-auto px-1 pb-1 scrollbar-thin"
             data-testid="timeline-stage-progression-scroll"
             tabIndex={0}
           >
-            <ol className="grid min-w-[34rem] grid-cols-6 gap-2">
+            <ol className="grid grid-cols-3 gap-2 sm:min-w-[34rem] sm:grid-cols-6">
               {STAGES.map((s, i) => {
                 const count = stageCounts[s.value] || 0;
                 const isCurrent = i === currentStageIdx;
@@ -2561,7 +2568,7 @@ export default function Timeline() {
                           const { sensorViewModel, reviewMessage, warningMessage } =
                             buildTimelineCardSensorSnapshotViewModel(
                               { sensor, useManualValidation },
-                              { validateManualCompatibility: true },
+                              { validateManualCompatibility: true, temperatureUnit },
                             );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0
@@ -2722,7 +2729,7 @@ export default function Timeline() {
                                 ) : null}
                               </div>
                               <p
-                                className="text-sm text-foreground whitespace-pre-wrap cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                                className="min-w-0 max-w-full text-sm text-foreground whitespace-pre-wrap [overflow-wrap:anywhere] cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
                                 role="button"
                                 tabIndex={0}
                                 data-testid="timeline-entry-body"

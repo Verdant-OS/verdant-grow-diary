@@ -12,6 +12,7 @@ import {
   type DiaryPhotoReferenceRowLike,
 } from "@/lib/diaryPhotoDisplayRules";
 import { buildPhotoHistory } from "@/lib/photoHistoryRules";
+import { parsePlantProfilePhotoReference } from "@/lib/plantProfilePhotoStorageRules";
 
 /** Most cards one /plants render signs; the grid is one unpaginated page. */
 export const PLANT_LIST_PHOTO_FALLBACK_LIMIT = 48;
@@ -37,8 +38,16 @@ export function liftDiaryEventType(raw: unknown): Record<string, unknown> {
     : row;
 }
 
-function hasProfilePhoto(plant: PlantListPhotoFallbackPlant): boolean {
-  return typeof plant.photo === "string" && plant.photo.trim().length > 0;
+/**
+ * A profile photo PlantPhoto can display without a diary fallback. Blank,
+ * malformed and other-owner references resolve to nothing there, so they get
+ * the fallback too. A storage reference whose object is missing is only known
+ * after signing; it keeps the placeholder rather than flashing a diary photo
+ * over a valid profile photo while it loads.
+ */
+function hasUsableProfilePhoto(plant: PlantListPhotoFallbackPlant, viewerUserId: string): boolean {
+  const kind = parsePlantProfilePhotoReference(plant.photo, { viewerUserId }).kind;
+  return kind !== "clear" && kind !== "invalid";
 }
 
 function isNewer(
@@ -55,8 +64,8 @@ function isNewer(
 }
 
 /**
- * The newest photo-bearing diary row for each visible plant without a profile
- * photo, in plant order, capped at `limit`. Rows whose photo is not owned by
+ * The newest photo-bearing diary row for each visible plant without a usable
+ * profile photo, in plant order, capped at `limit` photos. Rows whose photo is not owned by
  * the viewer or not displayable are skipped, so an older usable photo still wins.
  */
 export function selectPlantListPhotoFallbackRows(input: {
@@ -69,8 +78,7 @@ export function selectPlantListPhotoFallbackRows(input: {
   if (!viewerUserId || !Array.isArray(input.diaryRows)) return [];
   const limit = input.limit ?? PLANT_LIST_PHOTO_FALLBACK_LIMIT;
   const wanted = input.plants
-    .filter((plant) => !hasProfilePhoto(plant))
-    .slice(0, Math.max(0, limit))
+    .filter((plant) => !hasUsableProfilePhoto(plant, viewerUserId))
     .map((plant) => plant.id);
   if (wanted.length === 0) return [];
   const wantedSet = new Set(wanted);
@@ -92,10 +100,14 @@ export function selectPlantListPhotoFallbackRows(input: {
     if (!current || isNewer(candidate, current)) best.set(plantId, candidate);
   }
 
-  return wanted.flatMap((plantId) => {
-    const hit = best.get(plantId);
-    return hit ? [hit.row] : [];
-  });
+  // Cap the photos signed, not the plants considered, so plants without a
+  // usable diary photo do not use up the budget.
+  return wanted
+    .flatMap((plantId) => {
+      const hit = best.get(plantId);
+      return hit ? [hit.row] : [];
+    })
+    .slice(0, Math.max(0, limit));
 }
 
 /**

@@ -13,7 +13,7 @@ import type { PlantRow } from "@/lib/db";
 import type { Plant } from "@/mock";
 
 const USER_ID = "owner-1";
-const signer = vi.hoisted(() => ({ calls: [] as string[][] }));
+const signer = vi.hoisted(() => ({ calls: [] as string[][], fail: new Set<string>() }));
 let plants: Plant[] = [];
 let diary: Record<string, unknown>[] = [];
 
@@ -37,7 +37,11 @@ vi.mock("@/integrations/supabase/client", () => ({
         createSignedUrls: async (paths: string[]) => {
           signer.calls.push([...paths]);
           return {
-            data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${path}` })),
+            data: paths.map((path) =>
+              signer.fail.has(path)
+                ? { path, signedUrl: null, error: "Object not found" }
+                : { path, signedUrl: `https://signed.example/${path}` },
+            ),
             error: null,
           };
         },
@@ -160,6 +164,7 @@ function card(name: string) {
 
 beforeEach(() => {
   signer.calls = [];
+  signer.fail = new Set();
   plants = [plant("A", "Alpha", null), plant("B", "Bravo", null)];
   diary = [
     photo("a-old", "A", "2026-10-01T00:00:00Z"),
@@ -185,6 +190,17 @@ describe("#2257 /plants card diary-photo fallback", () => {
   it("keeps the empty state for a plant with no diary photo", async () => {
     renderPlants();
     await waitFor(() => expect(signer.calls.length).toBeGreaterThan(0));
+    expect(within(card("Bravo")).getByText("No plant photo yet")).toBeInTheDocument();
+  });
+
+  it("still shows other plants' photos when one photo fails to sign (review)", async () => {
+    diary = [...diary, photo("b-gone", "B", "2026-10-09T00:00:00Z")];
+    signer.fail = new Set([`${USER_ID}/diary/b-gone.jpg`]);
+    renderPlants();
+    await waitFor(() => {
+      const img = within(card("Alpha")).getByRole("img");
+      expect(img).toHaveAttribute("src", `https://signed.example/${USER_ID}/diary/a-new.jpg`);
+    });
     expect(within(card("Bravo")).getByText("No plant photo yet")).toBeInTheDocument();
   });
 });

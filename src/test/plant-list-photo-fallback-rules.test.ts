@@ -80,6 +80,37 @@ describe("selectPlantListPhotoFallbackRows", () => {
     expect(picked[0].id).toBe("r-p0");
   });
 
+  it("spends the cap on photos found, not on plants without one (review)", () => {
+    const plants = Array.from({ length: PLANT_LIST_PHOTO_FALLBACK_LIMIT + 1 }, (_, i) => ({
+      id: `p${i}`,
+      photo: null,
+    }));
+    const last = plants[plants.length - 1].id;
+    const picked = selectPlantListPhotoFallbackRows({
+      plants,
+      diaryRows: [row("only", last, "2026-10-10T00:00:00Z", `${VIEWER}/diary/only.jpg`)],
+      viewerUserId: VIEWER,
+    });
+    expect(picked.map((r) => r.id)).toEqual(["only"]);
+  });
+
+  it("falls back for a profile photo PlantPhoto cannot show (review)", () => {
+    const rows = ["A", "B", "C"].map((id) =>
+      row(`r-${id}`, id, "2026-10-10T00:00:00Z", `${VIEWER}/diary/${id}.jpg`),
+    );
+    const picked = selectPlantListPhotoFallbackRows({
+      plants: [
+        { id: "A", photo: "storage://diary-photos/other-user/plant/a.jpg" },
+        { id: "B", photo: "storage://unknown-bucket/x.jpg" },
+        { id: "C", photo: `storage://diary-photos/${VIEWER}/plant/c.jpg` },
+      ],
+      diaryRows: rows,
+      viewerUserId: VIEWER,
+    });
+    // A (other owner) and B (unknown bucket) resolve to nothing; C's own photo shows.
+    expect(picked.map((r) => r.id)).toEqual(["r-A", "r-B"]);
+  });
+
   it("returns nothing without a signed-in viewer or diary rows", () => {
     expect(
       selectPlantListPhotoFallbackRows({

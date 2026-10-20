@@ -307,6 +307,7 @@ export default function Plants() {
   );
   const photoFallbackDisplay = useDiaryPhotoDisplayRows(
     photoFallbackRows as ReadonlyArray<DiaryPhotoDisplayRow>,
+    { allowPartial: true },
   );
   const photoFallbackByPlant = useMemo(
     () => plantListPhotoFallbackUrls(photoFallbackDisplay.rows),

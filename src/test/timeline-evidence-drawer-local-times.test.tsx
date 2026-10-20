@@ -59,6 +59,18 @@ describe("Timeline evidence drawer local times (QA 2026-10-20 bug 5)", () => {
     expect(drawer.textContent).toContain("Captured Oct 15, 2026, 3:50 PM");
   });
 
+  it("uses the viewer's zone, not UTC: America/Chicago shows 10:54 AM", () => {
+    process.env.TZ = "America/Chicago";
+    // Proves the zone took effect: local 10:54 AM CDT is the stored 15:54 UTC instant.
+    expect(new Date(2026, 9, 15, 10, 54, 0, 0).toISOString()).toBe("2026-10-15T15:54:00.000Z");
+    const vm = renderDrawer();
+    expect(vm?.occurredAt).toBe(ENTRY_AT);
+    const text = screen.getByTestId("timeline-evidence-drawer").textContent ?? "";
+    expect(text).toContain("Oct 15, 2026, 10:54 AM");
+    expect(text).toContain("Captured Oct 15, 2026, 10:50 AM");
+    expect(text).not.toContain("3:54 PM");
+  });
+
   it("prints no raw ISO timestamp anywhere in the drawer", () => {
     renderDrawer();
     const text = screen.getByTestId("timeline-evidence-drawer").textContent ?? "";

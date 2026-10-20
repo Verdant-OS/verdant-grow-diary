@@ -14,7 +14,7 @@ type Workflow = {
   on: Record<string, unknown>;
   permissions: Record<string, string>;
   concurrency: { group: string; "cancel-in-progress": boolean };
-  jobs: Record<string, { steps: Step[] }>;
+  jobs: Record<string, { if?: string; steps: Step[] }>;
 };
 
 const ROOT = resolve(__dirname, "../..");
@@ -33,6 +33,18 @@ describe("served-build-monotonic workflow", () => {
     expect(workflow.on.schedule).toEqual([{ cron: "*/30 * * * *" }]);
   });
 
+  it("offers an explicit initialize dispatch input that defaults to false", () => {
+    expect(workflow.on.workflow_dispatch).toMatchObject({
+      inputs: { initialize: { type: "boolean", default: false } },
+    });
+  });
+
+  it("only runs the job on the deploy ref", () => {
+    for (const job of Object.values(workflow.jobs)) {
+      expect(job.if).toBe("github.ref == 'refs/heads/verdant-grow-diary'");
+    }
+  });
+
   it("grants read-only contents permission and never cancels a run in progress", () => {
     expect(workflow.permissions).toEqual({ contents: "read" });
     expect(workflow.concurrency["cancel-in-progress"]).toBe(false);
@@ -49,19 +61,24 @@ describe("served-build-monotonic workflow", () => {
     expect(runs[0].run).toContain("--previous-file .served-build/previous.sha");
     expect(runs[0].run).toContain("--write-file .served-build/previous.sha");
     expect(runs[0].if).toBeUndefined();
+    // --initialize is passed only on a manual dispatch that asked for it.
+    expect(runs[0].run).toContain(
+      "${{ github.event_name == 'workflow_dispatch' && inputs.initialize && '--initialize' || '' }}",
+    );
+    expect(runs[0].run?.match(/--initialize/g)).toHaveLength(1);
   });
 
-  it("restores and saves state under the run-scoped cache key", () => {
+  it("restores and saves state under the run- and attempt-scoped cache key", () => {
     const [restore] = byAction("actions/cache/restore");
     const [save] = byAction("actions/cache/save");
     expect(restore.with).toEqual({
       path: ".served-build/previous.sha",
-      key: "served-build-sha-${{ github.run_id }}",
+      key: "served-build-sha-${{ github.run_id }}-${{ github.run_attempt }}",
       "restore-keys": "served-build-sha-",
     });
     expect(save.with).toEqual({
       path: ".served-build/previous.sha",
-      key: "served-build-sha-${{ github.run_id }}",
+      key: "served-build-sha-${{ github.run_id }}-${{ github.run_attempt }}",
     });
     // Saving only after a successful check: a FAIL must not overwrite the accepted SHA.
     expect(save.if).toBeUndefined();

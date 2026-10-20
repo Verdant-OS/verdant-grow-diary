@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SERVED_BUILD_DEPLOY_REF,
   SERVED_BUILD_EXIT_CODES,
+  SERVED_BUILD_PREVIOUS_MISSING_HINT,
   evaluateServedBuild,
   formatServedBuildSummary,
   runServedBuildCheck,
@@ -38,13 +39,37 @@ describe("evaluateServedBuild", () => {
     });
   });
 
-  it("PASSES the first run as a recorded baseline", () => {
+  it("BLOCKS on a missing previous checkpoint unless explicitly initialized", () => {
     for (const previousSha of [null, undefined, ""]) {
       expect(decide({ previousSha, previousIsAncestorOfServed: false })).toEqual({
+        status: "BLOCKED",
+        reason: "previous_missing",
+      });
+      expect(decide({ previousSha, previousIsAncestorOfServed: false, initialize: false })).toEqual(
+        { status: "BLOCKED", reason: "previous_missing" },
+      );
+    }
+  });
+
+  it("PASSES an explicitly initialized run with no previous as a recorded baseline", () => {
+    for (const previousSha of [null, undefined, ""]) {
+      expect(decide({ previousSha, previousIsAncestorOfServed: false, initialize: true })).toEqual({
         status: "PASS",
         reason: "baseline_recorded",
       });
     }
+  });
+
+  it("still compares against an existing previous when initialize is set", () => {
+    expect(decide({ initialize: true, previousIsAncestorOfServed: false })).toEqual({
+      status: "FAIL",
+      reason: "moved_backward_or_diverged",
+    });
+    expect(decide({ initialize: true })).toEqual({ status: "PASS", reason: "moved_forward" });
+    expect(decide({ initialize: true, previousSha: "not-a-sha" })).toEqual({
+      status: "BLOCKED",
+      reason: "previous_unreadable",
+    });
   });
 
   it("PASSES an unchanged served SHA", () => {
@@ -157,13 +182,41 @@ describe("runServedBuildCheck", () => {
     ]);
   });
 
-  it("treats a missing or blank previous file as the first run", async () => {
+  it("BLOCKS with exit 2, no write and a re-initialize hint on a missing previous", async () => {
+    for (const previous of [null, "", "  \n"]) {
+      const { deps, writes, lines } = harness({ previous });
+      const outcome = await runServedBuildCheck(deps);
+      expect(outcome).toMatchObject({ status: "BLOCKED", reason: "previous_missing" });
+      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.BLOCKED);
+      expect(writes).toEqual([]);
+      expect(lines).toEqual([
+        `served-build-monotonic: BLOCKED (previous_missing) served=${NEW} previous=none`,
+        SERVED_BUILD_PREVIOUS_MISSING_HINT,
+      ]);
+      expect(SERVED_BUILD_PREVIOUS_MISSING_HINT).toContain("unavailable");
+      expect(SERVED_BUILD_PREVIOUS_MISSING_HINT).toContain("initialize=true");
+    }
+  });
+
+  it("records the baseline on a missing previous only when initialized", async () => {
     for (const previous of [null, "", "  \n"]) {
       const { deps, writes } = harness({ previous });
-      const outcome = await runServedBuildCheck(deps);
-      expect(outcome.reason).toBe("baseline_recorded");
+      const outcome = await runServedBuildCheck({ ...deps, initialize: true });
+      expect(outcome).toMatchObject({ status: "PASS", reason: "baseline_recorded" });
+      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.PASS);
       expect(writes).toEqual([NEW]);
     }
+  });
+
+  it("still FAILS a backward move when initialized with a previous present", async () => {
+    const { deps, writes } = harness({
+      body: { commit: OLD, dirty: false },
+      previous: NEW,
+      ancestry: { [`${OLD}>${SERVED_BUILD_DEPLOY_REF}`]: true, [`${OLD}>${NEW}`]: true },
+    });
+    const outcome = await runServedBuildCheck({ ...deps, initialize: true });
+    expect(outcome).toMatchObject({ status: "FAIL", reason: "moved_backward_or_diverged" });
+    expect(writes).toEqual([]);
   });
 
   it("trims the recorded previous SHA before comparing", async () => {

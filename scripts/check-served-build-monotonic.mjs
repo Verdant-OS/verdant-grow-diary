@@ -6,6 +6,8 @@
 // Reads public build metadata only. It never deploys, never writes to production and
 // uses no secrets or tokens. The only write is the local state file (--write-file),
 // and only on PASS, so a FAIL keeps alerting until production moves forward again.
+// A missing checkpoint (first run, cache miss or eviction) BLOCKS unless the run was
+// explicitly initialized (--initialize), so an evicted cache never silently re-baselines.
 // Exit 0 PASS, 1 FAIL, 2 BLOCKED.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,12 +31,15 @@ export function evaluateServedBuild({
   previousSha,
   servedOnDeployBranch,
   previousIsAncestorOfServed,
+  initialize = false,
 }) {
   if (!isSha(servedSha)) return { status: "BLOCKED", reason: "served_unreadable" };
   if (servedOnDeployBranch !== true)
     return { status: "FAIL", reason: "served_not_on_deploy_branch" };
   if (previousSha === null || previousSha === undefined || previousSha === "")
-    return { status: "PASS", reason: "baseline_recorded" };
+    return initialize === true
+      ? { status: "PASS", reason: "baseline_recorded" }
+      : { status: "BLOCKED", reason: "previous_missing" };
   // A recorded state that is not a commit SHA cannot be compared; fail closed and keep it.
   if (!isSha(previousSha)) return { status: "BLOCKED", reason: "previous_unreadable" };
   if (servedSha === previousSha) return { status: "PASS", reason: "unchanged" };
@@ -49,6 +54,11 @@ export function formatServedBuildSummary({ status, reason }, { servedSha, previo
   );
 }
 
+export const SERVED_BUILD_PREVIOUS_MISSING_HINT =
+  "served-build-monotonic: the previous checkpoint was unavailable (first run, cache miss " +
+  "or eviction), so there is nothing to compare against. Re-initialize by dispatching the " +
+  "'Served build monotonic check' workflow with initialize=true.";
+
 /**
  * The I/O sequence with every effect injected, so the write-only-on-PASS rule is testable
  * without the network, git or the filesystem.
@@ -59,6 +69,7 @@ export async function runServedBuildCheck({
   readPrevious,
   writeServed,
   log,
+  initialize = false,
 }) {
   let servedSha = null;
   try {
@@ -83,9 +94,11 @@ export async function runServedBuildCheck({
     previousSha,
     servedOnDeployBranch,
     previousIsAncestorOfServed,
+    initialize,
   });
   if (result.status === "PASS") writeServed(servedSha);
   log(formatServedBuildSummary(result, { servedSha, previousSha }));
+  if (result.reason === "previous_missing") log(SERVED_BUILD_PREVIOUS_MISSING_HINT);
   return { ...result, servedSha, previousSha, exitCode: SERVED_BUILD_EXIT_CODES[result.status] };
 }
 
@@ -101,6 +114,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     options: {
       "previous-file": { type: "string" },
       "write-file": { type: "string" },
+      initialize: { type: "boolean", default: false },
     },
   });
   const previousFile = values["previous-file"];
@@ -116,6 +130,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       writeFileSync(writeFile, `${sha}\n`);
     },
     log: (line) => console.log(line),
+    initialize: values.initialize === true,
   });
   process.exitCode = outcome.exitCode;
 }

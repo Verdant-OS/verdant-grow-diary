@@ -1,5 +1,6 @@
 /**
- * Advisories 1242661 (vite >=8.2.0 <=8.2.3) and 1242663 (launch-editor <=2.14.1),
+ * Advisories 1242661 (vite >=8.2.0 <=8.2.3; GHSA-rq7h-c2jc-7f22 also lists >=8.3.0 <=8.3.2,
+ * patched in 8.3.3) and 1242663 (launch-editor <=2.14.1),
  * both high: launch-editor's `fs.existsSync()` check can be bypassed on Windows.
  * The lockfile policy's floors must reject a vulnerable vite or launch-editor on
  * their own, independent of the manifest range and the exact
@@ -75,7 +76,12 @@ const floorErrors = (name: string, result: { errors: string[] }) =>
 describe("vite and launch-editor security floors (advisories 1242661, 1242663)", () => {
   it("rejects the vulnerable releases on their own", () => {
     expect(floorErrors("vite", evaluateWith("vite", "8.2.0"))).toEqual([
-      "bun.lock security floor for vite is 8.2.4; found 8.2.0.",
+      "bun.lock security floor for vite is 8.3.3; found 8.2.0.",
+    ]);
+    // The advisory's ranges are disjoint: 8.2.4 is patched but 8.3.0-8.3.2 are not,
+    // so the floor sits at 8.3.3 and the last vulnerable 8.3 release must fail too.
+    expect(floorErrors("vite", evaluateWith("vite", "8.3.2"))).toEqual([
+      "bun.lock security floor for vite is 8.3.3; found 8.3.2.",
     ]);
     expect(floorErrors("launch-editor", evaluateWith("launch-editor", "2.14.1"))).toEqual([
       "bun.lock security floor for launch-editor is 2.14.2; found 2.14.1.",
@@ -83,7 +89,7 @@ describe("vite and launch-editor security floors (advisories 1242661, 1242663)",
   });
 
   it("accepts the first fixed releases", () => {
-    expect(floorErrors("vite", evaluateWith("vite", "8.2.4"))).toEqual([]);
+    expect(floorErrors("vite", evaluateWith("vite", "8.3.3"))).toEqual([]);
     expect(floorErrors("launch-editor", evaluateWith("launch-editor", "2.14.2"))).toEqual([]);
   });
 });

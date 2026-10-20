@@ -335,17 +335,14 @@ function resourceWithDirectExternalId(resource: unknown): unknown {
   return { ...resource, importMeta: { ...importMeta, externalId } };
 }
 
-/** Paddle id of a subscription item that has a price and no product external id. */
+/**
+ * Paddle id of a subscription item whose product has no custom_data external
+ * id. An import_meta id alone is a source-provider id, so it still needs the
+ * catalog read.
+ */
 export function directPriceOnlyProductId(item: unknown): string | null {
   if (!isRecord(item) || !isRecord(item.price)) return null;
-  const product = item.product;
-  if (
-    isRecord(product) &&
-    isRecord(product.importMeta) &&
-    nonEmptyString(product.importMeta.externalId)
-  ) {
-    return null;
-  }
+  if (externalIdFromCustomData(item.product)) return null;
   const raw = item.price.product_id ?? item.price.productId;
   return nonEmptyString(raw) ? raw : null;
 }
@@ -357,9 +354,16 @@ export function directPriceOnlyProductId(item: unknown): string | null {
 export function attachCatalogProductExternalId(item: unknown, catalogProduct: unknown): boolean {
   if (!isRecord(item) || !directPriceOnlyProductId(item)) return false;
   const externalId = externalIdFromCustomData(catalogProduct);
-  if (!externalId) return false;
   const product = isRecord(item.product) ? item.product : {};
   const importMeta = isRecord(product.importMeta) ? product.importMeta : {};
+  if (!externalId) {
+    // Drop a source import id so the processor skips instead of storing it.
+    if (isRecord(item.product) && "externalId" in importMeta) {
+      const { externalId: _source, ...rest } = importMeta;
+      item.product = { ...product, importMeta: rest };
+    }
+    return false;
+  }
   const price = isRecord(item.price) ? item.price : undefined;
   const productId = price
     ? nonEmptyString(price.product_id)

@@ -14,7 +14,10 @@
  */
 import { formatHarvestSavedBreakdownDetail } from "@/lib/harvestDetailsRules";
 import { withGrowId } from "@/lib/routes";
-import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export const DAILY_CHECK_SUCCESS_TITLE = "Today's check was logged";
 export const DAILY_CHECK_SUCCESS_BODY =
@@ -322,8 +325,8 @@ export const DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL =
  * Unit line under the Daily Check manual snapshot form. It must name the
  * grower's display unit, the same one the form's own "Entered in" hint uses.
  */
-export function dailyCheckManualSnapshotUnitNote(_unit: TemperatureUnitPreference): string {
-  return "Temperature uses °F.";
+export function dailyCheckManualSnapshotUnitNote(unit: TemperatureUnitPreference): string {
+  return `Temperature uses ${getTemperatureUnitSymbol(unit)}.`;
 }
 
 /**

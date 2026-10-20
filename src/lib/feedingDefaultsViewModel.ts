@@ -191,6 +191,20 @@ export function feedingDefaultsPrefillSettled(input: {
   return true;
 }
 
+/**
+ * Recipe identity only (line and products). Volume, readings and the note are
+ * the grower's own entries and never mark a prefilled recipe as edited.
+ */
+export function feedingRecipeMatches(
+  form: Pick<QuickLogFeedingFormState, "lineId" | "products">,
+  recipe: Pick<QuickLogFeedingFormState, "lineId" | "products">,
+): boolean {
+  return (
+    form.lineId === recipe.lineId &&
+    JSON.stringify(form.products) === JSON.stringify(recipe.products)
+  );
+}
+
 export function applyFeedingDefaultsToForm(
   result: FeedingDefaultsResult,
 ): QuickLogFeedingFormState {

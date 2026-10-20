@@ -136,6 +136,25 @@ describe("QuickLogV2Sheet — Feed target change A → B (#2172 / VER-195)", () 
     await waitFor(() => expect(lineField().value).toBe(""));
   });
 
+  // Codex r4326563270: an entered applied volume is not a recipe edit.
+  const volumeField = () => screen.getByLabelText("Applied volume (ml)") as HTMLInputElement;
+
+  it("applies B's recipe and keeps the entered volume when the target changes", async () => {
+    await openFeedOnPlantA();
+    fireEvent.change(volumeField(), { target: { value: "750" } });
+    fireEvent.change(targetProxy(), { target: { value: "plant:plant-b" } });
+    await waitFor(() => expect(lineField().value).toBe("flower-week-1"));
+    expect(volumeField().value).toBe("750");
+  });
+
+  it("clears A's recipe and keeps the entered volume when B has no history", async () => {
+    await openFeedOnPlantA();
+    fireEvent.change(volumeField(), { target: { value: "750" } });
+    fireEvent.change(targetProxy(), { target: { value: "plant:plant-c" } });
+    await waitFor(() => expect(lineField().value).toBe(""));
+    expect(volumeField().value).toBe("750");
+  });
+
   it("keeps a recipe the grower edited when the target changes", async () => {
     await openFeedOnPlantA();
     fireEvent.change(lineField(), { target: { value: "my custom mix" } });

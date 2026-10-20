@@ -168,6 +168,7 @@ import {
   buildFeedingDefaults,
   applyFeedingDefaultsToForm,
   feedingDefaultsPrefillSettled,
+  feedingRecipeMatches,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
 import {
@@ -891,16 +892,21 @@ function QuickLogV2SheetForOwner({
   // into plant B. An untouched prefill is cleared so B's own defaults (or none)
   // apply; a recipe the grower edited is theirs and stays.
   const feedingDefaultsPlantRef = useRef(resolvedContext.plantId);
+  // After a retarget reset only the recipe must be pristine for B's defaults.
+  const feedingRecipeRetargetedRef = useRef(false);
   useEffect(() => {
     if (feedingDefaultsPlantRef.current === resolvedContext.plantId) return;
     feedingDefaultsPlantRef.current = resolvedContext.plantId;
     const applied = appliedFeedingDefaultsRef.current;
     if (!feedingDefaultsApplied || !applied) return;
-    const untouched =
-      JSON.stringify({ ...feedingForm, note: "" }) === JSON.stringify({ ...applied, note: "" });
-    if (!untouched) return;
+    if (!feedingRecipeMatches(feedingForm, applied)) return;
     appliedFeedingDefaultsRef.current = null;
-    setFeedingForm((previous) => ({ ...EMPTY_QUICKLOG_FEEDING_FORM, note: previous.note }));
+    feedingRecipeRetargetedRef.current = true;
+    setFeedingForm((previous) => ({
+      ...previous,
+      lineId: EMPTY_QUICKLOG_FEEDING_FORM.lineId,
+      products: EMPTY_QUICKLOG_FEEDING_FORM.products.map((row) => ({ ...row })),
+    }));
     setFeedingDefaultsApplied(false);
   }, [resolvedContext.plantId, feedingDefaultsApplied, feedingForm]);
 
@@ -1218,10 +1224,21 @@ function QuickLogV2SheetForOwner({
     // Defaults affect only the recipe. A note handed off from Note/Water (for
     // example a selected Better/Same/Worse response) must neither block those
     // defaults nor be overwritten by them.
-    if (!isFeedingFormPristine({ ...feedingForm, note: "" })) return;
+    const retargeted = feedingRecipeRetargetedRef.current;
+    if (
+      retargeted
+        ? !feedingRecipeMatches(feedingForm, EMPTY_QUICKLOG_FEEDING_FORM)
+        : !isFeedingFormPristine({ ...feedingForm, note: "" })
+    )
+      return;
     const applied = applyFeedingDefaultsToForm(feedingDefaults);
     appliedFeedingDefaultsRef.current = applied;
-    setFeedingForm((previous) => ({ ...applied, note: previous.note }));
+    feedingRecipeRetargetedRef.current = false;
+    setFeedingForm((previous) =>
+      retargeted
+        ? { ...previous, lineId: applied.lineId, products: applied.products }
+        : { ...applied, note: previous.note },
+    );
     setFeedingDefaultsApplied(true);
   }, [
     open,

@@ -183,6 +183,27 @@ export default function GuidePage() {
                   </ul>
                 </nav>
               )}
+              {section.downloads && section.downloads.length > 0 && (
+                <div className="mt-4 rounded-md border border-border/60 bg-muted/30 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-medium">
+                    Blank record downloads
+                  </p>
+                  <ul aria-label="Blank record downloads" className="mt-2 space-y-2 text-sm">
+                    {section.downloads.map((file) => (
+                      <li key={file.href}>
+                        <a
+                          href={file.href}
+                          download={file.fileName}
+                          className="text-primary underline underline-offset-4 hover:text-primary/80 break-words"
+                        >
+                          {file.label}
+                        </a>
+                        <span className="block text-muted-foreground">{file.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </section>
           ))}
         </div>

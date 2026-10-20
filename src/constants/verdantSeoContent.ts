@@ -39,12 +39,45 @@ export interface GuideSectionLink {
   readonly to: string;
 }
 
+export interface GuideDownload {
+  readonly label: string;
+  /** Public static file path under /downloads/. */
+  readonly href: string;
+  /** Filename offered by the download attribute. */
+  readonly fileName: string;
+  readonly description: string;
+}
+
 export interface GuideSection {
   readonly heading: string;
   readonly body: string;
   /** Optional in-app internal links surfaced under the section body. */
   readonly links?: ReadonlyArray<GuideSectionLink>;
+  /** Optional static file downloads surfaced under the section body. */
+  readonly downloads?: ReadonlyArray<GuideDownload>;
 }
+
+/** Blank local records shipped in public/downloads (#2260). */
+export const BLANK_OBSERVATION_RECORD_DOWNLOADS: ReadonlyArray<GuideDownload> = [
+  {
+    label: "Download the blank CSV",
+    href: "/downloads/blank-observation-record.csv",
+    fileName: "blank-observation-record.csv",
+    description: "Eight empty columns and one blank row, for any spreadsheet app.",
+  },
+  {
+    label: "Download the printable PDF",
+    href: "/downloads/blank-observation-record.pdf",
+    fileName: "blank-observation-record.pdf",
+    description: "One letter-size page with the same eight fields to fill in by hand.",
+  },
+  {
+    label: "Download the instructions (TXT)",
+    href: "/downloads/blank-observation-record-instructions.txt",
+    fileName: "blank-observation-record-instructions.txt",
+    description: "Plain-text notes on filling in the record locally.",
+  },
+];
 
 export interface GuideCallToAction {
   readonly label: string;
@@ -204,6 +237,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "30-second Quick Log so entries actually happen",
         body: "The best grow diary is the one you actually fill in. Quick Log is designed to capture a watering, feeding, or observation in about 30 seconds, with an optional photo and sensor snapshot. If logging takes five minutes, it stops happening after week two.",
+        links: [
+          {
+            label: "Prefer paper first? Get a blank printable or CSV record",
+            to: "/guides/grow-journal-template",
+          },
+        ],
       },
       {
         heading: "Source-labeled sensor snapshots",
@@ -882,18 +921,20 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Grow journal template you can use right now | Verdant Grow Diary",
     h1: "A grow journal template that fits in 30 seconds",
     description:
-      "A practical grow journal template: plant, entry type, stage, note, and one number when it matters — usable as an interactive starter in your browser, no account needed.",
+      "A practical grow journal template: plant, entry type, stage, note, and one number when it matters. Use it in your browser with no account, or download a blank CSV or printable PDF record.",
     targetKeyword: "grow journal template",
     intro:
-      "Most grow journal template downloads are spreadsheets with twenty columns you will stop filling by Friday. A template earns its keep when it is small enough to complete every time: which plant, what kind of entry, what stage, one note, and one number when the entry type calls for it.",
+      "Many grow journal template downloads are spreadsheets with twenty columns you will stop filling by Friday. A template earns its keep when it is small enough to complete every time: which plant, what kind of entry, what stage, one note, and one number when the entry type calls for it.",
     sections: [
       {
         heading: "The five-field template",
         body: "Plant nickname. Entry type (watering, feeding, observation, or environment check). Growth stage — with \u201cnot sure yet\u201d as a legitimate answer. A short note. And for waterings only, the volume in ml. That is the whole template, and it is enough to build a timeline worth trusting.",
       },
       {
-        heading: "Use it as an interactive starter, not a download",
-        body: "Instead of printing a sheet, you can fill this grow journal template directly in the public Quick Log starter at /quick-log. It runs without an account, and the draft is saved only on your device — honestly labeled as such — until you choose to create a free diary.",
+        heading: "Download a blank record, or use the interactive starter",
+        body: "Prefer paper or a spreadsheet? Download a blank observation record: a CSV with eight empty columns (date, local time, time zone, record identifier, observation, photo/file reference, source/reference, follow-up note) or a one-page printable PDF with the same fields. These are blank local records, not automatic Verdant imports. Opening or filling one in does not add anything to a Verdant account; to put an entry in your diary, save it through Quick Log in your Verdant account yourself. If you would rather type than print, the public Quick Log starter at /quick-log runs without an account and keeps its draft only in this browser.",
+        downloads: BLANK_OBSERVATION_RECORD_DOWNLOADS,
+        links: [{ label: "Open the Quick Log starter", to: "/quick-log" }],
       },
       {
         heading: "Why the template refuses to guess",
@@ -908,7 +949,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Is there a free grow journal template I can try in the browser?",
         answer:
-          "Yes — the public Quick Log starter at /quick-log is the template in interactive form. No account, no download; the draft lives in your browser until you clear it, or until you review and save it into a free diary after signing up.",
+          "Yes — the public Quick Log starter at /quick-log is the template in interactive form. It needs no account; the draft lives in your browser until you clear it, or until you review and save it into a free diary after signing up.",
+      },
+      {
+        question: "Is there a printable or spreadsheet version?",
+        answer:
+          "Yes. This page offers a blank CSV and a one-page printable PDF observation record with the same eight fields, plus plain-text instructions. They are blank local records, not automatic Verdant imports: nothing you write in them reaches a Verdant account unless you save it through Quick Log yourself.",
       },
       {
         question: "What fields should a grow journal template include?",
@@ -978,6 +1024,11 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         body: "At /quick-log you can nickname a plant, pick an entry type (watering, feeding, observation, environment check), set a stage or honestly leave it unknown, write a note, and save a draft that stays on this device. No email, no signup, no server involved.",
       },
       {
+        heading: "Or keep a blank record on paper or in a spreadsheet",
+        body: "If you would rather not use a browser draft at all, download a blank observation record as a CSV or a printable PDF. These are blank local records, not automatic Verdant imports. Filling one in does not save anything to Verdant, and nothing is uploaded; the file stays wherever you keep it. To add an entry to a diary later, save it through Quick Log in a Verdant account yourself.",
+        downloads: BLANK_OBSERVATION_RECORD_DOWNLOADS,
+      },
+      {
         heading: "Where the draft actually lives",
         body: "The draft is stored only in this browser — it is not sent anywhere, not synced to an account, and clearing browser data deletes it. The starter says this on the page, before and after you save, because a diary product that fudges where your data lives has already failed at its one job.",
       },
@@ -1017,7 +1068,13 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "The 60-second pass",
         body: "Look at color, posture, new growth, and both the most exposed and shaded leaves. Touch or lift for pot weight or medium moisture. Notice local heat or airflow near the canopy. Then log only what changed — a watering with its volume, a feeding, a fixture or timer change, or one observation line. If nothing changed, an honest empty day beats a filler entry.",
-        links: [{ label: "Draft the observation in Quick Log", to: "/quick-log" }],
+        links: [
+          { label: "Draft the observation in Quick Log", to: "/quick-log" },
+          {
+            label: "Print a blank observation record instead",
+            to: "/guides/grow-journal-template",
+          },
+        ],
       },
       {
         heading: "One entry per change, against the plant",

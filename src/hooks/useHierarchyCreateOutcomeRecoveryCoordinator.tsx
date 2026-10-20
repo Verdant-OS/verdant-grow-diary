@@ -189,9 +189,21 @@ export function HierarchyCreateOutcomeRecoveryCoordinator({
   if (seenOwnerRef.current !== ownerId) {
     seenOwnerRef.current = ownerId;
     releasedAbsentEntityRef.current = null;
-    retryableRef.current.clear();
     recheckPendingRef.current = false;
   }
+
+  // The reconciled mark is runtime-global but retry eligibility lives here, so
+  // release retryable attempts on unmount or owner change; the next mount
+  // re-reads them instead of skipping a marked attempt nobody can retry.
+  useEffect(() => {
+    const retryable = retryableRef.current;
+    return () => {
+      for (const attempt of retryable.values()) {
+        unmarkHierarchyCreateOutcomeRecoveryAttemptReconciled(attempt);
+      }
+      retryable.clear();
+    };
+  }, [ownerId]);
 
   useEffect(() => {
     if (!ownerId || !attempts.some((record) => record.runtimeEpoch === null)) return;
@@ -335,7 +347,6 @@ export function HierarchyCreateOutcomeRecoveryCoordinator({
           if (recheckPendingRef.current) requestRecheck();
           return;
         }
-        inFlight.delete(key);
         const released = await recoverPreviousRuntimeHierarchyCreateAttempt({
           attempt: record.attempt,
           ownerId,
@@ -344,7 +355,9 @@ export function HierarchyCreateOutcomeRecoveryCoordinator({
           refreshVisibleList,
           clear: clearHierarchyCreateOutcomeRecoveryAttempt,
         });
+        // Stay in flight across the list read so a rerun's cleanup unmarks it.
         if (!isCurrentOwner()) return;
+        inFlight.delete(key);
         if (released) releasedAbsentEntityRef.current = null;
         publishNotice();
       })();

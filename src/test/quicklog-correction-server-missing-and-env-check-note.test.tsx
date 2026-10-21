@@ -134,6 +134,25 @@ describe("Environment Check readings note", () => {
     );
   });
 
+  it("explains a legacy check whose only temperature is room_temp_f", () => {
+    expect(
+      quickLogCorrectionEnvironmentCheckReadingsNote({
+        event_type: "environment_check",
+        environment_check: { checkType: "airflow", room_temp_f: 76 },
+      }),
+    ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+  });
+
+  it("is null for a typed Watering entry that carries an environment envelope as context", () => {
+    expect(
+      quickLogCorrectionEnvironmentCheckReadingsNote({
+        event_type: "watering",
+        watering: { volume_ml: 500 },
+        environment_check: { temp_c: 24.5, humidity_pct: 58 },
+      }),
+    ).toBeNull();
+  });
+
   it("is null when the check also carries a sensor snapshot the RPC can correct", () => {
     expect(
       quickLogCorrectionEnvironmentCheckReadingsNote({

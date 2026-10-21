@@ -20,6 +20,18 @@ import {
 import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { SensorSnapshot as StrictSnapshot } from "@/lib/latestSensorSnapshotRules";
 
+/** Runs `fn` with the local clock pinned to UTC, restoring the caller's TZ. */
+function inUtc(fn: () => void): void {
+  const original = process.env.TZ;
+  process.env.TZ = "UTC";
+  try {
+    fn();
+  } finally {
+    if (original === undefined) delete process.env.TZ;
+    else process.env.TZ = original;
+  }
+}
+
 const NOW = new Date("2026-07-07T19:14:00Z");
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 
@@ -97,14 +109,18 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
   });
 
   it("legacy adapter: capturedAtLabel is a deterministic absolute string when data exists", () => {
-    const v = buildQuickLogSnapshotStrip({
-      snapshot: snap({}),
-      hasTent: true,
-      now: NOW,
-      temperatureUnit: "celsius",
+    // Local clock pinned under TZ=UTC (Matthew approved this pin edit, 2026-10-21).
+    inUtc(() => {
+      expect(new Date(2026, 6, 7, 19, 9, 0, 0).toISOString()).toBe(minutesAgo(5));
+      const v = buildQuickLogSnapshotStrip({
+        snapshot: snap({}),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM");
+      expect(v.capturedAt).toBe(minutesAgo(5));
     });
-    expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM UTC");
-    expect(v.capturedAt).toBe(minutesAgo(5));
   });
 
   it("legacy adapter: capturedAtLabel is null with no snapshot", () => {
@@ -129,15 +145,19 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
   });
 
   it("strict adapter: manual fresh snapshot exposes Edit action + captured label", () => {
-    const v = buildQuickLogStripFromTentState({
-      status: "ready",
-      snapshot: strictManualSnap(),
-      hasTent: true,
-      now: NOW,
-      temperatureUnit: "celsius",
+    // Local clock pinned under TZ=UTC (Matthew approved this pin edit, 2026-10-21).
+    inUtc(() => {
+      expect(new Date(2026, 6, 7, 19, 9, 0, 0).toISOString()).toBe(minutesAgo(5));
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: strictManualSnap(),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.action.kind).toBe("edit");
+      expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM");
     });
-    expect(v.action.kind).toBe("edit");
-    expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM UTC");
   });
 
   it("strict adapter: live snapshot never surfaces edit", () => {

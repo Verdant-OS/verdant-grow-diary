@@ -274,11 +274,11 @@ describe("Quick Log action labels via shared helpers", () => {
     expect(mod.toTimelineItem(base).title).toBe("Diagnosis");
   });
 
-  it("formatQuickLogOccurredAt produces a deterministic, UTC-stable string", () => {
+  it("formatQuickLogOccurredAt produces a deterministic local clock string", () => {
     const out = formatQuickLogOccurredAt("2026-03-15T09:00:00.000Z");
-    // Stable across machines/timezones — UTC-anchored.
+    // Viewer-local clock. The stored instant stays UTC; the label does not.
     expect(out).toMatch(/2026/);
-    expect(out).toMatch(/UTC$/);
+    expect(out).not.toMatch(/\bUTC\b/);
     // Invalid input is passed through, never invented as "now".
     expect(formatQuickLogOccurredAt("not-a-date")).toBe("not-a-date");
     expect(formatQuickLogOccurredAt("")).toBe("");

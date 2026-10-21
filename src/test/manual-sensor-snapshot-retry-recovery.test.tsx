@@ -355,6 +355,8 @@ describe("manual duplicate receipt verification", () => {
       quality: "ok",
       device_id: null,
       raw_payload: null,
+      notes: null,
+      unit_unconfirmed: false,
     },
   ];
 
@@ -487,6 +489,8 @@ describe("manual duplicate receipt verification", () => {
         metric: "humidity_pct",
         value: 55,
         raw_payload: null,
+        notes: null,
+        unit_unconfirmed: false,
       },
     ];
     expect(await confirmManualSnapshotConflict([...canonical, ...legacy], { code: "23505" })).toBe(
@@ -625,6 +629,8 @@ describe("manual duplicate receipt verification", () => {
         metric: "humidity_pct",
         value: 55,
         raw_payload: null,
+        notes: null,
+        unit_unconfirmed: false,
       },
     ];
     expect(await confirmManualSnapshotConflict(mixedBatch, { code: "23505" })).toBe(false);

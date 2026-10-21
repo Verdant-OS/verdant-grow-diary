@@ -348,6 +348,8 @@ describe("Issue #2156 — Dashboard CSV export includes all 4 readings", () => {
       source: "manual",
       quality: "ok",
       raw_payload: null,
+      notes: null,
+      unit_unconfirmed: false,
     };
     const r2 = {
       id: "sr-2",
@@ -359,6 +361,8 @@ describe("Issue #2156 — Dashboard CSV export includes all 4 readings", () => {
       source: "manual",
       quality: "ok",
       raw_payload: null,
+      notes: null,
+      unit_unconfirmed: false,
     };
     H.aggregateRows = [r1, r2];
     H.perTentRows = [r1, r2];
@@ -415,6 +419,8 @@ describe("Issue #2160 — °C/°F setting applied across Dashboard strip, Timeli
       source: "manual",
       quality: "ok",
       raw_payload: null,
+      notes: null,
+      unit_unconfirmed: false,
     };
     H.aggregateRows = [row35C];
     H.perTentRows = [row35C];
@@ -442,6 +448,8 @@ describe("Issue #2160 — °C/°F setting applied across Dashboard strip, Timeli
       source: "manual",
       quality: "ok",
       raw_payload: null,
+      notes: null,
+      unit_unconfirmed: false,
     };
     H.aggregateRows = [row35C];
     H.perTentRows = [row35C];
@@ -524,6 +532,8 @@ describe("Issue #2160 — °C/°F setting applied across Dashboard strip, Timeli
         user_id: "u1",
         device_id: null,
         raw_payload: null,
+        notes: null,
+        unit_unconfirmed: false,
       },
       {
         id: "r2",
@@ -538,6 +548,8 @@ describe("Issue #2160 — °C/°F setting applied across Dashboard strip, Timeli
         user_id: "u1",
         device_id: null,
         raw_payload: null,
+        notes: null,
+        unit_unconfirmed: false,
       },
     ];
 

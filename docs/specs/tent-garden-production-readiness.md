@@ -160,8 +160,9 @@ Consequences that bind every slice:
      has to run on production. Acceptance (P1–P9, A1–A9) runs on `https://verdantgrowdiary.com` once live
      `/version.json` reports the S5a SHA. Any failure that cannot be fixed in place triggers the flag
      rollback below.
-   - **S5b, link:** add the one Tent Detail link, only after every S5a receipt passes. The release is
-     complete when live `/version.json` reports the S5b SHA and the link check in §13 passes.
+   - **S5b, link:** add the one Tent Detail link, only after every S5a receipt passes and is still
+     valid (§13). The release is complete when live `/version.json` reports the S5b SHA and the S5b
+     completion check in §13 passes.
 4. **Rollback, in order of speed.** Agents never roll back; they prepare the step.
    - Flip `tentGardenEnabled` back to `false` (and remove the link if S5b landed): one PR through the
      normal merge gate. Use this for any Tent Garden defect. It is done only when live `/version.json`
@@ -412,10 +413,27 @@ rendering, so no earlier build can exercise the page, and Verdant has no non-pro
 on. S5a therefore turns the page on without a link, and the receipts are taken on
 `https://verdantgrowdiary.com` after live `/version.json` reports the S5a SHA. They use the reference
 devices and the disposable QA account on its own fixture tent (read-only page, so no writes). Each receipt
-names the live SHA; a later deploy voids receipts taken before it. A failing receipt is fixed in a new PR
-(re-measured at its live SHA) or answered with the flag rollback in §4. S5b merges only after every
-receipt passes; after S5b is live, the link check confirms Tent Detail shows the link and it opens the
-page.
+names the live SHA it was taken at.
+
+**When receipts stay valid.** Other PRs keep deploying, so a later deploy voids a receipt only if it
+changes the Garden's own surface. That means any file under `src/lib/tentGarden/`,
+`src/components/tentGarden/`, `src/pages/TentGarden.tsx`, the route file, `tentGardenEnabled`, or the
+`three` dependency. The check is `git diff --name-only <receipt SHA> <live SHA>` against that list, and
+the result is recorded with the receipts at each later step.
+
+A failing receipt is fixed in a new PR, which is re-measured at its live SHA, or answered with the flag
+rollback in §4.
+
+S5b merges only after every receipt passes and is still valid. S5b's diff is the one Tent Detail link,
+outside that list, so S5a's receipts carry over. Once S5b is live, its completion check is:
+
+- the diff check above, confirming the receipts are still valid;
+- the link check: Tent Detail shows the link and it opens the page;
+- P4 for `/tents/:id`, the page that gained the link;
+- P1, A2 and T7 repeated once at the live S5b SHA.
+
+If the diff check shows a Garden file changed since S5a, the full P1–P9 and A1–A9 set is taken again
+at the live S5b SHA before the release counts as complete.
 
 Revision 1 split the scene (S3) from its draw-call reduction (S4) and measured phones only afterwards
 (S5). That would have merged a scene known to run at 2.7k–5.3k draw calls. Here the scene lands only

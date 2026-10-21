@@ -9,7 +9,8 @@ export const COMMUNITY_RESERVED_USERNAMES: readonly string[] = Object.freeze([
   "deleted",
 ]);
 
-const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
+// Checked before lowercasing: "\u212A" (Kelvin sign) lowercases to an ASCII "k".
+const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,30}$/;
 const DISPLAY_NAME_MAX = 60;
 const BIO_MAX = 280;
 
@@ -26,11 +27,16 @@ function characterCount(text: string): number {
 export function normalizeCommunityProfile(
   draft: CommunityProfileDraft,
 ): CommunityResult<CommunityProfileDraft> {
-  const username = draft.username.trim().toLowerCase();
+  if (typeof draft !== "object" || draft === null) return { ok: false, code: "invalid" };
+  const fields = [draft.username, draft.displayName, draft.bio];
+  if (!fields.every((field) => typeof field === "string")) return { ok: false, code: "invalid" };
+
+  const trimmedUsername = draft.username.trim();
+  if (!USERNAME_PATTERN.test(trimmedUsername)) return { ok: false, code: "invalid" };
+  const username = trimmedUsername.toLowerCase();
   const displayName = draft.displayName.trim();
   const bio = draft.bio.trim();
 
-  if (!USERNAME_PATTERN.test(username)) return { ok: false, code: "invalid" };
   if (COMMUNITY_RESERVED_USERNAMES.includes(username)) return { ok: false, code: "invalid" };
 
   const displayNameLength = characterCount(displayName);

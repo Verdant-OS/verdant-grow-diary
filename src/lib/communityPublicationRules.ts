@@ -1,4 +1,5 @@
 import { isCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
+import { readCommunityInstant } from "@/lib/communityDigestRules";
 import type {
   CommunityResult,
   PublicationDraft,
@@ -34,12 +35,14 @@ function isValidMeasurement(measurement: SharedMeasurement): boolean {
 function isValidDraft(entry: PublicationDraft): boolean {
   // The label is returned as given, so its padding counts toward the limit.
   return (
+    typeof entry === "object" &&
+    entry !== null &&
     isPresent(entry.sourceEntryHandle) &&
     isPresent(entry.sourceRevision) &&
     isPresent(entry.action) &&
     isPresent(entry.sourceJournalLabel) &&
     characterCount(entry.sourceJournalLabel) <= SOURCE_LABEL_MAX &&
-    Number.isFinite(Date.parse(entry.occurredAt)) &&
+    readCommunityInstant(entry.occurredAt) !== null &&
     typeof entry.note === "string" &&
     characterCount(entry.note) <= NOTE_MAX &&
     (entry.stage === null || isPresent(entry.stage)) &&
@@ -79,7 +82,7 @@ export function isPreviewCurrent(
   },
   nowMs: number,
 ): boolean {
-  const expiresAtMs = Date.parse(preview.expiresAt);
+  const expiresAtMs = readCommunityInstant(preview.expiresAt)?.ms ?? Number.NaN;
   if (!Number.isFinite(nowMs) || !Number.isFinite(expiresAtMs)) return false;
   if (!isPresent(preview.previewToken)) return false;
   if (nowMs >= expiresAtMs) return false;

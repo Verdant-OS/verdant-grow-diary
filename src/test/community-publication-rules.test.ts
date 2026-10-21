@@ -178,6 +178,22 @@ describe("validatePublicationDrafts", () => {
     }
   });
 
+  it("rejects an occurredAt without Z or an offset, or on an impossible date", () => {
+    for (const occurredAt of ["2026-10-01T12:00:00", "2026-02-30T12:00:00Z"]) {
+      expect(validatePublicationDrafts([entry({ occurredAt })], "publish")).toEqual({
+        ok: false,
+        code: "invalid",
+      });
+    }
+  });
+
+  it("returns invalid instead of throwing for a null entry", () => {
+    expect(validatePublicationDrafts([null] as unknown as PublicationDraft[], "publish")).toEqual({
+      ok: false,
+      code: "invalid",
+    });
+  });
+
   it("keeps omitted values absent rather than filling them in", () => {
     const input = [entry({ stage: null, mediaRevisionHandle: null, measurements: [] })];
     const result = validatePublicationDrafts(input, "publish");
@@ -254,5 +270,11 @@ describe("isPreviewCurrent", () => {
     expect(isPreviewCurrent(preview({ expiresAt: "soon" }), current, ISSUED_AT_MS)).toBe(false);
     expect(isPreviewCurrent(preview(), current, Number.NaN)).toBe(false);
     expect(isPreviewCurrent(preview({ previewToken: "" }), current, ISSUED_AT_MS)).toBe(false);
+  });
+
+  it("treats an expiry without Z or an offset as unreadable, never as local time", () => {
+    expect(
+      isPreviewCurrent(preview({ expiresAt: "2026-10-21T04:15:00" }), current, ISSUED_AT_MS),
+    ).toBe(false);
   });
 });

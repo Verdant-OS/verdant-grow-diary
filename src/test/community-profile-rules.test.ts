@@ -90,4 +90,24 @@ describe("community profile rules", () => {
     const input = draft({ username: " Repeat_Me " });
     expect(normalizeCommunityProfile(input)).toEqual(normalizeCommunityProfile(input));
   });
+
+  it("rejects a non-ASCII username that lowercases to ASCII, such as the Kelvin sign", () => {
+    expect(normalizeCommunityProfile(draft({ username: "\u212Aai_1" }))).toEqual({
+      ok: false,
+      code: "invalid",
+    });
+  });
+
+  it("returns invalid instead of throwing for a missing draft or field", () => {
+    expect(normalizeCommunityProfile(null as unknown as CommunityProfileDraft)).toEqual({
+      ok: false,
+      code: "invalid",
+    });
+    for (const field of ["username", "displayName", "bio"] as const) {
+      for (const value of [undefined, null, 7]) {
+        const bad = { ...draft(), [field]: value } as unknown as CommunityProfileDraft;
+        expect(normalizeCommunityProfile(bad)).toEqual({ ok: false, code: "invalid" });
+      }
+    }
+  });
 });

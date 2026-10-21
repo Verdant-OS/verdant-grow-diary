@@ -1,22 +1,34 @@
 import type { CommunityResult, DigestCursor, DigestItem } from "@/lib/communityTypes";
 
-/** A publish instant: epoch milliseconds plus the fraction digits Date.parse drops. */
-interface Instant {
+/** An instant: epoch milliseconds plus the fraction digits Date.parse drops. */
+export interface CommunityInstant {
   ms: number;
   subMs: number;
 }
 
+/** Date, time and an explicit Z or numeric offset; T, t or a space between date and time. */
+const INSTANT_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})[Tt ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:[Zz]|[+-]\d{2}:?\d{2})$/;
+
 /**
- * Reads an ISO timestamp without losing database microseconds. Date.parse keeps
+ * Reads a timestamp without losing database microseconds. Date.parse keeps
  * whole milliseconds; digits past the third fractional place are compared
- * separately. Returns null when the timestamp is unreadable.
+ * separately. Returns null for anything unreadable: no explicit offset (which
+ * Date.parse would read as host-local time), an impossible calendar date or
+ * clock time (which Date.parse rolls over), or a non-string.
  */
-function readInstant(timestamp: string): Instant | null {
+export function readCommunityInstant(timestamp: string): CommunityInstant | null {
+  if (typeof timestamp !== "string") return null;
+  const match = INSTANT_PATTERN.exec(timestamp);
+  if (match === null) return null;
+  const [, year, month, day, hour, minute, second, fraction = ""] = match;
+  const calendarDay = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  // An impossible day (00, Feb 30, 32 and up) rolls into another month.
+  if (calendarDay.getUTCMonth() !== Number(month) - 1) return null;
+  if (Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59) return null;
   const ms = Date.parse(timestamp);
   if (!Number.isFinite(ms)) return null;
-  const fraction = /T\d{2}:\d{2}:\d{2}\.(\d+)/.exec(timestamp)?.[1] ?? "";
-  const subMs = Number(fraction.slice(3, 9).padEnd(6, "0"));
-  return { ms, subMs };
+  return { ms, subMs: Number(fraction.slice(3, 9).padEnd(6, "0")) };
 }
 
 /** Code-point comparison, so ordering never depends on the runtime locale. */
@@ -26,7 +38,12 @@ function compareHandles(a: string, b: string): number {
 }
 
 /** Newest first by (publishedAt, publicationHandle), both descending. */
-function compareDescending(a: Instant, aHandle: string, b: Instant, bHandle: string): number {
+function compareDescending(
+  a: CommunityInstant,
+  aHandle: string,
+  b: CommunityInstant,
+  bHandle: string,
+): number {
   if (a.ms !== b.ms) return b.ms - a.ms;
   if (a.subMs !== b.subMs) return b.subMs - a.subMs;
   return compareHandles(bHandle, aHandle);
@@ -42,12 +59,15 @@ export function orderCommunityDigest(
   items: readonly DigestItem[],
   before: DigestCursor,
 ): CommunityResult<readonly DigestItem[]> {
-  const cursorAt = before === null ? null : readInstant(before.publishedAt);
+  const cursorAt = before === null ? null : readCommunityInstant(before.publishedAt);
   if (before !== null && cursorAt === null) return { ok: false, code: "invalid" };
 
-  const placed: { item: DigestItem; at: Instant }[] = [];
+  const placed: { item: DigestItem; at: CommunityInstant }[] = [];
   for (const item of items) {
-    const at = readInstant(item.publication.publishedAt);
+    if (item?.publication === null || item?.publication === undefined) {
+      return { ok: false, code: "invalid" };
+    }
+    const at = readCommunityInstant(item.publication.publishedAt);
     if (at === null) return { ok: false, code: "invalid" };
     placed.push({ item, at });
   }

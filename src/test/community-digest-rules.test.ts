@@ -147,4 +147,44 @@ describe("orderCommunityDigest", () => {
   it("returns an empty successful page for an empty digest", () => {
     expect(orderCommunityDigest([], null)).toEqual({ ok: true, value: [] });
   });
+
+  it("reports a null item or a null publication as invalid instead of throwing", () => {
+    const nullItem = [null] as unknown as readonly DigestItem[];
+    const nullPublication = [
+      { ...item("pub-null", "2026-10-21T09:00:00Z"), publication: null },
+    ] as unknown as readonly DigestItem[];
+    expect(orderCommunityDigest(nullItem, null)).toEqual({ ok: false, code: "invalid" });
+    expect(orderCommunityDigest(nullPublication, null)).toEqual({ ok: false, code: "invalid" });
+  });
+
+  it("reports a timestamp without Z or an offset as invalid, never as local time", () => {
+    expect(
+      orderCommunityDigest([...items, item("pub-local", "2026-10-21T09:00:00")], null),
+    ).toEqual({ ok: false, code: "invalid" });
+    expect(
+      orderCommunityDigest(items, {
+        publishedAt: "2026-10-21T09:00:00",
+        publicationHandle: "pub-c",
+      }),
+    ).toEqual({ ok: false, code: "invalid" });
+  });
+
+  it("reports an impossible calendar date or clock time as invalid", () => {
+    for (const bad of ["2026-02-30T00:00:00Z", "2026-10-21T24:00:00Z", "2026-10-21T09:60:00Z"]) {
+      expect(orderCommunityDigest([item("pub-bad", bad)], null)).toEqual({
+        ok: false,
+        code: "invalid",
+      });
+    }
+  });
+
+  it("keeps microseconds for space and lowercase-t separators", () => {
+    for (const separator of [" ", "t"]) {
+      const sameMs = [
+        item("pub-z", `2026-10-21${separator}09:00:00.123100+00:00`),
+        item("pub-a", `2026-10-21${separator}09:00:00.123900+00:00`),
+      ];
+      expect(handles(page(sameMs, null))).toEqual(["pub-a", "pub-z"]);
+    }
+  });
 });

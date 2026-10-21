@@ -65,4 +65,9 @@ describe("canReadCommunityPublication", () => {
     const loose = { ...approvedReader, activeAccount: "yes" } as unknown as AccessFacts;
     expect(canReadCommunityPublication(loose)).toBe(false);
   });
+
+  it("denies instead of throwing when the facts are missing", () => {
+    expect(canReadCommunityPublication(null)).toBe(false);
+    expect(canReadCommunityPublication(undefined)).toBe(false);
+  });
 });

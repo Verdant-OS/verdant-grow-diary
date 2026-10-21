@@ -5,7 +5,8 @@ import type { AccessFacts } from "@/lib/communityTypes";
  * the viewer must be the owner or a currently approved reader. Following is not
  * an input. The server's database predicate stays authoritative.
  */
-export function canReadCommunityPublication(facts: AccessFacts): boolean {
+export function canReadCommunityPublication(facts: AccessFacts | null | undefined): boolean {
+  if (facts === null || facts === undefined) return false;
   const allFactsHold =
     facts.activeAccount === true &&
     facts.activeProfile === true &&

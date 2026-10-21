@@ -358,6 +358,34 @@ describe("addPhenoHuntCandidates", () => {
   });
 
   it.each([
+    ["undone", () => ({ data: { id: "p1" }, error: null }), "network"],
+    ["absent", () => ({ data: null, error: null }), "network"],
+    ["unknown", () => ({ data: null, error: { message: "offline" } }), "cleanup_unconfirmed"],
+  ])(
+    "reconciles a tag write whose response was lost (cleanup %s)",
+    async (_label, untag, reason) => {
+      const { client, calls } = huntDb({
+        max: [16],
+        tagOk: () => {
+          throw new Error("connection dropped");
+        },
+        untag,
+      });
+      const assignNumber = vi.fn();
+      const result = await addPhenoHuntCandidates(
+        { huntId: "hunt-1", plantIds: ["p1"] },
+        { client, assignNumber },
+      );
+      expect(result.added).toEqual([]);
+      expect(result.failed).toEqual([{ plantId: "p1", reason }]);
+      expect(assignNumber).not.toHaveBeenCalled();
+      const undo = calls.find((c) => updateOf(c)?.pheno_hunt_id === null);
+      expect(undo && has(undo, "eq", "pheno_hunt_id", "hunt-1")).toBe(true);
+      expect(undo && has(undo, "is", "candidate_number", null)).toBe(true);
+    },
+  );
+
+  it.each([
     ["an error", () => ({ data: null, error: { message: "denied" } })],
     ["zero rows", () => ({ data: null, error: null })],
     [

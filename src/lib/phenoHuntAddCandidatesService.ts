@@ -88,12 +88,16 @@ async function readOrdinalBaseline(
   }
 }
 
-/** Undo OUR tag on a still-unnumbered plant. True only when the database confirms it. */
+/**
+ * Conditionally undo OUR tag on a still-unnumbered plant. "undone": the database
+ * returned the row; "absent": it confirmed there was no such tag to undo;
+ * "unknown": the request failed, so the plant's state is not known.
+ */
 async function untag(
   client: SupabaseClient<any>,
   plantId: string,
   huntId: string,
-): Promise<boolean> {
+): Promise<"undone" | "absent" | "unknown"> {
   try {
     const { data, error } = await client
       .from("plants")
@@ -103,9 +107,10 @@ async function untag(
       .is("candidate_number", null)
       .select("id")
       .maybeSingle();
-    return !error && data != null;
+    if (error) return "unknown";
+    return data != null ? "undone" : "absent";
   } catch {
-    return false;
+    return "unknown";
   }
 }
 
@@ -159,12 +164,15 @@ export async function addPhenoHuntCandidates(
         .is("pheno_hunt_id", null)
         .select("id")
         .maybeSingle();
-      if (error) {
-        failed.push({ plantId, reason: "network" });
-        continue;
-      }
+      if (error) throw error;
       tagged = data;
     } catch {
+      // The tag may have committed with its response lost: undo it if present.
+      // Only a confirmed undo or a confirmed absence means nothing changed.
+      if ((await untag(client, plantId, huntId)) === "unknown") {
+        failed.push({ plantId, reason: "cleanup_unconfirmed" });
+        return failAll("network", plantIds.slice(i + 1));
+      }
       failed.push({ plantId, reason: "network" });
       continue;
     }
@@ -182,7 +190,8 @@ export async function addPhenoHuntCandidates(
     }
 
     if (!outcome || !outcome.ok) {
-      const cleaned = await untag(client, plantId, huntId);
+      // The tag was confirmed above, so only a returned row proves it was undone.
+      const cleaned = (await untag(client, plantId, huntId)) === "undone";
       const reason = outcome && !outcome.ok ? outcome.reason : "network";
       const mapped: AddCandidateFailureReason =
         reason === "entitlement" || reason === "not_owner" || reason === "duplicate"

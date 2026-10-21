@@ -3046,6 +3046,7 @@ export default function Timeline() {
                                       ...supplementalLinkedGrowEvents,
                                       ...timelineSensorEvents,
                                     ])}
+                                    environmentCheckDetails={e.details}
                                     onChanged={() => void load()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (

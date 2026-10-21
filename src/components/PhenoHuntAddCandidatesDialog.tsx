@@ -75,6 +75,8 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
   );
 
   function handleOpenChange(next: boolean) {
+    // Stay open until an in-flight add settles, so its result and reload are not lost.
+    if (!next && saving) return;
     setOpen(next);
     if (!next && changedHunt) {
       setChangedHunt(false);

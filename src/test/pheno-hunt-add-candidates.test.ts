@@ -151,13 +151,16 @@ const updateOf = (call: Call) =>
   call.ops.find((o) => o[0] === "update")?.[1] as Record<string, unknown> | undefined;
 
 type Result = { data: unknown; error: unknown };
+type Identity = { id?: string; candidate_number: number | null; candidate_label: string | null };
 /** Candidates numbered 1..n with matching labels (the shape after numbering). */
 const numbered = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ candidate_number: i + 1, candidate_label: `#${i + 1}` }));
 
 function huntDb(opts: {
   max: number[];
-  candidates?: { candidate_number: number | null; candidate_label: string | null }[];
+  candidates?: Identity[];
+  /** Successive baseline reads (one per `range` page or retry re-read). */
+  reads?: Identity[][];
   tagOk?: (plantId: string) => boolean;
   untag?: () => Result;
   relabel?: () => Result;
@@ -168,6 +171,8 @@ function huntDb(opts: {
     const upd = updateOf(call);
     const id = call.ops.find((o) => o[0] === "eq" && o[1] === "id")?.[2] as string;
     if (!upd) {
+      if (opts.reads)
+        return { data: opts.reads[Math.min(maxIdx++, opts.reads.length - 1)], error: null };
       if (opts.candidates) return { data: opts.candidates, error: null };
       return { data: numbered(opts.max[Math.min(maxIdx++, opts.max.length - 1)]), error: null };
     }
@@ -299,6 +304,57 @@ describe("addPhenoHuntCandidates", () => {
     );
     expect(assignNumber.mock.calls.map((c) => c[0].candidateNumber)).toEqual([17, 18]);
     expect(result.added.map((a) => a.candidateLabel)).toEqual(["#17", "#18"]);
+  });
+
+  it("pages the baseline read so a legacy label past the first 1,000 rows counts", async () => {
+    const legacy = (n: number) => ({
+      id: `c${String(n).padStart(5, "0")}`,
+      candidate_number: null,
+      candidate_label: `#${n}`,
+    });
+    const page1 = Array.from({ length: 1000 }, (_, i) => legacy(i + 1));
+    const { client, calls } = huntDb({ max: [0], reads: [page1, [legacy(1001), legacy(1002)]] });
+    const assignNumber = vi.fn(async ({ candidateNumber }: { candidateNumber: number }) => ({
+      ok: true as const,
+      candidateNumber,
+    }));
+    const result = await addPhenoHuntCandidates(
+      { huntId: "hunt-1", plantIds: ["p1"] },
+      { client, assignNumber },
+    );
+    expect(result.added).toEqual([
+      { plantId: "p1", candidateNumber: 1003, candidateLabel: "#1003" },
+    ]);
+    const reads = calls.filter((c) => c.table === "plants" && !updateOf(c));
+    expect(reads.map((c) => c.ops.find((o) => o[0] === "range"))).toEqual([
+      ["range", 0, 999],
+      ["range", 1000, 1999],
+    ]);
+    expect(has(reads[0], "order", "id", { ascending: true })).toBe(true);
+  });
+
+  it("retries a taken number with the next unused one, not counting its own pending tag", async () => {
+    const setup = Array.from({ length: 16 }, (_, i) => ({
+      id: `s${i}`,
+      candidate_number: null,
+      candidate_label: defaultCandidateLabel(i),
+    }));
+    const afterCollision = [
+      ...setup,
+      { id: "other", candidate_number: 17, candidate_label: "#17" },
+      { id: "p1", candidate_number: null, candidate_label: "#17" },
+    ];
+    const { client } = huntDb({ max: [0], reads: [setup, afterCollision] });
+    const assignNumber = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, reason: "duplicate", error: "dup" })
+      .mockResolvedValueOnce({ ok: true, candidateNumber: 18 });
+    const result = await addPhenoHuntCandidates(
+      { huntId: "hunt-1", plantIds: ["p1"] },
+      { client, assignNumber },
+    );
+    expect(assignNumber.mock.calls.map((c) => c[0].candidateNumber)).toEqual([17, 18]);
+    expect(result.added).toEqual([{ plantId: "p1", candidateNumber: 18, candidateLabel: "#18" }]);
   });
 
   it.each([

@@ -4,7 +4,7 @@
  * and two plants created later in the same grow that could not be added.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const service = vi.hoisted(() => ({
   listPhenoHuntGrowPlants: vi.fn(),
@@ -137,6 +137,30 @@ describe("workspace Add candidates dialog", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onAdded).not.toHaveBeenCalled();
+  });
+
+  it("stays open while an add is in flight, then reloads when closed after it lands", async () => {
+    service.listPhenoHuntGrowPlants.mockResolvedValue({ ok: true, plants: GROW_PLANTS });
+    let finish: (value: unknown) => void = () => {};
+    service.addPhenoHuntCandidates.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const onAdded = vi.fn();
+    render(<PhenoHuntAddCandidatesDialog huntId={HUNT} growId={GROW} onAdded={onAdded} />);
+    fireEvent.click(screen.getByTestId("pheno-add-candidates-open"));
+    fireEvent.click(await screen.findByLabelText("Ashato #3"));
+    fireEvent.click(screen.getByTestId("pheno-add-candidates-submit"));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByTestId("pheno-add-candidates-dialog")).toBeInTheDocument();
+    await act(async () =>
+      finish({
+        added: [{ plantId: "ashato-3", candidateNumber: 17, candidateLabel: "#17" }],
+        failed: [],
+      }),
+    );
+    expect(screen.getByTestId("pheno-add-candidates-result")).toHaveTextContent(
+      "Added 1 candidate: #17.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onAdded).toHaveBeenCalledTimes(1);
   });
 
   it("says nothing was changed when the grow's plants cannot be read", async () => {

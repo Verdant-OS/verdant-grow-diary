@@ -51,17 +51,38 @@ export interface AddPhenoHuntCandidatesDeps {
   ) => Promise<AssignCandidateNumberResult>;
 }
 
+// snip: 1,000-row pages, capped at 50 (50,000 candidates per hunt); raise if a hunt outgrows it.
+const BASELINE_PAGE_SIZE = 1000;
+const BASELINE_MAX_PAGES = 50;
+
+/**
+ * Highest ordinal used by the hunt's established candidates, read in full
+ * (paged, stable order) so no legacy "#<n>" label is missed. `excludePlantId`
+ * leaves out this request's own tagged-but-unnumbered plant on a retry.
+ */
 async function readOrdinalBaseline(
   client: SupabaseClient<any>,
   huntId: string,
+  excludePlantId: string | null = null,
 ): Promise<number | null> {
+  const rows: (PhenoHuntCandidateIdentity & { id: string })[] = [];
   try {
-    const { data, error } = await client
-      .from("plants")
-      .select("candidate_number, candidate_label")
-      .eq("pheno_hunt_id", huntId);
-    if (error || !Array.isArray(data)) return null;
-    return phenoCandidateOrdinalBaseline(data as PhenoHuntCandidateIdentity[]);
+    for (let page = 0; page < BASELINE_MAX_PAGES; page += 1) {
+      const from = page * BASELINE_PAGE_SIZE;
+      const { data, error } = await client
+        .from("plants")
+        .select("id, candidate_number, candidate_label")
+        .eq("pheno_hunt_id", huntId)
+        .order("id", { ascending: true })
+        .range(from, from + BASELINE_PAGE_SIZE - 1);
+      if (error || !Array.isArray(data)) return null;
+      rows.push(...(data as (PhenoHuntCandidateIdentity & { id: string })[]));
+      if (data.length < BASELINE_PAGE_SIZE) {
+        return phenoCandidateOrdinalBaseline(rows.filter((r) => r.id !== excludePlantId));
+      }
+    }
+    // More candidates than the cap: refuse to guess a number.
+    return null;
   } catch {
     return null;
   }
@@ -156,7 +177,7 @@ export async function addPhenoHuntCandidates(
     for (let attempt = 0; attempt < PHENO_HUNT_ADD_CANDIDATES_MAX_NUMBER_ATTEMPTS; attempt += 1) {
       outcome = await assignNumber({ plantId, candidateNumber: nextNumber });
       if (outcome.ok || outcome.reason !== "duplicate") break;
-      const latest = await readOrdinalBaseline(client, huntId);
+      const latest = await readOrdinalBaseline(client, huntId, plantId);
       nextNumber = Math.max(nextNumber, latest ?? nextNumber) + 1;
     }
 

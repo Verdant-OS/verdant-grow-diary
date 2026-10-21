@@ -167,6 +167,31 @@ function pickEnvelope(details: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * The readings a `details.environment_check` envelope carries, by every alias
+ * a persisted row may use (legacy Fahrenheit-only and numeric-string values
+ * included). Null for each reading that is absent or not a finite number.
+ */
+export function environmentCheckEnvelopeReadings(envelope: unknown): {
+  tempC: number | null;
+  tempF: number | null;
+  rhPercent: number | null;
+  vpdKpa: number | null;
+} {
+  const env =
+    envelope && typeof envelope === "object" && !Array.isArray(envelope)
+      ? (envelope as Record<string, unknown>)
+      : null;
+  return {
+    tempC: asFiniteNumber(env?.temp_c ?? env?.tempC ?? env?.air_temp_c),
+    tempF: asFiniteNumber(env?.room_temp_f ?? env?.tempF ?? env?.air_temp_f),
+    rhPercent: asFiniteNumber(
+      env?.humidity_pct ?? env?.rhPercent ?? env?.rh_percent ?? env?.humidity,
+    ),
+    vpdKpa: asFiniteNumber(env?.vpd_kpa ?? env?.vpdKpa),
+  };
+}
+
+/**
  * Adapt one diary row into the canonical Environment Check rule input.
  * Measurements stay nested under `details.environment_check`; generic diary
  * fields never masquerade as live telemetry. Invalid rows return null.
@@ -183,14 +208,10 @@ export function buildEnvironmentCheckDiaryEntryInput(
     raw.details && typeof raw.details === "object" && !Array.isArray(raw.details)
       ? (raw.details as Record<string, unknown>)
       : null;
-  const envelope = pickEnvelope(details);
-  const tempC = asFiniteNumber(envelope?.temp_c ?? envelope?.tempC ?? envelope?.air_temp_c);
-  const tempF = asFiniteNumber(envelope?.room_temp_f ?? envelope?.tempF ?? envelope?.air_temp_f);
-  const normalizedTempC = tempC ?? (tempF == null ? null : fahrenheitToCelsius(tempF));
-  const rhPercent = asFiniteNumber(
-    envelope?.humidity_pct ?? envelope?.rhPercent ?? envelope?.rh_percent ?? envelope?.humidity,
+  const { tempC, tempF, rhPercent, vpdKpa } = environmentCheckEnvelopeReadings(
+    pickEnvelope(details),
   );
-  const vpdKpa = asFiniteNumber(envelope?.vpd_kpa ?? envelope?.vpdKpa);
+  const normalizedTempC = tempC ?? (tempF == null ? null : fahrenheitToCelsius(tempF));
 
   if (
     !isAirTempCRealistic(normalizedTempC) ||

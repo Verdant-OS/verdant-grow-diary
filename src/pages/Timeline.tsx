@@ -3049,6 +3049,12 @@ export default function Timeline() {
                                     ])}
                                     readingsNote={quickLogCorrectionEnvironmentCheckReadingsNote(
                                       e.details,
+                                      {
+                                        linkedReadingsComplete:
+                                          !supplementalLoading &&
+                                          !partialReadSources.includes("manual_sensor_readings") &&
+                                          !partialReadSources.includes("linked_grow_events"),
+                                      },
                                     )}
                                     onChanged={() => void load()}
                                   />

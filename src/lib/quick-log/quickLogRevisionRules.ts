@@ -1,5 +1,8 @@
 import { LARGE_WATER_AMOUNT_HARD_MAX_ML } from "@/lib/quickLogWaterVolumeWarningRules";
-import { isEnvironmentCheckTimelineEntry } from "@/lib/environmentCheckTimelineViewModel";
+import {
+  environmentCheckEnvelopeReadings,
+  isEnvironmentCheckTimelineEntry,
+} from "@/lib/environmentCheckTimelineViewModel";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import {
   isHumidityValid,
@@ -406,28 +409,19 @@ export const QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE =
  * details.environment_check (no sensor snapshot). The correction RPC rejects
  * sensor changes for those entries (20261014210000, "unsupported_change"), so
  * fields there could never save. Null for every other entry, including typed
- * care events (Watering, …) that only carry an environment envelope as context.
+ * care events (Watering, …) that only carry an environment envelope as context,
+ * and null while the linked sensor context that decides correctability is
+ * still loading or failed to load (unmeasured is not unsupported).
  */
-export function quickLogCorrectionEnvironmentCheckReadingsNote(details: unknown): string | null {
+export function quickLogCorrectionEnvironmentCheckReadingsNote(
+  details: unknown,
+  context: { linkedReadingsComplete: boolean },
+): string | null {
+  if (!context.linkedReadingsComplete) return null;
   if (!isPlainObject(details)) return null;
   if (!isEnvironmentCheckTimelineEntry({ details })) return null;
-  const check = details.environment_check;
-  if (!isPlainObject(check)) return null;
-  // Same reading aliases buildEnvironmentCheckDiaryEntryInput accepts,
-  // including legacy Fahrenheit-only rows.
-  const readings = [
-    check.temp_c,
-    check.tempC,
-    check.air_temp_c,
-    check.room_temp_f,
-    check.tempF,
-    check.air_temp_f,
-    check.humidity_pct,
-    check.rhPercent,
-    check.rh_percent,
-    check.humidity,
-  ];
-  if (readings.every((value) => finiteOrNull(value) === null)) return null;
+  const readings = environmentCheckEnvelopeReadings(details.environment_check);
+  if (Object.values(readings).every((value) => value === null)) return null;
   if (sensorFromDetails(details)) return null;
   return QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE;
 }

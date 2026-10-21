@@ -46,6 +46,9 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
 
+const envCheckNote = (details: unknown) =>
+  quickLogCorrectionEnvironmentCheckReadingsNote(details, { linkedReadingsComplete: true });
+
 const ENV_CHECK_ONLY = {
   event_type: "environment_check",
   linked_grow_event_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -129,23 +132,46 @@ describe("missing correction server function", () => {
 
 describe("Environment Check readings note", () => {
   it("explains readings that live only in details.environment_check", () => {
-    expect(quickLogCorrectionEnvironmentCheckReadingsNote(ENV_CHECK_ONLY)).toBe(
+    expect(envCheckNote(ENV_CHECK_ONLY)).toBe(
       "Temperature and humidity on this Environment check can't be corrected yet. You can still correct the note, time, or plant.",
     );
   });
 
   it("explains a legacy check whose only temperature is room_temp_f", () => {
     expect(
-      quickLogCorrectionEnvironmentCheckReadingsNote({
+      envCheckNote({
         event_type: "environment_check",
         environment_check: { checkType: "airflow", room_temp_f: 76 },
       }),
     ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
   });
 
+  it("explains legacy numeric-string and VPD-only readings, like the canonical parser", () => {
+    expect(
+      envCheckNote({
+        event_type: "environment_check",
+        environment_check: { checkType: "airflow", room_temp_f: "76" },
+      }),
+    ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    expect(
+      envCheckNote({
+        event_type: "environment_check",
+        environment_check: { checkType: "airflow", vpd_kpa: 1.1 },
+      }),
+    ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+  });
+
+  it("is null while the linked sensor context is loading or failed (unmeasured, not unsupported)", () => {
+    expect(
+      quickLogCorrectionEnvironmentCheckReadingsNote(ENV_CHECK_ONLY, {
+        linkedReadingsComplete: false,
+      }),
+    ).toBeNull();
+  });
+
   it("is null for a typed Watering entry that carries an environment envelope as context", () => {
     expect(
-      quickLogCorrectionEnvironmentCheckReadingsNote({
+      envCheckNote({
         event_type: "watering",
         watering: { volume_ml: 500 },
         environment_check: { temp_c: 24.5, humidity_pct: 58 },
@@ -155,7 +181,7 @@ describe("Environment Check readings note", () => {
 
   it("is null when the check also carries a sensor snapshot the RPC can correct", () => {
     expect(
-      quickLogCorrectionEnvironmentCheckReadingsNote({
+      envCheckNote({
         ...ENV_CHECK_ONLY,
         sensor_snapshot: { temperature_c: 24.5, humidity_pct: 58 },
       }),
@@ -164,21 +190,19 @@ describe("Environment Check readings note", () => {
 
   it("is null for a check with no recorded readings, other entries, and bad input", () => {
     expect(
-      quickLogCorrectionEnvironmentCheckReadingsNote({
+      envCheckNote({
         event_type: "environment_check",
         environment_check: { checkType: "smell" },
       }),
     ).toBeNull();
-    expect(
-      quickLogCorrectionEnvironmentCheckReadingsNote({ event_type: "watering", watering: {} }),
-    ).toBeNull();
-    expect(quickLogCorrectionEnvironmentCheckReadingsNote(null)).toBeNull();
-    expect(quickLogCorrectionEnvironmentCheckReadingsNote("x")).toBeNull();
+    expect(envCheckNote({ event_type: "watering", watering: {} })).toBeNull();
+    expect(envCheckNote(null)).toBeNull();
+    expect(envCheckNote("x")).toBeNull();
   });
 
   it("renders the note in the correction dialog instead of absent fields", () => {
     mount({
-      readingsNote: quickLogCorrectionEnvironmentCheckReadingsNote(ENV_CHECK_ONLY),
+      readingsNote: envCheckNote(ENV_CHECK_ONLY),
       correctionValues: null,
     });
     fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));

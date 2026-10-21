@@ -115,8 +115,8 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/community-v1-task2a-proof verdant-grow-diary && git switch claude/community-v1-task2a-proof && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2301 (draft)
 head_sha: d0a009fb98c0d7bd5091f12a11e84932ffb0bb9a (observed 2026-10-21 19:20 UTC, origin/claude/community-v1-task2a-proof)
-state: pushed draft. 35/35 required green at d0a009fb. Codex PASS-with-P2 (PR description only); description reconciled 2026-10-21 18:37 UTC, head unchanged.
-next_action: Merge steward checks the head; after merge, dispatch the RED run (expect=red) on verdant-grow-diary — owner action.
+state: pushed draft. 35/35 required green at d0a009fb. Codex PASS-with-P2 (PR description only); description reconciled 2026-10-21 18:37 UTC, head unchanged; clean re-verdict pending.
+next_action: Get Codex's clean exact-head re-verdict on the corrected description (its verdict reads "PASS-with-P2 is not a clean PASS and does not waive corrections"); requested on the PR 2026-10-21 19:30 UTC. Then the merge steward checks the head; after merge, dispatching the RED run (expect=red) on verdant-grow-diary is an owner action.
 files: .github/workflows/community-v1-db-proof.yml; scripts/security/community-v1-db-proof.mjs; scripts/security/run-community-v1-db-security.mjs; src/test/community-v1-db-proof-runner.test.ts; src/test/integration/community-v1-authority.integration.test.ts; supabase/tests/community_v1_permissions.sql
 blockers: RED receipt against a disposable local Supabase is NOT_MEASURED until dispatched after merge. Non-required Supabase Preview fails on ai_credit_grants 42P07 (not this PR's).
 artifacts: PR body Tests run section.
@@ -235,8 +235,8 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/welcome-home-redirect-05d3 verdant-grow-diary && git switch cursor/welcome-home-redirect-05d3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2023 (draft)
 head_sha: 543e03308d29e626be743cc48e62cd1bdc691220 (observed 2026-10-21 19:20 UTC, origin/cursor/welcome-home-redirect-05d3)
-state: pushed draft. Codex PASS-with-P2 (PR description only); description fixed 2026-10-21 18:37 UTC, head unchanged. 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head. If #2310 merges first, merge base here.
+state: pushed draft. Codex PASS-with-P2 (PR description only); description fixed 2026-10-21 18:37 UTC, head unchanged; clean re-verdict pending. 35/35 required green at the 18:07 UTC check.
+next_action: Get Codex's clean exact-head re-verdict on the corrected description (its verdict reads "PASS-with-P2 is not a clean PASS and does not waive corrections"); requested on the PR 2026-10-21 19:30 UTC. Then the merge steward checks the head. If #2310 merges first, merge base here; that new head needs fresh checks and a fresh verdict.
 files: 71 files; see the PR (Worker redirects, sitemap, llms.txt, verdantSeoContent.ts, appRouteManifest.ts, legal shell, tests)
 blockers: Live redirect/canonical behaviour NOT_MEASURED until released. #2028 owns the llms.txt Pricing wording.
 artifacts: PR body Evidence section; coordination note with #2310.
@@ -255,8 +255,8 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 (not draft)
 head_sha: 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da (observed 2026-10-21 19:20 UTC, origin/cursor/quicklog-local-timezone-ec09)
-state: pushed. Codex PASS-with-P2 (PR description only); description fixed 2026-10-21 18:37 UTC, head unchanged. 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
+state: pushed. Codex PASS-with-P2 (PR description only); description fixed 2026-10-21 18:37 UTC, head unchanged; clean re-verdict pending. 35/35 required green at the 18:07 UTC check.
+next_action: Get Codex's clean exact-head re-verdict on the corrected description (its verdict reads "PASS-with-P2 is not a clean PASS and does not waive corrections"); requested on the PR 2026-10-21 19:30 UTC. Then the merge steward checks the head.
 files: src/lib/quickLogGroupedTimelineFilterViewModel.ts; src/components/QuickLogGroupedTimelineSection.tsx; src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts; src/components/AiDoctorPhase1TimelineEvidenceCard.tsx; src/lib/quickLogSnapshotStripAdapter.ts; 9 test files (4 renegotiated pins approved 2026-10-09 and 2026-10-21)
 blockers: none for the repository change
 artifacts: PR body Scorer-lock record and Tests run.

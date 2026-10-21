@@ -42,7 +42,7 @@ anyone else edits one of these branches, the holder posts a claim (or release) c
 
 Lines that other open PRs edit (§0.3) stay **locked to those PRs' holders**. Tent Garden slices add
 lines to three shared files (manifest, `package.json` script, feature flags), none of which an open PR
-touches. The one riskier edit, the Tent Detail link in S5, waits until no open PR edits
+touches. The one riskier edit, the Tent Detail link in S5b, waits until no open PR edits
 `src/pages/TentDetail.tsx`, or until that PR's holder agrees.
 
 ### 0.3 Overlapping open PRs
@@ -50,15 +50,15 @@ touches. The one riskier edit, the Tent Detail link in S5, waits until no open P
 101 open PRs checked on 2026-10-21 (`established fact`; file lists from the GitHub API). Those touching
 files this plan reads or edits:
 
-| Planned edit (slice)                                        | Open PRs on the same file                                  | Same lines?                                    | Rule for the slice                                                                      |
-| ----------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `src/pages/TentDetail.tsx` link (S5)                        | #1986, #2114, #2186                                        | Not measured (the link's line is chosen in S5) | Wait until these settle, or get the holder's yes                                        |
-| `src/lib/appRouteManifest.ts` new entry (S3)                | #2023, #2028, #2287                                        | No: none touches a `/tents` entry              | Add one line; merge from base if one lands first                                        |
-| `package.json` `e2e:mocked-closure` (S3)                    | #1879, #2086, #2216, #2290                                 | No: none touches that script                   | Same                                                                                    |
-| `src/lib/featureFlags.ts` (S3)                              | none                                                       | —                                              | —                                                                                       |
-| `src/lib/tentManagementRules.ts`, `src/lib/grow.ts`         | none                                                       | —                                              | Read only; not edited                                                                   |
-| Plant Detail (read only: the target of "Open Plant Detail") | #2193, #2262, #2285 edit Plant Detail components and hooks | —                                              | Not edited by any slice                                                                 |
-| `spikes/tent-garden-prototype/` (porting source)            | #2231 (Claude), #2240 (Cursor, stacked on #2231)           | —                                              | S1 ports from #2231's head, plus #2240's leader fix only if #2240 has merged into #2231 |
+| Planned edit (slice)                                        | Open PRs on the same file                                  | Same lines?                                     | Rule for the slice                                                                      |
+| ----------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `src/pages/TentDetail.tsx` link (S5b)                       | #1986, #2114, #2186                                        | Not measured (the link's line is chosen in S5b) | Wait until these settle, or get the holder's yes                                        |
+| `src/lib/appRouteManifest.ts` new entry (S3)                | #2023, #2028, #2287                                        | No: none touches a `/tents` entry               | Add one line; merge from base if one lands first                                        |
+| `package.json` `e2e:mocked-closure` (S3)                    | #1879, #2086, #2216, #2290                                 | No: none touches that script                    | Same                                                                                    |
+| `src/lib/featureFlags.ts` (S3)                              | none                                                       | —                                               | —                                                                                       |
+| `src/lib/tentManagementRules.ts`, `src/lib/grow.ts`         | none                                                       | —                                               | Read only; not edited                                                                   |
+| Plant Detail (read only: the target of "Open Plant Detail") | #2193, #2262, #2285 edit Plant Detail components and hooks | —                                               | Not edited by any slice                                                                 |
+| `spikes/tent-garden-prototype/` (porting source)            | #2231 (Claude), #2240 (Cursor, stacked on #2231)           | —                                               | S1 ports from #2231's head, plus #2240's leader fix only if #2240 has merged into #2231 |
 
 Revision 1 listed twelve overlapping PRs; #2076, #2078, #2081, #2115, #2148, #2151, #2217 and #2220 are no
 longer open.
@@ -105,7 +105,7 @@ not polish, so further work inside `spikes/` cannot close it.
 ## 3. Decisions D1–D4 (decided 2026-10-21)
 
 Matthew keeps four decisions: production database changes, spend, anything that gates a publish, and the
-publish decision (AGENTS.md). D1 is a named lockfile action and S5's release is a publish decision; those
+publish decision (AGENTS.md). D1 is a named lockfile action and S5a and S5b each gate a publish; those
 are his. D2 and D4 are product choices that are not among the four; they are decided by whoever Matthew
 names for Tent Garden product calls, recorded on the PR. Until someone is named, they wait for Matthew.
 
@@ -117,7 +117,7 @@ change. Any later change to a decision is recorded here with its date.
 | #   | Decision                                                          | Options                                                                                                                                                                                                                                                                                         | Recommendation (decided)                                          | Decider                                                                                              | Blocks          |
 | --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------- |
 | D1  | Add `three` as a runtime dependency (`package.json` + `bun.lock`) | (a) pinned exact, lazy route chunk only; (b) no 3D: ship List-only                                                                                                                                                                                                                              | **(a) — decided**                                                 | Matthew (named lockfile action)                                                                      | S2, S4          |
-| D2  | Page location and exposure                                        | (a) `/tents/$id/garden`, linked once from Tent Detail; (b) a tab inside Tent Detail; (c) List-first release, 3D later                                                                                                                                                                           | **(a) — decided**; keeps new code out of the open Tent Detail PRs | Named product decider, else Matthew                                                                  | S3, S5          |
+| D2  | Page location and exposure                                        | (a) `/tents/$id/garden`, linked once from Tent Detail; (b) a tab inside Tent Detail; (c) List-first release, 3D later                                                                                                                                                                           | **(a) — decided**; keeps new code out of the open Tent Detail PRs | Named product decider, else Matthew                                                                  | S3, S5a, S5b    |
 | D3  | Saved arrangements                                                | (a) none in V1: deterministic auto-placement, read-only; (b) saved positions (schema + migration)                                                                                                                                                                                               | **(a) — decided**. V1 needs no schema. (b) is a separate spec     | Matthew for (b), since it is a database change. (a) needs no decision beyond accepting this V1 scope | Nothing in V1   |
 | D4  | What growers see per stage                                        | (a) **neutral visuals**: same pot and plant form for every stage, stage shown as text; (b) **illustrative stage art** (prototype look) with a persistent "Illustration — not your plant" label; (c) mixed: neutral for `flush`/`harvest`/`drying`/unknown, illustrative for seedling/veg/flower | **(a) — decided** for V1; (b) only with the label rule in §8      | Named product decider, else Matthew                                                                  | S4 visuals only |
 
@@ -152,15 +152,20 @@ Consequences that bind every slice:
      read; it never imports the 3D chunk;
    - no link to it exists anywhere;
    - an E2E test asserts both (§12, T12).
-3. **Flipping the flag to `true` is the release** (S5). It gates a publish, so it merges only on
-   Matthew's explicit yes, after the S5 acceptance receipts **taken against that flag-flip PR's exact
-   head** (§13) and a release packet (live SHA, target SHA, commits, checks at the target, rollback
-   target). The release is complete when live `/version.json` reports the merged SHA and the post-release
-   check in §13 passes.
+3. **Release in two steps, both on production** (Verdant has no other verification host; AGENTS.md,
+   release rules). Each step gates a publish, so each merges only on Matthew's explicit yes with a
+   release packet (live SHA, target SHA, commits, checks at the target, rollback target):
+   - **S5a, dark launch:** set the flag `true` with **no link anywhere**. The page is then reachable only
+     by typing its URL: the one exception to item 2, chosen by Matthew on 2026-10-21 because acceptance
+     has to run on production. Acceptance (P1–P9, A1–A9) runs on `https://verdantgrowdiary.com` once live
+     `/version.json` reports the S5a SHA. Any failure that cannot be fixed in place triggers the flag
+     rollback below.
+   - **S5b, link:** add the one Tent Detail link, only after every S5a receipt passes. The release is
+     complete when live `/version.json` reports the S5b SHA and the link check in §13 passes.
 4. **Rollback, in order of speed.** Agents never roll back; they prepare the step.
-   - Flip `tentGardenEnabled` back to `false`: a one-line PR through the normal merge gate. Use this for
-     any Tent Garden defect. It is done only when live `/version.json` reports the rollback SHA and the
-     route shows the not-found page again.
+   - Flip `tentGardenEnabled` back to `false` (and remove the link if S5b landed): one PR through the
+     normal merge gate. Use this for any Tent Garden defect. It is done only when live `/version.json`
+     reports the rollback SHA and the route shows the not-found page again.
    - Revert the slice PR: same path, same verification.
    - Promote the previous production deployment on the publisher: Matthew's action, for a build-level
      failure that blocks merging.
@@ -295,7 +300,7 @@ Queue.
 | `src/components/tentGarden/TentGardenList.tsx`    | Component        | S3     | List view and details panel                                                                                                                     |
 | `src/components/tentGarden/TentGardenScene.tsx`   | Component        | S4     | Three.js renderer, instanced geometry; the only `import("three")`                                                                               |
 | `src/lib/tentGarden/tentGardenArtRules.ts`        | Rules            | S4     | Stage → artwork table per D4                                                                                                                    |
-| `src/pages/TentDetail.tsx`                        | Page (edit)      | S5     | One "Open Tent Garden" link, in the flag-flip PR                                                                                                |
+| `src/pages/TentDetail.tsx`                        | Page (edit)      | S5b    | One "Open Tent Garden" link, after the S5a receipts pass                                                                                        |
 | `src/test/tent-garden-*.test.ts(x)`               | Tests            | each   | §12                                                                                                                                             |
 | `e2e/tent-garden.spec.ts`                         | E2E              | S3, S4 | §12, `chromium-mocked`, explicit spec filter                                                                                                    |
 | `package.json` (`e2e:mocked-closure` script only) | CI wiring (edit) | S3     | Append `e2e/tent-garden.spec.ts` to that script's explicit spec list                                                                            |
@@ -330,7 +335,7 @@ tent (§12, T10).
 | P9  | JS heap after 20 rotate-and-select cycles versus after the first                     | growth ≤ 10 MB                   |
 
 P3, P4, P6 and P7 are also measured in CI or locally per slice; P1, P2, P5, P8 and P9 need the reference
-devices (S5). If P2 or P5 fails on a reference device and cannot be fixed, the release choice reverts to
+devices and run on production during S5a. If P2 or P5 fails on a reference device and cannot be fixed, the release choice reverts to
 D2(c), List-first.
 
 | ID  | Accessibility criterion                                                                          | Pass                                                                                                                                                                                |
@@ -377,13 +382,14 @@ D2(c), List-first.
     26-plant fixture opens List view.
 11. **Route policy:** the manifest cross-check passes with `/tents/:id/garden`.
 12. **Flag off (E2E):** with `tentGardenEnabled = false`, `/tents/<id>/garden` shows the not-found page,
-    issues no plant read, loads no 3D chunk, and no page links to it.
+    issues no plant read, loads no 3D chunk, and no page links to it. **Dark launch (E2E, S5a):** with
+    the flag `true` and before S5b, the page renders and still no page links to it.
 13. **Accessibility:** A1–A7 automated in the E2E spec; A8 as a recorded manual receipt.
 
 **Where they run.** Unit tests live in `src/test/`, so the 32 Vitest shards run them. The E2E spec runs
 through the `e2e:mocked-closure` script (§10), so the "Mocked E2E closure" context executes it on every
 PR touching `src/**`, `e2e/**` or `package.json`. Until S3 lands that wiring, each slice attaches an
-exact-head receipt of the spec run. The real-phone metrics and A8 are S5 receipts, not CI.
+exact-head receipt of the spec run. The real-phone metrics and A8 are S5a production receipts, not CI.
 
 ## 13. Slices
 
@@ -392,26 +398,28 @@ independent exact-head PASS from a reviewer who did not touch it; 35/35 required
 Chemdawg. Every merge triggers the deployment path (§4), so each slice must be safe to be live alone;
 it counts as live only once `/version.json` reports it.
 
-| Slice | Content                                                                                                                                                                                                               | Live effect after merge                                             | Needs                                                      | Review                                                                                   |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| S1    | Pure rules, view model, copy and their unit tests (§10 S1 rows)                                                                                                                                                       | None: nothing imports them                                          | Holder + go. No D1–D4                                      | Critical Mass (no `.tsx`)                                                                |
-| S2    | Add `three`, pinned exact, nothing imports it yet                                                                                                                                                                     | None; P4 check proves no chunk changes                              | D1                                                         | Codex (not if Codex authored or repaired it), Blue Dream, Critical Mass or Durban Poison |
-| S3    | Flag (`false`), route, manifest, page, List view and details panel, E2E spec and its wiring; no 3D                                                                                                                    | None for users: route renders not-found while the flag is off (T12) | S1, D2                                                     | Blue Dream (`.tsx`)                                                                      |
-| S4    | 3D scene with instancing, meeting P3, P6 and P7 on first landing; art table per D4                                                                                                                                    | None for users: still behind the flag                               | S2, S3, D4                                                 | Blue Dream                                                                               |
-| S5    | Open the release candidate first: one draft PR that sets the flag `true` and adds the Tent Detail link. Then take the P1–P9 and A1–A9 receipts against **that PR's exact head** (below), and write the release packet | **This PR is the release**                                          | S4, D2, all receipts at the S5 head, Matthew's publish yes | Blue Dream reviews; Matthew decides the publish; the merge publishes                     |
+| Slice | Content                                                                                                                             | Live effect after merge                                                                                             | Needs                                        | Review                                                                                       |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| S1    | Pure rules, view model, copy and their unit tests (§10 S1 rows)                                                                     | None: nothing imports them                                                                                          | Holder + go. No D1–D4                        | Critical Mass (no `.tsx`)                                                                    |
+| S2    | Add `three`, pinned exact, nothing imports it yet                                                                                   | None; P4 check proves no chunk changes                                                                              | D1                                           | Codex (not if Codex authored or repaired it), Blue Dream, Critical Mass or Durban Poison     |
+| S3    | Flag (`false`), route, manifest, page, List view and details panel, E2E spec and its wiring; no 3D                                  | None for users: route renders not-found while the flag is off (T12)                                                 | S1, D2                                       | Blue Dream (`.tsx`)                                                                          |
+| S4    | 3D scene with instancing, meeting P3, P6 and P7 on first landing; art table per D4                                                  | None for users: still behind the flag                                                                               | S2, S3, D4                                   | Blue Dream                                                                                   |
+| S5a   | Dark launch: set the flag `true`, no link. Then take P1–P9 and A1–A9 on production with the QA account, at the live S5a SHA (below) | Page reachable by URL only; complete only when live `/version.json` reports the SHA                                 | S4, D2, Matthew's publish yes                | Blue Dream reviews; Matthew decides the publish; the merge triggers the configured publisher |
+| S5b   | Add the one Tent Detail link                                                                                                        | The feature becomes discoverable; complete only when live `/version.json` reports the SHA and the link check passes | All S5a receipts pass, Matthew's publish yes | Blue Dream reviews; Matthew decides the publish; the merge triggers the configured publisher |
 
-**How S5 is measured.** With the flag `false` (every head before S5), the route returns before rendering,
-so no earlier build can exercise the page. The receipts are therefore taken on the S5 candidate itself:
-a production build (`bun run build`) of the S5 PR's exact head, served from the holder's machine to the
-reference devices over the local network, signed in with the disposable QA account (read-only page, so
-no writes). Any push to the S5 PR voids the receipts and they are taken again. After merge, the release
-is verified on `https://verdantgrowdiary.com`: live `/version.json` reports the merged SHA, then P1, A2
-and the T7 no-mutation check are repeated with the same account; a failure there triggers the flag
-rollback in §4.
+**How S5 is measured.** With the flag `false` (every head before S5a), the route returns before
+rendering, so no earlier build can exercise the page, and Verdant has no non-production host to measure
+on. S5a therefore turns the page on without a link, and the receipts are taken on
+`https://verdantgrowdiary.com` after live `/version.json` reports the S5a SHA. They use the reference
+devices and the disposable QA account on its own fixture tent (read-only page, so no writes). Each receipt
+names the live SHA; a later deploy voids receipts taken before it. A failing receipt is fixed in a new PR
+(re-measured at its live SHA) or answered with the flag rollback in §4. S5b merges only after every
+receipt passes; after S5b is live, the link check confirms Tent Detail shows the link and it opens the
+page.
 
 Revision 1 split the scene (S3) from its draw-call reduction (S4) and measured phones only afterwards
 (S5). That would have merged a scene known to run at 2.7k–5.3k draw calls. Here the scene lands only
-once it meets the budgets, and nothing is reachable before S5.
+once it meets the budgets, nothing is reachable before S5a, and nothing is linked before S5b.
 
 ## 14. Risks
 
@@ -427,8 +435,8 @@ once it meets the budgets, and nothing is reachable before S5.
 - `NOT_MEASURED`: every P and A metric; the gzipped `three` chunk under this Vite build.
 - `uncertainty`: how many production tents have a `size` that `parseTentFootprint` accepts, and how
   many plants have parseable `pot_size`. A read-only count needs a production read, which is Matthew's.
-- `BLOCKED` for S5 until it exists: a disposable QA login with its own fixture tent (owner item, pending
-  since VER-216). S5 receipts and the post-release check need it.
+- `BLOCKED` for S5a until it exists: a disposable QA login with its own fixture tent (owner item, pending
+  since VER-216). The S5a receipts and the S5b link check need it.
 - `uncertainty`: whether the publisher always deploys on merge; observed for two merges on 2026-10-20,
   not a contract.
 - `uncertainty`: whether growers want saved arrangements enough to justify a schema change (D3b).
@@ -436,5 +444,5 @@ once it meets the budgets, and nothing is reachable before S5.
 **Calibrated verdict:** the prototype is a sound basis for the interaction and label rules; with D4(a)
 decided, V1 does not use its stage artwork. It is not production code. V1 as specified is a read-only,
 flag-gated, reversible page with a guaranteed List. With D1–D4 decided, it is production ready only after
-S1–S5 with their tests and independent PASSes, the S5 device and accessibility receipts, and Matthew's
-publish decision.
+S1–S5b with their tests and independent PASSes, the S5a device and accessibility receipts taken on
+production, and Matthew's publish decision for each of S5a and S5b.

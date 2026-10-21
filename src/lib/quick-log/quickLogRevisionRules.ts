@@ -396,6 +396,27 @@ function sensorFromDetails(
   return Object.keys(sensor).length > 0 ? sensor : null;
 }
 
+export const QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE =
+  "Temperature and humidity on this Environment check can't be corrected yet. You can still correct the note, time, or plant.";
+
+/**
+ * Explains why the correction dialog shows no temperature or humidity fields
+ * for an Environment Check whose readings live only in
+ * details.environment_check (no sensor snapshot). The correction RPC rejects
+ * sensor changes for those entries (20261014210000, "unsupported_change"), so
+ * fields there could never save. Null for every other entry.
+ */
+export function quickLogCorrectionEnvironmentCheckReadingsNote(details: unknown): string | null {
+  if (!isPlainObject(details)) return null;
+  const check = details.environment_check;
+  if (!isPlainObject(check)) return null;
+  if (finiteOrNull(check.temp_c) === null && finiteOrNull(check.humidity_pct) === null) {
+    return null;
+  }
+  if (sensorFromDetails(details)) return null;
+  return QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE;
+}
+
 /**
  * Which value the correction dialog can edit for one saved Quick Log entry.
  * Returns null for notes, photos, and any other entry type.
@@ -668,9 +689,10 @@ export const QUICKLOG_REVISION_FAILURE_COPY: Record<string, string> = {
   grow_not_owned: "That grow is not yours.",
   // PGRST202/42883: the RPC does not exist on the server, so nothing ran.
   // Production served a client ahead of its migration (QA 2026-09-24,
-  // BUG-021); the grower must know the entry is unchanged.
+  // BUG-021; again 2026-10-21). The grower must know the entry is unchanged
+  // and that retrying cannot help until the server is updated.
   rpc_unavailable:
-    "Correcting or retracting entries isn't available right now. Nothing was changed. Try again later.",
+    "Correcting or retracting entries isn't set up on the server yet. Nothing was changed. Trying again won't help until the server is updated.",
   forbidden: "You do not have permission to change this entry.",
   invalid_idempotency_key: "This change could not be identified. Close and reopen the entry.",
   idempotency_conflict: "This change could not be confirmed. Close and reopen the entry.",

@@ -71,6 +71,8 @@ export interface QuickLogEntryIntegrityControlsProps {
   currentPlantId?: string | null;
   /** Volume, dose, or sensor values for this entry type. Omitted for other types. */
   correctionValues?: QuickLogCorrectionValueContext | null;
+  /** Why recorded readings have no correction fields; shown only when none are offered. */
+  readingsNote?: string | null;
   /** Invalidation scope (best-effort; broad prefixes are used regardless). */
   plantId?: string | null;
   tentId?: string | null;
@@ -202,6 +204,7 @@ function RevisionControls({
   currentOccurredAt,
   currentPlantId,
   correctionValues,
+  readingsNote,
   plantId,
   tentId,
   growId,
@@ -478,6 +481,14 @@ function RevisionControls({
                   className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
                 />
               </label>
+            )}
+            {!editsSensor && readingsNote && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="quicklog-correct-readings-note"
+              >
+                {readingsNote}
+              </p>
             )}
             {editsSensor && (
               <div className="space-y-2">

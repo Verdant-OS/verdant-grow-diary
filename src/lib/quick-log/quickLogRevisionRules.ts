@@ -401,14 +401,16 @@ function sensorFromDetails(
 }
 
 export const QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE =
-  "Temperature and humidity on this Environment check can't be corrected yet. You can still correct the note, time, or plant.";
+  "Recorded readings on this Environment check can't be corrected here. You can still correct the note, time, or plant.";
 
 /**
- * Explains why the correction dialog shows no temperature or humidity fields
- * for an Environment Check whose readings live only in
- * details.environment_check (no sensor snapshot). The correction RPC rejects
- * sensor changes for those entries (20261014210000, "unsupported_change"), so
- * fields there could never save. Null for every other entry, including typed
+ * Explains why the correction dialog shows no reading fields for an
+ * Environment Check that recorded readings (temperature, humidity, VPD or
+ * CO₂) in details.environment_check. The copy states only what the dialog
+ * offers, not why: readings that live only in the envelope are rejected by
+ * the correction RPC (20261014210000, "unsupported_change"), and a linked
+ * reading this page did not load is equally not offered here. The caller
+ * shows it only when the dialog has no sensor fields. Null for every other entry, including typed
  * care events (Watering, …) that only carry an environment envelope as context,
  * and null while the linked sensor context that decides correctability is
  * still loading or failed to load (unmeasured is not unsupported).

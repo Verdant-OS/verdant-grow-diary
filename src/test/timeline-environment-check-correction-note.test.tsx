@@ -273,7 +273,7 @@ describe("Timeline Environment check correction note", () => {
     renderTimeline();
     await waitFor(() => {
       expect(screen.getByTestId("timeline-correction-readings-note")).toHaveTextContent(
-        "Temperature and humidity on this Environment check can't be corrected yet.",
+        "Recorded readings on this Environment check can't be corrected here.",
       );
     });
   });

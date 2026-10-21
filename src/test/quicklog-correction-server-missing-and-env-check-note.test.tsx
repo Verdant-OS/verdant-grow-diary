@@ -133,7 +133,7 @@ describe("missing correction server function", () => {
 describe("Environment Check readings note", () => {
   it("explains readings that live only in details.environment_check", () => {
     expect(envCheckNote(ENV_CHECK_ONLY)).toBe(
-      "Temperature and humidity on this Environment check can't be corrected yet. You can still correct the note, time, or plant.",
+      "Recorded readings on this Environment check can't be corrected here. You can still correct the note, time, or plant.",
     );
   });
 
@@ -159,6 +159,15 @@ describe("Environment Check readings note", () => {
         environment_check: { checkType: "airflow", vpd_kpa: 1.1 },
       }),
     ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+  });
+
+  it("explains a CO₂-only check, and names no specific reading it did not record", () => {
+    const note = envCheckNote({
+      event_type: "environment_check",
+      environment_check: { checkType: "airflow", co2_ppm: 900 },
+    });
+    expect(note).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    expect(note).not.toMatch(/temperature|humidity/i);
   });
 
   it("is null while the linked sensor context is loading or failed (unmeasured, not unsupported)", () => {

@@ -176,6 +176,7 @@ export function environmentCheckEnvelopeReadings(envelope: unknown): {
   tempF: number | null;
   rhPercent: number | null;
   vpdKpa: number | null;
+  co2Ppm: number | null;
 } {
   const env =
     envelope && typeof envelope === "object" && !Array.isArray(envelope)
@@ -188,6 +189,7 @@ export function environmentCheckEnvelopeReadings(envelope: unknown): {
       env?.humidity_pct ?? env?.rhPercent ?? env?.rh_percent ?? env?.humidity,
     ),
     vpdKpa: asFiniteNumber(env?.vpd_kpa ?? env?.vpdKpa),
+    co2Ppm: asFiniteNumber(env?.co2_ppm ?? env?.co2Ppm ?? env?.co2),
   };
 }
 

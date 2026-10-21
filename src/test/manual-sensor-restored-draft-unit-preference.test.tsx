@@ -14,6 +14,7 @@ import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 type Row = Record<string, unknown>;
 const backend = vi.hoisted(() => ({
   posts: [] as Row[][],
+  offline: false,
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -33,6 +34,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       return {
         select: () => query,
         insert: async (input: Row[]) => {
+          if (backend.offline) throw new Error("network down");
           backend.posts.push(input.map((row) => ({ ...row })));
           return { error: null };
         },
@@ -99,6 +101,7 @@ beforeEach(() => {
   sessionStorage.clear();
   vi.clearAllMocks();
   backend.posts = [];
+  backend.offline = false;
   Element.prototype.scrollIntoView = vi.fn();
   Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(false);
   Element.prototype.setPointerCapture = vi.fn();
@@ -134,5 +137,28 @@ describe("manual reading form keeps the °F preference after a restored draft", 
 
     await waitFor(() => expect(backend.posts).toHaveLength(1));
     expect(temperatureRow(backend.posts[0])?.value).toBe(25);
+  });
+
+  it("keeps a fractional temperature exact when only humidity is edited after a reload", async () => {
+    const first = mountPage();
+    backend.offline = true;
+    fireEvent.change(airTemp(), { target: { value: "77.02" } });
+    fireEvent.change(screen.getByLabelText(/Humidity/i), { target: { value: "50" } });
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await screen.findByTestId("manual-reading-save-unconfirmed");
+    const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) ?? "null");
+    expect(temperatureRow(pending?.payloads)?.value).toBe(25.01);
+    first.unmount();
+    backend.offline = false;
+    mountPage();
+
+    expect(airTemp().value).toBe("77.02");
+    fireEvent.change(screen.getByLabelText(/Humidity/i), { target: { value: "55" } });
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+
+    await waitFor(() => expect(backend.posts).toHaveLength(1));
+    expect(temperatureRow(backend.posts[0])?.value).toBe(25.01);
   });
 });

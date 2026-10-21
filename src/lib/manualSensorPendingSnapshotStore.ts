@@ -4,6 +4,7 @@ import { isCanonicalManualSensorPayload } from "./manualSensorProvenanceRules";
 import { normalizeManualSourceNote } from "./manualSensorSourceLabel";
 import {
   convertTemperatureInputString,
+  parseTemperatureInput,
   type TemperatureInputUnit,
 } from "./sensorInputUnitConversion";
 import {
@@ -134,9 +135,24 @@ function valid(value: unknown, ownerId: string): value is PendingManualSnapshot 
 }
 
 /**
+ * Stored °C (two decimals) re-expressed in `unit`: one decimal when that saves
+ * back to the same °C (200 °F → 93.33 °C → 200 °F), otherwise two decimals,
+ * which always does (77.02 °F → 25.01 °C → 77.02 °F, not 77 → 25 °C).
+ */
+function restoredTemperature(storedC: string, unit: TemperatureInputUnit): string {
+  const oneDecimal = convertTemperatureInputString(storedC, "C", unit, 1);
+  const back = parseTemperatureInput(oneDecimal, unit);
+  const savesBack =
+    back.kind === "ok" &&
+    back.celsius !== null &&
+    Math.round(back.celsius * 100) / 100 === Number(storedC);
+  return savesBack ? oneDecimal : convertTemperatureInputString(storedC, "C", unit, 2);
+}
+
+/**
  * Rebuild an unconfirmed snapshot's draft in the unit the form should show.
- * Payloads hold canonical °C at two decimals; re-expressing to °F at one
- * decimal returns the grower's typed value (200 °F → 93.33 °C → 200 °F).
+ * Payloads hold canonical °C at two decimals; the shown value saves back to
+ * exactly that °C even if another field is edited first.
  * The draft keeps an explicit unit so the shown number and unit always agree.
  */
 export function restoreManualSnapshotValues(
@@ -150,7 +166,7 @@ export function restoreManualSnapshotValues(
       ? form
       : {
           ...form,
-          airTemp: convertTemperatureInputString(String(form.airTemp ?? ""), "C", displayUnit, 1),
+          airTemp: restoredTemperature(String(form.airTemp ?? ""), displayUnit),
           airTempUnit: displayUnit,
         };
   return {

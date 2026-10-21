@@ -237,6 +237,26 @@ last_updated: 2026-10-06 16:05 CT, by Claude
 
 ## Closed
 
+### CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY
+
+```text
+TASK CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY  priority: P2  status: CLOSED
+goal: Verify current deploy-tip dependency audits after #1343; carry #1543 historical failures. Confirm the four Hono/js-yaml advisories and the Vitest/mocker GHSA no longer block at the tip, or open the smallest scoped follow-up for any survivor. Record the exact SHA and run URLs. Verification/documentation only; NOT a reopen or revert of #1543.
+branch: claude/verify-deploy-tip-dependency-audits
+base: verdant-grow-diary
+checkout: none; verification receipt only. Start new work from origin/verdant-grow-diary.
+pr: NOT_MEASURED (verification receipt; no code change opened by this block)
+head_sha: branch head b07c85ba7ad6b1031dea713d4ec4dd020ee6f8cc ("Initial plan") over deploy-tip parent 05f5138d08c943921df0ce224af8d9c0837c09d9 (#2296). The "Initial plan" commit has no own dependency-security run; the meaningful evidence is at the parent.
+state: VERIFIED. Dependency & Security CI run 39571694293 at 05f5138d = conclusion success; job 119127189913 all steps green, including Lockfile policy check, Dependency security scan (check:deps = node scripts/check-dependency-security.mjs over bun audit --json), Dependency security contract tests, typecheck, build, and Playwright (36 passed). The four #1543 advisories no longer block: Hono 1193729/1193730/1193731 (moderate, blocked via BLOCKED_PACKAGES "hono") and js-yaml 1193727 (high, blocked via BLOCKED_SEVERITIES) are absent at the tip after #1343 (merged 7266acd6886b22b92bfdf405d04ffa8f05a4edee) raised hono 4.13.11 / js-yaml 4.3.2 / vitest ^4.1.12 in ancestry. Vitest/@vitest/mocker GHSA-82fw-gwwq-j7x9 is covered by the passing deploy-branch check:deps over the full tree (vitest repaired in ancestry by #1343); the Cursor SDK local orchestration spike (workflow 334730604) has ZERO runs on verdant-grow-diary, so there is no deploy-tip spike run to read. config/dependency-security-exceptions.json has an empty exceptions array: no silent waiver.
+next_action: CLOSED. No surviving/new advisory required a follow-up; no scoped exception added.
+files: docs/agents/HANDOFF_LOG.md (this receipt)
+blockers: none. Local check:deps could not be re-run (bun not on PATH, node_modules absent); evidence is the deploy-tip CI run per the issue's own close criterion to read the completed jobs/logs.
+artifacts: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293 (Dependency & Security CI, success); job https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293/job/119127189913; config/dependency-security-exceptions.json (empty)
+reviewer_seat: Dependency/audit verification receipt. Independent exact-head acceptance per AGENTS.md routing (Codex, or Blue Dream / Critical Mass / Durban Poison); Claude observations are not acceptance.
+claimed_by: Claude, 2026-10-21
+last_updated: 2026-10-21, by Claude (#1723 deploy-tip dependency-audit verification receipt)
+```
+
 ### QUICKLOG-CORRECTION-EDITABLE-VALUES
 
 ```text

@@ -22,6 +22,7 @@ const state = vi.hoisted(() => ({
   manualError: false,
   manualRefetch: vi.fn(() => Promise.resolve([])),
   stability: null as unknown,
+  snapshot: { status: "idle", snapshot: null } as { status: string; snapshot: unknown },
 }));
 
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "owner-1" } }) }));
@@ -80,7 +81,14 @@ vi.mock("@/components/WateringCadenceHistoryStrip", () => ({ default: () => null
 vi.mock("@/components/DrybackMonitoringStrip", () => ({ default: () => null }));
 vi.mock("@/components/TentAiDoctorSessionsPanel", () => ({ default: () => null }));
 vi.mock("@/components/StageBadge", () => ({ default: () => null }));
-vi.mock("@/components/MetricChip", () => ({ default: () => null }));
+vi.mock("@/components/MetricChip", () => ({
+  default: ({ label, value }: { label: string; value: unknown }) => (
+    <span data-testid={`metric-chip-${label}`}>{String(value)}</span>
+  ),
+}));
+vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
+  useLatestSensorSnapshot: () => state.snapshot,
+}));
 vi.mock("@/components/SensorChart", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogV2Fab", () => ({ default: () => null }));
 vi.mock("@/components/CreatePlantDialog", () => ({ default: () => null }));
@@ -106,6 +114,9 @@ vi.mock("@/components/StartPhenoHuntButton", () => ({ default: () => null }));
 vi.mock("@/components/TentPendingOutcomeNotice", () => ({ default: () => null }));
 
 import TentDetail from "@/pages/TentDetail";
+import { buildTonightTentMetrics } from "@/lib/tonightTentHomeViewModel";
+import { formatSensorValue } from "@/lib/sensorFormat";
+import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 
 const NOW = new Date("2026-10-15T12:00:00.000Z");
 const clients: QueryClient[] = [];
@@ -153,6 +164,7 @@ beforeEach(() => {
   state.manualError = false;
   state.manualRefetch.mockClear();
   state.stability = null;
+  state.snapshot = { status: "idle", snapshot: null };
 });
 
 afterEach(() => {
@@ -241,9 +253,14 @@ describe("Tent detail mixed-metric provenance (Codex P1 4288338459)", () => {
     expect(screen.getByTestId("tent-detail-sensor-captured")).toHaveTextContent("5 minutes ago");
     // The live temp/RH are fresh; the old manual VPD must not mark them stale.
     expect(screen.queryByTestId("tent-detail-sensor-stale")).toBeNull();
-    expect(screen.getByTestId("tent-detail-vpd-source")).toHaveTextContent("Manual reading");
-    expect(screen.getByTestId("tent-detail-vpd-captured")).toHaveTextContent("2 days ago");
-    expect(screen.getByTestId("tent-detail-vpd-stale")).toBeVisible();
+    // #2268 / VER-189: the fresh same-capture live pair's calculated VPD wins over the
+    // two-day-old manual VPD, as on the Dashboard Tonight card, with its own provenance.
+    expect(screen.getByTestId("tent-detail-vpd-provenance")).toHaveTextContent(
+      "Calculated from temperature and RH",
+    );
+    expect(screen.getByTestId("tent-detail-vpd-source")).toHaveTextContent("Live sensor");
+    expect(screen.getByTestId("tent-detail-vpd-captured")).toHaveTextContent("5 minutes ago");
+    expect(screen.queryByTestId("tent-detail-vpd-stale")).toBeNull();
   });
 
   it("shows no separate VPD provenance when the stored snapshot observed VPD", () => {
@@ -313,5 +330,81 @@ describe("Tent detail manual-history read (Codex security 4288384000, Copilot 42
     expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toBeVisible();
     fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
     expect(state.manualRefetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// #2268 / VER-189: the tent page's VPD chip shows the Dashboard Tonight card's value.
+describe("Tent detail VPD agrees with the Dashboard Tonight card", () => {
+  const hoursAgo = (hours: number) =>
+    new Date(NOW.getTime() - hours * 60 * 60 * 1000).toISOString();
+  const row = (metric: string, value: number, at: string) => ({
+    metric,
+    value,
+    ts: at,
+    captured_at: at,
+    tent_id: "tent-1",
+    source: "manual",
+  });
+  const tonightVpd = () =>
+    buildTonightTentMetrics({
+      rows: state.rows as never,
+      rowsRead: { status: "success" },
+      snapshot: state.snapshot as never,
+      now: NOW,
+    }).find((metric) => metric.key === "vpd");
+  const shown = (value: number) => formatSensorValue("vpd_kpa", value).replace(/\s*kPa$/, "");
+
+  it("replaces a day-old stored VPD with a newer same-capture temperature and RH pair", () => {
+    const pairAt = hoursAgo(16);
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(24)),
+      row("temperature_c", 30, pairAt),
+      row("humidity_pct", 46, pairAt),
+    ];
+    mount();
+    const expected = calculateVpdKpa({ tempC: 30, rhPercent: 46 })!;
+    expect(tonightVpd()).toMatchObject({ state: "value", value: expected, calculated: true });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(expected));
+    expect(screen.getByTestId("metric-chip-VPD")).not.toHaveTextContent("1.3");
+    expect(screen.getByTestId("tent-detail-vpd-provenance")).toHaveTextContent(
+      "Calculated from temperature and RH",
+    );
+  });
+
+  it("counts a newer Quick Log pair from the diary-inclusive snapshot, as the Dashboard does", () => {
+    state.rows = [row("vpd_kpa", 1.3, hoursAgo(24))];
+    state.snapshot = {
+      status: "ok",
+      snapshot: { source: "diary", ts: hoursAgo(16), temp: 30, rh: 46, vpd: null },
+    };
+    mount();
+    const expected = tonightVpd();
+    expect(expected).toMatchObject({ state: "value", calculated: true });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(expected!.value!));
+  });
+
+  it("shows no VPD when the newest same-capture pair is invalid, never the older stored value", () => {
+    const pairAt = hoursAgo(16);
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(24)),
+      row("temperature_c", 30, pairAt),
+      row("humidity_pct", 100, pairAt),
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "invalid" });
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+  });
+
+  it("keeps a stored VPD that is newer than the temperature and RH pair", () => {
+    const pairAt = hoursAgo(24);
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(2)),
+      row("temperature_c", 30, pairAt),
+      row("humidity_pct", 46, pairAt),
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.3, calculated: false });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(1.3));
+    expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
   });
 });

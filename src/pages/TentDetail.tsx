@@ -112,6 +112,9 @@ import { isQueryGrowScopeMismatch } from "@/lib/detailGrowScopeRules";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
 import TentPendingOutcomeNotice from "@/components/TentPendingOutcomeNotice";
+import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
+import { resolveTentDetailVpd } from "@/lib/tentDetailVpdRules";
 
 const EMPTY_TENT_PLANTS: never[] = [];
 
@@ -195,7 +198,7 @@ export default function TentDetail() {
   const nowMs = useNowTick();
   const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
-  const headerVpdObservation = resolveDisplayedVpdObservation({
+  const storedVpdObservation = resolveDisplayedVpdObservation({
     snapshotVpd: snap?.vpd,
     snapshotVpdRejected: header.truth?.invalidFields.includes("vpd") ?? false,
     snapshotCapturedAt: header.capturedAt,
@@ -204,12 +207,34 @@ export default function TentDetail() {
     fallback: sharedVpdSeries[0] ?? null,
     nowMs,
   });
+  // One VPD per tent (#2268, VER-189): the Dashboard Tonight card's choice for
+  // this tent, from the same stored rows and diary-inclusive snapshot, so a
+  // newer same-capture temperature and RH pair beats an older stored VPD here too.
+  const tonightSnapshot = useLatestSensorSnapshot(tent?.growId ?? null, tent ? [tent.id] : []);
+  const tonightVpd = buildTonightTentMetrics({
+    rows: readings,
+    rowsRead: {
+      status: sensorReadings.isError ? "error" : sensorReadings.isPending ? "loading" : "success",
+    },
+    snapshot: { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+    now: new Date(nowMs),
+  }).find((metric) => metric.key === "vpd");
+  const headerVpdObservation = resolveTentDetailVpd({
+    tonight: tonightVpd,
+    existing: storedVpdObservation,
+    rejectedMetrics: header.truth?.invalidFields ?? [],
+    nowMs,
+  });
   const headerVpd = headerVpdObservation.value;
   // A fallback VPD carries its own provenance on a VPD-specific element. The
   // shared Environment header keeps the stored snapshot's source, time and
   // staleness, because its temperature and RH come from that snapshot.
   const vpdFromFallback =
-    headerVpdObservation.value !== null && (snap?.vpd === null || snap?.vpd === undefined);
+    headerVpdObservation.value !== null &&
+    (headerVpdObservation.calculated ||
+      snap?.vpd === null ||
+      snap?.vpd === undefined ||
+      headerVpdObservation.value !== snap.vpd);
   const fallbackVpdSourceLabel = vpdFromFallback
     ? formatSensorSourceLabel({ source: headerVpdObservation.source })
     : null;
@@ -495,7 +520,9 @@ export default function TentDetail() {
           className="text-[11px] text-muted-foreground -mt-3 mb-4 flex flex-wrap items-center gap-2"
           data-testid="tent-detail-vpd-provenance"
         >
-          <span>VPD reading</span>
+          <span>
+            {headerVpdObservation.calculated ? TONIGHT_TENT_HOME_COPY.calculatedVpd : "VPD reading"}
+          </span>
           {fallbackVpdSourceLabel && (
             <span className="rounded-md border px-1.5 py-0.5" data-testid="tent-detail-vpd-source">
               {fallbackVpdSourceLabel}

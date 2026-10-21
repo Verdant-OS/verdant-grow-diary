@@ -19,6 +19,7 @@ import {
   maxPhenoCandidateNumber,
   phenoCandidateLabelForNumber,
   type AddCandidateFailureReason,
+  type PhenoHuntAddCandidatePlant,
 } from "@/lib/phenoHuntAddCandidatesRules";
 
 export interface AddPhenoHuntCandidatesInput {
@@ -123,6 +124,7 @@ export async function addPhenoHuntCandidates(
         .update({ pheno_hunt_id: huntId, candidate_label: plannedLabel })
         .eq("id", plantId)
         .eq("grow_id", growId)
+        .eq("is_archived", false)
         .is("pheno_hunt_id", null)
         .select("id")
         .maybeSingle();
@@ -180,4 +182,61 @@ export async function addPhenoHuntCandidates(
   }
 
   return { added, failed };
+}
+
+const ADDABLE_PLANT_COLUMNS = "id, name, grow_id, pheno_hunt_id, is_archived";
+
+/** The grow's plants for the "Add candidates" picker; RLS limits them to the owner's. */
+export async function listPhenoHuntGrowPlants(
+  growId: string,
+  deps: Pick<AddPhenoHuntCandidatesDeps, "client"> = {},
+): Promise<{ ok: true; plants: PhenoHuntAddCandidatePlant[] } | { ok: false }> {
+  const client = deps.client ?? phenoDb;
+  try {
+    const { data, error } = await client
+      .from("plants")
+      .select(ADDABLE_PLANT_COLUMNS)
+      .eq("grow_id", growId)
+      .limit(500);
+    if (error || !Array.isArray(data)) return { ok: false };
+    return { ok: true, plants: data as PhenoHuntAddCandidatePlant[] };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export interface PlantPhenoHuntOffer {
+  readonly plant: PhenoHuntAddCandidatePlant;
+  readonly hunt: { readonly id: string; readonly grow_id: string; readonly name: string };
+}
+
+/**
+ * The plant page's "Add to pheno hunt" target: the plant's current tag and its
+ * grow's hunt. Offered only when the grow has exactly one hunt, so the page
+ * never guesses between hunts. Null on any failure or ambiguity.
+ */
+export async function loadPlantPhenoHuntOffer(
+  plantId: string,
+  deps: Pick<AddPhenoHuntCandidatesDeps, "client"> = {},
+): Promise<PlantPhenoHuntOffer | null> {
+  const client = deps.client ?? phenoDb;
+  try {
+    const plantRead = await client
+      .from("plants")
+      .select(ADDABLE_PLANT_COLUMNS)
+      .eq("id", plantId)
+      .maybeSingle();
+    const plant = plantRead.data as PhenoHuntAddCandidatePlant | null;
+    if (plantRead.error || !plant?.grow_id) return null;
+    const huntRead = await client
+      .from("pheno_hunts")
+      .select("id, grow_id, name")
+      .eq("grow_id", plant.grow_id)
+      .limit(2);
+    const hunts = huntRead.data as PlantPhenoHuntOffer["hunt"][] | null;
+    if (huntRead.error || !Array.isArray(hunts) || hunts.length !== 1) return null;
+    return { plant, hunt: hunts[0] };
+  } catch {
+    return null;
+  }
 }

@@ -146,6 +146,7 @@ describe("addPhenoHuntCandidates", () => {
     expect(tags).toHaveLength(2);
     for (const tag of tags) {
       expect(has(tag, "eq", "grow_id", "grow-A")).toBe(true);
+      expect(has(tag, "eq", "is_archived", false)).toBe(true);
       expect(has(tag, "is", "pheno_hunt_id", null)).toBe(true);
     }
     // Every plants write targets one of the picked ids.

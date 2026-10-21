@@ -37,6 +37,27 @@ export const PHENO_HUNT_ADD_CANDIDATES_COPY = {
   network: "Could not add that plant right now. Nothing was changed; try again.",
 } as const satisfies Record<AddCandidateFailureReason, string>;
 
+/** Fixed UI copy for the workspace dialog and the plant-page button. */
+export const PHENO_HUNT_ADD_CANDIDATES_UI_COPY = {
+  trigger: "Add candidates",
+  title: "Add candidates",
+  description:
+    "Plants in this hunt's grow that aren't candidates yet. Each one gets the next candidate number; existing candidates, numbers, scores and keepers don't change.",
+  loading: "Loading this grow's plants…",
+  loadError: "Could not load this grow's plants. Nothing was changed; try again.",
+  empty:
+    "No plants to add. Every plant in this grow is already a candidate, archived, or in another hunt.",
+  submit: "Add selected",
+  saving: "Adding…",
+  plantButton: "Add to pheno hunt",
+} as const;
+
+/** "Added 2 candidates: #17, #18." — the grower-visible success line. */
+export function phenoHuntAddedSummary(labels: readonly string[]): string {
+  const count = labels.length;
+  return `Added ${count} candidate${count === 1 ? "" : "s"}: ${labels.join(", ")}.`;
+}
+
 /** Bounded retry when a concurrent writer takes the planned candidate number. */
 export const PHENO_HUNT_ADD_CANDIDATES_MAX_NUMBER_ATTEMPTS = 3;
 

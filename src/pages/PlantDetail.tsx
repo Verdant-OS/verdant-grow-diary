@@ -72,6 +72,7 @@ import {
 } from "@/lib/plantDetailDisclosureRules";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import AddToPhenoHuntButton from "@/components/AddToPhenoHuntButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
 import PlantPhoto from "@/components/PlantPhoto";
@@ -616,6 +617,7 @@ export default function PlantDetail() {
           variant="row"
           hideView
         />
+        {isActivePlant(plant) && <AddToPhenoHuntButton plantId={plant.id} />}
       </div>
       <section
         id={PLANT_DETAIL_SECTION_ANCHORS.overview}

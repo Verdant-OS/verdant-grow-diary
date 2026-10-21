@@ -160,9 +160,9 @@ Consequences that bind every slice:
      has to run on production. Acceptance (P1–P9, A1–A9) runs on `https://verdantgrowdiary.com` once live
      `/version.json` reports the S5a SHA. Any failure that cannot be fixed in place triggers the flag
      rollback below.
-   - **S5b, link:** add the one Tent Detail link, only after every S5a receipt passes and is still
-     valid (§13). The release is complete when live `/version.json` reports the S5b SHA and the S5b
-     completion check in §13 passes.
+   - **S5b, link:** add the one Tent Detail link, only after every S5a receipt passes. The release is
+     complete only when live `/version.json` reports the S5b SHA and the full acceptance set, the link
+     check and P4 pass again at that SHA (§13).
 4. **Rollback, in order of speed.** Agents never roll back; they prepare the step.
    - Flip `tentGardenEnabled` back to `false` (and remove the link if S5b landed): one PR through the
      normal merge gate. Use this for any Tent Garden defect. It is done only when live `/version.json`
@@ -251,8 +251,14 @@ values.
   "Drawn at ‹s×100›% size".
 - **Oversized pot** (one pot's diameter exceeds the shorter footprint side): same rule as crowded, and
   that pot's details say "Larger than the recorded tent".
-- **Scene limit:** if `s < 0.5`, or `n > 25`, the scene is not drawn; the page opens in List view with
-  the reason ("Too many plants to draw clearly — showing the list"). The List still shows every plant.
+- **Scene limit:** if `s < 0.5`, or `n > 25`, the scene is not drawn and the page opens in List view
+  with the reason that applies:
+  - `n > 25`: "Too many plants to draw clearly — showing the list";
+  - `s < 0.5` with 25 or fewer plants: "These pots are too large for this tent as recorded to draw
+    clearly — showing the list".
+
+  When both hold, the plant-count reason is shown. The List still shows every plant.
+
 - **Footprint missing or invalid:** the fitted square sizes to the pots, so crowding cannot arise from
   the footprint; the approximate-layout header applies.
 
@@ -363,7 +369,8 @@ D2(c), List-first.
    plants in 2×2, 4×4, 5×5, missing and invalid footprints; archived plants and other tents' plants
    excluded.
 4. **Crowded and oversized:** ten 7 gal pots in a 2×2 tent → crowded notice, uniform `s < 1`, no
-   overlap; one 100 gal pot in a 2×2 → oversized note; `s < 0.5` → List view with reason.
+   overlap; one 100 gal pot in a 2×2 → oversized note. `s < 0.5` with one plant → List view with the
+   pot-size reason, never the plant-count reason; 26 plants → the plant-count reason.
 5. **Labels:** the prototype's label checks ported (no card on another pot or within 22 px; no leader
    through a card or another pot; no crossing leaders; 8 px edge inset).
 6. **Selection (E2E, `chromium-mocked`):** each rotation, desktop and 390×844 touch emulation: every
@@ -399,14 +406,14 @@ independent exact-head PASS from a reviewer who did not touch it; 35/35 required
 Chemdawg. Every merge triggers the deployment path (§4), so each slice must be safe to be live alone;
 it counts as live only once `/version.json` reports it.
 
-| Slice | Content                                                                                                                             | Live effect after merge                                                                                             | Needs                                        | Review                                                                                       |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| S1    | Pure rules, view model, copy and their unit tests (§10 S1 rows)                                                                     | None: nothing imports them                                                                                          | Holder + go. No D1–D4                        | Critical Mass (no `.tsx`)                                                                    |
-| S2    | Add `three`, pinned exact, nothing imports it yet                                                                                   | None; P4 check proves no chunk changes                                                                              | D1                                           | Codex (not if Codex authored or repaired it), Blue Dream, Critical Mass or Durban Poison     |
-| S3    | Flag (`false`), route, manifest, page, List view and details panel, E2E spec and its wiring; no 3D                                  | None for users: route renders not-found while the flag is off (T12)                                                 | S1, D2                                       | Blue Dream (`.tsx`)                                                                          |
-| S4    | 3D scene with instancing, meeting P3, P6 and P7 on first landing; art table per D4                                                  | None for users: still behind the flag                                                                               | S2, S3, D4                                   | Blue Dream                                                                                   |
-| S5a   | Dark launch: set the flag `true`, no link. Then take P1–P9 and A1–A9 on production with the QA account, at the live S5a SHA (below) | Page reachable by URL only; complete only when live `/version.json` reports the SHA                                 | S4, D2, Matthew's publish yes                | Blue Dream reviews; Matthew decides the publish; the merge triggers the configured publisher |
-| S5b   | Add the one Tent Detail link                                                                                                        | The feature becomes discoverable; complete only when live `/version.json` reports the SHA and the link check passes | All S5a receipts pass, Matthew's publish yes | Blue Dream reviews; Matthew decides the publish; the merge triggers the configured publisher |
+| Slice | Content                                                                                                                             | Live effect after merge                                                                                                                            | Needs                                        | Review                                                                                       |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| S1    | Pure rules, view model, copy and their unit tests (§10 S1 rows)                                                                     | None: nothing imports them                                                                                                                         | Holder + go. No D1–D4                        | Critical Mass (no `.tsx`)                                                                    |
+| S2    | Add `three`, pinned exact, nothing imports it yet                                                                                   | None; P4 check proves no chunk changes                                                                                                             | D1                                           | Codex (not if Codex authored or repaired it), Blue Dream, Critical Mass or Durban Poison     |
+| S3    | Flag (`false`), route, manifest, page, List view and details panel, E2E spec and its wiring; no 3D                                  | None for users: route renders not-found while the flag is off (T12)                                                                                | S1, D2                                       | Blue Dream (`.tsx`)                                                                          |
+| S4    | 3D scene with instancing, meeting P3, P6 and P7 on first landing; art table per D4                                                  | None for users: still behind the flag                                                                                                              | S2, S3, D4                                   | Blue Dream                                                                                   |
+| S5a   | Dark launch: set the flag `true`, no link. Then take P1–P9 and A1–A9 on production with the QA account, at the live S5a SHA (below) | Page reachable by URL only; complete only when live `/version.json` reports the SHA                                                                | S4, D2, Matthew's publish yes                | Blue Dream reviews; Matthew decides the publish; the merge triggers the configured publisher |
+| S5b   | Add the one Tent Detail link                                                                                                        | The feature becomes discoverable; complete only when live `/version.json` reports the SHA and the full P/A set, link check and P4 pass at that SHA | All S5a receipts pass, Matthew's publish yes | Blue Dream reviews; Matthew decides the publish; the merge triggers the configured publisher |
 
 **How S5 is measured.** With the flag `false` (every head before S5a), the route returns before
 rendering, so no earlier build can exercise the page, and Verdant has no non-production host to measure
@@ -415,25 +422,20 @@ on. S5a therefore turns the page on without a link, and the receipts are taken o
 devices and the disposable QA account on its own fixture tent (read-only page, so no writes). Each receipt
 names the live SHA it was taken at.
 
-**When receipts stay valid.** Other PRs keep deploying, so a later deploy voids a receipt only if it
-changes the Garden's own surface. That means any file under `src/lib/tentGarden/`,
-`src/components/tentGarden/`, `src/pages/TentGarden.tsx`, the route file, `tentGardenEnabled`, or the
-`three` dependency. The check is `git diff --name-only <receipt SHA> <live SHA>` against that list, and
-the result is recorded with the receipts at each later step.
+**What gates S5b, and what completes it.** S5b merges only after every S5a receipt has passed. S5a
+receipts gate the merge only; they do not complete the release. The Garden also runs shared code that
+other PRs keep changing: data hooks, the router shim, global styles and build configuration. So once
+live `/version.json` reports the S5b SHA, the **full P1–P9 and A1–A9 set is taken again at that SHA**,
+together with:
 
-A failing receipt is fixed in a new PR, which is re-measured at its live SHA, or answered with the flag
-rollback in §4.
-
-S5b merges only after every receipt passes and is still valid. S5b's diff is the one Tent Detail link,
-outside that list, so S5a's receipts carry over. Once S5b is live, its completion check is:
-
-- the diff check above, confirming the receipts are still valid;
 - the link check: Tent Detail shows the link and it opens the page;
-- P4 for `/tents/:id`, the page that gained the link;
-- P1, A2 and T7 repeated once at the live S5b SHA.
+- P4 for `/tents/:id`, the page that gained the link.
 
-If the diff check shows a Garden file changed since S5a, the full P1–P9 and A1–A9 set is taken again
-at the live S5b SHA before the release counts as complete.
+The release is complete only when all of these pass at the live S5b SHA. Any failure that cannot be
+fixed in place is answered with the flag rollback in §4, which also removes the link.
+
+A failing S5a receipt is fixed in a new PR and re-measured at that PR's live SHA, or answered with the
+same rollback.
 
 Revision 1 split the scene (S3) from its draw-call reduction (S4) and measured phones only afterwards
 (S5). That would have merged a scene known to run at 2.7k–5.3k draw calls. Here the scene lands only

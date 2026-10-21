@@ -240,16 +240,33 @@ values.
 ## 7. Placement, crowding and oversized pots
 
 - **Order:** `created_at`, then `id`. Same input, same layout on every device. Positions are not saved.
-- **Pot diameter** comes from the recorded volume through one fixed table (`gal → cm`), or the 3 gal
-  default when missing or invalid.
-- **Fit test:** pots go on the most-square grid with `cols × rows ≥ n` and a 4 cm gap. The layout
-  **fits** if every pot is fully inside the footprint and no two pots overlap.
+- **Pot diameter `d`** comes from the volume in gallons (litres ÷ 3.78541) through this fixed table,
+  with linear interpolation between rows. Below 1 gal, `d = 20 × gal^(1/3)`. A missing or invalid
+  volume uses the 3 gal row. Values are rounded to 0.1 cm.
+
+  | gal   | 1   | 2   | 3   | 5   | 7   | 10  | 15  | 20  | 25  | 30  | 45  | 65  | 100 |
+  | ----- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | d, cm | 20  | 25  | 30  | 36  | 41  | 46  | 51  | 61  | 66  | 71  | 81  | 91  | 122 |
+
+  `practical observation`: these are typical fabric-pot diameters (8″ to 48″), not a measured standard.
+  A drawn diameter is an estimate from the recorded volume, and the details panel says "Diameter
+  estimated from recorded volume". Changing the table is a spec change, because the §12 fixtures pin it.
+
+- **Grid:** every pot gets a square cell sized to the largest diameter in the tent, `dmax`, and sits
+  centred in its cell. Columns run along the footprint's first number `W`, rows along the second `D`.
+  With a gap `g = 4 cm` between pots and between a pot and a wall, a `c × r` grid's scale is
+  `s(c) = min((W − (c + 1)·g) / (c·dmax), (D − (r + 1)·g) / (r·dmax))`, where `r = ceil(n / c)`. The
+  rules try `c = 1 … n` and keep the largest `s`. Ties go to fewer empty cells (`c·r − n`), then to
+  fewer columns. Pots fill row-major in the order above, starting at the back-left cell. A part-filled
+  last row is left-aligned, and the whole grid is centred in the footprint.
+- **Fit test:** the layout **fits** when the chosen `s ≥ 1`. Pots are then drawn at `s = 1`, which is
+  to scale.
 - **Fits:** draw to scale.
 - **Crowded** (the recorded pots do not fit the recorded footprint): do not overlap pots, do not clamp
   them on top of each other, and do not resize the footprint. Draw every pot at one uniform scale factor
   `s < 1` that makes the grid fit, and show the notice "Crowded: N pots of these sizes don't fit a
   ‹W × D› tent as recorded. Pots are drawn smaller than recorded." Each crowded pot's details say
-  "Drawn at ‹s×100›% size".
+  "Drawn at ‹s×100, rounded to a whole number›% size".
 - **Oversized pot** (one pot's diameter exceeds the shorter footprint side): same rule as crowded, and
   that pot's details say "Larger than the recorded tent".
 - **Scene limit:** if `s < 0.5`, or `n > 25`, the scene is not drawn and the page opens in List view
@@ -260,8 +277,12 @@ values.
 
   When both hold, the plant-count reason is shown. The List still shows every plant.
 
-- **Footprint missing or invalid:** the fitted square sizes to the pots, so crowding cannot arise from
-  the footprint; the approximate-layout header applies.
+- **Footprint missing or invalid:** the footprint becomes a square of side `k·dmax + (k + 1)·g`, with
+  `k = ceil(√n)`. That square fits the grid at `s = 1`, so crowding cannot come from the footprint.
+  The approximate-layout header applies.
+- **Reference values** (pinned by T4 and T10): nine 3 gal in a 4×4 → 3×3 grid, fits. Ten 3 gal in a
+  4×4 → 3×4, `s = 0.849`, crowded. Twenty-five 3 gal in a 5×5 → 5×5, `s = 0.856`, crowded. Ten 7 gal
+  in a 2×2 → `s = 0.250`, List view. One 100 gal in a 2×2 → `s = 0.434`, List view, oversized.
 
 ## 8. Visuals: neutral by default, illustrative only when labelled
 
@@ -344,8 +365,9 @@ tent (§12, T10).
 | P9  | JS heap after 20 rotate-and-select cycles versus after the first                     | growth ≤ 10 MB                   |
 
 P3, P4, P6 and P7 are also measured in CI or locally per slice; P1, P2, P5, P8 and P9 need the reference
-devices and run on production during S5a. If P2 or P5 fails on a reference device and cannot be fixed, the release choice reverts to
-D2(c), List-first.
+devices and run on production during S5a. If P2 or P5 fails on a reference device and cannot be fixed,
+the flag goes back to `false` (§4) and S5b stays `BLOCKED`. The release does not switch to List-first on its own. That needs a new D2 decision,
+recorded in §3 by D2's decider, for example D2(c).
 
 | ID  | Accessibility criterion                                                                          | Pass                                                                                                                                                                                |
 | --- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -370,9 +392,11 @@ D2(c), List-first.
 3. **Placement:** deterministic across runs; no overlap and every pot inside the footprint for 1–25
    plants in 2×2, 4×4, 5×5, missing and invalid footprints; archived plants and other tents' plants
    excluded.
-4. **Crowded and oversized:** ten 7 gal pots in a 2×2 tent → crowded notice, uniform `s < 1`, no
-   overlap; one 100 gal pot in a 2×2 → oversized note. `s < 0.5` with one plant → List view with the
-   pot-size reason, never the plant-count reason; 26 plants → the plant-count reason.
+4. **Crowded and oversized:** every §7 reference value holds to 3 decimals, including grid shape and
+   tie-break. Nine 3 gal in a 4×4 fits. Ten 3 gal in a 4×4 shows the crowded notice and "Drawn at 85%
+   size", with no overlap. Ten 7 gal in a 2×2 (`s = 0.250`) and one 100 gal in a 2×2 (`s = 0.434`,
+   oversized) open List view with the pot-size reason, never the plant-count reason. 26 plants show the
+   plant-count reason.
 5. **Labels:** the prototype's label checks ported (no card on another pot or within 22 px; no leader
    through a card or another pot; no crossing leaders; 8 px edge inset).
 6. **Selection (E2E, `chromium-mocked`):** each rotation, desktop and 390×844 touch emulation: every
@@ -387,9 +411,9 @@ D2(c), List-first.
 9. **Visual truth (D4):** under neutral visuals, two plants with different recorded stages render the
    same form; under illustrative visuals the caption is present, and a missing or invalid stage renders
    the neutral form.
-10. **25 plants:** a 25-plant fixture in a 5×5 tent: List has 25 rows (A2); the scene draws 25 pots or
-    takes the scene-limit path per §7; P7 draw calls recorded; selection test 6 passes for all 25; a
-    26-plant fixture opens List view.
+10. **25 plants:** twenty-five 3 gal plants in a 5×5 tent: List has 25 rows (A2); the scene draws 25
+    pots on a 5×5 grid at `s = 0.856`, crowded (§7); P7 draw calls recorded; selection test 6 passes
+    for all 25; a 26-plant fixture opens List view.
 11. **Route policy:** the manifest cross-check passes with `/tents/:id/garden`, and
     `e2e/auth-route-protection-mobile.spec.ts` lists `/tents/<fixture-id>/garden` in
     `PROTECTED_MOBILE_ROUTES`, so a signed-out visit at 390×844 redirects to sign-in and reads no

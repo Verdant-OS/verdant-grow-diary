@@ -74,20 +74,18 @@ describe("contextual internal links to orphaned public pages", () => {
       const html = renderToString(withRouter(path, element()));
       const doc = new DOMParser().parseFromString(html, "text/html");
       const anchors = [...doc.querySelectorAll(`a[href="${href}"]`)];
-      expect(anchors.map((a) => a.textContent?.trim())).toContain(label);
-      const sameLabel = [...doc.querySelectorAll("a")].filter(
-        (a) => a.textContent?.trim() === label,
-      );
-      expect(sameLabel).toHaveLength(1);
-      expect(sameLabel[0].getAttribute("rel")).toBeNull();
+      expect(anchors).toHaveLength(1);
+      expect(anchors[0].textContent?.trim()).toBe(label);
+      expect(anchors[0].getAttribute("rel")).toBeNull();
     },
   );
 
   it.each(CASES)("$page links to $href after hydration", ({ path, element, href, label }) => {
-    render(withRouter(path, element()));
-    const link = screen.getByRole("link", { name: label });
-    expect(link).toHaveAttribute("href", href);
-    expect(screen.getAllByRole("link", { name: label })).toHaveLength(1);
+    const { container } = render(withRouter(path, element()));
+    const anchors = [...container.querySelectorAll(`a[href="${href}"]`)];
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]).toBe(screen.getByRole("link", { name: label }));
+    expect(anchors[0].getAttribute("rel")).toBeNull();
   });
 
   it("carries the glossary link in the guide hub's static no-JS body", () => {

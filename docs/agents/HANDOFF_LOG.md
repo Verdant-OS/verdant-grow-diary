@@ -55,14 +55,14 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/pheno-hunt-add-candidates verdant-grow-diary && git switch claude/pheno-hunt-add-candidates && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2307 (draft)
 head_sha: 4f50ef1363f434b8cf05976831c50788837afaeb (observed 2026-10-21 19:20 UTC, origin/claude/pheno-hunt-add-candidates)
-state: pushed draft. Codex FAIL (P1) at ed5a4a61 fixed in bcbe2792 (no untag after an ambiguous tag write; reports tag_unconfirmed). Codex bot P2s at 30ffc092/bcbe2792 fixed in 4f50ef13 (generation counter for stale results). All review threads resolved. CI and the Codex review at 4f50ef13 were running.
-next_action: Read Codex's verdict and CI at 4f50ef13; fix any finding and re-request review at the new head.
+state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:31 UTC; posted with Matthew's approval): the ed5a4a61 P1 is resolved (ambiguous tag write never undone; tag_unconfirmed) and stale results are dropped across navigation generations. 35/35 required green, all 18 threads resolved; Codex bot found no major issues at 4f50ef13.
+next_action: Merge steward checks the head. Any new commit voids the PASS.
 files: src/lib/phenoHuntAddCandidatesRules.ts; src/lib/phenoHuntAddCandidatesService.ts; src/components/PhenoHuntAddCandidatesDialog.tsx; src/components/AddToPhenoHuntButton.tsx; src/pages/PhenoHuntWorkspace.tsx; src/pages/PlantDetail.tsx; src/test/pheno-hunt-add-candidates.test.ts; src/test/pheno-hunt-add-candidates-ui.test.tsx
-blockers: Codex exact-head verdict pending. RLS/trigger behaviour against a real DB and production 16 -> 18 are NOT_MEASURED.
+blockers: none for the repository change. RLS/trigger behaviour against a real DB and production 16 -> 18 are NOT_MEASURED.
 artifacts: PR body Tests section; RED/GREEN in commit messages bcbe2792 (3 RED, 40/40) and 4f50ef13 (2 RED, 42/42).
 reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
 claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+last_updated: 2026-10-21 14:40 CT, by Claude
 ```
 
 ### CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA
@@ -95,14 +95,14 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/seo-blank-record-download-links verdant-grow-diary && git switch claude/seo-blank-record-download-links && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2261 (draft)
 head_sha: 3e3de6251dfd2b8ea2827d706e19fc4e12fc9059 (observed 2026-10-21 19:20 UTC, origin/claude/seo-blank-record-download-links)
-state: pushed draft. Codex PASS-with-P2 at 038064b3; the P2 (count destinations by href) fixed in 3e3de625. CI on 3e3de625 completed with no failed suite; Codex bot found no major issues.
-next_action: Wait for the owner-assistant Codex exact-head verdict at 3e3de625.
+state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2 at 038064b3; the href-count P2 is resolved. CI 70 success / 17 skipped incl. 32 shards and the main build (per the verdict).
+next_action: After #2260 merges, merge base here (a new head needs fresh checks and a fresh verdict); then the merge steward checks the head.
 files: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/build/staticPublicSeoDocuments.ts; src/test/seo-blank-record-download-links.test.tsx; src/test/seo-guide-internal-link-map.test.tsx; src/test/internal-link-manifest-integrity.test.ts (approved .csv pin, 2026-10-20); plus #2260's five files
-blockers: Merge order: #2260 first. Codex exact-head verdict pending.
+blockers: Merge order: #2260 first. The inherited #2260 PDF needs its own acceptance; this verdict did not visually review it.
 artifacts: PR body Commits / Renegotiated scorer / Tests sections.
 reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
 claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+last_updated: 2026-10-21 14:40 CT, by Claude
 ```
 
 ### CLAUDE-2301-COMMUNITY-V1-TASK2A-PROOF
@@ -115,14 +115,14 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/community-v1-task2a-proof verdant-grow-diary && git switch claude/community-v1-task2a-proof && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2301 (draft)
 head_sha: d0a009fb98c0d7bd5091f12a11e84932ffb0bb9a (observed 2026-10-21 19:20 UTC, origin/claude/community-v1-task2a-proof)
-state: pushed draft. 35/35 required green at d0a009fb. Codex PASS-with-P2 (PR description only); description reconciled 2026-10-21 18:37 UTC, head unchanged; clean re-verdict pending.
-next_action: Get Codex's clean exact-head re-verdict on the corrected description (its verdict reads "PASS-with-P2 is not a clean PASS and does not waive corrections"); requested on the PR 2026-10-21 19:30 UTC. Then the merge steward checks the head; after merge, dispatching the RED run (expect=red) on verdant-grow-diary is an owner action.
+state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:31 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at d0a009fb.
+next_action: Merge steward checks the head; after merge, dispatching the RED run (expect=red) on verdant-grow-diary is an owner action.
 files: .github/workflows/community-v1-db-proof.yml; scripts/security/community-v1-db-proof.mjs; scripts/security/run-community-v1-db-security.mjs; src/test/community-v1-db-proof-runner.test.ts; src/test/integration/community-v1-authority.integration.test.ts; supabase/tests/community_v1_permissions.sql
 blockers: RED receipt against a disposable local Supabase is NOT_MEASURED until dispatched after merge. Non-required Supabase Preview fails on ai_credit_grants 42P07 (not this PR's).
 artifacts: PR body Tests run section.
 reviewer_seat: Codex (.github workflow + security harness), exact head. Claude authored it.
 claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+last_updated: 2026-10-21 14:40 CT, by Claude
 ```
 
 ### CLAUDE-2297-COMMUNITY-OCCURRED-DATE
@@ -235,14 +235,14 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/welcome-home-redirect-05d3 verdant-grow-diary && git switch cursor/welcome-home-redirect-05d3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2023 (draft)
 head_sha: 543e03308d29e626be743cc48e62cd1bdc691220 (observed 2026-10-21 19:20 UTC, origin/cursor/welcome-home-redirect-05d3)
-state: pushed draft. Codex PASS-with-P2 (PR description only); description fixed 2026-10-21 18:37 UTC, head unchanged; clean re-verdict pending. 35/35 required green at the 18:07 UTC check.
-next_action: Get Codex's clean exact-head re-verdict on the corrected description (its verdict reads "PASS-with-P2 is not a clean PASS and does not waive corrections"); requested on the PR 2026-10-21 19:30 UTC. Then the merge steward checks the head. If #2310 merges first, merge base here; that new head needs fresh checks and a fresh verdict.
+state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
+next_action: Merge steward checks the head. If #2310 merges first, merge base here; that new head needs fresh checks and a fresh verdict.
 files: 71 files; see the PR (Worker redirects, sitemap, llms.txt, verdantSeoContent.ts, appRouteManifest.ts, legal shell, tests)
 blockers: Live redirect/canonical behaviour NOT_MEASURED until released. #2028 owns the llms.txt Pricing wording.
 artifacts: PR body Evidence section; coordination note with #2310.
 reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
 claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+last_updated: 2026-10-21 14:40 CT, by Claude
 ```
 
 ### CLAUDE-1949-QUICKLOG-LOCAL-TIMEZONE
@@ -255,14 +255,14 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 (not draft)
 head_sha: 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da (observed 2026-10-21 19:20 UTC, origin/cursor/quicklog-local-timezone-ec09)
-state: pushed. Codex PASS-with-P2 (PR description only); description fixed 2026-10-21 18:37 UTC, head unchanged; clean re-verdict pending. 35/35 required green at the 18:07 UTC check.
-next_action: Get Codex's clean exact-head re-verdict on the corrected description (its verdict reads "PASS-with-P2 is not a clean PASS and does not waive corrections"); requested on the PR 2026-10-21 19:30 UTC. Then the merge steward checks the head.
+state: pushed (not draft). Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
+next_action: Merge steward checks the head.
 files: src/lib/quickLogGroupedTimelineFilterViewModel.ts; src/components/QuickLogGroupedTimelineSection.tsx; src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts; src/components/AiDoctorPhase1TimelineEvidenceCard.tsx; src/lib/quickLogSnapshotStripAdapter.ts; 9 test files (4 renegotiated pins approved 2026-10-09 and 2026-10-21)
 blockers: none for the repository change
 artifacts: PR body Scorer-lock record and Tests run.
 reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
 claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+last_updated: 2026-10-21 14:40 CT, by Claude
 ```
 
 ### PADDLE-WIRE-001-NORMALIZATION

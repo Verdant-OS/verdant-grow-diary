@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -49,6 +49,17 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
   const [saving, setSaving] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
   const [changedHunt, setChangedHunt] = useState(false);
+  // The hunt this dialog shows now; an add submitted for another hunt is ignored.
+  const currentHunt = useRef(`${huntId}|${growId}`);
+  currentHunt.current = `${huntId}|${growId}`;
+
+  useEffect(() => {
+    // A different hunt starts clean, even if an add for the previous one is pending.
+    setSaving(false);
+    setPicked([]);
+    setMessages([]);
+    setChangedHunt(false);
+  }, [huntId, growId]);
 
   useEffect(() => {
     if (!open) return;
@@ -64,7 +75,7 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
     return () => {
       cancelled = true;
     };
-  }, [open, growId]);
+  }, [open, huntId, growId]);
 
   const eligible = useMemo(
     () =>
@@ -90,8 +101,10 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
       setMessages([PHENO_HUNT_ADD_CANDIDATES_COPY.invalid]);
       return;
     }
+    const submittedFor = `${huntId}|${growId}`;
     setSaving(true);
     const result = await addPhenoHuntCandidates({ huntId, plantIds });
+    if (currentHunt.current !== submittedFor) return;
     setSaving(false);
     const nameOf = (id: string) => eligible.find((p) => p.id === id)?.name ?? "Plant";
     const lines = result.failed.map(

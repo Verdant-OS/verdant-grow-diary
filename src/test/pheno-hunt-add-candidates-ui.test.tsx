@@ -163,6 +163,33 @@ describe("workspace Add candidates dialog", () => {
     expect(onAdded).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores an add that finishes after the workspace moved to another hunt", async () => {
+    service.listPhenoHuntGrowPlants.mockResolvedValue({ ok: true, plants: GROW_PLANTS });
+    let finish: (value: unknown) => void = () => {};
+    service.addPhenoHuntCandidates.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const onAdded = vi.fn();
+    const { rerender } = render(
+      <PhenoHuntAddCandidatesDialog huntId={HUNT} growId={GROW} onAdded={onAdded} />,
+    );
+    fireEvent.click(screen.getByTestId("pheno-add-candidates-open"));
+    fireEvent.click(await screen.findByLabelText("Ashato #3"));
+    fireEvent.click(screen.getByTestId("pheno-add-candidates-submit"));
+    rerender(<PhenoHuntAddCandidatesDialog huntId="hunt-other" growId={GROW} onAdded={onAdded} />);
+    await waitFor(() => expect(service.listPhenoHuntGrowPlants).toHaveBeenCalledTimes(2));
+    await act(async () =>
+      finish({
+        added: [{ plantId: "ashato-3", candidateNumber: 17, candidateLabel: "#17" }],
+        failed: [],
+      }),
+    );
+    expect(screen.queryByTestId("pheno-add-candidates-result")).toBeNull();
+    expect(
+      within(screen.getByTestId("pheno-add-candidates-list")).getByLabelText("Ashato #3"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onAdded).not.toHaveBeenCalled();
+  });
+
   it("says nothing was changed when the grow's plants cannot be read", async () => {
     service.listPhenoHuntGrowPlants.mockResolvedValue({ ok: false });
     render(<PhenoHuntAddCandidatesDialog huntId={HUNT} growId={GROW} onAdded={vi.fn()} />);

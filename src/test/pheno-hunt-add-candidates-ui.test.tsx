@@ -190,6 +190,41 @@ describe("workspace Add candidates dialog", () => {
     expect(onAdded).not.toHaveBeenCalled();
   });
 
+  it("ignores an add that settles after the workspace went to another hunt and back", async () => {
+    service.listPhenoHuntGrowPlants.mockResolvedValue({ ok: true, plants: GROW_PLANTS });
+    let finishFirst: (value: unknown) => void = () => {};
+    let finishSecond: (value: unknown) => void = () => {};
+    service.addPhenoHuntCandidates
+      .mockReturnValueOnce(new Promise((resolve) => (finishFirst = resolve)))
+      .mockReturnValueOnce(new Promise((resolve) => (finishSecond = resolve)));
+    const onAdded = vi.fn();
+    const { rerender } = render(
+      <PhenoHuntAddCandidatesDialog huntId={HUNT} growId={GROW} onAdded={onAdded} />,
+    );
+    fireEvent.click(screen.getByTestId("pheno-add-candidates-open"));
+    fireEvent.click(await screen.findByLabelText("Ashato #3"));
+    fireEvent.click(screen.getByTestId("pheno-add-candidates-submit"));
+    rerender(<PhenoHuntAddCandidatesDialog huntId="hunt-other" growId={GROW} onAdded={onAdded} />);
+    rerender(<PhenoHuntAddCandidatesDialog huntId={HUNT} growId={GROW} onAdded={onAdded} />);
+    await waitFor(() => expect(service.listPhenoHuntGrowPlants).toHaveBeenCalledTimes(3));
+    fireEvent.click(await screen.findByLabelText("Ashato #3"));
+    fireEvent.click(screen.getByTestId("pheno-add-candidates-submit"));
+    await act(async () =>
+      finishSecond({ added: [], failed: [{ plantId: "ashato-3", reason: "network" }] }),
+    );
+    await act(async () =>
+      finishFirst({
+        added: [{ plantId: "ashato-3", candidateNumber: 17, candidateLabel: "#17" }],
+        failed: [],
+      }),
+    );
+    const result = screen.getByTestId("pheno-add-candidates-result");
+    expect(result).toHaveTextContent(PHENO_HUNT_ADD_CANDIDATES_COPY.network);
+    expect(result).not.toHaveTextContent("Added 1 candidate");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onAdded).not.toHaveBeenCalled();
+  });
+
   it("says nothing was changed when the grow's plants cannot be read", async () => {
     service.listPhenoHuntGrowPlants.mockResolvedValue({ ok: false });
     render(<PhenoHuntAddCandidatesDialog huntId={HUNT} growId={GROW} onAdded={vi.fn()} />);
@@ -271,6 +306,36 @@ describe("plant page Add to pheno hunt", () => {
     );
     expect(screen.queryByTestId("add-to-pheno-hunt-result")).toBeNull();
     expect(await screen.findByTestId("add-to-pheno-hunt")).toBeEnabled();
+  });
+
+  it("ignores an add that settles after the page went to another plant and back", async () => {
+    service.loadPlantPhenoHuntOffer.mockImplementation(async (id: string) => ({
+      plant: plant(id, id === "ashato-3" ? "Ashato #3" : "Original Z x Platinum #3"),
+      hunt,
+    }));
+    let finishFirst: (value: unknown) => void = () => {};
+    let finishSecond: (value: unknown) => void = () => {};
+    service.addPhenoHuntCandidates
+      .mockReturnValueOnce(new Promise((resolve) => (finishFirst = resolve)))
+      .mockReturnValueOnce(new Promise((resolve) => (finishSecond = resolve)));
+    const { rerender } = render(<AddToPhenoHuntButton plantId="ashato-3" />);
+    fireEvent.click(await screen.findByTestId("add-to-pheno-hunt"));
+    rerender(<AddToPhenoHuntButton plantId="ozp-3" />);
+    rerender(<AddToPhenoHuntButton plantId="ashato-3" />);
+    fireEvent.click(await screen.findByTestId("add-to-pheno-hunt"));
+    await act(async () =>
+      finishSecond({ added: [], failed: [{ plantId: "ashato-3", reason: "network" }] }),
+    );
+    await act(async () =>
+      finishFirst({
+        added: [{ plantId: "ashato-3", candidateNumber: 17, candidateLabel: "#17" }],
+        failed: [],
+      }),
+    );
+    expect(screen.getByTestId("add-to-pheno-hunt-result")).toHaveTextContent(
+      PHENO_HUNT_ADD_CANDIDATES_COPY.network,
+    );
+    expect(screen.getByTestId("add-to-pheno-hunt")).toBeEnabled();
   });
 
   it("is not offered without Pheno Tracker write access", async () => {

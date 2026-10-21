@@ -25,14 +25,15 @@ export default function AddToPhenoHuntButton({ plantId }: { plantId: string }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
-  // The plant the page shows now; an add that started for another plant is ignored.
-  const currentPlantId = useRef(plantId);
-  currentPlantId.current = plantId;
+  // Bumped on every plant change and every add: only the latest add, for the
+  // plant still shown, may apply its result (A -> B -> A included).
+  const generation = useRef(0);
   const { entitlement } = useMyEntitlements();
   const canWrite = canWriteFeatureData(entitlement, "pheno_tracker");
 
   useEffect(() => {
     let cancelled = false;
+    generation.current += 1;
     setOffer(null);
     setMessage(null);
     setAdded(false);
@@ -59,9 +60,9 @@ export default function AddToPhenoHuntButton({ plantId }: { plantId: string }) {
     if (!canWrite) return;
     setSaving(true);
     setMessage(null);
-    const startedFor = plantId;
-    const result = await addPhenoHuntCandidates({ huntId: hunt.id, plantIds: [startedFor] });
-    if (currentPlantId.current !== startedFor) return;
+    const ticket = ++generation.current;
+    const result = await addPhenoHuntCandidates({ huntId: hunt.id, plantIds: [plantId] });
+    if (generation.current !== ticket) return;
     setSaving(false);
     const addedOne = result.added[0];
     const failure = result.failed[0];

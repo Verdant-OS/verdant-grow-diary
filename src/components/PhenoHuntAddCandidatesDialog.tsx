@@ -49,12 +49,13 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
   const [saving, setSaving] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
   const [changedHunt, setChangedHunt] = useState(false);
-  // The hunt this dialog shows now; an add submitted for another hunt is ignored.
-  const currentHunt = useRef(`${huntId}|${growId}`);
-  currentHunt.current = `${huntId}|${growId}`;
+  // Bumped on every hunt change and every submit: only the latest submit, for
+  // the hunt still shown, may apply its result (H1 -> H2 -> H1 included).
+  const generation = useRef(0);
 
   useEffect(() => {
     // A different hunt starts clean, even if an add for the previous one is pending.
+    generation.current += 1;
     setSaving(false);
     setPicked([]);
     setMessages([]);
@@ -101,10 +102,10 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
       setMessages([PHENO_HUNT_ADD_CANDIDATES_COPY.invalid]);
       return;
     }
-    const submittedFor = `${huntId}|${growId}`;
+    const ticket = ++generation.current;
     setSaving(true);
     const result = await addPhenoHuntCandidates({ huntId, plantIds });
-    if (currentHunt.current !== submittedFor) return;
+    if (generation.current !== ticket) return;
     setSaving(false);
     const nameOf = (id: string) => eligible.find((p) => p.id === id)?.name ?? "Plant";
     const lines = result.failed.map(

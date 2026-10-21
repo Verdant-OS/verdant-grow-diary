@@ -1,9 +1,10 @@
 /**
  * Internal-link map, 2026-10-21 (ranks 1–3). Three guide sections gain one
  * ordinary crawlable link each, to a page the crawl found with few or no
- * incoming internal links. Each anchor must appear exactly once on its source
- * guide, inside the named section, identically in the static no-JS body and on
- * the hydrated page, and point at a page that exists.
+ * incoming internal links. Each destination must be linked exactly once on its
+ * source guide (counted by href, whatever the label), inside the named section,
+ * identically in the static no-JS body and on the hydrated page, and point at a
+ * page that exists.
  */
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -53,6 +54,11 @@ const EDGES = [
   },
 ] as const;
 
+/** Every anchor to `to` under `root`, whatever its label. */
+function anchorsTo(root: ParentNode, to: string): HTMLAnchorElement[] {
+  return Array.from(root.querySelectorAll<HTMLAnchorElement>(`a[href="${to}"]`));
+}
+
 function staticBody(slug: string): Document {
   const doc = STATIC_PUBLIC_SEO_DOCUMENTS.find((d) => d.path === `/guides/${slug}`);
   return new DOMParser().parseFromString(doc?.metadata.bodyFallbackHtml ?? "", "text/html");
@@ -66,6 +72,7 @@ describe("internal-link map data", () => {
     expect(section?.links ?? []).toContainEqual({ label: edge.label, to: edge.to });
     const everyLink = guide?.sections.flatMap((s) => s.links ?? []) ?? [];
     expect(everyLink.filter((l) => l.label === edge.label)).toHaveLength(1);
+    expect(everyLink.filter((l) => l.to === edge.to)).toHaveLength(1);
   });
 
   it("keeps the glossary link after the existing sensor-truth link", () => {
@@ -102,6 +109,20 @@ describe("internal-link map in the static no-JS body", () => {
     );
     expect(sameLabel).toHaveLength(1);
     expect(sameLabel[0].getAttribute("rel")).toBeNull();
+    expect(anchorsTo(html, edge.to)).toHaveLength(1);
+  });
+
+  it("counts a differently labelled second link to the same destination", () => {
+    const edge = EDGES[0];
+    const html = staticBody(edge.source);
+    const extra = html.createElement("a");
+    extra.setAttribute("href", edge.to);
+    extra.textContent = "Grow journal template";
+    html.body.appendChild(extra);
+    expect(anchorsTo(html, edge.to).map((a) => a.textContent)).toEqual([
+      edge.label,
+      "Grow journal template",
+    ]);
   });
 });
 
@@ -112,5 +133,6 @@ describe("internal-link map on the hydrated guide", () => {
     const nav = screen.getByRole("navigation", { name: `In Verdant: ${edge.heading}` });
     expect(within(nav).getByRole("link", { name: edge.label })).toHaveAttribute("href", edge.to);
     expect(screen.getAllByRole("link", { name: edge.label })).toHaveLength(1);
+    expect(anchorsTo(document.body, edge.to)).toHaveLength(1);
   });
 });

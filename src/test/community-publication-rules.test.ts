@@ -194,6 +194,16 @@ describe("validatePublicationDrafts", () => {
     });
   });
 
+  it("returns invalid instead of throwing when the selection is not an array", () => {
+    for (const selection of [null, undefined, {}, "entry-1"]) {
+      for (const mode of ["draft", "publish"] as const) {
+        expect(validatePublicationDrafts(selection as unknown as PublicationDraft[], mode)).toEqual(
+          { ok: false, code: "invalid" },
+        );
+      }
+    }
+  });
+
   it("keeps omitted values absent rather than filling them in", () => {
     const input = [entry({ stage: null, mediaRevisionHandle: null, measurements: [] })];
     const result = validatePublicationDrafts(input, "publish");
@@ -276,5 +286,16 @@ describe("isPreviewCurrent", () => {
     expect(
       isPreviewCurrent(preview({ expiresAt: "2026-10-21T04:15:00" }), current, ISSUED_AT_MS),
     ).toBe(false);
+  });
+
+  it("is not current instead of throwing when the preview or current snapshot is missing", () => {
+    for (const missing of [null, undefined]) {
+      expect(
+        isPreviewCurrent(missing as unknown as PublicationPreview, current, ISSUED_AT_MS),
+      ).toBe(false);
+      expect(isPreviewCurrent(preview(), missing as unknown as typeof current, ISSUED_AT_MS)).toBe(
+        false,
+      );
+    }
   });
 });

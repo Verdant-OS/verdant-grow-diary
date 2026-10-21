@@ -31,6 +31,11 @@ export function readCommunityInstant(timestamp: string): CommunityInstant | null
   return { ms, subMs: Number(fraction.slice(3, 9).padEnd(6, "0")) };
 }
 
+/** A usable publication handle: a non-empty string, so ties break consistently. */
+function isHandle(handle: unknown): handle is string {
+  return typeof handle === "string" && handle.length > 0;
+}
+
 /** Code-point comparison, so ordering never depends on the runtime locale. */
 function compareHandles(a: string, b: string): number {
   if (a === b) return 0;
@@ -59,6 +64,10 @@ export function orderCommunityDigest(
   items: readonly DigestItem[],
   before: DigestCursor,
 ): CommunityResult<readonly DigestItem[]> {
+  if (!Array.isArray(items)) return { ok: false, code: "invalid" };
+  if (before !== null && (typeof before !== "object" || !isHandle(before.publicationHandle))) {
+    return { ok: false, code: "invalid" };
+  }
   const cursorAt = before === null ? null : readCommunityInstant(before.publishedAt);
   if (before !== null && cursorAt === null) return { ok: false, code: "invalid" };
 
@@ -67,6 +76,7 @@ export function orderCommunityDigest(
     if (item?.publication === null || item?.publication === undefined) {
       return { ok: false, code: "invalid" };
     }
+    if (!isHandle(item.publication.publicationHandle)) return { ok: false, code: "invalid" };
     const at = readCommunityInstant(item.publication.publishedAt);
     if (at === null) return { ok: false, code: "invalid" };
     placed.push({ item, at });

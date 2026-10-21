@@ -151,7 +151,8 @@ Consequences that bind every slice:
    - the Tent Garden route renders the same not-found page as the catch-all and returns before any data
      read; it never imports the 3D chunk;
    - no link to it exists anywhere;
-   - an E2E test asserts both (§12, T12).
+   - T12 asserts both: a unit test covers both flag values at every head, and the E2E spec covers the
+     value that head ships (§12).
 3. **Release in two steps, both on production** (Verdant has no other verification host; AGENTS.md,
    release rules). Each step gates a publish, so each merges only on Matthew's explicit yes with a
    release packet (live SHA, target SHA, commits, checks at the target, rollback target):
@@ -310,6 +311,7 @@ Queue.
 | `src/pages/TentDetail.tsx`                        | Page (edit)      | S5b    | One "Open Tent Garden" link, after the S5a receipts pass                                                                                        |
 | `src/test/tent-garden-*.test.ts(x)`               | Tests            | each   | §12                                                                                                                                             |
 | `e2e/tent-garden.spec.ts`                         | E2E              | S3, S4 | §12, `chromium-mocked`, explicit spec filter                                                                                                    |
+| `e2e/auth-route-protection-mobile.spec.ts`        | E2E (edit)       | S3     | Add `/tents/<fixture-id>/garden` to `PROTECTED_MOBILE_ROUTES` (T11): signed-out redirect and no private read at 390×844                         |
 | `package.json` (`e2e:mocked-closure` script only) | CI wiring (edit) | S3     | Append `e2e/tent-garden.spec.ts` to that script's explicit spec list                                                                            |
 
 The `e2e:mocked-closure` script is what the "Mocked E2E closure" job runs, a `mustBeGreen` context
@@ -388,10 +390,21 @@ D2(c), List-first.
 10. **25 plants:** a 25-plant fixture in a 5×5 tent: List has 25 rows (A2); the scene draws 25 pots or
     takes the scene-limit path per §7; P7 draw calls recorded; selection test 6 passes for all 25; a
     26-plant fixture opens List view.
-11. **Route policy:** the manifest cross-check passes with `/tents/:id/garden`.
-12. **Flag off (E2E):** with `tentGardenEnabled = false`, `/tents/<id>/garden` shows the not-found page,
-    issues no plant read, loads no 3D chunk, and no page links to it. **Dark launch (E2E, S5a):** with
-    the flag `true` and before S5b, the page renders and still no page links to it.
+11. **Route policy:** the manifest cross-check passes with `/tents/:id/garden`, and
+    `e2e/auth-route-protection-mobile.spec.ts` lists `/tents/<fixture-id>/garden` in
+    `PROTECTED_MOBILE_ROUTES`, so a signed-out visit at 390×844 redirects to sign-in and reads no
+    private table. That list is hard-coded, so adding the route to the manifest alone does not cover it.
+12. **Flag gate, both values.** The build-time constant fixes one value per build, so no single E2E
+    build can exercise both. Coverage is split:
+    - **Unit, every head:** `src/test/tent-garden-flag-gate.test.tsx` renders the route component with
+      `@/lib/featureFlags` mocked to each value and the plant hook stubbed. With `false`: the not-found
+      page, no plant read, no 3D import. With `true`: the page renders. This keeps the rollback path
+      (flag back to `false`) tested at every head, including after S5a.
+    - **E2E, the value the head ships:** S3 and S4 assert the flag-off half: `/tents/<id>/garden` shows
+      the not-found page, issues no plant read, loads no 3D chunk, and no page links to it. S5a replaces
+      it with the dark-launch half: the page renders and still no page links to it. S5b replaces that
+      with the linked state: Tent Detail's one link opens the page. A rollback PR restores the flag-off
+      half in the same commit that sets the flag back to `false`.
 13. **Accessibility:** A1–A7 automated in the E2E spec; A8 as a recorded manual receipt.
 
 **Where they run.** Unit tests live in `src/test/`, so the 32 Vitest shards run them. The E2E spec runs

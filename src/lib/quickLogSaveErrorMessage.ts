@@ -11,12 +11,14 @@
  *     consistent.
  */
 
+import { QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE } from "./quickLogWateringFormViewModel";
 export type QuickLogSaveReason =
   | "no_selection"
   | "target_unresolved"
   | "selection_not_found"
   | "empty_content"
   | "invalid_volume"
+  | "volume_too_large"
   | "temperature_out_of_range"
   | "humidity_out_of_range"
   | "vpd_out_of_range"
@@ -121,6 +123,8 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
       return "Add a note, photo, or reading before saving.";
     case "invalid_volume":
       return "Enter a watering volume greater than zero.";
+    case "volume_too_large":
+      return QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE;
     case "temperature_out_of_range":
       return "Temperature must be between -10 and 60°C.";
     case "humidity_out_of_range":
@@ -194,6 +198,8 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
       return "Check the plant's grow and tent, correct the assignment, then retry this entry.";
     case "invalid_volume":
       return "Enter a volume above zero and save again.";
+    case "volume_too_large":
+      return QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE;
     case "empty_content":
       return "Add a note, photo, or reading, then save again.";
     case "temperature_out_of_range":

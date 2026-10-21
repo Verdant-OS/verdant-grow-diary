@@ -19,9 +19,13 @@ describe("TentDetail VPD stage-missing info badge", () => {
   });
 
   it("gates the badge on a present VPD value and an unknown resolved tent stage", () => {
+    // #2148: the displayed VPD is `headerVpd` (the stored snapshot's VPD, or
+    // the shared-series fallback when the snapshot observed none), so the
+    // badge gates on that value instead of `snap?.vpd` alone.
     expect(SRC).toMatch(
-      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*normalizeVpdStage\(envStage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tent-detail-vpd-stage-missing-badge/,
+      /headerVpd\s*!==\s*null\s*&&\s*headerVpd\s*!==\s*undefined\s*&&\s*normalizeVpdStage\(envStage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tent-detail-vpd-stage-missing-badge/,
     );
+    expect(SRC).toMatch(/const headerVpd = headerVpdObservation\.value;/);
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {

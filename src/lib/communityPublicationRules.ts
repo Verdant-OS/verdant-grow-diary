@@ -1,9 +1,9 @@
+import { isCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
 import type {
   CommunityResult,
   PublicationDraft,
   PublicationPreview,
   SharedMeasurement,
-  SharedMeasurementProvenance,
 } from "@/lib/communityTypes";
 
 export const COMMUNITY_MAX_SELECTED_ENTRIES = 100;
@@ -12,29 +12,22 @@ export const COMMUNITY_PREVIEW_TTL_MS = 15 * 60 * 1000;
 const SOURCE_LABEL_MAX = 80;
 const NOTE_MAX = 4000;
 
-const PROVENANCES: readonly SharedMeasurementProvenance[] = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-];
-
 function characterCount(text: string): number {
   return Array.from(text).length;
 }
 
 function isPresent(text: string): boolean {
-  return text.trim().length > 0;
+  return typeof text === "string" && text.trim().length > 0;
 }
 
 function isValidMeasurement(measurement: SharedMeasurement): boolean {
   return (
+    typeof measurement === "object" &&
+    measurement !== null &&
     isPresent(measurement.name) &&
     isPresent(measurement.unit) &&
     Number.isFinite(measurement.value) &&
-    PROVENANCES.includes(measurement.provenance)
+    isCanonicalSensorSource(measurement.provenance)
   );
 }
 
@@ -47,9 +40,11 @@ function isValidDraft(entry: PublicationDraft): boolean {
     isPresent(entry.sourceJournalLabel) &&
     characterCount(entry.sourceJournalLabel) <= SOURCE_LABEL_MAX &&
     Number.isFinite(Date.parse(entry.occurredAt)) &&
+    typeof entry.note === "string" &&
     characterCount(entry.note) <= NOTE_MAX &&
     (entry.stage === null || isPresent(entry.stage)) &&
     (entry.mediaRevisionHandle === null || isPresent(entry.mediaRevisionHandle)) &&
+    Array.isArray(entry.measurements) &&
     entry.measurements.every(isValidMeasurement)
   );
 }
@@ -88,6 +83,12 @@ export function isPreviewCurrent(
   if (!Number.isFinite(nowMs) || !Number.isFinite(expiresAtMs)) return false;
   if (!isPresent(preview.previewToken)) return false;
   if (nowMs >= expiresAtMs) return false;
+  // Absent on both sides is not a match: every binding field must be present to compare.
+  const bindings = [preview, current];
+  if (!bindings.every((b) => Number.isFinite(b.collectionRevision))) return false;
+  if (!bindings.every((b) => Number.isFinite(b.accessVersion))) return false;
+  if (!bindings.every((b) => isPresent(b.payloadHash))) return false;
+  if (!bindings.every((b) => isPresent(b.sourceMediaBindingHash))) return false;
   return (
     preview.collectionRevision === current.collectionRevision &&
     preview.accessVersion === current.accessVersion &&

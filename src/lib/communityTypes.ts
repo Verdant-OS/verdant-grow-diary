@@ -1,3 +1,5 @@
+import type { CanonicalSensorSource } from "@/constants/sensorIngestProvenance";
+
 /**
  * Community V1 contracts (docs: community-v1-design.md, plan Task 1).
  *
@@ -24,7 +26,7 @@ export interface CommunityProfileDraft {
 }
 
 /** Canonical sensor source labels; vendor or transport details are not provenance. */
-export type SharedMeasurementProvenance = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
+export type SharedMeasurementProvenance = CanonicalSensorSource;
 
 export interface SharedMeasurement {
   name: string;

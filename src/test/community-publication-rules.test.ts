@@ -164,6 +164,20 @@ describe("validatePublicationDrafts", () => {
     }
   });
 
+  it("returns invalid instead of throwing when an untrusted draft has no measurements array", () => {
+    for (const measurements of [undefined, null, "ph", [null]]) {
+      const bad = { ...entry(), measurements } as unknown as PublicationDraft;
+      expect(validatePublicationDrafts([bad], "publish")).toEqual({ ok: false, code: "invalid" });
+    }
+  });
+
+  it("returns invalid instead of throwing when an untrusted draft omits a text field", () => {
+    for (const field of ["note", "stage", "action", "sourceJournalLabel"] as const) {
+      const bad = { ...entry(), [field]: undefined } as unknown as PublicationDraft;
+      expect(validatePublicationDrafts([bad], "publish")).toEqual({ ok: false, code: "invalid" });
+    }
+  });
+
   it("keeps omitted values absent rather than filling them in", () => {
     const input = [entry({ stage: null, mediaRevisionHandle: null, measurements: [] })];
     const result = validatePublicationDrafts(input, "publish");
@@ -205,6 +219,35 @@ describe("isPreviewCurrent", () => {
     expect(isPreviewCurrent(preview(), { ...current, payloadHash: "edited" }, ISSUED_AT_MS)).toBe(
       false,
     );
+  });
+
+  it("fails closed when a revision or hash is missing on both sides, not matching absent to absent", () => {
+    const missing = {
+      collectionRevision: undefined,
+      accessVersion: undefined,
+      payloadHash: undefined,
+      sourceMediaBindingHash: undefined,
+    } as unknown as typeof current;
+    for (const field of Object.keys(missing) as (keyof typeof current)[]) {
+      const blank = { [field]: missing[field] };
+      expect(
+        isPreviewCurrent(
+          preview(blank as Partial<PublicationPreview>),
+          { ...current, ...blank },
+          ISSUED_AT_MS,
+        ),
+      ).toBe(false);
+    }
+    expect(
+      isPreviewCurrent(
+        preview({ collectionRevision: Number.NaN }),
+        { ...current, collectionRevision: Number.NaN },
+        ISSUED_AT_MS,
+      ),
+    ).toBe(false);
+    expect(
+      isPreviewCurrent(preview({ payloadHash: "" }), { ...current, payloadHash: "" }, ISSUED_AT_MS),
+    ).toBe(false);
   });
 
   it("fails closed on an unreadable expiry, non-finite time or missing handle", () => {

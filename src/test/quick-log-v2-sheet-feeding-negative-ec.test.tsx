@@ -169,6 +169,22 @@ describe("QuickLogV2Sheet — feeding EC cannot be negative (#2159)", () => {
     expect(saveButton()).toBeDisabled();
   });
 
+  it.each([
+    ["EC in", "-1e2", "qlv2-feed-ec-in-error", "EC can't be negative."],
+    ["EC in", "-1e-2", "qlv2-feed-ec-in-error", "EC can't be negative."],
+    ["EC out", "-1e2", "qlv2-feed-ec-out-error", "Output EC can't be negative."],
+    ["Runoff EC", "-1e2", "qlv2-feed-runoff-ec-error", "Runoff EC can't be negative."],
+  ])("guards %s typed in exponent form (%s)", (label, typed, testId, message) => {
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    typeAndTab(label, typed);
+    expect(screen.getByTestId(testId)).toHaveTextContent(message);
+    expect(saveButton()).toBeDisabled();
+    clickSave();
+    expect(writeFeedingMock).not.toHaveBeenCalled();
+  });
+
   it("clears the message and re-enables Save once the EC is corrected", () => {
     renderSheet("plant:plant-1");
     clickFeed();

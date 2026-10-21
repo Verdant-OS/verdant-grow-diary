@@ -447,10 +447,19 @@ const FEEDING_EC_NEGATIVE_CHECKS = [
   ["runoffEc", "runoff_ec:negative"],
 ] as const;
 
+/** Any typed text that parses to a finite number below zero, exponent forms included. */
+function isTypedNegativeNumber(raw: string | null | undefined): boolean {
+  const trimmed = raw?.trim() ?? "";
+  if (trimmed === "") return false;
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value < 0;
+}
+
 /**
- * Live check of the feeding EC fields (#2159). A negative EC is named under
- * its own field and blocks Save as soon as it is typed, with the same copy the
- * save-time validation uses. Blank, zero and positive values pass here.
+ * Live check of the feeding EC fields (#2159). A negative EC, in plain or
+ * exponent form, is named under its own field and blocks Save as soon as it
+ * is typed, with the same copy the save-time validation uses. Blank, zero and
+ * positive values pass here.
  */
 export function assessFeedingEcFields(form: Pick<QuickLogFeedingFormState, FeedingEcFieldKey>): {
   fields: Partial<Record<FeedingEcFieldKey, string>>;
@@ -459,7 +468,7 @@ export function assessFeedingEcFields(form: Pick<QuickLogFeedingFormState, Feedi
   const fields: Partial<Record<FeedingEcFieldKey, string>> = {};
   let footerMessage: string | null = null;
   for (const [key, reason] of FEEDING_EC_NEGATIVE_CHECKS) {
-    if (!isExplicitNegativeDecimal(form[key])) continue;
+    if (!isTypedNegativeNumber(form[key])) continue;
     fields[key] = feedingFormReasonToHelper(reason);
     footerMessage ??= fields[key];
   }

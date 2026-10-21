@@ -1,11 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, basename } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
+import CommunityV1RunErrorsReporter, {
   COMMUNITY_V1_REQUIRED_CASES,
+  COMMUNITY_V1_RUN_ERRORS_ENV,
   runCommunityFixtureSql,
 } from "../../scripts/security/community-v1-db-proof.mjs";
 
@@ -16,7 +17,8 @@ const TOTAL = COMMUNITY_V1_REQUIRED_CASES.length;
 beforeEach(() => {
   sqlCommand.mockReset();
 });
-function fixture(result: object | null, code = 0) {
+const CLEAN_RUN = { moduleErrors: 0, suiteErrors: 0, unhandledErrors: 0 };
+function fixture(result: object | null, code = 0, runErrors: object | null = CLEAN_RUN) {
   const root = mkdtempSync(join(tmpdir(), "verdant-community-runner-"));
   roots.push(root);
   mkdirSync(join(root, "node_modules/vitest"), { recursive: true });
@@ -27,6 +29,10 @@ function fixture(result: object | null, code = 0) {
     const report = process.argv.find(arg => arg.startsWith('--outputFile='))?.slice(13);
     const body = ${JSON.stringify(result === null ? null : JSON.stringify(result))};
     if (report && body !== null) writeFileSync(report, body);
+    const errorsPath = process.env.${COMMUNITY_V1_RUN_ERRORS_ENV};
+    const runErrors = ${JSON.stringify(runErrors === null ? null : JSON.stringify(runErrors))};
+    if (errorsPath && runErrors !== null) writeFileSync(errorsPath, runErrors);
+    console.log('STUB_ARGS ' + process.argv.slice(2).join(' '));
     console.log('STUB_EXECUTED');
     process.exit(${code});
   `,
@@ -217,6 +223,74 @@ describe("community v1 RED receipt mode", () => {
       expect(redRun(red(), code).status).toBe(2);
     },
   );
+  it("runs Vitest with the run-errors reporter", () => {
+    const result = redRun(red());
+    expect(result.stdout).toContain("--reporter=./scripts/security/community-v1-db-proof.mjs");
+  });
+  it.each([
+    ["a describe-level hook error (Codex P1 at 10bd581e)", { ...CLEAN_RUN, suiteErrors: 1 }],
+    ["a file-level hook error", { ...CLEAN_RUN, moduleErrors: 1 }],
+    ["an unhandled error", { ...CLEAN_RUN, unhandledErrors: 1 }],
+    ["a missing run-errors record", null],
+    ["a malformed run-errors record", { suiteErrors: "0" }],
+  ])("blocks RED on %s", (_label, runErrors) => {
+    const blocked = run(fixture(red(), 1, runErrors), {}, ["--expect-red"]);
+    expect(blocked.status).toBe(2);
+    expect(blocked.stderr).toContain("BLOCKED");
+  });
+  it("blocks RED when the JSON report carries a file-level error message", () => {
+    const result = red();
+    (result.testResults[0] as { message?: string }).message = "afterAll failed";
+    expect(redRun(result).status).toBe(2);
+  });
+  it("blocks RED when a case carries a second failure (an afterEach error)", () => {
+    const result = red();
+    result.testResults[0].assertionResults[7].failureMessages = [
+      FUNCTION_MARKER,
+      "Error: AFTER_EACH_BOOM",
+    ];
+    expect(redRun(result).status).toBe(2);
+  });
+});
+
+describe("community v1 run-errors reporter", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+  function capture(modules: object[], unhandled: unknown[]) {
+    const dir = mkdtempSync(join(tmpdir(), "verdant-community-reporter-"));
+    dirs.push(dir);
+    const out = join(dir, "run-errors.json");
+    const previous = process.env[COMMUNITY_V1_RUN_ERRORS_ENV];
+    process.env[COMMUNITY_V1_RUN_ERRORS_ENV] = out;
+    try {
+      new CommunityV1RunErrorsReporter().onTestRunEnd(modules as never, unhandled as never);
+    } finally {
+      if (previous === undefined) delete process.env[COMMUNITY_V1_RUN_ERRORS_ENV];
+      else process.env[COMMUNITY_V1_RUN_ERRORS_ENV] = previous;
+    }
+    return JSON.parse(readFileSync(out, "utf8"));
+  }
+  const module = (moduleErrors: number, suiteErrors: number[]) => ({
+    errors: () => Array.from({ length: moduleErrors }, () => new Error("module")),
+    children: {
+      allSuites: () =>
+        suiteErrors.map((n) => ({
+          errors: () => Array.from({ length: n }, () => new Error("suite")),
+        })),
+    },
+  });
+  it("counts module, suite and unhandled errors without their messages", () => {
+    expect(capture([module(1, [0, 2]), module(0, [1])], [new Error("x")])).toEqual({
+      moduleErrors: 1,
+      suiteErrors: 3,
+      unhandledErrors: 1,
+    });
+  });
+  it("records a clean run as zeros", () => {
+    expect(capture([module(0, [0])], [])).toEqual(CLEAN_RUN);
+  });
 });
 
 describe("community v1 fixture SQL stays local and private", () => {

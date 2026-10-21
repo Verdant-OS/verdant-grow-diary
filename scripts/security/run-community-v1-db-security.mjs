@@ -24,7 +24,9 @@ import { mkdtempSync, readFileSync, unlinkSync, rmdirSync, existsSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  COMMUNITY_V1_RUN_ERRORS_ENV,
   requireLocalCommunityEnvironment,
+  requireCleanCommunityRun,
   requireExecutedCommunityProof,
   requireRedCommunityProof,
 } from "./community-v1-db-proof.mjs";
@@ -38,6 +40,7 @@ try {
 }
 const reportDir = mkdtempSync(join(tmpdir(), "verdant-community-v1-proof-"));
 const reportPath = join(reportDir, "report.json");
+const runErrorsPath = join(reportDir, "run-errors.json");
 try {
   const child = spawnSync(
     process.execPath,
@@ -48,9 +51,15 @@ try {
       "src/test/integration/community-v1-authority.integration.test.ts",
       "--reporter=default",
       "--reporter=json",
+      "--reporter=./scripts/security/community-v1-db-proof.mjs",
       `--outputFile=${reportPath}`,
     ],
-    { stdio: "inherit", env: process.env, timeout: 600_000, windowsHide: true },
+    {
+      stdio: "inherit",
+      env: { ...process.env, [COMMUNITY_V1_RUN_ERRORS_ENV]: runErrorsPath },
+      timeout: 600_000,
+      windowsHide: true,
+    },
   );
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
   const { passed, failed } = requireExecutedCommunityProof(report);
@@ -60,6 +69,8 @@ try {
     // A timeout, signal, spawn error or runner crash is never a RED receipt.
     if (child.error || child.signal || child.status !== 1) throw new Error("abnormal exit");
     requireRedCommunityProof(report);
+    // Hook and unhandled errors are invisible in the JSON report; the reporter counts them.
+    requireCleanCommunityRun(JSON.parse(readFileSync(runErrorsPath, "utf8")), report);
     console.log("Community V1 RED receipt: every case failed on a missing community object.");
     process.exitCode = 0;
   } else {
@@ -69,8 +80,9 @@ try {
   console.error("BLOCKED: community v1 DB proof did not produce a complete execution receipt.");
   process.exitCode = 2;
 } finally {
-  // Only these two exact temporary paths; no recursive removal.
+  // Only these exact temporary paths; no recursive removal.
   if (existsSync(reportPath)) unlinkSync(reportPath);
+  if (existsSync(runErrorsPath)) unlinkSync(runErrorsPath);
   try {
     rmdirSync(reportDir);
   } catch {

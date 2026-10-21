@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
@@ -162,10 +163,62 @@ export function requireRedCommunityProof(report) {
   const cases = (report?.testResults ?? []).flatMap((file) => file.assertionResults ?? []);
   if (
     passed !== 0 ||
-    cases.some((item) => !COMMUNITY_OBJECT_MISSING_LINE.test(firstFailureLine(item)))
+    cases.some(
+      (item) =>
+        // A second failure on a case (an afterEach error) is not the missing schema.
+        item.failureMessages?.length !== 1 ||
+        !COMMUNITY_OBJECT_MISSING_LINE.test(firstFailureLine(item)),
+    )
   ) {
     throw new Error(
       "BLOCKED: community v1 RED receipt requires every case to fail on a missing community function or relation.",
+    );
+  }
+}
+
+/** Env var naming the file the run-errors reporter writes for the proof runner. */
+export const COMMUNITY_V1_RUN_ERRORS_ENV = "COMMUNITY_V1_RUN_ERRORS_FILE";
+
+const RUN_ERROR_KEYS = ["moduleErrors", "suiteErrors", "unhandledErrors"];
+
+/**
+ * Vitest's JSON report drops a describe-level hook error and unhandled errors,
+ * so a teardown failure could sit beside 37 marker failures unseen (Codex P1 at
+ * 10bd581e). The runner loads this module as an extra Vitest reporter; it
+ * writes only counts, never error text, to the file the runner names.
+ */
+export default class CommunityV1RunErrorsReporter {
+  onTestRunEnd(testModules = [], unhandledErrors = []) {
+    const path = process.env[COMMUNITY_V1_RUN_ERRORS_ENV];
+    if (!path) return;
+    let moduleErrors = 0;
+    let suiteErrors = 0;
+    for (const testModule of testModules) {
+      moduleErrors += testModule.errors().length;
+      for (const suite of testModule.children.allSuites()) suiteErrors += suite.errors().length;
+    }
+    writeFileSync(
+      path,
+      JSON.stringify({ moduleErrors, suiteErrors, unhandledErrors: unhandledErrors.length }),
+    );
+  }
+}
+
+/**
+ * A RED receipt also needs a clean run outside the cases: zero module, suite and
+ * unhandled errors from the reporter, and no file-level error in the JSON report.
+ */
+export function requireCleanCommunityRun(runErrors, report) {
+  const counted =
+    runErrors !== null &&
+    typeof runErrors === "object" &&
+    RUN_ERROR_KEYS.every((key) => runErrors[key] === 0);
+  const fileErrors = (report?.testResults ?? []).some(
+    (file) => typeof file.message === "string" && file.message !== "",
+  );
+  if (!counted || fileErrors) {
+    throw new Error(
+      "BLOCKED: community v1 RED receipt requires no suite, module or unhandled errors.",
     );
   }
 }

@@ -141,8 +141,20 @@ export function requireExecutedCommunityProof(report) {
   return { passed, failed: total - passed };
 }
 
-// A RED failure must come from the absent Community V1 schema, never from fixture setup.
-const MISSING_COMMUNITY_OBJECT = /MISSING_RPC community_|PGRST205|42P01/;
+/**
+ * A RED failure must come from the absent Community V1 schema, never from fixture setup
+ * or an assertion. The integration test throws this structured marker only after
+ * PostgREST names the missing community function or table itself. It is matched
+ * against the FIRST LINE of the case's first failure message, never anywhere in
+ * the text, so an assertion diff that quotes a code cannot pass for RED.
+ */
+export const COMMUNITY_OBJECT_MISSING_LINE =
+  /^(?:Error: )?COMMUNITY_OBJECT_MISSING (?:function|relation) community_[a-z_]+ (?:PGRST202|PGRST205)$/;
+
+function firstFailureLine(item) {
+  const first = item.failureMessages?.[0];
+  return typeof first === "string" ? first.split("\n", 1)[0].trim() : "";
+}
 
 /** Task 2A receipt: every case executed and failed on a missing community function or relation. */
 export function requireRedCommunityProof(report) {
@@ -150,7 +162,7 @@ export function requireRedCommunityProof(report) {
   const cases = (report?.testResults ?? []).flatMap((file) => file.assertionResults ?? []);
   if (
     passed !== 0 ||
-    cases.some((item) => !MISSING_COMMUNITY_OBJECT.test((item.failureMessages ?? []).join("\n")))
+    cases.some((item) => !COMMUNITY_OBJECT_MISSING_LINE.test(firstFailureLine(item)))
   ) {
     throw new Error(
       "BLOCKED: community v1 RED receipt requires every case to fail on a missing community function or relation.",

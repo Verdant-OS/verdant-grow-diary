@@ -54,6 +54,7 @@ function isLocalSupabaseUrl(u: string): boolean {
       h === "127.0.0.1" ||
       h === "localhost" ||
       h === "::1" ||
+      h === "[::1]" ||
       h === "0.0.0.0" ||
       h.endsWith(".localhost")
     );
@@ -75,7 +76,6 @@ interface Actor {
   username: string;
 }
 
-const MISSING_FUNCTION_CODES = new Set(["PGRST202", "42883"]);
 const MUTATING = new Set([
   "community_profile_upsert",
   "community_profile_deactivate",
@@ -122,7 +122,11 @@ function uname(): string {
 }
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Sends one RPC; a transport error is a test failure, never a denial value. */
+/**
+ * Sends one RPC; a transport error is a test failure, never a denial value.
+ * Only when PostgREST itself names this community function as missing does the
+ * error carry the structured RED marker that requireRedCommunityProof accepts.
+ */
 async function rpc(
   client: SupabaseClient,
   fn: string,
@@ -131,8 +135,15 @@ async function rpc(
   const body = MUTATING.has(fn) ? { p_idempotency_key: randomUUID(), ...args } : args;
   const { data, error } = await client.rpc(fn as never, body as never);
   if (error) {
-    const kind = MISSING_FUNCTION_CODES.has(error.code ?? "") ? "MISSING_RPC" : "RPC_ERROR";
-    throw new Error(`${kind} ${fn} ${error.code ?? "unknown"}`);
+    const missing =
+      error.code === "PGRST202" &&
+      /^community_[a-z_]+$/.test(fn) &&
+      (error.message ?? "").includes(`public.${fn}(`);
+    throw new Error(
+      missing
+        ? `COMMUNITY_OBJECT_MISSING function ${fn} PGRST202`
+        : `RPC_ERROR ${fn} ${error.code ?? "unknown"}`,
+    );
   }
   return data as Result;
 }
@@ -153,16 +164,13 @@ function denied(result: Result, code: string): void {
   expect(result).toEqual({ ok: false, code });
 }
 
-async function newUser(
-  tag: string,
-  confirmed = true,
-): Promise<Omit<Actor, "communityId" | "username">> {
+async function newUser(tag: string): Promise<Omit<Actor, "communityId" | "username">> {
   const email = `cv1+${tag}+${randomUUID().slice(0, 8)}@example.test`;
   const password = `Test-${randomUUID()}-A1!`;
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: confirmed,
+    email_confirm: true,
   });
   if (error || !data.user) throw new Error("failed to create fixture user");
   createdUsers.push(data.user.id);
@@ -172,6 +180,21 @@ async function newUser(
   const { error: signInError } = await client.auth.signInWithPassword({ email, password });
   if (signInError) throw new Error("failed to sign in fixture user");
   return { id: data.user.id, client };
+}
+
+/**
+ * A signed-in user whose email is then marked unconfirmed in the disposable
+ * database, so the server-side verification check (D4) is what is exercised,
+ * independent of the local GoTrue confirmation and autoconfirm settings.
+ */
+async function unverifiedUser(tag: string): Promise<Omit<Actor, "communityId" | "username">> {
+  const user = await newUser(tag);
+  sql(`UPDATE auth.users SET email_confirmed_at = NULL WHERE id = ${lit(user.id)};`);
+  const state = sql(
+    `SELECT coalesce(email_confirmed_at::text, 'unconfirmed') FROM auth.users WHERE id = ${lit(user.id)};`,
+  );
+  if (state !== "unconfirmed") throw new Error("BLOCKED: unverified fixture is still confirmed.");
+  return user;
 }
 
 /** A verified user who has opted in with an explicit username. */
@@ -346,28 +369,77 @@ function seedDerivativeItem(owner: Actor, collection: string, entryId: string): 
   return derivative;
 }
 
-/** Holds a row lock in a second psql session while the race calls are fired. */
-function holdRowLock(table: string, column: string, value: string, seconds = 2): Promise<void> {
-  return new Promise((resolve, reject) => {
+interface LockHold {
+  pid: number;
+  done: Promise<void>;
+}
+
+/**
+ * Holds one row lock in a second psql session. Ready only once that session has
+ * locked the row and is sleeping inside its transaction. The hold is bounded by
+ * the fixture's 10 s statement_timeout and released early by race().
+ */
+async function holdRowLock(table: string, column: string, value: string): Promise<LockHold> {
+  const where = `${column} = ${lit(value)}`;
+  if (sql(`SELECT count(*) FROM public.${table} WHERE ${where};`) !== "1") {
+    throw new Error("BLOCKED: the row to lock does not exist.");
+  }
+  const tag = `cv1_lock_${randomUUID().replace(/-/g, "")}`;
+  const done = new Promise<void>((resolve) => {
     runCommunityFixtureSql(
-      `BEGIN; SELECT 1 FROM public.${table} WHERE ${column} = ${lit(value)} FOR UPDATE;
-       SELECT pg_sleep(${seconds}); COMMIT;`,
+      `SET application_name = '${tag}';
+       BEGIN; SELECT 1 FROM public.${table} WHERE ${where} FOR UPDATE;
+       SELECT pg_sleep(9); COMMIT;`,
       process.env,
       (command: string, args: string[], options: { env: NodeJS.ProcessEnv; input: string }) => {
-        const child = execFile(command, args, { env: options.env, timeout: 15_000 }, (error) =>
-          error ? reject(new Error("BLOCKED: lock-holding psql session failed.")) : resolve(),
+        // Cancelled on purpose by race(); either way the transaction ends and the lock is released.
+        const child = execFile(command, args, { env: options.env, timeout: 20_000 }, () =>
+          resolve(),
         );
         child.stdin?.end(options.input);
         return "";
       },
     );
   });
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const pid = sql(
+      `SELECT pid FROM pg_stat_activity WHERE application_name = '${tag}' AND wait_event = 'PgSleep';`,
+    );
+    if (pid) return { pid: Number(pid), done };
+    await sleep(100);
+  }
+  throw new Error("BLOCKED: the lock-holding session did not take its row lock.");
 }
-async function race<T>(lock: Promise<void>, calls: Array<() => Promise<T>>): Promise<T[]> {
-  await sleep(300);
-  const results = await Promise.all(calls.map((call) => call()));
-  await lock;
-  return results;
+
+/**
+ * Fires the calls while the row is held, waits until at least two of them are
+ * queued on a lock (PostgREST's pool may queue the rest before the database),
+ * then releases the lock. Contention is asserted, never assumed from timing.
+ */
+async function race<T>(hold: LockHold, calls: Array<() => Promise<T>>): Promise<T[]> {
+  const settled = calls.map((call) =>
+    call().then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    ),
+  );
+  const needed = Math.min(calls.length, 2);
+  let waiting = 0;
+  for (let attempt = 0; attempt < 70 && waiting < needed; attempt += 1) {
+    await sleep(100);
+    waiting = Number(
+      sql(
+        `SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND pid <> ${hold.pid};`,
+      ),
+    );
+  }
+  sql(`SELECT pg_cancel_backend(${hold.pid});`);
+  await hold.done;
+  const outcomes = await Promise.all(settled);
+  const failed = outcomes.find((outcome) => !outcome.ok);
+  if (failed && !failed.ok) throw failed.error;
+  expect(waiting, "racing calls queued on the held lock").toBeGreaterThanOrEqual(needed);
+  return outcomes.map((outcome) => (outcome as { value: T }).value);
 }
 
 /** Every client RPC, with real targets where the context supplies them. */
@@ -718,7 +790,7 @@ d("community v1 authority (local DB)", () => {
       expect(await notUnavailable(anonymous, everyClientCall(target))).toEqual([]);
     }
 
-    const unverified = await newUser("pro3u", false);
+    const unverified = await unverifiedUser("pro3u");
     expect(await notUnavailable(unverified.client, everyClientCall(target))).toEqual([]);
     expect(
       sql(`SELECT count(*) FROM public.community_profiles WHERE user_id = ${lit(unverified.id)};`),
@@ -812,7 +884,7 @@ d("community v1 authority (local DB)", () => {
     const accessHandle = await requestAccess(viewer, collection);
     const expected = accessRevision(accessHandle);
     const [withdraw, approve] = await race(
-      holdRowLock("community_collection_access", "handle", accessHandle),
+      await holdRowLock("community_collection_access", "handle", accessHandle),
       [
         () =>
           rpc(viewer.client, "community_access_withdraw", {
@@ -889,11 +961,17 @@ d("community v1 authority (local DB)", () => {
       watering: { volume_ml: 500, ph: 6.2, ec_ms_cm: 1.4 },
     });
     const plain = diaryEntry(owner);
+    // The owner-selected date (#2297): the UTC date of entry_at, inside the server's ±1 day bound.
+    const selectedDate = sql(
+      `SELECT to_char((entry_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') FROM public.diary_entries WHERE id = ${lit(watered)};`,
+    );
     await publish(owner, collection, [draft(diaryEntry(owner))]);
     await grant(owner, viewer, collection);
+    ok(await follow(viewer, owner));
     const { preview: shown } = await publish(owner, collection, [
       draft(watered, {
         sharedNote: "Watered to runoff",
+        occurredDate: selectedDate,
         includeStage: true,
         measurementKeys: ["watering.volume_ml", "watering.ph", "watering.ec_ms_cm"],
       }),
@@ -916,6 +994,40 @@ d("community v1 authority (local DB)", () => {
     expect(delivered[0].measurements).toEqual(
       expect.arrayContaining([expect.objectContaining({ provenance: "manual" })]),
     );
+    // Exact reader-facing fields: no full instant, source id, preview binding or private key.
+    const publicationKeys = [
+      "action",
+      "derivativeHandle",
+      "measurements",
+      "note",
+      "occurredDate",
+      "publicationHandle",
+      "publishedAt",
+      "revision",
+      "sourceJournalLabel",
+      "stage",
+    ];
+    const digestItems = (await digest(viewer)).items;
+    expect(digestItems).toHaveLength(2);
+    for (const item of [...delivered, ...digestItems.map((entry: Json) => entry.publication)]) {
+      expect(Object.keys(item).sort()).toEqual(publicationKeys);
+    }
+    for (const entry of digestItems) {
+      expect(Object.keys(entry).sort()).toEqual([
+        "collectionTitle",
+        "ownerDisplayName",
+        "ownerUsername",
+        "publication",
+        "sourceJournalLabel",
+      ]);
+    }
+    expect(delivered[0].occurredDate).toBe(selectedDate);
+    expect(delivered[0].occurredDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(delivered[1].occurredDate).toBeNull();
+    const serialized = JSON.stringify([delivered, digestItems]);
+    for (const secret of [watered, plain, owner.id, owner.communityId]) {
+      expect(serialized).not.toContain(secret);
+    }
   }, 60_000);
 
   it("T-PUB-02 later private entries and note edits never appear in a publication", async () => {
@@ -986,7 +1098,7 @@ d("community v1 authority (local DB)", () => {
     expect(revision()).toBe(before + 1);
 
     const second = await preview(owner, collection, [draft(diaryEntry(owner))]);
-    const racing = await race(holdRowLock("community_collections", "handle", collection), [
+    const racing = await race(await holdRowLock("community_collections", "handle", collection), [
       () =>
         rpc(owner.client, "community_publish", {
           p_collection_handle: collection,
@@ -1015,7 +1127,7 @@ d("community v1 authority (local DB)", () => {
       draft(diaryEntry(owner), { sharedNote: "racing" }),
     ]);
     const expected = accessRevision(revokedAccess);
-    await race(holdRowLock("community_collections", "handle", collection), [
+    await race(await holdRowLock("community_collections", "handle", collection), [
       () =>
         rpc(owner.client, "community_publish", {
           p_collection_handle: collection,
@@ -1442,7 +1554,7 @@ d("community v1 authority (local DB)", () => {
       }
     }
     const follows = await race(
-      holdRowLock("community_profiles", "id", actor.communityId),
+      await holdRowLock("community_profiles", "id", actor.communityId),
       targets.map((target) => () => follow(actor, target)),
     );
     expect(follows.filter((r) => r.ok)).toHaveLength(20);
@@ -1451,7 +1563,7 @@ d("community v1 authority (local DB)", () => {
     ]);
 
     const requests = await race(
-      holdRowLock("community_profiles", "id", actor.communityId),
+      await holdRowLock("community_profiles", "id", actor.communityId),
       collections.map(
         (handle) => () =>
           rpc(actor.client, "community_access_request", { p_collection_handle: handle }),
@@ -1485,27 +1597,143 @@ d("community v1 authority (local DB)", () => {
   }, 60_000);
 
   it("T-KS-01 with the kill switch off every client RPC is unavailable", async () => {
+    // Each RPC runs as an otherwise-authorized actor with valid arguments, first with the
+    // switch off (must be unavailable), then on (must not be), so only the switch explains it.
     const { owner, collection, entries } = await publishedOwner("ks1");
-    const viewer = await participant("ks1v");
-    const accessHandle = await requestAccess(viewer, collection);
-    const publicationHandle = ok(await read(owner, collection)).items[0].publicationHandle;
-    expect(entries).toHaveLength(1);
-    sql(`UPDATE public.community_feature_state SET enabled = false;`);
+    const second = await newCollection(owner, "Second");
+    await publish(owner, second, [draft(diaryEntry(owner))]);
+    const reader = await participant("ks1r");
+    await grant(owner, reader, collection);
+    ok(await follow(reader, owner));
+    await publish(owner, collection, [
+      draft(entries[0], { sharedNote: "shared ks1 0" }),
+      draft(diaryEntry(owner), { sharedNote: "after follow" }),
+    ]);
+    const publicationHandle = ok(await read(reader, collection)).items[0].publicationHandle;
+    const requester = await participant("ks1q");
+    const decideHandle = await requestAccess(requester, collection);
+    const withdrawer = await participant("ks1w");
+    const withdrawHandle = await requestAccess(withdrawer, collection);
+    const newcomer = await participant("ks1n");
+    const blockTarget = await participant("ks1b");
+    const leaver = await participant("ks1l");
+    await grant(owner, leaver, collection);
+    const reporter = await participant("ks1p");
+    await grant(owner, reporter, collection);
+    const report = ok(
+      await rpc(reporter.client, "community_report_create", {
+        p_publication_handle: publicationHandle,
+        p_reason_code: "spam",
+        p_reason_text: "",
+      }),
+    );
+    const moderator = await participant("ks1m");
+    sql(`INSERT INTO public.community_moderators (user_id) VALUES (${lit(moderator.id)});`);
+    const quitter = await participant("ks1d");
+    const pending = await preview(owner, collection, [draft(diaryEntry(owner))]);
+
+    const calls: Array<[Actor, string, () => Record<string, unknown>]> = [
+      [
+        owner,
+        "community_publish",
+        () => ({ p_collection_handle: collection, p_preview_token: pending.previewToken }),
+      ],
+      [
+        owner,
+        "community_profile_upsert",
+        () => ({ p_username: owner.username, p_display_name: "Owner again", p_bio: "" }),
+      ],
+      [newcomer, "community_profile_search", () => ({ p_username: owner.username })],
+      [
+        newcomer,
+        "community_follow_set",
+        () => ({ p_profile_id: owner.communityId, p_follow: true }),
+      ],
+      [
+        owner,
+        "community_collection_draft",
+        () => ({
+          p_collection_handle: collection,
+          p_title: "Tent log",
+          p_source_label: "Main tent",
+          p_description: "Synthetic fixture collection",
+        }),
+      ],
+      [owner, "community_source_entries", () => ({ p_cursor: null, p_limit: 20 })],
+      [
+        owner,
+        "community_preview_create",
+        () => ({ p_collection_handle: collection, p_entries: [draft(entries[0])] }),
+      ],
+      [
+        reader,
+        "community_collection_read",
+        () => ({ p_collection_handle: collection, p_cursor: null, p_limit: 20 }),
+      ],
+      [reader, "community_digest_read", () => ({ p_cursor: null, p_limit: 20 })],
+      [reader, "community_digest_seen", () => ({ p_publication_handles: [publicationHandle] })],
+      [
+        reader,
+        "community_report_create",
+        () => ({
+          p_publication_handle: publicationHandle,
+          p_reason_code: "other",
+          p_reason_text: "",
+        }),
+      ],
+      [newcomer, "community_access_request", () => ({ p_collection_handle: collection })],
+      [
+        owner,
+        "community_access_decide",
+        () => ({
+          p_access_handle: decideHandle,
+          p_decision: "approve",
+          p_expected_revision: accessRevision(decideHandle),
+        }),
+      ],
+      [
+        withdrawer,
+        "community_access_withdraw",
+        () => ({
+          p_access_handle: withdrawHandle,
+          p_expected_revision: accessRevision(withdrawHandle),
+        }),
+      ],
+      [leaver, "community_access_leave", () => ({ p_collection_handle: collection })],
+      [
+        owner,
+        "community_block_set",
+        () => ({ p_profile_id: blockTarget.communityId, p_block: true }),
+      ],
+      [moderator, "community_moderation_list", () => ({ p_cursor: null, p_limit: 20 })],
+      [
+        moderator,
+        "community_moderation_decide",
+        () => ({
+          p_report_handle: report.reportHandle,
+          p_decision: "dismiss",
+          p_reason: "fixture",
+        }),
+      ],
+      [owner, "community_unpublish", () => ({ p_collection_handle: second })],
+      [quitter, "community_profile_deactivate", () => ({})],
+    ];
+    expect(new Set(calls.map(([, fn]) => fn)).size).toBe(20);
+    const leaks: string[] = [];
+    const baselineUnavailable: string[] = [];
     try {
-      expect(
-        await notUnavailable(
-          owner.client,
-          everyClientCall({
-            username: owner.username,
-            profileId: viewer.communityId,
-            collection,
-            accessHandle,
-            publicationHandle,
-          }),
-        ),
-      ).toEqual([]);
+      for (const [actor, fn, args] of calls) {
+        sql(`UPDATE public.community_feature_state SET enabled = false;`);
+        const off = await rpc(actor.client, fn, args());
+        if (!(off.ok === false && off.code === "unavailable")) leaks.push(fn);
+        sql(`UPDATE public.community_feature_state SET enabled = true;`);
+        const on = await rpc(actor.client, fn, args());
+        if (on.ok === false && on.code === "unavailable") baselineUnavailable.push(fn);
+      }
     } finally {
       sql(`UPDATE public.community_feature_state SET enabled = true;`);
     }
-  }, 90_000);
+    expect(leaks).toEqual([]);
+    expect(baselineUnavailable).toEqual([]);
+  }, 180_000);
 });

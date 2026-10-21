@@ -56,6 +56,9 @@ try {
   const { passed, failed } = requireExecutedCommunityProof(report);
   console.log(`Community V1 DB proof: ${passed} passed, ${failed} failed, 0 skipped`);
   if (expectRed) {
+    // RED is Vitest's normal failing exit (1) with every case on the missing schema.
+    // A timeout, signal, spawn error or runner crash is never a RED receipt.
+    if (child.error || child.signal || child.status !== 1) throw new Error("abnormal exit");
     requireRedCommunityProof(report);
     console.log("Community V1 RED receipt: every case failed on a missing community object.");
     process.exitCode = 0;

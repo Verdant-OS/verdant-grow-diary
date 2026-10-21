@@ -31,63 +31,106 @@ BEGIN
   RAISE NOTICE '✓ T-CAT-01 RLS enabled and forced on all 13 community tables';
 END $$;
 
--- T-CAT-02: no table privilege for PUBLIC, anon or authenticated (survives db reset + seed).
+-- T-CAT-02: no table or column privilege for PUBLIC, anon or authenticated (survives db reset + seed).
+-- Reads the ACLs directly: information_schema.role_table_grants omits grants to PUBLIC.
 DO $$
-DECLARE leaked TEXT;
+DECLARE leaked TEXT; tbl RECORD; role_name TEXT;
 BEGIN
-  SELECT string_agg(format('%s on %s (%s)', grantee, table_name, privilege_type), ', ')
+  SELECT string_agg(format('%s on %s (%s)',
+                           CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE r.rolname END,
+                           c.relname, a.privilege_type), ', ')
     INTO leaked
-    FROM information_schema.role_table_grants
-   WHERE table_schema = 'public' AND table_name LIKE 'community\_%'
-     AND grantee IN ('PUBLIC', 'anon', 'authenticated');
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL aclexplode(c.relacl) a
+    LEFT JOIN pg_roles r ON r.oid = a.grantee
+   WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname LIKE 'community\_%'
+     AND (a.grantee = 0 OR r.rolname IN ('anon', 'authenticated'));
   ASSERT leaked IS NULL, format('T-CAT-02 client table grants present: %s', leaked);
-  RAISE NOTICE '✓ T-CAT-02 no client table grants on community tables';
+  FOR tbl IN
+    SELECT c.oid, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname LIKE 'community\_%'
+  LOOP
+    FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+      ASSERT NOT has_table_privilege(role_name, tbl.oid,
+                 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+         AND NOT has_any_column_privilege(role_name, tbl.oid, 'SELECT, INSERT, UPDATE, REFERENCES'),
+        format('T-CAT-02 %I holds a privilege on %I (direct, column-level or via PUBLIC)', role_name, tbl.relname);
+    END LOOP;
+  END LOOP;
+  RAISE NOTICE '✓ T-CAT-02 no client table or column grants on community tables';
 END $$;
 
--- T-CAT-03: definer + fixed search_path, and the EXECUTE matrix, per function.
+-- T-CAT-03: exact signatures (no extra overloads), definer, the exact fixed search_path
+-- with pg_temp last, and the EXECUTE matrix, per function.
 DO $$
 DECLARE
-  client_rpcs TEXT[] := ARRAY[
-    'community_profile_upsert', 'community_profile_search', 'community_profile_deactivate',
-    'community_follow_set', 'community_collection_draft', 'community_source_entries',
-    'community_preview_create', 'community_publish', 'community_unpublish',
-    'community_access_request', 'community_access_decide', 'community_access_withdraw',
-    'community_access_leave', 'community_collection_read', 'community_digest_read',
-    'community_digest_seen', 'community_block_set', 'community_report_create',
-    'community_moderation_list', 'community_moderation_decide'
-  ];
-  server_rpcs TEXT[] := ARRAY['community_account_deletion_begin', 'community_media_lookup'];
+  -- Identity arguments per client RPC (packet §6.3; mutating RPCs add p_idempotency_key).
+  client_rpcs JSONB := '{
+    "community_profile_upsert":     ["p_bio text", "p_display_name text", "p_idempotency_key uuid", "p_username text"],
+    "community_profile_search":     ["p_username text"],
+    "community_profile_deactivate": ["p_idempotency_key uuid"],
+    "community_follow_set":         ["p_follow boolean", "p_idempotency_key uuid", "p_profile_id uuid"],
+    "community_collection_draft":   ["p_collection_handle uuid", "p_description text", "p_idempotency_key uuid", "p_source_label text", "p_title text"],
+    "community_source_entries":     ["p_cursor text", "p_limit integer"],
+    "community_preview_create":     ["p_collection_handle uuid", "p_entries jsonb", "p_idempotency_key uuid"],
+    "community_publish":            ["p_collection_handle uuid", "p_idempotency_key uuid", "p_preview_token text"],
+    "community_unpublish":          ["p_collection_handle uuid", "p_idempotency_key uuid"],
+    "community_access_request":     ["p_collection_handle uuid", "p_idempotency_key uuid"],
+    "community_access_decide":      ["p_access_handle uuid", "p_decision text", "p_expected_revision integer", "p_idempotency_key uuid"],
+    "community_access_withdraw":    ["p_access_handle uuid", "p_expected_revision integer", "p_idempotency_key uuid"],
+    "community_access_leave":       ["p_collection_handle uuid", "p_idempotency_key uuid"],
+    "community_collection_read":    ["p_collection_handle uuid", "p_cursor text", "p_limit integer"],
+    "community_digest_read":        ["p_cursor text", "p_limit integer"],
+    "community_digest_seen":        ["p_publication_handles uuid[]"],
+    "community_block_set":          ["p_block boolean", "p_idempotency_key uuid", "p_profile_id uuid"],
+    "community_report_create":      ["p_idempotency_key uuid", "p_publication_handle uuid", "p_reason_code text", "p_reason_text text"],
+    "community_moderation_list":    ["p_cursor text", "p_limit integer"],
+    "community_moderation_decide":  ["p_decision text", "p_idempotency_key uuid", "p_reason text", "p_report_handle uuid"]
+  }'::jsonb;
+  server_rpcs JSONB := '{
+    "community_account_deletion_begin": ["p_user_id uuid"],
+    "community_media_lookup":           ["p_derivative_handle uuid", "p_viewer_user_id uuid"]
+  }'::jsonb;
   helpers TEXT[] := ARRAY['community_actor', 'community_can_read', 'community_fmt_ts'];
-  fn RECORD; name TEXT;
+  signatures JSONB := client_rpcs || server_rpcs;
+  fn RECORD; name TEXT; got JSONB;
 BEGIN
-  FOREACH name IN ARRAY client_rpcs || server_rpcs || helpers LOOP
-    ASSERT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-                    WHERE n.nspname = 'public' AND p.proname = name),
-      format('T-CAT-03 missing function public.%I', name);
+  FOR name IN SELECT jsonb_object_keys(signatures) UNION ALL SELECT unnest(helpers) LOOP
+    ASSERT (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+             WHERE n.nspname = 'public' AND p.proname = name) = 1,
+      format('T-CAT-03 expected exactly one public.%I (no overloads)', name);
   END LOOP;
   FOR fn IN
-    SELECT p.oid, p.proname, p.prosecdef, p.proconfig
+    SELECT p.oid, p.proname, p.prosecdef, p.proconfig, p.proacl
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public' AND p.proname LIKE 'community\_%'
   LOOP
-    ASSERT fn.proname = ANY (client_rpcs || server_rpcs || helpers),
+    ASSERT signatures ? fn.proname OR fn.proname = ANY (helpers),
       format('T-CAT-03 unexpected community function %I', fn.proname);
+    IF signatures ? fn.proname THEN
+      SELECT coalesce(jsonb_agg(arg ORDER BY arg), '[]'::jsonb) INTO got
+        FROM unnest(string_to_array(pg_get_function_identity_arguments(fn.oid), ', ')) AS arg
+       WHERE arg <> '';
+      ASSERT got = signatures -> fn.proname,
+        format('T-CAT-03 %I has arguments %s, expected %s', fn.proname, got, signatures -> fn.proname);
+    END IF;
     ASSERT fn.prosecdef, format('T-CAT-03 %I is not SECURITY DEFINER', fn.proname);
-    ASSERT EXISTS (SELECT 1 FROM unnest(fn.proconfig) c WHERE c LIKE 'search_path=%'),
-      format('T-CAT-03 %I has no fixed search_path', fn.proname);
+    ASSERT (SELECT array_agg(c) FROM unnest(fn.proconfig) c WHERE c LIKE 'search_path=%')
+             = ARRAY['search_path=public, pg_temp'],
+      format('T-CAT-03 %I search_path must be exactly public, pg_temp (got %s)', fn.proname, fn.proconfig);
     ASSERT NOT has_function_privilege('anon', fn.oid, 'EXECUTE'),
       format('T-CAT-03 anon can execute %I', fn.proname);
-    ASSERT NOT EXISTS (SELECT 1 FROM aclexplode(
-                        (SELECT proacl FROM pg_proc WHERE oid = fn.oid)) a
-                        WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE')
-             AND (SELECT proacl FROM pg_proc WHERE oid = fn.oid) IS NOT NULL,
+    ASSERT fn.proacl IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM aclexplode(fn.proacl) a
+                        WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'),
       format('T-CAT-03 PUBLIC can execute %I', fn.proname);
-    ASSERT has_function_privilege('authenticated', fn.oid, 'EXECUTE') = (fn.proname = ANY (client_rpcs)),
+    ASSERT has_function_privilege('authenticated', fn.oid, 'EXECUTE') = (client_rpcs ? fn.proname),
       format('T-CAT-03 authenticated EXECUTE on %I is wrong', fn.proname);
-    ASSERT has_function_privilege('service_role', fn.oid, 'EXECUTE') = (fn.proname = ANY (server_rpcs)),
+    ASSERT has_function_privilege('service_role', fn.oid, 'EXECUTE') = (server_rpcs ? fn.proname),
       format('T-CAT-03 service_role EXECUTE on %I is wrong', fn.proname);
   END LOOP;
-  RAISE NOTICE '✓ T-CAT-03 community functions are definer, pinned and correctly granted';
+  RAISE NOTICE '✓ T-CAT-03 community functions have exact signatures, definer, pinned search_path and grants';
 END $$;
 
 -- T-CAT-04: no views over community tables; no policy TO anon.

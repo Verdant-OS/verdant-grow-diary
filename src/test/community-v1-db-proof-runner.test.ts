@@ -156,41 +156,67 @@ describe("community v1 proof runner refuses false receipts", () => {
 });
 
 describe("community v1 RED receipt mode", () => {
-  const red = (message = "Error: MISSING_RPC community_profile_upsert PGRST202") => {
+  const FUNCTION_MARKER =
+    "Error: COMMUNITY_OBJECT_MISSING function community_profile_upsert PGRST202\n    at rpc (file.ts:1:1)";
+  const red = (message = FUNCTION_MARKER) => {
     const result = report("failed");
     for (const item of result.testResults[0].assertionResults) item.failureMessages = [message];
     return result;
   };
+  const redRun = (result: object, code = 1) => run(fixture(result, code), {}, ["--expect-red"]);
+
   it("confirms RED with exit 0 when every case failed on a missing community object", () => {
-    const result = run(fixture(red(), 1), {}, ["--expect-red"]);
+    const result = redRun(red());
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Community V1 RED receipt");
   });
-  it("accepts a missing relation (PGRST205) as a RED cause", () => {
+  it("accepts a missing community relation marker", () => {
     expect(
-      run(fixture(red("expected ':PGRST205' to end with ':42501'"), 1), {}, ["--expect-red"])
-        .status,
+      redRun(red("Error: COMMUNITY_OBJECT_MISSING relation community_profiles PGRST205")).status,
     ).toBe(0);
   });
-  it("blocks RED when any case failed for another reason, such as fixture setup", () => {
+  it.each([
+    [
+      "an assertion diff quoting a code (Codex P1)",
+      "AssertionError: expected ':PGRST205' to end with ':42501'",
+    ],
+    [
+      "a marker quoted inside an assertion",
+      "AssertionError: expected 'COMMUNITY_OBJECT_MISSING relation community_profiles PGRST205' to be null",
+    ],
+    ["a non-community relation", "Error: COMMUNITY_OBJECT_MISSING relation profiles PGRST205"],
+    ["a bare missing-relation code", "Error: relation does not exist 42P01"],
+    [
+      "a community RPC failing on a base dependency",
+      "Error: RPC_ERROR community_profile_upsert 42P01",
+    ],
+    [
+      "a marker on a later line only",
+      "Error: failed to create fixture user\nCOMMUNITY_OBJECT_MISSING function community_x PGRST202",
+    ],
+  ])("blocks RED on %s", (_label, message) => {
     const result = red();
-    result.testResults[0].assertionResults[4].failureMessages = [
-      "Error: failed to create fixture user",
-    ];
-    const run1 = run(fixture(result, 1), {}, ["--expect-red"]);
-    expect(run1.status).toBe(2);
-    expect(run1.stderr).toContain("BLOCKED");
+    result.testResults[0].assertionResults[4].failureMessages = [message];
+    const blocked = redRun(result);
+    expect(blocked.status).toBe(2);
+    expect(blocked.stderr).toContain("BLOCKED");
   });
   it("blocks RED when any case passed", () => {
     const result = red();
     result.testResults[0].assertionResults[0].status = "passed";
-    expect(run(fixture(result, 1), {}, ["--expect-red"]).status).toBe(2);
+    expect(redRun(result).status).toBe(2);
   });
   it("blocks RED on an incomplete receipt", () => {
     const result = red();
     result.numPendingTests = 1;
-    expect(run(fixture(result, 1), {}, ["--expect-red"]).status).toBe(2);
+    expect(redRun(result).status).toBe(2);
   });
+  it.each([0, 2])(
+    "blocks RED when Vitest exits %i instead of its failing exit (Codex P1)",
+    (code) => {
+      expect(redRun(red(), code).status).toBe(2);
+    },
+  );
 });
 
 describe("community v1 fixture SQL stays local and private", () => {

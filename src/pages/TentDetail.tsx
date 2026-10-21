@@ -114,7 +114,11 @@ import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetConte
 import TentPendingOutcomeNotice from "@/components/TentPendingOutcomeNotice";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
-import { resolveTentDetailVpd } from "@/lib/tentDetailVpdRules";
+import {
+  resolveTentDetailVpd,
+  tentDetailCaptureClimate,
+  tentDetailVpdNeedsOwnProvenance,
+} from "@/lib/tentDetailVpdRules";
 
 const EMPTY_TENT_PLANTS: never[] = [];
 
@@ -211,30 +215,40 @@ export default function TentDetail() {
   // this tent, from the same stored rows and diary-inclusive snapshot, so a
   // newer same-capture temperature and RH pair beats an older stored VPD here too.
   const tonightSnapshot = useLatestSensorSnapshot(tent?.growId ?? null, tent ? [tent.id] : []);
-  const tonightVpd = buildTonightTentMetrics({
+  const tonightMetrics = buildTonightTentMetrics({
     rows: readings,
     rowsRead: {
       status: sensorReadings.isError ? "error" : sensorReadings.isPending ? "loading" : "success",
     },
     snapshot: { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
     now: new Date(nowMs),
-  }).find((metric) => metric.key === "vpd");
+  });
+  const tonightValue = (key: string) =>
+    tonightMetrics.find((metric) => metric.key === key)?.value ?? null;
   const headerVpdObservation = resolveTentDetailVpd({
-    tonight: tonightVpd,
+    tonight: tonightMetrics.find((metric) => metric.key === "vpd"),
     existing: storedVpdObservation,
     rejectedMetrics: header.truth?.invalidFields ?? [],
+    contributors: { temp: tonightValue("temp"), rh: tonightValue("rh") },
+    captureClimate: tentDetailCaptureClimate(
+      readings,
+      tonightSnapshot.status === "ok" ? tonightSnapshot.snapshot : null,
+    ),
     nowMs,
   });
   const headerVpd = headerVpdObservation.value;
   // A fallback VPD carries its own provenance on a VPD-specific element. The
   // shared Environment header keeps the stored snapshot's source, time and
   // staleness, because its temperature and RH come from that snapshot.
-  const vpdFromFallback =
-    headerVpdObservation.value !== null &&
-    (headerVpdObservation.calculated ||
-      snap?.vpd === null ||
-      snap?.vpd === undefined ||
-      headerVpdObservation.value !== snap.vpd);
+  const vpdFromFallback = tentDetailVpdNeedsOwnProvenance({
+    observation: headerVpdObservation,
+    header: {
+      vpd: snap?.vpd,
+      source: snap?.source ?? null,
+      capturedAt: header.capturedAt,
+      stale: header.stale,
+    },
+  });
   const fallbackVpdSourceLabel = vpdFromFallback
     ? formatSensorSourceLabel({ source: headerVpdObservation.source })
     : null;

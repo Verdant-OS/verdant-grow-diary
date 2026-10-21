@@ -407,4 +407,59 @@ describe("Tent detail VPD agrees with the Dashboard Tonight card", () => {
     expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(1.3));
     expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
   });
+
+  // Copilot P1 on #2303: Tonight runs no realism check, so the chosen VPD and
+  // its same-capture temperature and RH are checked before the tent page adopts it.
+  it("does not adopt a VPD whose capture has unrealistic RH when a newer CO2-only capture follows", () => {
+    const badAt = new Date(NOW.getTime() - 10 * 60 * 1000).toISOString();
+    const co2At = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+    state.rows = [
+      { ...row("temperature_c", 24, badAt), source: "live" },
+      { ...row("humidity_pct", 150, badAt), source: "live" },
+      { ...row("vpd_kpa", 1.2, badAt), source: "live" },
+      { ...row("co2_ppm", 800, co2At), source: "live" },
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.2 });
+    expect(screen.queryByTestId("metric-chip-VPD")?.textContent ?? "").not.toContain("1.2");
+  });
+
+  it("does not adopt a diary snapshot VPD whose RH is unrealistic when there are no stored rows", () => {
+    state.snapshot = {
+      status: "ok",
+      snapshot: { source: "diary", ts: hoursAgo(1), temp: 24, rh: 150, vpd: 1.2 },
+    };
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.2 });
+    expect(screen.queryByTestId("metric-chip-VPD")?.textContent ?? "").not.toContain("1.2");
+  });
+
+  // Copilot P2 on #2303: an equal value from a different, fresher observation
+  // still needs its own provenance line.
+  it("shows the VPD's own provenance when an equal value comes from a fresher observation", () => {
+    const oldAt = hoursAgo(48);
+    state.rows = [
+      { ...row("temperature_c", 25, oldAt), source: "live" },
+      { ...row("humidity_pct", 60, oldAt), source: "live" },
+      { ...row("vpd_kpa", 1.3, oldAt), source: "live" },
+    ];
+    state.snapshot = {
+      status: "ok",
+      snapshot: {
+        source: "diary",
+        ts: new Date(NOW.getTime() - 5 * 60 * 1000).toISOString(),
+        temp: null,
+        rh: null,
+        vpd: 1.3,
+      },
+    };
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.3, calculated: false });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(1.3));
+    const provenance = screen.getByTestId("tent-detail-vpd-provenance");
+    expect(within(provenance).getByTestId("tent-detail-vpd-captured")).toHaveTextContent(
+      "5 minutes ago",
+    );
+    expect(within(provenance).queryByTestId("tent-detail-vpd-stale")).toBeNull();
+  });
 });

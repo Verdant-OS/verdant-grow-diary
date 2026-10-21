@@ -293,6 +293,40 @@ describe("community v1 run-errors reporter", () => {
   });
 });
 
+describe("community v1 integration suite skip gate", () => {
+  it("skips, rather than fails, when the database URL is missing", () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-community-runner-gate-"));
+    roots.push(root);
+    const outputFile = join(root, "report.json");
+    const env: Record<string, string | undefined> = Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([k]) => !k.startsWith("GIT_") && !k.startsWith("SUPABASE_"),
+      ),
+    );
+    Object.assign(env, {
+      SUPABASE_URL: "http://127.0.0.1:54321",
+      SUPABASE_ANON_KEY: "fake-anon",
+      SUPABASE_SERVICE_ROLE_KEY: "fake-service",
+    });
+    const child = spawnSync(
+      process.execPath,
+      [
+        resolve("node_modules/vitest/vitest.mjs"),
+        "run",
+        "src/test/integration/community-v1-authority.integration.test.ts",
+        "--reporter=json",
+        `--outputFile=${outputFile}`,
+      ],
+      { env, encoding: "utf8", timeout: 120_000 },
+    );
+    expect(child.status).toBe(0);
+    const result = JSON.parse(readFileSync(outputFile, "utf8"));
+    expect(result.numFailedTests).toBe(0);
+    expect(result.numPassedTests).toBe(0);
+    expect(result.numPendingTests).toBe(TOTAL);
+  }, 150_000);
+});
+
 describe("community v1 fixture SQL stays local and private", () => {
   const env = {
     SUPABASE_URL: "http://127.0.0.1:54321",

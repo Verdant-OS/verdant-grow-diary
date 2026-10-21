@@ -45,6 +45,7 @@ import {
 const URL = process.env.SUPABASE_URL ?? "";
 const ANON = process.env.SUPABASE_ANON_KEY ?? "";
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const DB_URL = process.env.SUPABASE_DB_URL?.trim() ?? "";
 // Safety gate: this file creates and deletes auth users and writes fixture
 // rows. It must never run against a remote project.
 function isLocalSupabaseUrl(u: string): boolean {
@@ -62,7 +63,7 @@ function isLocalSupabaseUrl(u: string): boolean {
     return false;
   }
 }
-const hasLocalSupabase = !!URL && !!ANON && !!SERVICE && isLocalSupabaseUrl(URL);
+const hasLocalSupabase = !!URL && !!ANON && !!SERVICE && !!DB_URL && isLocalSupabaseUrl(URL);
 const d = hasLocalSupabase ? describe : describe.skip;
 
 // Response bodies are untyped JSON from PostgREST.

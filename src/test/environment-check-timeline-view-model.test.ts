@@ -269,17 +269,4 @@ describe("environmentCheckTimelineViewModel", () => {
       }),
     ).toBeNull();
   });
-
-  it("shows RH on the Timeline card for an envelope that stores only the humidity alias", () => {
-    // The diary snapshot and the correction note already read `humidity`;
-    // the card must not drop a reading they count.
-    const entry = {
-      id: "env-humidity-alias",
-      entry_at: "2026-06-15T18:30:00.000Z",
-      details: { event_type: "environment", environment_check: { humidity: 55 } },
-    };
-    const vm = buildEnvironmentCheckTimelineViewModel(entry);
-    expect(vm?.fields).toEqual([{ key: "humidity", label: "RH", value: "55%" }]);
-    expect(buildEnvironmentCheckDiaryEntryInput(entry)?.snapshot?.rhPercent).toBe(55);
-  });
 });

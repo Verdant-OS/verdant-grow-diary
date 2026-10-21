@@ -50,7 +50,10 @@ import QuickLogAllActivitiesSection, {
   type QuickLogAllActivitiesSaveSuccess,
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
-import { resolveQuickLogPendingSectionPhotoBlock } from "@/lib/quickLogPendingSectionPhotoRules";
+import {
+  QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY,
+  resolveQuickLogPendingSectionPhotoBlock,
+} from "@/lib/quickLogPendingSectionPhotoRules";
 import { buildQuickLogTargetKey } from "@/lib/quickLogActivityRules";
 import { readPendingQuickLogActivity } from "@/lib/quickLogPendingActivityStore";
 import { STAGES } from "@/lib/grow";
@@ -504,6 +507,15 @@ export default function QuickLog({
   const [saveError, setSaveError] = useState<string | null>(null);
   // The All activity types Photo editor saves its image itself; Save log never carries it.
   const [sectionPhotoPending, setSectionPhotoPending] = useState(false);
+  const handleSectionPhotoPendingChange = useCallback((pending: boolean) => {
+    setSectionPhotoPending(pending);
+    // Once the photo is saved, cleared or rejected, drop only this block message.
+    if (!pending) {
+      setSaveError((current) =>
+        current === QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY ? null : current,
+      );
+    }
+  }, []);
   const [starterWaterPending, setStarterWaterPending] = useState<PendingStarterWater | null>(null);
   const [starterWaterStorageBlocked, setStarterWaterStorageBlocked] = useState(false);
   const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
@@ -2347,7 +2359,7 @@ export default function QuickLog({
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           onRecoveryLockChange={handleActivityRecoveryLockChange}
-          onPendingPhotoChange={setSectionPhotoPending}
+          onPendingPhotoChange={handleSectionPhotoPendingChange}
           saveBlocked={saveLocked || recoveryLocked}
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {

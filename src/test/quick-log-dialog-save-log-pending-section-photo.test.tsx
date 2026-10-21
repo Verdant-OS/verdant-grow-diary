@@ -7,7 +7,7 @@
  * selected there. A note-only Save log keeps working.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import QuickLog from "@/components/QuickLog";
@@ -24,6 +24,17 @@ vi.mock("@/hooks/useQuickLogV2Save", () => ({
     error: null,
   }),
 }));
+
+// The PNG signature read can be held open to exercise the validation window.
+const pngCheck = vi.hoisted(() => ({ hold: null as null | (() => Promise<unknown>) }));
+vi.mock("@/lib/quickLogPhotoContentRules", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quickLogPhotoContentRules")>();
+  return {
+    ...actual,
+    validateQuickLogPngClaim: (file: File) =>
+      pngCheck.hold ? pngCheck.hold() : actual.validateQuickLogPngClaim(file),
+  };
+});
 
 const insertMock = vi.fn();
 const uploadMock = vi.fn();
@@ -124,6 +135,7 @@ beforeEach(() => {
   insertMock.mockReset();
   uploadMock.mockReset();
   rpcMock.mockReset();
+  pngCheck.hold = null;
 });
 
 describe("resolveQuickLogPendingSectionPhotoBlock", () => {
@@ -160,6 +172,56 @@ describe("Quick Log dialog: Save log with a selected Photo-section image", () =>
     listener.stop();
     // The selected photo is kept so the grower can still save it.
     expect(screen.getByText(/Selected: bud\.jpg/)).toBeInTheDocument();
+  });
+
+  it("blocks Save log while a chosen PNG is still being checked, and releases it if rejected", async () => {
+    let finishCheck: (result: { ok: true } | { ok: false; message: string }) => void = () => {};
+    pngCheck.hold = () => new Promise((resolve) => (finishCheck = resolve));
+    const dialog = openDialog();
+    selectPhotoActivity();
+    const file = new File(["img-bytes"], "bud.png", { type: "image/png" });
+    fireEvent.change(screen.getByTestId(`${PREFIX}-photo-file`), { target: { files: [file] } });
+    // The check has not finished, so nothing is shown as selected yet.
+    expect(screen.queryByText(/Selected: bud\.png/)).toBeNull();
+    expect(screen.getByTestId(`${PREFIX}-save`)).toBeDisabled();
+
+    typeMainNote(dialog, "short note");
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+    expect(await screen.findByTestId("quick-log-save-error")).toHaveTextContent(
+      QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY,
+    );
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+
+    // The file turns out not to be a PNG: the photo is no longer pending, the
+    // block message goes away and the note saves on its own.
+    await act(async () => finishCheck({ ok: false, message: "Not a real PNG." }));
+    await waitFor(() =>
+      expect(screen.queryByText(QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY)).toBeNull(),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).not.toHaveBeenCalled();
+  });
+
+  it("clears the block message once the selected photo is cancelled", async () => {
+    const dialog = openDialog();
+    selectPhotoActivity();
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId(`${PREFIX}-photo-file`), { target: { files: [file] } });
+    typeMainNote(dialog, "short note");
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+    expect(await screen.findByTestId("quick-log-save-error")).toHaveTextContent(
+      QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY,
+    );
+
+    fireEvent.click(screen.getByTestId(`${PREFIX}-cancel`));
+    await waitFor(() =>
+      expect(screen.queryByText(QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY)).toBeNull(),
+    );
+    expect(saveMock).not.toHaveBeenCalled();
   });
 
   it("keeps note-only Save log working when no photo is selected", async () => {

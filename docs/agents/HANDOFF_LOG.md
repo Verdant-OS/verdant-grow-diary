@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-1949-QUICKLOG-LOCAL-TIMEZONE
+
+```text
+TASK CLAUDE-1949-QUICKLOG-LOCAL-TIMEZONE  priority: P2  status: OPEN
+goal: Quick Log timeline clocks, day groups and snapshot strip follow the viewer's timezone; stored values stay UTC.
+branch: cursor/quicklog-local-timezone-ec09
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 (draft)
+head_sha: 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da (observed 2026-10-21 19:20 UTC, origin/cursor/quicklog-local-timezone-ec09)
+state: pushed draft (returned to draft 2026-10-21 19:44 UTC at Matthew's direction, per AGENTS.md "Open PRs as drafts"). Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
+next_action: Merge steward checks the head.
+files: src/lib/quickLogGroupedTimelineFilterViewModel.ts; src/components/QuickLogGroupedTimelineSection.tsx; src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts; src/components/AiDoctorPhase1TimelineEvidenceCard.tsx; src/lib/quickLogSnapshotStripAdapter.ts; 9 test files (4 renegotiated pins approved 2026-10-09 and 2026-10-21)
+blockers: none for the repository change
+artifacts: PR body Scorer-lock record and Tests run.
+reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+claimed_by: Claude, 2026-10-21 14:20 CT
+last_updated: 2026-10-21 14:45 CT, by Claude
+```
+
 ### CLAUDE-2307-PHENO-ADD-CANDIDATES
 
 ```text
@@ -63,26 +83,6 @@ artifacts: PR body Tests section; RED/GREEN in commit messages bcbe2792 (3 RED, 
 reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
 claimed_by: Claude, 2026-10-21 14:20 CT
 last_updated: 2026-10-21 14:40 CT, by Claude
-```
-
-### CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA
-
-```text
-TASK CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA  priority: P2  status: OPEN
-goal: Ship /guides/grow-stage-care-guide FAQPage and BreadcrumbList JSON-LD in the first SSR response (Ahrefs Article-schema audit 2026-10-21). No Article or dates; publishedOn gate preserved.
-branch: claude/verdant-closeout-handoff-phofrz
-base: verdant-grow-diary
-checkout: git fetch origin claude/verdant-closeout-handoff-phofrz verdant-grow-diary && git switch claude/verdant-closeout-handoff-phofrz && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2310 (draft)
-head_sha: 9d05deae12eca8117dea5e1859ebf18fc11fe28b (observed 2026-10-21 19:20 UTC, origin/claude/verdant-closeout-handoff-phofrz)
-state: pushed draft. 35/35 required checks green; Codex bot found no major issues. Merges cleanly with #2023 (combined 4 files, 35/35).
-next_action: Wait for the owner-assistant Codex exact-head verdict at 9d05deae.
-files: src/lib/build/staticPublicSeoDocuments.ts; src/pages/GrowStageCareGuide.tsx; src/test/grow-stage-care-schema-ssr.test.tsx
-blockers: Codex exact-head verdict pending. Shares two files with #2023: whichever merges second merges base.
-artifacts: RED 3 of 5 with the fix set aside; GREEN 5/5, neighbours 10 files 283/283. Coordination note on #2023.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
 ```
 
 ### CLAUDE-2261-BLANK-RECORD-DOWNLOAD-LINKS
@@ -123,6 +123,46 @@ artifacts: PR body Tests run section.
 reviewer_seat: Codex (.github workflow + security harness), exact head. Claude authored it.
 claimed_by: Claude, 2026-10-21 14:20 CT
 last_updated: 2026-10-21 14:40 CT, by Claude
+```
+
+### CLAUDE-2023-HOME-CONSOLIDATION
+
+```text
+TASK CLAUDE-2023-HOME-CONSOLIDATION  priority: P2  status: OPEN
+goal: Make / the only home page: /welcome, /features and /demo 308 to /; sitemap and static SEO docs drop /welcome.
+branch: cursor/welcome-home-redirect-05d3
+base: verdant-grow-diary
+checkout: git fetch origin cursor/welcome-home-redirect-05d3 verdant-grow-diary && git switch cursor/welcome-home-redirect-05d3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2023 (draft)
+head_sha: 543e03308d29e626be743cc48e62cd1bdc691220 (observed 2026-10-21 19:20 UTC, origin/cursor/welcome-home-redirect-05d3)
+state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
+next_action: Merge steward checks the head. If #2310 merges first, merge base here; that new head needs fresh checks and a fresh verdict.
+files: 71 files; see the PR (Worker redirects, sitemap, llms.txt, verdantSeoContent.ts, appRouteManifest.ts, legal shell, tests)
+blockers: Live redirect/canonical behaviour NOT_MEASURED until released. #2028 owns the llms.txt Pricing wording.
+artifacts: PR body Evidence section; coordination note with #2310.
+reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+claimed_by: Claude, 2026-10-21 14:20 CT
+last_updated: 2026-10-21 14:40 CT, by Claude
+```
+
+### CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA
+
+```text
+TASK CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA  priority: P2  status: OPEN
+goal: Ship /guides/grow-stage-care-guide FAQPage and BreadcrumbList JSON-LD in the first SSR response (Ahrefs Article-schema audit 2026-10-21). No Article or dates; publishedOn gate preserved.
+branch: claude/verdant-closeout-handoff-phofrz
+base: verdant-grow-diary
+checkout: git fetch origin claude/verdant-closeout-handoff-phofrz verdant-grow-diary && git switch claude/verdant-closeout-handoff-phofrz && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2310 (draft)
+head_sha: 9d05deae12eca8117dea5e1859ebf18fc11fe28b (observed 2026-10-21 19:20 UTC, origin/claude/verdant-closeout-handoff-phofrz)
+state: pushed draft. 35/35 required checks green; Codex bot found no major issues. Merges cleanly with #2023 (combined 4 files, 35/35).
+next_action: Wait for the owner-assistant Codex exact-head verdict at 9d05deae.
+files: src/lib/build/staticPublicSeoDocuments.ts; src/pages/GrowStageCareGuide.tsx; src/test/grow-stage-care-schema-ssr.test.tsx
+blockers: Codex exact-head verdict pending. Shares two files with #2023: whichever merges second merges base.
+artifacts: RED 3 of 5 with the fix set aside; GREEN 5/5, neighbours 10 files 283/283. Coordination note on #2023.
+reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+claimed_by: Claude, 2026-10-21 14:20 CT
+last_updated: 2026-10-21 14:20 CT, by Claude
 ```
 
 ### CLAUDE-2297-COMMUNITY-OCCURRED-DATE
@@ -223,46 +263,6 @@ artifacts: PR body.
 reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
 claimed_by: Claude, 2026-10-21 14:20 CT
 last_updated: 2026-10-21 14:20 CT, by Claude
-```
-
-### CLAUDE-2023-HOME-CONSOLIDATION
-
-```text
-TASK CLAUDE-2023-HOME-CONSOLIDATION  priority: P2  status: OPEN
-goal: Make / the only home page: /welcome, /features and /demo 308 to /; sitemap and static SEO docs drop /welcome.
-branch: cursor/welcome-home-redirect-05d3
-base: verdant-grow-diary
-checkout: git fetch origin cursor/welcome-home-redirect-05d3 verdant-grow-diary && git switch cursor/welcome-home-redirect-05d3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2023 (draft)
-head_sha: 543e03308d29e626be743cc48e62cd1bdc691220 (observed 2026-10-21 19:20 UTC, origin/cursor/welcome-home-redirect-05d3)
-state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head. If #2310 merges first, merge base here; that new head needs fresh checks and a fresh verdict.
-files: 71 files; see the PR (Worker redirects, sitemap, llms.txt, verdantSeoContent.ts, appRouteManifest.ts, legal shell, tests)
-blockers: Live redirect/canonical behaviour NOT_MEASURED until released. #2028 owns the llms.txt Pricing wording.
-artifacts: PR body Evidence section; coordination note with #2310.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:40 CT, by Claude
-```
-
-### CLAUDE-1949-QUICKLOG-LOCAL-TIMEZONE
-
-```text
-TASK CLAUDE-1949-QUICKLOG-LOCAL-TIMEZONE  priority: P2  status: OPEN
-goal: Quick Log timeline clocks, day groups and snapshot strip follow the viewer's timezone; stored values stay UTC.
-branch: cursor/quicklog-local-timezone-ec09
-base: verdant-grow-diary
-checkout: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 (not draft)
-head_sha: 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da (observed 2026-10-21 19:20 UTC, origin/cursor/quicklog-local-timezone-ec09)
-state: pushed (not draft). Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
-files: src/lib/quickLogGroupedTimelineFilterViewModel.ts; src/components/QuickLogGroupedTimelineSection.tsx; src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts; src/components/AiDoctorPhase1TimelineEvidenceCard.tsx; src/lib/quickLogSnapshotStripAdapter.ts; 9 test files (4 renegotiated pins approved 2026-10-09 and 2026-10-21)
-blockers: none for the repository change
-artifacts: PR body Scorer-lock record and Tests run.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:40 CT, by Claude
 ```
 
 ### PADDLE-WIRE-001-NORMALIZATION

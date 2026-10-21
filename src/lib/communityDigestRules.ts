@@ -1,5 +1,24 @@
 import type { DigestCursor, DigestItem } from "@/lib/communityTypes";
 
+/** A publish instant: epoch milliseconds plus the fraction digits Date.parse drops. */
+interface Instant {
+  ms: number;
+  subMs: number;
+}
+
+/**
+ * Reads an ISO timestamp without losing database microseconds. Date.parse keeps
+ * whole milliseconds; digits past the third fractional place are compared
+ * separately. Returns null when the timestamp is unreadable.
+ */
+function readInstant(timestamp: string): Instant | null {
+  const ms = Date.parse(timestamp);
+  if (!Number.isFinite(ms)) return null;
+  const fraction = /T\d{2}:\d{2}:\d{2}\.(\d+)/.exec(timestamp)?.[1] ?? "";
+  const subMs = Number(fraction.slice(3, 9).padEnd(6, "0"));
+  return { ms, subMs };
+}
+
 /** Code-point comparison, so ordering never depends on the runtime locale. */
 function compareHandles(a: string, b: string): number {
   if (a === b) return 0;
@@ -7,8 +26,9 @@ function compareHandles(a: string, b: string): number {
 }
 
 /** Newest first by (publishedAt, publicationHandle), both descending. */
-function compareDescending(aMs: number, aHandle: string, bMs: number, bHandle: string): number {
-  if (aMs !== bMs) return bMs - aMs;
+function compareDescending(a: Instant, aHandle: string, b: Instant, bHandle: string): number {
+  if (a.ms !== b.ms) return b.ms - a.ms;
+  if (a.subMs !== b.subMs) return b.subMs - a.subMs;
   return compareHandles(bHandle, aHandle);
 }
 
@@ -22,22 +42,23 @@ export function orderCommunityDigest(
   items: readonly DigestItem[],
   before: DigestCursor,
 ): readonly DigestItem[] {
-  const cursorMs = before === null ? null : Date.parse(before.publishedAt);
-  if (cursorMs !== null && !Number.isFinite(cursorMs)) return [];
+  const cursorAt = before === null ? null : readInstant(before.publishedAt);
+  if (before !== null && cursorAt === null) return [];
 
-  const placed = items
-    .map((item) => ({ item, ms: Date.parse(item.publication.publishedAt) }))
-    .filter((entry) => Number.isFinite(entry.ms));
+  const placed = items.flatMap((item) => {
+    const at = readInstant(item.publication.publishedAt);
+    return at === null ? [] : [{ item, at }];
+  });
 
   const afterCursor =
-    before === null || cursorMs === null
+    before === null || cursorAt === null
       ? placed
       : placed.filter(
           (entry) =>
             compareDescending(
-              entry.ms,
+              entry.at,
               entry.item.publication.publicationHandle,
-              cursorMs,
+              cursorAt,
               before.publicationHandle,
             ) > 0,
         );
@@ -45,9 +66,9 @@ export function orderCommunityDigest(
   return afterCursor
     .sort((a, b) =>
       compareDescending(
-        a.ms,
+        a.at,
         a.item.publication.publicationHandle,
-        b.ms,
+        b.at,
         b.item.publication.publicationHandle,
       ),
     )

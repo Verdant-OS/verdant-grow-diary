@@ -39,13 +39,13 @@ function isValidMeasurement(measurement: SharedMeasurement): boolean {
 }
 
 function isValidDraft(entry: PublicationDraft): boolean {
-  const labelLength = characterCount(entry.sourceJournalLabel.trim());
+  // The label is returned as given, so its padding counts toward the limit.
   return (
     isPresent(entry.sourceEntryHandle) &&
     isPresent(entry.sourceRevision) &&
     isPresent(entry.action) &&
-    labelLength >= 1 &&
-    labelLength <= SOURCE_LABEL_MAX &&
+    isPresent(entry.sourceJournalLabel) &&
+    characterCount(entry.sourceJournalLabel) <= SOURCE_LABEL_MAX &&
     Number.isFinite(Date.parse(entry.occurredAt)) &&
     characterCount(entry.note) <= NOTE_MAX &&
     (entry.stage === null || isPresent(entry.stage)) &&

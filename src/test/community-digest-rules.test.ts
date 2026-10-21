@@ -97,6 +97,34 @@ describe("orderCommunityDigest", () => {
     expect(handles(orderCommunityDigest(withBad, null))).not.toContain("pub-bad");
   });
 
+  it("orders by database microseconds within one millisecond", () => {
+    const sameMs = [
+      item("pub-z", "2026-10-21T09:00:00.123100+00:00"),
+      item("pub-a", "2026-10-21T09:00:00.123900+00:00"),
+    ];
+    expect(handles(orderCommunityDigest(sameMs, null))).toEqual(["pub-a", "pub-z"]);
+  });
+
+  it("keeps an older publication after a cursor in the same millisecond", () => {
+    const sameMs = [
+      item("pub-z", "2026-10-21T09:00:00.123100+00:00"),
+      item("pub-a", "2026-10-21T09:00:00.123900+00:00"),
+    ];
+    const cursor: DigestCursor = {
+      publishedAt: "2026-10-21T09:00:00.123900+00:00",
+      publicationHandle: "pub-a",
+    };
+    expect(handles(orderCommunityDigest(sameMs, cursor))).toEqual(["pub-z"]);
+  });
+
+  it("treats equal instants written with different precision as a tie", () => {
+    const equal = [
+      item("pub-b", "2026-10-21T09:00:00.123Z"),
+      item("pub-c", "2026-10-21T09:00:00.123000+00:00"),
+    ];
+    expect(handles(orderCommunityDigest(equal, null))).toEqual(["pub-c", "pub-b"]);
+  });
+
   it("returns an empty list for an empty digest", () => {
     expect(orderCommunityDigest([], null)).toEqual([]);
   });

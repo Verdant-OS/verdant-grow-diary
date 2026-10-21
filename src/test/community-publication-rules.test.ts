@@ -89,6 +89,16 @@ describe("validatePublicationDrafts", () => {
     );
   });
 
+  it("counts padding toward the label limit, since the label is returned as given", () => {
+    expect(
+      validatePublicationDrafts([entry({ sourceJournalLabel: `${"L".repeat(80)} ` })], "publish"),
+    ).toEqual({ ok: false, code: "invalid" });
+    expect(
+      validatePublicationDrafts([entry({ sourceJournalLabel: ` ${"L".repeat(78)} ` })], "publish")
+        .ok,
+    ).toBe(true);
+  });
+
   it("caps the shared note copy at 4,000 characters and allows an empty note", () => {
     expect(validatePublicationDrafts([entry({ note: "n".repeat(4000) })], "publish").ok).toBe(true);
     expect(validatePublicationDrafts([entry({ note: "n".repeat(4001) })], "publish").ok).toBe(

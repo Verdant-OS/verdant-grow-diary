@@ -263,8 +263,13 @@ function buildFields(
   // source converts exactly once, at string-build time, to match `tempUnit`
   // — never double-converted, never left in the wrong unit just because the
   // stored shape happened to be Fahrenheit-only.
-  const tempC = asFiniteNumber(envelope.temp_c ?? envelope.tempC ?? envelope.air_temp_c);
-  const tempF = asFiniteNumber(envelope.room_temp_f ?? envelope.tempF ?? envelope.air_temp_f);
+  const {
+    tempC,
+    tempF,
+    rhPercent: rh,
+    vpdKpa: vpd,
+    co2Ppm: co2,
+  } = environmentCheckEnvelopeReadings(envelope);
   if (tempC != null) {
     fields.push({
       key: "temp",
@@ -285,17 +290,14 @@ function buildFields(
     });
   }
 
-  const rh = asFiniteNumber(envelope.humidity_pct ?? envelope.rhPercent ?? envelope.rh_percent);
   if (rh != null) {
     fields.push({ key: "humidity", label: "RH", value: `${rh.toFixed(0)}%` });
   }
 
-  const vpd = asFiniteNumber(envelope.vpd_kpa ?? envelope.vpdKpa);
   if (vpd != null) {
     fields.push({ key: "vpd", label: "VPD", value: `${vpd.toFixed(2)} kPa` });
   }
 
-  const co2 = asFiniteNumber(envelope.co2_ppm ?? envelope.co2Ppm ?? envelope.co2);
   if (co2 != null) {
     fields.push({ key: "co2", label: "CO₂", value: `${Math.round(co2)} ppm` });
   }

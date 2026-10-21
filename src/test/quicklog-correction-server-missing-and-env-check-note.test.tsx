@@ -21,6 +21,7 @@ import {
   quickLogCorrectionEnvironmentCheckReadingsNote,
   quickLogRevisionFailureCopy,
 } from "@/lib/quick-log/quickLogRevisionRules";
+import { ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS } from "@/lib/environmentCheckQuickLogRules";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -46,8 +47,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
 
-const envCheckNote = (details: unknown) =>
-  quickLogCorrectionEnvironmentCheckReadingsNote(details, { linkedReadingsComplete: true });
+const envCheckNote = (details: unknown) => quickLogCorrectionEnvironmentCheckReadingsNote(details);
 
 const ENV_CHECK_ONLY = {
   event_type: "environment_check",
@@ -170,12 +170,27 @@ describe("Environment Check readings note", () => {
     expect(note).not.toMatch(/temperature|humidity/i);
   });
 
-  it("is null while the linked sensor context is loading or failed (unmeasured, not unsupported)", () => {
-    expect(
-      quickLogCorrectionEnvironmentCheckReadingsNote(ENV_CHECK_ONLY, {
-        linkedReadingsComplete: false,
-      }),
-    ).toBeNull();
+  it("explains every reading the Environment check writer persists, each on its own", () => {
+    for (const key of ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS) {
+      expect(
+        envCheckNote({
+          event_type: "environment_check",
+          environment_check: { checkType: "airflow", [key]: 1.5 },
+        }),
+        key,
+      ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    }
+  });
+
+  it("explains water-temperature-only and EC-only checks", () => {
+    for (const reading of [{ water_temp_f: 68 }, { water_temp_c: 20 }, { ec_mscm: 1.4 }]) {
+      expect(
+        envCheckNote({
+          event_type: "environment_check",
+          environment_check: { checkType: "root_zone", ...reading },
+        }),
+      ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    }
   });
 
   it("is null for a typed Watering entry that carries an environment envelope as context", () => {

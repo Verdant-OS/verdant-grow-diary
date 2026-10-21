@@ -278,7 +278,9 @@ describe("Timeline Environment check correction note", () => {
     });
   });
 
-  it("withholds the note when the manual sensor read failed", async () => {
+  it("keeps the note beside the partial-read warning when the manual sensor read failed", async () => {
+    // The note only says the dialog can't correct these readings, which stays
+    // true when a read failed; the warning discloses the missing source.
     harness.sensorMode = "error";
     harness.diaryDetails = {
       event_type: "environment_check",
@@ -286,9 +288,10 @@ describe("Timeline Environment check correction note", () => {
       environment_check: { checkType: "airflow", temp_c: 24.5, humidity_pct: 58 },
     };
     renderTimeline();
-    // The failed read is disclosed; only then is the note's input settled.
     await screen.findByTestId("timeline-partial-read-warning");
-    expect(screen.getByTestId("timeline-correction-readings-note")).toHaveTextContent("none");
+    expect(screen.getByTestId("timeline-correction-readings-note")).toHaveTextContent(
+      "Recorded readings on this Environment check can't be corrected here.",
+    );
   });
 
   it("passes no note for a Fast Check observation whose readings are correctable", async () => {

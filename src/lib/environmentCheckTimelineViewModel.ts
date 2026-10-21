@@ -21,6 +21,7 @@ import {
   loadTemperatureUnitPreference,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import { ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS } from "@/lib/environmentCheckQuickLogRules";
 import type { EnvironmentCheckEntryInput } from "@/lib/environmentCheckViewModel";
 import { isAirTempCRealistic, isHumidityRealistic, isVpdRealistic } from "@/lib/sensorTruthRules";
 
@@ -191,6 +192,20 @@ export function environmentCheckEnvelopeReadings(envelope: unknown): {
     vpdKpa: asFiniteNumber(env?.vpd_kpa ?? env?.vpdKpa),
     co2Ppm: asFiniteNumber(env?.co2_ppm ?? env?.co2Ppm ?? env?.co2),
   };
+}
+
+/**
+ * Whether an envelope carries any recorded reading: under every alias a
+ * reader accepts (above) or any key the writer persists
+ * (ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS, kept complete by typecheck).
+ */
+export function environmentCheckEnvelopeHasRecordedReading(envelope: unknown): boolean {
+  if (Object.values(environmentCheckEnvelopeReadings(envelope)).some((v) => v !== null)) {
+    return true;
+  }
+  if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) return false;
+  const env = envelope as Record<string, unknown>;
+  return ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS.some((key) => asFiniteNumber(env[key]) !== null);
 }
 
 /**

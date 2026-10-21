@@ -1,6 +1,6 @@
 import { LARGE_WATER_AMOUNT_HARD_MAX_ML } from "@/lib/quickLogWaterVolumeWarningRules";
 import {
-  environmentCheckEnvelopeReadings,
+  environmentCheckEnvelopeHasRecordedReading,
   isEnvironmentCheckTimelineEntry,
 } from "@/lib/environmentCheckTimelineViewModel";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
@@ -405,25 +405,19 @@ export const QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE =
 
 /**
  * Explains why the correction dialog shows no reading fields for an
- * Environment Check that recorded readings (temperature, humidity, VPD or
- * CO₂) in details.environment_check. The copy states only what the dialog
- * offers, not why: readings that live only in the envelope are rejected by
+ * Environment Check that recorded any reading in details.environment_check.
+ * The copy states only what the dialog offers, not why, so it holds whatever
+ * the page loaded: readings that live only in the envelope are rejected by
  * the correction RPC (20261014210000, "unsupported_change"), and a linked
  * reading this page did not load is equally not offered here. The caller
- * shows it only when the dialog has no sensor fields. Null for every other entry, including typed
- * care events (Watering, …) that only carry an environment envelope as context,
- * and null while the linked sensor context that decides correctability is
- * still loading or failed to load (unmeasured is not unsupported).
+ * shows it only when the dialog has no sensor fields. Null for every other
+ * entry, including typed care events (Watering, …) that only carry an
+ * environment envelope as context.
  */
-export function quickLogCorrectionEnvironmentCheckReadingsNote(
-  details: unknown,
-  context: { linkedReadingsComplete: boolean },
-): string | null {
-  if (!context.linkedReadingsComplete) return null;
+export function quickLogCorrectionEnvironmentCheckReadingsNote(details: unknown): string | null {
   if (!isPlainObject(details)) return null;
   if (!isEnvironmentCheckTimelineEntry({ details })) return null;
-  const readings = environmentCheckEnvelopeReadings(details.environment_check);
-  if (Object.values(readings).every((value) => value === null)) return null;
+  if (!environmentCheckEnvelopeHasRecordedReading(details.environment_check)) return null;
   if (sensorFromDetails(details)) return null;
   return QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE;
 }

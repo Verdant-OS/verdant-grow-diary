@@ -438,3 +438,30 @@ export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | str
       return FEEDING_SAVE_FAILURE_MESSAGE;
   }
 }
+
+export type FeedingEcFieldKey = "ecIn" | "ecOut" | "runoffEc";
+
+const FEEDING_EC_NEGATIVE_CHECKS = [
+  ["ecIn", "ec_in:negative"],
+  ["ecOut", "ec_out:negative"],
+  ["runoffEc", "runoff_ec:negative"],
+] as const;
+
+/**
+ * Live check of the feeding EC fields (#2159). A negative EC is named under
+ * its own field and blocks Save as soon as it is typed, with the same copy the
+ * save-time validation uses. Blank, zero and positive values pass here.
+ */
+export function assessFeedingEcFields(form: Pick<QuickLogFeedingFormState, FeedingEcFieldKey>): {
+  fields: Partial<Record<FeedingEcFieldKey, string>>;
+  footerMessage: string | null;
+} {
+  const fields: Partial<Record<FeedingEcFieldKey, string>> = {};
+  let footerMessage: string | null = null;
+  for (const [key, reason] of FEEDING_EC_NEGATIVE_CHECKS) {
+    if (!isExplicitNegativeDecimal(form[key])) continue;
+    fields[key] = feedingFormReasonToHelper(reason);
+    footerMessage ??= fields[key];
+  }
+  return { fields, footerMessage };
+}

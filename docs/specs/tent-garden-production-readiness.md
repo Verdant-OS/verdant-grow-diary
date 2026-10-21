@@ -132,15 +132,19 @@ agent names a holder and says go (§13).
 
 ## 4. Release and rollback model
 
-`practical observation`, 2026-10-20: merges to `verdant-grow-diary` reach production automatically. #2294
+`practical observation`, 2026-10-20: merges to `verdant-grow-diary` have triggered a production deployment
+automatically. #2294
 merged at 23:54:15 UTC and live `/version.json` reported its build at 23:54:41 UTC; #2277 showed the same
 pattern earlier the same day. Which publisher performs it is operating state recorded in
 `docs/agents/CURRENT_STATE.md`, not here (`uncertainty` for this document).
 
 Consequences that bind every slice:
 
-1. **A merge is a release.** Anything merged is live within about a minute. "Unlinked" is not hidden:
-   a mounted route is reachable by URL.
+1. **Treat every merge as reaching users.** A merge triggers the observed deployment path, so each
+   slice must be safe to be live on its own. "Unlinked" is not hidden: a mounted route is reachable by
+   URL. A merge **counts as released only when live `/version.json` reports a SHA that contains it**
+   (AGENTS.md, release rules); until then the release, and any rollback step, is pending, not done. If
+   the publisher is delayed or fails, nothing in this plan treats the code as live.
 2. **Unfinished functionality stays inaccessible until acceptance** by a build-time flag,
    `tentGardenEnabled = false as const`, in `src/lib/featureFlags.ts` (the file's existing rule: flags
    default `false` until enabled after live verification). While it is `false`:
@@ -149,12 +153,15 @@ Consequences that bind every slice:
    - no link to it exists anywhere;
    - an E2E test asserts both (§12, T12).
 3. **Flipping the flag to `true` is the release** (S5). It gates a publish, so it merges only on
-   Matthew's explicit yes, after the S5 acceptance receipts and a release packet (live SHA, target SHA,
-   commits, checks at the target, rollback target).
+   Matthew's explicit yes, after the S5 acceptance receipts **taken against that flag-flip PR's exact
+   head** (§13) and a release packet (live SHA, target SHA, commits, checks at the target, rollback
+   target). The release is complete when live `/version.json` reports the merged SHA and the post-release
+   check in §13 passes.
 4. **Rollback, in order of speed.** Agents never roll back; they prepare the step.
-   - Flip `tentGardenEnabled` back to `false`: a one-line PR through the normal merge gate, live about a
-     minute after merge. Use this for any Tent Garden defect.
-   - Revert the slice PR: same path.
+   - Flip `tentGardenEnabled` back to `false`: a one-line PR through the normal merge gate. Use this for
+     any Tent Garden defect. It is done only when live `/version.json` reports the rollback SHA and the
+     route shows the not-found page again.
+   - Revert the slice PR: same path, same verification.
    - Promote the previous production deployment on the publisher: Matthew's action, for a build-level
      failure that blocks merging.
    - No data is written, so there is nothing to undo in the database.
@@ -343,9 +350,9 @@ D2(c), List-first.
 1. **Footprint, pot and stage parsing:** every recorded, missing and invalid example in §6 is a test
    case, including `2-3 ft`, `4x.5`, `4x4x6`, `0x4`, `100x100 ft`, `null`, `""`, `"  "`, `3-5 gal`,
    `vegetative`, empty stage.
-2. **Missing versus invalid rendering:** for each field, a missing fixture shows the "not recorded" text
-   and an invalid fixture shows the "recorded as … can't be drawn" text; neither shows a default as
-   recorded.
+2. **Missing versus invalid rendering:** for each field, a missing fixture shows its "not recorded"
+   text. An invalid tent size or pot size shows "Recorded as "‹raw›" — can't be drawn"; an invalid stage
+   shows "Stage "‹raw›" not recognised" (§6). Neither state shows a default as recorded.
 3. **Placement:** deterministic across runs; no overlap and every pot inside the footprint for 1–25
    plants in 2×2, 4×4, 5×5, missing and invalid footprints; archived plants and other tents' plants
    excluded.
@@ -382,15 +389,25 @@ exact-head receipt of the spec run. The real-phone metrics and A8 are S5 receipt
 
 Each slice: one holder, named by Matthew or the assigning agent; one branch; draft PR before code; an
 independent exact-head PASS from a reviewer who did not touch it; 35/35 required checks; merged by
-Chemdawg. Every merge is live within about a minute (§4), so each slice must be safe to be live alone.
+Chemdawg. Every merge triggers the deployment path (§4), so each slice must be safe to be live alone;
+it counts as live only once `/version.json` reports it.
 
-| Slice | Content                                                                                                                                                                       | Live effect after merge                                             | Needs                                       | Review                                                                                   |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| S1    | Pure rules, view model, copy and their unit tests (§10 S1 rows)                                                                                                               | None: nothing imports them                                          | Holder + go. No D1–D4                       | Critical Mass (no `.tsx`)                                                                |
-| S2    | Add `three`, pinned exact, nothing imports it yet                                                                                                                             | None; P4 check proves no chunk changes                              | D1                                          | Codex (not if Codex authored or repaired it), Blue Dream, Critical Mass or Durban Poison |
-| S3    | Flag (`false`), route, manifest, page, List view and details panel, E2E spec and its wiring; no 3D                                                                            | None for users: route renders not-found while the flag is off (T12) | S1, D2                                      | Blue Dream (`.tsx`)                                                                      |
-| S4    | 3D scene with instancing, meeting P3, P6 and P7 on first landing; art table per D4                                                                                            | None for users: still behind the flag                               | S2, S3, D4                                  | Blue Dream                                                                               |
-| S5    | Acceptance: P1–P9 and A1–A9 receipts on reference devices against a build of the S4 head, release packet; then one PR that sets the flag `true` and adds the Tent Detail link | **This PR is the release**                                          | S4, D2, all receipts, Matthew's publish yes | Blue Dream reviews; Matthew decides the publish; the merge publishes                     |
+| Slice | Content                                                                                                                                                                                                               | Live effect after merge                                             | Needs                                                      | Review                                                                                   |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| S1    | Pure rules, view model, copy and their unit tests (§10 S1 rows)                                                                                                                                                       | None: nothing imports them                                          | Holder + go. No D1–D4                                      | Critical Mass (no `.tsx`)                                                                |
+| S2    | Add `three`, pinned exact, nothing imports it yet                                                                                                                                                                     | None; P4 check proves no chunk changes                              | D1                                                         | Codex (not if Codex authored or repaired it), Blue Dream, Critical Mass or Durban Poison |
+| S3    | Flag (`false`), route, manifest, page, List view and details panel, E2E spec and its wiring; no 3D                                                                                                                    | None for users: route renders not-found while the flag is off (T12) | S1, D2                                                     | Blue Dream (`.tsx`)                                                                      |
+| S4    | 3D scene with instancing, meeting P3, P6 and P7 on first landing; art table per D4                                                                                                                                    | None for users: still behind the flag                               | S2, S3, D4                                                 | Blue Dream                                                                               |
+| S5    | Open the release candidate first: one draft PR that sets the flag `true` and adds the Tent Detail link. Then take the P1–P9 and A1–A9 receipts against **that PR's exact head** (below), and write the release packet | **This PR is the release**                                          | S4, D2, all receipts at the S5 head, Matthew's publish yes | Blue Dream reviews; Matthew decides the publish; the merge publishes                     |
+
+**How S5 is measured.** With the flag `false` (every head before S5), the route returns before rendering,
+so no earlier build can exercise the page. The receipts are therefore taken on the S5 candidate itself:
+a production build (`bun run build`) of the S5 PR's exact head, served from the holder's machine to the
+reference devices over the local network, signed in with the disposable QA account (read-only page, so
+no writes). Any push to the S5 PR voids the receipts and they are taken again. After merge, the release
+is verified on `https://verdantgrowdiary.com`: live `/version.json` reports the merged SHA, then P1, A2
+and the T7 no-mutation check are repeated with the same account; a failure there triggers the flag
+rollback in §4.
 
 Revision 1 split the scene (S3) from its draw-call reduction (S4) and measured phones only afterwards
 (S5). That would have merged a scene known to run at 2.7k–5.3k draw calls. Here the scene lands only
@@ -410,6 +427,8 @@ once it meets the budgets, and nothing is reachable before S5.
 - `NOT_MEASURED`: every P and A metric; the gzipped `three` chunk under this Vite build.
 - `uncertainty`: how many production tents have a `size` that `parseTentFootprint` accepts, and how
   many plants have parseable `pot_size`. A read-only count needs a production read, which is Matthew's.
+- `BLOCKED` for S5 until it exists: a disposable QA login with its own fixture tent (owner item, pending
+  since VER-216). S5 receipts and the post-release check need it.
 - `uncertainty`: whether the publisher always deploys on merge; observed for two merges on 2026-10-20,
   not a contract.
 - `uncertainty`: whether growers want saved arrangements enough to justify a schema change (D3b).

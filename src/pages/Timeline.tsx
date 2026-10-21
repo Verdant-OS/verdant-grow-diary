@@ -137,6 +137,7 @@ import {
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
   timelineMeasurementChipCount,
+  timelineResultsCountReceiptSuffix,
   timelineStageChipRows,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
@@ -2455,6 +2456,7 @@ export default function Timeline() {
           {entriesTotal !== null && entriesTotal > entries.length
             ? ` (${entries.length} loaded)`
             : ""}
+          {timelineResultsCountReceiptSuffix(filtered)}
           {growEvents.length > 0
             ? " · Quick Log activity appears in the history panels below."
             : ""}

@@ -152,11 +152,11 @@ export default function HardwareIntegrations() {
           ))}
         </div>
         <p className="mt-6 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
-          Connecting an AI assistant? The{" "}
+          For assistant access to your own grow records,{" "}
           <Link to="/docs/mcp-api" className="font-medium text-primary hover:underline">
-            MCP API reference
-          </Link>{" "}
-          documents Verdant's read-only tools for grow, diary, and sensor context.
+            read the read-only MCP API reference
+          </Link>
+          .
         </p>
       </section>
 

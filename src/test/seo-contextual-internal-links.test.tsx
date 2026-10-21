@@ -19,6 +19,7 @@ vi.mock("@/components/LandingAuthedOnboardingBridge", () => ({ default: () => nu
 
 import GuidesIndex from "@/pages/GuidesIndex";
 import HardwareIntegrations from "@/pages/HardwareIntegrations";
+import HowAiDoctorWorks from "@/pages/HowAiDoctorWorks";
 import Landing from "@/pages/Landing";
 import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
@@ -42,7 +43,7 @@ const CASES: ReadonlyArray<{
     element: () => <HardwareIntegrations />,
     path: "/hardware-integrations",
     href: "/docs/mcp-api",
-    label: "MCP API reference",
+    label: "read the read-only MCP API reference",
   },
   {
     page: "/",
@@ -50,6 +51,13 @@ const CASES: ReadonlyArray<{
     path: "/",
     href: "/creator-beta",
     label: "Creator and breeder beta",
+  },
+  {
+    page: "/how-ai-doctor-works",
+    element: () => <HowAiDoctorWorks />,
+    path: "/how-ai-doctor-works",
+    href: "/creator-beta",
+    label: "Read the Creator & Breeder Beta walkthrough",
   },
 ];
 
@@ -67,6 +75,11 @@ describe("contextual internal links to orphaned public pages", () => {
       const doc = new DOMParser().parseFromString(html, "text/html");
       const anchors = [...doc.querySelectorAll(`a[href="${href}"]`)];
       expect(anchors.map((a) => a.textContent?.trim())).toContain(label);
+      const sameLabel = [...doc.querySelectorAll("a")].filter(
+        (a) => a.textContent?.trim() === label,
+      );
+      expect(sameLabel).toHaveLength(1);
+      expect(sameLabel[0].getAttribute("rel")).toBeNull();
     },
   );
 
@@ -74,6 +87,7 @@ describe("contextual internal links to orphaned public pages", () => {
     render(withRouter(path, element()));
     const link = screen.getByRole("link", { name: label });
     expect(link).toHaveAttribute("href", href);
+    expect(screen.getAllByRole("link", { name: label })).toHaveLength(1);
   });
 
   it("carries the glossary link in the guide hub's static no-JS body", () => {

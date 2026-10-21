@@ -205,6 +205,13 @@ export default function HowAiDoctorWorks() {
             <p className="text-sm text-muted-foreground">
               Plant memory. Sensor truth. Grower-approved decisions.
             </p>
+            <p className="text-sm text-muted-foreground">
+              <Link to="/creator-beta" className="font-medium text-primary hover:underline">
+                Read the Creator & Breeder Beta walkthrough
+              </Link>
+              . A written walkthrough of the controlled beta; access is granted after a short
+              walkthrough.
+            </p>
           </div>
         </section>
 

@@ -88,6 +88,9 @@ describe("phenoHuntAddCandidatesRules", () => {
     expect(
       phenoHuntAddChangedHunt({ added: [], failed: [{ reason: "cleanup_unconfirmed" }] }),
     ).toBe(true);
+    expect(phenoHuntAddChangedHunt({ added: [], failed: [{ reason: "tag_unconfirmed" }] })).toBe(
+      true,
+    );
     expect(phenoHuntAddChangedHunt({ added: [], failed: [{ reason: "relabel_failed" }] })).toBe(
       true,
     );
@@ -357,33 +360,61 @@ describe("addPhenoHuntCandidates", () => {
     expect(result.added).toEqual([{ plantId: "p1", candidateNumber: 18, candidateLabel: "#18" }]);
   });
 
+  it("never undoes a tag write whose response was lost, and stops writing", async () => {
+    const { client, calls } = huntDb({
+      max: [16],
+      tagOk: () => {
+        throw new Error("connection dropped");
+      },
+    });
+    const assignNumber = vi.fn();
+    const result = await addPhenoHuntCandidates(
+      { huntId: "hunt-1", plantIds: ["p1", "p2"] },
+      { client, assignNumber },
+    );
+    expect(result.added).toEqual([]);
+    expect(result.failed).toEqual([
+      { plantId: "p1", reason: "tag_unconfirmed" },
+      { plantId: "p2", reason: "network" },
+    ]);
+    expect(phenoHuntAddChangedHunt(result)).toBe(true);
+    expect(assignNumber).not.toHaveBeenCalled();
+    expect(calls.filter((c) => updateOf(c)?.pheno_hunt_id === null)).toHaveLength(0);
+    expect(calls.filter((c) => updateOf(c)?.pheno_hunt_id === "hunt-1")).toHaveLength(1);
+    expect(PHENO_HUNT_ADD_CANDIDATES_COPY.tag_unconfirmed).not.toMatch(/Nothing was changed/);
+  });
+
+  // Stateful row: the conditional writes below apply to it the way Postgres would.
   it.each([
-    ["undone", () => ({ data: { id: "p1" }, error: null }), "network"],
-    ["absent", () => ({ data: null, error: null }), "network"],
-    ["unknown", () => ({ data: null, error: { message: "offline" } }), "cleanup_unconfirmed"],
-  ])(
-    "reconciles a tag write whose response was lost (cleanup %s)",
-    async (_label, untag, reason) => {
-      const { client, calls } = huntDb({
-        max: [16],
-        tagOk: () => {
-          throw new Error("connection dropped");
-        },
-        untag,
-      });
-      const assignNumber = vi.fn();
-      const result = await addPhenoHuntCandidates(
-        { huntId: "hunt-1", plantIds: ["p1"] },
-        { client, assignNumber },
-      );
-      expect(result.added).toEqual([]);
-      expect(result.failed).toEqual([{ plantId: "p1", reason }]);
-      expect(assignNumber).not.toHaveBeenCalled();
-      const undo = calls.find((c) => updateOf(c)?.pheno_hunt_id === null);
-      expect(undo && has(undo, "eq", "pheno_hunt_id", "hunt-1")).toBe(true);
-      expect(undo && has(undo, "is", "candidate_number", null)).toBe(true);
-    },
-  );
+    ["another tab tags the plant first", { pheno_hunt_id: null, candidate_label: null }, true],
+    [
+      "a legacy candidate was added after the picker loaded",
+      { pheno_hunt_id: "hunt-1", candidate_label: "#3" },
+      false,
+    ],
+  ])("leaves the row alone when %s and our tag errors", async (_label, initial, otherTabTags) => {
+    const row: { pheno_hunt_id: string | null; candidate_label: string | null } = { ...initial };
+    const before = { pheno_hunt_id: "hunt-1", candidate_label: otherTabTags ? "#17" : "#3" };
+    const { client } = huntDb({
+      max: [16],
+      tagOk: () => {
+        // Tab B's identical conditional tag commits first; ours then fails.
+        if (otherTabTags && row.pheno_hunt_id === null) Object.assign(row, before);
+        throw new Error("connection dropped");
+      },
+      untag: () => {
+        if (row.pheno_hunt_id !== "hunt-1") return { data: null, error: null };
+        Object.assign(row, { pheno_hunt_id: null, candidate_label: null });
+        return { data: { id: "p1" }, error: null };
+      },
+    });
+    const result = await addPhenoHuntCandidates(
+      { huntId: "hunt-1", plantIds: ["p1"] },
+      { client, assignNumber: vi.fn() },
+    );
+    expect(row).toEqual(before);
+    expect(result.failed).toEqual([{ plantId: "p1", reason: "tag_unconfirmed" }]);
+  });
 
   it.each([
     ["an error", () => ({ data: null, error: { message: "denied" } })],

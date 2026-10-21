@@ -24,6 +24,7 @@ export type AddCandidateFailureReason =
   | "invalid"
   | "network"
   | "cleanup_unconfirmed"
+  | "tag_unconfirmed"
   | "relabel_failed";
 
 /** Calm, grower-facing copy. Pinned here so tests can assert exact strings. */
@@ -39,6 +40,8 @@ export const PHENO_HUNT_ADD_CANDIDATES_COPY = {
   network: "Could not add that plant right now. Nothing was changed; try again.",
   cleanup_unconfirmed:
     "Could not add that plant, and Verdant could not confirm it was taken back out of the hunt. Reload the hunt: it may show as a candidate without a number.",
+  tag_unconfirmed:
+    "Verdant could not confirm whether that plant was added. Reload the hunt: it may show as a candidate without a number.",
   relabel_failed:
     "That plant was added with a later number, but its label could not be updated to match. Reload the hunt and rename it.",
 } as const satisfies Record<AddCandidateFailureReason, string>;
@@ -116,6 +119,7 @@ export function maxPhenoCandidateNumber(
 /** Failures that may have left a change behind, so the hunt must be re-read. */
 const PARTIAL_FAILURES: ReadonlySet<AddCandidateFailureReason> = new Set([
   "cleanup_unconfirmed",
+  "tag_unconfirmed",
   "relabel_failed",
 ]);
 

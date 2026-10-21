@@ -89,9 +89,10 @@ async function readOrdinalBaseline(
 }
 
 /**
- * Conditionally undo OUR tag on a still-unnumbered plant. "undone": the database
- * returned the row; "absent": it confirmed there was no such tag to undo;
- * "unknown": the request failed, so the plant's state is not known.
+ * Conditionally undo OUR tag on a still-unnumbered plant. Call it only after the
+ * conditional tag returned this plant's row, which proves this attempt tagged it.
+ * "undone": the database returned the row; "absent": it confirmed there was no
+ * such tag to undo; "unknown": the request failed, so the plant's state is not known.
  */
 async function untag(
   client: SupabaseClient<any>,
@@ -167,14 +168,12 @@ export async function addPhenoHuntCandidates(
       if (error) throw error;
       tagged = data;
     } catch {
-      // The tag may have committed with its response lost: undo it if present.
-      // Only a confirmed undo or a confirmed absence means nothing changed.
-      if ((await untag(client, plantId, huntId)) === "unknown") {
-        failed.push({ plantId, reason: "cleanup_unconfirmed" });
-        return failAll("network", plantIds.slice(i + 1));
-      }
-      failed.push({ plantId, reason: "network" });
-      continue;
+      // The tag may have committed with its response lost, but a tagged,
+      // unnumbered row does not prove it was THIS attempt's (another tab, or a
+      // legacy candidate added after the picker loaded). Never undo it: say the
+      // outcome is unknown, and stop writing.
+      failed.push({ plantId, reason: "tag_unconfirmed" });
+      return failAll("network", plantIds.slice(i + 1));
     }
     if (!tagged) {
       failed.push({ plantId, reason: "ineligible" });

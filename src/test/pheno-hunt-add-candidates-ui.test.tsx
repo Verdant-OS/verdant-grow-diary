@@ -225,6 +225,27 @@ describe("plant page Add to pheno hunt", () => {
     expect(service.addPhenoHuntCandidates).toHaveBeenCalledTimes(2);
   });
 
+  it("ignores an add that finishes after the page moved to another plant", async () => {
+    service.loadPlantPhenoHuntOffer.mockImplementation(async (id: string) => ({
+      plant: plant(id, id === "ashato-3" ? "Ashato #3" : "Original Z x Platinum #3"),
+      hunt,
+    }));
+    let finish: (value: unknown) => void = () => {};
+    service.addPhenoHuntCandidates.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const { rerender } = render(<AddToPhenoHuntButton plantId="ashato-3" />);
+    fireEvent.click(await screen.findByTestId("add-to-pheno-hunt"));
+    rerender(<AddToPhenoHuntButton plantId="ozp-3" />);
+    await waitFor(() => expect(service.loadPlantPhenoHuntOffer).toHaveBeenCalledWith("ozp-3"));
+    await act(async () =>
+      finish({
+        added: [{ plantId: "ashato-3", candidateNumber: 17, candidateLabel: "#17" }],
+        failed: [],
+      }),
+    );
+    expect(screen.queryByTestId("add-to-pheno-hunt-result")).toBeNull();
+    expect(await screen.findByTestId("add-to-pheno-hunt")).toBeEnabled();
+  });
+
   it("is not offered without Pheno Tracker write access", async () => {
     access.canWrite = false;
     service.loadPlantPhenoHuntOffer.mockResolvedValue({

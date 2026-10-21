@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
@@ -25,6 +25,9 @@ export default function AddToPhenoHuntButton({ plantId }: { plantId: string }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
+  // The plant the page shows now; an add that started for another plant is ignored.
+  const currentPlantId = useRef(plantId);
+  currentPlantId.current = plantId;
   const { entitlement } = useMyEntitlements();
   const canWrite = canWriteFeatureData(entitlement, "pheno_tracker");
 
@@ -33,6 +36,7 @@ export default function AddToPhenoHuntButton({ plantId }: { plantId: string }) {
     setOffer(null);
     setMessage(null);
     setAdded(false);
+    setSaving(false);
     void loadPlantPhenoHuntOffer(plantId).then((result) => {
       if (!cancelled) setOffer(result);
     });
@@ -55,7 +59,9 @@ export default function AddToPhenoHuntButton({ plantId }: { plantId: string }) {
     if (!canWrite) return;
     setSaving(true);
     setMessage(null);
-    const result = await addPhenoHuntCandidates({ huntId: hunt.id, plantIds: [plantId] });
+    const startedFor = plantId;
+    const result = await addPhenoHuntCandidates({ huntId: hunt.id, plantIds: [startedFor] });
+    if (currentPlantId.current !== startedFor) return;
     setSaving(false);
     const addedOne = result.added[0];
     const failure = result.failed[0];

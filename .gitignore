@@ -83,3 +83,7 @@ public/version.json
 # Local scratch written by the simple-workflow agent plugin (session logs, plans).
 # Anchored to the checkout root so a nested package can keep its own .simple-workflow.
 /.simple-workflow
+
+# simple-workflow plugin artifacts (local-only; delete entries to share via git)
+.simple-workflow/
+.simple-workflow

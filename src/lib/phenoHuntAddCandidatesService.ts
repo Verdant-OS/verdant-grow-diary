@@ -16,8 +16,9 @@ import {
 } from "@/lib/phenoCandidateNumberService";
 import {
   PHENO_HUNT_ADD_CANDIDATES_MAX_NUMBER_ATTEMPTS,
-  maxPhenoCandidateNumber,
   phenoCandidateLabelForNumber,
+  phenoCandidateOrdinalBaseline,
+  type PhenoHuntCandidateIdentity,
   type AddCandidateFailureReason,
   type PhenoHuntAddCandidatePlant,
 } from "@/lib/phenoHuntAddCandidatesRules";
@@ -50,31 +51,40 @@ export interface AddPhenoHuntCandidatesDeps {
   ) => Promise<AssignCandidateNumberResult>;
 }
 
-async function readMaxNumber(client: SupabaseClient<any>, huntId: string): Promise<number | null> {
-  const { data, error } = await client
-    .from("plants")
-    .select("candidate_number")
-    .eq("pheno_hunt_id", huntId)
-    .not("candidate_number", "is", null)
-    .order("candidate_number", { ascending: false })
-    .limit(1);
-  if (error || !Array.isArray(data)) return null;
-  return maxPhenoCandidateNumber(
-    (data as { candidate_number: number | null }[]).map((r) => r.candidate_number),
-  );
+async function readOrdinalBaseline(
+  client: SupabaseClient<any>,
+  huntId: string,
+): Promise<number | null> {
+  try {
+    const { data, error } = await client
+      .from("plants")
+      .select("candidate_number, candidate_label")
+      .eq("pheno_hunt_id", huntId);
+    if (error || !Array.isArray(data)) return null;
+    return phenoCandidateOrdinalBaseline(data as PhenoHuntCandidateIdentity[]);
+  } catch {
+    return null;
+  }
 }
 
-async function untag(client: SupabaseClient<any>, plantId: string, huntId: string): Promise<void> {
+/** Undo OUR tag on a still-unnumbered plant. True only when the database confirms it. */
+async function untag(
+  client: SupabaseClient<any>,
+  plantId: string,
+  huntId: string,
+): Promise<boolean> {
   try {
-    // Only undo OUR tag on a still-unnumbered plant — never an existing candidate.
-    await client
+    const { data, error } = await client
       .from("plants")
       .update({ pheno_hunt_id: null, candidate_label: null })
       .eq("id", plantId)
       .eq("pheno_hunt_id", huntId)
-      .is("candidate_number", null);
+      .is("candidate_number", null)
+      .select("id")
+      .maybeSingle();
+    return !error && data != null;
   } catch {
-    // Best effort; the row stays unnumbered either way.
+    return false;
   }
 }
 
@@ -110,9 +120,9 @@ export async function addPhenoHuntCandidates(
   }
   if (!growId) return failAll("hunt_not_found", plantIds);
 
-  const startMax = await readMaxNumber(client, huntId);
-  if (startMax === null) return failAll("network", plantIds);
-  let nextNumber = startMax + 1;
+  const baseline = await readOrdinalBaseline(client, huntId);
+  if (baseline === null) return failAll("network", plantIds);
+  let nextNumber = baseline + 1;
 
   for (let i = 0; i < plantIds.length; i += 1) {
     const plantId = plantIds[i];
@@ -146,17 +156,22 @@ export async function addPhenoHuntCandidates(
     for (let attempt = 0; attempt < PHENO_HUNT_ADD_CANDIDATES_MAX_NUMBER_ATTEMPTS; attempt += 1) {
       outcome = await assignNumber({ plantId, candidateNumber: nextNumber });
       if (outcome.ok || outcome.reason !== "duplicate") break;
-      const latest = await readMaxNumber(client, huntId);
+      const latest = await readOrdinalBaseline(client, huntId);
       nextNumber = Math.max(nextNumber, latest ?? nextNumber) + 1;
     }
 
     if (!outcome || !outcome.ok) {
-      await untag(client, plantId, huntId);
+      const cleaned = await untag(client, plantId, huntId);
       const reason = outcome && !outcome.ok ? outcome.reason : "network";
       const mapped: AddCandidateFailureReason =
         reason === "entitlement" || reason === "not_owner" || reason === "duplicate"
           ? reason
           : "network";
+      if (!cleaned) {
+        // The plant may still be tagged without a number: say so, and stop writing.
+        failed.push({ plantId, reason: "cleanup_unconfirmed" });
+        return failAll(mapped, plantIds.slice(i + 1));
+      }
       failed.push({ plantId, reason: mapped });
       // Entitlement / ownership denials will repeat for every plant: stop writing.
       if (mapped === "entitlement" || mapped === "not_owner") {
@@ -166,25 +181,39 @@ export async function addPhenoHuntCandidates(
     }
 
     const candidateNumber = outcome.candidateNumber;
-    let candidateLabel = plannedLabel;
-    const finalLabel = phenoCandidateLabelForNumber(candidateNumber);
-    if (finalLabel !== plannedLabel) {
+    const candidateLabel = phenoCandidateLabelForNumber(candidateNumber);
+    nextNumber = candidateNumber + 1;
+    if (candidateLabel !== plannedLabel) {
       // Number moved after a duplicate retry: align the label on THIS plant only.
-      const { error } = await client
-        .from("plants")
-        .update({ candidate_label: finalLabel })
-        .eq("id", plantId)
-        .eq("pheno_hunt_id", huntId);
-      if (!error) candidateLabel = finalLabel;
+      let relabeled = false;
+      try {
+        const { data, error } = await client
+          .from("plants")
+          .update({ candidate_label: candidateLabel })
+          .eq("id", plantId)
+          .eq("pheno_hunt_id", huntId)
+          .eq("candidate_number", candidateNumber)
+          .select("id")
+          .maybeSingle();
+        relabeled = !error && data != null;
+      } catch {
+        relabeled = false;
+      }
+      if (!relabeled) {
+        failed.push({ plantId, reason: "relabel_failed" });
+        continue;
+      }
     }
     added.push({ plantId, candidateNumber, candidateLabel });
-    nextNumber = candidateNumber + 1;
   }
 
   return { added, failed };
 }
 
 const ADDABLE_PLANT_COLUMNS = "id, name, grow_id, pheno_hunt_id, is_archived";
+// snip: 20 pages x 500 = 10,000 addable plants per grow; raise if a grow outgrows it.
+const LIST_PAGE_SIZE = 500;
+const LIST_MAX_PAGES = 20;
 
 /** The grow's plants for the "Add candidates" picker; RLS limits them to the owner's. */
 export async function listPhenoHuntGrowPlants(
@@ -192,14 +221,26 @@ export async function listPhenoHuntGrowPlants(
   deps: Pick<AddPhenoHuntCandidatesDeps, "client"> = {},
 ): Promise<{ ok: true; plants: PhenoHuntAddCandidatePlant[] } | { ok: false }> {
   const client = deps.client ?? phenoDb;
+  const plants: PhenoHuntAddCandidatePlant[] = [];
   try {
-    const { data, error } = await client
-      .from("plants")
-      .select(ADDABLE_PLANT_COLUMNS)
-      .eq("grow_id", growId)
-      .limit(500);
-    if (error || !Array.isArray(data)) return { ok: false };
-    return { ok: true, plants: data as PhenoHuntAddCandidatePlant[] };
+    // Eligibility is filtered server-side and paged in a stable order, so a
+    // large grow never hides addable plants behind ineligible ones.
+    for (let page = 0; page < LIST_MAX_PAGES; page += 1) {
+      const from = page * LIST_PAGE_SIZE;
+      const { data, error } = await client
+        .from("plants")
+        .select(ADDABLE_PLANT_COLUMNS)
+        .eq("grow_id", growId)
+        .eq("is_archived", false)
+        .is("pheno_hunt_id", null)
+        .order("name", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + LIST_PAGE_SIZE - 1);
+      if (error || !Array.isArray(data)) return { ok: false };
+      plants.push(...(data as PhenoHuntAddCandidatePlant[]));
+      if (data.length < LIST_PAGE_SIZE) return { ok: true, plants };
+    }
+    return { ok: true, plants };
   } catch {
     return { ok: false };
   }

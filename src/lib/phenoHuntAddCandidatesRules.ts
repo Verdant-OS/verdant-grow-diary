@@ -22,7 +22,9 @@ export type AddCandidateFailureReason =
   | "duplicate"
   | "hunt_not_found"
   | "invalid"
-  | "network";
+  | "network"
+  | "cleanup_unconfirmed"
+  | "relabel_failed";
 
 /** Calm, grower-facing copy. Pinned here so tests can assert exact strings. */
 export const PHENO_HUNT_ADD_CANDIDATES_COPY = {
@@ -35,6 +37,10 @@ export const PHENO_HUNT_ADD_CANDIDATES_COPY = {
   hunt_not_found: "This pheno hunt could not be found. Refresh and try again.",
   invalid: "Pick at least one plant to add.",
   network: "Could not add that plant right now. Nothing was changed; try again.",
+  cleanup_unconfirmed:
+    "Could not add that plant, and Verdant could not confirm it was taken back out of the hunt. Reload the hunt: it may show as a candidate without a number.",
+  relabel_failed:
+    "That plant was added with a later number, but its label could not be updated to match. Reload the hunt and rename it.",
 } as const satisfies Record<AddCandidateFailureReason, string>;
 
 /** Fixed UI copy for the workspace dialog and the plant-page button. */
@@ -105,6 +111,48 @@ export function maxPhenoCandidateNumber(
 ): number {
   if (!Array.isArray(numbers)) return 0;
   return numbers.reduce<number>((max, n) => (isPositiveInteger(n) && n > max ? n : max), 0);
+}
+
+/** Failures that may have left a change behind, so the hunt must be re-read. */
+const PARTIAL_FAILURES: ReadonlySet<AddCandidateFailureReason> = new Set([
+  "cleanup_unconfirmed",
+  "relabel_failed",
+]);
+
+/** Whether an add attempt may have changed the hunt (something added, or a partial failure). */
+export function phenoHuntAddChangedHunt(result: {
+  readonly added: readonly unknown[];
+  readonly failed: readonly { readonly reason: AddCandidateFailureReason }[];
+}): boolean {
+  return result.added.length > 0 || result.failed.some((f) => PARTIAL_FAILURES.has(f.reason));
+}
+
+export interface PhenoHuntCandidateIdentity {
+  readonly candidate_number: number | null;
+  readonly candidate_label: string | null;
+}
+
+const POSITIONAL_LABEL = /^#(\d+)$/;
+
+/**
+ * The highest candidate ordinal already used in the hunt. Setup labels its
+ * candidates "#1".."#n" WITHOUT a candidate_number, so numbers alone undercount:
+ * take the max of the numbers, of "#<n>" labels, and of the candidate count.
+ */
+export function phenoCandidateOrdinalBaseline(
+  candidates: readonly PhenoHuntCandidateIdentity[] | null | undefined,
+): number {
+  if (!Array.isArray(candidates)) return 0;
+  let max = candidates.length;
+  for (const c of candidates) {
+    if (isPositiveInteger(c?.candidate_number) && c.candidate_number > max) {
+      max = c.candidate_number;
+    }
+    const match = POSITIONAL_LABEL.exec((c?.candidate_label ?? "").trim());
+    const fromLabel = match ? Number(match[1]) : 0;
+    if (Number.isSafeInteger(fromLabel) && fromLabel > max) max = fromLabel;
+  }
+  return max;
 }
 
 /** Next `count` numbers after the current max, in pick order: max+1, max+2, ... */

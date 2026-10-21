@@ -12,6 +12,7 @@ import {
   PHENO_HUNT_ADD_CANDIDATES_COPY,
   PHENO_HUNT_ADD_CANDIDATES_UI_COPY as COPY,
   orderPickedPhenoPlantIds,
+  phenoHuntAddChangedHunt,
   phenoHuntAddedSummary,
   selectEligiblePhenoHuntPlants,
   type PhenoHuntAddCandidatePlant,
@@ -24,7 +25,10 @@ import {
 interface Props {
   huntId: string;
   growId: string;
-  /** Called after at least one plant was added, so the workspace can reload. */
+  /**
+   * Called when the dialog closes after an add changed the hunt, so the
+   * workspace reloads without unmounting the dialog's results.
+   */
   onAdded: () => void;
 }
 
@@ -44,6 +48,7 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
   const [picked, setPicked] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
+  const [changedHunt, setChangedHunt] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +56,7 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
     setLoad({ status: "loading" });
     setPicked([]);
     setMessages([]);
+    setChangedHunt(false);
     void listPhenoHuntGrowPlants(growId).then((result) => {
       if (cancelled) return;
       setLoad(result.ok ? { status: "ready", plants: result.plants } : { status: "error" });
@@ -67,6 +73,14 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
         : [],
     [load, growId],
   );
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next && changedHunt) {
+      setChangedHunt(false);
+      onAdded();
+    }
+  }
 
   async function submit() {
     const plantIds = orderPickedPhenoPlantIds(picked, eligible);
@@ -95,8 +109,8 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
           : prev,
       );
       setPicked([]);
-      onAdded();
     }
+    if (phenoHuntAddChangedHunt(result)) setChangedHunt(true);
     setMessages(lines);
   }
 
@@ -111,7 +125,7 @@ export default function PhenoHuntAddCandidatesDialog({ huntId, growId, onAdded }
       >
         {COPY.trigger}
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent data-testid="pheno-add-candidates-dialog">
           <DialogHeader>
             <DialogTitle>{COPY.title}</DialogTitle>

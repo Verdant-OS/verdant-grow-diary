@@ -24,6 +24,13 @@ const item = (publicationHandle: string, publishedAt: string): DigestItem => ({
 const handles = (items: readonly DigestItem[]) =>
   items.map((digestItem) => digestItem.publication.publicationHandle);
 
+/** Unwraps a successful page; a failed result fails the test. */
+const page = (input: readonly DigestItem[], cursor: DigestCursor): readonly DigestItem[] => {
+  const result = orderCommunityDigest(input, cursor);
+  if (!result.ok) throw new Error(`expected a page, got ${result.code}`);
+  return result.value;
+};
+
 const items = [
   item("pub-a", "2026-10-20T10:00:00Z"),
   item("pub-c", "2026-10-21T09:00:00Z"),
@@ -34,20 +41,12 @@ const items = [
 
 describe("orderCommunityDigest", () => {
   it("orders newest first, breaking time ties by handle, descending", () => {
-    expect(handles(orderCommunityDigest(items, null))).toEqual([
-      "pub-e",
-      "pub-c",
-      "pub-b",
-      "pub-a",
-      "pub-d",
-    ]);
+    expect(handles(page(items, null))).toEqual(["pub-e", "pub-c", "pub-b", "pub-a", "pub-d"]);
   });
 
   it("is stable regardless of input order", () => {
     const reversed = [...items].reverse();
-    expect(handles(orderCommunityDigest(reversed, null))).toEqual(
-      handles(orderCommunityDigest(items, null)),
-    );
+    expect(handles(page(reversed, null))).toEqual(handles(page(items, null)));
   });
 
   it("returns only items strictly before the cursor, including within a tie", () => {
@@ -55,17 +54,17 @@ describe("orderCommunityDigest", () => {
       publishedAt: "2026-10-21T09:00:00Z",
       publicationHandle: "pub-c",
     };
-    expect(handles(orderCommunityDigest(items, cursor))).toEqual(["pub-b", "pub-a", "pub-d"]);
+    expect(handles(page(items, cursor))).toEqual(["pub-b", "pub-a", "pub-d"]);
   });
 
   it("pages through ties without skipping or repeating an item", () => {
     const seen: string[] = [];
     let cursor: DigestCursor = null;
     for (;;) {
-      const page = orderCommunityDigest(items, cursor).slice(0, 2);
-      if (page.length === 0) break;
-      seen.push(...handles(page));
-      const last = page[page.length - 1].publication;
+      const slice = page(items, cursor).slice(0, 2);
+      if (slice.length === 0) break;
+      seen.push(...handles(slice));
+      const last = slice[slice.length - 1].publication;
       cursor = { publishedAt: last.publishedAt, publicationHandle: last.publicationHandle };
     }
     expect(seen).toEqual(["pub-e", "pub-c", "pub-b", "pub-a", "pub-d"]);
@@ -74,27 +73,47 @@ describe("orderCommunityDigest", () => {
   it("does not mark anything seen: paging leaves items and input untouched", () => {
     const input = [...items];
     const before = JSON.stringify(input);
-    const page = orderCommunityDigest(input, null).slice(0, 1);
+    const first = page(input, null).slice(0, 1);
     expect(JSON.stringify(input)).toBe(before);
-    expect(page[0]).toBe(items[4]);
-    expect(Object.keys(page[0])).not.toContain("seen");
+    expect(first[0]).toBe(items[4]);
+    expect(Object.keys(first[0])).not.toContain("seen");
     // A later page still returns items the first page never showed.
-    expect(handles(orderCommunityDigest(input, null))).toContain("pub-d");
+    expect(handles(page(input, null))).toContain("pub-d");
   });
 
   it("treats a new revision with the same timestamp as its own item", () => {
     const newer = item("pub-c2", "2026-10-21T09:00:00Z");
-    expect(handles(orderCommunityDigest([...items, newer], null)).slice(0, 3)).toEqual([
+    expect(handles(page([...items, newer], null)).slice(0, 3)).toEqual([
       "pub-e",
       "pub-c2",
       "pub-c",
     ]);
   });
 
-  it("fails closed on an unreadable cursor and drops unreadable timestamps", () => {
-    expect(orderCommunityDigest(items, { publishedAt: "bad", publicationHandle: "x" })).toEqual([]);
+  it("reports an unreadable cursor as invalid instead of an empty page", () => {
+    expect(orderCommunityDigest(items, { publishedAt: "bad", publicationHandle: "x" })).toEqual({
+      ok: false,
+      code: "invalid",
+    });
+  });
+
+  it("reports any item with an unreadable timestamp as invalid instead of dropping it", () => {
     const withBad = [...items, item("pub-bad", "not-a-time")];
-    expect(handles(orderCommunityDigest(withBad, null))).not.toContain("pub-bad");
+    expect(orderCommunityDigest(withBad, null)).toEqual({ ok: false, code: "invalid" });
+    expect(
+      orderCommunityDigest(withBad, {
+        publishedAt: "2026-10-21T09:00:00Z",
+        publicationHandle: "pub-c",
+      }),
+    ).toEqual({ ok: false, code: "invalid" });
+  });
+
+  it("keeps a genuinely empty page after a valid cursor distinct from bad input", () => {
+    const cursor: DigestCursor = {
+      publishedAt: "2026-10-19T08:00:00Z",
+      publicationHandle: "pub-d",
+    };
+    expect(orderCommunityDigest(items, cursor)).toEqual({ ok: true, value: [] });
   });
 
   it("orders by database microseconds within one millisecond", () => {
@@ -102,7 +121,7 @@ describe("orderCommunityDigest", () => {
       item("pub-z", "2026-10-21T09:00:00.123100+00:00"),
       item("pub-a", "2026-10-21T09:00:00.123900+00:00"),
     ];
-    expect(handles(orderCommunityDigest(sameMs, null))).toEqual(["pub-a", "pub-z"]);
+    expect(handles(page(sameMs, null))).toEqual(["pub-a", "pub-z"]);
   });
 
   it("keeps an older publication after a cursor in the same millisecond", () => {
@@ -114,7 +133,7 @@ describe("orderCommunityDigest", () => {
       publishedAt: "2026-10-21T09:00:00.123900+00:00",
       publicationHandle: "pub-a",
     };
-    expect(handles(orderCommunityDigest(sameMs, cursor))).toEqual(["pub-z"]);
+    expect(handles(page(sameMs, cursor))).toEqual(["pub-z"]);
   });
 
   it("treats equal instants written with different precision as a tie", () => {
@@ -122,10 +141,10 @@ describe("orderCommunityDigest", () => {
       item("pub-b", "2026-10-21T09:00:00.123Z"),
       item("pub-c", "2026-10-21T09:00:00.123000+00:00"),
     ];
-    expect(handles(orderCommunityDigest(equal, null))).toEqual(["pub-c", "pub-b"]);
+    expect(handles(page(equal, null))).toEqual(["pub-c", "pub-b"]);
   });
 
-  it("returns an empty list for an empty digest", () => {
-    expect(orderCommunityDigest([], null)).toEqual([]);
+  it("returns an empty successful page for an empty digest", () => {
+    expect(orderCommunityDigest([], null)).toEqual({ ok: true, value: [] });
   });
 });

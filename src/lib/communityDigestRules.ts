@@ -1,4 +1,4 @@
-import type { DigestCursor, DigestItem } from "@/lib/communityTypes";
+import type { CommunityResult, DigestCursor, DigestItem } from "@/lib/communityTypes";
 
 /** A publish instant: epoch milliseconds plus the fraction digits Date.parse drops. */
 interface Instant {
@@ -35,20 +35,22 @@ function compareDescending(a: Instant, aHandle: string, b: Instant, bHandle: str
 /**
  * Orders digest items newest first and keeps only those strictly after the
  * cursor in that order. The cursor is navigation only: this function records
- * nothing as seen. Items or a cursor with an unreadable timestamp cannot be
- * placed honestly, so they are dropped (cursor: empty page).
+ * nothing as seen. A cursor or any item with an unreadable timestamp is
+ * reported as `invalid`, so bad input never looks like "nothing newer".
  */
 export function orderCommunityDigest(
   items: readonly DigestItem[],
   before: DigestCursor,
-): readonly DigestItem[] {
+): CommunityResult<readonly DigestItem[]> {
   const cursorAt = before === null ? null : readInstant(before.publishedAt);
-  if (before !== null && cursorAt === null) return [];
+  if (before !== null && cursorAt === null) return { ok: false, code: "invalid" };
 
-  const placed = items.flatMap((item) => {
+  const placed: { item: DigestItem; at: Instant }[] = [];
+  for (const item of items) {
     const at = readInstant(item.publication.publishedAt);
-    return at === null ? [] : [{ item, at }];
-  });
+    if (at === null) return { ok: false, code: "invalid" };
+    placed.push({ item, at });
+  }
 
   const afterCursor =
     before === null || cursorAt === null
@@ -63,7 +65,7 @@ export function orderCommunityDigest(
             ) > 0,
         );
 
-  return afterCursor
+  const ordered = afterCursor
     .sort((a, b) =>
       compareDescending(
         a.at,
@@ -73,4 +75,5 @@ export function orderCommunityDigest(
       ),
     )
     .map((entry) => entry.item);
+  return { ok: true, value: ordered };
 }

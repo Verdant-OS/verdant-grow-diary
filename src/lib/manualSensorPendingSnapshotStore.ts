@@ -17,6 +17,8 @@ export interface PendingManualSnapshot {
   version: 1;
   ownerId: string;
   payloads: ManualSnapshotPayloads;
+  /** The unit the grower typed the air temperature in; display only, never sent. */
+  airTempUnit?: TemperatureInputUnit;
 }
 
 export const MANUAL_RECOVERY_STORAGE_ERROR =
@@ -66,8 +68,9 @@ function valid(value: unknown, ownerId: string): value is PendingManualSnapshot 
   if (
     !owner(ownerId) ||
     !object(value) ||
-    !exactKeys(value, ["version", "ownerId", "payloads"]) ||
+    !exactKeys(value, ["version", "ownerId", "payloads", "airTempUnit"]) ||
     value.version !== 1 ||
+    (value.airTempUnit !== undefined && value.airTempUnit !== "C" && value.airTempUnit !== "F") ||
     value.ownerId !== ownerId ||
     !Array.isArray(value.payloads) ||
     !value.payloads.length ||
@@ -199,7 +202,8 @@ export function claimPendingManualSnapshot(
     const current = readPendingManualSnapshot(record.ownerId);
     if (current.status === "blocked") return current;
     if (current.status === "pending")
-      return JSON.stringify(current.record) === JSON.stringify(record)
+      // The snapshot's identity is its payloads; the entry unit is display only.
+      return JSON.stringify(current.record.payloads) === JSON.stringify(record.payloads)
         ? { status: "claimed", record: current.record }
         : current;
     const raw = JSON.stringify(record);
@@ -215,7 +219,10 @@ export function clearPendingManualSnapshot(record: PendingManualSnapshot): boole
   try {
     if (!valid(record, record.ownerId)) return false;
     const current = readPendingManualSnapshot(record.ownerId);
-    if (current.status !== "pending" || JSON.stringify(current.record) !== JSON.stringify(record))
+    if (
+      current.status !== "pending" ||
+      JSON.stringify(current.record.payloads) !== JSON.stringify(record.payloads)
+    )
       return false;
     window.sessionStorage.removeItem(key(record.ownerId));
     return window.sessionStorage.getItem(key(record.ownerId)) === null;

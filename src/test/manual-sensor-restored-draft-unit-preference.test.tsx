@@ -5,6 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
+import {
+  claimPendingManualSnapshot,
+  clearPendingManualSnapshot,
+  readPendingManualSnapshot,
+  type PendingManualSnapshot,
+} from "@/lib/manualSensorPendingSnapshotStore";
+import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
 
 // QA (production 05f5138d): with a °F preference, a refused manual snapshot
 // restored after a reload showed "Entered in °C" with 93.33, so typing 77
@@ -160,5 +167,76 @@ describe("manual reading form keeps the °F preference after a restored draft", 
 
     await waitFor(() => expect(backend.posts).toHaveLength(1));
     expect(temperatureRow(backend.posts[0])?.value).toBe(25.01);
+  });
+
+  it("restores a reading entered in °C as °C, even with a °F preference", async () => {
+    const first = mountPage();
+    backend.offline = true;
+    fireEvent.click(screen.getByTestId("manual-reading-temp-unit-C"));
+    fireEvent.change(airTemp(), { target: { value: "26" } });
+    fireEvent.change(screen.getByLabelText(/Humidity/i), { target: { value: "60" } });
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await screen.findByTestId("manual-reading-save-unconfirmed");
+    const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) ?? "null");
+    expect(temperatureRow(pending?.payloads)?.value).toBe(26);
+    first.unmount();
+    backend.offline = false;
+    mountPage();
+
+    expect(screen.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(airTemp().value).toBe("26");
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() => expect(backend.posts).toHaveLength(1));
+    expect(backend.posts[0]).toEqual(pending.payloads);
+  });
+});
+
+describe("pending manual snapshot keeps the entry unit as display-only data", () => {
+  const record = (airTempUnit?: "C" | "F"): PendingManualSnapshot => ({
+    version: 1,
+    ownerId: "owner-a",
+    payloads: buildManualReadingPayloads({
+      tentId: TENT,
+      ts: "2026-10-21T12:00:00.000Z",
+      metrics: [
+        { metric: "temperature_c", value: 26 },
+        { metric: "humidity_pct", value: 60 },
+      ],
+      deviceNote: null,
+    }),
+    ...(airTempUnit ? { airTempUnit } : {}),
+  });
+
+  it("stores the unit, and still reads records saved without one", () => {
+    expect(claimPendingManualSnapshot(record("F"))).toEqual({
+      status: "claimed",
+      record: record("F"),
+    });
+    expect(readPendingManualSnapshot("owner-a")).toEqual({
+      status: "pending",
+      record: record("F"),
+    });
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify(record()));
+    expect(readPendingManualSnapshot("owner-a")).toEqual({ status: "pending", record: record() });
+  });
+
+  it("rejects an unknown unit", () => {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ ...record(), airTempUnit: "K" }));
+    expect(readPendingManualSnapshot("owner-a")).toEqual({ status: "blocked" });
+  });
+
+  it("matches and clears by payloads, whatever unit each side carries", () => {
+    claimPendingManualSnapshot(record("C"));
+    expect(claimPendingManualSnapshot(record())).toEqual({
+      status: "claimed",
+      record: record("C"),
+    });
+    expect(clearPendingManualSnapshot(record())).toBe(true);
+    expect(readPendingManualSnapshot("owner-a")).toEqual({ status: "empty" });
   });
 });

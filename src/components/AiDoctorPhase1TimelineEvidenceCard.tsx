@@ -90,7 +90,7 @@ export function AiDoctorPhase1TimelineEvidenceCard({
         </li>
         {occurredAt && (
           <li data-testid="ai-doctor-phase1-timeline-evidence-card-occurred-at">
-            Saved: <time dateTime={occurredAt}>{occurredAt}</time>
+            Saved: <time dateTime={occurredAt}>{savedAtLabel ?? occurredAt}</time>
           </li>
         )}
       </ul>

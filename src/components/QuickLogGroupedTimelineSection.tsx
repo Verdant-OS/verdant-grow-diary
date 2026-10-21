@@ -9,6 +9,7 @@ import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard"
 import { MISSING_SNAPSHOT_NOTE_LABEL } from "@/lib/manualSensorSnapshotViewModel";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { useQuickLogGroupedTimeline } from "@/hooks/useQuickLogGroupedTimeline";
+import { useTimelineGrowDayNow } from "@/hooks/useTimelineGrowDayNow";
 import { correctionValuesForTimelineAction } from "@/lib/quick-log/quickLogRevisionRules";
 import type {
   QuickLogActionEvent,
@@ -486,6 +487,8 @@ export const QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL = "Updating QuickLog time
 
 export default function QuickLogGroupedTimelineSection(props: Props) {
   const dayHeadingPrefix = useId();
+  // Re-renders at local midnight so Today / Yesterday headings roll over.
+  const timelineNow = useTimelineGrowDayNow();
   const scope = toScope(props);
   const { entries, isLoading, isFetching, isError } = useQuickLogGroupedTimeline(scope);
   const [filter, setFilter] = useState<QuickLogGroupedTimelineFilter>("all");
@@ -532,7 +535,9 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   );
   const timelineDays = useMemo(() => {
     const seenDayHeadings = new Map<string, string>();
-    return groupByQuickLogLocalDay(orderedWrapped, (item) => item.entry.occurredAt).map((day) => {
+    return groupByQuickLogLocalDay(orderedWrapped, (item) => item.entry.occurredAt, {
+      now: timelineNow,
+    }).map((day) => {
       const dayToken = day.dayKey.length > 0 ? day.dayKey : "unknown";
       const existingHeadingId = seenDayHeadings.get(dayToken);
       const showHeading = existingHeadingId === undefined;
@@ -540,7 +545,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
       if (showHeading) seenDayHeadings.set(dayToken, headingId);
       return { day, showHeading, headingId };
     });
-  }, [orderedWrapped, dayHeadingPrefix]);
+  }, [orderedWrapped, dayHeadingPrefix, timelineNow]);
   const aiDoctorResultsHref = aiDoctorResultsHrefFor(props);
   const isAiDoctorEvidenceFilter = filter === "ai-doctor-evidence";
 

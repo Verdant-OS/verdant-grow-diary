@@ -861,12 +861,19 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Log inputs with their numbers, not adjectives",
         body: "\u201cFed lightly\u201d means nothing in six weeks. \u201c500 ml\u201d does. Verdant's numeric fields never invent values: an empty field stays empty instead of becoming a fake zero, because an honest gap beats a false number.",
+        links: [
+          {
+            label: "Use the five-field grow journal template",
+            to: "/guides/grow-journal-template",
+          },
+        ],
       },
       {
         heading: "Photos and sensor snapshots: the context multipliers",
         body: "A photo turns a note into evidence. A sensor snapshot — temperature, humidity, VPD — turns it into context. Verdant labels every reading's source (live, manual, csv, demo, stale, invalid) so the context you attach stays trustworthy as it ages.",
         links: [
           { label: "Understand source-labeled sensor truth", to: "/guides/sensor-truth-grow-room" },
+          { label: "Look up cultivation terms in the glossary", to: "/glossary" },
         ],
       },
       {
@@ -1079,6 +1086,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "One entry per change, against the plant",
         body: "Log against the specific plant, not the room in general, so each timeline stays readable. The public Quick Log starter at /quick-log covers the four types a daily pass produces — watering, feeding, observation, environment check — and lets you rehearse the format with no account, draft kept on your device.",
+        links: [
+          {
+            label: "See how the no-account draft works",
+            to: "/guides/grow-journal-app-without-account",
+          },
+        ],
       },
       {
         heading: "Weekly additions that stay cheap",

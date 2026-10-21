@@ -50,6 +50,7 @@ import QuickLogAllActivitiesSection, {
   type QuickLogAllActivitiesSaveSuccess,
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
+import { resolveQuickLogPendingSectionPhotoBlock } from "@/lib/quickLogPendingSectionPhotoRules";
 import { buildQuickLogTargetKey } from "@/lib/quickLogActivityRules";
 import { readPendingQuickLogActivity } from "@/lib/quickLogPendingActivityStore";
 import { STAGES } from "@/lib/grow";
@@ -501,6 +502,8 @@ export default function QuickLog({
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // The All activity types Photo editor saves its image itself; Save log never carries it.
+  const [sectionPhotoPending, setSectionPhotoPending] = useState(false);
   const [starterWaterPending, setStarterWaterPending] = useState<PendingStarterWater | null>(null);
   const [starterWaterStorageBlocked, setStarterWaterStorageBlocked] = useState(false);
   const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
@@ -1426,6 +1429,11 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const pendingSectionPhotoBlock = resolveQuickLogPendingSectionPhotoBlock(sectionPhotoPending);
+    if (pendingSectionPhotoBlock) {
+      setSaveError(pendingSectionPhotoBlock);
+      return;
+    }
     // The previous Water may have committed. Never let a new/edited payload
     // rotate its key until the exact stored attempt has been reconciled.
     if (user?.id) {
@@ -2339,6 +2347,7 @@ export default function QuickLog({
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           onRecoveryLockChange={handleActivityRecoveryLockChange}
+          onPendingPhotoChange={setSectionPhotoPending}
           saveBlocked={saveLocked || recoveryLocked}
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {

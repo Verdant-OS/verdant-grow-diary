@@ -183,6 +183,8 @@ export interface QuickLogAllActivitiesSectionProps {
   reviewedStarterHandoffKey?: string | null;
   /** Fires only after persistence confirms success. */
   onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void;
+  /** Reports whether a selected photo is waiting for this section's own Save. */
+  onPendingPhotoChange?: (pending: boolean) => void;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -297,6 +299,7 @@ export default function QuickLogAllActivitiesSection({
   requestedNote = null,
   reviewedStarterHandoffKey = null,
   onSaveSuccess,
+  onPendingPhotoChange,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -325,6 +328,12 @@ export default function QuickLogAllActivitiesSection({
   // bucket; the diary row's photo_url column carries the bare storage path.
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const photoContentGenerationRef = useRef(0);
+  const hasPendingPhoto = photoFile !== null;
+  useEffect(() => {
+    if (!onPendingPhotoChange) return;
+    onPendingPhotoChange(hasPendingPhoto);
+    return () => onPendingPhotoChange(false);
+  }, [hasPendingPhoto, onPendingPhotoChange]);
   // A lost diary-insert response cannot prove the uploaded object is orphaned.
   // Keep the object and lock only the exact grow/tent/plant target that owns
   // the uncertain write. A target switch must not disable a different plant's

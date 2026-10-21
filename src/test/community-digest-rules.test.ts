@@ -187,4 +187,41 @@ describe("orderCommunityDigest", () => {
       expect(handles(page(sameMs, null))).toEqual(["pub-a", "pub-z"]);
     }
   });
+
+  it("reports a cursor with a missing, empty or non-string handle as invalid", () => {
+    for (const publicationHandle of [undefined, null, "", 7]) {
+      const cursor = {
+        publishedAt: "2026-10-21T09:00:00Z",
+        publicationHandle,
+      } as unknown as DigestCursor;
+      expect(orderCommunityDigest(items, cursor)).toEqual({ ok: false, code: "invalid" });
+    }
+  });
+
+  it("reports an item with a missing, empty or non-string handle as invalid", () => {
+    for (const publicationHandle of [undefined, null, "", 7]) {
+      const bad = item("pub-x", "2026-10-21T09:00:00Z");
+      const malformed = {
+        ...bad,
+        publication: { ...bad.publication, publicationHandle },
+      } as unknown as DigestItem;
+      expect(orderCommunityDigest([...items, malformed], null)).toEqual({
+        ok: false,
+        code: "invalid",
+      });
+    }
+  });
+
+  it("reports a non-array item list or a non-object cursor as invalid", () => {
+    for (const input of [null, undefined, {}]) {
+      expect(orderCommunityDigest(input as unknown as readonly DigestItem[], null)).toEqual({
+        ok: false,
+        code: "invalid",
+      });
+    }
+    expect(orderCommunityDigest(items, "2026-10-21T09:00:00Z" as unknown as DigestCursor)).toEqual({
+      ok: false,
+      code: "invalid",
+    });
+  });
 });

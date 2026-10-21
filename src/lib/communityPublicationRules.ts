@@ -60,6 +60,7 @@ export function validatePublicationDrafts(
   entries: readonly PublicationDraft[],
   mode: "draft" | "publish",
 ): CommunityResult<readonly PublicationDraft[]> {
+  if (!Array.isArray(entries)) return { ok: false, code: "invalid" };
   if (entries.length > COMMUNITY_MAX_SELECTED_ENTRIES) return { ok: false, code: "invalid" };
   if (mode === "publish" && entries.length === 0) return { ok: false, code: "invalid" };
   if (!entries.every(isValidDraft)) return { ok: false, code: "invalid" };
@@ -82,6 +83,8 @@ export function isPreviewCurrent(
   },
   nowMs: number,
 ): boolean {
+  if (typeof preview !== "object" || preview === null) return false;
+  if (typeof current !== "object" || current === null) return false;
   const expiresAtMs = readCommunityInstant(preview.expiresAt)?.ms ?? Number.NaN;
   if (!Number.isFinite(nowMs) || !Number.isFinite(expiresAtMs)) return false;
   if (!isPresent(preview.previewToken)) return false;

@@ -3,6 +3,10 @@ import { validateManualEntry, type ManualEntryInput } from "./sensorReadingManua
 import { isCanonicalManualSensorPayload } from "./manualSensorProvenanceRules";
 import { normalizeManualSourceNote } from "./manualSensorSourceLabel";
 import {
+  convertTemperatureInputString,
+  type TemperatureInputUnit,
+} from "./sensorInputUnitConversion";
+import {
   createManualDraftValues,
   type ManualDraftValues,
   type ManualSnapshotPayloads,
@@ -129,10 +133,28 @@ function valid(value: unknown, ownerId: string): value is PendingManualSnapshot 
   return payloads.every((row) => isCanonicalManualSensorPayload(row.raw_payload));
 }
 
-export function restoreManualSnapshotValues(record: PendingManualSnapshot): ManualDraftValues {
+/**
+ * Rebuild an unconfirmed snapshot's draft in the unit the form should show.
+ * Payloads hold canonical °C at two decimals; re-expressing to °F at one
+ * decimal returns the grower's typed value (200 °F → 93.33 °C → 200 °F).
+ * The draft keeps an explicit unit so the shown number and unit always agree.
+ */
+export function restoreManualSnapshotValues(
+  record: PendingManualSnapshot,
+  displayUnit: TemperatureInputUnit = "C",
+): ManualDraftValues {
   const device = record.payloads[0].device_id;
+  const form = formFor(record.payloads);
+  const shown =
+    displayUnit === "C"
+      ? form
+      : {
+          ...form,
+          airTemp: convertTemperatureInputString(String(form.airTemp ?? ""), "C", displayUnit, 1),
+          airTempUnit: displayUnit,
+        };
   return {
-    ...createManualDraftValues(formFor(record.payloads), "C"),
+    ...createManualDraftValues(shown, displayUnit),
     hasEditedReading: true,
     devicePreset: device ? "custom" : "none",
     deviceCustom: device?.slice(7) ?? "",

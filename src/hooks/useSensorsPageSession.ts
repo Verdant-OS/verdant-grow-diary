@@ -190,7 +190,12 @@ export function createSensorsPageSessionController(
             ? {
                 ...input,
                 defaultTentId: recovery.payloads[0].tent_id,
-                initial: restoreManualSnapshotValues(recovery),
+                // Restore in the unit the card starts drafts in (the grower's
+                // preference), not the canonical °C the payloads are stored in.
+                initial: restoreManualSnapshotValues(
+                  recovery,
+                  input.initial.form.airTempUnit ?? "C",
+                ),
               }
             : input,
         ),

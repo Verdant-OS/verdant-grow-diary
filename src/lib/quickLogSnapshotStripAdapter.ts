@@ -14,6 +14,10 @@
  *    so the UI never shows an unsupported variant.
  */
 import {
+  formatQuickLogOccurredAt,
+  quickLogLocalClockParts,
+} from "@/lib/quickLogGroupedTimelineFilterViewModel";
+import {
   classifyAuditRow,
   type Classification,
   type SnapshotStatus,
@@ -53,7 +57,7 @@ export interface QuickLogSnapshotStripViewModel {
   /** Captured timestamp (ISO) or null when no snapshot is available. */
   capturedAt: string | null;
   /**
-   * Absolute, deterministic captured-at label ("Jul 7, 2026, 7:14 PM UTC")
+   * Absolute captured-at label in the viewer's local clock ("Jul 7, 2026, 2:14 PM")
    * or null when there is no snapshot. Presented alongside the relative
    * age so growers can always see the exact moment captured. Never
    * relabels manual data as live.
@@ -185,38 +189,13 @@ function actionFor(
 }
 
 /**
- * Deterministic absolute-time formatter for the "Captured: …" line.
- * Uses UTC + a fixed format so unit tests are stable across machines.
- * Example: "Jul 7, 2026, 7:14 PM UTC".
+ * Absolute-time formatter for the "Captured: …" line, in the viewer's local
+ * clock, the same as the Quick Log timeline (#1949). Stored instants stay UTC.
+ * Example in America/Chicago: "2026-10-22T01:29:00.000Z" → "Oct 21, 2026, 8:29 PM".
  */
 export function formatCapturedAtAbsolute(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return null;
-  const d = new Date(ms);
-  const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const mo = MONTHS[d.getUTCMonth()];
-  const day = d.getUTCDate();
-  const yr = d.getUTCFullYear();
-  let h = d.getUTCHours();
-  const m = d.getUTCMinutes().toString().padStart(2, "0");
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12;
-  if (h === 0) h = 12;
-  return `${mo} ${day}, ${yr}, ${h}:${m} ${ampm} UTC`;
+  if (!quickLogLocalClockParts(iso)) return null;
+  return formatQuickLogOccurredAt(iso);
 }
 
 function formatAge(capturedMs: number, nowMs: number): string {

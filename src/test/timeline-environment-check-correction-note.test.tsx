@@ -172,14 +172,16 @@ vi.mock("@/components/EntryEditDialog", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogEntryIntegrityControls", () => ({
   default: ({
     correctionValues,
-    readingsNote,
+    environmentCheckDetails,
   }: {
     correctionValues: unknown;
-    readingsNote?: string | null;
+    environmentCheckDetails?: unknown;
   }) => (
     <>
       <output data-testid="timeline-correction-values">{JSON.stringify(correctionValues)}</output>
-      <output data-testid="timeline-correction-readings-note">{readingsNote ?? "none"}</output>
+      <output data-testid="timeline-correction-env-details">
+        {JSON.stringify(environmentCheckDetails ?? null)}
+      </output>
     </>
   ),
 }));
@@ -264,7 +266,7 @@ describe("Timeline Environment check correction note", () => {
     harness.executeQuery.mockImplementation(queryResult);
   });
 
-  it("passes the readings note for an Environment check whose readings live only in details", async () => {
+  it("passes an Environment check's saved details to its correction controls", async () => {
     harness.diaryDetails = {
       event_type: "environment_check",
       linked_grow_event_id: "parent-1",
@@ -272,15 +274,15 @@ describe("Timeline Environment check correction note", () => {
     };
     renderTimeline();
     await waitFor(() => {
-      expect(screen.getByTestId("timeline-correction-readings-note")).toHaveTextContent(
-        "Recorded readings on this Environment check can't be corrected here.",
+      expect(screen.getByTestId("timeline-correction-env-details")).toHaveTextContent(
+        '"environment_check":{"checkType":"airflow","temp_c":24.5,"humidity_pct":58}',
       );
     });
   });
 
-  it("keeps the note beside the partial-read warning when the manual sensor read failed", async () => {
-    // The note only says the dialog can't correct these readings, which stays
-    // true when a read failed; the warning discloses the missing source.
+  it("still passes the details beside the partial-read warning when the manual sensor read failed", async () => {
+    // The dialog's note only says which readings it has no field for, which
+    // stays true when a read failed; the warning discloses the missing source.
     harness.sensorMode = "error";
     harness.diaryDetails = {
       event_type: "environment_check",
@@ -289,12 +291,12 @@ describe("Timeline Environment check correction note", () => {
     };
     renderTimeline();
     await screen.findByTestId("timeline-partial-read-warning");
-    expect(screen.getByTestId("timeline-correction-readings-note")).toHaveTextContent(
-      "Recorded readings on this Environment check can't be corrected here.",
+    expect(screen.getByTestId("timeline-correction-env-details")).toHaveTextContent(
+      '"environment_check":{"checkType":"airflow"',
     );
   });
 
-  it("passes no note for a Fast Check observation whose readings are correctable", async () => {
+  it("passes a Fast Check observation's own details beside its correctable readings", async () => {
     harness.diaryDetails = {
       event_type: "observation",
       quick_log_version: 2,
@@ -306,6 +308,8 @@ describe("Timeline Environment check correction note", () => {
         '"humidity_pct":44',
       );
     });
-    expect(screen.getByTestId("timeline-correction-readings-note")).toHaveTextContent("none");
+    expect(screen.getByTestId("timeline-correction-env-details")).toHaveTextContent(
+      '"event_type":"observation"',
+    );
   });
 });

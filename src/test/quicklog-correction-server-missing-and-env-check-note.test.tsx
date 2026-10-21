@@ -46,8 +46,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { RecentQuickLogActivityPanel } from "@/components/QuickLogHistoryPanels";
 
-const envCheckNote = (details: unknown) => quickLogCorrectionEnvironmentCheckReadingsNote(details);
+const envCheckNote = (details: unknown) =>
+  quickLogCorrectionEnvironmentCheckReadingsNote(details, { offersAirReadingFields: false });
 
 const ENV_CHECK_ONLY = {
   event_type: "environment_check",
@@ -133,7 +135,7 @@ describe("missing correction server function", () => {
 describe("Environment Check readings note", () => {
   it("explains readings that live only in details.environment_check", () => {
     expect(envCheckNote(ENV_CHECK_ONLY)).toBe(
-      "Recorded readings on this Environment check can't be corrected here. You can still correct the note, time, or plant.",
+      "Recorded readings on this Environment check that have no field here can't be corrected. You can still correct the note, time, or plant.",
     );
   });
 
@@ -203,12 +205,13 @@ describe("Environment Check readings note", () => {
     ).toBeNull();
   });
 
-  it("is null when the check also carries a sensor snapshot the RPC can correct", () => {
+  it("is null when the dialog's sensor fields cover every recorded reading", () => {
+    // A check with a sensor snapshot opens with temperature/humidity fields.
     expect(
-      envCheckNote({
-        ...ENV_CHECK_ONLY,
-        sensor_snapshot: { temperature_c: 24.5, humidity_pct: 58 },
-      }),
+      quickLogCorrectionEnvironmentCheckReadingsNote(
+        { ...ENV_CHECK_ONLY, sensor_snapshot: { temperature_c: 24.5, humidity_pct: 58 } },
+        { offersAirReadingFields: true },
+      ),
     ).toBeNull();
   });
 
@@ -224,11 +227,8 @@ describe("Environment Check readings note", () => {
     expect(envCheckNote("x")).toBeNull();
   });
 
-  it("renders the note in the correction dialog instead of absent fields", () => {
-    mount({
-      readingsNote: envCheckNote(ENV_CHECK_ONLY),
-      correctionValues: null,
-    });
+  it("renders the note in the correction dialog when it offers no reading fields", () => {
+    mount({ environmentCheckDetails: ENV_CHECK_ONLY, correctionValues: null });
     fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
     expect(screen.getByTestId("quicklog-correct-readings-note")).toHaveTextContent(
       QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
@@ -236,13 +236,58 @@ describe("Environment Check readings note", () => {
     expect(screen.queryByTestId("quicklog-correct-temperature-input")).toBeNull();
   });
 
-  it("does not show the note where sensor fields are offered", () => {
+  it("shows no note when the offered sensor fields cover every recorded reading", () => {
     mount({
-      readingsNote: QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
+      environmentCheckDetails: ENV_CHECK_ONLY,
       correctionValues: { kind: "sensor", sensor: { temperature_c: 24.5, humidity_pct: 58 } },
     });
     fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
     expect(screen.getByTestId("quicklog-correct-temperature-input")).toBeInTheDocument();
     expect(screen.queryByTestId("quicklog-correct-readings-note")).toBeNull();
+  });
+
+  it("shows the note beside the sensor fields when water temperature, EC or CO₂ has no field", () => {
+    for (const extra of [{ water_temp_f: 68 }, { ec_mscm: 1.4 }, { co2_ppm: 900 }]) {
+      mount({
+        environmentCheckDetails: {
+          ...ENV_CHECK_ONLY,
+          environment_check: { ...ENV_CHECK_ONLY.environment_check, ...extra },
+        },
+        correctionValues: { kind: "sensor", sensor: { temperature_c: 24.5, humidity_pct: 58 } },
+      });
+      fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+      expect(screen.getByTestId("quicklog-correct-temperature-input")).toBeInTheDocument();
+      expect(screen.getByTestId("quicklog-correct-readings-note")).toHaveTextContent(
+        QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
+      );
+      cleanup();
+    }
+  });
+});
+
+describe("history correction dialogs", () => {
+  it("explain an envelope-only Environment check in the recent Quick Log panel", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <RecentQuickLogActivityPanel
+          rawEntries={[
+            {
+              id: "diary-env",
+              entry_at: "2026-03-15T09:00:00.000Z",
+              note: "airflow ok",
+              details: {
+                ...ENV_CHECK_ONLY,
+                origin_grow_event_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+              },
+            },
+          ]}
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+    expect(screen.getByTestId("quicklog-correct-readings-note")).toHaveTextContent(
+      QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
+    );
   });
 });

@@ -221,10 +221,7 @@ import {
 } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
-import {
-  correctionValuesForTimelineDiaryEntry,
-  quickLogCorrectionEnvironmentCheckReadingsNote,
-} from "@/lib/quick-log/quickLogRevisionRules";
+import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
@@ -3047,9 +3044,7 @@ export default function Timeline() {
                                       ...supplementalLinkedGrowEvents,
                                       ...timelineSensorEvents,
                                     ])}
-                                    readingsNote={quickLogCorrectionEnvironmentCheckReadingsNote(
-                                      e.details,
-                                    )}
+                                    environmentCheckDetails={e.details}
                                     onChanged={() => void load()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (

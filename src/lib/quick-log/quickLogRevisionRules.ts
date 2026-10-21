@@ -1,6 +1,8 @@
 import { LARGE_WATER_AMOUNT_HARD_MAX_ML } from "@/lib/quickLogWaterVolumeWarningRules";
+import { ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS } from "@/lib/environmentCheckQuickLogRules";
 import {
   environmentCheckEnvelopeHasRecordedReading,
+  environmentCheckEnvelopeReadings,
   isEnvironmentCheckTimelineEntry,
 } from "@/lib/environmentCheckTimelineViewModel";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
@@ -401,25 +403,49 @@ function sensorFromDetails(
 }
 
 export const QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE =
-  "Recorded readings on this Environment check can't be corrected here. You can still correct the note, time, or plant.";
+  "Recorded readings on this Environment check that have no field here can't be corrected. You can still correct the note, time, or plant.";
+
+/** Envelope readings the dialog's sensor fields (temperature, humidity, VPD) cover. */
+const DIALOG_AIR_READING_KEYS: ReadonlySet<string> = new Set([
+  "room_temp_f",
+  "temp_c",
+  "humidity_pct",
+  "vpd_kpa",
+]);
 
 /**
- * Explains why the correction dialog shows no reading fields for an
- * Environment Check that recorded any reading in details.environment_check.
- * The copy states only what the dialog offers, not why, so it holds whatever
- * the page loaded: readings that live only in the envelope are rejected by
- * the correction RPC (20261014210000, "unsupported_change"), and a linked
- * reading this page did not load is equally not offered here. The caller
- * shows it only when the dialog has no sensor fields. Null for every other
- * entry, including typed care events (Watering, …) that only carry an
- * environment envelope as context.
+ * Explains, inside the correction dialog, that an Environment Check recorded
+ * readings the dialog has no field for. The dialog passes whether it offers
+ * its air-reading fields: without them every recorded reading is uncovered;
+ * with them only the rest are (water temperature, EC, CO₂, and any reading
+ * the writer adds later). The copy states only what the dialog offers, not
+ * why, so it holds whatever the page loaded: envelope-only readings are
+ * rejected by the correction RPC (20261014210000, "unsupported_change"), and
+ * a linked reading this page did not load is equally not offered here. Null
+ * for every other entry, including typed care events (Watering, …) that only
+ * carry an environment envelope as context.
  */
-export function quickLogCorrectionEnvironmentCheckReadingsNote(details: unknown): string | null {
+export function quickLogCorrectionEnvironmentCheckReadingsNote(
+  details: unknown,
+  dialog: { offersAirReadingFields: boolean },
+): string | null {
   if (!isPlainObject(details)) return null;
   if (!isEnvironmentCheckTimelineEntry({ details })) return null;
-  if (!environmentCheckEnvelopeHasRecordedReading(details.environment_check)) return null;
-  if (sensorFromDetails(details)) return null;
-  return QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE;
+  const check = details.environment_check;
+  if (!dialog.offersAirReadingFields) {
+    return environmentCheckEnvelopeHasRecordedReading(check)
+      ? QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE
+      : null;
+  }
+  if (!isPlainObject(check)) return null;
+  const uncovered =
+    environmentCheckEnvelopeReadings(check).co2Ppm !== null ||
+    ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS.some(
+      (key) =>
+        !DIALOG_AIR_READING_KEYS.has(key) &&
+        environmentCheckEnvelopeHasRecordedReading({ [key]: check[key] }),
+    );
+  return uncovered ? QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE : null;
 }
 
 /**

@@ -69,12 +69,18 @@ export default function BlueprintTargetsGuide() {
         <Link to="/welcome" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm">
           <Link to="/guides" className="text-muted-foreground hover:text-foreground">
             All guides
           </Link>
           <Link to="/tools/vpd-calculator" className="text-muted-foreground hover:text-foreground">
             VPD calculator
+          </Link>
+          <Link
+            to="/tools/grow-help-toolkit"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Grow Help Toolkit
           </Link>
         </nav>
       </header>
@@ -137,7 +143,10 @@ export default function BlueprintTargetsGuide() {
           })}
         </section>
 
-        <section className="mt-14 rounded-lg border border-border/60 p-6" data-testid="blueprint-targets-cta">
+        <section
+          className="mt-14 rounded-lg border border-border/60 p-6"
+          data-testid="blueprint-targets-cta"
+        >
           <h2 className="font-display text-xl font-semibold tracking-tight">
             Log your grow against these targets
           </h2>
@@ -160,13 +169,18 @@ export default function BlueprintTargetsGuide() {
             >
               Try the VPD calculator
             </Link>
+            <Link
+              to="/tools/grow-help-toolkit"
+              className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+              data-testid="blueprint-targets-grow-help-link"
+            >
+              Plan nutrients, light, and costs
+            </Link>
           </div>
         </section>
 
         <section className="mt-14">
-          <h2 className="font-display text-2xl font-semibold tracking-tight">
-            Common questions
-          </h2>
+          <h2 className="font-display text-2xl font-semibold tracking-tight">Common questions</h2>
           <dl className="mt-6 space-y-6">
             {VERDANT_BLUEPRINT_TARGETS_FAQ.map((item) => (
               <div key={item.question}>

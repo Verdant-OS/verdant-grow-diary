@@ -22,6 +22,12 @@ for (const source of ["live", "manual"] as const) {
       const f = await createLocalFixture();
       try {
         await fenceBrowser(context, f.env);
+        // #2195 made the CSV export follow the grower's °C/°F preference
+        // (browser-local, default °F). Pin °C so the export proves the stored
+        // canonical Celsius reading round-trips faithfully.
+        await context.addInitScript(() =>
+          window.localStorage.setItem("verdant:temperatureUnit", "celsius"),
+        );
         await signIn(page, f);
         const env = localEnvironment();
         const admin = createClient(env.api, env.service, {
@@ -93,6 +99,7 @@ for (const source of ["live", "manual"] as const) {
           return Buffer.concat(chunks).toString("utf8");
         };
         const originalCsv = await exportCsv();
+        expect(originalCsv).toContain("Temperature (°C)");
         expect(originalCsv).toContain(`,${source},`);
         expect(originalCsv).toContain(observedVpd ? ",25,55,1.2," : ",25,55,,");
         await page.clock.fastForward(5 * 60_000);

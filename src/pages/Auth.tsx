@@ -15,6 +15,7 @@ import {
   buildResetRedirectUrl,
   GENERIC_RESET_REQUEST_SUCCESS,
   MIN_PASSWORD_LENGTH,
+  SIGN_IN_PASSWORD_REQUIRED,
 } from "@/lib/passwordResetRules";
 import {
   DEFAULT_RESET_EMAIL_COOLDOWN_MS,
@@ -184,6 +185,9 @@ export default function Auth() {
     }
   }
 
+  const [signInEmailError, setSignInEmailError] = useState<string | null>(null);
+  const [signInPasswordError, setSignInPasswordError] = useState<string | null>(null);
+
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
@@ -315,10 +319,24 @@ export default function Auth() {
     setSignInError(null);
     setVerifyRequired(false);
     setResendNotice(null);
+    const emailCheck = validateResetEmail(email);
+    const passwordMissing = password.length === 0;
+    if (!emailCheck.ok || passwordMissing) {
+      setSignInEmailError(emailCheck.ok ? null : emailCheck.message);
+      setSignInPasswordError(passwordMissing ? SIGN_IN_PASSWORD_REQUIRED : null);
+      if (!emailCheck.ok) signInEmailRef.current?.focus();
+      else document.getElementById("signin-password")?.focus();
+      return;
+    }
+    setSignInEmailError(null);
+    setSignInPasswordError(null);
     setBusy(true);
     // We never log the raw Supabase error — it can leak rate-limit timing
     // or other account-state hints. Always show the friendly copy.
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailCheck.email,
+      password,
+    });
     setBusy(false);
     if (error) {
       if (classifyAuthError(error) === "emailNotConfirmed") {
@@ -558,6 +576,8 @@ export default function Auth() {
             onValueChange={(v) => {
               setMode(v as AuthMode);
               setSignInError(null);
+              setSignInEmailError(null);
+              setSignInPasswordError(null);
               setSignUpError(null);
               setForgotError(null);
               setForgotSent(false);
@@ -578,6 +598,10 @@ export default function Auth() {
 
             <TabsContent value="signin">
               <p className="text-xs text-muted-foreground mb-3">
+                Sign-in is kept separately in each tab. If you opened a new tab, sign in here or
+                return to your signed-in tab.
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
                 Use the email and password you used to create your Verdant account.
               </p>
               <form onSubmit={signIn} noValidate className="grid gap-3" aria-label="Sign in">
@@ -586,23 +610,53 @@ export default function Auth() {
                   label="Email"
                   inputRef={signInEmailRef}
                   value={email}
-                  onChange={setEmail}
-                  ariaInvalid={!!signInError}
-                  ariaDescribedBy={signInError ? "signin-error" : undefined}
+                  onChange={(next) => {
+                    setEmail(next);
+                    if (signInEmailError) setSignInEmailError(null);
+                  }}
+                  ariaInvalid={!!signInEmailError || !!signInError}
+                  ariaDescribedBy={
+                    [
+                      signInEmailError ? "signin-email-error" : null,
+                      signInError ? "signin-error" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
                   required
                 />
+                {signInEmailError ? (
+                  <AuthInlineMessage id="signin-email-error" role="alert" tone="error">
+                    {signInEmailError}
+                  </AuthInlineMessage>
+                ) : null}
                 <AuthPasswordField
                   id="signin-password"
                   label="Password"
                   value={password}
-                  onChange={setPassword}
+                  onChange={(next) => {
+                    setPassword(next);
+                    if (signInPasswordError) setSignInPasswordError(null);
+                  }}
                   showPassword={showPassword}
                   onToggleShowPassword={() => setShowPassword((v) => !v)}
                   autoComplete="current-password"
-                  ariaInvalid={!!signInError}
-                  ariaDescribedBy={signInError ? "signin-error" : undefined}
+                  ariaInvalid={!!signInPasswordError || !!signInError}
+                  ariaDescribedBy={
+                    [
+                      signInPasswordError ? "signin-password-error" : null,
+                      signInError ? "signin-error" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
                   required
                 />
+                {signInPasswordError ? (
+                  <AuthInlineMessage id="signin-password-error" role="alert" tone="error">
+                    {signInPasswordError}
+                  </AuthInlineMessage>
+                ) : null}
                 <div className="flex justify-end -mt-1">
                   <button
                     type="button"

@@ -1,7 +1,7 @@
 /**
  * Dependency-resolution contract for Phase A security patches.
- * Reads package.json, canonical bun.lock, and the synchronized npm
- * compatibility lock.
+ * Reads package.json and bun.lock, the only lockfile (the npm compatibility
+ * lock was retired on 2026-10-03).
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
@@ -11,7 +11,6 @@ import { describe, expect, it } from "vitest";
 const root = resolve(__dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const bunLock = readFileSync(resolve(root, "bun.lock"), "utf8");
-const packageLock = JSON.parse(readFileSync(resolve(root, "package-lock.json"), "utf8"));
 const exceptionDocument = JSON.parse(
   readFileSync(resolve(root, "config/dependency-security-exceptions.json"), "utf8"),
 );
@@ -47,17 +46,6 @@ function resolvedVersions(packageName: string): Version[] {
     new RegExp(`\\["${escaped}@(\\d+\\.\\d+\\.\\d+)(?:[-+][^"]+)?",`, "g"),
   );
   return [...matches].map((match) => parseVersion(match[1]));
-}
-
-function npmResolvedVersions(packageName: string): Version[] {
-  const suffix = `/node_modules/${packageName}`;
-  return Object.entries(packageLock.packages)
-    .filter(
-      ([path, value]) =>
-        (path === `node_modules/${packageName}` || path.endsWith(suffix)) &&
-        typeof (value as { version?: unknown }).version === "string",
-    )
-    .map(([, value]) => parseVersion((value as { version: string }).version));
 }
 
 function productionSourceFiles(directory: string): string[] {
@@ -149,7 +137,7 @@ describe("dependency security Phase A resolution floors", () => {
 
   it("declares the direct security floors", () => {
     expect(
-      isAtLeast(parseVersion(packageJson.devDependencies.vite), [6, 4, 3]),
+      isAtLeast(parseVersion(packageJson.devDependencies.vite), [8, 3, 3]),
       packageJson.devDependencies.vite,
     ).toBe(true);
     expect(
@@ -163,13 +151,16 @@ describe("dependency security Phase A resolution floors", () => {
   });
 
   it.each([
-    ["vite", [6, 4, 3] as const],
+    ["vite", [8, 3, 3] as const],
+    ["launch-editor", [2, 14, 2] as const],
     ["postcss", [8, 5, 18] as const],
     ["esbuild", [0, 28, 1] as const],
     ["fast-uri", [3, 1, 8] as const],
     ["form-data", [4, 0, 6] as const],
+    ["follow-redirects", [1, 16, 1] as const],
+    ["@modelcontextprotocol/sdk", [1, 32, 0] as const],
     ["js-yaml", [4, 3, 2] as const],
-    ["hono", [4, 13, 5] as const],
+    ["hono", [4, 13, 11] as const],
     ["qs", [6, 16, 0] as const],
     ["ajv", [6, 15, 0] as const],
     ["picomatch", [2, 3, 2] as const],
@@ -177,47 +168,31 @@ describe("dependency security Phase A resolution floors", () => {
     ["@vitest/mocker", [4, 1, 11] as const],
     ["nanoid", [3, 3, 18] as const],
     ["undici", [6, 28, 1] as const],
-  ])("resolves every %s instance at or above %s in both locks", (packageName, minimum) => {
-    for (const [lockName, versions] of [
-      ["bun.lock", resolvedVersions(packageName)],
-      ["package-lock.json", npmResolvedVersions(packageName)],
-    ] as const) {
-      expect(versions.length, `${packageName} must be present in ${lockName}`).toBeGreaterThan(0);
-      for (const version of versions) {
-        expect(
-          isAtLeast(version, minimum),
-          `${lockName}: ${packageName}@${version.join(".")}`,
-        ).toBe(true);
-      }
+  ])("resolves every %s instance at or above %s in bun.lock", (packageName, minimum) => {
+    const versions = resolvedVersions(packageName);
+    expect(versions.length, `${packageName} must be present in bun.lock`).toBeGreaterThan(0);
+    for (const version of versions) {
+      expect(isAtLeast(version, minimum), `bun.lock: ${packageName}@${version.join(".")}`).toBe(
+        true,
+      );
     }
   });
 
   it("keeps any remaining Rollup resolutions patched without requiring its retired subtree", () => {
-    // Vitest 4 can reuse root Vite/Rolldown; npm removes the old Vite 7/Rollup graph.
-    for (const [lockName, versions] of [
-      ["bun.lock", resolvedVersions("rollup")],
-      ["package-lock.json", npmResolvedVersions("rollup")],
-    ] as const) {
-      for (const version of versions) {
-        expect(isAtLeast(version, [4, 59, 0]), `${lockName}: rollup@${version.join(".")}`).toBe(
-          true,
-        );
-      }
+    // Vitest 4 can reuse root Vite/Rolldown, so the old Vite 7/Rollup graph may be absent.
+    for (const version of resolvedVersions("rollup")) {
+      expect(isAtLeast(version, [4, 59, 0]), `bun.lock: rollup@${version.join(".")}`).toBe(true);
     }
   });
 
   it("keeps every brace-expansion resolution outside the current vulnerable ranges", () => {
-    for (const [lockName, versions] of [
-      ["bun.lock", resolvedVersions("brace-expansion")],
-      ["package-lock.json", npmResolvedVersions("brace-expansion")],
-    ] as const) {
-      expect(versions.length, `brace-expansion must be present in ${lockName}`).toBeGreaterThan(0);
-      for (const version of versions) {
-        expect(
-          isSafeBraceExpansionVersion(version),
-          `${lockName}: brace-expansion@${version.join(".")}`,
-        ).toBe(true);
-      }
+    const versions = resolvedVersions("brace-expansion");
+    expect(versions.length, "brace-expansion must be present in bun.lock").toBeGreaterThan(0);
+    for (const version of versions) {
+      expect(
+        isSafeBraceExpansionVersion(version),
+        `bun.lock: brace-expansion@${version.join(".")}`,
+      ).toBe(true);
     }
   });
 
@@ -266,8 +241,11 @@ describe("dependency security Phase A resolution floors", () => {
       esbuild: "0.28.1",
       "fast-uri": "3.1.8",
       "form-data": "4.0.6",
+      "follow-redirects": "1.16.1",
+      "@modelcontextprotocol/sdk": "1.32.0",
       "js-yaml": "4.3.2",
-      hono: "4.13.7",
+      "launch-editor": "2.14.2",
+      hono: "4.13.11",
       qs: "6.16.0",
       nanoid: "3.3.18",
       undici: "6.28.1",

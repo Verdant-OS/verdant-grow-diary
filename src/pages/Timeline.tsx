@@ -27,12 +27,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
-import { STAGES, stageLabel } from "@/lib/grow";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
+import { STAGES } from "@/lib/grow";
+import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
+import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Sprout,
-  Image as ImageIcon,
   Camera,
   FileText,
   FlaskConical,
@@ -118,12 +120,26 @@ import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayR
 import {
   completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
+  formatTimelineManualSensorReceiptForUnit,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
   TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import {
+  collectTimelineDiaryPhotoIds,
+  dedupeAlertEventsForTimeline,
+  EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  applyTimelineDiaryPhotoEdit,
+  resolveTimelineDiaryPhotoReferenceSource,
+  type TimelineDiaryPhotoReferenceSource,
+  timelineDiaryRowsForChipCounts,
+  timelineEntryCountsAsPhoto,
+  timelineMeasurementChipCount,
+  timelineStageChipRows,
+  unionTimelineDiaryPhotoIds,
+} from "@/lib/timelineChipCountRules";
 import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
@@ -134,6 +150,7 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { applyLinkedEventTypes, LINKED_SPINE_EVENT_TYPES } from "@/lib/diaryLinkedEventTypeRules";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import {
   collapseQuickLogSaveFanOut,
@@ -144,12 +161,17 @@ import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules"
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
+  deriveTimelineRowSensorSource,
   deriveTimelineTentOptions,
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
+  timelineClearFiltersEnabled,
+  resolveTimelineCardPlaceLabels,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
+  withResolvedTimelinePlaceDetails,
 } from "@/lib/timelineEvidenceFilterRules";
+import { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 import {
   buildMissingActionCopy,
   findNewestEntryIdForCategory,
@@ -169,6 +191,12 @@ import {
   buildTimelinePhotoAltText,
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import { TimelineEntryOpenButton } from "@/components/TimelineEntryOpenButton";
+import {
+  resolveCollidingOpenLabels,
+  timelineEntryOpenAccessibleName,
+  timelineEntryOpenContext,
+} from "@/lib/timelineEntryOpenLabelRules";
 import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
@@ -187,9 +215,13 @@ import {
   type TimelineSensorSourceKind,
 } from "@/lib/timelineSensorSourceBadgeRules";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
-import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
+import {
+  SENSOR_SOURCE_SHORT_LABEL,
+  timelineSensorSourceFilterKinds,
+} from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
@@ -254,6 +286,8 @@ interface Entry {
   entry_at: string;
   plant_id: string | null;
   tent_id: string | null;
+  /** Client-only: persisted field the displayed photo came from (not a column). */
+  photoReferenceSource?: TimelineDiaryPhotoReferenceSource;
 }
 
 interface TimelineDiaryPhotoDisplayRows {
@@ -274,15 +308,16 @@ function buildTimelineDiaryPhotoDisplayRows(
   const privatePhotoPathById = new Map<string, string>();
   const displayRows = rows.map((row) => {
     const reference = parseDiaryPhotoDisplayReferenceFromRow(row, { viewerUserId });
+    const photoReferenceSource = resolveTimelineDiaryPhotoReferenceSource(row, viewerUserId);
 
     if (reference.kind === "external") {
-      return { ...row, photo_url: reference.url };
+      return { ...row, photo_url: reference.url, photoReferenceSource };
     }
     if (reference.kind === "storage") {
       privatePhotoPathById.set(row.id, reference.path);
     }
 
-    return { ...row, photo_url: null };
+    return { ...row, photo_url: null, photoReferenceSource };
   });
 
   return { rows: displayRows, privatePhotoPathById };
@@ -322,9 +357,10 @@ interface AlertEventRow {
 
 type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
-function entryKinds(e: Entry): EventFilter[] {
-  const kinds: EventFilter[] = ["note"];
-  if (e.photo_url) kinds.push("photo");
+function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
+  const kinds: EventFilter[] = [];
+  if (!isTimelineSensorDerivedDiaryId(e.id)) kinds.push("note");
+  if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
   // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
   // manuals use the same LIVE window as the evidence drawer badge.
@@ -361,6 +397,25 @@ function entryKinds(e: Entry): EventFilter[] {
  * fetched". `onResolved`/`onPartial` own their scope-currency guards and the
  * merge into the supplemental collapse-only state.
  */
+/** Timeline-only. The shared root-zone select stays unchanged for the other readers. */
+const TIMELINE_SENSOR_GROW_EVENT_SELECT =
+  "id,plant_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+const TIMELINE_LINKED_ROOT_SELECT = "id,created_at,event_type,source,plant_id,occurred_at";
+
+function linkedEnvironmentEventIds(diaryRows: ReadonlyArray<{ details?: unknown }>): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const row of diaryRows) {
+    const details = row.details;
+    if (!details || typeof details !== "object" || Array.isArray(details)) continue;
+    const linked = (details as Record<string, unknown>).linked_grow_event_id;
+    if (typeof linked !== "string" || linked.length === 0 || seen.has(linked)) continue;
+    seen.add(linked);
+    ids.push(linked);
+  }
+  return ids;
+}
+
 async function resolveMissingLinkedGrowEventParents(input: {
   growId: string;
   diaryRows: ReadonlyArray<{ id: string; details?: unknown }>;
@@ -391,6 +446,62 @@ async function resolveMissingLinkedGrowEventParents(input: {
     input.onResolved(linkedResult.data as unknown as GrowEventRowForRecent[]);
   } catch {
     input.onPartial();
+  }
+}
+
+/** Roots outside the first grow-event page still need their created_at siblings. */
+async function loadLinkedRootSensorSiblings(input: {
+  growId: string;
+  rootIds: readonly string[];
+  isCurrent: () => boolean;
+  onRoots: (rows: GrowEventRowForRecent[]) => void;
+  onSiblings: (rows: GrowEventRowForRecent[]) => void;
+  onPartial: () => void;
+}): Promise<void> {
+  if (input.rootIds.length === 0) return;
+  try {
+    const rootResult = await supabase
+      .from("grow_events")
+      .select(TIMELINE_LINKED_ROOT_SELECT)
+      .eq("grow_id", input.growId)
+      .in("id", input.rootIds);
+    if (!input.isCurrent()) return;
+    if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
+      input.onPartial();
+      return;
+    }
+    const roots = rootResult.data as unknown as GrowEventRowForRecent[];
+    input.onRoots(roots);
+    const createdAts = [
+      ...new Set(
+        roots
+          .map((row) => {
+            const createdAt = (row as unknown as { created_at?: unknown }).created_at;
+            return typeof createdAt === "string" && createdAt.length > 0 ? createdAt : null;
+          })
+          .filter((value): value is string => value !== null),
+      ),
+    ];
+    if (createdAts.length === 0 || !input.isCurrent()) return;
+    const sensorSiblingResult = await supabase
+      .from("grow_events")
+      .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+      .eq("grow_id", input.growId)
+      .eq("event_type", "environment")
+      .eq("source", "manual")
+      .eq("is_deleted", false)
+      .in("created_at", createdAts);
+    if (!input.isCurrent()) return;
+    if (
+      hasTimelineRequiredReadError(sensorSiblingResult) ||
+      !Array.isArray(sensorSiblingResult.data)
+    ) {
+      input.onPartial();
+      return;
+    }
+    input.onSiblings(sensorSiblingResult.data as unknown as GrowEventRowForRecent[]);
+  } catch {
+    if (input.isCurrent()) input.onPartial();
   }
 }
 
@@ -444,6 +555,11 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [diaryPhotoIds, setDiaryPhotoIds] = useState<ReadonlySet<string>>(
+    () => EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  );
+  // Newest storage path an edit asked to sign, per entry id.
+  const editPhotoSignRef = useRef(new Map<string, string>());
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
@@ -453,6 +569,8 @@ export default function Timeline() {
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineLinkedRoots, setTimelineLinkedRoots] = useState<GrowEventRowForRecent[]>([]);
   const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   // Deleted or out-of-page grow_event parents that a loaded diary companion
   // references (details.linked_grow_event_id). Resolved separately from the
@@ -565,12 +683,7 @@ export default function Timeline() {
     const urlStart = searchParams.get(TIMELINE_START_DATE_PARAM) ?? "";
     const urlEnd = searchParams.get(TIMELINE_END_DATE_PARAM) ?? "";
     if (urlStart === startDateFilter && urlEnd === endDateFilter) return;
-    const next = new URLSearchParams(searchParams);
-    if (isTimelineDateFilterValue(startDateFilter))
-      next.set(TIMELINE_START_DATE_PARAM, startDateFilter);
-    else next.delete(TIMELINE_START_DATE_PARAM);
-    if (isTimelineDateFilterValue(endDateFilter)) next.set(TIMELINE_END_DATE_PARAM, endDateFilter);
-    else next.delete(TIMELINE_END_DATE_PARAM);
+    const next = timelineDateParamsAfterSync(searchParams, startDateFilter, endDateFilter);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
@@ -627,10 +740,13 @@ export default function Timeline() {
     const requestId = ++readRequestIdRef.current;
     if (!user || !activeGrowId) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -648,10 +764,13 @@ export default function Timeline() {
     // the network boundary instead of ever issuing an unscoped read.
     if (!activeReadKey) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -703,6 +822,7 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
       const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
       const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rows,
         user,
@@ -731,15 +851,37 @@ export default function Timeline() {
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
       const nextGrowEvents = growEventsResult.data as unknown as GrowEventRowForRecent[];
+      let sensorEventsQuery = orderNewestFirstStable(
+        supabase
+          .from("grow_events")
+          .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+          .eq("grow_id", activeGrowId)
+          .eq("event_type", "environment")
+          .eq("is_deleted", false),
+        "occurred_at",
+      ).limit(100);
+      if (timelineDateRangeBounds.startIso)
+        sensorEventsQuery = sensorEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        sensorEventsQuery = sensorEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
+      const sensorEventsResult = await sensorEventsQuery;
+      if (!isCurrentRequest()) return;
+      const sensorReadFailed = hasTimelineRequiredReadError(sensorEventsResult);
+      const nextSensorEvents = sensorReadFailed
+        ? []
+        : (sensorEventsResult.data as unknown as GrowEventRowForRecent[]);
 
       // Core plant memory is confirmed for the exact active scope. Make it
       // visible immediately; photos/action/alert context continues separately
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
+      setDiaryPhotoIds(nextDiaryPhotoIds);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
+      setTimelineSensorEvents(nextSensorEvents);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(
         typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       );
@@ -751,7 +893,7 @@ export default function Timeline() {
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
-      setPartialReadSources([]);
+      setPartialReadSources(sensorReadFailed ? ["manual_sensor_readings"] : []);
       setCoreRead({ status: "success", readKey: requestedReadKey });
       setLoading(false);
 
@@ -771,19 +913,47 @@ export default function Timeline() {
       // fetched" instead of guessing from a primary page that was never
       // meant to be exhaustive.
       supplementalTasks.push(
-        resolveMissingLinkedGrowEventParents({
-          growId: activeGrowId,
-          diaryRows: coreRows,
-          knownGrowEvents: nextGrowEvents,
-          isCurrent: isCurrentRequest,
-          onResolved: (rows) =>
-            setSupplementalLinkedGrowEvents((current) => {
-              const seen = new Set(current.map((row) => row.id));
-              const extra = rows.filter((row) => !seen.has(row.id));
-              return extra.length === 0 ? current : [...current, ...extra];
+        (async () => {
+          const diaryRows = coreRows.map((row) => ({
+            id: row.id,
+            details: (row.details ?? null) as Record<string, unknown> | null,
+          }));
+          await resolveMissingLinkedGrowEventParents({
+            growId: activeGrowId,
+            diaryRows: coreRows,
+            knownGrowEvents: nextGrowEvents,
+            isCurrent: isCurrentRequest,
+            onResolved: (rows) =>
+              setSupplementalLinkedGrowEvents((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onPartial: () => markPartial("linked_grow_events"),
+          });
+          if (!isCurrentRequest()) return;
+          await loadLinkedRootSensorSiblings({
+            growId: activeGrowId,
+            rootIds: findMissingLinkedGrowEventIds({
+              diaryEntries: diaryRows,
+              growEvents: nextGrowEvents,
             }),
-          onPartial: () => markPartial("linked_grow_events"),
-        }),
+            isCurrent: isCurrentRequest,
+            onRoots: (rows) =>
+              setTimelineLinkedRoots((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onSiblings: (rows) =>
+              setTimelineSensorEvents((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onPartial: () => markPartial("manual_sensor_readings"),
+          });
+        })(),
       );
 
       if (paths.length > 0) {
@@ -1015,6 +1185,7 @@ export default function Timeline() {
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
       const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const olderPhotoIds = collectTimelineDiaryPhotoIds(rawOlder, user);
       const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rawOlder,
         user,
@@ -1048,6 +1219,7 @@ export default function Timeline() {
         }
       }
       if (isCurrentPage() && older.length) {
+        setDiaryPhotoIds((current) => unionTimelineDiaryPhotoIds(current, olderPhotoIds));
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
           return [...prev, ...older.filter((e) => !seen.has(e.id))];
@@ -1074,6 +1246,75 @@ export default function Timeline() {
             );
           },
         });
+        const knownRootIds = new Set(timelineLinkedRoots.map((row) => row.id));
+        const missingRootIds = linkedEnvironmentEventIds(older).filter(
+          (id) => !knownRootIds.has(id),
+        );
+        if (missingRootIds.length > 0 && isCurrentPage()) {
+          try {
+            const rootResult = await supabase
+              .from("grow_events")
+              .select(TIMELINE_LINKED_ROOT_SELECT)
+              .eq("grow_id", requestedGrowId)
+              .in("id", missingRootIds);
+            if (!isCurrentPage()) return;
+            if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
+              setPartialReadSources((current) =>
+                mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+              );
+            } else {
+              const roots = rootResult.data as unknown as GrowEventRowForRecent[];
+              setTimelineLinkedRoots((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = roots.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              });
+              const createdAts = [
+                ...new Set(
+                  roots
+                    .map((row) => {
+                      const createdAt = (row as unknown as { created_at?: unknown }).created_at;
+                      return typeof createdAt === "string" && createdAt.length > 0
+                        ? createdAt
+                        : null;
+                    })
+                    .filter((value): value is string => value !== null),
+                ),
+              ];
+              if (createdAts.length > 0 && isCurrentPage()) {
+                const sensorSiblingResult = await supabase
+                  .from("grow_events")
+                  .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+                  .eq("grow_id", requestedGrowId)
+                  .eq("event_type", "environment")
+                  .eq("source", "manual")
+                  .eq("is_deleted", false)
+                  .in("created_at", createdAts);
+                if (!isCurrentPage()) return;
+                if (
+                  hasTimelineRequiredReadError(sensorSiblingResult) ||
+                  !Array.isArray(sensorSiblingResult.data)
+                ) {
+                  setPartialReadSources((current) =>
+                    mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+                  );
+                } else {
+                  const siblings = sensorSiblingResult.data as unknown as GrowEventRowForRecent[];
+                  setTimelineSensorEvents((current) => {
+                    const seen = new Set(current.map((row) => row.id));
+                    const extra = siblings.filter((row) => row.id && !seen.has(row.id));
+                    return extra.length === 0 ? current : [...current, ...extra];
+                  });
+                }
+              }
+            }
+          } catch {
+            if (!isCurrentPage()) return;
+            setPartialReadSources((current) =>
+              mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+            );
+          }
+        }
       }
     } catch {
       if (isCurrentPage()) setLoadOlderError(true);
@@ -1115,27 +1356,79 @@ export default function Timeline() {
     0,
   );
 
-  const displayEntries = useMemo(
-    () => mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),
-    [entries, manualSensorMeasurementEntries],
-  );
-
-  const eventCounts = useMemo(() => {
-    const m = {
-      all: displayEntries.length,
-      photo: 0,
-      note: 0,
-      measurement: 0,
-      followup: 0,
-      actionresponse: 0,
-    };
-    displayEntries.forEach((e) =>
-      entryKinds(e).forEach((k) => {
-        m[k] = (m[k] || 0) + 1;
-      }),
+  const enrichedEntries = useMemo(() => {
+    const knownGrowEvents =
+      supplementalLinkedGrowEvents.length === 0
+        ? growEvents
+        : [...growEvents, ...supplementalLinkedGrowEvents];
+    if (knownGrowEvents.length === 0) return entries;
+    const mappedGrowEvents = mapGrowEventsToRecentRawEntries(knownGrowEvents);
+    const spineTypes = new Map(
+      mappedGrowEvents.map((r) => [r.id.trim().toLowerCase(), r.entry_type] as const),
     );
-    return m;
-  }, [displayEntries]);
+    const growMappedById = new Map(mappedGrowEvents.map((r) => [r.id, r] as const));
+    return applyLinkedEventTypes(entries, spineTypes).map((e) => {
+      const details = (e.details ?? null) as Record<string, unknown> | null;
+      if (!details) return e;
+      const link =
+        typeof details.linked_grow_event_id === "string"
+          ? details.linked_grow_event_id
+          : typeof details.grow_event_id === "string"
+            ? details.grow_event_id
+            : null;
+      if (!link) return e;
+      const mapped = growMappedById.get(link);
+      if (!mapped) return e;
+      let nextDetails = details;
+      const declaredType =
+        typeof (details.event_type ?? details.eventType) === "string"
+          ? String(details.event_type ?? details.eventType)
+              .trim()
+              .toLowerCase()
+          : "";
+      const hasType =
+        declaredType !== "" && declaredType !== "quick_log" && declaredType !== "note";
+      const mappedType =
+        typeof mapped.entry_type === "string" ? mapped.entry_type.trim().toLowerCase() : "";
+      if (!hasType && LINKED_SPINE_EVENT_TYPES.has(mappedType)) {
+        nextDetails = { ...nextDetails, event_type: mappedType };
+      }
+      const effectiveType =
+        typeof (nextDetails.event_type ?? nextDetails.eventType) === "string"
+          ? String(nextDetails.event_type ?? nextDetails.eventType)
+              .trim()
+              .toLowerCase()
+          : "";
+      const hasVol =
+        nextDetails.watering != null ||
+        nextDetails.feeding != null ||
+        nextDetails.watering_amount_ml != null ||
+        nextDetails.wateringAmountMl != null ||
+        nextDetails.volume_ml != null;
+      const vol = mapped.details?.watering_amount_ml;
+      if (
+        !hasVol &&
+        (effectiveType === "watering" || effectiveType === "feeding") &&
+        typeof vol === "number" &&
+        Number.isFinite(vol)
+      ) {
+        const volumeEnvelope = effectiveType === "feeding" ? "feeding" : "watering";
+        nextDetails = { ...nextDetails, [volumeEnvelope]: { volume_ml: vol } };
+      }
+      return nextDetails === details ? e : { ...e, details: nextDetails };
+    });
+  }, [entries, growEvents, supplementalLinkedGrowEvents]);
+
+  const displayEntries = useMemo(
+    () =>
+      mergeTimelineMeasurementDisplayEntries(
+        enrichedEntries,
+        manualSensorMeasurementEntries.map((entry) =>
+          formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+        ),
+      ),
+    [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
+  );
 
   // Canonical Action Response Memory (read-only). One grower response renders
   // as ONE compact card inside its own evidence row — never an extra event.
@@ -1176,6 +1469,19 @@ export default function Timeline() {
     user,
     directoryGrowId,
   );
+  const demoSensorDataPresent = useMemo(
+    () => displayEntries.some((row) => deriveTimelineRowSensorSource(row) === "demo"),
+    [displayEntries],
+  );
+  const sensorSourceFilterKinds = useMemo(
+    () =>
+      timelineSensorSourceFilterKinds({
+        demoDataPresent: demoSensorDataPresent,
+        demoMode: false,
+        selected: sensorSourceFilter,
+      }),
+    [demoSensorDataPresent, sensorSourceFilter],
+  );
   const plantOptions = useMemo(
     () => deriveTimelinePlantOptions(displayEntries, plantNamesById),
     [displayEntries, plantNamesById],
@@ -1211,6 +1517,8 @@ export default function Timeline() {
     // row the query correctly fetched could be dropped again here by a
     // second, stale UTC-day interpretation.
     timeZone: TIMELINE_LOCAL_TIME_ZONE,
+    plantNamesById,
+    tentNamesById,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
@@ -1229,25 +1537,134 @@ export default function Timeline() {
     };
   }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);
 
+  const evidenceFilteredEntries = useMemo(
+    () =>
+      filterTimelineEvidenceRows(displayEntries, {
+        query: searchQuery,
+        plantId: plantFilter,
+        tentId: tentFilter,
+        eventType: eventTypeFilter,
+        sensorSources: sensorSourceFilter,
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+        timeZone: TIMELINE_LOCAL_TIME_ZONE,
+        plantNamesById,
+        tentNamesById,
+      }),
+    [
+      displayEntries,
+      searchQuery,
+      plantFilter,
+      tentFilter,
+      eventTypeFilter,
+      sensorSourceFilter,
+      effectiveStartDate,
+      effectiveEndDate,
+      plantNamesById,
+      tentNamesById,
+    ],
+  );
+
+  const diaryChipEntries = useMemo(
+    () => timelineDiaryRowsForChipCounts(evidenceFilteredEntries),
+    [evidenceFilteredEntries],
+  );
+
+  // Under Measurements the list carries sensor receipts, so the stage chips
+  // count them too (timelineStageChipRows); otherwise diary rows only.
+  const stageChipEntries = useMemo(
+    () => timelineStageChipRows(eventFilter, diaryChipEntries, evidenceFilteredEntries),
+    [eventFilter, diaryChipEntries, evidenceFilteredEntries],
+  );
+
+  const chipStageCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    stageChipEntries.forEach((e) => {
+      if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter)) return;
+      const stage = resolveTimelineDiaryEntryStage(e);
+      if (stage) m[stage] = (m[stage] || 0) + 1;
+    });
+    return m;
+  }, [stageChipEntries, eventFilter, diaryPhotoIds]);
+
+  const chipAllStagesCount = useMemo(() => {
+    if (eventFilter === "all") return stageChipEntries.length;
+    return stageChipEntries.filter((e) => entryKinds(e, diaryPhotoIds).includes(eventFilter))
+      .length;
+  }, [stageChipEntries, eventFilter, diaryPhotoIds]);
+
+  const eventCounts = useMemo(() => {
+    const stageMatchedDiary =
+      stageFilter === "all"
+        ? diaryChipEntries
+        : diaryChipEntries.filter((e) => resolveTimelineDiaryEntryStage(e) === stageFilter);
+    const stageMatchedAll =
+      stageFilter === "all"
+        ? evidenceFilteredEntries
+        : evidenceFilteredEntries.filter((e) => resolveTimelineDiaryEntryStage(e) === stageFilter);
+    const m = {
+      all: stageMatchedDiary.length,
+      photo: 0,
+      note: 0,
+      measurement: 0,
+      followup: 0,
+      actionresponse: 0,
+    };
+    stageMatchedDiary.forEach((e) =>
+      entryKinds(e, diaryPhotoIds).forEach((k) => {
+        m[k] = (m[k] || 0) + 1;
+      }),
+    );
+    m.measurement = timelineMeasurementChipCount(m.measurement, stageMatchedAll);
+    return m;
+  }, [diaryChipEntries, evidenceFilteredEntries, stageFilter, diaryPhotoIds]);
+
   const filtered = useMemo(() => {
-    const afterStageEvent = displayEntries.filter((e) => {
+    return evidenceFilteredEntries.filter((e) => {
       if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
-      if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
+      if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter))
+        return false;
       return true;
     });
-    return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
-  }, [
-    displayEntries,
-    stageFilter,
-    eventFilter,
-    searchQuery,
-    plantFilter,
-    tentFilter,
-    eventTypeFilter,
-    sensorSourceFilter,
-    effectiveStartDate,
-    effectiveEndDate,
-  ]);
+  }, [evidenceFilteredEntries, stageFilter, eventFilter, diaryPhotoIds]);
+
+  const openLabelsById = useMemo(() => {
+    const rows = filtered.map((e) => {
+      const effectiveCareType = resolveEffectiveQuickLogCareType({
+        details: e.details,
+      });
+      const et = getEventType(effectiveCareType);
+      const place = resolveTimelineCardPlaceLabels({
+        plantId: e.plant_id,
+        tentId: e.tent_id,
+        details: e.details,
+        plantNamesById,
+        tentNamesById,
+      });
+      const openOccurredAt = Number.isNaN(new Date(e.entry_at).getTime())
+        ? ""
+        : format(new Date(e.entry_at), "PP");
+      const openDifferentiator = Number.isNaN(new Date(e.entry_at).getTime())
+        ? ""
+        : format(new Date(e.entry_at), "p");
+      const openContext = timelineEntryOpenContext({
+        plantName: place.plantName ?? undefined,
+        tentName: place.tentName,
+        note: e.note,
+      });
+      return {
+        id: e.id,
+        note: e.note,
+        label: timelineEntryOpenAccessibleName({
+          title: et.label,
+          occurredAtLabel: openOccurredAt,
+          differentiator: openDifferentiator,
+          context: openContext,
+        }),
+      };
+    });
+    return resolveCollidingOpenLabels(rows);
+  }, [filtered, plantNamesById, tentNamesById]);
 
   const renderedDiaryAnchorIds = useMemo(
     () => buildRenderedDiaryTimelineAnchorIds(filtered),
@@ -1279,7 +1696,12 @@ export default function Timeline() {
   }
 
   const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
-  const anyFilterActive = evidenceActive || chipFiltersActive;
+  const anyFilterActive = timelineClearFiltersEnabled({
+    evidenceActive,
+    chipFiltersActive,
+    enteredStartDate: startDateFilter,
+    enteredEndDate: endDateFilter,
+  });
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
@@ -1502,8 +1924,10 @@ export default function Timeline() {
   // future-proof empty/limited disclosure. Includes invalid entries so
   // malformed diary rows still surface as "Limited data" instead of vanishing.
   const normalizedById = useMemo(() => {
+    // Built from enrichedEntries so a linked feeding companion's recovered
+    // type reaches DiaryEntryBadges and the FAQ model, not just the card.
     const items = buildGrowDiaryTimeline({
-      rawEntries: entries.map((e) => ({
+      rawEntries: enrichedEntries.map((e) => ({
         id: e.id,
         grow_id: activeGrowId ?? null,
         plant_id: e.plant_id,
@@ -1520,12 +1944,12 @@ export default function Timeline() {
     const map = new Map<string, (typeof items)[number]>();
     items.forEach((it) => map.set(it.id, it));
     return map;
-  }, [entries, activeGrowId]);
+  }, [enrichedEntries, activeGrowId]);
 
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
     filtered.forEach((e) => {
-      const key = resolveTimelineDiaryEntryStage(e) ?? "unknown";
+      const key = resolveTimelineDiaryEntryStage(e) ?? "";
       const last = groups[groups.length - 1];
       if (last && last.stage === key) last.items.push(e);
       else groups.push({ stage: key, items: [e] });
@@ -1647,7 +2071,7 @@ export default function Timeline() {
   }
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full overflow-x-clip">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -1728,15 +2152,7 @@ export default function Timeline() {
           title={activeGrow.name}
           description="Trace observations, evidence, and decisions across this grow."
           icon={<Sprout className="size-5" aria-hidden="true" />}
-          meta={
-            <span className="text-sm text-muted-foreground">
-              {stageLabel(activeGrow.stage)} · day{" "}
-              {Math.max(
-                1,
-                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-              )}
-            </span>
-          }
+          meta={<TimelineGrowDayLabel startedAt={activeGrow.started_at} stage={activeGrow.stage} />}
         />
       )}
 
@@ -1756,11 +2172,11 @@ export default function Timeline() {
           </div>
           <div
             aria-label="Grow stage progression"
-            className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin"
+            className="-mx-1 min-w-0 max-w-full overflow-x-auto px-1 pb-1 scrollbar-thin"
             data-testid="timeline-stage-progression-scroll"
             tabIndex={0}
           >
-            <ol className="grid min-w-[34rem] grid-cols-6 gap-2">
+            <ol className="grid grid-cols-3 gap-2 sm:min-w-[34rem] sm:grid-cols-6">
               {STAGES.map((s, i) => {
                 const count = stageCounts[s.value] || 0;
                 const isCurrent = i === currentStageIdx;
@@ -2005,7 +2421,7 @@ export default function Timeline() {
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">
             Sensor source
           </span>
-          {SENSOR_SOURCE_KINDS.map((kind) => {
+          {sensorSourceFilterKinds.map((kind) => {
             const active = sensorSourceFilter.includes(kind);
             return (
               <button
@@ -2165,7 +2581,7 @@ export default function Timeline() {
             active={stageFilter === "all"}
             onClick={() => setStageFilter("all")}
             label="All stages"
-            count={displayEntries.length}
+            count={chipAllStagesCount}
           />
           {STAGES.map((s) => (
             <FilterChip
@@ -2173,8 +2589,8 @@ export default function Timeline() {
               active={stageFilter === s.value}
               onClick={() => setStageFilter(s.value)}
               label={s.label}
-              count={stageCounts[s.value] || 0}
-              disabled={!stageCounts[s.value]}
+              count={chipStageCounts[s.value] || 0}
+              disabled={!chipStageCounts[s.value]}
             />
           ))}
         </div>
@@ -2372,7 +2788,7 @@ export default function Timeline() {
               <div className="flex items-center gap-2 mb-2 sticky top-0 z-10 py-1 bg-background/80 backdrop-blur-sm">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
                   <Sprout className="h-3.5 w-3.5" />
-                  {stageLabel(group.stage)}
+                  {timelineStagePresentationLabel(group.stage)}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {group.items.length} {group.items.length === 1 ? "entry" : "entries"}
@@ -2406,57 +2822,50 @@ export default function Timeline() {
                           hidden
                         />
                       ) : null}
-                      {e.photo_url ? (
-                        (() => {
-                          const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
-                          const item = idx >= 0 ? lightboxItems[idx] : null;
-                          const alt = buildTimelinePhotoAltText(item);
-                          const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
-                            hasPhoto: true,
-                            details: e.details,
-                          });
-                          return (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (idx >= 0) setLightboxPhotoId(e.id);
-                                }}
-                                aria-label={`Open photo: ${alt}`}
-                                data-testid="timeline-photo-open"
-                                className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
-                              >
-                                <img
-                                  src={e.photo_url}
-                                  className="w-full aspect-[4/3] object-cover"
-                                  alt={alt}
-                                  loading="lazy"
-                                />
-                              </button>
-                              {showNonDiagnostic && (
-                                <div
-                                  data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
-                                  className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                      {e.photo_url
+                        ? (() => {
+                            const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
+                            const item = idx >= 0 ? lightboxItems[idx] : null;
+                            const alt = buildTimelinePhotoAltText(item);
+                            const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
+                              hasPhoto: true,
+                              details: e.details,
+                            });
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (idx >= 0) setLightboxPhotoId(e.id);
+                                  }}
+                                  aria-label={`Open photo: ${alt}`}
+                                  data-testid="timeline-photo-open"
+                                  className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
                                 >
-                                  {PHOTO_NON_DIAGNOSTIC_LABEL}
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()
-                      ) : (
-                        <div className="w-full aspect-[4/3] bg-secondary/40 flex items-center justify-center text-muted-foreground">
-                          <ImageIcon className="h-8 w-8" />
-                        </div>
-                      )}
+                                  <img
+                                    src={e.photo_url}
+                                    className="w-full aspect-[4/3] object-cover"
+                                    alt={alt}
+                                    loading="lazy"
+                                  />
+                                </button>
+                                {showNonDiagnostic && (
+                                  <div
+                                    data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+                                    className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                                  >
+                                    {PHOTO_NON_DIAGNOSTIC_LABEL}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()
+                        : null}
                       <div
-                        className="p-4 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
-                        role="button"
-                        tabIndex={0}
-                        data-testid="timeline-entry-body"
-                        aria-label="Open entry details"
+                        className="p-4"
                         onClick={() => setDetailEntryId(e.id)}
                         onKeyDown={(ev) => {
+                          if (ev.target !== ev.currentTarget) return;
                           if (ev.key === "Enter" || ev.key === " ") {
                             ev.preventDefault();
                             setDetailEntryId(e.id);
@@ -2469,7 +2878,33 @@ export default function Timeline() {
                           });
                           const et = getEventType(effectiveCareType);
                           const Icon = et.icon;
-                          const plantName = e.details?.plant_name as string | undefined;
+                          const place = resolveTimelineCardPlaceLabels({
+                            plantId: e.plant_id,
+                            tentId: e.tent_id,
+                            details: e.details,
+                            plantNamesById,
+                            tentNamesById,
+                          });
+                          const plantName = place.plantName ?? undefined;
+                          const openOccurredAt = Number.isNaN(new Date(e.entry_at).getTime())
+                            ? ""
+                            : format(new Date(e.entry_at), "PP");
+                          const openDifferentiator = Number.isNaN(new Date(e.entry_at).getTime())
+                            ? ""
+                            : format(new Date(e.entry_at), "p");
+                          const openContext = timelineEntryOpenContext({
+                            plantName,
+                            tentName: place.tentName,
+                            note: e.note,
+                          });
+                          const openLabel =
+                            openLabelsById.get(e.id) ??
+                            timelineEntryOpenAccessibleName({
+                              title: et.label,
+                              occurredAtLabel: openOccurredAt,
+                              differentiator: openDifferentiator,
+                              context: openContext,
+                            });
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility
                           // envelope. No persisted row is rewritten.
@@ -2480,7 +2915,7 @@ export default function Timeline() {
                           const { sensorViewModel, reviewMessage, warningMessage } =
                             buildTimelineCardSensorSnapshotViewModel(
                               { sensor, useManualValidation },
-                              { validateManualCompatibility: true },
+                              { validateManualCompatibility: true, temperatureUnit },
                             );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0
@@ -2565,14 +3000,31 @@ export default function Timeline() {
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-primary">
                                   <Sprout className="h-3 w-3" />
-                                  {stageLabel(resolveTimelineDiaryEntryStage(e))}
+                                  {timelineStagePresentationLabel(
+                                    resolveTimelineDiaryEntryStage(e),
+                                  )}
                                 </span>
                                 {plantName && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]">
+                                  <span
+                                    data-testid="timeline-entry-plant-name"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]"
+                                  >
                                     <Leaf className="h-3 w-3" />
                                     {plantName}
                                   </span>
                                 )}
+                                {place.tentName && (
+                                  <span
+                                    data-testid="timeline-entry-tent-name"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]"
+                                  >
+                                    {place.tentName}
+                                  </span>
+                                )}
+                                <TimelineEntryOpenButton
+                                  label={openLabel}
+                                  onOpen={() => setDetailEntryId(e.id)}
+                                />
                                 <span title={format(new Date(e.entry_at), "PPpp")}>
                                   {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
                                 </span>
@@ -2586,6 +3038,12 @@ export default function Timeline() {
                                     plantId={e.plant_id ?? null}
                                     tentId={e.tent_id ?? null}
                                     growId={loopGrowId}
+                                    correctionValues={correctionValuesForTimelineDiaryEntry(e, [
+                                      ...timelineLinkedRoots,
+                                      ...growEvents,
+                                      ...supplementalLinkedGrowEvents,
+                                      ...timelineSensorEvents,
+                                    ])}
                                     onChanged={() => void load()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (
@@ -2623,7 +3081,21 @@ export default function Timeline() {
                                   </>
                                 ) : null}
                               </div>
-                              <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              <p
+                                className="min-w-0 max-w-full text-sm text-foreground whitespace-pre-wrap [overflow-wrap:anywhere] cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                                role="button"
+                                tabIndex={0}
+                                data-testid="timeline-entry-body"
+                                aria-label="Open entry details"
+                                onKeyDown={(ev) => {
+                                  if (ev.key === "Enter" || ev.key === " ") {
+                                    ev.preventDefault();
+                                    setDetailEntryId(e.id);
+                                  }
+                                }}
+                              >
+                                {localizeReadingAtTimestamps(e.note)}
+                              </p>
                               {lightingGuideByEntryId.has(e.id) ? (
                                 <div
                                   onClick={(event) => event.stopPropagation()}
@@ -2968,11 +3440,53 @@ export default function Timeline() {
         onOpenChange={(o) => {
           if (!o) setEditingId(null);
         }}
-        onSaved={(patch) =>
+        onSaved={(patch) => {
+          const before = entries.find((r) => r.id === patch.id);
+          const photo =
+            before && patch.details !== undefined
+              ? applyTimelineDiaryPhotoEdit(diaryPhotoIds, before, patch.details, user)
+              : null;
+          if (photo) setDiaryPhotoIds(photo.photoIds);
+          const signPath = photo?.signStoragePath ?? null;
+          if (signPath) {
+            // The edit moved the photo to a new private path, so the old
+            // signed URL was cleared; sign the new one. A later edit of the
+            // same entry wins over this result.
+            editPhotoSignRef.current.set(patch.id, signPath);
+            void supabase.storage
+              .from("diary-photos")
+              .createSignedUrl(signPath, 3600)
+              .then(({ data }) => {
+                if (editPhotoSignRef.current.get(patch.id) !== signPath) return;
+                const url = data?.signedUrl;
+                if (!url) return;
+                setEntries((rows) =>
+                  rows.map((r) => (r.id === patch.id ? ({ ...r, photo_url: url } as Entry) : r)),
+                );
+              })
+              // An unsigned photo stays blank, as it would after a failed load.
+              .catch(() => undefined);
+          } else {
+            // Supersede any signing still in flight for this entry.
+            editPhotoSignRef.current.set(patch.id, "");
+          }
           setEntries((rows) =>
-            rows.map((r) => (r.id === patch.id ? ({ ...r, ...patch } as Entry) : r)),
-          )
-        }
+            rows.map((r) =>
+              r.id === patch.id
+                ? ({
+                    ...r,
+                    ...patch,
+                    ...(photo
+                      ? {
+                          photo_url: photo.photo_url,
+                          photoReferenceSource: photo.photoReferenceSource,
+                        }
+                      : {}),
+                  } as Entry)
+                : r,
+            ),
+          );
+        }}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
       />
       {lightboxIndex >= 0 && lightboxItems.length > 0 && (
@@ -2987,18 +3501,24 @@ export default function Timeline() {
         open={!!detailEntryId}
         entry={(() => {
           const row = displayEntries.find((r) => r.id === detailEntryId);
-          return row
-            ? {
-                id: row.id,
-                note: row.note,
-                photo_url: row.photo_url,
-                stage: resolveTimelineDiaryEntryStage(row),
-                entry_at: row.entry_at,
-                plant_id: row.plant_id,
-                tent_id: row.tent_id,
-                details: row.details,
-              }
-            : null;
+          if (!row) return null;
+          const labels = resolveTimelineCardPlaceLabels({
+            plantId: row.plant_id,
+            tentId: row.tent_id,
+            details: row.details,
+            plantNamesById,
+            tentNamesById,
+          });
+          return {
+            id: row.id,
+            note: localizeReadingAtTimestamps(row.note),
+            photo_url: row.photo_url,
+            stage: resolveTimelineDiaryEntryStage(row),
+            entry_at: row.entry_at,
+            plant_id: row.plant_id,
+            tent_id: row.tent_id,
+            details: withResolvedTimelinePlaceDetails(row.details, labels),
+          };
         })()}
         onClose={() => setDetailEntryId(null)}
       />
@@ -3133,7 +3653,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
             )}
             {e.action?.reason && (
               <p className="text-xs text-muted-foreground mt-1">
-                {stripBackPointerTokens(e.action.reason)}
+                {localizeReadingAtTimestamps(stripBackPointerTokens(e.action.reason))}
               </p>
             )}
             {e.note && <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>}
@@ -3161,10 +3681,9 @@ const ALERT_EVENT_TONE: Record<AlertEventType, string> = {
 
 function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
   if (!events?.length) return null;
-  // Defensive: sort newest-first regardless of fetch order.
-  const sorted = [...events].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  // Defensive: sort newest-first regardless of fetch order, and keep at most
+  // one CREATED event per alert_id.
+  const sorted = dedupeAlertEventsForTimeline(events);
   return (
     <section className="glass rounded-2xl p-4 mb-4" aria-label="Alert events">
       <div className="flex items-center gap-2 mb-3">

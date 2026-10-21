@@ -39,14 +39,15 @@ import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import StartBreedingLogButton from "@/components/StartBreedingLogButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import GrowArchiveControlButton from "@/components/GrowArchiveControlButton";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 import GrowPendingOutcomeNotice from "@/components/GrowPendingOutcomeNotice";
 
 /**
- * Read-only grow detail hub. Presentational only — all data loading +
- * derivation live in @/hooks/useGrowDetailData and @/lib/growStatus.
- * No writes. No ai-coach call. No device-control surface.
+ * Grow detail hub. Presentational — all data loading + derivation live in
+ * @/hooks/useGrowDetailData and @/lib/growStatus; archive/restore writes live in
+ * @/components/GrowArchiveControlButton. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
   const {
@@ -207,6 +208,11 @@ export default function GrowDetail() {
             <FileDown className="h-4 w-4" aria-hidden="true" />
             Export PDF
           </Button>
+          <GrowArchiveControlButton
+            growId={grow.id}
+            isArchived={grow.is_archived}
+            onChanged={refetch}
+          />
         </div>
       </header>
 
@@ -240,6 +246,7 @@ export default function GrowDetail() {
           description="Manage plants in this grow."
           count={counts.plants}
           countLabel="plants"
+          singularLabel="plant"
         />
         <HubLink
           to={tentsPath(growId)}
@@ -248,6 +255,7 @@ export default function GrowDetail() {
           description="Tents linked to this grow."
           count={counts.tents}
           countLabel="tents"
+          singularLabel="tent"
         />
         <HubLink
           to={actionsPath(growId)}
@@ -270,8 +278,6 @@ export default function GrowDetail() {
           icon={<Sparkles className="h-4 w-4" />}
           title="Dashboard"
           description="Open the dashboard scoped to this grow."
-          count="unavailable"
-          countLabel="dashboard"
         />
         {showPostGrowReport && (
           <HubLink
@@ -288,8 +294,6 @@ export default function GrowDetail() {
           icon={<GraduationCap className="h-4 w-4" />}
           title="Learning review"
           description="Completed actions, grower-recorded outcomes, and next-run decisions."
-          count="unavailable"
-          countLabel="learning review"
         />
       </section>
 
@@ -493,23 +497,30 @@ function HubLink({
   description,
   count,
   countLabel,
+  singularLabel,
 }: {
   to: string;
   icon: React.ReactNode;
   title: string;
   description: string;
-  count: CountValue;
-  countLabel: string;
+  count?: CountValue;
+  countLabel?: string;
+  singularLabel?: string;
 }) {
+  const label = count === 1 && singularLabel ? singularLabel : countLabel;
   return (
     <Link to={to} className="glass rounded-2xl p-4 hover:bg-secondary/20 transition-colors block">
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         {icon}
         {title}
-        <span className="ml-auto text-xs font-normal text-muted-foreground">
-          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span>{" "}
-          {countLabel}
-        </span>
+        {count !== undefined && countLabel ? (
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>
+              {formatCount(count)}
+            </span>{" "}
+            {label}
+          </span>
+        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
     </Link>

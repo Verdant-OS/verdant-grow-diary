@@ -7,8 +7,10 @@
  * register and execute tests. They do not replace the authenticated run; they
  * prevent it from silently omitting the production handoffs it exists to prove.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as browserProofContract from "../../e2e/helpers/oneTentBrowserProofReceipt";
 import { stripSourceComments } from "./utils/stripSourceComments";
@@ -470,6 +472,44 @@ describe("authenticated One-Tent proof covers the production objective", () => {
   });
 
   it("proves Paddle remains visibly sandboxed without opening checkout", () => {
+    const paddleStage = SPEC.slice(
+      SPEC.indexOf('await stage("paddle_sandbox_verified"'),
+      SPEC.indexOf("expect(sawPasswordAuth)"),
+    );
+    expect(paddleStage).toContain("sandbox-checkout-test-mode-note");
+    const noteBeforeRole = paddleStage.slice(0, paddleStage.indexOf("has_role"));
+    expect(noteBeforeRole).toContain("sandbox-checkout-test-mode-note");
+    expect(noteBeforeRole).toContain("await expect(checkoutNote).toBeVisible()");
+    const operatorStart = paddleStage.indexOf("operatorGranted === true");
+    const operatorEnd = paddleStage.indexOf("} else if (operatorRoleError == null)");
+    expect(operatorStart).toBeGreaterThanOrEqual(0);
+    expect(operatorEnd).toBeGreaterThanOrEqual(0);
+    const operatorBranch = paddleStage.slice(operatorStart, operatorEnd);
+    expect(operatorBranch).toContain("payments-test-mode-banner");
+    expect(operatorBranch).toContain('data-payment-env", "sandbox"');
+    expect(operatorBranch).toContain("No real charges");
+    const nonOperatorStart = paddleStage.indexOf("} else if (operatorRoleError == null)");
+    const nonOperatorEnd = paddleStage.indexOf("} else {", nonOperatorStart + 1);
+    expect(nonOperatorStart).toBeGreaterThanOrEqual(0);
+    expect(nonOperatorEnd).toBeGreaterThanOrEqual(0);
+    const nonOperatorBranch = paddleStage.slice(nonOperatorStart, nonOperatorEnd);
+    expect(nonOperatorBranch).toContain("toHaveCount(0)");
+    const executablePaddle = EXECUTABLE_SPEC.slice(
+      EXECUTABLE_SPEC.indexOf('await stage("paddle_sandbox_verified"'),
+      EXECUTABLE_SPEC.indexOf("expect(sawPasswordAuth)"),
+    );
+    expect(executablePaddle).toContain("await expect(checkoutNote).toBeVisible()");
+    expect(executablePaddle).toMatch(
+      /if \(operatorRoleError == null && operatorGranted === true\) \{\s*paddleSandboxBranch = "operator";\s*const testModeBanner = page\.getByTestId\("payments-test-mode-banner"\);/,
+    );
+    const errorBranch = executablePaddle.slice(executablePaddle.indexOf("} else {"));
+    expect(errorBranch).toContain('paddleSandboxBranch = "error"');
+    expect(errorBranch).not.toContain('stageOutcomes["paddle_sandbox_verified"] = "blocked"');
+    expect(errorBranch).not.toContain('proofBlockerReason ??= "paddle_sandbox_has_role_error"');
+    expect(EXECUTABLE_SPEC).toContain(
+      'let paddleSandboxBranch: "operator" | "non_operator" | "error" | "not_run" = "not_run";',
+    );
+    expect(SPEC).toContain("ONE_TENT_PADDLE_SANDBOX_BRANCH=");
     expect(SPEC).toContain("paddle_sandbox_verified");
     expect(SPEC).toContain("payments-test-mode-banner");
     expect(SPEC).toContain('data-payment-env", "sandbox"');
@@ -477,6 +517,95 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("pricing-checkout-trust");
     expect(SPEC).toContain('data-checkout-state", "sandbox"');
     expect(SPEC).not.toMatch(/pricing-(?:founder|pro)-(?:lifetime|monthly|annual)-cta"\)\.click/);
+  });
+
+  it("leaves an unreached paddle stage not_run and fails a role-check error as the stage failure", () => {
+    expect(EXECUTABLE_SPEC).toContain(
+      'let paddleSandboxBranch: "operator" | "non_operator" | "error" | "not_run" = "not_run";',
+    );
+    const stageFn = EXECUTABLE_SPEC.slice(
+      EXECUTABLE_SPEC.indexOf("async function stage"),
+      EXECUTABLE_SPEC.indexOf('page.on("request"'),
+    );
+    expect(stageFn).not.toContain("paddle_sandbox_has_role_error");
+    expect(stageFn).not.toContain("paddle_sandbox_verified");
+    expect(stageFn).toContain('stageOutcomes[name] = "fail"');
+    expect(stageFn).toContain("proofBlockerReason ??= `${name}_failed`");
+    expect(stageFn.match(/stageOutcomes\[name\] = "[^"]+"/g)).toEqual([
+      'stageOutcomes[name] = "pass"',
+      'stageOutcomes[name] = "fail"',
+    ]);
+
+    const paddleStage = EXECUTABLE_SPEC.slice(
+      EXECUTABLE_SPEC.indexOf('await stage("paddle_sandbox_verified"'),
+      EXECUTABLE_SPEC.indexOf("expect(sawPasswordAuth)"),
+    );
+    const roleError = paddleStage.slice(paddleStage.indexOf("} else {"));
+    expect(roleError).toContain('paddleSandboxBranch = "error"');
+    expect(roleError).toContain('throw new Error("paddle_sandbox_has_role_error")');
+    expect(roleError).not.toContain('stageOutcomes["paddle_sandbox_verified"] = "blocked"');
+    expect(roleError).not.toContain('proofBlockerReason ??= "paddle_sandbox_has_role_error"');
+  });
+
+  it("keeps earlier stage passes and records paddle_sandbox_verified_failed", () => {
+    const stages: NonNullable<
+      Parameters<typeof browserProofContract.buildOneTentBrowserProofReceipt>[0]["stages"]
+    > = {};
+    for (const stage of browserProofContract.ONE_TENT_PROOF_STAGES) {
+      stages[stage] = stage === "paddle_sandbox_verified" ? "fail" : "pass";
+    }
+    const receipt = browserProofContract.buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      blockerReason: "paddle_sandbox_verified_failed",
+      cleanupRequired: true,
+      stages,
+      duplicateFences: {
+        quick_log_count: 1,
+        alert_count: 1,
+        action_queue_count: 1,
+      },
+      cleanup: {
+        status: "completed_with_retained_history",
+        active_rows_removed: true,
+        retained_history: true,
+      },
+    });
+    expect(receipt.status).toBe("fail");
+    expect(receipt.blocker_reason).toBe("paddle_sandbox_verified_failed");
+    expect(receipt.stages.paddle_sandbox_verified).toBe("fail");
+    for (const stage of browserProofContract.ONE_TENT_PROOF_STAGES) {
+      if (stage === "paddle_sandbox_verified") continue;
+      expect(receipt.stages[stage]).toBe("pass");
+    }
+
+    const root = mkdtempSync(join(tmpdir(), "paddle-role-check-receipt-"));
+    try {
+      const logPath = join(root, "proof.log");
+      writeFileSync(
+        logPath,
+        `${browserProofContract.renderOneTentBrowserProofReceipt(receipt)}\n`,
+        "utf8",
+      );
+      const verified = spawnSync(
+        process.execPath,
+        [
+          resolve(ROOT, "scripts/e2e/verify-one-tent-browser-proof-log.mjs"),
+          "--log",
+          logPath,
+          "--playwright-exit",
+          "1",
+        ],
+        { cwd: ROOT, encoding: "utf8" },
+      );
+      expect(verified.status).not.toBe(0);
+      expect(`${verified.stdout}${verified.stderr}`).toContain(
+        "playwright_failed:paddle_sandbox_verified_failed",
+      );
+      expect(`${verified.stdout}${verified.stderr}`).not.toContain("unclassified");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("receipt cannot report PASS without every new objective stage", () => {

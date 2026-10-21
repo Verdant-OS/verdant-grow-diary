@@ -9,6 +9,7 @@ import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard"
 import { MISSING_SNAPSHOT_NOTE_LABEL } from "@/lib/manualSensorSnapshotViewModel";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { useQuickLogGroupedTimeline } from "@/hooks/useQuickLogGroupedTimeline";
+import { correctionValuesForTimelineAction } from "@/lib/quick-log/quickLogRevisionRules";
 import type {
   QuickLogActionEvent,
   QuickLogTimelineEntry,
@@ -207,6 +208,10 @@ function EntryItem({ entry, demoVariant, correctionCount }: EntryItemProps) {
           currentPlantId={entry.action.plantId}
           plantId={entry.action.plantId}
           tentId={entry.action.tentId}
+          correctionValues={correctionValuesForTimelineAction(
+            entry.action,
+            entry.kind === "grouped" ? entry.environmentCard.readings : undefined,
+          )}
         />
       </>
     ) : null;

@@ -33,13 +33,12 @@ import {
 } from "@/lib/plantStartDateRules";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
-  PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
   PLANT_HEALTH_NOT_ASSESSED_LABEL,
   PLANT_HEALTH_NOT_ASSESSED_OPTION,
   buildPlantHealthCreateInsert,
-  isPlantHealthClearRejected,
   plantHealthFromSelectValue,
 } from "@/lib/plantHealthRules";
+import { plantCreateFailureMessage } from "@/lib/plantCreateFailureNotice";
 import {
   primeConfirmedPlantCaches,
   reaffirmConfirmedPlantCacheMeta,
@@ -56,8 +55,11 @@ import {
   buildCreateGrowBindingView,
   canWriteCreateGrowId,
   evaluateSuppliedTentBinding,
+  createGrowIdsEqual,
   evaluateTentGrowCompatibility,
   plantCreateAllowsTentless,
+  plantCreateNoTentsHintVisible,
+  selectCreatePlantTents,
   resolveInitialPlantTentId,
   resolveSetupName,
   suppliedTentBlocksWrite,
@@ -112,6 +114,11 @@ function emptyForm(tentId: string) {
     started_at: "",
     plant_type: "unknown",
   };
+}
+
+/** Physical key identity; falls back to event.key when event.code is unavailable. */
+function physicalKeyId(event: KeyboardEvent): string {
+  return event.code || event.key;
 }
 
 export default function CreatePlantDialog({
@@ -209,13 +216,17 @@ export default function CreatePlantDialog({
     requireTent || !!defaultTentId || suppliedTent.requireCompatibleTentSelection;
 
   const tents = targetGrowId
-    ? tentRows.filter(
-        (tent, _index, rows) =>
-          tent.grow_id === targetGrowId &&
-          tent.id.trim().length > 0 &&
-          rows.filter((candidate) => candidate.id === tent.id).length === 1,
+    ? selectCreatePlantTents(tentRows, targetGrowId).filter(
+        (t) =>
+          t.grow_id === targetGrowId ||
+          t.grow_id?.trim().toLowerCase() === targetGrowId.trim().toLowerCase(),
       )
     : [];
+  const showNoTentsHint = plantCreateNoTentsHintVisible({
+    selectableTentCount: tents.length,
+    tentsSettled: tentsLoaded,
+    tentsReadFailed: tentsError,
+  });
 
   const initialTentId = resolveInitialPlantTentId({
     defaultTentId,
@@ -229,7 +240,37 @@ export default function CreatePlantDialog({
 
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const createInFlightRef = useRef(false);
+  const suppressTentSelectSubmitRef = useRef(false);
+  const closedAfterSubmitRef = useRef(false);
+  const releaseReopenGuardRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => releaseReopenGuardRef.current?.(), []);
+  // Keys physically held right now, keyed by physical key (event.code): event.key
+  // changes with Shift/dead keys between keydown and keyup and would leave
+  // phantom entries. A save usually resolves after the keyup of the submitting key,
+  // and a guard armed then would swallow the next genuine activation of
+  // New plant (Codex P2 at 885e48b8).
+  const heldKeysRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const held = heldKeysRef.current;
+    const onKeyDown = (event: KeyboardEvent) => {
+      held.add(physicalKeyId(event));
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      held.delete(physicalKeyId(event));
+    };
+    const onBlur = () => held.clear();
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onBlur);
+      held.clear();
+    };
+  }, []);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
   });
@@ -259,7 +300,7 @@ export default function CreatePlantDialog({
   useEffect(() => {
     if (!pendingNestedTentId || !targetGrowId) return;
     const nestedTent = uniqueTentById(tentRows, pendingNestedTentId);
-    if (!nestedTent || nestedTent.grow_id !== targetGrowId) return;
+    if (!nestedTent || !createGrowIdsEqual(nestedTent.grow_id, targetGrowId)) return;
     setForm((current) => ({ ...current, tent_id: nestedTent.id }));
     setExplicitCompatiblePick(true);
     setPendingNestedTentId(null);
@@ -267,8 +308,10 @@ export default function CreatePlantDialog({
 
   const selectedTentRow = uniqueTentById(tentRows, form.tent_id);
   const selectedTentGrowId = selectedTentRow?.grow_id ?? null;
-  const selectedTentIsLocallyVerified =
-    uniqueTentById(nestedTents, form.tent_id)?.grow_id === targetGrowId;
+  const selectedTentIsLocallyVerified = createGrowIdsEqual(
+    uniqueTentById(nestedTents, form.tent_id)?.grow_id,
+    targetGrowId,
+  );
   const selectedTentHasVerifiedSource =
     selectedTentIsLocallyVerified || (tentsLoaded && !tentsError);
   const hasVerifiedCompatibleReplacement =
@@ -277,7 +320,7 @@ export default function CreatePlantDialog({
     selectedTentHasVerifiedSource &&
     !!selectedTentRow &&
     !!targetGrowId &&
-    selectedTentRow.grow_id === targetGrowId;
+    createGrowIdsEqual(selectedTentRow.grow_id, targetGrowId);
 
   const tentCompat = evaluateTentGrowCompatibility({
     selectedTentId: form.tent_id,
@@ -324,14 +367,81 @@ export default function CreatePlantDialog({
     !canWriteCreateGrowId(targetGrowId) ||
     tentBlocksWrite;
 
+  function outsideCreateDialogTarget(target: EventTarget | null): boolean {
+    return (
+      target instanceof Element &&
+      Boolean(target.closest("[data-sonner-toaster], [data-sonner-toast]"))
+    );
+  }
+
+  function armTentSelectSubmitGuard() {
+    suppressTentSelectSubmitRef.current = true;
+    queueMicrotask(() => {
+      suppressTentSelectSubmitRef.current = false;
+    });
+  }
+
+  function stopSelectEnterKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Enter") {
+      armTentSelectSubmitGuard();
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  // After a successful create, let Radix return focus to the New plant trigger
+  // (keyboard users keep their place) but keep the reopen guard armed until the
+  // submitting gesture ends: a held or trailing key must not reopen the dialog
+  // empty. It is released once every key held at close is up (in any order),
+  // on the next pointerdown, or on window blur (keyups elsewhere are lost).
+  // When no key is held at close (pointer submit, or a keyboard save that
+  // resolved after keyup), the gesture has already ended, so the guard is
+  // released immediately.
+  function handleDialogCloseAutoFocus(_event: Event) {
+    if (!closedAfterSubmitRef.current) return;
+    releaseReopenGuardRef.current?.();
+    const held = heldKeysRef.current;
+    if (held.size === 0) {
+      closedAfterSubmitRef.current = false;
+      return;
+    }
+    const release = () => {
+      closedAfterSubmitRef.current = false;
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("pointerdown", release, true);
+      window.removeEventListener("blur", release);
+      releaseReopenGuardRef.current = null;
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      held.delete(physicalKeyId(event));
+      if (held.size === 0) release();
+    };
+    releaseReopenGuardRef.current = release;
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("pointerdown", release, true);
+    window.addEventListener("blur", release);
+  }
+
+  // Closing the listbox arms the same-turn submit guard too: reselecting the
+  // already-selected tent does not fire onValueChange (Radix keeps the value).
+  function handleTentSelectOpenChange(next: boolean) {
+    if (!next) armTentSelectSubmitGuard();
+    setTentSelectOpen(next);
+  }
+
   function handleOpenChange(next: boolean) {
-    if (next && createOutcomeUnknown) return;
+    // The recovery explanation lives in this dialog, and the trigger cannot
+    // reopen it while the outcome is unknown. Closing would hide that notice.
+    if (!next && createOutcomeUnknown) return;
+    if (next && (createOutcomeUnknown || closedAfterSubmitRef.current)) return;
     // The insert may already be durable, so closing cannot cancel it. Let the
     // grower dismiss a stalled refresh, but suppress the later Quick Log
     // handoff so closing never causes a delayed navigation surprise.
     if (!next && busy) handoffSuppressedRef.current = true;
     setOpen(next);
+    if (next) setSaveError(null);
     if (!next) {
+      setSaveError(null);
       setExplicitCompatiblePick(false);
       setForm(emptyForm(initialTentId));
       setNestedTents([]);
@@ -342,6 +452,7 @@ export default function CreatePlantDialog({
   }
 
   function onTentSelect(v: string) {
+    armTentSelectSubmitGuard();
     if (v === "none") {
       setForm((current) => ({ ...current, tent_id: "none" }));
       setExplicitCompatiblePick(false);
@@ -349,7 +460,7 @@ export default function CreatePlantDialog({
     }
 
     const row = uniqueTentById(tentRows, v);
-    if (!row || !targetGrowId || row.grow_id !== targetGrowId) {
+    if (!row || !createGrowIdsEqual(row.grow_id, targetGrowId)) {
       setForm((current) => ({ ...current, tent_id: "none" }));
       setExplicitCompatiblePick(false);
       return;
@@ -360,7 +471,7 @@ export default function CreatePlantDialog({
   }
 
   function handleNestedTentCreated(tent: CreatedTent) {
-    if (!targetGrowId || tent.grow_id !== targetGrowId) {
+    if (!createGrowIdsEqual(tent.grow_id, targetGrowId)) {
       setForm((current) => ({ ...current, tent_id: "none" }));
       setExplicitCompatiblePick(false);
       setPendingNestedTentId(null);
@@ -374,7 +485,8 @@ export default function CreatePlantDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || createInFlightRef.current) return;
+    if (busy || createInFlightRef.current || tentSelectOpen || suppressTentSelectSubmitRef.current)
+      return;
     if (!hasTrimmedRequiredIdentity(form.name)) return;
     if (!user) {
       toast.error("Not signed in");
@@ -384,6 +496,9 @@ export default function CreatePlantDialog({
       toast.error("Refresh this page before trying to create another plant.");
       return;
     }
+    // A retry has begun: the last failure no longer describes this attempt,
+    // even when a pre-write check below stops it before any insert.
+    setSaveError(null);
     if (formBlocked || !targetGrowId) {
       if (binding.toastMessage) toast.error(binding.toastMessage);
       else if (suppliedTent.blockSubmit) toast.error(suppliedTent.title);
@@ -478,8 +593,11 @@ export default function CreatePlantDialog({
       }
 
       if (!confirmed && needsReconciliation) {
+        const notice =
+          "Verdant could not confirm whether this plant was saved. Refresh before adding another.";
         if (mountedRef.current) {
           setBusy(false);
+          setSaveError(notice);
         }
         recordUnknownCreateOutcome({
           entity: "plant",
@@ -488,26 +606,18 @@ export default function CreatePlantDialog({
           growId: targetGrowId,
           tentId: validation.value.tent_id ?? null,
         });
-        toast.error(
-          "Verdant could not confirm whether this plant was saved. Refresh before adding another.",
-        );
+        toast.error(notice);
         return;
       }
       if (error && !confirmed) {
-        if (mountedRef.current) setBusy(false);
-        const message =
-          typeof error === "object" &&
-          error &&
-          typeof (error as { message?: unknown }).message === "string"
-            ? (error as { message: string }).message
-            : "Plant could not be created";
         // Before 20260924120000 the trigger rejects "unknown" and nothing is
         // written; the form stays open so the grower can pick a health value.
-        toast.error(
-          isPlantHealthClearRejected(message)
-            ? PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE
-            : message,
-        );
+        const notice = plantCreateFailureMessage(error);
+        if (mountedRef.current) {
+          setBusy(false);
+          setSaveError(notice);
+        }
+        toast.error(notice);
         return;
       }
       // The insert is now durable. Record that fact before any cache refresh can
@@ -552,7 +662,10 @@ export default function CreatePlantDialog({
       }
       const stillMounted = mountedRef.current;
       const handoffSuppressed = handoffSuppressedRef.current;
-      if (stillMounted) setBusy(false);
+      if (stillMounted) {
+        setBusy(false);
+        setSaveError(null);
+      }
       toast.success("Plant created");
       if (!stillMounted || handoffSuppressed) return;
       setForm(emptyForm(initialTentId));
@@ -560,6 +673,8 @@ export default function CreatePlantDialog({
       setNestedTents([]);
       setPendingNestedTentId(null);
       setNestedTentCreatorMounted(false);
+      setTentSelectOpen(false);
+      closedAfterSubmitRef.current = true;
       setOpen(false);
       if (onCreated) onCreated(confirmed.row);
     } finally {
@@ -572,6 +687,7 @@ export default function CreatePlantDialog({
       <DialogTrigger asChild>
         {trigger ?? (
           <Button
+            type="button"
             size="sm"
             className="gradient-leaf text-primary-foreground gap-1"
             disabled={createOutcomeUnknown}
@@ -580,7 +696,22 @@ export default function CreatePlantDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]">
+      <DialogContent
+        className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]"
+        onFocusOutside={(event) => {
+          // Disabling the focused submit button moves focus to the document.
+          // That is not the grower leaving the form.
+          if (busy || saveError || outsideCreateDialogTarget(event.target)) {
+            event.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          // The error toast sits outside this dialog. Pressing it must not
+          // count as leaving, or the form the grower just filled is cleared.
+          if (outsideCreateDialogTarget(event.target)) event.preventDefault();
+        }}
+        onCloseAutoFocus={handleDialogCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle className="font-display">New plant</DialogTitle>
         </DialogHeader>
@@ -818,10 +949,10 @@ export default function CreatePlantDialog({
             <div>
               <Label>Stage</Label>
               <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                <SelectTrigger>
+                <SelectTrigger type="button">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                   {STAGES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
@@ -836,10 +967,10 @@ export default function CreatePlantDialog({
                 value={form.plant_type}
                 onValueChange={(v) => setForm({ ...form, plant_type: v })}
               >
-                <SelectTrigger data-testid="create-plant-type-select">
+                <SelectTrigger type="button" data-testid="create-plant-type-select">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                   <SelectItem value="unknown">Not sure</SelectItem>
                   <SelectItem value="autoflower">Autoflower</SelectItem>
                   <SelectItem value="photoperiod">Photoperiod</SelectItem>
@@ -886,14 +1017,14 @@ export default function CreatePlantDialog({
               </div>
               <Select
                 open={tentSelectOpen}
-                onOpenChange={setTentSelectOpen}
+                onOpenChange={handleTentSelectOpenChange}
                 value={form.tent_id}
                 onValueChange={onTentSelect}
               >
-                <SelectTrigger data-testid="create-plant-tent-select">
+                <SelectTrigger type="button" data-testid="create-plant-tent-select">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                   {plantCreateAllowsTentless({
                     suppliedTentId: defaultTentId,
                     requireTent,
@@ -905,8 +1036,11 @@ export default function CreatePlantDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {tents.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
+              {showNoTentsHint && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="create-plant-no-tents-hint"
+                >
                   No tents yet. Create a tent first.
                 </p>
               )}
@@ -932,10 +1066,10 @@ export default function CreatePlantDialog({
                       setForm({ ...form, health: plantHealthFromSelectValue(v) })
                     }
                   >
-                    <SelectTrigger data-testid="create-plant-health">
+                    <SelectTrigger type="button" data-testid="create-plant-health">
                       <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent onKeyDown={stopSelectEnterKeyDown}>
                       <SelectItem value={PLANT_HEALTH_NOT_ASSESSED_OPTION}>
                         {PLANT_HEALTH_NOT_ASSESSED_LABEL}
                       </SelectItem>
@@ -958,7 +1092,17 @@ export default function CreatePlantDialog({
                 </div>
               </div>
             </details>
+            {saveError ? (
+              <p
+                role="alert"
+                data-testid="create-plant-save-error"
+                className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
+                {saveError}
+              </p>
+            ) : null}
             <Button
+              type="submit"
               disabled={
                 busy ||
                 formBlocked ||

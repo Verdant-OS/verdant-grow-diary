@@ -155,6 +155,7 @@
       "tables": ["lovable_paddle_events", "paddle_customers", "subscriptions"],
       "rpcs": [
         "allocate_lovable_founder_lifetime",
+        "clawback_lovable_credit_pack",
         "grant_lovable_credit_pack",
         "revoke_lovable_founder_lifetime_by_transaction"
       ],

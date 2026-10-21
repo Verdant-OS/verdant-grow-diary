@@ -106,6 +106,7 @@ import {
   type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { ActionQueueRpcStatusPill } from "@/components/ActionQueueRpcStatusPill";
+import { ActionQueueCreateButton } from "@/components/ActionQueueCreateButton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -159,6 +160,7 @@ import {
 } from "@/lib/actionQueueUrlStateRules";
 
 import { Input } from "@/components/ui/input";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -1070,8 +1072,15 @@ export default function ActionQueue() {
           description="Suggestions are approval-gated. Verdant never sends commands to equipment."
           icon={<ListChecks className="h-5 w-5" aria-hidden="true" />}
           actions={
-            <div className="flex items-center gap-2">
-              <ActionQueueRpcStatusPill availability={rpcAvailability} />
+            <div className="flex flex-wrap items-center gap-2">
+              {(rpcAvailability !== "unknown" || rows.length > 0) && (
+                <ActionQueueRpcStatusPill availability={rpcAvailability} />
+              )}
+              <ActionQueueCreateButton
+                growId={effectiveGrowId}
+                disabled={loading || isRefreshing || hasInvalidScope}
+                onCreated={() => load()}
+              />
               <Button
                 size="sm"
                 variant="ghost"
@@ -1649,7 +1658,9 @@ export default function ActionQueue() {
                           </div>
                           <p className="text-sm mt-1">{sanitizeActionCopy(row.suggested_change)}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {sanitizeActionCopy(stripBackPointerTokens(row.reason))}
+                            {localizeReadingAtTimestamps(
+                              sanitizeActionCopy(stripBackPointerTokens(row.reason)),
+                            )}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <AiDoctorSessionLink row={row} />

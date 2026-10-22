@@ -45,6 +45,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### REVIEWER-ROUTING-20261022
+
+```text
+TASK REVIEWER-ROUTING-20261022  priority: P2  status: OPEN
+goal: Matthew-approved bounded reviewer routing: retire Blue Dream/Critical Mass for future requests, allow available eligible independent sessions, preserve all acceptance and production gates.
+branch: codex/reviewer-routing-20261022
+base: verdant-grow-diary at ebaf1b6afa7fb8cfa7fb8090914c8633f7537a98, verified 2026-10-22 UTC
+checkout: git fetch origin codex/reviewer-routing-20261022 verdant-grow-diary && git switch codex/reviewer-routing-20261022 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED — draft PR bootstrapping; no existing branch or PR taken over
+head_sha: NOT_MEASURED — first ownership-record commit follows verified deploy ebaf1b6afa7fb8cfa7fb8090914c8633f7537a98; read current full SHA from the draft PR before review
+state: local proposal complete; bounded ownership approved; first branch/draft ownership checkpoint precedes routing implementation commit
+next_action: Create the assigned branch and draft PR with this ownership checkpoint, then commit only the existing sixteen-file routing correction after available validation; keep draft and obtain new-head hosted CI and eligible independent acceptance.
+files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/{claude,codex,council-chair,gemini,grok,security}.md; docs/agents/OWNERSHIP.md; docs/agents/CURRENT_STATE.md (active header only); .agents/skills/verdant-exact-sha-review/SKILL.md; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Broad governance overlaps remain; Matthew approved this session as sole writer for only the narrow reviewer-routing correction on 2026-10-22 (parent question: designate this task sole writer while leaving #1971/#2086 unrelated work and branches untouched; Matthew: "Yeah"). This designation resolves the routing-slice collision, grants no takeover or review PASS, and changes no other assignments. Rechecked overlaps: #1971 canopy/constitution-clash-fixes at 82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e (51 files), #2086 claude/new-session-nms5b8 at 98b660ab13d2e3087364d1bc5faeb333b20590c8 (35 files). No fresh 24-hour claim or matching deploy HANDOFF_LOG block observed; staleness is not reassignment. #1971 issuecomment-6222081602 preserves the existing governance writer after last Canopy claim issuecomment-6102182294. The 12-file parity bump also overlaps #2028/#1879/#1876. Shared live-session registry unavailable. No claim/release comment posted; existing comment-approval gate remains.
+artifacts: /workspace/reviewer-routing-deliverables/ contains proposed patch, scope/hash and local validation receipt; local success is not hosted CI. Proposed Sentinel-Version 2026-10-22.1 across exactly 12 files; no parity expansion or checker/test/pin edits.
+reviewer_seat: BLOCKED — no independent available Claude/Grok session assigned; Codex is proposal author and cannot accept it; Graft governance lane excluded
+review_request: not sent; owner: parent; permalink: NOT_MEASURED; state: blocked; fallback transfers: 0
+claimed_by: Codex reviewer-routing session, 2026-10-22 03:01 UTC (Matthew direct bounded sole-writer designation; no claim on #1971/#2086; no GitHub claim comment posted because separate comment-approval gate remains)
+last_updated: 2026-10-22 03:01 UTC, by Codex reviewer-routing session
+limits: #2303/#2304 existing independent PASSes are preserved and are not review work here. #2312 moved to 588fe03c; the old 720e9b3 PASS cannot transfer. No merge, ready, auto-merge, enqueue, deploy, production dispatch, SQL, runtime automation, hooks, GitHub settings, security, billing, secret or protected-scorer changes.
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text

@@ -333,8 +333,12 @@ export async function fetchLatestSensorSnapshotsByTent(
             const windowFull = diaryRows.length > windowLimit;
             const scope = pendingDiary;
             const partition = partitionWindowByTent(
+              // With one tent in scope the lookahead row is that tent's own,
+              // so keep it: the verdict can then see the candidate bound was
+              // passed, as the single-tent read does, and settle the tent
+              // without a per-tent retry (Codex P2 on #2303 at 6a242e1f).
               diaryRows
-                .slice(0, windowLimit)
+                .slice(0, scope.length === 1 ? windowLimit + 1 : windowLimit)
                 .filter((row) => isDiaryRowInTentScope(row.tent_id, scope)),
               scope,
               Number.POSITIVE_INFINITY,

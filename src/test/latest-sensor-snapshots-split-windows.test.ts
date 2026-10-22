@@ -171,6 +171,32 @@ describe("capped shared windows split instead of fanning out", () => {
   });
 });
 
+describe("a single-tent deepest diary window settles past the candidate bound", () => {
+  it("marks each over-bound tent unavailable without a per-tent retry (Codex P2 at 6a242e1f)", async () => {
+    // The sensor read succeeds with no rows, so every tent goes to the diary.
+    const tents = tentIds(3, 400);
+    const rows: Record<string, unknown>[] = [];
+    for (let round = 0; round < 250; round++) {
+      tents.forEach((tent, t) => {
+        rows.push({
+          id: uuid(++seq),
+          entry_at: minutesAgo(10 + round + t * 0.01),
+          tent_id: tent,
+          details: { sensor_snapshot: { note: "no metric" } },
+        });
+      });
+    }
+    io.diaryRows = rows;
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, tents);
+    // One shared sensor read; no per-tent read repeats it for each tent.
+    expect(sensorCalls()).toBe(1);
+    for (const tent of tents) expect(bulk[tent]).toBeNull();
+    // The single-tent read reaches the same verdict.
+    const single = await fetchLatestSensorSnapshot(GROW, [tents[1]]).catch(() => null);
+    expect(single).toBeNull();
+  });
+});
+
 describe("a later sensor page's failure keeps the tents earlier pages settled", () => {
   it("keeps a tent the first window settled when the follow-up window fails", async () => {
     // Codex P2 on #2303 at 3e689090. A busy tent fills the first window and

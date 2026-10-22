@@ -108,7 +108,9 @@ export default function TentEnvironmentSnapshotStrip({
       </p>
     );
   }
-  if (selection.kind === "manual_unavailable") {
+  // A failed manual read does not hide a successful Dashboard snapshot; that
+  // snapshot backs the card instead (Codex P2 on #2303 at 6a242e1f).
+  if (selection.kind === "manual_unavailable" && diaryRows.length === 0) {
     const unavailableCopy =
       manualUnavailableReason === "cap_exhausted"
         ? "Manual snapshot unavailable — the saved-reading scan reached its safe limit."
@@ -183,7 +185,9 @@ export default function TentEnvironmentSnapshotStrip({
     );
   }
   const rows =
-    selection.kind === "empty" || selection.kind === "sensor_unavailable"
+    selection.kind === "empty" ||
+    selection.kind === "sensor_unavailable" ||
+    selection.kind === "manual_unavailable"
       ? diaryRows
       : selection.rows;
   if (rows.length === 0) {

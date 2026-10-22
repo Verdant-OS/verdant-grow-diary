@@ -258,3 +258,46 @@ describe("raw rejected siblings withhold a raw VPD without the snapshot (P1 at 4
     expect(vpd.value).toBe(1.2);
   });
 });
+
+describe("a self-rejected newest VPD stays terminal (P1 at 6a242e1f)", () => {
+  const older = row("vpd_kpa", 1.1, at(30), "live");
+
+  it.each([
+    ["degraded quality", row("vpd_kpa", 1.4, T, "live", "degraded")],
+    ["invalid source", row("vpd_kpa", 1.4, T, "invalid", null)],
+    ["stale source", row("vpd_kpa", 1.4, T, "stale", "ok")],
+  ])("withholds an older valid VPD behind a newest VPD with %s", (_label, rejected) => {
+    const vpd = tonightVpd({ rows: [older, rejected], status: "success", snapshot: null });
+    expect(vpd.state).toBe("invalid");
+    expect(vpd.value).toBeNull();
+  });
+
+  it("withholds it when the rejection is only in the snapshot metadata", () => {
+    const vpd = tonightVpd({
+      rows: [],
+      status: "error",
+      snapshot: {
+        source: "live",
+        ts: at(30),
+        temp: null,
+        rh: null,
+        vpd: 1.1,
+        metric_refs: { vpd: ref("live", at(30), "r-old") },
+        rejected_quality_rows: [
+          { metric: "vpd_kpa", value: 1.4, captured_at: T, source: "live", quality: "degraded" },
+        ],
+      },
+    });
+    expect(vpd.state).toBe("invalid");
+  });
+
+  it("keeps a valid VPD that is newer than the rejected one", () => {
+    const vpd = tonightVpd({
+      rows: [row("vpd_kpa", 1.2, T), row("vpd_kpa", 1.4, at(30), "live", "degraded")],
+      status: "success",
+      snapshot: null,
+    });
+    expect(vpd.state).toBe("value");
+    expect(vpd.value).toBe(1.2);
+  });
+});

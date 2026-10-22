@@ -350,6 +350,37 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-sensor-source-tent-1")).toHaveTextContent(/Live/);
   });
 
+  it("shows a successful snapshot when the manual fallback read fails (Codex P2 at 6a242e1f)", () => {
+    const t = at(0.05);
+    const live: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "live",
+      ts: t,
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+      metric_refs: {
+        temp: { id: "row-temp", captured_at: t, source: "live" },
+        rh: { id: "row-rh", captured_at: t, source: "live" },
+      },
+    };
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={{ status: "ok", snapshot: live }}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="success"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[]}
+        manualStatus="error"
+      />,
+    );
+    expect(screen.queryByTestId("tents-list-manual-unavailable-tent-1")).toBeNull();
+    expect(screen.getByTestId("tents-list-metric-tent-1-vpd")).toHaveTextContent("1.75");
+  });
+
   it("waits for a pending snapshot read before calling a failed raw read unavailable (Codex P2 at 0994ea2a)", () => {
     render(
       <TentEnvironmentSnapshotStrip

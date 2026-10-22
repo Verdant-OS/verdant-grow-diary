@@ -185,7 +185,8 @@ export interface TonightMetricView {
    * True when the value comes from a generic diary snapshot (raw source
    * `diary`): historical context, never a healthy current cue on surfaces that
    * grade it (`isDashboardSnapshotEligibleForHealthyCues`; Codex P1 on #2303
-   * at 4bd3fae7). Tonight itself still labels it Manual.
+   * at 4bd3fae7). Tonight labels it "Diary note" (`DIARY_SOURCE_LABEL`), never
+   * Manual (Codex P1 on #2303 at 0994ea2a).
    */
   historical?: true;
   /**
@@ -525,6 +526,24 @@ export function buildTonightTentMetrics(input: {
         refs: [snapRef],
         ...(isDiarySource(snap.source) ? { historical: true as const } : {}),
       });
+    }
+    // A VPD row rejected on its own (quality or explicit stale/invalid source)
+    // stays terminal: it is the newest VPD evidence, so an older valid VPD
+    // must not surface behind it (Codex P1 on #2303 at 6a242e1f).
+    if (key === "vpd") {
+      for (const rejected of rejectedSiblings) {
+        if (rejected.metric !== readingMetric) continue;
+        const when = parseAt(rejected.captured_at);
+        if (!when) continue;
+        candidates.push({
+          value: 0,
+          source: "invalid",
+          ...when,
+          origin: 0,
+          ownSource: false,
+          refs: [sensorCaptureRef(rejected.captured_at, rejected.source)],
+        });
+      }
     }
     candidates.sort(newestFirst);
   }

@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => {
 // Idle keeps this harness on stored rows only, as before.
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({ status: "idle", snapshot: null }),
+  useLatestSensorSnapshotsByTent: () => ({}),
 }));
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => mocks.queries.tents,

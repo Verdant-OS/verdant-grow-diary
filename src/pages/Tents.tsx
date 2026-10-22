@@ -13,6 +13,7 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useLatestSensorSnapshotsByTent } from "@/hooks/useLatestSensorSnapshot";
 import { useNowTick } from "@/hooks/useNowTick";
 import {
   useTentManualSnapshotBatch,
@@ -133,6 +134,14 @@ export default function Tents() {
     refreshingByTent: sensorRefreshingByTent = {},
     retryTent: retrySensorTent,
   } = useSensorReadingsByTents(sensorTentIds);
+  // The Dashboard's diary-inclusive snapshot for every tent, read once here
+  // (same per-tent cache entries as the Dashboard and Tent Detail) and passed
+  // to each card, instead of one hook call per card (Codex P2 on #2303).
+  const tonightSnapshotsByTent = useLatestSensorSnapshotsByTent(
+    tents
+      .filter((tent) => isUuid(tent.id))
+      .map((tent) => ({ tentId: tent.id, growId: tent.growId ?? null })),
+  );
   const emptySensorRefreshTentIdSet = new Set(
     sensorTentIds.filter(
       (tentId) => sensorRefreshingByTent[tentId] && (readingsByTent[tentId]?.length ?? 0) === 0,
@@ -635,7 +644,7 @@ export default function Tents() {
 
                       <TentEnvironmentSnapshotStrip
                         tentId={t.id}
-                        growId={t.growId ?? null}
+                        tonightSnapshot={tonightSnapshotsByTent[t.id]}
                         stage={envStage}
                         sensorRows={readingsByTent[t.id] ?? []}
                         sensorStatus={sensorReadStatus}

@@ -6,20 +6,17 @@
  * and the same diary-inclusive snapshot (Codex P2 on #2303). A VPD from another
  * capture keeps its own source and age (Codex P1 on #2303).
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
 
-const hook = vi.hoisted(() => ({
-  state: { status: "idle", snapshot: null as unknown } as { status: string; snapshot: unknown },
-  calls: [] as { growId: unknown; tentIds: unknown }[],
-}));
-vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
-  useLatestSensorSnapshot: (growId: unknown, tentIds: unknown) => {
-    hook.calls.push({ growId, tentIds });
-    return hook.state;
-  },
-}));
+import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
+
+// The Dashboard snapshot the page passes to each card (one read per tent at
+// page level, Codex P2 at 0c19a9e0); tests set it per case.
+const hook = { state: { status: "idle", snapshot: EMPTY_SNAPSHOT } as SnapshotState };
 
 import TentEnvironmentSnapshotStrip from "@/components/TentEnvironmentSnapshotStrip";
 import { buildTonightTentMetrics } from "@/lib/tonightTentHomeViewModel";
@@ -46,7 +43,7 @@ function renderStrip(rows: ReturnType<typeof row>[]) {
   render(
     <TentEnvironmentSnapshotStrip
       tentId="tent-1"
-      growId="grow-1"
+      tonightSnapshot={hook.state}
       stage="flower"
       sensorRows={rows}
       sensorStatus="success"
@@ -63,7 +60,7 @@ function renderEmptyStrip() {
   render(
     <TentEnvironmentSnapshotStrip
       tentId="tent-1"
-      growId="grow-1"
+      tonightSnapshot={hook.state}
       stage="flower"
       sensorRows={[]}
       sensorStatus="success"
@@ -92,7 +89,6 @@ function dashboardVpd(
 
 beforeEach(() => {
   hook.state = { status: "idle", snapshot: EMPTY_SNAPSHOT };
-  hook.calls = [];
 });
 afterEach(cleanup);
 
@@ -133,9 +129,18 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(document.body.textContent).not.toMatch(RAW_ISO);
   });
 
-  it("reads the Dashboard's tent-scoped diary-inclusive snapshot", () => {
-    renderStrip([STORED_OLD, ...FIRST]);
-    expect(hook.calls.at(-1)).toEqual({ growId: "grow-1", tentIds: ["tent-1"] });
+  it("takes the Dashboard snapshot from the page, which reads every tent once (Codex P2 at 0c19a9e0)", () => {
+    const strip = readFileSync(
+      resolve(__dirname, "../components/TentEnvironmentSnapshotStrip.tsx"),
+      "utf8",
+    );
+    const page = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
+    // No per-card hook call: the strip only renders what the page hands it.
+    expect(strip).not.toMatch(/useLatestSensorSnapshot\(/);
+    expect(strip).toMatch(/tonightSnapshot = IDLE_SNAPSHOT/);
+    // One page-level read, keyed by tent, passed to each card.
+    expect(page.match(/useLatestSensorSnapshotsByTent\(/g)).toHaveLength(1);
+    expect(page).toMatch(/tonightSnapshot=\{tonightSnapshotsByTent\[t\.id\]\}/);
   });
 
   it("uses a newer Quick Log diary capture, as the Dashboard does (Codex P2)", () => {
@@ -310,7 +315,7 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     render(
       <TentEnvironmentSnapshotStrip
         tentId="tent-1"
-        growId="grow-1"
+        tonightSnapshot={hook.state}
         stage="flower"
         sensorRows={[]}
         sensorStatus="success"

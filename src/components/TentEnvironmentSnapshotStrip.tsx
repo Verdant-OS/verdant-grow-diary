@@ -15,12 +15,17 @@ import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference"
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
 import { tentsListCanonicalVpd, tentsListDiarySnapshotRows } from "@/lib/tentsListVpdRules";
-import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
+import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
 export interface TentEnvironmentSnapshotStripProps {
   tentId: string;
-  /** The tent's grow, for the Dashboard's diary-inclusive snapshot (#2268). */
-  growId?: string | null;
+  /**
+   * The tent's Dashboard diary-inclusive snapshot (`useLatestSensorSnapshotsByTent`),
+   * read once at page level and passed down, never fetched per card (#2268;
+   * Codex P2 on #2303 at 0c19a9e0). Idle when the page has none for this tent.
+   */
+  tonightSnapshot?: SnapshotState;
   stage: string | null | undefined;
   sensorRows: readonly BuildTentSnapshotInput[];
   sensorStatus: TentSensorReadStatus;
@@ -31,9 +36,11 @@ export interface TentEnvironmentSnapshotStripProps {
   manualUnavailableReason?: TentManualSnapshotUnavailableReason | null;
 }
 
+const IDLE_SNAPSHOT: SnapshotState = { status: "idle", snapshot: EMPTY_SNAPSHOT };
+
 export default function TentEnvironmentSnapshotStrip({
   tentId,
-  growId = null,
+  tonightSnapshot = IDLE_SNAPSHOT,
   stage,
   sensorRows,
   sensorStatus,
@@ -43,9 +50,6 @@ export default function TentEnvironmentSnapshotStrip({
   manualStatus,
   manualUnavailableReason,
 }: TentEnvironmentSnapshotStripProps) {
-  // The same tent-scoped, diary-inclusive snapshot the Dashboard and Tent
-  // Detail read (one shared query), so the list's VPD sees the same evidence.
-  const tonightSnapshot = useLatestSensorSnapshot(growId, [tentId]);
   const selection = selectTentEnvironmentSnapshotFallback({
     sensorRows,
     sensorStatus,

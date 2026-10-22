@@ -807,22 +807,14 @@ describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)"
     expect(() => new URL(BAD_URL)).toThrow();
   });
 
-  it("a malformed credential-bearing --mqtt-url through connectMqtt exits 2 and never rejects", async () => {
-    const thrown = Object.assign(new TypeError("Invalid URL"), {
-      code: "ERR_INVALID_URL",
-      input: BAD_URL,
-    });
-    const mod = {
-      connect: vi.fn(() => {
-        throw thrown;
-      }),
-    };
+  it("a malformed credential-bearing --mqtt-url is refused before connect, logging no configuration (Codex P1 at 95f5dfe7)", async () => {
+    const mod = { connect: vi.fn() };
     const exit = vi.fn();
     const { lines, restore } = capture();
     try {
       await expect(
         main(
-          ["--mqtt-url", BAD_URL],
+          ["--mqtt-url", BAD_URL, "--topic", `topic/${USER}/${PASS}`],
           {},
           {
             connect: (f, e) => connectMqtt(f, e, async () => mod),
@@ -833,10 +825,10 @@ describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)"
     } finally {
       restore();
     }
-    expect(mod.connect).toHaveBeenCalledTimes(1);
+    expect(mod.connect).not.toHaveBeenCalled();
     expect(exit).toHaveBeenCalledTimes(1);
     expect(exit).toHaveBeenCalledWith(2);
-    expect(lines.some((l) => l.includes("mqtt_connect_failed"))).toBe(true);
+    expect(lines).toEqual(["[ecowitt-forwarder] refused: --mqtt-url is not a valid URL."]);
     for (const l of lines) {
       expect(l).not.toContain(USER);
       expect(l).not.toContain(PASS);

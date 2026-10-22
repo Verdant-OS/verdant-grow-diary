@@ -1189,6 +1189,15 @@ export async function main(
   const env = readEnv(processEnv);
   setConfiguredSecrets(configuredSecretValues(flags, env));
 
+  // An unparseable broker URL hides its credentials from extraction, so no
+  // configuration string can be proven redacted: refuse with a value-free
+  // line before anything else is logged (Codex P1 on #2335 at 95f5dfe7).
+  if (!URL.canParse(flags.mqttUrl)) {
+    console.error("[ecowitt-forwarder] refused: --mqtt-url is not a valid URL.");
+    deps.exit(2);
+    return;
+  }
+
   if (flags.live) {
     const problems = liveConfigProblems(env);
     if (problems.length > 0) {

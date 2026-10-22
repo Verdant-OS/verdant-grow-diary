@@ -181,6 +181,28 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(label).not.toMatch(/Live/i);
   });
 
+  it("grades a same-instant VPD from another source with its own provenance (Codex P1 at be0fe2f5)", () => {
+    // Stored rows: a fresh live CO2-only reading. Diary: 80°F/50% at exactly the same instant.
+    const t = at(0.05);
+    const stored = [row("co2_ppm", 800, t, "live")];
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts: t,
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    };
+    hook.state = { status: "ok", snapshot: diary };
+    expect(dashboardVpd(stored, { status: "ok", snapshot: diary })?.value).toBeCloseTo(1.75, 2);
+    const vpd = renderStrip(stored);
+    expect(vpd).toHaveTextContent("1.75");
+    // A shared timestamp is not a shared capture: the manual VPD keeps its own label.
+    const label = screen.getByTestId("tents-list-metric-status-tent-1-vpd").textContent ?? "";
+    expect(label).toMatch(/Manual/);
+    expect(label).not.toMatch(/Live/i);
+  });
+
   it("marks an older live VPD stale even beside a fresh live capture (Codex P1)", () => {
     const rows = [
       row("temperature_c", (80 - 32) / 1.8, at(2), "live"),

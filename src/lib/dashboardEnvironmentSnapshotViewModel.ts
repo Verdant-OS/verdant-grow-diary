@@ -290,20 +290,26 @@ export function buildTentSnapshotView(
     options.canonicalVpd != null && Number.isFinite(options.canonicalVpd.kpa)
       ? options.canonicalVpd
       : null;
-  const canonicalRejected = canonical?.rejected === true;
-  const useCanonicalVpd =
-    canonical !== null && !canonicalRejected && sameInstant(canonical.capturedAt, snap.ts);
-  // The capture gate rejected the cohort's own capture: its stored VPD is the
-  // rejected reading and must not fall back to "ok" (Codex P1 at 108e3eab).
-  const cohortVpdRejected =
-    canonical !== null && canonicalRejected && sameInstant(canonical.capturedAt, snap.ts);
-  const vpdKpa = useCanonicalVpd ? canonical.kpa : snap.vpd;
-
   // Source resolution is strict across the whole latest timestamp. A mixed
   // or unknown cohort stays visible but is never promoted to healthy/live.
   // `pi_bridge` remains the one explicit legacy alias for physical live
   // readings; diagnostics carrying that label are classified as demo first.
   const provenance = classifyLatestGroupProvenance(latestRows);
+  const canonicalRejected = canonical?.rejected === true;
+  // The canonical VPD is the cohort's own capture only when it shares both the
+  // instant and the source. A matching timestamp from another source (a manual
+  // pair beside a live CO2-only row) is graded with its own provenance
+  // (Codex P1 on #2303 at be0fe2f5).
+  const sameCapture =
+    canonical !== null &&
+    sameInstant(canonical.capturedAt, snap.ts) &&
+    canonical.source !== null &&
+    canonical.source === provenance;
+  const useCanonicalVpd = sameCapture && !canonicalRejected;
+  // The capture gate rejected the cohort's own capture: its stored VPD is the
+  // rejected reading and must not fall back to "ok" (Codex P1 at 108e3eab).
+  const cohortVpdRejected = sameCapture && canonicalRejected;
+  const vpdKpa = useCanonicalVpd && canonical ? canonical.kpa : snap.vpd;
   const canonicalSource: SensorReadingSource | null =
     provenance === "live" || provenance === "manual" || provenance === "csv"
       ? provenance
@@ -344,7 +350,7 @@ export function buildTentSnapshotView(
     useCanonicalVpd && typeof vpdKpa === "number" && !classifyManualMetric("vpd_kpa", vpdKpa).valid;
   // A VPD Tonight derived from a CSV capture is historical context on this
   // path too, never a healthy cue (Codex P1 on #2303 at 3d1e5800).
-  const canonicalVpdHistorical = useCanonicalVpd && canonical.source === "csv";
+  const canonicalVpdHistorical = useCanonicalVpd && canonical?.source === "csv";
   const invalid =
     flaggedInvalid ||
     canonicalVpdInvalid ||

@@ -23,6 +23,7 @@ import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import {
   rowCaptureRef,
   snapshotCaptureRef,
+  sensorCaptureRef,
   type SensorCaptureRef,
 } from "@/lib/sensorCaptureRefRules";
 
@@ -249,6 +250,22 @@ function snapshotMetricSourceProven(
   return ref != null && normalizeSensorSource(ref.source) === source;
 }
 
+/**
+ * The source of one snapshot metric: its own row's source when the snapshot
+ * carries that metric's exact ref (a mixed-source snapshot must not lend its
+ * aggregate source to every metric — Codex P1 on #2303 at 4a304fe3). A diary
+ * record, or a legacy snapshot without refs, keeps the record's own source.
+ */
+function snapshotMetricSource(
+  snap: TonightSnapshot,
+  key: TonightMetricKey,
+  aggregate: SensorSource,
+): SensorSource {
+  if (snap.source === "diary" || snap.diary_evidence_ref) return aggregate;
+  const ref = snap.metric_refs?.[key];
+  return ref ? normalizeSensorSource(ref.source) : aggregate;
+}
+
 function parseAt(value: string | null | undefined): { at: string; epochMs: number } | null {
   if (typeof value !== "string" || value.length === 0) return null;
   const epochMs = Date.parse(value);
@@ -400,6 +417,25 @@ function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | nu
 }
 
 /**
+ * Whether a snapshot metric's own capture carries a sibling row the snapshot
+ * read dropped for intake quality. Matched by record identity when both are
+ * known, else by instant (ambiguous captures are withheld). Such a capture is
+ * never shown as current, as the raw-row capture gate already decides for the
+ * tents list and Tent Detail (Codex P1 on #2303 at 4a304fe3).
+ */
+function snapshotCaptureHasRejectedSibling(snap: TonightSnapshot, key: TonightMetricKey): boolean {
+  const rejected = snap.rejected_quality_rows ?? [];
+  if (rejected.length === 0) return false;
+  const ref = snapshotCaptureRef(snap, key);
+  const atMs = Date.parse(snap.metric_refs?.[key]?.captured_at ?? snap.ts ?? "");
+  return rejected.some((row) => {
+    const rowRef = sensorCaptureRef(row.captured_at, row.source);
+    if (ref && rowRef) return ref === rowRef;
+    return Number.isFinite(atMs) && Date.parse(row.captured_at) === atMs;
+  });
+}
+
+/**
  * Newest finite candidate per metric, each keeping its own source and capture
  * time. A newer RH-only record never renews temperature. VPD with no stored
  * reading is calculated from temperature and RH (same capture time first); a
@@ -448,12 +484,15 @@ export function buildTonightTentMetrics(input: {
       typeof snapValue === "number" &&
       Number.isFinite(snapValue)
     ) {
+      const metricSource = snapshotCaptureHasRejectedSibling(snap, key)
+        ? "invalid"
+        : snapshotMetricSource(snap, key, snapSource);
       candidates.push({
         value: snapValue,
-        source: snapSource,
+        source: metricSource,
         ...snapWhen,
         origin: 1,
-        ownSource: snapshotMetricSourceProven(snap, key, snapSource),
+        ownSource: snapshotMetricSourceProven(snap, key, metricSource),
         refs: [snapshotCaptureRef(snap, key)],
         ...(isDiarySource(snap.source) ? { historical: true as const } : {}),
       });

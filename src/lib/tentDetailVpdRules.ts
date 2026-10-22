@@ -3,6 +3,7 @@ import { classifyManualMetric, isHumidityStuckExtreme } from "@/lib/sensorTruthR
 import {
   captureRefsKnown,
   rowCaptureRef,
+  sensorCaptureRef,
   snapshotCaptureRef,
   type SensorCaptureRef,
 } from "@/lib/sensorCaptureRefRules";
@@ -15,6 +16,12 @@ const CURRENT_SOURCES = new Set(["live", "manual"]);
 export interface TentDetailVpdObservation extends DisplayedVpdObservation {
   /** True only for VPD derived from temperature and RH (no stored vpd_kpa). */
   calculated: boolean;
+  /**
+   * Tonight's own provenance label when the normalized source would misname
+   * it: a generic diary snapshot is "Diary note", not a manual reading
+   * (Codex P2 on #2303 at 4a304fe3).
+   */
+  sourceLabel?: string;
 }
 
 /** Temperature and RH observed at one capture instant. */
@@ -68,6 +75,12 @@ export function tentDetailCaptureClimate(
         diary_evidence_ref?: { id: string } | null;
         diary_capture_id?: string | null;
         metric_refs?: Partial<Record<string, { captured_at: string; source: string }>>;
+        rejected_quality_rows?: readonly {
+          metric: string;
+          value: number | string | null;
+          captured_at: string;
+          source: string;
+        }[];
       }
     | null
     | undefined,
@@ -100,6 +113,19 @@ export function tentDetailCaptureClimate(
       rh: snapshot.rh,
       ref: snapshotCaptureRef(snapshot, "rh"),
     });
+    // Siblings the snapshot read dropped for intake quality reject their own
+    // capture here too, as they do on the raw-row path (Codex P1 on #2303 at
+    // 4a304fe3). Their number is never used as a value.
+    for (const row of snapshot.rejected_quality_rows ?? []) {
+      if (row.metric !== "temperature_c" && row.metric !== "humidity_pct") continue;
+      out.push({
+        at: row.captured_at,
+        temp: null,
+        rh: null,
+        untrusted: true,
+        ref: sensorCaptureRef(row.captured_at, row.source),
+      });
+    }
   }
   return out;
 }
@@ -317,7 +343,17 @@ export function resolveTentDetailVpd(input: {
     return { ...input.existing, calculated: false };
   }
   const rejectionApplies = rejectedMs === null || tonightMs === null || tonightMs <= rejectedMs;
-  if (rejectionApplies && climateRejected) {
+  // Tonight's candidate is held to the same identity test as `existing`: when
+  // the rejected metrics and Tonight's own records are all known and disjoint,
+  // Tonight is a different capture and keeps its own truth check below
+  // (Codex P2 on #2303 at 4a304fe3).
+  const tonightRefs = tonight?.captureRefs;
+  const tonightIndependent =
+    input.rejectedRefs !== undefined &&
+    captureRefsKnown(rejectedClimateRefs) &&
+    captureRefsKnown(tonightRefs) &&
+    !tonightRefs.some((ref) => rejectedClimateRefs.includes(ref));
+  if (rejectionApplies && climateRejected && !tonightIndependent) {
     return existingOrNothing();
   }
   if (tonight?.state === "invalid") {
@@ -342,6 +378,9 @@ export function resolveTentDetailVpd(input: {
         tonight.historical === true ||
         isStale(tonight.capturedAt, input.nowMs, undefined, source),
       calculated: tonight.calculated,
+      ...(tonight.historical === true && tonight.sourceLabel
+        ? { sourceLabel: tonight.sourceLabel }
+        : {}),
     };
   }
   // Tonight's candidate failed sensor truth. The tent page's own observation

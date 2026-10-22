@@ -237,9 +237,15 @@ export async function fetchLatestSensorSnapshotsByTent(
     // settles at least one tent unless the row ceiling splits the quota;
     // then the rest fall back to their own reads (Codex P2 on #2303 at
     // 0994ea2a).
-    let pending = unique;
+    // A window that settles no tent is split in half rather than fanned out
+    // to per-tent reads: under distributed ceiling pressure every partition
+    // can sit below the exactness threshold, and two half windows fit the
+    // ceiling again (Codex P2 on #2303 at 4a304fe3). Only a single tent that
+    // still makes no progress takes its own read.
+    const sensorQueue: string[][] = [unique];
     try {
-      while (pending.length > 0) {
+      while (sensorQueue.length > 0) {
+        const pending = sensorQueue.shift()!;
         const windowLimit = sensorWindowLimit(pending.length, SENSOR_ROWS_PER_TENT);
         const { data, error } = await effectiveSensorReadingsQuery()
           .select("*")
@@ -270,11 +276,17 @@ export async function fetchLatestSensorSnapshotsByTent(
           staleByTent.set(tentId, snap);
           needDiary.push(tentId);
         }
+        if (partition.fallback.length === 0) continue;
         if (partition.fallback.length === pending.length) {
-          partition.fallback.forEach((tentId) => fallback.add(tentId));
-          break;
+          if (pending.length > 1) {
+            const mid = Math.ceil(pending.length / 2);
+            sensorQueue.push(pending.slice(0, mid), pending.slice(mid));
+          } else {
+            fallback.add(pending[0]);
+          }
+          continue;
         }
-        pending = partition.fallback;
+        sensorQueue.push(partition.fallback);
       }
     } catch {
       // A failure on any page fails the whole sensor read, as one window did:
@@ -294,10 +306,19 @@ export async function fetchLatestSensorSnapshotsByTent(
       if (!growId) {
         for (const tentId of needDiary) result[tentId] = staleByTent.get(tentId) ?? EMPTY_SNAPSHOT;
       } else {
-        let pendingDiary = needDiary;
-        let pageSize = DIARY_EVIDENCE_PAGE_SIZE;
+        // Same rule for the diary windows: once the deepest window is capped
+        // by the row ceiling and settles no tent, split the set in half rather
+        // than give up, so bulk and single reads stay equivalent (Codex P2 on
+        // #2303 at 4a304fe3).
+        const diaryQueue: { tents: string[]; pageSize: number }[] = [
+          { tents: needDiary, pageSize: DIARY_EVIDENCE_PAGE_SIZE },
+        ];
+        let pendingDiary: string[] = [];
         try {
-          while (pendingDiary.length > 0) {
+          while (diaryQueue.length > 0) {
+            const item = diaryQueue.shift()!;
+            pendingDiary = item.tents;
+            const pageSize = item.pageSize;
             const windowLimit = diaryWindowLimit(pendingDiary.length, pageSize);
             const diaryRows = await readDiaryEvidenceCandidates(growId, pendingDiary, windowLimit);
             const windowFull = diaryRows.length > windowLimit;
@@ -331,18 +352,30 @@ export async function fetchLatestSensorSnapshotsByTent(
                 unsettled.push(tentId);
               }
             }
+            if (unsettled.length === 0) continue;
             const deepest = pageSize >= DIARY_EVIDENCE_MAX_CANDIDATES;
             if (unsettled.length === scope.length && deepest) {
-              unsettled.forEach((tentId) => fallback.add(tentId));
-              break;
+              if (unsettled.length > 1) {
+                const mid = Math.ceil(unsettled.length / 2);
+                diaryQueue.push(
+                  { tents: unsettled.slice(0, mid), pageSize },
+                  { tents: unsettled.slice(mid), pageSize },
+                );
+              } else {
+                fallback.add(unsettled[0]);
+              }
+              continue;
             }
-            pendingDiary = unsettled;
-            pageSize = Math.min(pageSize * 2, DIARY_EVIDENCE_MAX_CANDIDATES);
+            diaryQueue.push({
+              tents: unsettled,
+              pageSize: Math.min(pageSize * 2, DIARY_EVIDENCE_MAX_CANDIDATES),
+            });
           }
         } catch {
           // A failed diary read is unavailable for the per-tent read as well;
           // no per-tent read could repair it, so none is started.
           for (const tentId of pendingDiary) result[tentId] = null;
+          for (const item of diaryQueue) for (const tentId of item.tents) result[tentId] = null;
         }
       }
     }

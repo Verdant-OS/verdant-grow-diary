@@ -17,6 +17,7 @@ import type {
   CanonicalTentVpd,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import { sensorCaptureRef, snapshotCaptureRef } from "@/lib/sensorCaptureRefRules";
+import { normalizeSensorSource, type SensorSource } from "@/lib/sensor/sensorSourceRules";
 
 /** Label for a VPD from a generic diary snapshot: historical, not current. */
 export { DIARY_SOURCE_LABEL } from "@/lib/tonightTentHomeViewModel";
@@ -30,6 +31,28 @@ const SNAPSHOT_ROW_SOURCE: Partial<Record<string, string>> = {
   sim: "sim",
   unverified: "unverified",
 };
+
+/** Canonical sources a raw row source normalizes to (e.g. `pi_bridge` → live). */
+const CANONICAL_ROW_SOURCE: Partial<Record<SensorSource, string>> = {
+  live: "live",
+  manual: "manual",
+  csv: "csv",
+  demo: "sim",
+};
+
+/**
+ * Row source for a raw sensor-row source: known snapshot tokens first, then
+ * the canonical resolver, so a proven `pi_bridge` row stays Live here as it
+ * does on the raw-row path (Codex P2 on #2303 at 4a304fe3). Anything else is
+ * `unverified`, which never reads as healthy.
+ */
+function rawRowSource(raw: string | null | undefined): string {
+  return (
+    SNAPSHOT_ROW_SOURCE[raw ?? ""] ??
+    CANONICAL_ROW_SOURCE[normalizeSensorSource(raw)] ??
+    "unverified"
+  );
+}
 import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { tentDetailCaptureClimate, tonightCaptureRejected } from "@/lib/tentDetailVpdRules";
 import {
@@ -144,9 +167,7 @@ export function tentsListDiarySnapshotRows(
     // which never reads as healthy (Codex P1 on #2303 at 0994ea2a).
     const refs = (snap as { metric_refs?: Partial<Record<string, { source: string }>> })
       .metric_refs;
-    const rowSource = refs
-      ? (SNAPSHOT_ROW_SOURCE[refs[key]?.source ?? ""] ?? "unverified")
-      : source;
+    const rowSource = refs ? (refs[key] ? rawRowSource(refs[key]?.source) : "unverified") : source;
     rows.push({
       metric,
       value,
@@ -171,7 +192,7 @@ export function tentsListDiarySnapshotRows(
       ts: rejected.captured_at,
       captured_at: rejected.captured_at,
       tent_id: tentId,
-      source: SNAPSHOT_ROW_SOURCE[rejected.source] ?? "unverified",
+      source: rawRowSource(rejected.source),
       quality: rejected.quality,
       ...(captureRef ? { capture_ref: captureRef } : {}),
     });

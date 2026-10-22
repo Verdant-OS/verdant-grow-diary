@@ -263,7 +263,8 @@ export default function TentDetail() {
     },
   });
   const fallbackVpdSourceLabel = vpdFromFallback
-    ? formatSensorSourceLabel({ source: headerVpdObservation.source })
+    ? (headerVpdObservation.sourceLabel ??
+      formatSensorSourceLabel({ source: headerVpdObservation.source }))
     : null;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);

@@ -111,7 +111,9 @@ function tonightVpdPassesTruth(
  *   does not read.
  * - The tent page's own observation is newer than Tonight's capture (a Quick
  *   Log manual VPD, which Tonight does not read): keep it rather than replace
- *   newer evidence with older (Codex P2 on #2303).
+ *   newer evidence with older (Codex P2 on #2303). At the same instant a
+ *   direct observation also beats a VPD Tonight calculated, as the shared
+ *   merge gives manual evidence precedence (Codex P2 on #2303 at 85ec1e78).
  * - The tent's sensor-truth check rejected the stored temperature, RH or VPD
  *   at a capture no older than Tonight's, or Tonight's chosen VPD fails
  *   realism on its own value, its calculation inputs or its capture's
@@ -136,7 +138,11 @@ export function resolveTentDetailVpd(input: {
   const { tonight } = input;
   const tonightMs = tonight ? instantMs(tonight.capturedAt) : null;
   const existingMs = input.existing.value === null ? null : instantMs(input.existing.capturedAt);
-  if (existingMs !== null && tonightMs !== null && existingMs > tonightMs) {
+  if (
+    existingMs !== null &&
+    tonightMs !== null &&
+    (existingMs > tonightMs || (existingMs === tonightMs && tonight?.calculated === true))
+  ) {
     return { ...input.existing, calculated: false };
   }
   const rejectedMs = instantMs(input.rejectedCapturedAt);

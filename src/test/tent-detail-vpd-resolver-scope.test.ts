@@ -46,6 +46,35 @@ describe("resolveTentDetailVpd keeps newer evidence", () => {
     expect(out.calculated).toBe(false);
   });
 
+  it("keeps a direct manual VPD over a calculated Tonight value at the same instant (Codex P2 at 85ec1e78)", () => {
+    const manual = { value: 1.1, capturedAt: at(2), source: "manual" as const, stale: false };
+    const out = resolveTentDetailVpd({
+      tonight: tonightAt(2),
+      existing: manual,
+      rejectedMetrics: [],
+      rejectedCapturedAt: null,
+      contributors: CONTRIBUTORS,
+      captureClimate: [],
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.1);
+    expect(out.calculated).toBe(false);
+  });
+
+  it("lets a direct Tonight VPD stand at the same instant", () => {
+    const manual = { value: 1.1, capturedAt: at(2), source: "manual" as const, stale: false };
+    const out = resolveTentDetailVpd({
+      tonight: { ...tonightAt(2), value: 1.75, calculated: false },
+      existing: manual,
+      rejectedMetrics: [],
+      rejectedCapturedAt: null,
+      contributors: null,
+      captureClimate: [],
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.75);
+  });
+
   it("still prefers Tonight when it is the newer capture", () => {
     const manual = { value: 1.1, capturedAt: at(5), source: "manual" as const, stale: false };
     const out = resolveTentDetailVpd({

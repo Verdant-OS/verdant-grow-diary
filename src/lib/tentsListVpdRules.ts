@@ -16,6 +16,7 @@ import type {
   BuildTentSnapshotInput,
   CanonicalTentVpd,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { buildTonightTentMetrics, type TonightSensorRow } from "@/lib/tonightTentHomeViewModel";
 
 type TonightSnapshotInput = Parameters<typeof buildTonightTentMetrics>[0]["snapshot"];
@@ -52,14 +53,18 @@ export function tentsListCanonicalVpd(
  * Environment Check) when the tent has no stored sensor rows and no manual
  * snapshot card, so the list shows the Dashboard's evidence instead of
  * "No sensor data yet" (Codex P2 on #2303 at 69de43db). A diary capture is
- * manual evidence; anything else returns no rows.
+ * manual evidence; anything else returns no rows. A capture whose timestamp
+ * the shared sensor-truth classifier rejects (missing, unparseable or in the
+ * future beyond the allowed skew) yields no rows either, as Tonight rejects
+ * it (Codex P1 on #2303 at 85ec1e78).
  */
 export function tentsListDiarySnapshotRows(
   snapshot: TonightSnapshotInput,
   tentId: string,
+  nowMs: number,
 ): BuildTentSnapshotInput[] {
   const snap = snapshot.status === "ok" ? snapshot.snapshot : null;
-  if (!snap || !snap.ts || !Number.isFinite(Date.parse(snap.ts))) return [];
+  if (!snap || !snap.ts || classifySnapshotTimestamp(snap.ts, nowMs) !== "ok") return [];
   if (snap.source !== "diary" && !snap.diary_evidence_ref) return [];
   const rows: BuildTentSnapshotInput[] = [];
   const push = (metric: string, value: number | null) => {

@@ -314,8 +314,15 @@ export function buildTentSnapshotView(
   // (review hint for the quality card), but a missing metric is
   // unknown/no-data — it must not relabel an otherwise-honest
   // Stale/Manual/CSV snapshot as Invalid.
+  // A canonical VPD from the cohort's own capture is graded here, not in
+  // ownCaptureVpdMetric, so it needs the same shared realism range: 3–5 kPa
+  // passes evaluateSensorQuality's 0..5 but sensor truth rejects it
+  // (Codex P1 on #2303 at 85ec1e78).
+  const canonicalVpdInvalid =
+    useCanonicalVpd && typeof vpdKpa === "number" && !classifyManualMetric("vpd_kpa", vpdKpa).valid;
   const invalid =
     flaggedInvalid ||
+    canonicalVpdInvalid ||
     quality.suspiciousFields.some((f) => typeof snap[f as keyof typeof snap] === "number");
   const canAssessStage =
     provenanceEligible && capturedAt !== null && !stale && !invalid && !flaggedDegraded;
@@ -352,7 +359,11 @@ export function buildTentSnapshotView(
     if (value === null) {
       status = "unknown";
       statusLabel = "Unknown";
-    } else if (rowFlag === "invalid" || quality.suspiciousFields.includes(suspiciousKey)) {
+    } else if (
+      rowFlag === "invalid" ||
+      quality.suspiciousFields.includes(suspiciousKey) ||
+      (key === "vpd" && canonicalVpdInvalid)
+    ) {
       status = "invalid";
       statusLabel = "Invalid";
     } else if (stale || rowFlag === "stale") {

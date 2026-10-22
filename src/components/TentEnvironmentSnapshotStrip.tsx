@@ -143,11 +143,34 @@ export default function TentEnvironmentSnapshotStrip({
   // No stored rows and no manual card: the Dashboard's diary-inclusive
   // snapshot may still hold a Quick Log or Environment Check capture for this
   // tent, which is what the Dashboard shows (Codex P2 on #2303 at 69de43db).
+  // Until that read resolves, say so rather than claiming absence; a failed
+  // read is unavailable, not empty (Codex P2 on #2303 at 85ec1e78).
+  if (selection.kind === "empty" && tonightSnapshot.status === "loading") {
+    return (
+      <p
+        className="text-xs text-muted-foreground animate-pulse"
+        data-testid={`tents-list-sensor-loading-${tentId}`}
+      >
+        Loading sensor data…
+      </p>
+    );
+  }
+  if (selection.kind === "empty" && tonightSnapshot.status === "unavailable") {
+    return (
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid={`tents-list-sensor-unavailable-${tentId}`}
+      >
+        Sensor data unavailable — readings couldn't be loaded.
+      </p>
+    );
+  }
   const rows =
     selection.kind === "empty"
       ? tentsListDiarySnapshotRows(
           { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
           tentId,
+          now,
         )
       : selection.rows;
   if (rows.length === 0) {

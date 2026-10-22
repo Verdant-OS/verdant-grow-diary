@@ -23,7 +23,7 @@ vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
 
 import TentEnvironmentSnapshotStrip from "@/components/TentEnvironmentSnapshotStrip";
 import { buildTonightTentMetrics } from "@/lib/tonightTentHomeViewModel";
-import { tentsListCanonicalVpd } from "@/lib/tentsListVpdRules";
+import { tentsListCanonicalVpd, tentsListDiarySnapshotRows } from "@/lib/tentsListVpdRules";
 
 const NOW = new Date("2026-10-22T03:00:00.000Z");
 const at = (hoursAgo: number) => new Date(NOW.getTime() - hoursAgo * 3_600_000).toISOString();
@@ -56,6 +56,22 @@ function renderStrip(rows: ReturnType<typeof row>[]) {
     />,
   );
   return screen.getByTestId("tents-list-metric-tent-1-vpd");
+}
+
+function renderEmptyStrip() {
+  render(
+    <TentEnvironmentSnapshotStrip
+      tentId="tent-1"
+      growId="grow-1"
+      stage="flower"
+      sensorRows={[]}
+      sensorStatus="success"
+      now={NOW.getTime()}
+      temperatureUnit="fahrenheit"
+      manualCards={[]}
+      manualStatus="success"
+    />,
+  );
 }
 
 function dashboardVpd(
@@ -198,6 +214,56 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-sensor-source-tent-1")).toHaveTextContent(/Manual/);
     expect(screen.queryByTestId("tents-list-sensor-empty-tent-1")).toBeNull();
   });
+
+  it("marks a diary-only direct VPD outside the shared range invalid (Codex P1 at 85ec1e78)", () => {
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts: at(0.5),
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      vpd: 4.0,
+      tent_id: "tent-1",
+    };
+    hook.state = { status: "ok", snapshot: diary };
+    expect(dashboardVpd([], { status: "ok", snapshot: diary })?.value).toBe(4.0);
+    const vpd = renderStrip([]);
+    expect(vpd).toHaveAttribute("data-status", "invalid");
+    expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(/Invalid/);
+  });
+
+  it("shows nothing for a diary capture stamped in the future (Codex P1 at 85ec1e78)", () => {
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts: at(-2),
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    };
+    hook.state = { status: "ok", snapshot: diary };
+    expect(dashboardVpd([], { status: "ok", snapshot: diary })?.state).not.toBe("value");
+    expect(
+      tentsListDiarySnapshotRows({ status: "ok", snapshot: diary }, "tent-1", NOW.getTime()),
+    ).toEqual([]);
+    renderEmptyStrip();
+    expect(screen.getByTestId("tents-list-sensor-empty-tent-1")).toHaveTextContent(
+      "No sensor data yet",
+    );
+  });
+
+  it.each([
+    ["loading", "tents-list-sensor-loading-tent-1", /Loading sensor data/],
+    ["unavailable", "tents-list-sensor-unavailable-tent-1", /Sensor data unavailable/],
+  ] as const)(
+    "keeps the %s state visible instead of claiming no sensor data (Codex P2 at 85ec1e78)",
+    (status, testId, copy) => {
+      hook.state = { status, snapshot: EMPTY_SNAPSHOT };
+      renderEmptyStrip();
+      expect(screen.getByTestId(testId)).toHaveTextContent(copy);
+      expect(screen.queryByTestId("tents-list-sensor-empty-tent-1")).toBeNull();
+    },
+  );
 
   it("still says no sensor data when there are no rows and no diary capture", () => {
     render(

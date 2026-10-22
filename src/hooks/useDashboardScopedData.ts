@@ -25,6 +25,8 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { formatActionReasonForDisplay } from "@/lib/actionQueueRowView";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export async function fetchDashboardDiaryRows(growId: string) {
@@ -127,7 +129,8 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
           kind: "diary",
           ts: d.entry_at ?? "",
           title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
-          detail: d.note,
+          // Action Queue trace notes copy "Reading at <ISO>." from the alert reason.
+          detail: d.note ? localizeReadingAtTimestamps(d.note) : d.note,
         }));
 
         const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
@@ -165,7 +168,7 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
             kind: "action_event",
             ts: e.created_at,
             title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
-            detail: e.note ?? parent?.reason ?? null,
+            detail: e.note ?? formatActionReasonForDisplay(parent?.reason),
             href: `/actions/${e.action_queue_id}`,
           };
         });

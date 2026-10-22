@@ -598,6 +598,10 @@ export default function Auth() {
 
             <TabsContent value="signin">
               <p className="text-xs text-muted-foreground mb-3">
+                Sign-in is kept separately in each tab. If you opened a new tab, sign in here or
+                return to your signed-in tab.
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
                 Use the email and password you used to create your Verdant account.
               </p>
               <form onSubmit={signIn} noValidate className="grid gap-3" aria-label="Sign in">

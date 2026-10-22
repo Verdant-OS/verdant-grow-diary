@@ -20,7 +20,7 @@
  */
 
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
-import { resolveEcPpm500Pair } from "./ecPpm500PairRules";
+import { isExplicitNegativeDecimal, resolveEcPpm500Pair } from "./ecPpm500PairRules";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 
 // ---------------------------------------------------------------------------
@@ -160,6 +160,9 @@ export type FeedingFormFailureReason =
   | "products:contains_secret"
   | "ec_ppm:mismatch"
   | "numeric:invalid"
+  | "ec_in:negative"
+  | "ec_out:negative"
+  | "runoff_ec:negative"
   | FeedingNumericRangeReason;
 
 /**
@@ -337,6 +340,15 @@ export function buildFeedingFormPayload(input: FeedingFormMapInput): FeedingForm
     ["runoffEc", "runoffPpm", "runoff_ec"],
   ] as const;
   for (const [ecKey, ppmKey, payloadKey] of ecPairs) {
+    if (isExplicitNegativeDecimal(input.form[ecKey])) {
+      const reason =
+        payloadKey === "ec_in"
+          ? "ec_in:negative"
+          : payloadKey === "ec_out"
+            ? "ec_out:negative"
+            : "runoff_ec:negative";
+      return { ok: false, reason };
+    }
     const resolved = resolveEcPpm500Pair(input.form[ecKey], input.form[ppmKey]);
     if (resolved.status === "invalid") return { ok: false, reason: "numeric:invalid" };
     if (resolved.status === "mismatch") return { ok: false, reason: "ec_ppm:mismatch" };
@@ -396,6 +408,12 @@ export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | str
       return "Product entries must not contain tokens or secrets.";
     case "numeric:invalid":
       return "Optional metrics must be valid numbers or left blank.";
+    case "ec_in:negative":
+      return "EC can't be negative.";
+    case "ec_out:negative":
+      return "Output EC can't be negative.";
+    case "runoff_ec:negative":
+      return "Runoff EC can't be negative.";
     case "ec_ppm:mismatch":
       return "EC and PPM must match the 500 scale. Re-enter either value.";
     case "ph:out_of_range":

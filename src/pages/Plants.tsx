@@ -873,7 +873,7 @@ export default function Plants() {
                     )}
                     {showDailyCheckBadge && !checkedToday && (
                       <div
-                        className="mt-2 flex flex-wrap items-center gap-1.5"
+                        className="mt-2 flex flex-wrap items-center gap-1.5 pr-28"
                         data-testid="plant-card-daily-check-actions"
                         data-plant-id={p.id}
                       >

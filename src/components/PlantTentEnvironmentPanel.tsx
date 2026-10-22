@@ -6,6 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
+import { usePlantManualEnvironmentReadings } from "@/hooks/usePlantManualEnvironmentReadings";
+import {
+  combinePlantEnvironmentReads,
+  mergePlantTentReadingsWithManualEvents,
+} from "@/lib/plantManualEnvironmentEventRules";
 import { useNowTick } from "@/hooks/useNowTick";
 import {
   buildPlantEnvironmentReadView,
@@ -53,9 +58,19 @@ export default function PlantTentEnvironmentPanel({
   const temperatureUnit = useTemperatureUnitPreference();
   const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
   const readingsQuery = usePlantTentLatestReadings(tentId ?? null);
-  const rows = enabled ? (readingsQuery.data ?? []) : [];
+  const manualQuery = usePlantManualEnvironmentReadings(tentId ?? null, plantId ?? null);
+  const rows = enabled
+    ? mergePlantTentReadingsWithManualEvents(readingsQuery.data ?? [], manualQuery.data ?? [])
+    : [];
+  // Both reads gate the panel: a pending, paused or failed manual read must
+  // not let older sensor rows present as current; Retry refetches both.
+  const environmentRead = combinePlantEnvironmentReads({
+    sensor: readingsQuery,
+    manual: manualQuery,
+    manualEnabled: enabled && !!plantId,
+  });
   const readView = buildPlantEnvironmentReadView({
-    ...readingsQuery,
+    ...environmentRead,
     enabled,
     hasCachedReadings: rows.length > 0,
   });
@@ -105,7 +120,7 @@ export default function PlantTentEnvironmentPanel({
                 variant="outline"
                 size="sm"
                 disabled={!readView.canRetry}
-                onClick={() => void readingsQuery.refetch()}
+                onClick={() => environmentRead.refetch()}
               >
                 Retry
               </Button>

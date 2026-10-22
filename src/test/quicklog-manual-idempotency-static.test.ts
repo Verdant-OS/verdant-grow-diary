@@ -173,6 +173,9 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
   const PAYLOAD = readFileSync(resolve(ROOT, "src/lib/quickLogV2SavePayload.ts"), "utf8");
   const HISTORY_DISCARD =
     SHEET.match(/ {2}async function handleDiscardHistoryDraft\(\) \{[\s\S]*?\n {2}\}/)?.[0] ?? "";
+  const UNREADABLE_WATER_CLEAR =
+    SHEET.match(/ {2}async function handleClearUnreadableWatering\(\) \{[\s\S]*?\n {2}\}/)?.[0] ??
+    "";
 
   it("payload builder requires and threads the key", () => {
     expect(PAYLOAD).toMatch(/p_idempotency_key: string/);
@@ -191,12 +194,12 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     // key; the corrected entry is a new logical submission), plus a first Water
     // rejection after its exact pending claim is cleared. An ambiguous
     // failure must never rotate.
-    // The separate, explicitly reviewed abandonment path is pinned below;
-    // exclude it from the existing completion/definitive-rejection contract.
+    // The two separate, explicitly reviewed abandonment paths are pinned below;
+    // exclude them from the existing completion/definitive-rejection contract.
     const rotations =
-      SHEET.replace(HISTORY_DISCARD, "").match(
-        /saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g,
-      ) ?? [];
+      SHEET.replace(HISTORY_DISCARD, "")
+        .replace(UNREADABLE_WATER_CLEAR, "")
+        .match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g) ?? [];
     expect(rotations).toHaveLength(5);
     expect(SHEET).toMatch(
       /trackQuickLogSuccess\("feed", \{ reused: result\.reused \}\);[\s\S]{0,300}saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/,
@@ -210,6 +213,33 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     expect(SHEET).toMatch(
       /const released = clearance\?\.status === "cleared";\s*if \(released\) \{\s*wateringRetrySubmissionRef\.current = null;\s*saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\);/,
     );
+  });
+
+  it("rotates after an unreadable Water clear only when a retry was active, then resets", () => {
+    expect(UNREADABLE_WATER_CLEAR).not.toBe("");
+    // Exactly one rotation, only after the grower explicitly clears an
+    // unreadable Water journal: the old key may have committed, so the next
+    // entry must not reuse it.
+    expect(
+      UNREADABLE_WATER_CLEAR.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g) ??
+        [],
+    ).toHaveLength(1);
+    expect(UNREADABLE_WATER_CLEAR).toMatch(
+      /if \(!ownerId \|\| !unreadableWaterClearAllowed \|\| saveInFlightRef\.current\) return;/,
+    );
+    expect(UNREADABLE_WATER_CLEAR).toMatch(
+      /if \(outcome === "still_blocked"\) \{\s*setLocalError\(QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED\);\s*return;\s*\}/,
+    );
+    expect(UNREADABLE_WATER_CLEAR).toMatch(
+      /if \(wateringRetrySubmissionRef\.current\) \{\s*saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\);\s*handleLogAnother\(\);\s*return;\s*\}/,
+    );
+    const rotation = UNREADABLE_WATER_CLEAR.indexOf(
+      "saveIdempotencyKeyRef.current = newQuickLogSaveKey()",
+    );
+    expect(rotation).toBeGreaterThan(
+      UNREADABLE_WATER_CLEAR.indexOf("clearUnreadablePendingQuickLogWatering(ownerId)"),
+    );
+    expect(rotation).toBeGreaterThan(UNREADABLE_WATER_CLEAR.indexOf('"still_blocked"'));
   });
 
   it("rotates an abandoned history draft only after guarded exact journal clearance", () => {

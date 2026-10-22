@@ -102,6 +102,7 @@ export default function Coach() {
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
+  const fileSelectSeqRef = useRef(0);
   const pendingCoachRequestRef = useRef<PendingAiCoachRequest | null>(null);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
@@ -278,30 +279,43 @@ export default function Coach() {
       // URL. A changed grow, question, mode, or photo receives a fresh key.
       let photoUrl = selectedRequest.photoUrl;
       if (mode === "diagnose" && photoFile && !photoUrl) {
+        const photoSeq = fileSelectSeqRef.current;
         const photoValidation = validatePlantProfilePhotoFile(photoFile);
-        const coachPhotoValidation = validateAiCoachPhotoFile(photoFile);
-        if (coachPhotoValidation.ok === false) {
+        const coachPhotoValidation = await validateAiCoachPhotoFile(photoFile);
+        const clearPhotoIfUnchanged = () => {
+          if (photoSeq !== fileSelectSeqRef.current) return;
           setPhotoFile(null);
           setPhotoPreviewStatus("empty");
+        };
+        if (coachPhotoValidation.ok === false) {
+          clearPhotoIfUnchanged();
           throw new Error(coachPhotoValidation.message);
         }
-        if (photoValidation.ok === false) {
-          setPhotoFile(null);
-          setPhotoPreviewStatus("empty");
+        const publishPhoto = async (path: string, options: { contentType: string }) => {
+          const { error } = await supabase.storage
+            .from("diary-photos")
+            .upload(path, photoFile, options);
+          if (error) throw error;
+          const { data: signed, error: sErr } = await supabase.storage
+            .from("diary-photos")
+            .createSignedUrl(path, 600);
+          if (sErr) throw sErr;
+          photoUrl = signed.signedUrl;
+          if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
+            pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+          }
+        };
+        if (coachPhotoValidation.mime === "image/gif") {
+          await publishPhoto(`${user.id}/coach/${Date.now()}.${coachPhotoValidation.extension}`, {
+            contentType: coachPhotoValidation.mime,
+          });
+        } else if (photoValidation.ok === false) {
+          clearPhotoIfUnchanged();
           throw new Error(photoValidation.message);
-        }
-        const path = `${user.id}/coach/${Date.now()}.${photoValidation.extension}`;
-        const { error } = await supabase.storage
-          .from("diary-photos")
-          .upload(path, photoFile, { contentType: photoValidation.mime });
-        if (error) throw error;
-        const { data: signed, error: sErr } = await supabase.storage
-          .from("diary-photos")
-          .createSignedUrl(path, 600);
-        if (sErr) throw sErr;
-        photoUrl = signed.signedUrl;
-        if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
-          pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+        } else {
+          await publishPhoto(`${user.id}/coach/${Date.now()}.${photoValidation.extension}`, {
+            contentType: photoValidation.mime,
+          });
         }
       }
       invocationStarted = true;
@@ -393,15 +407,17 @@ export default function Coach() {
     }
   }
 
-  function handleFile(f: File | null) {
+  async function handleFile(f: File | null) {
     if (!f) return;
+    const seq = ++fileSelectSeqRef.current;
     const validation = validatePlantProfilePhotoFile(f);
-    const coachValidation = validateAiCoachPhotoFile(f);
+    const coachValidation = await validateAiCoachPhotoFile(f);
+    if (seq !== fileSelectSeqRef.current) return;
     if (coachValidation.ok === false) {
       toast.error(coachValidation.message);
       return;
     }
-    if (validation.ok === false) {
+    if (validation.ok === false && coachValidation.mime !== "image/gif") {
       toast.error(validation.message);
       return;
     }

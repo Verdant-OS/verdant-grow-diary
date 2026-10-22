@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### FIX-1989-PLANTS-HEALTH-NOT-ASSESSED
+
+```text
+TASK FIX-1989-PLANTS-HEALTH-NOT-ASSESSED  priority: P2  status: OPEN
+goal: Schema work only. New migration 20261015161000 drops the plants.health default of 'healthy' and allows NULL, so an omitted health is stored as no assessment. No backfill. No production apply. The "not assessed" display on /plants and the plant page is NOT in this PR: Matthew moved it to #2330 on 2026-10-22 (block FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY). Fixes the schema half of #1989.
+branch: cursor/plants-health-not-assessed-6187
+base: verdant-grow-diary
+checkout: git fetch origin cursor/plants-health-not-assessed-6187 verdant-grow-diary && git switch cursor/plants-health-not-assessed-6187 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2140 (open, ready for review; not merged)
+head_sha: 3911eb5fc246d34e1a45cda9eb69f6130343773e before the narrowing commit that records this line; re-read the PR for the current exact head before resuming.
+state: review. Display hunks removed 2026-10-22 (plantHealthRules.ts, Plants.tsx and the label tests are back to base; plants-page-unassessed-health-label.test.tsx deleted). Base merged.
+next_action: exact-head independent review of the narrowed PR (migration lane: Codex, Blue Dream, Critical Mass or Durban Poison). Production apply is a separate owner yes.
+files: supabase/migrations/20261015161000_plants_health_drop_healthy_default.sql; .github/workflows/plants-health-drop-healthy-default-pg15.yml; scripts/run-plants-health-drop-healthy-default-pg15-harness.mjs; src/test/plants-health-drop-healthy-default-migration.test.ts; src/test/plants-health-drop-healthy-default-pg15-harness.test.ts; docs/agents/HANDOFF_LOG.md
+blockers: production apply waits on Matthew; knk production database lock remains. The locked-test unlock receipt of 2026-10-15 for plant-health-unknown-rendering.test.tsx is no longer needed here (that file is back to base); it now belongs to #2330.
+artifacts: migration + harness tests green after narrowing (counts in the PR comment of 2026-10-22)
+reviewer_seat: Codex, Blue Dream, Critical Mass, or Durban Poison (migration)
+claimed_by: Claude, 2026-10-22 05:45 UTC
+last_updated: 2026-10-22 00:45 CT, by Claude
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text

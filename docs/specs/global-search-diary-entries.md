@@ -31,14 +31,24 @@ switch know only grow / tent / plant / cultivar.
 
 1. Match the grower's **own** logged notes on `note` text in **both** places a log lives:
    `grow_events` (every confirmed Quick Log save writes this spine row) and `diary_entries`.
-   The current manual writer `quicklog_save_manual` always inserts a linked `diary_entries`
-   mirror, even without details (`20260927160000_quicklog_manual_plant_tent_lineage.sql:211–229`,
-   note `'(quick log)'` when empty), but other paths do not: the `quicklog_save_event` path
-   mirrors conditionally, and legacy rows can be spine-only (the case
-   `src/hooks/useGrowDetailData.ts:11–15` describes). So searching `diary_entries` alone would
-   miss spine-only logs. A diary row linked to a matching spine
-   (`details.linked_grow_event_id`) is one result, not two, and the placeholder note
-   `'(quick log)'` never matches on its own.
+   Companion presence depends on the writer, not on "structured details" as a single rule:
+   - `quicklog_save_manual` always inserts a linked `diary_entries` mirror, even without
+     details (`20260927160000_quicklog_manual_plant_tent_lineage.sql:211–229`). Empty notes
+     become `'(quick log)'` on the mirror (`v_diary_note`).
+   - `quicklog_save_event` mirrors only when `v_needs_diary` is true: sensor snapshot, photo
+     URL, extra details, water, or feed
+     (`20260725023000_core_schema_forward_repair.sql:383–387`). A **current** note-only event
+     save is spine-only. When it does mirror, empty notes use the same placeholder
+     (`COALESCE(NULLIF(btrim(p_note), ''), '(quick log)')`).
+   - Legacy rows can also be spine-only (the case `src/hooks/useGrowDetailData.ts:11–15`
+     describes).
+
+   Searching `diary_entries` alone would miss those spine-only logs. A diary row linked to a
+   matching spine (`details.linked_grow_event_id`) is one result, not two. The placeholder
+   `'(quick log)'` is not grower-authored text: exclude it only when
+   `isQuickLogPlaceholderNote` (`src/lib/plantFeedingDisplayRules.ts:54`) is true (exact,
+   trimmed, case-insensitive). A grower note that merely contains those words still matches.
+   Naive `ilike '%quick%'` would otherwise hit empty-note mirrors.
    - Matching is a case-insensitive literal substring: `%`, `_` and `\` in the query match
      themselves.
    - Order is newest first (`occurred_at` / `entry_at`) with an `id` tie-break, bounded to
@@ -51,6 +61,7 @@ switch know only grow / tent / plant / cultivar.
    - "Own" means `user_id = auth.uid()` even for operators: RLS grants operators SELECT on
      every grower's diary entries (`20260517010926_65004f70-….sql:67–74`), so RLS alone is not
      owner scoping.
+
 2. Each result shows a ~80-character note excerpt with the match, the plant or tent name
    when known, and the local date (`formatSnapshotTimestamp`). Under the chosen Option B the
    RPC returns the names from owner-scoped joins; Option A would need one batched
@@ -168,10 +179,13 @@ The function must:
   `verdant_search` results still render; a failing `verdant_search` does not hide diary
   results.
 - Short queries: "OG" still returns cultivar and entity results and makes no diary read.
-- Sources: a legacy spine-only Quick Log note is found; a current manual Quick Log (spine plus
-  its unconditional mirror) that matches is one result; a `'(quick log)'` placeholder note
-  alone does not match; a deleted spine and a retracted entry are not returned. Option B:
-  `verdant_search` is unchanged, so a plant found by its `strain` is still returned.
+- Sources: a legacy spine-only Quick Log note is found; a current `quicklog_save_event`
+  note-only save (no snapshot, photo, details, water, or feed) is found via the spine; a
+  current `quicklog_save_manual` save (spine plus its unconditional mirror) that matches is
+  one result; an exact `'(quick log)'` placeholder does not match query `"quick"` or
+  `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
+  a deleted spine and a retracted entry are not returned. Option B: `verdant_search` is
+  unchanged, so a plant found by its `strain` is still returned.
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed

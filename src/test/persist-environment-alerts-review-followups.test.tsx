@@ -309,4 +309,33 @@ describe("usePersistEnvironmentAlerts review follow-ups (#2267 at 4dcba2be)", ()
 
     hook.unmount();
   });
+
+  it("retries a pending insert that fails after the context refresh retry would have fired (Copilot at 705072e0)", async () => {
+    alertsIo.list.mockResolvedValue([OPEN_STAGE_RH]);
+    alertsIo.update.mockRejectedValueOnce(new Error("network down")).mockResolvedValue(true);
+    let rejectFirstSave!: (err: Error) => void;
+    alertsIo.save
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectFirstSave = reject;
+        }),
+      )
+      .mockResolvedValue({ id: "alert-temp" });
+    const hook = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: refreshAndInsertInput(),
+    });
+
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    // Hold the insert past the (5 ms in tests) refresh retry delay.
+    await settle();
+    await act(async () => {
+      rejectFirstSave(new Error("insert failed"));
+    });
+
+    await waitFor(() => expect(savesFor("temp")).toBe(2));
+    await waitFor(() => expect(hook.result.current.status).toBe("done"));
+    expect(alertsIo.update).toHaveBeenCalledTimes(2);
+
+    hook.unmount();
+  });
 });

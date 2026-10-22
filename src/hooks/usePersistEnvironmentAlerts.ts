@@ -469,22 +469,31 @@ export function usePersistEnvironmentAlerts(
         }
       }
       if (cancelled) return;
+      // A failed refresh leaves the open alert quoting the old range, and no
+      // dependency of this effect moves to run it again. Surface the error
+      // and wake a bounded number of times to retry; success resets it. The
+      // wake re-runs this effect, so it is armed only once this run's inserts
+      // have settled: an earlier wake would cancel a pending insert whose
+      // failure could then reach no one.
+      let refreshRetryDelay: number | null = null;
       if (contextRefreshes.length > 0) {
-        // A failed refresh leaves the open alert quoting the old range, and no
-        // dependency of this effect moves to run it again. Surface the error
-        // and wake a bounded number of times to retry; success resets it.
         if (refreshError) {
           refreshFailures.current += 1;
-          const delay = alertContextRefreshRetryDelayMs(refreshFailures.current);
-          if (delay !== null) {
-            refreshRetryId = window.setTimeout(() => setRefreshRetryWake((n) => n + 1), delay);
-          }
+          refreshRetryDelay = alertContextRefreshRetryDelayMs(refreshFailures.current);
         } else {
           refreshFailures.current = 0;
         }
       }
+      const armRefreshRetry = () => {
+        if (cancelled || refreshRetryDelay === null) return;
+        refreshRetryId = window.setTimeout(
+          () => setRefreshRetryWake((n) => n + 1),
+          refreshRetryDelay,
+        );
+      };
 
       if (toInsert.length === 0) {
+        armRefreshRetry();
         setState({
           status: refreshError ? "error" : "done",
           persistedCount: 0,
@@ -554,6 +563,7 @@ export function usePersistEnvironmentAlerts(
       }
 
       if (!cancelled) {
+        armRefreshRetry();
         setState({
           status: lastError ? "error" : "done",
           persistedCount,

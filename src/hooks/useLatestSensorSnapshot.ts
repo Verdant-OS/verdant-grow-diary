@@ -132,6 +132,7 @@ export async function fetchLatestSensorSnapshot(
     // replace (see preferNewer).
     let staleSensorCandidate: SensorSnapshot | null = null;
     let sensorReadFailed = false;
+    let rawRowsForRejection: ReturnType<typeof requireEffectiveSensorReadings> = [];
     // 1) Prefer live sensor_readings if any tents are scoped.
     if (tentIds.length > 0) {
       let evidenceRows: ReturnType<typeof requireEffectiveSensorReadings> = [];
@@ -150,6 +151,7 @@ export async function fetchLatestSensorSnapshot(
           .limit(SENSOR_ROWS_PER_TENT);
         if (error) throw error;
         rawRows = requireEffectiveSensorReadings(data);
+        rawRowsForRejection = rawRows;
         evidenceRows = selectDashboardSensorEvidenceRows(requireEffectiveSensorReadings(data));
       } catch {
         // A separate, usable diary read may survive this failure. If no
@@ -162,11 +164,33 @@ export async function fetchLatestSensorSnapshot(
         staleSensorCandidate = snap;
       }
     }
-    // 2) and 3) Diary evidence, else the stale candidate, else nothing.
-    return await resolveDiaryEvidence(growId, tentIds, staleSensorCandidate, sensorReadFailed);
+    // 2) and 3) Diary evidence, else the stale candidate, else nothing. The
+    // sensor read's rejected rows travel with a diary snapshot too, so a newer
+    // rejected VPD still outranks older diary evidence for Tonight (Codex P1
+    // on #2303 at b49c32ae).
+    const resolved = await resolveDiaryEvidence(
+      growId,
+      tentIds,
+      staleSensorCandidate,
+      sensorReadFailed,
+    );
+    return withDiaryRejectedRows(resolved, rawRowsForRejection);
   } catch {
     throw new Error("unavailable");
   }
+}
+
+/**
+ * A diary-sourced result keeps the sensor read's rejected rows, so the capture
+ * gate still sees a newer rejected reading behind older diary evidence. The
+ * empty snapshot stays empty.
+ */
+function withDiaryRejectedRows(
+  snapshot: SensorSnapshot,
+  rawRows: Parameters<typeof withRejectedQualityRows>[1],
+): SensorSnapshot {
+  if (snapshot === EMPTY_SNAPSHOT) return snapshot;
+  return withRejectedQualityRows(snapshot, rawRows) ?? snapshot;
 }
 
 /**
@@ -223,6 +247,7 @@ export async function fetchLatestSensorSnapshotsByTent(
   if (unique.length === 0) return result;
   const fallback = new Set<string>();
   const staleByTent = new Map<string, SensorSnapshot | null>();
+  const rawRowsByTent = new Map<string, Parameters<typeof withRejectedQualityRows>[1]>();
   let needDiary: string[] = [];
   // The per-tent read treats a failed sensor read as "diary evidence or
   // unavailable". The bulk read does the same through one shared diary window
@@ -279,6 +304,7 @@ export async function fetchLatestSensorSnapshotsByTent(
             continue;
           }
           staleByTent.set(tentId, snap);
+          rawRowsByTent.set(tentId, own);
           needDiary.push(tentId);
         }
         if (partition.fallback.length === 0) continue;
@@ -353,7 +379,10 @@ export async function fetchLatestSensorSnapshotsByTent(
                 (row) => snapshotFromDiaryEvidenceRow(row, [tentId]),
               );
               if (verdict.kind === "found") {
-                result[tentId] = preferNewer(staleByTent.get(tentId) ?? null, verdict.snapshot);
+                result[tentId] = withDiaryRejectedRows(
+                  preferNewer(staleByTent.get(tentId) ?? null, verdict.snapshot),
+                  rawRowsByTent.get(tentId) ?? [],
+                );
               } else if (verdict.kind === "none") {
                 result[tentId] = sensorReadFailed.has(tentId)
                   ? null

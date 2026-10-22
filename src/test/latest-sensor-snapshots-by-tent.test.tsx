@@ -22,6 +22,7 @@ import {
   useLatestSensorSnapshotsByTent,
 } from "@/hooks/useLatestSensorSnapshot";
 import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { buildTonightTentMetrics } from "@/lib/tonightTentHomeViewModel";
 
 type Row = Record<string, unknown>;
 const io = vi.hoisted(() => {
@@ -285,6 +286,30 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     for (const tentId of [TENT_A, TENT_B]) {
       expect(bulk[tentId]).toEqual(await fetchLatestSensorSnapshot(GROW, [tentId]));
     }
+  });
+
+  it("keeps a newer rejected VPD on an older diary fallback, in bulk and per tent alike (Codex P1 on #2303 at b49c32ae)", async () => {
+    const capture = minutesAgo(2);
+    io.sensorRows = [
+      { ...sensorRow(TENT_A, "vpd_kpa", 1.2, capture), quality: "degraded" },
+      sensorRow(TENT_B, "temperature_c", 20, capture),
+      sensorRow(TENT_B, "humidity_pct", 50, capture),
+    ];
+    io.diaryRows = [diaryRow(TENT_A, minutesAgo(30), 26, 60)];
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B]);
+    expect(bulk[TENT_A]).toMatchObject({ source: "diary", temp: 26 });
+    expect(bulk[TENT_A]?.rejected_quality_rows).toEqual([
+      { metric: "vpd_kpa", value: 1.2, captured_at: capture, source: "live", quality: "degraded" },
+    ]);
+    expect(await fetchLatestSensorSnapshot(GROW, [TENT_A])).toEqual(bulk[TENT_A]);
+    // With Tonight's own raw-row read failed, the older diary VPD is never shown.
+    const vpd = buildTonightTentMetrics({
+      rows: null,
+      rowsRead: { status: "error" },
+      snapshot: { status: "ok", snapshot: bulk[TENT_A] as never },
+      now: new Date(),
+    }).find((m) => m.key === "vpd")!;
+    expect(vpd.state).not.toBe("value");
   });
 
   it("fills the per-tent cache entries the Dashboard and Tent Detail read", async () => {

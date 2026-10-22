@@ -159,7 +159,12 @@ describe("the tents list follows Tonight on a failed refresh (P2 at b2606eca)", 
   const unavailable = { status: "unavailable" as const, snapshot: null };
 
   it("derives no VPD from cached rows whose refresh failed", () => {
-    expect(tentsListCanonicalVpd(cached, TENT, NOW, unavailable, "refresh_error")).toBeNull();
+    // Reported as unavailable, not as an omitted override, so the strip cannot
+    // restore the cached VPD as healthy (Copilot on #2303 at b49c32ae).
+    expect(tentsListCanonicalVpd(cached, TENT, NOW, unavailable, "refresh_error")).toMatchObject({
+      kpa: null,
+      unavailable: true,
+    });
   });
 
   it("still derives it when the read succeeded", () => {

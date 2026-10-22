@@ -219,6 +219,12 @@ export interface CanonicalTentVpd {
    */
   rejected?: boolean;
   /**
+   * True when Tonight could not read this tent's VPD at all (raw refresh and
+   * snapshot read both failed). The stored VPD is then withheld rather than
+   * restored as a healthy value (Copilot on #2303 at b49c32ae).
+   */
+  unavailable?: boolean;
+  /**
    * The stored records behind the VPD (`sensorCaptureRefRules`); null entries
    * are unknown. Decides whether it is the cohort's own capture.
    */
@@ -306,7 +312,9 @@ export function buildTentSnapshotView(
   const latestRows = rows.filter((r) => resolveSensorObservationTime(r) === snap.ts);
   const canonical =
     options.canonicalVpd != null &&
-    (Number.isFinite(options.canonicalVpd.kpa) || options.canonicalVpd.rejected === true)
+    (Number.isFinite(options.canonicalVpd.kpa) ||
+      options.canonicalVpd.rejected === true ||
+      options.canonicalVpd.unavailable === true)
       ? options.canonicalVpd
       : null;
   // Source resolution is strict across the whole latest timestamp. A mixed
@@ -331,7 +339,12 @@ export function buildTentSnapshotView(
   // The capture gate rejected the cohort's own capture: its stored VPD is the
   // rejected reading and must not fall back to "ok" (Codex P1 at 108e3eab).
   const cohortVpdRejected = sameCapture && canonicalRejected;
-  const vpdKpa = useCanonicalVpd && canonical ? canonical.kpa : snap.vpd;
+  const vpdKpa =
+    canonical?.unavailable === true
+      ? null
+      : useCanonicalVpd && canonical
+        ? canonical.kpa
+        : snap.vpd;
   const canonicalSource: SensorReadingSource | null =
     provenance === "live" || provenance === "manual" || provenance === "csv"
       ? provenance

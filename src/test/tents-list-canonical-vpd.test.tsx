@@ -448,6 +448,31 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(vpd.textContent).toBe(rawText);
   });
 
+  it("never restores a cached in-range VPD as OK when the refresh and snapshot reads both fail (Copilot on #2303 at b49c32ae)", () => {
+    hook.state = { status: "unavailable", snapshot: EMPTY_SNAPSHOT };
+    const fresh = at(0.05);
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={hook.state}
+        stage="flower"
+        sensorRows={[
+          row("temperature_c", 25, fresh, "live"),
+          row("humidity_pct", 55, fresh, "live"),
+          row("vpd_kpa", 1.2, fresh, "live"),
+        ]}
+        sensorStatus="refresh_error"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[]}
+        manualStatus="success"
+      />,
+    );
+    const vpd = screen.getByTestId("tents-list-metric-tent-1-vpd");
+    expect(vpd).not.toHaveAttribute("data-status", "ok");
+    expect(vpd).not.toHaveTextContent("1.20");
+  });
+
   it("marks an older live VPD stale even beside a fresh live capture (Codex P1)", () => {
     const rows = [
       row("temperature_c", (80 - 32) / 1.8, at(2), "live"),

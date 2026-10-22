@@ -101,6 +101,19 @@ export function tentsListCanonicalVpd(
       rejected: true,
     };
   }
+  // Tonight could not read the VPD at all: say so, so the list never restores
+  // a cached stored VPD as healthy beside Tonight's "unavailable" (Copilot on
+  // #2303 at b49c32ae).
+  if (vpd?.state === "unavailable") {
+    return {
+      kpa: null,
+      capturedAt: null,
+      source: null,
+      sourceLabel: null,
+      ageText: null,
+      unavailable: true,
+    };
+  }
   if (vpd?.state !== "value" || typeof vpd.value !== "number") return null;
   // Tonight runs no realism check. The same capture gate the tent page applies
   // decides here too: the pair a calculated VPD came from, and every

@@ -883,6 +883,29 @@ describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)"
     expect(lines).toEqual(["[ecowitt-forwarder] refused: --mqtt-url is not a valid URL."]);
   });
 
+  it.each(["\t", "\r", "\n"])(
+    "a --mqtt-url with a control character in its credentials is refused before logging (Copilot at 5d10996a): %j",
+    async (ctl) => {
+      const url = `mqtt://${USER}:pa${ctl}ss-${PASS}@broker.invalid:1883`;
+      const mod = { connect: vi.fn() };
+      const exit = vi.fn();
+      const { lines, restore } = capture();
+      try {
+        await main(
+          ["--mqtt-url", url],
+          {},
+          { connect: (f, e) => connectMqtt(f, e, async () => mod), exit },
+        );
+      } finally {
+        restore();
+      }
+      expect(mod.connect).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(lines).toEqual(["[ecowitt-forwarder] refused: --mqtt-url is not a valid URL."]);
+      for (const l of lines) expect(l).not.toContain(PASS);
+    },
+  );
+
   it("a rejecting connect dependency exits 2 with a fixed line and never rejects", async () => {
     const exit = vi.fn();
     const connect = vi.fn(async () => {
@@ -945,6 +968,56 @@ describe("redaction", () => {
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(out)).not.toContain("evil.example");
+  });
+
+  it("does not re-send after a final status whose body cannot be read (Copilot at 5d10996a)", async () => {
+    const failing = () =>
+      new ReadableStream({
+        pull(controller) {
+          controller.error(new Error("connection reset"));
+        },
+      });
+    const fetchImpl = vi.fn(async () => new Response(failing(), { status: 401 }));
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(out).toMatchObject({
+      kind: "forwarded",
+      attempts: 1,
+      response: { status: 401, reason: "response_unreadable" },
+    });
+  });
+
+  it("still retries a retryable status whose body cannot be read", async () => {
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response(
+          new ReadableStream({
+            pull(c) {
+              c.error(new Error("reset"));
+            },
+          }),
+          { status: 503 },
+        );
+      }
+      return new Response('{"accepted":true}', { status: 200 });
+    });
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(out).toMatchObject({ kind: "forwarded", response: { status: 200, accepted: true } });
   });
 
   it("cancels a refused redirect's unread body (Codex P2 at d236df20)", async () => {

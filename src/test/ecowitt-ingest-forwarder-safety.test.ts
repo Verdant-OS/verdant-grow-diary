@@ -1,6 +1,9 @@
 /**
  * Static safety scan for scripts/dev/ecowitt-ingest-forwarder.ts.
  *
+ * @source-scan-justified: forbidden imports, call sites and log sinks are
+ *   properties of the source text, not of any exported runtime value.
+ *
  * The forwarder must NEVER:
  *   - import the supabase client / SDK
  *   - perform direct DB writes (.insert/.upsert/.update/.delete)

@@ -684,7 +684,19 @@ export async function handleMessage(args: {
           attempts: attempt + 1,
         };
       }
-      const response = summarizeResponse(r.status, await readBoundedText(r));
+      let bodyText: string | null;
+      let unreadable = false;
+      try {
+        bodyText = await readBoundedText(r);
+      } catch {
+        // The status is known even when its body cannot be read. A final
+        // status (401, 4xx) is never re-sent because the body read failed;
+        // only a retryable one is (Copilot on #2335 at 5d10996a).
+        bodyText = null;
+        unreadable = true;
+      }
+      const summarized = summarizeResponse(r.status, bodyText);
+      const response = unreadable ? { ...summarized, reason: "response_unreadable" } : summarized;
       // A retryable status (408/429/5xx) with retries left falls through to the sleep below.
       if (!isRetryableStatus(r.status) || attempt >= maxRetries) {
         return { kind: "forwarded", summary: prepared.summary, response, attempts: attempt + 1 };
@@ -1191,6 +1203,11 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
 
 /** True for a broker URL with an authority (`scheme://host`), the only form whose credentials can be extracted. */
 export function brokerUrlIsHierarchical(value: string): boolean {
+  // URL parsing silently drops tab, CR and LF (and trims other C0 controls),
+  // so a credential written with one would be extracted in a different form
+  // than the text the startup line logs. Refuse any control character
+  // (Copilot on #2335 at 5d10996a).
+  if (/[\u0000-\u001f\u007f]/.test(value)) return false;
   if (!URL.canParse(value)) return false;
   return new URL(value).host !== "";
 }

@@ -73,9 +73,11 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   rejected (`invalid_dateutc`). Free-form upload strings such as `stationtype`
   are never shown.
 - A message without `PASSKEY` or `dateutc` (for example the runbook's
-  hand-made sanity POST) is rejected locally and never forwarded. A valid
-  `dateutc` that contains the PASSKEY (a short or date-shaped key such as `-`)
-  is still forwarded unchanged; only the summary's copy is replaced with
+  hand-made sanity POST) is rejected locally and never forwarded. A `dateutc`
+  that is not in the EcoWitt form is rejected (`invalid_dateutc`), whether or
+  not it contains the PASSKEY. A valid `dateutc` that contains the upload's
+  PASSKEY (possible with a short or date-shaped key such as `-`) is forwarded
+  unchanged; only the summary's copy is replaced with
   `[redacted: contains PASSKEY]`, so the credential value never reaches a
   summary string. Any 32-hex run inside a logged string is redacted whether or
   not it stands alone.
@@ -85,6 +87,11 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   validated URL is reported as `network_error` (`redirect_refused_<status>`)
   after the first attempt, never followed and never retried with the PASSKEY
   and token. Its unread body is cancelled before the result is reported.
+- A final status (for example `401`) whose body cannot be read is reported
+  with that status and reason `response_unreadable`, and is not re-sent; only
+  a retryable status (408, 429, 5xx) is retried.
+- A `--mqtt-url` containing a control character (tab, CR, LF or another C0
+  character) is refused before anything is logged.
 - A message whose `PASSKEY` or `dateutc` is not a string is rejected locally
   (`invalid_passkey` / `invalid_dateutc`); nothing is coerced.
   The HTTP bridge keeps `PASSKEY` as the exact string it received, so a

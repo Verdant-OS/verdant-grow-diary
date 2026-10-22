@@ -129,6 +129,12 @@ export function parseEcowittBody(
     const k = decodeURIComponent(pair.slice(0, eq).replace(/\+/g, " ")).trim();
     const v = decodeURIComponent(pair.slice(eq + 1).replace(/\+/g, " "));
     if (k.length === 0) continue;
+    // The PASSKEY is a credential, not a reading: a digits-only key such as
+    // "000012345678" must reach the forwarder unchanged (Codex P2 on #2335).
+    if (/^passkey$/i.test(k)) {
+      out[k] = v;
+      continue;
+    }
     const num = Number(v);
     out[k] = Number.isFinite(num) && v.trim() !== "" ? num : v;
   }

@@ -30,7 +30,8 @@ cd "<repo>"
 $env:ECOWITT_MQTT_URL="mqtt://127.0.0.1:1883"
 $env:ECOWITT_MQTT_TOPIC="ecowitt/grow"
 
-# Dry run (default): parse, summarise channels, never call the network.
+# Dry run (default): parse and summarise channels. It connects to the MQTT
+# broker above and subscribes, but never POSTs to ecowitt-ingest.
 bun run dev:ecowitt-forwarder -- --once --write-report
 
 # Live (owner-gated): forward to ecowitt-ingest with a bridge token.
@@ -44,10 +45,21 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
 
 ## Fail-closed rules
 
-- `--live` refuses to start unless `ECOWITT_INGEST_URL` is `https://` and its
-  path ends in `/ecowitt-ingest`, and `VERDANT_BRIDGE_TOKEN` has the `vbt_`
-  shape. A raw gateway payload carries the PASSKEY, so it is never posted
-  anywhere else.
+- `--live` refuses to start unless `ECOWITT_INGEST_URL` is exactly the Verdant
+  project's function URL (`APPROVED_INGEST_URLS`: `https://<project>.supabase.co/functions/v1/ecowitt-ingest`
+  or `https://<project>.functions.supabase.co/ecowitt-ingest`, no userinfo,
+  query or fragment) and `VERDANT_BRIDGE_TOKEN` has the `vbt_` shape. A raw
+  gateway payload carries the PASSKEY, so it is never posted anywhere else.
+- The live POST times out after 15 s and retries only the transient cases in
+  `docs/bridge-client-retry-guidance.md` (timeout, network failure, HTTP 408,
+  429, 5xx) with Full Jitter, at most 4 retries. 4xx auth and payload errors
+  are final.
+- `--once` exits `0` only for a dry run or a `2xx` response with
+  `accepted: true`; a broker connect timeout (20 s), broker error or rejected
+  subscription exits `2` instead of hanging.
+- A message over 64 KiB is rejected before it is parsed; summary strings are
+  capped at 64 characters, and a `stationtype` that contains the PASSKEY is
+  dropped.
 - A message without `PASSKEY` or `dateutc` (for example the runbook's
   hand-made sanity POST) is rejected locally and never forwarded.
 - The live POST is sent with `redirect: "error"`: a redirect from the
@@ -64,6 +76,10 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
 
 ## What it never does
 
-No Supabase SDK, no `service_role`, no database writes, no Action Queue, no
-alerts, no automation, no device control. Enforced by
+No Supabase SDK, no `service_role`, no direct database access, no Action
+Queue, no alerts, no automation, no device control. Enforced by
 `src/test/ecowitt-ingest-forwarder-safety.test.ts`.
+
+What `--live` does do: an accepted POST asks `ecowitt-ingest` to persist
+`sensor_readings` rows and update bridge-token usage in production. That is the
+owner-gated effect live mode exists for; dry-run has none of it.

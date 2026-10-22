@@ -12,9 +12,15 @@
  *   `soil_channels`) and authenticates with a Verdant bridge token.
  *
  * Posture:
- *   - DRY-RUN BY DEFAULT. Without `--live` nothing leaves this machine.
- *   - `--live` fails closed unless ECOWITT_INGEST_URL is an https URL ending
- *     in `/ecowitt-ingest` and VERDANT_BRIDGE_TOKEN has the `vbt_` shape.
+ *   - DRY-RUN BY DEFAULT. Without `--live` no HTTPS ingest POST is made. The
+ *     forwarder still connects to the configured MQTT broker and subscribes,
+ *     so a remote broker URL does carry MQTT credentials off this machine.
+ *   - `--live` fails closed unless ECOWITT_INGEST_URL is exactly the Verdant
+ *     project's ecowitt-ingest function URL (APPROVED_INGEST_URLS) and
+ *     VERDANT_BRIDGE_TOKEN has the `vbt_` shape. The POST never follows a
+ *     redirect, times out after LIVE_REQUEST_TIMEOUT_MS, and retries only the
+ *     transient cases in docs/bridge-client-retry-guidance.md with Full Jitter.
+ *   - A message over MAX_MESSAGE_BYTES is rejected before it is parsed.
  *   - EcoWitt ingest is dry-run only until the gates in
  *     docs/ecowitt-future-real-ingest-gates.md are cleared by the owner.
  *     `--live` is the tool for the canary and for ingest after that; it is
@@ -24,7 +30,10 @@
  *   - No Supabase SDK import. No service_role. No direct DB writes.
  *   - No Action Queue writes. No alert creation. No automation. No device control.
  *   - Never logs or writes PASSKEY, MAC, the bridge token, or MQTT credentials.
- *   - Only ever POSTs to an `ecowitt-ingest` URL, and only with `--live`.
+ *   - Only ever POSTs to the approved `ecowitt-ingest` URL, and only with
+ *     `--live`. An accepted live POST asks that edge function to persist
+ *     sensor_readings and bridge-token usage; the forwarder itself has no
+ *     database access.
  *
  * CLI flags:
  *   --live             POST to ECOWITT_INGEST_URL. Default is dry-run (no network).
@@ -43,6 +52,26 @@ export const DEFAULT_MQTT_URL = "mqtt://127.0.0.1:1883";
 export const DEFAULT_MQTT_TOPIC = "ecowitt/grow";
 export const DEFAULT_REPORT_PATH = "./tmp/ecowitt-forwarder-last-report.json";
 export const TRANSPORT = "ecowitt_mqtt_ingest_forwarder";
+/** The Verdant Supabase project (the same ref as VITE_SUPABASE_URL in .env). */
+export const VERDANT_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+/**
+ * The only destinations a live POST may use (Codex P1 on #2335 at 79ce2801):
+ * a raw gateway payload carries the PASSKEY and the request carries the
+ * bridge token, so "https and the right path" is not a destination check.
+ */
+export const APPROVED_INGEST_URLS: readonly string[] = [
+  `https://${VERDANT_PROJECT_REF}.supabase.co/functions/v1/ecowitt-ingest`,
+  `https://${VERDANT_PROJECT_REF}.functions.supabase.co/ecowitt-ingest`,
+];
+/** Broker-controlled input is bounded before it is parsed (Codex P2 on #2335). */
+export const MAX_MESSAGE_BYTES = 64 * 1024;
+/** Summary strings copied from the payload are capped before they are logged. */
+export const MAX_SUMMARY_STRING = 64;
+/** Live POST timeout and Full Jitter retry policy (docs/bridge-client-retry-guidance.md §4). */
+export const LIVE_REQUEST_TIMEOUT_MS = 15_000;
+export const LIVE_RETRY_POLICY = { maxRetries: 4, baseDelayMs: 3_000, maxDelayMs: 45_000 } as const;
+/** `--once` gives the broker this long to connect before exiting nonzero. */
+export const MQTT_CONNECT_TIMEOUT_MS = 20_000;
 
 /** Keys the HTTP bridge wraps around the gateway payload; not gateway fields. */
 const BRIDGE_WRAPPER_KEYS = new Set(["received_at", "transport", "topic"]);
@@ -93,6 +122,7 @@ export type LiveConfigProblem =
   | "missing_ingest_url"
   | "ingest_url_not_https"
   | "ingest_url_not_ecowitt_ingest"
+  | "ingest_url_not_approved_origin"
   | "missing_bridge_token"
   | "bridge_token_shape";
 
@@ -114,6 +144,18 @@ export function liveConfigProblems(env: ForwarderEnv): LiveConfigProblem[] {
     if (!parsed || parsed.protocol !== "https:") problems.push("ingest_url_not_https");
     else if (!/\/ecowitt-ingest\/?$/.test(parsed.pathname)) {
       problems.push("ingest_url_not_ecowitt_ingest");
+    } else {
+      // Exact approved origin and canonical path; no userinfo, query or fragment.
+      const canonical = parsed.origin + parsed.pathname.replace(/\/+$/, "");
+      if (
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash ||
+        !APPROVED_INGEST_URLS.includes(canonical)
+      ) {
+        problems.push("ingest_url_not_approved_origin");
+      }
     }
   }
   if (!env.token) problems.push("missing_bridge_token");
@@ -127,7 +169,8 @@ export type PrepareReason =
   | "missing_passkey"
   | "invalid_passkey"
   | "missing_dateutc"
-  | "invalid_dateutc";
+  | "invalid_dateutc"
+  | "payload_too_large";
 
 export interface PayloadSummary {
   /** Air channels present as temp{n}f / humidity{n}. */
@@ -155,6 +198,9 @@ function findKey(obj: Record<string, unknown>, name: string): string | undefined
  * dateutc), since the edge function would only answer `accepted: false`.
  */
 export function prepareForwardPayload(text: string): PreparedPayload {
+  if (Buffer.byteLength(text, "utf8") > MAX_MESSAGE_BYTES) {
+    return { ok: false, reason: "payload_too_large" };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -182,7 +228,7 @@ export function prepareForwardPayload(text: string): PreparedPayload {
     return { ok: false, reason: "missing_dateutc" };
   }
   if (typeof dateutcRaw !== "string") return { ok: false, reason: "invalid_dateutc" };
-  const dateutc = dateutcRaw.trim();
+  const dateutc = dateutcRaw.trim().slice(0, MAX_SUMMARY_STRING);
   if (!dateutc) return { ok: false, reason: "missing_dateutc" };
 
   const air = new Set<number>();
@@ -195,6 +241,12 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   }
   const stationKey = findKey(payload, "stationtype");
   const stationRaw = stationKey ? payload[stationKey] : undefined;
+  // A hostile upload can copy its PASSKEY into any text field; never let the
+  // credential value reach the summary (Codex P1 on #2335 at 79ce2801).
+  const station =
+    typeof stationRaw === "string" && !stationRaw.includes(passkey)
+      ? stationRaw.slice(0, MAX_SUMMARY_STRING)
+      : null;
   return {
     ok: true,
     payload,
@@ -203,7 +255,7 @@ export function prepareForwardPayload(text: string): PreparedPayload {
       soil_channels: [...soil].sort((x, y) => x - y),
       key_count: Object.keys(payload).length,
       dateutc,
-      station: typeof stationRaw === "string" ? stationRaw : null,
+      station,
     },
   };
 }
@@ -269,6 +321,8 @@ export function summarizeResponse(status: number, bodyText: string): ResponseSum
 
 /** Token shapes that must never appear in output, wherever they sit in a string. */
 const EMBEDDED_SECRET_RE = /\b(?:vbt|sk|sbp)_[A-Za-z0-9_-]{4,}/g;
+/** An EcoWitt PASSKEY is a 32-hex digest; scrub that shape wherever it appears. */
+const HEX32_RE = /\b[0-9a-f]{32}\b/gi;
 /** `scheme://user:password@host` → `scheme://(redacted)@host`. */
 const URL_USERINFO_RE = /(\/\/)[^/\s@]+@/g;
 /** `?token=…`, `&password=…` and similar query credentials. */
@@ -278,6 +332,7 @@ const URL_SECRET_QUERY_RE = /([?&](?:token|key|api_key|password|passkey|secret)=
 export function redactString(value: string): string {
   return value
     .replace(EMBEDDED_SECRET_RE, "(redacted)")
+    .replace(HEX32_RE, "(redacted)")
     .replace(URL_USERINFO_RE, "$1(redacted)@")
     .replace(URL_SECRET_QUERY_RE, "$1(redacted)");
 }
@@ -306,19 +361,45 @@ export function redactForLog(fields: Record<string, unknown>): Record<string, un
 
 export type ForwardOutcome =
   | { kind: "dry_run"; summary: PayloadSummary }
-  | { kind: "forwarded"; summary: PayloadSummary; response: ResponseSummary }
+  | { kind: "forwarded"; summary: PayloadSummary; response: ResponseSummary; attempts: number }
   | { kind: "rejected_locally"; reason: PrepareReason }
-  | { kind: "network_error"; summary: PayloadSummary; error: string };
+  | { kind: "network_error"; summary: PayloadSummary; error: string; attempts: number };
+
+export interface LiveRetryOptions {
+  maxRetries?: number;
+  timeoutMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+}
+
+/** Pure. `random(0, min(maxDelay, base * 2^attempt))`, as the bridge-client guidance states. */
+export function fullJitterDelayMs(
+  attempt: number,
+  random: () => number = Math.random,
+  policy: { baseDelayMs: number; maxDelayMs: number } = LIVE_RETRY_POLICY,
+): number {
+  return Math.floor(random() * Math.min(policy.maxDelayMs, policy.baseDelayMs * 2 ** attempt));
+}
+
+/** Only the transient cases the guidance names are retried; 4xx auth/payload errors are final. */
+export function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
  * Handles one MQTT message. In dry-run it never calls `fetchImpl`. In live
- * mode it forwards exactly one request and reports the redacted response.
+ * mode it forwards one request per attempt, bounded by LIVE_REQUEST_TIMEOUT_MS
+ * and the Full Jitter retry policy for transient failures only, and reports
+ * the redacted response (Codex P2 on #2335 at 79ce2801).
  */
 export async function handleMessage(args: {
   text: string;
   flags: ForwarderFlags;
   env: ForwarderEnv;
   fetchImpl?: typeof fetch;
+  retry?: LiveRetryOptions;
 }): Promise<ForwardOutcome> {
   const prepared = prepareForwardPayload(args.text);
   if (!prepared.ok) return { kind: "rejected_locally", reason: prepared.reason };
@@ -327,30 +408,55 @@ export async function handleMessage(args: {
   const problems = liveConfigProblems(args.env);
   if (problems.length > 0) {
     // Config is checked before connecting, so this is defensive only.
-    return { kind: "network_error", summary: prepared.summary, error: problems.join(",") };
-  }
-  const req = buildForwardRequest(prepared.payload, args.env.ingestUrl!, args.env.token!);
-  const fetchImpl = args.fetchImpl ?? fetch;
-  try {
-    const r = await fetchImpl(req.url, req.init);
-    return {
-      kind: "forwarded",
-      summary: prepared.summary,
-      response: summarizeResponse(r.status, await r.text()),
-    };
-  } catch (e) {
     return {
       kind: "network_error",
       summary: prepared.summary,
-      error: e instanceof Error ? e.message : "unknown",
+      error: problems.join(","),
+      attempts: 0,
     };
+  }
+  const req = buildForwardRequest(prepared.payload, args.env.ingestUrl!, args.env.token!);
+  const fetchImpl = args.fetchImpl ?? fetch;
+  const maxRetries = args.retry?.maxRetries ?? LIVE_RETRY_POLICY.maxRetries;
+  const timeoutMs = args.retry?.timeoutMs ?? LIVE_REQUEST_TIMEOUT_MS;
+  const sleep = args.retry?.sleep ?? realSleep;
+  const random = args.retry?.random ?? Math.random;
+  let lastError = "unknown";
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const r = await fetchImpl(req.url, { ...req.init, signal: controller.signal });
+      const response = summarizeResponse(r.status, await r.text());
+      if (isRetryableStatus(r.status) && attempt < maxRetries) {
+        lastError = `http_${r.status}`;
+      } else {
+        return { kind: "forwarded", summary: prepared.summary, response, attempts: attempt + 1 };
+      }
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : "unknown";
+      if (attempt >= maxRetries) {
+        return {
+          kind: "network_error",
+          summary: prepared.summary,
+          error: lastError,
+          attempts: attempt + 1,
+        };
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+    await sleep(fullJitterDelayMs(attempt, random));
   }
 }
 
 /** `--once` exit code: 0 only when the one thing asked for happened. */
 export function onceExitCode(outcome: ForwardOutcome): number {
   if (outcome.kind === "dry_run") return 0;
-  if (outcome.kind === "forwarded") return outcome.response.accepted === true ? 0 : 1;
+  if (outcome.kind === "forwarded") {
+    const { status, accepted } = outcome.response;
+    return accepted === true && status >= 200 && status < 300 ? 0 : 1;
+  }
   return 1;
 }
 
@@ -423,6 +529,51 @@ export function createMessageHandler(
   };
 }
 
+export interface MqttClientLike {
+  on(event: string, listener: (...args: any[]) => void): unknown;
+  subscribe(topic: string, callback?: (err?: Error | null) => void): unknown;
+}
+
+export interface ClientLifecycleDeps {
+  flags: ForwarderFlags;
+  /** Called once in `--once` mode when the broker connection or subscription fails. */
+  onFatal: (exitCode: number) => void;
+  connectTimeoutMs?: number;
+}
+
+/**
+ * Connection and subscription handling. In `--once` mode a connect timeout,
+ * a broker error or a rejected subscription ends the run with exit 2 instead
+ * of reconnecting forever with no message to handle (Codex P2 on #2335 at
+ * 79ce2801). Continuous mode keeps the client's own reconnect.
+ */
+export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecycleDeps): void {
+  let connected = false;
+  let ended = false;
+  const fatal = (reason: string, fields: Record<string, unknown> = {}) => {
+    log("mqtt_fatal", { reason, ...fields });
+    if (deps.flags.once && !ended) {
+      ended = true;
+      deps.onFatal(2);
+    }
+  };
+  const timeoutMs = deps.connectTimeoutMs ?? MQTT_CONNECT_TIMEOUT_MS;
+  const timer = deps.flags.once
+    ? setTimeout(() => {
+        if (!connected) fatal("connect_timeout", { timeout_ms: timeoutMs });
+      }, timeoutMs)
+    : null;
+  client.on("connect", () => {
+    connected = true;
+    if (timer) clearTimeout(timer);
+    client.subscribe(deps.flags.topic, (err) => {
+      if (err) fatal("subscribe_failed", { error: err.message });
+      else log("subscribed", { topic: deps.flags.topic });
+    });
+  });
+  client.on("error", (e: Error) => fatal("mqtt_error", { error: e.message }));
+}
+
 async function connectMqtt(flags: ForwarderFlags, env: ForwarderEnv): Promise<any> {
   let mqtt: any;
   try {
@@ -434,7 +585,9 @@ async function connectMqtt(flags: ForwarderFlags, env: ForwarderEnv): Promise<an
   return mqtt.connect(flags.mqttUrl, {
     username: env.mqttUsername ?? undefined,
     password: env.mqttPassword ?? undefined,
-    reconnectPeriod: 5000,
+    // One-shot runs fail fast instead of reconnecting with nothing to handle.
+    reconnectPeriod: flags.once ? 0 : 5000,
+    connectTimeout: MQTT_CONNECT_TIMEOUT_MS,
   });
 }
 
@@ -447,7 +600,7 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
     if (problems.length > 0) {
       console.error(
         `[ecowitt-forwarder] --live refused (fail closed): ${problems.join(", ")}. ` +
-          "ECOWITT_INGEST_URL must be the https ecowitt-ingest function URL and VERDANT_BRIDGE_TOKEN a vbt_ token.",
+          `ECOWITT_INGEST_URL must be exactly ${APPROVED_INGEST_URLS.join(" or ")} and VERDANT_BRIDGE_TOKEN a vbt_ token.`,
       );
       process.exit(2);
     }
@@ -456,7 +609,7 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
   log("startup", {
     mode: flags.live
       ? "LIVE — forwarding to ecowitt-ingest"
-      : "dry-run — nothing leaves this machine",
+      : "dry-run — no ingest POST; MQTT broker connection only",
     topic: flags.topic,
     broker: flags.mqttUrl,
     ingest_url: flags.live ? env.ingestUrl : "(none — dry-run)",
@@ -464,11 +617,13 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
   });
 
   const client = await connectMqtt(flags, env);
-  client.on("connect", () => {
-    log("subscribed", { topic: flags.topic });
-    client.subscribe(flags.topic);
+  attachClientLifecycle(client, {
+    flags,
+    onFatal: (exitCode) => {
+      client.end();
+      process.exit(exitCode);
+    },
   });
-  client.on("error", (e: Error) => log("mqtt_error", { error: e.message }));
   client.on(
     "message",
     createMessageHandler({

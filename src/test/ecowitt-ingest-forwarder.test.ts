@@ -7,9 +7,14 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
+  APPROVED_INGEST_URLS,
+  MAX_MESSAGE_BYTES,
+  attachClientLifecycle,
   buildForwardRequest,
   createMessageHandler,
+  fullJitterDelayMs,
   handleMessage,
+  isRetryableStatus,
   liveConfigProblems,
   onceExitCode,
   parseFlags,
@@ -26,7 +31,9 @@ import {
 const FAKE_PASSKEY = ["FAKE", "TEST", "PASSKEY", "NOT", "REAL"].join("_");
 const FAKE_BRIDGE_TOKEN = ["vbt", "FAKE_TEST_TOKEN_0123456789"].join("_");
 const NOT_A_BRIDGE_TOKEN = ["sk", "live", "not_a_bridge_token"].join("_");
-const INGEST_URL = "https://example-ref.supabase.co/functions/v1/ecowitt-ingest";
+// The approved destination; any other host is refused (Codex P1 at 79ce2801).
+const INGEST_URL = APPROVED_INGEST_URLS[0];
+const NO_SLEEP = { sleep: async () => {} };
 
 // Shape of a GW3000B upload after the HTTP bridge wrapped it.
 const GATEWAY_MESSAGE = JSON.stringify({
@@ -102,6 +109,11 @@ describe("live config fails closed", () => {
     expect(liveConfigProblems(LIVE_ENV)).toEqual([]);
   });
 
+  it.each(APPROVED_INGEST_URLS.map((u) => [u]))("accepts the approved URL %s", (url) => {
+    expect(liveConfigProblems({ ...LIVE_ENV, ingestUrl: url })).toEqual([]);
+    expect(liveConfigProblems({ ...LIVE_ENV, ingestUrl: `${url}/` })).toEqual([]);
+  });
+
   it.each<[Partial<ForwarderEnv>, string]>([
     [{ ingestUrl: null }, "missing_ingest_url"],
     [{ ingestUrl: INGEST_URL.replace("https://", "http://") }, "ingest_url_not_https"],
@@ -110,6 +122,17 @@ describe("live config fails closed", () => {
       "ingest_url_not_ecowitt_ingest",
     ],
     [{ ingestUrl: "https://evil.example/collect" }, "ingest_url_not_ecowitt_ingest"],
+    // Right path, wrong host: PASSKEY and token would go to the attacker (Codex P1).
+    [{ ingestUrl: "https://attacker.example/ecowitt-ingest" }, "ingest_url_not_approved_origin"],
+    [
+      { ingestUrl: "https://attacker.example/functions/v1/ecowitt-ingest" },
+      "ingest_url_not_approved_origin",
+    ],
+    [{ ingestUrl: `${INGEST_URL}?redirect=1` }, "ingest_url_not_approved_origin"],
+    [
+      { ingestUrl: INGEST_URL.replace("https://", "https://u:p@") },
+      "ingest_url_not_approved_origin",
+    ],
     [{ token: null }, "missing_bridge_token"],
     [{ token: NOT_A_BRIDGE_TOKEN }, "bridge_token_shape"],
   ])("reports %j as %s", (over, problem) => {
@@ -161,6 +184,38 @@ describe("prepareForwardPayload", () => {
   it("rejects a non-string dateutc without throwing", () => {
     const text = JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: HOSTILE });
     expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "invalid_dateutc" });
+  });
+
+  it("rejects a message over the byte bound before parsing it (Codex P2 at 79ce2801)", () => {
+    const text = JSON.stringify({
+      PASSKEY: FAKE_PASSKEY,
+      dateutc: "2026-10-22 05:27:14",
+      pad: "x".repeat(MAX_MESSAGE_BYTES),
+    });
+    expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "payload_too_large" });
+  });
+
+  it("drops a stationtype that carries the PASSKEY and caps summary strings (Codex P1)", () => {
+    const copied = prepareForwardPayload(
+      JSON.stringify({
+        PASSKEY: FAKE_PASSKEY,
+        dateutc: "2026-10-22 05:27:14",
+        stationtype: FAKE_PASSKEY,
+      }),
+    );
+    expect(copied.ok && copied.summary.station).toBeNull();
+    const long = prepareForwardPayload(
+      JSON.stringify({
+        PASSKEY: FAKE_PASSKEY,
+        dateutc: `2026-10-22 05:27:14${" ".repeat(100)}`,
+        stationtype: "S".repeat(200),
+      }),
+    );
+    expect(long.ok).toBe(true);
+    if (long.ok) {
+      expect(long.summary.station).toHaveLength(64);
+      expect(long.summary.dateutc.length).toBeLessThanOrEqual(64);
+    }
   });
 
   it("omits a non-string stationtype instead of coercing it", () => {
@@ -261,7 +316,7 @@ describe("handleMessage", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("reports a network failure without throwing", async () => {
+  it("reports a network failure without throwing, after the bounded retries", async () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error("ECONNREFUSED");
     });
@@ -270,8 +325,72 @@ describe("handleMessage", () => {
       flags: flags({ live: true }),
       env: LIVE_ENV,
       fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
     });
-    expect(out).toMatchObject({ kind: "network_error", error: "ECONNREFUSED" });
+    expect(out).toMatchObject({ kind: "network_error", error: "ECONNREFUSED", attempts: 5 });
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
+  });
+
+  // Codex P2 at 79ce2801: docs/bridge-client-retry-guidance.md §4.
+  it("retries a transient 503 with Full Jitter and then forwards", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ accepted: true, inserted: 1 }), { status: 200 }),
+      );
+    const sleep = vi.fn(async () => {});
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: { sleep, random: () => 0.5 },
+    });
+    expect(out).toMatchObject({ kind: "forwarded", attempts: 2, response: { status: 200 } });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(1500);
+  });
+
+  it("never retries an auth or payload error", async () => {
+    const fetchImpl = vi.fn(async () => new Response("no", { status: 401 }));
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(out).toMatchObject({ kind: "forwarded", attempts: 1, response: { status: 401 } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts a hung POST at the timeout instead of waiting forever", async () => {
+    const fetchImpl = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: { ...NO_SLEEP, timeoutMs: 5, maxRetries: 0 },
+    });
+    expect(out).toMatchObject({ kind: "network_error", error: "aborted", attempts: 1 });
+  });
+
+  it("pins the retry policy helpers", () => {
+    expect(isRetryableStatus(408)).toBe(true);
+    expect(isRetryableStatus(429)).toBe(true);
+    expect(isRetryableStatus(503)).toBe(true);
+    expect(isRetryableStatus(401)).toBe(false);
+    expect(isRetryableStatus(400)).toBe(false);
+    expect(fullJitterDelayMs(0, () => 1)).toBe(3000);
+    expect(fullJitterDelayMs(10, () => 1)).toBe(45000);
+    expect(fullJitterDelayMs(3, () => 0)).toBe(0);
   });
 });
 
@@ -303,6 +422,26 @@ describe("response summary and exit codes", () => {
     });
   });
 
+  it("--once exits 1 when accepted: true rides a non-2xx status (Codex P2 at 79ce2801)", () => {
+    const summary = {
+      air_channels: [2],
+      soil_channels: [],
+      key_count: 5,
+      dateutc: "x",
+      station: null,
+    };
+    for (const status of [401, 429, 500]) {
+      expect(
+        onceExitCode({
+          kind: "forwarded",
+          summary,
+          attempts: 1,
+          response: summarizeResponse(status, '{"accepted":true}'),
+        }),
+      ).toBe(1);
+    }
+  });
+
   it("--once exits 0 only for a dry run or an accepted forward", () => {
     const summary = {
       air_channels: [2],
@@ -316,6 +455,7 @@ describe("response summary and exit codes", () => {
       onceExitCode({
         kind: "forwarded",
         summary,
+        attempts: 1,
         response: summarizeResponse(200, '{"accepted":true}'),
       }),
     ).toBe(0);
@@ -323,11 +463,12 @@ describe("response summary and exit codes", () => {
       onceExitCode({
         kind: "forwarded",
         summary,
+        attempts: 1,
         response: summarizeResponse(200, '{"accepted":false}'),
       }),
     ).toBe(1);
     expect(onceExitCode({ kind: "rejected_locally", reason: "missing_passkey" })).toBe(1);
-    expect(onceExitCode({ kind: "network_error", summary, error: "x" })).toBe(1);
+    expect(onceExitCode({ kind: "network_error", summary, error: "x", attempts: 1 })).toBe(1);
   });
 });
 
@@ -361,6 +502,12 @@ describe("redaction", () => {
     });
     expect(JSON.stringify(out)).not.toMatch(/vbt_/);
     expect((out.summary as { air_channels: number[] }).air_channels).toEqual([2]);
+  });
+
+  it("redacts a 32-hex PASSKEY shape wherever it sits in a string (Codex P1 at 79ce2801)", () => {
+    const hex = "0123456789abcdef0123456789ABCDEF";
+    expect(redactString(`station ${hex} ok`)).toBe("station (redacted) ok");
+    expect(JSON.stringify(redactForLog({ summary: { station: hex } }))).not.toContain(hex);
   });
 
   it("redacts broker URL credentials in the startup fields", () => {
@@ -408,5 +555,91 @@ describe("createMessageHandler (--once)", () => {
     });
     handle("ecowitt/grow", GATEWAY_MESSAGE);
     await vi.waitFor(() => expect(onDone).toHaveBeenCalledWith(1));
+  });
+});
+
+describe("attachClientLifecycle (--once broker failures)", () => {
+  function fakeClient() {
+    const handlers = new Map<string, (...args: unknown[]) => void>();
+    let subscribeErr: Error | null = null;
+    return {
+      on: (event: string, listener: (...args: unknown[]) => void) => handlers.set(event, listener),
+      subscribe: (_topic: string, cb?: (err?: Error | null) => void) => cb?.(subscribeErr),
+      emit: (event: string, ...args: unknown[]) => handlers.get(event)?.(...args),
+      failSubscribe: (e: Error) => (subscribeErr = e),
+    };
+  }
+
+  it("exits 2 once on a broker error in --once mode", () => {
+    const client = fakeClient();
+    const onFatal = vi.fn();
+    attachClientLifecycle(client, {
+      flags: flags({ once: true }),
+      onFatal,
+      connectTimeoutMs: 60_000,
+    });
+    client.emit("error", new Error("Not authorized"));
+    client.emit("error", new Error("Not authorized"));
+    expect(onFatal).toHaveBeenCalledTimes(1);
+    expect(onFatal).toHaveBeenCalledWith(2);
+  });
+
+  it("exits 2 when the subscription is rejected", () => {
+    const client = fakeClient();
+    client.failSubscribe(new Error("denied"));
+    const onFatal = vi.fn();
+    attachClientLifecycle(client, {
+      flags: flags({ once: true }),
+      onFatal,
+      connectTimeoutMs: 60_000,
+    });
+    client.emit("connect");
+    expect(onFatal).toHaveBeenCalledWith(2);
+  });
+
+  it("exits 2 when the broker never connects within the timeout", () => {
+    vi.useFakeTimers();
+    try {
+      const client = fakeClient();
+      const onFatal = vi.fn();
+      attachClientLifecycle(client, {
+        flags: flags({ once: true }),
+        onFatal,
+        connectTimeoutMs: 1000,
+      });
+      vi.advanceTimersByTime(1001);
+      expect(onFatal).toHaveBeenCalledWith(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stays quiet after a clean connect and subscribe, and never exits in continuous mode", () => {
+    vi.useFakeTimers();
+    try {
+      const once = fakeClient();
+      const onFatalOnce = vi.fn();
+      attachClientLifecycle(once, {
+        flags: flags({ once: true }),
+        onFatal: onFatalOnce,
+        connectTimeoutMs: 1000,
+      });
+      once.emit("connect");
+      vi.advanceTimersByTime(5000);
+      expect(onFatalOnce).not.toHaveBeenCalled();
+
+      const cont = fakeClient();
+      const onFatalCont = vi.fn();
+      attachClientLifecycle(cont, {
+        flags: flags({ once: false }),
+        onFatal: onFatalCont,
+        connectTimeoutMs: 1000,
+      });
+      cont.emit("error", new Error("Not authorized"));
+      vi.advanceTimersByTime(5000);
+      expect(onFatalCont).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

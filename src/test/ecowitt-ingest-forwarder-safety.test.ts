@@ -66,6 +66,13 @@ describe("ecowitt-ingest-forwarder — static safety", () => {
     expect(claim).toBeLessThan(body.indexOf("await"));
   });
 
+  it("pins the approved-origin, size-bound and timeout guards (Codex at 79ce2801)", () => {
+    expect(CODE).toMatch(/APPROVED_INGEST_URLS\.includes\(/);
+    expect(CODE).toMatch(/MAX_MESSAGE_BYTES/);
+    expect(CODE).toMatch(/new AbortController\(\)/);
+    expect(CODE).toMatch(/status >= 200 && status < 300/);
+  });
+
   it("requires the vbt_ token shape and https before going live", () => {
     expect(CODE).toMatch(/\^vbt_/);
     expect(CODE).toMatch(/protocol !== "https:"/);

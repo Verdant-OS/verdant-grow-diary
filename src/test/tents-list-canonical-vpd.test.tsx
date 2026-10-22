@@ -24,6 +24,7 @@ vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
 import TentEnvironmentSnapshotStrip from "@/components/TentEnvironmentSnapshotStrip";
 import { buildTonightTentMetrics } from "@/lib/tonightTentHomeViewModel";
 import { tentsListCanonicalVpd, tentsListDiarySnapshotRows } from "@/lib/tentsListVpdRules";
+import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 
 const NOW = new Date("2026-10-22T03:00:00.000Z");
 const at = (hoursAgo: number) => new Date(NOW.getTime() - hoursAgo * 3_600_000).toISOString();
@@ -250,6 +251,46 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-sensor-empty-tent-1")).toHaveTextContent(
       "No sensor data yet",
     );
+  });
+
+  it("uses Tonight's one-minute future skew, not the five-minute classifier (Codex P1 at 0c19a9e0)", () => {
+    const ts = new Date(NOW.getTime() + 2 * 60_000).toISOString();
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts,
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    };
+    // The shared classifier still accepts a capture two minutes ahead...
+    expect(classifySnapshotTimestamp(ts, NOW.getTime())).toBe("ok");
+    // ...and the Dashboard withholds it, so the list must too.
+    expect(dashboardVpd([], { status: "ok", snapshot: diary })?.state).not.toBe("value");
+    expect(
+      tentsListDiarySnapshotRows({ status: "ok", snapshot: diary }, "tent-1", NOW.getTime()),
+    ).toEqual([]);
+    hook.state = { status: "ok", snapshot: diary };
+    renderEmptyStrip();
+    expect(screen.getByTestId("tents-list-sensor-empty-tent-1")).toHaveTextContent(
+      "No sensor data yet",
+    );
+  });
+
+  it("still shows a diary capture within Tonight's skew", () => {
+    const ts = new Date(NOW.getTime() + 30_000).toISOString();
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts,
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    };
+    expect(dashboardVpd([], { status: "ok", snapshot: diary })?.state).toBe("value");
+    expect(
+      tentsListDiarySnapshotRows({ status: "ok", snapshot: diary }, "tent-1", NOW.getTime()),
+    ).toHaveLength(2);
   });
 
   it.each([

@@ -158,6 +158,8 @@ export interface TonightMetricView {
 
 /** Allowed clock skew before a capture time counts as "in the future". */
 const FUTURE_SKEW_MS = 60_000;
+/** Tonight's future-skew threshold, for surfaces that must agree with it (#2303). */
+export const TONIGHT_FUTURE_SKEW_MS = FUTURE_SKEW_MS;
 
 interface Candidate {
   value: number;

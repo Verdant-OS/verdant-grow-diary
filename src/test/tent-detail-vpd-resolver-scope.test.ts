@@ -183,6 +183,38 @@ describe("resolveTentDetailVpd honours intake quality at Tonight's capture", () 
     expect(out.value).toBe(1.2);
   });
 
+  it("withholds the same-capture direct VPD the header still carries (Codex P1 at 0c19a9e0)", () => {
+    // In TentDetail, `existing` is the header's own direct VPD, graded without
+    // the row quality flag: at Tonight's instant it is the rejected reading.
+    const headerVpd = { value: 1.2, capturedAt: at(1), source: "manual" as const, stale: false };
+    const out = resolveTentDetailVpd({
+      tonight: direct(),
+      existing: headerVpd,
+      rejectedMetrics: [],
+      rejectedCapturedAt: at(0.05),
+      contributors: null,
+      captureClimate: tentDetailCaptureClimate(rowsAt(1, "degraded"), null),
+      nowMs: NOW,
+    });
+    expect(out.value).toBeNull();
+    expect(out.capturedAt).toBeNull();
+  });
+
+  it("keeps an independent older observation when Tonight's capture is flagged", () => {
+    const older = { value: 1.0, capturedAt: at(3), source: "manual" as const, stale: false };
+    const out = resolveTentDetailVpd({
+      tonight: direct(),
+      existing: older,
+      rejectedMetrics: [],
+      rejectedCapturedAt: at(0.05),
+      contributors: null,
+      captureClimate: tentDetailCaptureClimate(rowsAt(1, "invalid"), null),
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.0);
+    expect(out.capturedAt).toBe(older.capturedAt);
+  });
+
   it("ignores a flagged row at a different capture", () => {
     const out = resolveTentDetailVpd({
       tonight: direct(),

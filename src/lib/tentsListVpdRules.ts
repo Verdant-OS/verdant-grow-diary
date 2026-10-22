@@ -17,7 +17,11 @@ import type {
   CanonicalTentVpd,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
-import { buildTonightTentMetrics, type TonightSensorRow } from "@/lib/tonightTentHomeViewModel";
+import {
+  buildTonightTentMetrics,
+  TONIGHT_FUTURE_SKEW_MS,
+  type TonightSensorRow,
+} from "@/lib/tonightTentHomeViewModel";
 
 type TonightSnapshotInput = Parameters<typeof buildTonightTentMetrics>[0]["snapshot"];
 
@@ -54,9 +58,11 @@ export function tentsListCanonicalVpd(
  * snapshot card, so the list shows the Dashboard's evidence instead of
  * "No sensor data yet" (Codex P2 on #2303 at 69de43db). A diary capture is
  * manual evidence; anything else returns no rows. A capture whose timestamp
- * the shared sensor-truth classifier rejects (missing, unparseable or in the
- * future beyond the allowed skew) yields no rows either, as Tonight rejects
- * it (Codex P1 on #2303 at 85ec1e78).
+ * the shared sensor-truth classifier rejects (missing or unparseable) yields
+ * no rows either (Codex P1 on #2303 at 85ec1e78), and so does one stamped
+ * further ahead than Tonight's own one-minute skew: the shared classifier
+ * allows five minutes, which would show as current here what the Dashboard
+ * withholds (Codex P1 on #2303 at 0c19a9e0).
  */
 export function tentsListDiarySnapshotRows(
   snapshot: TonightSnapshotInput,
@@ -65,6 +71,7 @@ export function tentsListDiarySnapshotRows(
 ): BuildTentSnapshotInput[] {
   const snap = snapshot.status === "ok" ? snapshot.snapshot : null;
   if (!snap || !snap.ts || classifySnapshotTimestamp(snap.ts, nowMs) !== "ok") return [];
+  if (Date.parse(snap.ts) - nowMs > TONIGHT_FUTURE_SKEW_MS) return [];
   if (snap.source !== "diary" && !snap.diary_evidence_ref) return [];
   const rows: BuildTentSnapshotInput[] = [];
   const push = (metric: string, value: number | null) => {

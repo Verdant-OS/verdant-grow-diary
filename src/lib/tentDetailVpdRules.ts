@@ -120,7 +120,9 @@ function tonightVpdPassesTruth(
  *   temperature and RH: keep the tent page's own observation, which only
  *   admits realistic readings. Tonight does not run that realism check
  *   itself. A rejection at an older capture does not block a newer one
- *   (Codex P2 on #2303).
+ *   (Codex P2 on #2303). When the tent page's own observation is the same
+ *   capture Tonight just failed, it is withheld too, never shown as the
+ *   fallback (Codex P1 on #2303 at 0c19a9e0).
  */
 export function resolveTentDetailVpd(input: {
   tonight: TonightMetricView | null | undefined;
@@ -174,6 +176,18 @@ export function resolveTentDetailVpd(input: {
         isStale(tonight.capturedAt, input.nowMs, undefined, source),
       calculated: tonight.calculated,
     };
+  }
+  // Tonight's candidate failed sensor truth. The tent page's own observation
+  // stands in only when it is a different capture: the Environment header
+  // grades the same direct VPD without the row quality flag, so at the same
+  // instant it is the rejected reading itself (Codex P1 on #2303 at 0c19a9e0).
+  if (
+    tonight?.state === "value" &&
+    existingMs !== null &&
+    tonightMs !== null &&
+    existingMs === tonightMs
+  ) {
+    return { value: null, capturedAt: null, source: null, stale: false, calculated: false };
   }
   return { ...input.existing, calculated: false };
 }

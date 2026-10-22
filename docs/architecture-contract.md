@@ -1,14 +1,17 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `c8523adccc81f18e0cf7118a69dc31493d273c4c` (deploy branch
-`verdant-grow-diary`, `#2079`), 2026-10-14, by Claude (§15 re-verification after `#1873` retired the
-npm lockfile, `#1857` rewrote the AI sensor-snapshot resolver and `#2070` gated the Gemini
-key-before-spend order; see §15.1). **Every clause describes that tree.** It supersedes the
-`22f8dfe8` stamp, whose record stays in §15.1, and it removes the note that AC-8.1 and AC-1.8 were
-amended after the stamp: both now describe the stamped tree. The re-read ran in two passes, from
-`22f8dfe8` to `ce1d281f` (`#2069`) and from `ce1d281f` to the stamped SHA; the first pass is
-described next, the second after it.
+**Verified from source at:** `dfb1567ee8c42b3449ea3314976c6ed1d16a382d` (deploy branch
+`verdant-grow-diary`, `#2134`), 2026-10-15, by Grok (§15 amendment for the nine `#2146` P2s; see
+§15.1). **Every clause amended below was re-read on that tree.** It supersedes the `c8523adc`
+stamp for those clauses. The `c8523adc` re-verification record stays: `#1873` retired the npm
+lockfile, `#1857` rewrote the AI sensor-snapshot resolver and `#2070` gated the Gemini
+key-before-spend order. That earlier stamp superseded `22f8dfe8`, whose record stays in §15.1, and
+it removed the note that AC-8.1 and AC-1.8 were amended after the stamp: both describe the
+`c8523adc` tree. The re-read ran in two passes, from
+`22f8dfe8` to `ce1d281f` (`#2069`) and from `ce1d281f` to `c8523adc`, and a third step, the
+`#2146` amendment, ran from `c8523adc` to the stamped SHA; the first pass is described next, then
+the second, then the amendment.
 **This stamp re-read every citation into a file that changed between `22f8dfe8` and the stamped
 SHA, and carried the rest by file identity.** `git diff --name-only 22f8dfe8 ce1d281f` names 84
 files across 12 first-parent merges (first `#2058`, last `#2069`), 30 of them under `src/test/`, and
@@ -43,13 +46,14 @@ AC-10.2's zero hits hold over `src/`, `supabase/`, `scripts/`, `e2e/`, `tools/`,
 `spikes/`. The seven stack claims stand as recorded at `22f8dfe8`, with claim 4 now reading "Bun is
 canonical; `bun.lock` is the only lockfile" and claim 6's AI-path gap closed in the repository
 (AC-4.2).
-**Second pass, `ce1d281f` to the stamped SHA.** `git diff --name-only ce1d281f c8523adc` names 134
+**Second pass, `ce1d281f` to `c8523adc`.** `git diff --name-only ce1d281f c8523adc` names 134
 files across 33 first-parent merges (`#1968` to `#2105`, the last merged being `#2079`), 65 of them
 under `src/test/`, and no migration. `config/required-status-checks.json` and `.github/workflows/ci.yml`
 are unchanged; the workflows that changed (`#2071` retired the sandbox money-migration lanes) are not
-cited. Twelve cited files changed, and every cite into them was re-read on the stamped tree. Changed
-in substance: `#2070` makes AC-5.1's order scan find the key-read call and adds handler tests that
-prove no credit is spent without the key, so fail-before-spend is now gated (AC-5.1 and its §11
+cited. Thirteen cited files changed, and every cite into them was re-read on the `c8523adc`
+tree. Changed in substance: `#2070` makes AC-5.1's order scan find the key-read call and adds
+handler tests that prove no credit is spent without the key, so fail-before-spend is now gated
+(AC-5.1 and its §11
 row). Line moves only: `geminiDirectChat.test.ts:25-58` → `:27-60` (AC-5.2);
 `src/pages/Coach.tsx:205-212`, `:308`, `:362-373` and `:481` → `:206-213`, `:322`, `:376-387` and
 `:497` (AC-5.3, AC-5.5); `src/pages/Dashboard.tsx:950` → `:962` (AC-4.2); `src/pages/Pricing.tsx:310`
@@ -58,10 +62,19 @@ lines are unchanged: `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md
 `docs/codebase-map.md` (`:469-470`), `src/routes/_app.tsx`, and the AC-3.2 file lists
 (`aiCoachPhotoFileRules.ts`, `plantStartDateRules.ts`, `quickLogTypedReusedReceiptRules.ts`,
 `quickLogWaterReceiptRules.ts`, `sandboxCheckoutTestModeNoteRules.ts:1`). The same script reproduced
-every `ce1d281f` figure above exactly, then measured the stamped SHA: AC-3.2 564 `*Rules.ts` files,
+every `ce1d281f` figure above exactly, then measured `c8523adc`: AC-3.2 564 `*Rules.ts` files,
 the five new ones moving no drift row (55/7 raw, 44/6 executable, 0 client importers, 2 type-only);
-AC-3.4 813 shim import statements in 812 files, all 21 added in new `src/test/` files; AC-4.3's
+AC-3.4 813 alias-only shim import statements in 812 files, all 21 added in new `src/test/` files
+(the relative-specifier exception is AC-3.4); AC-4.3's
 single-line figures unchanged (77 in 67, 70 in 61, 106 in 86); AC-10.2 still zero hits.
+**This amendment, `c8523adc` to `dfb1567e`.** `git diff --name-only c8523adc dfb1567e` names 13
+files. The clauses this amendment changes were re-read here. Cited files that changed, apart from
+this contract: `docs/agents/CURRENT_STATE.md` and `docs/agents/HANDOFF_LOG.md` (named, not
+line-cited by the amended clauses) and `docs/specs/release-topology-specification.md` (the
+not-implemented row is still `:943`, pinned in AC-10.2 to `#2072` head `c7838ccb`). AC-3.4's
+alias-only census, re-measured on this tree, is 814 statements in 813 files. Every clause this
+amendment does not re-state is carried by file identity from `c8523adc` where its cited files are
+unchanged between the two trees.
 Package-internal cites in AC-1.4, AC-1.5 and §14 are carried, not re-read: the only `node_modules`
 available to this session was resolved by npm against the public registry, not from `bun.lock`, so it
 is not the tree those cites describe. The pinned versions they name still match `bun.lock`. The AC-4.3
@@ -501,10 +514,14 @@ _Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:60,63`; `src/constants/ve
 **AC-3.4 — Component code routes through the react-router compat shim, not TanStack Router
 directly.**
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 surface on TanStack Router.
-Measured at the stamped SHA, **813** static import statements in **812** files import the shim;
-`src/pages/PlantDetail.tsx` imports it twice. By directory: 577 under `src/test`, 134 under
-`src/components`, 94 statements in 93 files elsewhere under `src/pages`, 1 under
-`src/pages/support/__tests__`, and 7 under `src/hooks`. **Zero** files under
+The census is **alias-only**: it counts static `from "@/lib/react-router-compat"` import
+statements and no other specifier. Measured at the stamped SHA, that census is **814** statements
+in **813** files; `src/pages/PlantDetail.tsx` imports it twice. By directory: 578 under `src/test`,
+134 under `src/components`, 94 statements in 93 files elsewhere under `src/pages`, 1 under
+`src/pages/support/__tests__`, and 7 under `src/hooks`. One static import is outside the census:
+`src/test/react-router-compat-navigate-real.test.tsx:28-39` imports `../lib/react-router-compat`
+on purpose (`#740`). With that statement the full static-import totals are **815** statements in
+**814** files. **Zero** files under
 `src/components/` or `src/pages/` mention `@tanstack/react-router` at all. Vitest aliases the shim to
 a real MemoryRouter, so idiomatic TanStack hooks in a component look correct and fail in tests.
 _Source:_ `src/lib/react-router-compat.tsx`; the Vitest alias is at `vitest.config.ts:50-52`. The count
@@ -521,7 +538,8 @@ ten of the eleven added under `src/test/` (nine in new files) and one in the exi
 `src/components/PhenoCandidateEvidenceCoverage.tsx`; 791 in 790 at `22f8dfe8`, all seven added in new
 `src/test/` files; 792 in 791 at `ce1d281f`, the one added in the existing
 `src/components/grow-help/GrowHelpAboutPanel.tsx` (`#1851`); 813 in 812 at `c8523adc`, all 21
-added in new `src/test/` files. The
+added in new `src/test/` files, alias-only, the same relative-specifier exception excluded; 814 in
+813 at `dfb1567e`, the one added in the new `src/test/create-plant-case-variant-tent.test.tsx`. The
 shim's `useNavigate` now returns the navigate promise, which does not affect this clause.
 `established fact`.
 _Enforcement:_ `convention only`, plus the test-time alias.
@@ -556,9 +574,10 @@ inherits the fix: for those tokens it returns `canonical: "invalid"`, `sourceLab
 member for `"constructor"` and `"__proto__"` (never healthy, since `isHealthySensorSource` is
 `=== "live"`, but not one of the six); an earlier guard, `fd33e8ff9` on #1620, closed unmerged on
 2026-09-23. The fixed behaviour was reproduced under Bun 1.3.11 on the #1655 tree merged onto the
-stamped SHA, and is **gated** by `src/test/sensor-source-prototype-key.test.tsx`, which iterates
-`Object.getOwnPropertyNames(Object.prototype)` through the normalizer, the display canon, both
-label helpers and both badge components. Whether any input path hands such a token to the display
+stamped SHA, and is **gated** by `src/test/sensor-source-prototype-key.test.tsx` in two
+coverages. The first (`:15-32`) iterates `Object.getOwnPropertyNames(Object.prototype)` through the
+normalizer, the display canon and both label helpers. The second (`:53-80`) renders both badge
+components only for `constructor`, `__proto__` and `toString`. Whether any input path hands such a token to the display
 canon is `NOT_MEASURED`; none is in the schema admit-list below (`inference`).
 
 **Schema is wider than the resolved vocabulary — recorded, not narrowed here.** The latest
@@ -795,8 +814,12 @@ layers, not merely as a badge.
 
 **Scope of the exception.** `pi_bridge` is **not** "the only value ever stored outside the six" —
 the schema admit-list is wider (AC-4.1), and historical or alternate paths may leave other
-non-canonical tokens on disk. What is unique here is the **promotion**: this is the sole
-non-canonical token the normalizer maps to `live`. Generic webhook ingest does the opposite —
+non-canonical tokens on disk. The promotion this clause records is the **transport alias**:
+`pi_bridge` is the stored transport name `ALIAS` maps to `live` (`sensorSourceRules.ts:28`). It is
+not the only token mapped to `live`. The same table maps the trust-label aliases `sensor` and
+`realtime` to `live` (`:22-23`), and `live` itself (`:21`). `TRUST_LIVE_ALIASES` is
+`{live, sensor, realtime}` (AC-4.5) and does not include `pi_bridge`. Those trust-label aliases are
+a different list from the transport alias. Generic webhook ingest does the opposite —
 canonicalizes at storage (`storageMapping.ts`) so transport names are not stored as trust state
 (AC-4.2). The unused `isRejectedSourceAlias` helpers do not participate in either path.
 
@@ -991,8 +1014,12 @@ _Source:_ `supabase/functions/ai-doctor-review/index.ts`:
 - `:739-749` (`readToolArguments`).
 
 `:220-221` repeat `tools` / `tool_choice` inside the HMAC signing frame, not the live request.
-Invalid, empty or unparseable output, and output that fails grounding, is refunded and returns a
-calm failure (`:668-689`). The validator is hand-written, not zod
+Invalid, empty or unparseable output, and output that fails grounding, is not an unconditional
+refund. Those paths call `failureAfterRefund` (`:517-523`, from `:654`, `:671`, `:678`, `:684` and
+`:689`), which attempts an idempotent `ai_credit_refund` keyed `refund:` plus the spend id
+(`:493-514`). A confirmed refund returns the terminal calm failure. An unconfirmed attempt,
+including a missing spend id, returns `result_pending`. Confirmed and pending stay separate
+outcomes. The validator is hand-written, not zod
 (`supabase/functions/ai-doctor-review/contract.ts:124-182`). `TOOL_SCHEMA` is closed
 (`additionalProperties: false`) and has no `action_queue_suggestion` property, while the validator
 accepts one as optional (`contract.ts:162`); the two disagree harmlessly.
@@ -1003,10 +1030,21 @@ forced tool and only a shape check. "AI Doctor output is tool-forced and validat
 review function, not of every surface named AI Doctor.
 `established fact`.
 
-**AC-5.4 — Credits are metered server-side before the model call, with idempotency, and refunded on
-failure.**
+**AC-5.4 — Credits are metered server-side before the model call, with idempotency, and a refund is
+attempted on the failure paths that call `failureAfterRefund`.**
 `ai_credit_spend` is called with a UUID-validated `p_idempotency_key` before inference; a failed
-call reverses through `ai_credit_refund` with its own key. Reversals are append-only.
+call is not an unconditional reversal. On model and upstream failures (timeout or network `:614`,
+HTTP 402 / 429 / other non-OK `:626`, `:636`, `:646`, unparseable, empty, invalid or ungrounded
+output `:654`-`:689`), on a stale result-less replay (`:561`) and on an explicit finalization
+rejection (`:723`), it attempts an idempotent `ai_credit_refund` keyed `refund:` plus the spend id
+through `failureAfterRefund` (`ai-doctor-review/index.ts:493-523`). A confirmed refund is an
+append-only reversal. An unconfirmed attempt, including a missing spend id, returns
+`result_pending`. Confirmed and pending stay separate outcomes. **No refund is attempted, by
+design, when the outcome is ambiguous:** an ambiguous `ai_doctor_finalize_review` result (timeout,
+transport error or unparseable response) returns `result_pending` without calling
+`failureAfterRefund` (`:715-717`), and so does the outer catch once a spend may exist
+(`:733-735`). Both keep the spend and request key so a same-key retry can recover a committed
+result rather than refund one.
 
 **`idempotencyKey` has a request-body path.** The edge function validates
 `request.idempotencyKey` as a UUID (`ai-doctor-review/index.ts:428-431`) and passes it to
@@ -1138,9 +1176,12 @@ account deletion (`supabase/functions/delete-account/index.ts:84`), which grants
 `established fact`.
 
 **Billing changes since the first stamp leave this clause intact.** #1375 blocks a founder purchase
-after an earlier refund. #1388 routes approved Paddle refund adjustments to revoke. #1373, #1374 and
-#1398 add founder-refund migrations. All of them only revoke or deny founder rows in `subscriptions`
-more strictly, through service-role paths. None of them touches `src/lib/entitlements/`,
+after an earlier refund. #1388 routes approved Paddle refund adjustments to revoke. #1374 and
+#1398 add founder-refund migrations. They only revoke or deny founder rows in `subscriptions`
+more strictly, through service-role paths. #1373 is separate: it is a client-UPDATE grant and RLS
+hardening on `public.founders` (`supabase/migrations/20260914190600_founders_client_updates_fail_closed.sql`),
+not a subscription-refund migration. It revokes `UPDATE` from `PUBLIC`, `anon` and `authenticated`
+and adds the restrictive `founders_no_client_update` policy. None of them touches `src/lib/entitlements/`,
 `ai_credit_*`, `billing_subscriptions` or `profiles.tier`.
 
 > **Naming hazard, recorded so it is not mistaken for a violation.** The row type is named
@@ -1154,9 +1195,11 @@ plan comparisons.**
 Prefer `canUseCapability(entitlement, "advancedExports")` over `if (plan === "pro")`. Plan gates do
 not belong in JSX.
 _Source:_ `src/lib/entitlements/capabilities.ts`, `src/lib/entitlements/capabilityAccess.ts:13-18`
-(`canUseCapability`), `src/lib/entitlements/planCatalog.ts`. `established fact`. Two display-only
-plan-id comparisons exist in pages (`src/pages/Pricing.tsx:311`, `src/pages/Settings.tsx:324`). Both
-predate the first stamp, and neither is a capability gate. They are drift, not precedent.
+(`canUseCapability`), `src/lib/entitlements/planCatalog.ts`. `established fact`. Examples of
+display-only `founder_lifetime` comparisons exist in pages (`src/pages/Pricing.tsx:311`,
+`src/pages/Settings.tsx:324`). `Settings.tsx:322-323` also compares `planId` with `free`, so those
+two `founder_lifetime` lines are examples, not a complete plan-id count. The `founder_lifetime`
+examples predate the first stamp, and neither is a capability gate. They are drift, not precedent.
 
 **AC-6.3 — `resolveEntitlements` is pure and takes `now` as a parameter.**
 It has no React, no Supabase, no fetch, and no internal clock, so entitlement resolution is
@@ -1367,8 +1410,12 @@ Case-insensitive search across `src/` and `supabase/` at the stamped SHA returns
 `nelson`, `modified z`, `modifiedZ`, `median absolute deviation`, `\bMAD\b`, `z-?score`, `zscore`
 or `robust ?z`, and the same at `2ffe78cc1` and `7e024f93` over `scripts/`, `e2e/`, `tools/`, `plugins/` and
 `spikes/`. Outside this contract, Nelson is mentioned only as not-implemented guidance: the
-2026-08-21 adjudication, `docs/specs/release-topology-specification.md:943` and the review rule at
-`.coderabbit.yaml:205-206`.
+2026-08-21 adjudication, `docs/specs/release-topology-specification.md:943` at `#2072` head
+`c7838ccb42f14e8f00dc4be5d8a8e629433897a6` (the not-implemented row; the same line on this stamp,
+re-read after `#2072` merged), and the review rule at
+`.coderabbit.yaml:205-206`. The `#2073` PR body named a prospective `:936` for that row. Merged PR
+bodies are not edited. A later integration that moves the row must revalidate this citation. The
+header's `:831` → `:853` move is the line on the `c8523adc` tree and stays that historical cite.
 _Source:_ measured at the stamped SHA; `docs/audits/architecture-audit-adjudication-2026-08-21.md`
 §4.1. `established fact`.
 
@@ -1580,9 +1627,12 @@ stale every time the operating picture moved. Only the durable rules stay:
   `#1728`) or "production deployer: docs/agents/CURRENT_STATE.md" (since). The durable requirement:
   **measure the publish trigger before asserting a publisher**, by the chain that specification's
   §4 defines. Not measured in this file, by design.
-- **The build target is not the serving target, and neither may be assumed from the other.** The
-  Lovable preset configures Nitro against one target while production is served through another;
-  reconciling them requires deployment metadata this repository does not contain. The durable
+- **The build target is not the serving target, and neither may be assumed from the other.** A
+  build target does not establish the serving target. The Lovable preset configures Nitro against
+  one build target; which host serves production is a separate measurement, and this section does
+  not state it. Dated measurements stay in `docs/specs/release-topology-specification.md` and in
+  `docs/agents/CURRENT_STATE.md`. Reconciling the two targets requires deployment metadata this
+  repository does not contain. The durable
   requirement: **a release topology claim is measured or it is `NOT_MEASURED`** — never inferred from
   build configuration, response headers, Make comments, vendor SDKs, or tip-equals-live parity.
   `docs/specs/release-topology-specification.md` §4 and §8 define the measurement chain; its
@@ -1654,7 +1704,8 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-10-13 | `7e024f9362d4f57c1d5cb8252bf0104a2626b46a` | Claude | Merge of the deploy tip (`ad79ebc6`, carrying `#1899`'s restamp) into `claude/remove-package-lock` (`#1873`), stamp unchanged. AC-8.1, AC-1.8's lockfile note, the §14 AC-8.1 row and the opening stamp note now state the bun-only rule this branch enforces; every other clause is `#1899`'s text. AC-8.1's cites were re-read on the merged tree: `check-bun-lockfile-policy.mjs:5`, `:24`, `:66-71`, `:179-190` (`:185-186`), `check-bun-lockfile-policy.test.ts:537`, `dependency-security-ci.yml:48-49`. This supersedes the 2026-10-10 Canopy stamp the branch carried (`ba991f60`), which read an older tree.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-10-14 | `22f8dfe8d46386bc4044d9312036b5fbd63c494f` | Claude | Merge of the deploy tip (`ad399831`, carrying `#2065`'s restamp at `22f8dfe8`) into `claude/remove-package-lock` (`#1873`), stamp unchanged. AC-8.1, AC-1.8's lockfile note, the §14 AC-8.1 row and the opening stamp note again state the bun-only rule this branch enforces; every other clause is `#2065`'s text. `#1931` added the `postcss-selector-parser` 7.1.6 floor to `BUN_LOCK_SECURITY_FLOORS`, which moves AC-8.1's cites down one line: `check-bun-lockfile-policy.mjs:5`, `:24`, `:67-72`, `:180-191` (`:186-187`); `check-bun-lockfile-policy.test.ts:537` and `dependency-security-ci.yml:48-49` hold. All re-read on the merged tree.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 2026-10-14 | `ce1d281fa3c39bfd54afd5dab7270a1b232c1014` | Claude | §15 re-verification, first pass, at the then deploy tip (`#2069`; this stamp was never merged on its own and is superseded by the `c8523adc` row below), on the owner's instruction (a `source claim`: given in chat, not recorded in the repository) after CodeRabbit flagged on `#1873` that AC-1.8 claimed the bun-only rule at a stamp that still had `package-lock.json`. Supersedes the `22f8dfe8` stamp. 84 files across 12 merges since `22f8dfe8` (first `#2058`, last `#2069`; 30 in `src/test/`; one migration, `#1872`'s `convert_referral` replacement, `service_role` only); 17 cited files changed, and every cite into them was re-read against both trees. Substance: AC-8.1 and AC-1.8 now describe the stamped tree, so the after-the-stamp note is gone; AC-4.2's AI-context-path gap is replaced by the fixed resolver (`#1857`), gated by `quick-log-sensor-snapshot-ai-allowlist.test.ts`, as §15.2 required; AC-1.7 records the Grow Help Toolkit branch that renders `<Outlet />` without the sink (`#1851`). Counts: AC-3.2 unchanged (559; 55/7, 44/6, 0, 2); AC-3.4 792 in 791; AC-4.3 77/67, 70/61, 106/86; AC-10.2 zero. Line moves are listed in the header.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 2026-10-14 | `c8523adccc81f18e0cf7118a69dc31493d273c4c` | Claude | §15 re-verification, second pass, at the deploy tip (`#2079`), completing `#2073` after Critical Mass's FAIL at `023ba0df` (P1: AC-5.1 still described the pre-`#2070` order check). The owner reassigned `#2073` to this session in chat (a `source claim`, recorded as the `claimed_by` comment on `#2073`). Supersedes the `22f8dfe8` stamp and the `ce1d281f` first pass above. 134 files across 33 merges since `ce1d281f` (`#1968` to `#2105`; 65 in `src/test/`; no migration; `required-status-checks.json` and `ci.yml` unchanged); 12 cited files changed, and every cite into them was re-read on the stamped tree. Substance: AC-5.1 now records fail-before-spend as gated by `#2070`'s call-level order scan and keyless handler tests, with `ai-cultivar-qa` still unenforced, and its §11 row says so. Counts, after the script first reproduced every `ce1d281f` figure: AC-3.2 564 files, drift rows unchanged (55/7, 44/6, 0, 2); AC-3.4 813 in 812; AC-4.3 77/67, 70/61, 106/86 unchanged; AC-10.2 zero. Line moves are listed in the header.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 2026-10-14 | `c8523adccc81f18e0cf7118a69dc31493d273c4c` | Claude | §15 re-verification, second pass, at the deploy tip (`#2079`), completing `#2073` after Critical Mass's FAIL at `023ba0df` (P1: AC-5.1 still described the pre-`#2070` order check). The owner reassigned `#2073` to this session in chat (a `source claim`, recorded as the `claimed_by` comment on `#2073`). Supersedes the `22f8dfe8` stamp and the `ce1d281f` first pass above. 134 files across 33 merges since `ce1d281f` (`#1968` to `#2105`; 65 in `src/test/`; no migration; `required-status-checks.json` and `ci.yml` unchanged); 13 cited files changed (the row originally said 12; `#2146` P2-1), and every cite into them was re-read on the stamped tree. Substance: AC-5.1 now records fail-before-spend as gated by `#2070`'s call-level order scan and keyless handler tests, with `ai-cultivar-qa` still unenforced, and its §11 row says so. Counts, after the script first reproduced every `ce1d281f` figure: AC-3.2 564 files, drift rows unchanged (55/7, 44/6, 0, 2); AC-3.4 813 in 812 alias-only; AC-4.3 77/67, 70/61, 106/86 unchanged; AC-10.2 zero. Line moves are listed in the header.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-10-15 | `dfb1567ee8c42b3449ea3314976c6ed1d16a382d` | Grok   | `#2146` amendment. Nine Codex P2s from the retrospective review of `#2073` (comment 6196768751). Docs only. 13 files changed since `c8523adc`; the amended clauses were re-read, and the rest are carried by file identity where the cited file is unchanged. P2-1: the second-pass cited-file count is 13. P2-2: AC-10.2 pins the not-implemented row at `:943` on `#2072` head `c7838ccb`; the merged `#2073` body is not edited. P2-3: §14 states that a build target does not establish the serving target. P2-4: AC-5.3 describes an idempotent refund attempt with confirmed and `result_pending` outcomes kept separate. P2-5: AC-4.4 limits the `pi_bridge` exception to the transport alias and names the `sensor` / `realtime` trust-label aliases. P2-6: AC-4.1 states the prototype-key and badge coverages separately. P2-7: `#1373` is described as `public.founders` client-UPDATE / RLS hardening, separate from the `#1374` / `#1398` refund migrations. P2-8: AC-6.2 calls the `founder_lifetime` page comparisons examples and notes `Settings.tsx:322-323` compares `planId` with `free`. P2-9: AC-3.4 is alias-only, 814 statements in 813 files, with the `#740` relative import disclosed (full static totals 815 / 814).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |     |
 
 ### 15.2 Evidence status at deploy tip `e0bb3930` — 2026-10-07, dated
 

@@ -39,13 +39,15 @@ describe("Action Queue status copy speaks plainly", () => {
     expect(ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.title).toBe(
       "Verdant hasn't confirmed status updates are working yet",
     );
-    expect(ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label).toBe("Updates unverified");
+    expect(ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label).toBe("Status updates unverified");
     expect(ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.title).toBe("Status changes are working");
-    expect(ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.label).toBe("Updates working");
+    expect(ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.label).toBe("Status updates working");
   });
 
   it("keeps the no-equipment-control promise where it already appeared", () => {
-    expect(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body).toMatch(/never sends/i);
+    expect(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body).toMatch(
+      /Verdant never sends commands to your equipment from this queue\./,
+    );
     expect(safeActionQueueFailureCopy("transition", { ok: false, reason: "rpc_missing" })).toMatch(
       /never sends commands to your equipment/i,
     );

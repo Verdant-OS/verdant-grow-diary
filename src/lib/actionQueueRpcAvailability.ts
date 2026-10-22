@@ -133,7 +133,7 @@ export const ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY = {
   body:
     "Approve, reject, simulate, cancel, and complete are paused until you refresh the queue. " +
     "No new status will be saved from those buttons while this message is showing. " +
-    "This queue never sends equipment control.",
+    "Verdant never sends commands to your equipment from this queue.",
 } as const;
 
 /** aria/title reason when transition buttons are fail-closed with the banner. */
@@ -181,7 +181,7 @@ export function areActionQueueTransitionMutationsBlocked(
  */
 export const ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY = {
   title: "Verdant hasn't confirmed status updates are working yet",
-  label: "Updates unverified",
+  label: "Status updates unverified",
 } as const;
 
 /**
@@ -189,7 +189,7 @@ export const ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY = {
  */
 export const ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY = {
   title: "Status changes are working",
-  label: "Updates working",
+  label: "Status updates working",
 } as const;
 
 /**

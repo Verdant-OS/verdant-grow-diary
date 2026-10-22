@@ -16,7 +16,20 @@ import type {
   BuildTentSnapshotInput,
   CanonicalTentVpd,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
-import { diaryCaptureRef } from "@/lib/sensorCaptureRefRules";
+import { snapshotCaptureRef } from "@/lib/sensorCaptureRefRules";
+
+/** Label for a VPD from a generic diary snapshot: historical, not current. */
+export const DIARY_SOURCE_LABEL = "Diary note";
+
+/** The row source each snapshot source projects to; unavailable projects nothing. */
+const SNAPSHOT_ROW_SOURCE: Partial<Record<string, string>> = {
+  diary: "diary",
+  manual: "manual",
+  live: "live",
+  csv: "csv",
+  sim: "sim",
+  unverified: "unverified",
+};
 import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { tentDetailCaptureClimate, tonightCaptureRejected } from "@/lib/tentDetailVpdRules";
 import {
@@ -76,8 +89,10 @@ export function tentsListCanonicalVpd(
   return {
     kpa: vpd.value,
     capturedAt: vpd.capturedAt,
-    source: vpd.source,
-    sourceLabel: vpd.sourceLabel,
+    // A generic diary snapshot is historical context: graded "Historical",
+    // never a healthy Manual value (Codex P1 on #2303 at 4bd3fae7).
+    source: vpd.historical ? "diary" : vpd.source,
+    sourceLabel: vpd.historical ? DIARY_SOURCE_LABEL : vpd.sourceLabel,
     captureRefs: vpd.captureRefs,
     ageText: vpd.ageText,
     // An explicit rejection, not null: the strip must also withhold its own
@@ -91,8 +106,9 @@ export function tentsListCanonicalVpd(
  * Rows standing in for a diary-only capture (Quick Log sensor_snapshot or
  * Environment Check) when the tent has no stored sensor rows and no manual
  * snapshot card, so the list shows the Dashboard's evidence instead of
- * "No sensor data yet" (Codex P2 on #2303 at 69de43db). A diary capture is
- * manual evidence; anything else returns no rows. A capture whose timestamp
+ * "No sensor data yet" (Codex P2 on #2303 at 69de43db), or when the raw
+ * readings read failed but the snapshot read succeeded (Codex P2 at
+ * fa8edcff and 4bd3fae7). Rows keep the snapshot's own source. A capture whose timestamp
  * the shared sensor-truth classifier rejects (missing or unparseable) yields
  * no rows either (Codex P1 on #2303 at 85ec1e78), and so does one stamped
  * further ahead than Tonight's own one-minute skew: the shared classifier
@@ -107,25 +123,31 @@ export function tentsListDiarySnapshotRows(
   const snap = snapshot.status === "ok" ? snapshot.snapshot : null;
   if (!snap || !snap.ts || classifySnapshotTimestamp(snap.ts, nowMs) !== "ok") return [];
   if (Date.parse(snap.ts) - nowMs > TONIGHT_FUTURE_SKEW_MS) return [];
-  if (snap.source !== "diary" && !snap.diary_evidence_ref) return [];
+  // Each row keeps the snapshot's own source: a generic diary blob stays
+  // `diary` (unverified, never healthy), an Environment Check or manual
+  // envelope stays `manual`, and a snapshot read from sensor rows keeps its
+  // live/manual/csv/sim source (Codex P1 and P2 on #2303 at 4bd3fae7).
+  const source = SNAPSHOT_ROW_SOURCE[snap.source];
+  if (!source) return [];
   const rows: BuildTentSnapshotInput[] = [];
-  // These rows are the diary entry itself, not sensor rows: they carry its
-  // identity so no capture check joins them to a sensor row by time.
-  const captureRef = diaryCaptureRef(snap.diary_evidence_ref?.id);
-  const push = (metric: string, value: number | null) => {
+  const push = (metric: string, key: string, value: number | null) => {
     if (typeof value !== "number" || !Number.isFinite(value)) return;
+    // Each row carries the identity of the record behind it (its diary entry,
+    // or the exact sensor row in metric_refs), so no capture check joins it
+    // to another record by time.
+    const captureRef = snapshotCaptureRef(snap, key);
     rows.push({
       metric,
       value,
       ts: snap.ts as string,
       captured_at: snap.ts,
       tent_id: tentId,
-      source: "manual",
+      source,
       ...(captureRef ? { capture_ref: captureRef } : {}),
     });
   };
-  push("temperature_c", snap.temp);
-  push("humidity_pct", snap.rh);
-  push("vpd_kpa", snap.vpd);
+  push("temperature_c", "temp", snap.temp);
+  push("humidity_pct", "rh", snap.rh);
+  push("vpd_kpa", "vpd", snap.vpd);
   return rows;
 }

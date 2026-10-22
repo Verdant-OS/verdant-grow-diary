@@ -169,6 +169,13 @@ export interface TonightMetricView {
    * entry is an unknown identity (Codex P1 on #2303 at fa8edcff).
    */
   captureRefs?: readonly (SensorCaptureRef | null)[];
+  /**
+   * True when the value comes from a generic diary snapshot (raw source
+   * `diary`): historical context, never a healthy current cue on surfaces that
+   * grade it (`isDashboardSnapshotEligibleForHealthyCues`; Codex P1 on #2303
+   * at 4bd3fae7). Tonight itself still labels it Manual.
+   */
+  historical?: true;
 }
 
 /** Allowed clock skew before a capture time counts as "in the future". */
@@ -195,6 +202,13 @@ interface Candidate {
   ownSource: boolean;
   /** Capture identity of the record(s) behind this candidate. */
   refs: readonly (SensorCaptureRef | null)[];
+  /** From a generic diary snapshot (raw source `diary`). */
+  historical?: true;
+}
+
+/** A generic diary snapshot, as opposed to an Environment Check or manual-snapshot envelope. */
+function isDiarySource(source: unknown): boolean {
+  return typeof source === "string" && source.trim().toLowerCase() === "diary";
 }
 
 /** Snapshot sources map onto the canonical vocabulary; "unavailable" carries no reading. */
@@ -326,6 +340,7 @@ function calculatedVpdCandidate(
     calculated: true as const,
     ownSource: true,
     refs: [...temp.refs, ...rh.refs],
+    ...(temp.historical || rh.historical ? { historical: true as const } : {}),
   };
   // RH pinned at 0% or 100% is a stuck sensor, not a reading (same guard as the Environment ribbon).
   const vpd = rhIsPinned(rh.value)
@@ -412,6 +427,7 @@ export function buildTonightTentMetrics(input: {
         origin: 0,
         ownSource: true,
         refs: [rowCaptureRef(row)],
+        ...(isDiarySource(row.source) ? { historical: true as const } : {}),
       });
     }
 
@@ -433,6 +449,7 @@ export function buildTonightTentMetrics(input: {
         origin: 1,
         ownSource: snapshotMetricSourceProven(snap, key, snapSource),
         refs: [snapshotCaptureRef(snap, key)],
+        ...(isDiarySource(snap.source) ? { historical: true as const } : {}),
       });
     }
     candidates.sort(newestFirst);
@@ -501,6 +518,7 @@ export function buildTonightTentMetrics(input: {
       ageText: formatAgeLabel(Math.max(0, ageMs)),
       calculated: best.calculated === true,
       captureRefs: best.refs,
+      ...(best.historical ? { historical: true as const } : {}),
     };
   });
 }

@@ -496,7 +496,8 @@ describe("Tent detail VPD agrees with the Dashboard Tonight card", () => {
     state.snapshot = {
       status: "ok",
       snapshot: {
-        source: "diary",
+        // An Environment Check envelope (manual), not a generic diary blob.
+        source: "manual",
         ts: new Date(NOW.getTime() - 5 * 60 * 1000).toISOString(),
         temp: null,
         rh: null,

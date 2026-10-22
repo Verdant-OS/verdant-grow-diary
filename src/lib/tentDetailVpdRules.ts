@@ -1,5 +1,5 @@
 import { isStale } from "@/lib/sensorSnapshot";
-import { classifyManualMetric } from "@/lib/sensorTruthRules";
+import { classifyManualMetric, isHumidityStuckExtreme } from "@/lib/sensorTruthRules";
 import {
   captureRefsKnown,
   rowCaptureRef,
@@ -153,7 +153,10 @@ function sameCaptureClimate(
 function climateUnrealistic(climate: { temp: number | null; rh: number | null }): boolean {
   return (
     !classifyManualMetric("temperature_c", climate.temp).valid ||
-    !classifyManualMetric("humidity_pct", climate.rh).valid
+    !classifyManualMetric("humidity_pct", climate.rh).valid ||
+    // RH stuck at 0, 1 or 100 % is in range but known fault telemetry
+    // (Codex P1 on #2303 at 4bd3fae7).
+    isHumidityStuckExtreme(climate.rh)
   );
 }
 
@@ -288,6 +291,8 @@ export function resolveTentDetailVpd(input: {
         tonight.capturedAt === null ||
         source === null ||
         !CURRENT_SOURCES.has(source) ||
+        // A generic diary snapshot is historical, never current (Codex P1 at 4bd3fae7).
+        tonight.historical === true ||
         isStale(tonight.capturedAt, input.nowMs, undefined, source),
       calculated: tonight.calculated,
     };

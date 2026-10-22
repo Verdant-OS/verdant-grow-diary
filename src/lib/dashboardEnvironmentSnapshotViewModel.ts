@@ -258,7 +258,9 @@ function ownCaptureVpdMetric(
   ) {
     status = "stale";
     word = "Stale";
-  } else if (canonical.source === "csv") {
+  } else if (canonical.source === "csv" || canonical.source === "diary") {
+    // CSV and generic diary snapshots are historical context, never a
+    // healthy cue (Codex P1 on #2303 at d6ef3a20 and 4bd3fae7).
     status = "degraded";
     word = "Historical";
   } else if (canonical.source === null || !CANONICAL_HEALTHY_SOURCES.has(canonical.source)) {
@@ -361,7 +363,8 @@ export function buildTentSnapshotView(
     useCanonicalVpd && typeof vpdKpa === "number" && !classifyManualMetric("vpd_kpa", vpdKpa).valid;
   // A VPD Tonight derived from a CSV capture is historical context on this
   // path too, never a healthy cue (Codex P1 on #2303 at 3d1e5800).
-  const canonicalVpdHistorical = useCanonicalVpd && canonical?.source === "csv";
+  const canonicalVpdHistorical =
+    useCanonicalVpd && (canonical?.source === "csv" || canonical?.source === "diary");
   const invalid =
     flaggedInvalid ||
     canonicalVpdInvalid ||

@@ -151,7 +151,8 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     ];
     const diary: SensorSnapshot = {
       ...EMPTY_SNAPSHOT,
-      source: "diary",
+      source: "manual",
+      diary_evidence_ref: { id: "quick-log-entry-1", entry_at: "2026-10-22T02:00:00.000Z" },
       ts: at(0.5),
       temp: (80 - 32) / 1.8,
       rh: 50,
@@ -187,7 +188,8 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     const stored = [row("co2_ppm", 800, t, "live")];
     const diary: SensorSnapshot = {
       ...EMPTY_SNAPSHOT,
-      source: "diary",
+      source: "manual",
+      diary_evidence_ref: { id: "quick-log-entry-2", entry_at: "2026-10-22T02:00:00.000Z" },
       ts: t,
       temp: (80 - 32) / 1.8,
       rh: 50,
@@ -238,7 +240,7 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
       status: "ok",
       snapshot: {
         ...EMPTY_SNAPSHOT,
-        source: "diary",
+        source: "manual",
         ts: t,
         temp: (80 - 32) / 1.8,
         rh: 50,
@@ -282,6 +284,69 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     // Both reads failed: still unavailable.
     renderFailed({ status: "unavailable", snapshot: EMPTY_SNAPSHOT });
     expect(screen.getByTestId("tents-list-sensor-unavailable-tent-1")).toBeInTheDocument();
+  });
+
+  it("grades a generic diary-blob VPD as historical, never a healthy Manual value (Codex P1 at 4bd3fae7)", () => {
+    const blob = (source: "diary" | "manual"): SensorSnapshot => ({
+      ...EMPTY_SNAPSHOT,
+      source,
+      ts: at(0.5),
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    });
+    // Beside a newer live CO2-only cohort: the VPD is graded on its own capture.
+    hook.state = { status: "ok", snapshot: blob("diary") };
+    let vpd = renderStrip([row("co2_ppm", 800, at(0.05), "live")]);
+    expect(vpd).toHaveTextContent("1.75");
+    expect(vpd).toHaveAttribute("data-status", "degraded");
+    expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(
+      /Historical/,
+    );
+    cleanup();
+    // Alone: the projected rows keep the diary source, so nothing reads ok.
+    hook.state = { status: "ok", snapshot: blob("diary") };
+    vpd = renderStrip([]);
+    expect(vpd).not.toHaveAttribute("data-status", "ok");
+    cleanup();
+    // The same values from a manual envelope stay healthy Manual evidence.
+    hook.state = { status: "ok", snapshot: blob("manual") };
+    vpd = renderStrip([]);
+    expect(vpd).toHaveAttribute("data-status", "ok");
+  });
+
+  it("backs a failed raw read with a successful sensor snapshot, keeping its own source (Codex P2 at 4bd3fae7)", () => {
+    const t = at(0.05);
+    const live: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "live",
+      ts: t,
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+      metric_refs: {
+        temp: { id: "row-temp", captured_at: t, source: "live" },
+        rh: { id: "row-rh", captured_at: t, source: "live" },
+      },
+    };
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={{ status: "ok", snapshot: live }}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="error"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[]}
+        manualStatus="success"
+      />,
+    );
+    expect(screen.queryByTestId("tents-list-sensor-unavailable-tent-1")).toBeNull();
+    const vpd = screen.getByTestId("tents-list-metric-tent-1-vpd");
+    expect(vpd).toHaveTextContent("1.75");
+    expect(vpd).toHaveAttribute("data-status", "ok");
+    expect(screen.getByTestId("tents-list-sensor-source-tent-1")).toHaveTextContent(/Live/);
   });
 
   it("marks an older live VPD stale even beside a fresh live capture (Codex P1)", () => {
@@ -392,7 +457,8 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
   it("shows the Dashboard's diary-only VPD when the tent has no stored rows (Codex P2 at 69de43db)", () => {
     const diary: SensorSnapshot = {
       ...EMPTY_SNAPSHOT,
-      source: "diary",
+      source: "manual",
+      diary_evidence_ref: { id: "env-check-entry-1", entry_at: "2026-10-22T02:00:00.000Z" },
       ts: at(0.5),
       temp: (80 - 32) / 1.8,
       rh: 50,

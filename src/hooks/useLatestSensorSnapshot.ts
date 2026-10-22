@@ -553,6 +553,10 @@ export function useLatestSensorSnapshotsByTent(
       queryKey: latestSensorSnapshotQueryKey(user?.id, tent.growId, [tent.tentId]),
       enabled: !!user && !!tent.growId,
       queryFn: () => batcher.load(tent.growId as string, tent.tentId),
+      // Per-query retry timers would leave the batcher one tent at a time,
+      // turning an outage into one bulk read per tent (Codex P2 on #2303 at
+      // 4bd3fae7). A failed tent stays unavailable until its next refetch.
+      retry: false,
     })),
   });
   const byTent: Record<string, SnapshotState> = {};

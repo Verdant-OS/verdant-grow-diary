@@ -283,6 +283,32 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(bulk[TENT_B]).toEqual(await fetchLatestSensorSnapshot(GROW, [TENT_B]));
   });
 
+  it("does not retry failed tents one by one at the real caller (Codex P2 at 4bd3fae7)", async () => {
+    threeTentFixture();
+    io.failSensor = true;
+    // Unlike freshClient, this client retries as an app client would.
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: 2, retryDelay: 0, staleTime: Infinity, gcTime: Infinity },
+      },
+    });
+    clients.push(client);
+    const { result } = renderHook(() => useLatestSensorSnapshotsByTent(THREE), {
+      wrapper: wrapperFor(client),
+    });
+    await waitFor(() =>
+      expect(Object.values(result.current).map((s) => s.status)).toEqual([
+        "unavailable",
+        "ok",
+        "unavailable",
+      ]),
+    );
+    // Give any retry timer the chance to fire.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(sensorCalls()).toBe(1);
+    expect(diaryCalls()).toBe(1);
+  });
+
   it("keeps one shared diary window when the sensor read fails, marking only evidence-less tents unavailable (Codex P2 at 3d1e5800)", async () => {
     threeTentFixture();
     io.failSensor = true;

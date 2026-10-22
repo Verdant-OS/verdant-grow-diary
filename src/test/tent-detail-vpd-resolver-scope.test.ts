@@ -429,3 +429,74 @@ describe("the capture gate joins climate by record identity (Codex P1 on #2303 a
     ).toBe(true);
   });
 });
+
+describe("the capture gate treats stuck humidity as fault telemetry (Codex P1 on #2303 at 4bd3fae7)", () => {
+  const T = at(1);
+  // The shared RH_STUCK_VALUES (0 and 100), as every sensor-truth surface uses them.
+  it.each([0, 100])("rejects a direct VPD whose own capture holds RH %s%%", (rh) => {
+    const rows = [
+      { metric: "vpd_kpa", value: 1.2, captured_at: T, source: "live" },
+      { metric: "temperature_c", value: 24, captured_at: T, source: "live" },
+      { metric: "humidity_pct", value: rh, captured_at: T, source: "live" },
+    ];
+    const vpd = buildTonightTentMetrics({
+      rows: rows.map((r) => ({ ...r, tent_id: "tent-1", ts: r.captured_at })),
+      rowsRead: { status: "success" },
+      snapshot: { status: "idle", snapshot: null },
+      now: new Date(NOW),
+    }).find((m) => m.key === "vpd")!;
+    expect(vpd.value).toBe(1.2);
+    expect(tonightCaptureRejected(vpd, null, tentDetailCaptureClimate(rows, null))).toBe(true);
+  });
+
+  it("keeps the VPD when its capture's RH is an ordinary 55%", () => {
+    const rows = [
+      { metric: "vpd_kpa", value: 1.2, captured_at: T, source: "live" },
+      { metric: "humidity_pct", value: 55, captured_at: T, source: "live" },
+    ];
+    const vpd = buildTonightTentMetrics({
+      rows: rows.map((r) => ({ ...r, tent_id: "tent-1", ts: r.captured_at })),
+      rowsRead: { status: "success" },
+      snapshot: { status: "idle", snapshot: null },
+      now: new Date(NOW),
+    }).find((m) => m.key === "vpd")!;
+    expect(tonightCaptureRejected(vpd, null, tentDetailCaptureClimate(rows, null))).toBe(false);
+  });
+});
+
+describe("a generic diary snapshot is historical, never current (Codex P1 on #2303 at 4bd3fae7)", () => {
+  const snapshotOf = (source: string) => ({
+    source,
+    ts: at(0.5),
+    temp: (80 - 32) / 1.8,
+    rh: 50,
+    vpd: null,
+  });
+  const vpdFrom = (source: string) =>
+    buildTonightTentMetrics({
+      rows: [],
+      rowsRead: { status: "success" },
+      snapshot: { status: "ok", snapshot: snapshotOf(source) },
+      now: new Date(NOW),
+    }).find((m) => m.key === "vpd")!;
+
+  it("Tonight flags a diary-blob VPD as historical and a manual envelope as not", () => {
+    expect(vpdFrom("diary").historical).toBe(true);
+    expect(vpdFrom("manual").historical).toBeUndefined();
+  });
+
+  it("Tent Detail never shows a diary-blob VPD as current", () => {
+    const resolve = (source: string) =>
+      resolveTentDetailVpd({
+        tonight: vpdFrom(source),
+        existing: NO_VPD,
+        rejectedMetrics: [],
+        rejectedCapturedAt: null,
+        contributors: CONTRIBUTORS,
+        captureClimate: [],
+        nowMs: NOW,
+      });
+    expect(resolve("diary").stale).toBe(true);
+    expect(resolve("manual").stale).toBe(false);
+  });
+});

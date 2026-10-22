@@ -43,8 +43,15 @@ switch know only grow / tent / plant / cultivar.
    - Legacy rows can also be spine-only (the case `src/hooks/useGrowDetailData.ts:11–15`
      describes).
 
-   Searching `diary_entries` alone would miss those spine-only logs. A diary row linked to a
-   matching spine (`details.linked_grow_event_id`) is one result, not two. The placeholder
+   Searching `diary_entries` alone would miss those spine-only logs. A diary row and its spine
+   are one result, not two, under the same rules Timeline uses
+   (`src/lib/timelineMergeRules.ts`):
+   - linked by `details.linked_grow_event_id`, or by the legacy alias `details.grow_event_id`
+     (`pickLogicalGrowEventLink`, lines 168–175);
+   - or, for an older unlinked manual companion, sharing the exact (plant, instant) pair with
+     a manual spine (lines 405–407).
+
+   The result keeps the spine's id, since Timeline collapses the companion away. The placeholder
    `'(quick log)'` is not grower-authored text: exclude it only when
    `isQuickLogPlaceholderNote` (`src/lib/plantFeedingDisplayRules.ts:54`) is true (exact,
    trimmed, case-insensitive). A grower note that merely contains those words still matches.
@@ -163,7 +170,10 @@ The function must:
   match literally;
 - search both tables and dedupe linked companions, applying `user_id = auth.uid()`, the
   deletion/retraction exclusions, the active-grow rule and newest-first `id`-tie-broken
-  ordering, as in requirement 1, then `limit least(max_results, 10)`.
+  ordering, as in requirement 1, then
+  `limit greatest(1, least(coalesce(max_results, 10), 10))`: a null or out-of-range
+  `max_results` from the client still caps at 10, as `verdant_search` clamps its own
+  (`20260723000807_…sql:78`). A plain `least(max_results, 10)` would be unlimited for null.
 
 ## Acceptance tests (for the implementing slice)
 
@@ -173,7 +183,8 @@ The function must:
 - Query shape, Option B (chosen; RPC-side, against a local database): with more than 10
   matches sharing one timestamp, two calls return the same 10 ids, ordered by
   `occurred_at desc, id desc` before the limit; the search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
-  with `grow_id` and `occurred_at`; `100%` does not match `100 ml` server-side; `anon`
+  with `grow_id` and `occurred_at`; `max_results` of `null`, `0`, `-5` and `500` each return at
+  most 10 rows; `100%` does not match `100 ml` server-side; `anon`
   cannot execute it.
 - Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
   `verdant_search` results still render; a failing `verdant_search` does not hide diary
@@ -182,7 +193,9 @@ The function must:
 - Sources: a legacy spine-only Quick Log note is found; a current `quicklog_save_event`
   note-only save (no snapshot, photo, details, water, or feed) is found via the spine; a
   current `quicklog_save_manual` save (spine plus its unconditional mirror) that matches is
-  one result; an exact `'(quick log)'` placeholder does not match query `"quick"` or
+  one result; a legacy pair linked only by `details.grow_event_id`, and a legacy unlinked
+  manual companion at the same plant and instant as its spine, are each one result carrying
+  the spine id; an exact `'(quick log)'` placeholder does not match query `"quick"` or
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
   a deleted spine and a retracted entry are not returned. Option B: `verdant_search` is
   unchanged, so a plant found by its `strain` is still returned.

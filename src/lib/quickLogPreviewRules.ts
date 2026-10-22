@@ -15,6 +15,10 @@ import {
   validateTempC,
 } from "./sensorValidation";
 import { type EcUnit } from "@/constants/units";
+import {
+  assessWateringVolumeInput,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "./quickLogWateringFormViewModel";
 
 export interface QuickLogDraftDetails {
   ph?: string;
@@ -127,10 +131,17 @@ export function evaluateQuickLogPreview(
   }
 
   if (!isBlank(d.watering)) {
-    const n = num(d.watering);
-    if (n == null) push("watering:invalid", "Watering amount is not a number.");
-    else if (n < 0 || n > 1_000_000) {
-      push("watering:out-of-range", "Watering amount is out of range.");
+    // Same grammar and single-watering ceiling the legacy submit and save
+    // adapter enforce, so the live preview warns before Save does.
+    const assessed = assessWateringVolumeInput(d.watering);
+    if (!assessed.ok) {
+      if (assessed.reason === "too_large") {
+        push("watering:out-of-range", QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE);
+      } else {
+        const n = num(d.watering);
+        if (n != null && n <= 0) push("watering:out-of-range", "Watering amount is out of range.");
+        else push("watering:invalid", "Watering amount is not a number.");
+      }
     }
   }
 

@@ -18,10 +18,11 @@
   "devDependencies": {
     "@types/node": "22.16.5",
     "typescript": "5.8.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   },
   "overrides": {
     "source-map-js": "1.2.2",
-    "undici": "6.28.1"
+    "undici": "6.28.1",
+    "vite": "7.3.7"
   }
 }

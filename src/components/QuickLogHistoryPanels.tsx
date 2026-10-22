@@ -29,6 +29,7 @@ import {
 } from "@/lib/growDiaryPdfExport";
 import {
   buildQuickLogEntryHandleIndex,
+  correctionValuePropsFromDiaryDetails,
   handleRootId,
   type QuickLogEntryHandleRef,
 } from "@/lib/quick-log/quickLogRevisionRules";
@@ -232,11 +233,15 @@ export function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
 function Row({
   row,
   integrityHandle,
+  correctionValues,
+  environmentCheckDetails,
   correctionCount,
   onEntryChanged,
 }: {
   row: QuickLogHistoryRow;
   integrityHandle?: QuickLogEntryHandleRef | null;
+  correctionValues?: ReturnType<typeof correctionValuePropsFromDiaryDetails>;
+  environmentCheckDetails?: unknown;
   correctionCount?: number;
   onEntryChanged?: () => void;
 }) {
@@ -273,6 +278,8 @@ function Row({
             currentPlantId={row.plantId}
             plantId={row.plantId}
             tentId={row.tentId}
+            correctionValues={correctionValues ?? null}
+            environmentCheckDetails={environmentCheckDetails}
             onChanged={onEntryChanged}
           />
         )}
@@ -404,11 +411,20 @@ function QuickLogHistorySection({
           {rows.map((r) => {
             const handle = handleIndex.get(r.id) ?? null;
             const badge = handle ? badges.get(handleRootId(handle)) : undefined;
+            const raw = (rawEntries ?? []).find(
+              (entry) =>
+                !!entry &&
+                typeof entry === "object" &&
+                "id" in entry &&
+                (entry as { id?: unknown }).id === r.id,
+            ) as { details?: unknown } | undefined;
             return (
               <Row
                 key={r.id}
                 row={r}
                 integrityHandle={handle}
+                correctionValues={correctionValuePropsFromDiaryDetails(raw?.details)}
+                environmentCheckDetails={raw?.details}
                 // Edited chrome only after a successful resolve (status === "ok").
                 // pending and unavailable must not look like confident edits/no-edits.
                 correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}

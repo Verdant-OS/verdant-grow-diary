@@ -165,6 +165,7 @@ import {
   buildTonightTentMetrics,
   resolveTonightTentSelection,
 } from "@/lib/tonightTentHomeViewModel";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Renders the grower's overview for a valid URL-selected grow or the full account.
@@ -2035,7 +2036,9 @@ export default function Dashboard() {
                         </div>
                         {a.reason && (
                           <p className="text-xs mt-2 italic text-muted-foreground">
-                            {sanitizeActionCopy(stripBackPointerTokens(a.reason))}
+                            {localizeReadingAtTimestamps(
+                              sanitizeActionCopy(stripBackPointerTokens(a.reason)),
+                            )}
                           </p>
                         )}
                         <div className="mt-2 flex items-center gap-2 flex-wrap">

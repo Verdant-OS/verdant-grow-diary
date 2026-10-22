@@ -61,6 +61,25 @@ export function timelineMeasurementChipCount(
   return diaryCount + receipts;
 }
 
+/**
+ * Suffix for the "Detailed diary: showing N of M entries" header when the
+ * visible list also carries synthetic sensor receipts (under Measurements, or
+ * when no diary rows exist). The header counts diary rows only, so without
+ * this the Measurements chip (diary rows + receipts) looks larger than the
+ * list it describes. Empty when no receipt is listed.
+ */
+export function timelineResultsCountReceiptSuffix(
+  listedRows: readonly { id?: string | null }[] | null | undefined,
+): string {
+  if (!listedRows) return "";
+  let receipts = 0;
+  for (const row of listedRows) {
+    if (isTimelineSensorDerivedDiaryId(row?.id)) receipts += 1;
+  }
+  if (receipts === 0) return "";
+  return ` · plus ${receipts} manual sensor ${receipts === 1 ? "reading" : "readings"}`;
+}
+
 /** Which persisted field a Timeline row's displayed photo was projected from. */
 export type TimelineDiaryPhotoReferenceSource = "top" | "details" | null;
 

@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { STAGES } from "@/lib/grow";
 import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
@@ -137,6 +138,7 @@ import {
   timelineEntryCountsAsPhoto,
   timelineEntryHasNoteText,
   timelineMeasurementChipCount,
+  timelineResultsCountReceiptSuffix,
   timelineStageChipRows,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
@@ -221,6 +223,7 @@ import {
 } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
@@ -400,6 +403,25 @@ function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[]
  * fetched". `onResolved`/`onPartial` own their scope-currency guards and the
  * merge into the supplemental collapse-only state.
  */
+/** Timeline-only. The shared root-zone select stays unchanged for the other readers. */
+const TIMELINE_SENSOR_GROW_EVENT_SELECT =
+  "id,plant_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+const TIMELINE_LINKED_ROOT_SELECT = "id,created_at,event_type,source,plant_id,occurred_at";
+
+function linkedEnvironmentEventIds(diaryRows: ReadonlyArray<{ details?: unknown }>): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const row of diaryRows) {
+    const details = row.details;
+    if (!details || typeof details !== "object" || Array.isArray(details)) continue;
+    const linked = (details as Record<string, unknown>).linked_grow_event_id;
+    if (typeof linked !== "string" || linked.length === 0 || seen.has(linked)) continue;
+    seen.add(linked);
+    ids.push(linked);
+  }
+  return ids;
+}
+
 async function resolveMissingLinkedGrowEventParents(input: {
   growId: string;
   diaryRows: ReadonlyArray<{ id: string; details?: unknown }>;
@@ -430,6 +452,62 @@ async function resolveMissingLinkedGrowEventParents(input: {
     input.onResolved(linkedResult.data as unknown as GrowEventRowForRecent[]);
   } catch {
     input.onPartial();
+  }
+}
+
+/** Roots outside the first grow-event page still need their created_at siblings. */
+async function loadLinkedRootSensorSiblings(input: {
+  growId: string;
+  rootIds: readonly string[];
+  isCurrent: () => boolean;
+  onRoots: (rows: GrowEventRowForRecent[]) => void;
+  onSiblings: (rows: GrowEventRowForRecent[]) => void;
+  onPartial: () => void;
+}): Promise<void> {
+  if (input.rootIds.length === 0) return;
+  try {
+    const rootResult = await supabase
+      .from("grow_events")
+      .select(TIMELINE_LINKED_ROOT_SELECT)
+      .eq("grow_id", input.growId)
+      .in("id", input.rootIds);
+    if (!input.isCurrent()) return;
+    if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
+      input.onPartial();
+      return;
+    }
+    const roots = rootResult.data as unknown as GrowEventRowForRecent[];
+    input.onRoots(roots);
+    const createdAts = [
+      ...new Set(
+        roots
+          .map((row) => {
+            const createdAt = (row as unknown as { created_at?: unknown }).created_at;
+            return typeof createdAt === "string" && createdAt.length > 0 ? createdAt : null;
+          })
+          .filter((value): value is string => value !== null),
+      ),
+    ];
+    if (createdAts.length === 0 || !input.isCurrent()) return;
+    const sensorSiblingResult = await supabase
+      .from("grow_events")
+      .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+      .eq("grow_id", input.growId)
+      .eq("event_type", "environment")
+      .eq("source", "manual")
+      .eq("is_deleted", false)
+      .in("created_at", createdAts);
+    if (!input.isCurrent()) return;
+    if (
+      hasTimelineRequiredReadError(sensorSiblingResult) ||
+      !Array.isArray(sensorSiblingResult.data)
+    ) {
+      input.onPartial();
+      return;
+    }
+    input.onSiblings(sensorSiblingResult.data as unknown as GrowEventRowForRecent[]);
+  } catch {
+    if (input.isCurrent()) input.onPartial();
   }
 }
 
@@ -497,6 +575,8 @@ export default function Timeline() {
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineLinkedRoots, setTimelineLinkedRoots] = useState<GrowEventRowForRecent[]>([]);
   const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   // Deleted or out-of-page grow_event parents that a loaded diary companion
   // references (details.linked_grow_event_id). Resolved separately from the
@@ -671,6 +751,8 @@ export default function Timeline() {
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -693,6 +775,8 @@ export default function Timeline() {
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -773,6 +857,25 @@ export default function Timeline() {
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
       const nextGrowEvents = growEventsResult.data as unknown as GrowEventRowForRecent[];
+      let sensorEventsQuery = orderNewestFirstStable(
+        supabase
+          .from("grow_events")
+          .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+          .eq("grow_id", activeGrowId)
+          .eq("event_type", "environment")
+          .eq("is_deleted", false),
+        "occurred_at",
+      ).limit(100);
+      if (timelineDateRangeBounds.startIso)
+        sensorEventsQuery = sensorEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        sensorEventsQuery = sensorEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
+      const sensorEventsResult = await sensorEventsQuery;
+      if (!isCurrentRequest()) return;
+      const sensorReadFailed = hasTimelineRequiredReadError(sensorEventsResult);
+      const nextSensorEvents = sensorReadFailed
+        ? []
+        : (sensorEventsResult.data as unknown as GrowEventRowForRecent[]);
 
       // Core plant memory is confirmed for the exact active scope. Make it
       // visible immediately; photos/action/alert context continues separately
@@ -783,6 +886,8 @@ export default function Timeline() {
       setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
+      setTimelineSensorEvents(nextSensorEvents);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(
         typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       );
@@ -794,7 +899,7 @@ export default function Timeline() {
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
-      setPartialReadSources([]);
+      setPartialReadSources(sensorReadFailed ? ["manual_sensor_readings"] : []);
       setCoreRead({ status: "success", readKey: requestedReadKey });
       setLoading(false);
 
@@ -814,19 +919,47 @@ export default function Timeline() {
       // fetched" instead of guessing from a primary page that was never
       // meant to be exhaustive.
       supplementalTasks.push(
-        resolveMissingLinkedGrowEventParents({
-          growId: activeGrowId,
-          diaryRows: coreRows,
-          knownGrowEvents: nextGrowEvents,
-          isCurrent: isCurrentRequest,
-          onResolved: (rows) =>
-            setSupplementalLinkedGrowEvents((current) => {
-              const seen = new Set(current.map((row) => row.id));
-              const extra = rows.filter((row) => !seen.has(row.id));
-              return extra.length === 0 ? current : [...current, ...extra];
+        (async () => {
+          const diaryRows = coreRows.map((row) => ({
+            id: row.id,
+            details: (row.details ?? null) as Record<string, unknown> | null,
+          }));
+          await resolveMissingLinkedGrowEventParents({
+            growId: activeGrowId,
+            diaryRows: coreRows,
+            knownGrowEvents: nextGrowEvents,
+            isCurrent: isCurrentRequest,
+            onResolved: (rows) =>
+              setSupplementalLinkedGrowEvents((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onPartial: () => markPartial("linked_grow_events"),
+          });
+          if (!isCurrentRequest()) return;
+          await loadLinkedRootSensorSiblings({
+            growId: activeGrowId,
+            rootIds: findMissingLinkedGrowEventIds({
+              diaryEntries: diaryRows,
+              growEvents: nextGrowEvents,
             }),
-          onPartial: () => markPartial("linked_grow_events"),
-        }),
+            isCurrent: isCurrentRequest,
+            onRoots: (rows) =>
+              setTimelineLinkedRoots((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onSiblings: (rows) =>
+              setTimelineSensorEvents((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onPartial: () => markPartial("manual_sensor_readings"),
+          });
+        })(),
       );
 
       if (paths.length > 0) {
@@ -1119,6 +1252,75 @@ export default function Timeline() {
             );
           },
         });
+        const knownRootIds = new Set(timelineLinkedRoots.map((row) => row.id));
+        const missingRootIds = linkedEnvironmentEventIds(older).filter(
+          (id) => !knownRootIds.has(id),
+        );
+        if (missingRootIds.length > 0 && isCurrentPage()) {
+          try {
+            const rootResult = await supabase
+              .from("grow_events")
+              .select(TIMELINE_LINKED_ROOT_SELECT)
+              .eq("grow_id", requestedGrowId)
+              .in("id", missingRootIds);
+            if (!isCurrentPage()) return;
+            if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
+              setPartialReadSources((current) =>
+                mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+              );
+            } else {
+              const roots = rootResult.data as unknown as GrowEventRowForRecent[];
+              setTimelineLinkedRoots((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = roots.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              });
+              const createdAts = [
+                ...new Set(
+                  roots
+                    .map((row) => {
+                      const createdAt = (row as unknown as { created_at?: unknown }).created_at;
+                      return typeof createdAt === "string" && createdAt.length > 0
+                        ? createdAt
+                        : null;
+                    })
+                    .filter((value): value is string => value !== null),
+                ),
+              ];
+              if (createdAts.length > 0 && isCurrentPage()) {
+                const sensorSiblingResult = await supabase
+                  .from("grow_events")
+                  .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+                  .eq("grow_id", requestedGrowId)
+                  .eq("event_type", "environment")
+                  .eq("source", "manual")
+                  .eq("is_deleted", false)
+                  .in("created_at", createdAts);
+                if (!isCurrentPage()) return;
+                if (
+                  hasTimelineRequiredReadError(sensorSiblingResult) ||
+                  !Array.isArray(sensorSiblingResult.data)
+                ) {
+                  setPartialReadSources((current) =>
+                    mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+                  );
+                } else {
+                  const siblings = sensorSiblingResult.data as unknown as GrowEventRowForRecent[];
+                  setTimelineSensorEvents((current) => {
+                    const seen = new Set(current.map((row) => row.id));
+                    const extra = siblings.filter((row) => row.id && !seen.has(row.id));
+                    return extra.length === 0 ? current : [...current, ...extra];
+                  });
+                }
+              }
+            }
+          } catch {
+            if (!isCurrentPage()) return;
+            setPartialReadSources((current) =>
+              mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+            );
+          }
+        }
       }
     } catch {
       if (isCurrentPage()) setLoadOlderError(true);
@@ -2259,6 +2461,7 @@ export default function Timeline() {
           {entriesTotal !== null && entriesTotal > entries.length
             ? ` (${entries.length} loaded)`
             : ""}
+          {timelineResultsCountReceiptSuffix(filtered)}
           {growEvents.length > 0
             ? " · Quick Log activity appears in the history panels below."
             : ""}
@@ -2842,6 +3045,13 @@ export default function Timeline() {
                                     plantId={e.plant_id ?? null}
                                     tentId={e.tent_id ?? null}
                                     growId={loopGrowId}
+                                    correctionValues={correctionValuesForTimelineDiaryEntry(e, [
+                                      ...timelineLinkedRoots,
+                                      ...growEvents,
+                                      ...supplementalLinkedGrowEvents,
+                                      ...timelineSensorEvents,
+                                    ])}
+                                    environmentCheckDetails={e.details}
                                     onChanged={() => void load()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (
@@ -2892,7 +3102,7 @@ export default function Timeline() {
                                   }
                                 }}
                               >
-                                {e.note}
+                                {localizeReadingAtTimestamps(e.note)}
                               </p>
                               {lightingGuideByEntryId.has(e.id) ? (
                                 <div
@@ -3309,7 +3519,7 @@ export default function Timeline() {
           });
           return {
             id: row.id,
-            note: row.note,
+            note: localizeReadingAtTimestamps(row.note),
             photo_url: row.photo_url,
             stage: resolveTimelineDiaryEntryStage(row),
             entry_at: row.entry_at,
@@ -3452,7 +3662,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
             )}
             {e.action?.reason && (
               <p className="text-xs text-muted-foreground mt-1">
-                {stripBackPointerTokens(e.action.reason)}
+                {localizeReadingAtTimestamps(stripBackPointerTokens(e.action.reason))}
               </p>
             )}
             {e.note && <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>}

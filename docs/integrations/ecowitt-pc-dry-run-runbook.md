@@ -119,9 +119,9 @@ That is the expected fail-closed result, not a healthy reading. A real
 gateway upload carries `dateutc`; its report should show
 `payload_kind: "real_ecowitt_gateway"` and the mapped `metric_keys`.
 `reasons` is empty only for a fresh, valid reading. A stale reading reports
-`stale_reading`, and an out-of-range value reports an `invalid_*` reason
-such as `invalid_rh`. Those are correct fail-closed results, not a broken
-dry run.
+`stale_timestamp`, and an out-of-range value reports an `invalid_*` reason
+such as `invalid_humidity` or `invalid_temperature`. Those are correct
+fail-closed results, not a broken dry run.
 
 ---
 

@@ -231,94 +231,125 @@ export async function fetchLatestSensorSnapshotsByTent(
   if (unique.length === 1) {
     fallback.add(unique[0]);
   } else {
-    // 1) One sensor window over every tent.
+    // 1) Shared sensor windows. A tent the window settles leaves the set; the
+    // next window covers only the tents a full window cut short, so a busy
+    // tent no longer crowds them into one per-tent read each. Each page
+    // settles at least one tent unless the row ceiling splits the quota;
+    // then the rest fall back to their own reads (Codex P2 on #2303 at
+    // 0994ea2a).
+    let pending = unique;
     try {
-      const windowLimit = sensorWindowLimit(unique.length, SENSOR_ROWS_PER_TENT);
-      const { data, error } = await effectiveSensorReadingsQuery()
-        .select("*")
-        .in("tent_id", unique)
-        .order("captured_at", { ascending: false, nullsFirst: false })
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(windowLimit);
-      if (error) throw error;
-      const rows = requireEffectiveSensorReadings(data);
-      const partition = partitionWindowByTent(
-        rows,
-        unique,
-        SENSOR_ROWS_PER_TENT,
-        rows.length >= windowLimit,
-      );
-      partition.fallback.forEach((tentId) => fallback.add(tentId));
-      for (const [tentId, own] of partition.exact) {
-        const evidenceRows = selectDashboardSensorEvidenceRows(own);
-        const snap =
-          evidenceRows.length > 0
-            ? withRejectedQualityRows(snapshotFromEvidenceRows(evidenceRows), own)
-            : null;
-        if (snap && !isSnapshotStale(snap)) {
-          result[tentId] = snap;
-          continue;
+      while (pending.length > 0) {
+        const windowLimit = sensorWindowLimit(pending.length, SENSOR_ROWS_PER_TENT);
+        const { data, error } = await effectiveSensorReadingsQuery()
+          .select("*")
+          .in("tent_id", pending)
+          .order("captured_at", { ascending: false, nullsFirst: false })
+          .order("ts", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(windowLimit);
+        if (error) throw error;
+        const rows = requireEffectiveSensorReadings(data);
+        const partition = partitionWindowByTent(
+          rows,
+          pending,
+          SENSOR_ROWS_PER_TENT,
+          rows.length >= windowLimit,
+        );
+        for (const [tentId, own] of partition.exact) {
+          const evidenceRows = selectDashboardSensorEvidenceRows(own);
+          const snap =
+            evidenceRows.length > 0
+              ? withRejectedQualityRows(snapshotFromEvidenceRows(evidenceRows), own)
+              : null;
+          if (snap && !isSnapshotStale(snap)) {
+            result[tentId] = snap;
+            continue;
+          }
+          staleByTent.set(tentId, snap);
+          needDiary.push(tentId);
         }
-        staleByTent.set(tentId, snap);
-        needDiary.push(tentId);
+        if (partition.fallback.length === pending.length) {
+          partition.fallback.forEach((tentId) => fallback.add(tentId));
+          break;
+        }
+        pending = partition.fallback;
       }
     } catch {
+      // A failure on any page fails the whole sensor read, as one window did:
+      // every tent goes to the shared diary windows.
       sensorReadFailed = true;
       fallback.clear();
       staleByTent.clear();
+      for (const tentId of unique) delete result[tentId];
       needDiary = [...unique];
     }
-    // 2) One diary window over the tents without a fresh sensor capture.
+    // 2) Shared diary windows over the tents without a fresh sensor capture.
+    // A tent a full window leaves unsettled is read again with the others
+    // left, at a doubled per-tent depth up to the per-tent candidate bound, so
+    // a crowded window settles it as its own read would, with no per-tent
+    // read (Codex P2 on #2303 at 0994ea2a).
     if (needDiary.length > 0) {
       if (!growId) {
         for (const tentId of needDiary) result[tentId] = staleByTent.get(tentId) ?? EMPTY_SNAPSHOT;
       } else {
+        let pendingDiary = needDiary;
+        let pageSize = DIARY_EVIDENCE_PAGE_SIZE;
         try {
-          const windowLimit = diaryWindowLimit(needDiary.length, DIARY_EVIDENCE_PAGE_SIZE);
-          const diaryRows = await readDiaryEvidenceCandidates(growId, needDiary, windowLimit);
-          const windowFull = diaryRows.length > windowLimit;
-          const partition = partitionWindowByTent(
-            diaryRows
-              .slice(0, windowLimit)
-              .filter((row) => isDiaryRowInTentScope(row.tent_id, needDiary)),
-            needDiary,
-            Number.POSITIVE_INFINITY,
-            false,
-          );
-          for (const tentId of needDiary) {
-            const verdict = resolveDiaryWindow(
-              partition.exact.get(tentId) ?? [],
-              windowFull,
-              DIARY_EVIDENCE_MAX_CANDIDATES,
-              (row) => snapshotFromDiaryEvidenceRow(row, [tentId]),
+          while (pendingDiary.length > 0) {
+            const windowLimit = diaryWindowLimit(pendingDiary.length, pageSize);
+            const diaryRows = await readDiaryEvidenceCandidates(growId, pendingDiary, windowLimit);
+            const windowFull = diaryRows.length > windowLimit;
+            const scope = pendingDiary;
+            const partition = partitionWindowByTent(
+              diaryRows
+                .slice(0, windowLimit)
+                .filter((row) => isDiaryRowInTentScope(row.tent_id, scope)),
+              scope,
+              Number.POSITIVE_INFINITY,
+              false,
             );
-            if (verdict.kind === "found") {
-              result[tentId] = preferNewer(staleByTent.get(tentId) ?? null, verdict.snapshot);
-            } else if (verdict.kind === "none") {
-              result[tentId] = sensorReadFailed
-                ? null
-                : (staleByTent.get(tentId) ?? EMPTY_SNAPSHOT);
-            } else if (verdict.kind === "unavailable") {
-              // The per-tent read gives up past its candidate bound too.
-              result[tentId] = null;
-            } else {
-              fallback.add(tentId);
+            const unsettled: string[] = [];
+            for (const tentId of scope) {
+              const verdict = resolveDiaryWindow(
+                partition.exact.get(tentId) ?? [],
+                windowFull,
+                DIARY_EVIDENCE_MAX_CANDIDATES,
+                (row) => snapshotFromDiaryEvidenceRow(row, [tentId]),
+              );
+              if (verdict.kind === "found") {
+                result[tentId] = preferNewer(staleByTent.get(tentId) ?? null, verdict.snapshot);
+              } else if (verdict.kind === "none") {
+                result[tentId] = sensorReadFailed
+                  ? null
+                  : (staleByTent.get(tentId) ?? EMPTY_SNAPSHOT);
+              } else if (verdict.kind === "unavailable") {
+                // The per-tent read gives up past its candidate bound too.
+                result[tentId] = null;
+              } else {
+                unsettled.push(tentId);
+              }
             }
+            const deepest = pageSize >= DIARY_EVIDENCE_MAX_CANDIDATES;
+            if (unsettled.length === scope.length && deepest) {
+              unsettled.forEach((tentId) => fallback.add(tentId));
+              break;
+            }
+            pendingDiary = unsettled;
+            pageSize = Math.min(pageSize * 2, DIARY_EVIDENCE_MAX_CANDIDATES);
           }
         } catch {
           // A failed diary read is unavailable for the per-tent read as well;
           // no per-tent read could repair it, so none is started.
-          for (const tentId of needDiary) result[tentId] = null;
+          for (const tentId of pendingDiary) result[tentId] = null;
         }
       }
     }
   }
-  // 3) Per-tent reads only where a window could not reproduce one. After a
-  // failed sensor window no per-tent read starts at all: a tent the shared
-  // diary window could not settle is unavailable, so an outage never fans out
-  // into one diary read per tent (Codex P2 on #2303 at fa8edcff).
+  // 3) Per-tent reads only where the shared windows could not settle a tent.
+  // After a failed sensor window no per-tent read starts at all, so an outage
+  // never fans out into one read per tent (Codex P2 on #2303 at fa8edcff).
   if (sensorReadFailed) {
     for (const tentId of fallback) result[tentId] = null;
     return result;

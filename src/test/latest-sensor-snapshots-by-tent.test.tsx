@@ -316,6 +316,24 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(bulk[TENT_B]).toEqual(await fetchLatestSensorSnapshot(GROW, [TENT_B]));
   });
 
+  it("settles every sparse tent a busy tent crowded out with one more shared window, not one read each (Codex P2 at 0994ea2a)", async () => {
+    // Three tents ask for 150 rows; A has 150 newer rows and fills the window.
+    io.sensorRows = [
+      ...Array.from({ length: 150 }, (_, i) =>
+        sensorRow(TENT_A, "temperature_c", 24, minutesAgo(1 + i * 0.01)),
+      ),
+      sensorRow(TENT_B, "temperature_c", 22, minutesAgo(5)),
+      sensorRow(TENT_C, "temperature_c", 21, minutesAgo(6)),
+    ];
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B, TENT_C]);
+    expect(sensorCalls()).toBe(2);
+    expect(diaryCalls()).toBe(0);
+    io.from.mockClear();
+    for (const tentId of [TENT_A, TENT_B, TENT_C]) {
+      expect(bulk[tentId]).toEqual(await fetchLatestSensorSnapshot(GROW, [tentId]));
+    }
+  });
+
   it("does not retry failed tents one by one at the real caller (Codex P2 at 4bd3fae7)", async () => {
     threeTentFixture();
     io.failSensor = true;
@@ -380,7 +398,7 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(bulk[tents[1]]).toEqual(EMPTY_SNAPSHOT);
   });
 
-  it("starts no per-tent read during a sensor outage, even when the diary window is crowded (Codex P2 at 108e3eab, fa8edcff)", async () => {
+  it("settles a crowded-out tent through a deeper shared diary window during a sensor outage, with no per-tent read (Codex P2 at 108e3eab, fa8edcff, 0994ea2a)", async () => {
     // Sensor read fails. Three tents need diary evidence (window of 60). Tent A
     // fills the window with unusable candidates; B's usable row is pushed out.
     io.failSensor = true;
@@ -394,13 +412,15 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
       diaryRow(TENT_B, minutesAgo(300), 26, 60),
     ];
     const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B, TENT_C]);
-    // B's row is outside the shared window: unavailable for now, not read on its own.
-    expect(bulk[TENT_B]).toBeNull();
+    // One failed sensor window and two shared diary windows (the second at
+    // double depth over the tents the first left unsettled); nothing per tent.
+    expect(sensorCalls()).toBe(1);
+    expect(diaryCalls()).toBe(2);
+    // B's usable row, crowded out of the first window, is found as its own read finds it.
+    expect(bulk[TENT_B]).toMatchObject({ source: "diary", temp: 26, rh: 60 });
     expect(bulk[TENT_A]).toBeNull();
     expect(bulk[TENT_C]).toBeNull();
-    // One failed sensor window and one shared diary window; nothing fans out per tent.
-    expect(sensorCalls()).toBe(1);
-    expect(diaryCalls()).toBe(1);
+    expect(bulk[TENT_B]).toEqual(await fetchLatestSensorSnapshot(GROW, [TENT_B]));
   });
 
   it("marks tents unavailable, with no per-tent reads, when the shared diary read fails", async () => {
@@ -417,7 +437,7 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
 
   it("treats a window at the PostgREST row ceiling as truncated (Codex P1 at 3d1e5800)", async () => {
     // 21 tents would ask for 1,050 rows; the window asks for 1,000. Tent A fills
-    // it with newer rows, so every other tent is read on its own.
+    // it with newer rows, so a second shared window covers the other 20.
     const tents = Array.from(
       { length: 21 },
       (_, i) => `aaaaaaaa-0000-4000-8000-${String(100 + i).padStart(12, "0")}`,
@@ -433,7 +453,9 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(bulk[a]).toMatchObject({ source: "live", temp: 24 });
     expect(bulk[b]).toMatchObject({ source: "live", temp: 22 });
     expect(bulk[tents[2]]).toEqual(EMPTY_SNAPSHOT);
-    expect(sensorCalls()).toBe(1 + 20);
+    // Two shared sensor windows instead of one plus 20 per-tent reads (Codex P2 at 0994ea2a).
+    expect(sensorCalls()).toBe(2);
+    expect(bulk[b]).toEqual(await fetchLatestSensorSnapshot(GROW, [b]));
   });
 
   it("orders both sensor reads by a unique final key before the limit (Codex P1 at 3d1e5800)", () => {

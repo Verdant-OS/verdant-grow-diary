@@ -31,6 +31,7 @@ const io = vi.hoisted(() => {
     sensorRows: [] as Row[],
     diaryRows: [] as Row[],
     failSensor: false,
+    failDiary: false,
     // A chainable, thenable PostgREST stand-in: fixtures are pre-sorted newest
     // first; `.in` filters by the named column and `.limit` slices.
     builder(table: string) {
@@ -59,7 +60,9 @@ const io = vi.hoisted(() => {
           Promise.resolve(
             table === "sensor_readings_effective" && state.failSensor
               ? { data: null, error: { message: "sensor read failed" } }
-              : { data: rows.slice(0, limit), error: null },
+              : table === "diary_entries" && state.failDiary
+                ? { data: null, error: { message: "diary read failed" } }
+                : { data: rows.slice(0, limit), error: null },
           ).then(onFulfilled, onRejected),
       };
       return b;
@@ -148,6 +151,7 @@ beforeEach(() => {
   io.sensorRows = [];
   io.diaryRows = [];
   io.failSensor = false;
+  io.failDiary = false;
 });
 afterEach(() => {
   cleanup();
@@ -288,6 +292,64 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(sensorCalls()).toBe(1);
     expect(diaryCalls()).toBe(1);
     await expect(fetchLatestSensorSnapshot(GROW, [TENT_A])).rejects.toThrow("unavailable");
+  });
+
+  it("never scans a tent's diary candidates past the per-tent bound (Codex P1 at 108e3eab)", async () => {
+    // 11 tents make the shared diary window ask for 220 rows. Tent A has 201
+    // candidates: 200 unusable, then one usable. The per-tent read examines
+    // 200 and gives up; the window must not reach the 201st.
+    const tents = Array.from(
+      { length: 11 },
+      (_, i) => `aaaaaaaa-0000-4000-8000-${String(200 + i).padStart(12, "0")}`,
+    );
+    const [a] = tents;
+    io.diaryRows = [
+      ...Array.from({ length: 200 }, (_, i) => ({
+        id: uuid(++seq),
+        entry_at: minutesAgo(10 + i),
+        tent_id: a,
+        details: { sensor_snapshot: { note: "no metric" } },
+      })),
+      diaryRow(a, minutesAgo(500), 26, 60),
+    ];
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, tents);
+    expect(bulk[a]).toBeNull();
+    await expect(fetchLatestSensorSnapshot(GROW, [a])).rejects.toThrow("unavailable");
+    expect(bulk[tents[1]]).toEqual(EMPTY_SNAPSHOT);
+  });
+
+  it("never repeats a failed sensor read per tent when the diary window is crowded (Codex P2 at 108e3eab)", async () => {
+    // Sensor read fails. Three tents need diary evidence (window of 60). Tent A
+    // fills the window with unusable candidates; B's usable row is pushed out.
+    io.failSensor = true;
+    io.diaryRows = [
+      ...Array.from({ length: 61 }, (_, i) => ({
+        id: uuid(++seq),
+        entry_at: minutesAgo(10 + i),
+        tent_id: TENT_A,
+        details: { sensor_snapshot: { note: "no metric" } },
+      })),
+      diaryRow(TENT_B, minutesAgo(300), 26, 60),
+    ];
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B, TENT_C]);
+    expect(bulk[TENT_B]).toMatchObject({ source: "diary", temp: 26 });
+    expect(bulk[TENT_A]).toBeNull();
+    expect(bulk[TENT_C]).toBeNull();
+    // One failed sensor window, then diary-only reads: the sensor query is never retried.
+    expect(sensorCalls()).toBe(1);
+    expect(diaryCalls()).toBeGreaterThanOrEqual(2);
+  });
+
+  it("marks tents unavailable, with no per-tent reads, when the shared diary read fails", async () => {
+    threeTentFixture();
+    io.failDiary = true;
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B, TENT_C]);
+    expect(bulk[TENT_A]).toMatchObject({ source: "live", temp: 24 });
+    expect(bulk[TENT_B]).toBeNull();
+    expect(bulk[TENT_C]).toBeNull();
+    expect(sensorCalls()).toBe(1);
+    expect(diaryCalls()).toBe(1);
+    await expect(fetchLatestSensorSnapshot(GROW, [TENT_B])).rejects.toThrow("unavailable");
   });
 
   it("treats a window at the PostgREST row ceiling as truncated (Codex P1 at 3d1e5800)", async () => {

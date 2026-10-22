@@ -75,9 +75,21 @@ describe("resolveDiaryWindow", () => {
     expect(resolveDiaryWindow([], false, 200, first)).toEqual({ kind: "none" });
   });
 
-  it("falls back when the complete set exceeds the per-tent candidate bound", () => {
-    const many = Array.from({ length: 3 }, (_, n) => ({ ok: false, n }));
-    expect(resolveDiaryWindow(many, false, 2, first)).toEqual({ kind: "fallback" });
+  it("never looks past the per-tent candidate bound (Codex P1 at 108e3eab)", () => {
+    // Usable only at index 2, past a bound of 2: the per-tent read never sees
+    // it and gives up as unavailable, so the window must too.
+    const late = [
+      { ok: false, n: 0 },
+      { ok: false, n: 1 },
+      { ok: true, n: 2 },
+    ];
+    expect(resolveDiaryWindow(late, false, 2, first)).toEqual({ kind: "unavailable" });
+    expect(resolveDiaryWindow(late, true, 2, first)).toEqual({ kind: "unavailable" });
+    // Usable within the bound wins even when more rows follow.
+    expect(resolveDiaryWindow([{ ok: true, n: 0 }, ...late], true, 2, first)).toEqual({
+      kind: "found",
+      snapshot: { hit: 0 },
+    });
   });
 });
 

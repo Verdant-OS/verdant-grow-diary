@@ -156,29 +156,48 @@ export async function fetchLatestSensorSnapshot(
         staleSensorCandidate = snap;
       }
     }
-    // 2) Fall back to latest diary_entries evidence for this grow.
-    if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
-    for (const candidateLimit of [DIARY_EVIDENCE_PAGE_SIZE, DIARY_EVIDENCE_MAX_CANDIDATES]) {
-      const diaryRows = await readDiaryEvidenceCandidates(growId, tentIds, candidateLimit);
-      for (const row of diaryRows.slice(0, candidateLimit)) {
-        const snap = snapshotFromDiaryEvidenceRow(row, tentIds);
-        if (snap) return preferNewer(staleSensorCandidate, snap);
-      }
-      // A candidate key alone does not prove a usable reading. Re-read
-      // from the beginning instead of trusting offsets in a changing set.
-      if (diaryRows.length > candidateLimit) {
-        if (candidateLimit === DIARY_EVIDENCE_MAX_CANDIDATES) throw new Error("unavailable");
-        continue;
-      }
-      break;
-    }
-    // 3) Nothing newer in the diary: a stale sensor snapshot is still the
-    // latest evidence (rendered with its stale badge), else nothing.
-    if (sensorReadFailed) throw new Error("unavailable");
-    return staleSensorCandidate ?? EMPTY_SNAPSHOT;
+    // 2) and 3) Diary evidence, else the stale candidate, else nothing.
+    return await resolveDiaryEvidence(growId, tentIds, staleSensorCandidate, sensorReadFailed);
   } catch {
     throw new Error("unavailable");
   }
+}
+
+/**
+ * Steps 2 and 3 of the per-tent read, without the sensor step: the bounded
+ * diary scan for this scope, then the stale sensor candidate, else nothing.
+ * Throws `unavailable` when the diary read fails, when the bounded candidate
+ * set is exhausted with a tail unexamined, or when the sensor read had failed
+ * and the diary holds nothing. The bulk read uses it on its own for a tent
+ * whose sensor window failed, so an outage never repeats the sensor read per
+ * tent (Codex P2 on #2303 at 108e3eab).
+ */
+async function resolveDiaryEvidence(
+  growId: string | null | undefined,
+  tentIds: readonly string[],
+  staleSensorCandidate: SensorSnapshot | null,
+  sensorReadFailed: boolean,
+): Promise<SensorSnapshot> {
+  // 2) Fall back to latest diary_entries evidence for this grow.
+  if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
+  for (const candidateLimit of [DIARY_EVIDENCE_PAGE_SIZE, DIARY_EVIDENCE_MAX_CANDIDATES]) {
+    const diaryRows = await readDiaryEvidenceCandidates(growId, tentIds, candidateLimit);
+    for (const row of diaryRows.slice(0, candidateLimit)) {
+      const snap = snapshotFromDiaryEvidenceRow(row, tentIds);
+      if (snap) return preferNewer(staleSensorCandidate, snap);
+    }
+    // A candidate key alone does not prove a usable reading. Re-read
+    // from the beginning instead of trusting offsets in a changing set.
+    if (diaryRows.length > candidateLimit) {
+      if (candidateLimit === DIARY_EVIDENCE_MAX_CANDIDATES) throw new Error("unavailable");
+      continue;
+    }
+    break;
+  }
+  // 3) Nothing newer in the diary: a stale sensor snapshot is still the
+  // latest evidence (rendered with its stale badge), else nothing.
+  if (sensorReadFailed) throw new Error("unavailable");
+  return staleSensorCandidate ?? EMPTY_SNAPSHOT;
 }
 
 /**
@@ -273,21 +292,30 @@ export async function fetchLatestSensorSnapshotsByTent(
               result[tentId] = sensorReadFailed
                 ? null
                 : (staleByTent.get(tentId) ?? EMPTY_SNAPSHOT);
+            } else if (verdict.kind === "unavailable") {
+              // The per-tent read gives up past its candidate bound too.
+              result[tentId] = null;
             } else {
               fallback.add(tentId);
             }
           }
         } catch {
-          needDiary.forEach((tentId) => fallback.add(tentId));
+          // A failed diary read is unavailable for the per-tent read as well;
+          // no per-tent read could repair it, so none is started.
+          for (const tentId of needDiary) result[tentId] = null;
         }
       }
     }
   }
-  // 3) Per-tent reads only where a window could not reproduce one.
+  // 3) Per-tent reads only where a window could not reproduce one. After a
+  // failed sensor window the per-tent read is diary-only, so the failed
+  // sensor query is never repeated per tent.
   await Promise.all(
     [...fallback].map(async (tentId) => {
       try {
-        result[tentId] = await fetchLatestSensorSnapshot(growId, [tentId]);
+        result[tentId] = sensorReadFailed
+          ? await resolveDiaryEvidence(growId, [tentId], null, true)
+          : await fetchLatestSensorSnapshot(growId, [tentId]);
       } catch {
         result[tentId] = null;
       }

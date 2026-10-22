@@ -48,9 +48,9 @@ export function tentsListCanonicalVpd(
   // Tonight runs no realism check. The same capture gate the tent page applies
   // decides here too: the pair a calculated VPD came from, and every
   // temperature and RH at its capture (realism and intake quality). A rejected
-  // capture yields no canonical VPD, so the list never shows telemetry the
-  // tent page withholds (Codex P1 on #2303 at 3d1e5800). The VPD's own value
-  // is still passed through: buildTentSnapshotView grades it Invalid.
+  // capture is returned flagged, never shown, so the list never shows telemetry
+  // the tent page withholds (Codex P1 on #2303 at 3d1e5800). The VPD's own
+  // value is still passed through: buildTentSnapshotView grades it Invalid.
   const metricValue = (key: string) => {
     const metric = metrics.find((m) => m.key === key);
     return metric?.state === "value" && typeof metric.value === "number" ? metric.value : null;
@@ -65,14 +65,21 @@ export function tentsListCanonicalVpd(
     })),
     snapshot.status === "ok" ? snapshot.snapshot : null,
   );
-  if (tonightCaptureRejected(vpd, { temp: metricValue("temp"), rh: metricValue("rh") }, climate))
-    return null;
+  const rejected = tonightCaptureRejected(
+    vpd,
+    { temp: metricValue("temp"), rh: metricValue("rh") },
+    climate,
+  );
   return {
     kpa: vpd.value,
     capturedAt: vpd.capturedAt,
     source: vpd.source,
     sourceLabel: vpd.sourceLabel,
     ageText: vpd.ageText,
+    // An explicit rejection, not null: the strip must also withhold its own
+    // stored VPD when the rejected capture is its latest cohort
+    // (Codex P1 on #2303 at 108e3eab).
+    ...(rejected ? { rejected: true } : {}),
   };
 }
 

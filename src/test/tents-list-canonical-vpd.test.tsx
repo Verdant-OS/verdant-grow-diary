@@ -242,9 +242,36 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     ];
     // Tonight itself still selects the direct VPD; the list must not.
     expect(dashboardVpd(rows)).toMatchObject({ state: "value", value: 1.2 });
-    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toBeNull();
+    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toMatchObject({ rejected: true });
     const vpd = renderStrip(rows);
     expect(vpd.textContent ?? "").not.toContain("1.2");
+    expect(vpd).not.toHaveAttribute("data-status", "ok");
+  });
+
+  it("withholds the cohort's own stored VPD when its capture is rejected (Codex P1 at 108e3eab)", () => {
+    // The rejected capture is the strip's latest cohort: no canonical override
+    // can stand in, and the raw stored VPD must not read ok either.
+    const at0 = at(0.1);
+    const rows = [
+      row("temperature_c", 24, at0, "live"),
+      row("humidity_pct", 150, at0, "live"),
+      row("vpd_kpa", 1.2, at0, "live"),
+    ];
+    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toMatchObject({ rejected: true });
+    const vpd = renderStrip(rows);
+    expect(vpd).toHaveAttribute("data-status", "invalid");
+    expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(/Invalid/);
+  });
+
+  it("withholds the cohort's own stored VPD when a plausible sibling is quality-flagged", () => {
+    const at0 = at(0.1);
+    const rows = [
+      { ...row("temperature_c", 24, at0, "live"), quality: "degraded" },
+      row("humidity_pct", 55, at0, "live"),
+      row("vpd_kpa", 1.2, at0, "live"),
+    ];
+    const vpd = renderStrip(rows);
+    expect(vpd).toHaveAttribute("data-status", "invalid");
     expect(vpd).not.toHaveAttribute("data-status", "ok");
   });
 
@@ -255,7 +282,7 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
       row("vpd_kpa", 1.2, badAt, "live"),
       row("co2_ppm", 800, at(0.05), "live"),
     ];
-    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toBeNull();
+    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toMatchObject({ rejected: true });
     expect(renderStrip(rows).textContent ?? "").not.toContain("1.2");
   });
 

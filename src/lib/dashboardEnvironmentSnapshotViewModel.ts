@@ -206,6 +206,14 @@ export interface CanonicalTentVpd {
   source: string | null;
   sourceLabel: string | null;
   ageText: string | null;
+  /**
+   * True when the capture behind this VPD failed the capture gate (an
+   * unrealistic or quality-flagged same-instant temperature or RH, or
+   * unrealistic contributors). The value is never shown as the canonical VPD;
+   * at the cohort's own instant the cohort's stored VPD is withheld as Invalid
+   * too (Codex P1 on #2303 at 108e3eab).
+   */
+  rejected?: boolean;
 }
 
 /**
@@ -282,7 +290,13 @@ export function buildTentSnapshotView(
     options.canonicalVpd != null && Number.isFinite(options.canonicalVpd.kpa)
       ? options.canonicalVpd
       : null;
-  const useCanonicalVpd = canonical !== null && sameInstant(canonical.capturedAt, snap.ts);
+  const canonicalRejected = canonical?.rejected === true;
+  const useCanonicalVpd =
+    canonical !== null && !canonicalRejected && sameInstant(canonical.capturedAt, snap.ts);
+  // The capture gate rejected the cohort's own capture: its stored VPD is the
+  // rejected reading and must not fall back to "ok" (Codex P1 at 108e3eab).
+  const cohortVpdRejected =
+    canonical !== null && canonicalRejected && sameInstant(canonical.capturedAt, snap.ts);
   const vpdKpa = useCanonicalVpd ? canonical.kpa : snap.vpd;
 
   // Source resolution is strict across the whole latest timestamp. A mixed
@@ -334,6 +348,7 @@ export function buildTentSnapshotView(
   const invalid =
     flaggedInvalid ||
     canonicalVpdInvalid ||
+    (cohortVpdRejected && typeof vpdKpa === "number") ||
     quality.suspiciousFields.some((f) => typeof snap[f as keyof typeof snap] === "number");
   const canAssessStage =
     provenanceEligible && capturedAt !== null && !stale && !invalid && !flaggedDegraded;
@@ -373,7 +388,7 @@ export function buildTentSnapshotView(
     } else if (
       rowFlag === "invalid" ||
       quality.suspiciousFields.includes(suspiciousKey) ||
-      (key === "vpd" && canonicalVpdInvalid)
+      (key === "vpd" && (canonicalVpdInvalid || cohortVpdRejected))
     ) {
       status = "invalid";
       statusLabel = "Invalid";
@@ -440,7 +455,7 @@ export function buildTentSnapshotView(
   ];
 
   // A canonical VPD from another capture keeps its own source and age.
-  if (canonical !== null && !useCanonicalVpd) {
+  if (canonical !== null && !canonicalRejected && !useCanonicalVpd) {
     metrics[2] = ownCaptureVpdMetric(canonical, stage, now);
   }
 

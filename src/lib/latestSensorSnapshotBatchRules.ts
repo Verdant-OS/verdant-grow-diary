@@ -42,14 +42,19 @@ export function partitionWindowByTent<T extends { tent_id?: string | null }>(
 }
 
 export type DiaryWindowVerdict<S> =
-  { kind: "found"; snapshot: S } | { kind: "none" } | { kind: "fallback" };
+  | { kind: "found"; snapshot: S }
+  | { kind: "none" }
+  | { kind: "fallback" }
+  | { kind: "unavailable" };
 
 /**
- * The per-tent diary scan returns the first usable candidate, newest first;
- * with none usable it yields nothing when the candidate set is complete and
- * at most `maxCandidates` long, else it is unavailable. Over a window: a hit
- * inside the tent's prefix is that same first hit; no hit is final only when
- * the window held the tent's whole candidate set within the per-tent bound.
+ * The per-tent diary scan looks at the newest `maxCandidates` rows at most:
+ * the first usable one wins; none usable with more candidates behind them is
+ * unavailable; none usable in a complete, bounded set is nothing. Over a
+ * window the tent's rows are a prefix of its own newest rows, so the same
+ * three answers hold once the scan is bounded the same way (Codex P1 on #2303
+ * at 108e3eab); only a full window with no hit and no excess leaves the tail
+ * unknown, which is the per-tent fallback.
  */
 export function resolveDiaryWindow<R, S>(
   own: readonly R[],
@@ -57,11 +62,12 @@ export function resolveDiaryWindow<R, S>(
   maxCandidates: number,
   toSnapshot: (row: R) => S | null,
 ): DiaryWindowVerdict<S> {
-  for (const row of own) {
+  for (const row of own.slice(0, maxCandidates)) {
     const snapshot = toSnapshot(row);
     if (snapshot) return { kind: "found", snapshot };
   }
-  if (windowFull || own.length > maxCandidates) return { kind: "fallback" };
+  if (own.length > maxCandidates) return { kind: "unavailable" };
+  if (windowFull) return { kind: "fallback" };
   return { kind: "none" };
 }
 

@@ -700,7 +700,7 @@ export default function Sensors() {
                   className="text-xs text-muted-foreground py-6 text-center"
                   data-testid={`sensors-empty-${m.key}`}
                 >
-                  {unresolvedManualMetric
+                  {unresolvedManualMetric || (isDerived && manualHistoryIncomplete)
                     ? manualHistoryMessage
                     : isDerived
                       ? "No recorded VPD history to chart yet. The value below is calculated from temperature and humidity."

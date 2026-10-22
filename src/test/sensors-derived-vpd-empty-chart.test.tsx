@@ -108,6 +108,12 @@ function mount() {
 
 afterEach(() => {
   cleanup();
+  Object.assign(state.manuals, {
+    isPending: false,
+    isError: false,
+    isSuccess: true,
+    fetchStatus: "idle",
+  });
 });
 
 describe("Sensors VPD card with only a calculated VPD", () => {
@@ -128,4 +134,34 @@ describe("Sensors VPD card with only a calculated VPD", () => {
     mount();
     expect(screen.getByTestId("chart-vpd")).toBeInTheDocument();
   });
+
+  it.each([
+    [
+      "pending",
+      { isPending: true, isSuccess: false, fetchStatus: "fetching" },
+      /checking quick log manual history/i,
+    ],
+    [
+      "paused",
+      { isPending: true, isSuccess: false, fetchStatus: "paused" },
+      /waiting for connection/i,
+    ],
+    [
+      "failed",
+      { isError: true, isSuccess: false, fetchStatus: "idle" },
+      /could not be fully checked/i,
+    ],
+  ] as const)(
+    "keeps the manual-history status while the history check is %s",
+    (_label, query, message) => {
+      state.sensors = [{ ...manual(), vpd: 0, observedMetrics: ["temp", "rh"] }];
+      state.manuals.data = [];
+      Object.assign(state.manuals, query);
+      mount();
+      expect(screen.getByTestId("sensors-vpd-derived-value")).toBeInTheDocument();
+      const empty = screen.getByTestId("sensors-empty-vpd");
+      expect(empty).toHaveTextContent(message);
+      expect(empty).not.toHaveTextContent(/no recorded vpd history/i);
+    },
+  );
 });

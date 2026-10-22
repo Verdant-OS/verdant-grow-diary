@@ -78,13 +78,19 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
   the message's own result sets the exit code.
 - `--once` also exits `2` when the broker connection closes or goes offline
   before a message is claimed; there is nothing to reconnect for.
+- The `--once` deadline (20 s) covers both the connection and the subscription
+  acknowledgement; a broker that connects but never answers the subscribe
+  ends the run with exit `2` instead of hanging.
+- The 64 KiB bound is applied to the raw frame before it is decoded or queued,
+  so the backlog never holds more than 32 bounded messages.
 - Continuous mode handles at most 4 messages at once and queues at most 32
   more; anything beyond that is dropped with a `dropped_backlog_full` log line,
   so a burst or a slow ingest never fans out into unbounded POSTs and retries.
   A broker close/offline is logged and left to the client's own reconnect.
 - Logs and reports pass through a redactor at every depth: `PASSKEY`, `MAC`,
-  tokens (also when embedded in another string or a URL) and MQTT credentials
-  never appear. The Mosquitto watcher window still shows the raw topic, so
+  tokens (also when embedded in another string or a URL), MAC addresses in any
+  common form and MQTT credentials never appear, in the report's topic field
+  as much as in the outcome. The Mosquitto watcher window still shows the raw topic, so
   crop it from anything you share.
 
 ## What it never does

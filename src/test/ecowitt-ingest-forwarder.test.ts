@@ -11,6 +11,7 @@ import {
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
   buildForwardRequest,
+  buildReport,
   createBoundedRunner,
   MAX_BACKLOG,
   MAX_INFLIGHT,
@@ -571,6 +572,50 @@ describe("redaction", () => {
     }
   });
 
+  it("redacts MAC addresses embedded in strings and drops a stationtype carrying one (Codex P1 at 3c16b6a4)", () => {
+    const macs = ["AA:BB:CC:DD:EE:FF", "aa-bb-cc-dd-ee-ff", "aabb.ccdd.eeff"];
+    for (const mac of macs) {
+      expect(redactString(`GW-${mac} ok`)).toBe("GW-(redacted) ok");
+      const out = prepareForwardPayload(
+        JSON.stringify({
+          PASSKEY: FAKE_PASSKEY,
+          dateutc: "2026-10-22 05:27:14",
+          stationtype: `GW-${mac}`,
+        }),
+      );
+      expect(out.ok && out.summary.station).toBeNull();
+    }
+    expect(JSON.stringify(redactForLog({ summary: { station: `GW-${macs[0]}` } }))).not.toContain(
+      macs[0],
+    );
+    // A plain firmware string is not a MAC.
+    expect(redactString("GW3000B_V1.2.4")).toBe("GW3000B_V1.2.4");
+  });
+
+  it("redacts the whole --write-report document, topic included (Codex P1 at 3c16b6a4)", () => {
+    const report = buildReport(
+      {
+        kind: "dry_run",
+        summary: {
+          air_channels: [1],
+          soil_channels: [],
+          key_count: 3,
+          dateutc: "x",
+          station: null,
+        },
+      },
+      flags({ topic: `bridge/${FAKE_BRIDGE_TOKEN}` }),
+      "2026-10-22T05:27:14.000Z",
+    );
+    const text = JSON.stringify(report);
+    expect(text).not.toMatch(/vbt_/);
+    expect(text).toContain("bridge/(redacted)");
+    expect(report.transport).toBe("ecowitt_mqtt_ingest_forwarder");
+    expect(
+      (report.outcome as { summary: { air_channels: number[] } }).summary.air_channels,
+    ).toEqual([1]);
+  });
+
   it("redacts broker URL credentials in the startup fields", () => {
     expect(redactString(`wss://broker/mqtt?token=${FAKE_BRIDGE_TOKEN}`)).toBe(
       "wss://broker/mqtt?token=(redacted)",
@@ -648,6 +693,53 @@ describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => 
     const ran = vi.fn(async () => {});
     runner.submit(ran);
     await vi.waitFor(() => expect(ran).toHaveBeenCalledTimes(1));
+  });
+
+  it("rejects an oversized frame before decoding or queueing it (Codex P2 at 3c16b6a4)", async () => {
+    const runner = createBoundedRunner(1, 4);
+    const fetchImpl = vi.fn(() => new Promise<Response>(() => {}));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const handle = createMessageHandler({
+        flags: flags({ live: true }),
+        env: LIVE_ENV,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        onDone: () => {},
+        runner,
+      });
+      handle("ecowitt/grow", GATEWAY_MESSAGE);
+      await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+      // The slot is held; an oversized frame must not join the backlog.
+      const oversized = Buffer.alloc(MAX_MESSAGE_BYTES + 1, 0x7b);
+      handle("ecowitt/grow", oversized);
+      expect(runner.backlog).toBe(0);
+      await vi.waitFor(() =>
+        expect(
+          logSpy.mock.calls.some(
+            (c) =>
+              String(c[0]).includes("rejected_locally") &&
+              JSON.stringify(c[1]).includes("payload_too_large"),
+          ),
+        ).toBe(true),
+      );
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("an oversized --once frame still exits 1 without a POST", async () => {
+    const fetchImpl = vi.fn();
+    const onDone = vi.fn();
+    const handle = createMessageHandler({
+      flags: flags({ live: true, once: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onDone,
+    });
+    handle("ecowitt/grow", Buffer.alloc(MAX_MESSAGE_BYTES + 1, 0x7b));
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalledWith(1));
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("the live handler never has more than MAX_INFLIGHT POSTs in flight and drops beyond the backlog", async () => {
@@ -799,6 +891,33 @@ describe("attachClientLifecycle (--once broker failures)", () => {
         connectTimeoutMs: 1000,
       });
       vi.advanceTimersByTime(1001);
+      expect(onFatal).toHaveBeenCalledWith(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("exits 2 when the broker connects but never answers the subscription (Codex P2 at 3c16b6a4)", () => {
+    vi.useFakeTimers();
+    try {
+      const handlers = new Map<string, (...args: unknown[]) => void>();
+      const silent = {
+        on: (event: string, listener: (...args: unknown[]) => void) =>
+          handlers.set(event, listener),
+        // CONNACK arrives; SUBACK never does.
+        subscribe: () => undefined,
+      };
+      const onFatal = vi.fn();
+      attachClientLifecycle(silent, {
+        flags: flags({ once: true }),
+        onFatal,
+        connectTimeoutMs: 1000,
+      });
+      handlers.get("connect")?.();
+      vi.advanceTimersByTime(999);
+      expect(onFatal).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2);
+      expect(onFatal).toHaveBeenCalledTimes(1);
       expect(onFatal).toHaveBeenCalledWith(2);
     } finally {
       vi.useRealTimers();

@@ -345,6 +345,12 @@ const EMBEDDED_SECRET_RE = /(?:vbt|sk|sbp)_[A-Za-z0-9_-]{4,}/g;
  * 3df0e691). Over-redacting another long hex string in a log is harmless.
  */
 const HEX32_RE = /[0-9a-f]{32}/gi;
+/**
+ * MAC addresses in the colon, hyphen and dotted forms. A gateway identifier
+ * copied into a text field such as `stationtype` must never be echoed
+ * (Codex P1 on #2335 at 3c16b6a4).
+ */
+const MAC_RE = /\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|\b(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}\b/gi;
 /** `scheme://user:password@host` → `scheme://(redacted)@host`. */
 const URL_USERINFO_RE = /(\/\/)[^/\s@]+@/g;
 /** `?token=…`, `&password=…` and similar query credentials. */
@@ -354,6 +360,7 @@ const URL_SECRET_QUERY_RE = /([?&](?:token|key|api_key|password|passkey|secret)=
 export function redactString(value: string): string {
   return value
     .replace(EMBEDDED_SECRET_RE, "(redacted)")
+    .replace(MAC_RE, "(redacted)")
     .replace(HEX32_RE, "(redacted)")
     .replace(URL_USERINFO_RE, "$1(redacted)@")
     .replace(URL_SECRET_QUERY_RE, "$1(redacted)");
@@ -483,16 +490,29 @@ function log(event: string, fields: Record<string, unknown> = {}): void {
   console.log(`[ecowitt-forwarder] ${event}`, redactForLog(fields));
 }
 
+/**
+ * Pure. The `--write-report` document, redacted as a whole: the configured
+ * topic is operator input and can carry a token shape just as the outcome can
+ * (Codex P1 on #2335 at 3c16b6a4).
+ */
+export function buildReport(
+  outcome: ForwardOutcome,
+  flags: ForwarderFlags,
+  writtenAt: string,
+): Record<string, unknown> {
+  return redactForLog({
+    transport: TRANSPORT,
+    written_at: writtenAt,
+    live: flags.live,
+    topic: flags.topic,
+    outcome: outcome as unknown as Record<string, unknown>,
+  });
+}
+
 async function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Promise<void> {
   const { mkdir, writeFile } = await import("node:fs/promises");
   const path = await import("node:path");
-  const report = {
-    transport: TRANSPORT,
-    written_at: new Date().toISOString(),
-    live: flags.live,
-    topic: flags.topic,
-    outcome: redactForLog(outcome as unknown as Record<string, unknown>),
-  };
+  const report = buildReport(outcome, flags, new Date().toISOString());
   await mkdir(path.dirname(DEFAULT_REPORT_PATH), { recursive: true });
   await writeFile(DEFAULT_REPORT_PATH, JSON.stringify(report, null, 2), "utf8");
   log("report written", { path: DEFAULT_REPORT_PATH });
@@ -592,24 +612,42 @@ export function createMessageHandler(
       }
       claim.claimed = true;
     }
-    const text = typeof buf === "string" ? buf : buf.toString("utf8");
-    const job = async () => {
+    const finish = async (outcome: ForwardOutcome | null) => {
       let exitCode = 1;
       try {
-        const outcome = await handleMessage({
+        if (outcome) {
+          log(outcome.kind, outcome as unknown as Record<string, unknown>);
+          if (deps.flags.writeReport)
+            await (deps.writeReportImpl ?? writeReport)(outcome, deps.flags);
+          exitCode = onceExitCode(outcome);
+        }
+      } catch (e) {
+        log("handler_error", { error: e instanceof Error ? e.message : "unknown" });
+      }
+      if (deps.flags.once) deps.onDone(exitCode);
+    };
+    // The size bound applies before the frame is decoded or queued, so the
+    // backlog holds at most MAX_BACKLOG × MAX_MESSAGE_BYTES of text and an
+    // oversized frame is never retained by a waiting closure (Codex P2 at 3c16b6a4).
+    const bytes = typeof buf === "string" ? Buffer.byteLength(buf, "utf8") : buf.byteLength;
+    if (bytes > MAX_MESSAGE_BYTES) {
+      void finish({ kind: "rejected_locally", reason: "payload_too_large" });
+      return;
+    }
+    const text = typeof buf === "string" ? buf : buf.toString("utf8");
+    const job = async () => {
+      let outcome: ForwardOutcome | null = null;
+      try {
+        outcome = await handleMessage({
           text,
           flags: deps.flags,
           env: deps.env,
           fetchImpl: deps.fetchImpl,
         });
-        log(outcome.kind, outcome as unknown as Record<string, unknown>);
-        if (deps.flags.writeReport)
-          await (deps.writeReportImpl ?? writeReport)(outcome, deps.flags);
-        exitCode = onceExitCode(outcome);
       } catch (e) {
         log("handler_error", { error: e instanceof Error ? e.message : "unknown" });
       }
-      if (deps.flags.once) deps.onDone(exitCode);
+      await finish(outcome);
     };
     if (runner.submit(job) === "dropped") {
       log("dropped_backlog_full", {
@@ -659,17 +697,23 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
     }
   };
   const timeoutMs = deps.connectTimeoutMs ?? MQTT_CONNECT_TIMEOUT_MS;
+  // One deadline covers both CONNACK and SUBACK: the client's connectTimeout
+  // waits only for CONNACK, and a broker that accepts the connection but never
+  // answers the subscription would otherwise hang a `--once` run forever
+  // (Codex P2 on #2335 at 3c16b6a4).
   const timer = deps.flags.once
     ? setTimeout(() => {
-        if (!connected) fatal("connect_timeout", { timeout_ms: timeoutMs });
+        fatal(connected ? "subscribe_timeout" : "connect_timeout", { timeout_ms: timeoutMs });
       }, timeoutMs)
     : null;
   client.on("connect", () => {
     connected = true;
-    if (timer) clearTimeout(timer);
     client.subscribe(deps.flags.topic, (err) => {
       if (err) fatal("subscribe_failed", { error: err.message });
-      else log("subscribed", { topic: deps.flags.topic });
+      else {
+        if (timer) clearTimeout(timer);
+        log("subscribed", { topic: deps.flags.topic });
+      }
     });
   });
   client.on("error", (e: Error) => fatal("mqtt_error", { error: e.message }));

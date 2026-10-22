@@ -1139,6 +1139,11 @@ export async function connectMqtt(
     // a refusal and ended continuous mode after an ordinary reconnect
     // (Codex P2 on #2335 at ac8be57b).
     resubscribe: false,
+    // MQTT.js logs its CONNECT packet (password included) and every inbound
+    // packet (the raw PASSKEY payload) through `debug("mqttjs:client")` when
+    // DEBUG enables it, outside redactForLog. A no-op logger keeps dependency
+    // diagnostics from bypassing redaction (Codex P1 on #2335 at d722d381).
+    log: () => {},
   });
   const buildStream = client.streamBuilder;
   if (typeof buildStream !== "function" || typeof client.connect !== "function") {
@@ -1175,6 +1180,12 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
     }
   }
   return [...new Set(values.filter((v): v is string => typeof v === "string" && v.length > 0))];
+}
+
+/** True for a broker URL with an authority (`scheme://host`), the only form whose credentials can be extracted. */
+export function brokerUrlIsHierarchical(value: string): boolean {
+  if (!URL.canParse(value)) return false;
+  return new URL(value).host !== "";
 }
 
 export interface MainDeps {
@@ -1218,8 +1229,11 @@ export async function main(
 
   // An unparseable broker URL hides its credentials from extraction, so no
   // configuration string can be proven redacted: refuse with a value-free
-  // line before anything else is logged (Codex P1 on #2335 at 95f5dfe7).
-  if (!URL.canParse(flags.mqttUrl)) {
+  // line before anything else is logged (Codex P1 on #2335 at 95f5dfe7). An
+  // opaque one (`mqtt:user:pass@host`, no `//`) parses with an empty host and
+  // no userinfo, yet MQTT.js's legacy parser reads `user:pass` as credentials,
+  // so it is refused the same way (Codex P1 on #2335 at d722d381).
+  if (!brokerUrlIsHierarchical(flags.mqttUrl)) {
     console.error("[ecowitt-forwarder] refused: --mqtt-url is not a valid URL.");
     deps.exit(2);
     return;

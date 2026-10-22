@@ -837,6 +837,27 @@ describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)"
     }
   });
 
+  it("an opaque credential-bearing --mqtt-url is refused before connect, logging no configuration (Codex P1 at d722d381)", async () => {
+    const OPAQUE = `mqtt:${USER}:${PASS}@broker.invalid`;
+    expect(URL.canParse(OPAQUE)).toBe(true);
+    expect(new URL(OPAQUE).host).toBe("");
+    const mod = { connect: vi.fn() };
+    const exit = vi.fn();
+    const { lines, restore } = capture();
+    try {
+      await main(
+        ["--mqtt-url", OPAQUE, "--topic", `topic/${USER}/${PASS}`],
+        {},
+        { connect: (f, e) => connectMqtt(f, e, async () => mod), exit },
+      );
+    } finally {
+      restore();
+    }
+    expect(mod.connect).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(lines).toEqual(["[ecowitt-forwarder] refused: --mqtt-url is not a valid URL."]);
+  });
+
   it("a rejecting connect dependency exits 2 with a fixed line and never rejects", async () => {
     const exit = vi.fn();
     const connect = vi.fn(async () => {
@@ -1840,6 +1861,11 @@ describe("inbound packet guard — production wiring", () => {
     const client: any = await connectMqtt(baseFlags(), baseEnv(), async () => mod);
     expect(clients[0].opts.manualConnect).toBe(true);
     expect(clients[0].opts.resubscribe).toBe(false);
+    // A no-op MQTT.js logger: DEBUG=mqttjs:client cannot print the CONNECT
+    // password or a raw payload (Codex P1 on #2335 at d722d381).
+    const log = clients[0].opts.log as ((...a: unknown[]) => unknown) | undefined;
+    expect(typeof log).toBe("function");
+    expect(log?.("CONNECT", { password: "synthetic" })).toBeUndefined();
     expect(client.connectCalls).toBe(1);
     expect(sockets).toHaveLength(1);
     expect(client.stream).not.toBe(sockets[0]);

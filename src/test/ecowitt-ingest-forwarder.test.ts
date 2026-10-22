@@ -336,6 +336,34 @@ describe("prepareForwardPayload", () => {
     });
     expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "duplicate_passkey" });
   });
+
+  it("rejects whitespace-only PASSKEY as missing", () => {
+    expect(
+      prepareForwardPayload(JSON.stringify({ PASSKEY: "   ", dateutc: "2026-10-22 05:27:14" })),
+    ).toEqual({ ok: false, reason: "missing_passkey" });
+  });
+
+  it("accepts the EcoWitt dateutc form with a T separator", () => {
+    const out = prepareForwardPayload(
+      JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: "2026-10-22T05:27:14" }),
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.summary.dateutc).toBe("2026-10-22T05:27:14");
+  });
+
+  it.each([
+    (pk: string) => `2026-10-22 05:27:14 ${pk}`,
+    (pk: string) => `prefix-${pk}-suffix`,
+    (pk: string) => pk.toUpperCase(),
+  ])(
+    "rejects dateutc that embeds this upload's PASSKEY (Codex P1 at 3df0e691): %s",
+    (buildDateutc) => {
+      const passkey = "a1b2c3d4e5f6789012345678901234ab";
+      expect(
+        prepareForwardPayload(JSON.stringify({ PASSKEY: passkey, dateutc: buildDateutc(passkey) })),
+      ).toEqual({ ok: false, reason: "invalid_dateutc" });
+    },
+  );
 });
 
 describe("handleMessage", () => {
@@ -420,7 +448,11 @@ describe("handleMessage", () => {
       env: { ...LIVE_ENV, token: null },
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    expect(out.kind).toBe("network_error");
+    expect(out).toMatchObject({
+      kind: "network_error",
+      error: "missing_bridge_token",
+      attempts: 0,
+    });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

@@ -2,7 +2,7 @@ import { OrchestrationError } from "./errors.ts";
 
 /**
  * The Node.js range this spike supports. It must equal `engines.node` in package.json:
- * `@cursor/sdk` needs 22.13 or newer, and Vitest 4.1.11 does not support Node 23.
+ * `@cursor/sdk` needs 22.13 or newer, and Vitest 4 does not support Node 23.
  * The gate below evaluates this string, so the declared range and the check cannot drift.
  */
 export const SUPPORTED_NODE_RANGE = "^22.13.0 || >=24.0.0";

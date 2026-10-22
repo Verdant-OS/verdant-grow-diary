@@ -17,6 +17,7 @@
 import { format } from "date-fns";
 import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
+import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 import {
   classifyRhAgainstStage,
@@ -223,7 +224,10 @@ function ownCaptureVpdMetric(
   const chipStatus = vpdMetricChipStatus(classifyVpdAgainstStage({ value: canonical.kpa, stage }));
   let status: MetricStatus = "ok";
   let word: string | null = null;
-  if (canonical.kpa < 0 || canonical.kpa > 5 || canonical.source === "invalid") {
+  // The shared realism range, as the Tent Detail resolver uses, so a VPD from
+  // another capture cannot read as current when sensor truth rejects it
+  // (Codex P1 on #2303 at 69de43db).
+  if (!classifyManualMetric("vpd_kpa", canonical.kpa).valid || canonical.source === "invalid") {
     status = "invalid";
     word = "Invalid";
   } else if (

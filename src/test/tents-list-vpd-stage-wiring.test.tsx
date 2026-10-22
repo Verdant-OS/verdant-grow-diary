@@ -55,7 +55,7 @@ describe("Tents list — VPD threshold cleanup", () => {
     expect(TENTS_SRC).toMatch(/<TentEnvironmentSnapshotStrip[\s\S]*?stage=\{envStage\}/);
     expect(TENTS_SRC).toMatch(/const envStage = resolveTentEnvironmentStage\(/);
     expect(SNAPSHOT_STRIP_SRC).toMatch(
-      /buildTentSnapshotView\(selection\.rows, stage, now, \{\s*temperatureUnit,/,
+      /buildTentSnapshotView\(rows, stage, now, \{\s*temperatureUnit,/,
     );
     expect(SNAPSHOT_VM_SRC).toMatch(/classifyVpdAgainstStage\(\s*\{[^}]*stage/);
   });

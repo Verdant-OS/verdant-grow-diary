@@ -4,9 +4,12 @@
  *   read) must not be replaced by Tonight's older value.
  * - P2: a sensor-truth rejection at an older capture must not block Tonight's
  *   newer, valid capture; a rejection at Tonight's own capture still does.
+ * Codex review at 69de43db:
+ * - P1: a same-capture temperature or RH whose intake quality flag is not ok
+ *   rejects Tonight's direct VPD, however plausible the flagged number.
  */
 import { describe, expect, it } from "vitest";
-import { resolveTentDetailVpd } from "@/lib/tentDetailVpdRules";
+import { resolveTentDetailVpd, tentDetailCaptureClimate } from "@/lib/tentDetailVpdRules";
 import type { TonightMetricView } from "@/lib/tonightTentHomeViewModel";
 
 const NOW = Date.parse("2026-10-22T03:00:00.000Z");
@@ -100,5 +103,67 @@ describe("resolveTentDetailVpd scopes rejections to their capture", () => {
       nowMs: NOW,
     });
     expect(out.value).toBeNull();
+  });
+});
+
+describe("resolveTentDetailVpd honours intake quality at Tonight's capture", () => {
+  // A stored vpd_kpa row Tonight selected directly, not calculated.
+  const direct = (): TonightMetricView => ({ ...tonightAt(1), value: 1.2, calculated: false });
+  const rowsAt = (hoursAgo: number, quality: string | null) => [
+    { metric: "temperature_c", value: 24, captured_at: at(hoursAgo), quality },
+    { metric: "humidity_pct", value: 55, captured_at: at(hoursAgo), quality: "ok" },
+  ];
+
+  it("carries each row's intake quality into the capture climate", () => {
+    const climate = tentDetailCaptureClimate(rowsAt(1, "invalid"), null);
+    expect(climate.map((c) => c.untrusted)).toEqual([true, false]);
+    expect(tentDetailCaptureClimate(rowsAt(1, null), null).map((c) => c.untrusted)).toEqual([
+      false,
+      false,
+    ]);
+  });
+
+  it.each(["invalid", "degraded"])(
+    "rejects a direct VPD whose capture holds a plausible temperature flagged %s",
+    (quality) => {
+      const out = resolveTentDetailVpd({
+        tonight: direct(),
+        existing: NO_VPD,
+        // The header's truth check rejected nothing: the flagged value is plausible,
+        // and the header belongs to a newer CO2-only capture anyway.
+        rejectedMetrics: [],
+        rejectedCapturedAt: at(0.05),
+        contributors: null,
+        captureClimate: tentDetailCaptureClimate(rowsAt(1, quality), null),
+        nowMs: NOW,
+      });
+      expect(out.value).toBeNull();
+    },
+  );
+
+  it("keeps the direct VPD when the same capture's climate is flagged ok", () => {
+    const out = resolveTentDetailVpd({
+      tonight: direct(),
+      existing: NO_VPD,
+      rejectedMetrics: [],
+      rejectedCapturedAt: at(0.05),
+      contributors: null,
+      captureClimate: tentDetailCaptureClimate(rowsAt(1, "ok"), null),
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.2);
+  });
+
+  it("ignores a flagged row at a different capture", () => {
+    const out = resolveTentDetailVpd({
+      tonight: direct(),
+      existing: NO_VPD,
+      rejectedMetrics: [],
+      rejectedCapturedAt: at(0.05),
+      contributors: null,
+      captureClimate: tentDetailCaptureClimate(rowsAt(6, "invalid"), null),
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.2);
   });
 });

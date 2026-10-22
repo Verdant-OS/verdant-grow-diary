@@ -1156,7 +1156,12 @@ describe("Tents list sensor truth — static wiring", () => {
       /manualFallbackTentIds = sensorSetSettled \? manualFallbackCandidateTentIds : \[\]/,
     );
     expect(TENTS_SRC).toMatch(/sensorRows=\{readingsByTent\[t\.id\] \?\? \[\]\}/);
-    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(selection\.rows, stage, now/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(rows, stage, now/);
+    // The rows are the fallback selection's, or the Dashboard's diary-only
+    // capture when the selection is empty (Codex P2 on #2303 at 69de43db).
+    expect(SNAPSHOT_STRIP_SRC).toMatch(
+      /const rows =\s*selection\.kind === "empty"\s*\? tentsListDiarySnapshotRows\([\s\S]*?\)\s*: selection\.rows;/,
+    );
     expect(SNAPSHOT_STRIP_SRC).not.toMatch(
       /useManualSnapshotTimelineCards|useTentManualSnapshotBatch/,
     );
@@ -1191,7 +1196,7 @@ describe("Tents list sensor truth — static wiring", () => {
     // Dashboard strip too); the page must consume it and feed the presenter.
     expect(TENTS_SRC).toMatch(/useNowTick/);
     expect(TENTS_SRC).toMatch(/now=\{nowTick\}/);
-    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(selection\.rows, stage, now/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(rows, stage, now/);
   });
 
   it("introduces no alert/queue/automation/device-control surfaces", () => {

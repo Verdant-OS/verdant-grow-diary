@@ -46,3 +46,35 @@ export function tentsListCanonicalVpd(
     ageText: vpd.ageText,
   };
 }
+
+/**
+ * Rows standing in for a diary-only capture (Quick Log sensor_snapshot or
+ * Environment Check) when the tent has no stored sensor rows and no manual
+ * snapshot card, so the list shows the Dashboard's evidence instead of
+ * "No sensor data yet" (Codex P2 on #2303 at 69de43db). A diary capture is
+ * manual evidence; anything else returns no rows.
+ */
+export function tentsListDiarySnapshotRows(
+  snapshot: TonightSnapshotInput,
+  tentId: string,
+): BuildTentSnapshotInput[] {
+  const snap = snapshot.status === "ok" ? snapshot.snapshot : null;
+  if (!snap || !snap.ts || !Number.isFinite(Date.parse(snap.ts))) return [];
+  if (snap.source !== "diary" && !snap.diary_evidence_ref) return [];
+  const rows: BuildTentSnapshotInput[] = [];
+  const push = (metric: string, value: number | null) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return;
+    rows.push({
+      metric,
+      value,
+      ts: snap.ts as string,
+      captured_at: snap.ts,
+      tent_id: tentId,
+      source: "manual",
+    });
+  };
+  push("temperature_c", snap.temp);
+  push("humidity_pct", snap.rh);
+  push("vpd_kpa", snap.vpd);
+  return rows;
+}

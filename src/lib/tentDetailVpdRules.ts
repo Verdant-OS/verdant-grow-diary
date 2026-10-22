@@ -16,6 +16,11 @@ export interface TentDetailCaptureClimate {
   at: string | null;
   temp: number | null;
   rh: number | null;
+  /**
+   * True when the row's intake `quality` flag is anything but ok: a plausible
+   * number is still untrusted (Codex P1 on #2303 at 69de43db).
+   */
+  untrusted?: boolean;
 }
 
 interface TentDetailClimateRow {
@@ -23,6 +28,14 @@ interface TentDetailClimateRow {
   value?: number | null;
   ts?: string | null;
   captured_at?: string | null;
+  quality?: string | null;
+}
+
+/** Same gate as the Dashboard's evidence rows: null, "" and "ok" are trusted. */
+function trustedIntakeQuality(quality: string | null | undefined): boolean {
+  if (quality == null) return true;
+  const normalized = quality.trim().toLowerCase();
+  return normalized === "" || normalized === "ok";
 }
 
 /**
@@ -38,8 +51,9 @@ export function tentDetailCaptureClimate(
   for (const row of rows ?? []) {
     if (typeof row.value !== "number") continue;
     const at = row.captured_at ?? row.ts ?? null;
-    if (row.metric === "temperature_c") out.push({ at, temp: row.value, rh: null });
-    if (row.metric === "humidity_pct") out.push({ at, temp: null, rh: row.value });
+    const untrusted = !trustedIntakeQuality(row.quality);
+    if (row.metric === "temperature_c") out.push({ at, temp: row.value, rh: null, untrusted });
+    if (row.metric === "humidity_pct") out.push({ at, temp: null, rh: row.value, untrusted });
   }
   if (snapshot) out.push({ at: snapshot.ts, temp: snapshot.temp, rh: snapshot.rh });
   return out;
@@ -61,7 +75,9 @@ function climateUnrealistic(climate: { temp: number | null; rh: number | null })
 /**
  * Sensor truth for Tonight's chosen VPD: the value itself, the temperature and
  * RH it was calculated from, and any temperature or RH observed at the same
- * capture must all be realistic, as the tent's stability inputs require.
+ * capture must all be realistic, as the tent's stability inputs require. A
+ * same-capture row whose intake quality flag is not ok fails too, however
+ * plausible its number (Codex P1 on #2303 at 69de43db).
  */
 function tonightVpdPassesTruth(
   tonight: TonightMetricView,
@@ -73,7 +89,9 @@ function tonightVpdPassesTruth(
   const selectedMs = instantMs(tonight.capturedAt);
   if (selectedMs === null) return false;
   return !captureClimate.some(
-    (climate) => instantMs(climate.at) === selectedMs && climateUnrealistic(climate),
+    (climate) =>
+      instantMs(climate.at) === selectedMs &&
+      (climate.untrusted === true || climateUnrealistic(climate)),
   );
 }
 

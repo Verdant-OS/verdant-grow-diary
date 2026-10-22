@@ -170,6 +170,54 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(/Stale/);
   });
 
+  it("marks an older out-of-range manual VPD invalid, never current (Codex P1 at 69de43db)", () => {
+    // Newest capture: fresh live CO2 only. The stored VPD an hour earlier is 4.0 kPa,
+    // outside the shared realistic range (0.2–3.0), so it must read Invalid.
+    const rows = [row("vpd_kpa", 4.0, at(1)), row("co2_ppm", 800, at(0.05), "live")];
+    expect(dashboardVpd(rows)?.value).toBe(4.0);
+    const vpd = renderStrip(rows);
+    expect(vpd).toHaveAttribute("data-status", "invalid");
+    expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(/Invalid/);
+  });
+
+  it("shows the Dashboard's diary-only VPD when the tent has no stored rows (Codex P2 at 69de43db)", () => {
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts: at(0.5),
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    };
+    hook.state = { status: "ok", snapshot: diary };
+    expect(dashboardVpd([], { status: "ok", snapshot: diary })?.value).toBeCloseTo(1.75, 2);
+    const vpd = renderStrip([]);
+    expect(vpd).toHaveTextContent("1.75");
+    expect(vpd).toHaveAttribute("data-status", "ok");
+    // Same capture as the strip's cohort, so the strip's source badge grades it: manual.
+    expect(screen.getByTestId("tents-list-sensor-source-tent-1")).toHaveTextContent(/Manual/);
+    expect(screen.queryByTestId("tents-list-sensor-empty-tent-1")).toBeNull();
+  });
+
+  it("still says no sensor data when there are no rows and no diary capture", () => {
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        growId="grow-1"
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="success"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[]}
+        manualStatus="success"
+      />,
+    );
+    expect(screen.getByTestId("tents-list-sensor-empty-tent-1")).toHaveTextContent(
+      "No sensor data yet",
+    );
+  });
+
   it.each(["invalid", "stale", "degraded"])(
     "calculates no VPD from a temperature flagged %s",
     (quality) => {

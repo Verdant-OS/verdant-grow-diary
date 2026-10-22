@@ -14,7 +14,7 @@ import {
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
-import { tentsListCanonicalVpd } from "@/lib/tentsListVpdRules";
+import { tentsListCanonicalVpd, tentsListDiarySnapshotRows } from "@/lib/tentsListVpdRules";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 
 export interface TentEnvironmentSnapshotStripProps {
@@ -140,7 +140,17 @@ export default function TentEnvironmentSnapshotStrip({
       </div>
     );
   }
-  if (selection.kind === "empty") {
+  // No stored rows and no manual card: the Dashboard's diary-inclusive
+  // snapshot may still hold a Quick Log or Environment Check capture for this
+  // tent, which is what the Dashboard shows (Codex P2 on #2303 at 69de43db).
+  const rows =
+    selection.kind === "empty"
+      ? tentsListDiarySnapshotRows(
+          { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+          tentId,
+        )
+      : selection.rows;
+  if (rows.length === 0) {
     return (
       <p
         className="text-xs text-muted-foreground"
@@ -151,9 +161,9 @@ export default function TentEnvironmentSnapshotStrip({
     );
   }
 
-  const snapView = buildTentSnapshotView(selection.rows, stage, now, {
+  const snapView = buildTentSnapshotView(rows, stage, now, {
     temperatureUnit,
-    canonicalVpd: tentsListCanonicalVpd(selection.rows, tentId, now, {
+    canonicalVpd: tentsListCanonicalVpd(rows, tentId, now, {
       status: tonightSnapshot.status,
       snapshot: tonightSnapshot.snapshot,
     }),
@@ -182,7 +192,7 @@ export default function TentEnvironmentSnapshotStrip({
           Refreshing saved manual snapshot…
         </p>
       ) : null}
-      {selection.refreshWarning ? (
+      {selection.kind !== "empty" && selection.refreshWarning ? (
         <p
           className="text-xs text-amber-600"
           data-testid={

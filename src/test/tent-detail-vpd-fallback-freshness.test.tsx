@@ -190,6 +190,26 @@ describe("Tent detail fallback VPD freshness", () => {
     expect(screen.queryByTestId("tent-detail-sensor-captured")).toBeNull();
   });
 
+  it("withholds a stored VPD whose own row is quality-flagged, even with no climate pair (Codex P1 at 307b10f4)", () => {
+    const ts = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+    // The Dashboard selector drops this row; Tonight is therefore missing, and
+    // the header is the only thing still holding the value.
+    state.rows = [
+      {
+        metric: "vpd_kpa",
+        value: 1.2,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "invalid",
+      } as never,
+    ];
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+    expect(screen.queryByTestId("tent-detail-vpd-stage-hint")).toBeNull();
+    expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
+  });
+
   it("does not let a fresh temperature-only row make an old Quick Log VPD current", () => {
     const tempTs = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
     const vpdTs = new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();

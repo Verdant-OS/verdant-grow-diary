@@ -116,6 +116,7 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
 import {
   resolveTentDetailVpd,
+  tentDetailVpdRowUntrusted,
   tentDetailCaptureClimate,
   tentDetailVpdNeedsOwnProvenance,
 } from "@/lib/tentDetailVpdRules";
@@ -202,9 +203,15 @@ export default function TentDetail() {
   const nowMs = useNowTick();
   const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
+  // The header's truth check is realism only and keeps a vpd_kpa row whose own
+  // intake quality flag is not ok. The Dashboard selector drops that row, so
+  // the tent page withholds it the same way the header withholds a realism
+  // rejection: no snapshot value, rejection noted (Codex P1 on #2303 at 307b10f4).
+  const storedVpdRowUntrusted = tentDetailVpdRowUntrusted(readings, header.capturedAt);
   const storedVpdObservation = resolveDisplayedVpdObservation({
-    snapshotVpd: snap?.vpd,
-    snapshotVpdRejected: header.truth?.invalidFields.includes("vpd") ?? false,
+    snapshotVpd: storedVpdRowUntrusted ? null : snap?.vpd,
+    snapshotVpdRejected:
+      (header.truth?.invalidFields.includes("vpd") ?? false) || storedVpdRowUntrusted,
     snapshotCapturedAt: header.capturedAt,
     snapshotSource: snap?.source ?? null,
     snapshotStale: header.stale,

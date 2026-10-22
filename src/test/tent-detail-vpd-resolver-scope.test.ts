@@ -9,7 +9,11 @@
  *   rejects Tonight's direct VPD, however plausible the flagged number.
  */
 import { describe, expect, it } from "vitest";
-import { resolveTentDetailVpd, tentDetailCaptureClimate } from "@/lib/tentDetailVpdRules";
+import {
+  resolveTentDetailVpd,
+  tentDetailCaptureClimate,
+  tentDetailVpdRowUntrusted,
+} from "@/lib/tentDetailVpdRules";
 import type { TonightMetricView } from "@/lib/tonightTentHomeViewModel";
 
 const NOW = Date.parse("2026-10-22T03:00:00.000Z");
@@ -226,5 +230,37 @@ describe("resolveTentDetailVpd honours intake quality at Tonight's capture", () 
       nowMs: NOW,
     });
     expect(out.value).toBe(1.2);
+  });
+});
+
+describe("tentDetailVpdRowUntrusted (Codex P1 at 307b10f4)", () => {
+  const vpdRow = (hoursAgo: number, quality: string | null) => ({
+    metric: "vpd_kpa",
+    value: 1.2,
+    captured_at: at(hoursAgo),
+    quality,
+  });
+
+  it.each(["invalid", "degraded", "suspect"])(
+    "flags a vpd_kpa row marked %s at the capture",
+    (q) => {
+      expect(tentDetailVpdRowUntrusted([vpdRow(1, q)], at(1))).toBe(true);
+    },
+  );
+
+  it.each([null, "", "ok", "OK "])("trusts a vpd_kpa row with quality %j", (q) => {
+    expect(tentDetailVpdRowUntrusted([vpdRow(1, q)], at(1))).toBe(false);
+  });
+
+  it("ignores a flagged row at another capture, a non-VPD row and an unknown capture time", () => {
+    expect(tentDetailVpdRowUntrusted([vpdRow(5, "invalid")], at(1))).toBe(false);
+    expect(
+      tentDetailVpdRowUntrusted(
+        [{ metric: "temperature_c", value: 24, captured_at: at(1), quality: "invalid" }],
+        at(1),
+      ),
+    ).toBe(false);
+    expect(tentDetailVpdRowUntrusted([vpdRow(1, "invalid")], null)).toBe(false);
+    expect(tentDetailVpdRowUntrusted(null, at(1))).toBe(false);
   });
 });

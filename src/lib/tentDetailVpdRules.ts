@@ -59,6 +59,28 @@ export function tentDetailCaptureClimate(
   return out;
 }
 
+/**
+ * True when a stored `vpd_kpa` row captured at `at` carries an intake quality
+ * flag other than ok. The Environment header grades the snapshot VPD without
+ * that flag, while the Dashboard selector drops the row, so the tent page must
+ * withhold it before it becomes the fallback observation, whatever Tonight's
+ * state (Codex P1 on #2303 at 307b10f4).
+ */
+export function tentDetailVpdRowUntrusted(
+  rows: readonly TentDetailClimateRow[] | null | undefined,
+  at: string | null | undefined,
+): boolean {
+  const atMs = instantMs(at);
+  if (atMs === null) return false;
+  return (rows ?? []).some(
+    (row) =>
+      row.metric === "vpd_kpa" &&
+      typeof row.value === "number" &&
+      instantMs(row.captured_at ?? row.ts) === atMs &&
+      !trustedIntakeQuality(row.quality),
+  );
+}
+
 function instantMs(at: string | null | undefined): number | null {
   if (!at) return null;
   const ms = Date.parse(at);

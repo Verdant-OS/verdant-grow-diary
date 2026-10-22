@@ -133,6 +133,35 @@ test('references are bounded, distinct, resolvable, and confined to the project'
   assert.throws(() => storeWith([foreign, make({ conflictsWith: [foreign.id] })]));
 });
 
+test('graph integrity rejects supersession cycles, self references, and mixed overlaps', () => {
+  const cycleB0 = make({ text: 'Cycle B.' });
+  const cycleA1 = make({ text: 'Cycle A.', supersedes: [cycleB0.id] });
+  const cycleB1 = make({ text: 'Cycle B.', supersedes: [cycleA1.id] });
+  const cycleA2 = make({ text: 'Cycle A.', supersedes: [cycleB1.id] });
+  const cycleB2 = make({ text: 'Cycle B.', supersedes: [cycleA2.id] });
+  assert.throws(() => storeWith([cycleA2, cycleB2]));
+
+  const solo = make({ text: 'Self edge candidate.' });
+  for (const edge of [{ supersedes: [solo.id] }, { conflictsWith: [solo.id] }]) {
+    assert.throws(() => storeWith([{ ...solo, ...edge }]));
+  }
+
+  const peer = make({ text: 'Shared relationship target.' });
+  assert.throws(() => storeWith([
+    peer,
+    make({ text: 'Mixed overlap.', supersedes: [peer.id], conflictsWith: [peer.id] }),
+  ]));
+});
+
+test('project slugs, whitespace text, and readOnly typing fail closed at the boundary', () => {
+  for (const projectId of ['1starts-with-digit', 'UPPER', 'a'.repeat(49), '', '-abc'])
+    assert.throws(() => make({ projectId }));
+  assert.throws(() => make({ text: ' \t\n\f' }));
+  assert.throws(() => new ContextStore({ projectId: PROJECT, readOnly: 'yes' }));
+  assert.throws(() => new ContextStore({ projectId: PROJECT, readOnly: 1 }));
+  assert.doesNotThrow(() => new ContextStore({ projectId: PROJECT, readOnly: false }));
+});
+
 test('project isolation applies to imports, reads, searches, and head assertions', () => {
   const a = make();
   const foreign = make({ projectId: 'synthetic-beta', text: 'Foreign-only marker.' });

@@ -35,6 +35,7 @@ import {
   onceExitCode,
   parseFlags,
   prepareForwardPayload,
+  REDACTED_DATEUTC,
   readEnv,
   redactForLog,
   redactString,
@@ -280,6 +281,30 @@ describe("prepareForwardPayload", () => {
       pad: "x".repeat(MAX_MESSAGE_BYTES),
     });
     expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "payload_too_large" });
+  });
+
+  it.each(["-", "05:27", "2026", ":"])(
+    "accepts a valid upload whose short PASSKEY occurs in its date, withholding only the summary copy (Codex P2 at d236df20): %s",
+    (key) => {
+      const out = prepareForwardPayload(
+        JSON.stringify({ PASSKEY: key, dateutc: "2026-10-22 05:27:14", temp1f: 77 }),
+        new Date("2026-10-22T12:00:00.000Z"),
+      );
+      expect(out.ok).toBe(true);
+      if (out.ok) {
+        expect(out.summary.dateutc).toBe(REDACTED_DATEUTC);
+        // The upload itself is forwarded unchanged.
+        expect(out.payload.dateutc).toBe("2026-10-22 05:27:14");
+      }
+    },
+  );
+
+  it("keeps the summary date when the PASSKEY does not occur in it", () => {
+    const out = prepareForwardPayload(
+      JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: "2026-10-22 05:27:14" }),
+      new Date("2026-10-22T12:00:00.000Z"),
+    );
+    expect(out.ok && out.summary.dateutc).toBe("2026-10-22 05:27:14");
   });
 
   it("caps a padded dateutc to its checked form", () => {
@@ -920,6 +945,31 @@ describe("redaction", () => {
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(out)).not.toContain("evil.example");
+  });
+
+  it("cancels a refused redirect's unread body (Codex P2 at d236df20)", async () => {
+    let cancelled = false;
+    const body = new ReadableStream({
+      pull(controller) {
+        controller.enqueue(new TextEncoder().encode("redirect body"));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(body, { status: 302, headers: { location: "https://evil.example/collect" } }),
+    );
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(out).toMatchObject({ kind: "network_error", error: "redirect_refused_302" });
+    expect(cancelled).toBe(true);
   });
 
   // Copilot on #2335: outcomes nest the summary; the broker URL may carry credentials.

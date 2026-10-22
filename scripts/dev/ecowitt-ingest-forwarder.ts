@@ -107,6 +107,8 @@ const AIR_HUMIDITY_RE = /^humidity([1-8])$/i;
 const SOIL_CHANNEL_RE = /^soilmoisture([1-8])$/i;
 /** The only `dateutc` form `ecowitt-ingest` accepts (`parseEcoWittDateUtc`). */
 const DATEUTC_RE = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/;
+/** Summary placeholder for a `dateutc` that contains the upload's PASSKEY. */
+export const REDACTED_DATEUTC = "[redacted: contains PASSKEY]";
 /** Mirrors `ECOWITT_DATEUTC_MIN_ISO` / `_FUTURE_SKEW_MS` in ecowittRoutedRowBuilder.ts. */
 const DATEUTC_MIN_MS = Date.parse("2020-01-01T00:00:00.000Z");
 const DATEUTC_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
@@ -314,17 +316,18 @@ export function prepareForwardPayload(text: string, now: Date = new Date()): Pre
     return { ok: false, reason: "missing_dateutc" };
   }
   if (typeof dateutcRaw !== "string") return { ok: false, reason: "invalid_dateutc" };
-  // A date never contains the credential. A hostile upload that embeds the
-  // PASSKEY in `dateutc` beside other text would otherwise reach the summary,
-  // where the standalone-shape redactor cannot see it (Codex P1 on #2335 at
-  // 3df0e691). Checked before truncation so a cut fragment cannot slip through.
-  if (echoesPasskey(dateutcRaw)) return { ok: false, reason: "invalid_dateutc" };
   const dateutc = dateutcRaw.trim();
   if (!dateutc) return { ok: false, reason: "missing_dateutc" };
   // Only the EcoWitt form `ecowitt-ingest` itself accepts
   // (parseEcoWittDateUtc). A free-form value could carry any encoding of a
   // secret, so it is refused here rather than echoed (Codex P1 at bae4ae77).
   if (!dateutcAccepted(dateutc, now)) return { ok: false, reason: "invalid_dateutc" };
+  // A format-checked date can still contain this upload's PASSKEY when the key
+  // is short or date-shaped (a key of "-" matches every date). Rejecting that
+  // would refuse valid uploads (Codex P2 on #2335 at d236df20), so the upload
+  // is forwarded unchanged and only the summary's copy is withheld: the
+  // credential never reaches a log (Codex P1 on #2335 at 3df0e691).
+  const summaryDateutc = echoesPasskey(dateutc) ? REDACTED_DATEUTC : dateutc;
 
   const air = new Set<number>();
   const soil = new Set<number>();
@@ -341,7 +344,7 @@ export function prepareForwardPayload(text: string, now: Date = new Date()): Pre
       air_channels: [...air].sort((x, y) => x - y),
       soil_channels: [...soil].sort((x, y) => x - y),
       key_count: Object.keys(payload).length,
-      dateutc,
+      dateutc: summaryDateutc,
     },
   };
 }
@@ -670,6 +673,10 @@ export async function handleMessage(args: {
       // destination is fixed, so a redirect is final: never followed, never
       // retried with the credential-bearing body (Codex P2 at efeae597).
       if (r.status >= 300 && r.status < 400) {
+        // Release the unread body so a refused redirect never leaves its
+        // stream or connection open in a long-running forwarder (Codex P2 on
+        // #2335 at d236df20).
+        await r.body?.cancel().catch(() => undefined);
         return {
           kind: "network_error",
           summary: prepared.summary,

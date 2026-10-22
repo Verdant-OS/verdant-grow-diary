@@ -1,4 +1,4 @@
--- Community V1 catalog proof (T-CAT-01 … T-CAT-05, Task 2 backend packet §8).
+-- Community V1 catalog proof (T-CAT-01 … T-CAT-06, Task 2 backend packet §8).
 -- Run with:
 --   psql "$SUPABASE_DB_URL" -f supabase/tests/community_v1_permissions.sql
 --
@@ -161,6 +161,27 @@ BEGIN
   ASSERT (SELECT enabled FROM public.community_feature_state) = false,
     'T-CAT-05 community_feature_state.enabled must default to false';
   RAISE NOTICE '✓ T-CAT-05 Community V1 kill switch defaults off';
+END $$;
+
+-- T-CAT-06: no approved Community RPC declares a defaulted argument. Identity
+-- arguments omit DEFAULT clauses, so T-CAT-03 alone would accept, say, a defaulted
+-- p_idempotency_key that a caller could silently leave out.
+DO $$
+DECLARE
+  fn RECORD; checked INTEGER := 0;
+BEGIN
+  FOR fn IN
+    SELECT p.proname, p.pronargdefaults
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname LIKE 'community\_%'
+       AND p.proname <> ALL (ARRAY['community_actor', 'community_can_read', 'community_fmt_ts'])
+  LOOP
+    ASSERT fn.pronargdefaults = 0,
+      format('T-CAT-06 %I declares %s defaulted argument(s); approved RPCs take none', fn.proname, fn.pronargdefaults);
+    checked := checked + 1;
+  END LOOP;
+  ASSERT checked = 17, format('T-CAT-06 expected 17 approved community RPCs, checked %s', checked);
+  RAISE NOTICE '✓ T-CAT-06 approved community RPCs declare no defaulted arguments';
 END $$;
 
 ROLLBACK;

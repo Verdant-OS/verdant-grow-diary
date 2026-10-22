@@ -56,25 +56,37 @@ jobs:
         id: supabase-start
         run: |
           set -eo pipefail
-          supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-start.log
-          echo "started=true" >> "$GITHUB_OUTPUT"
+          # `supabase start` prints local keys and the DB URL. Capture it to a file that
+          # is never printed or uploaded; masks are registered in the next step.
+          if supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" > supabase-start.log 2>&1; then
+            echo "started=true" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            echo "::error::supabase start failed (exit ${status}); sanitized tail follows."
+            tail -n 40 supabase-start.log \
+              | sed -E -e 's#postgres(ql)?://[^[:space:]]+#postgresql://[redacted]#g' \
+                       -e 's#eyJ[A-Za-z0-9_.-]+#[redacted-jwt]#g' \
+                       -e 's#sb_(publishable|secret)_[A-Za-z0-9_-]+#[redacted-key]#g' \
+                       -e 's#(([Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Tt][Oo][Kk][Ee][Nn])[^:=]*[:=][[:space:]]*)[^[:space:]]+#\1[redacted]#g'
+            exit "$status"
+          fi
 
       - name: Export local Supabase env
         run: |
           set -e
-          STATUS_JSON="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json)"
+          STATUS_JSON="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json 2>/dev/null)"
           SUPABASE_URL="$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // empty')"
           SUPABASE_ANON_KEY="$(echo "$STATUS_JSON" | jq -r '.ANON_KEY // .anon_key // empty')"
           SUPABASE_SERVICE_ROLE_KEY="$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')"
           SUPABASE_DB_URL="$(echo "$STATUS_JSON" | jq -r '.DB_URL // .db_url // empty')"
+          # Local-only values. Mask before any later output can carry them.
+          for value in "$SUPABASE_ANON_KEY" "$SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_DB_URL"; do
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$SUPABASE_DB_URL" ]; then
             echo "BLOCKED: local Supabase did not expose the required local values."
             exit 2
           fi
-          # Local-only values. Never echoed.
-          echo "::add-mask::$SUPABASE_ANON_KEY"
-          echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
-          echo "::add-mask::$SUPABASE_DB_URL"
           {
             echo "SUPABASE_URL=$SUPABASE_URL"
             echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
@@ -87,15 +99,8 @@ jobs:
           set -o pipefail
           supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-db-reset.log
 
-      - name: Community V1 runtime proof
-        run: |
-          set -o pipefail
-          if [ "$EXPECT" = "red" ]; then
-            node scripts/security/run-community-v1-db-security.mjs --expect-red 2>&1 | tee community-v1-runtime.log
-          else
-            node scripts/security/run-community-v1-db-security.mjs 2>&1 | tee community-v1-runtime.log
-          fi
-
+      # Catalog runs on the db reset state, before the runtime suite's teardown
+      # (which disables community_feature_state) can mask a wrong seeded default.
       - name: Community V1 catalog proof
         run: |
           set +e
@@ -108,7 +113,16 @@ jobs:
             # RED: the very first block must stop on the missing community relation.
             [ "$status" -ne 0 ] && grep -q 'relation "public.community_profiles" does not exist' community-v1-catalog.log
           else
-            [ "$status" -eq 0 ] && [ "$(grep -c '✓ T-CAT-0' community-v1-catalog.log)" -eq 5 ]
+            [ "$status" -eq 0 ] && [ "$(grep -c '✓ T-CAT-0' community-v1-catalog.log)" -eq 6 ]
+          fi
+
+      - name: Community V1 runtime proof
+        run: |
+          set -o pipefail
+          if [ "$EXPECT" = "red" ]; then
+            node scripts/security/run-community-v1-db-security.mjs --expect-red 2>&1 | tee community-v1-runtime.log
+          else
+            node scripts/security/run-community-v1-db-security.mjs 2>&1 | tee community-v1-runtime.log
           fi
 
       - name: Upload receipts

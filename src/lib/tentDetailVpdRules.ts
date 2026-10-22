@@ -162,20 +162,34 @@ export function resolveTentDetailVpd(input: {
   const { tonight } = input;
   const tonightMs = tonight ? instantMs(tonight.capturedAt) : null;
   const existingMs = input.existing.value === null ? null : instantMs(input.existing.capturedAt);
+  const rejectedMs = instantMs(input.rejectedCapturedAt);
+  const climateRejected = input.rejectedMetrics.some(
+    (key) => key === "temp" || key === "rh" || key === "vpd",
+  );
+  // The header rejects a capture's temperature or RH but keeps that capture's
+  // plausible direct VPD in `existing` (`snapshotVpdRejected` covers the VPD
+  // row alone). Telemetry from a rejected capture is never restored: only an
+  // observation proven to come from another capture may stand in (Codex P1 on
+  // #2303 at d6ef3a20). An unknown capture time cannot prove independence.
+  const existingFromRejectedCapture =
+    climateRejected &&
+    input.existing.value !== null &&
+    (existingMs === null || rejectedMs === null || existingMs === rejectedMs);
+  const existingOrNothing = (): TentDetailVpdObservation =>
+    existingFromRejectedCapture
+      ? { value: null, capturedAt: null, source: null, stale: false, calculated: false }
+      : { ...input.existing, calculated: false };
   if (
+    !existingFromRejectedCapture &&
     existingMs !== null &&
     tonightMs !== null &&
     (existingMs > tonightMs || (existingMs === tonightMs && tonight?.calculated === true))
   ) {
     return { ...input.existing, calculated: false };
   }
-  const rejectedMs = instantMs(input.rejectedCapturedAt);
   const rejectionApplies = rejectedMs === null || tonightMs === null || tonightMs <= rejectedMs;
-  if (
-    rejectionApplies &&
-    input.rejectedMetrics.some((key) => key === "temp" || key === "rh" || key === "vpd")
-  ) {
-    return { ...input.existing, calculated: false };
+  if (rejectionApplies && climateRejected) {
+    return existingOrNothing();
   }
   if (tonight?.state === "invalid") {
     return { value: null, capturedAt: null, source: null, stale: false, calculated: false };
@@ -211,7 +225,7 @@ export function resolveTentDetailVpd(input: {
   ) {
     return { value: null, capturedAt: null, source: null, stale: false, calculated: false };
   }
-  return { ...input.existing, calculated: false };
+  return existingOrNothing();
 }
 
 /**

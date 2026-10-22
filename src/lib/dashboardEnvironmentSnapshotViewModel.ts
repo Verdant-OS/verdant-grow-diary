@@ -208,7 +208,12 @@ export interface CanonicalTentVpd {
   ageText: string | null;
 }
 
-const CANONICAL_ELIGIBLE_SOURCES = new Set(["live", "manual", "csv"]);
+/**
+ * Sources whose canonical VPD may read healthy. CSV is historical context and
+ * never turns a badge or stage target green (`isDashboardSnapshotEligibleForHealthyCues`
+ * in dashboardSensorEvidenceRules; Codex P1 on #2303 at d6ef3a20).
+ */
+const CANONICAL_HEALTHY_SOURCES = new Set(["live", "manual"]);
 
 function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
@@ -237,7 +242,10 @@ function ownCaptureVpdMetric(
   ) {
     status = "stale";
     word = "Stale";
-  } else if (canonical.source === null || !CANONICAL_ELIGIBLE_SOURCES.has(canonical.source)) {
+  } else if (canonical.source === "csv") {
+    status = "degraded";
+    word = "Historical";
+  } else if (canonical.source === null || !CANONICAL_HEALTHY_SOURCES.has(canonical.source)) {
     status = "degraded";
     word = "Needs verification";
   }

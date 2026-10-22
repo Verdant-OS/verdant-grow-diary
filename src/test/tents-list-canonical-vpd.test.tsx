@@ -202,6 +202,23 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(/Invalid/);
   });
 
+  it("never grades a recent CSV canonical VPD healthy beside a newer live capture (Codex P1 at d6ef3a20)", () => {
+    // Newest capture: fresh live CO2 only. The VPD comes from a CSV pair 6 minutes
+    // earlier: well inside the live staleness window, yet historical context only.
+    const rows = [
+      ...FIRST.map((r) => ({ ...r, ts: at(0.1), captured_at: at(0.1), source: "csv" })),
+      row("co2_ppm", 800, at(0.05), "live"),
+    ];
+    expect(dashboardVpd(rows)?.value).toBeCloseTo(1.75, 2);
+    const vpd = renderStrip(rows);
+    expect(vpd).toHaveTextContent("1.75");
+    expect(vpd).not.toHaveAttribute("data-status", "ok");
+    expect(vpd).toHaveAttribute("data-status", "degraded");
+    expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(
+      /Historical/,
+    );
+  });
+
   it("shows the Dashboard's diary-only VPD when the tent has no stored rows (Codex P2 at 69de43db)", () => {
     const diary: SensorSnapshot = {
       ...EMPTY_SNAPSHOT,

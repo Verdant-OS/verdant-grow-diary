@@ -305,7 +305,9 @@ describe("Tent detail VPD sensor truth (Copilot 4286153360)", () => {
       { metric: "vpd_kpa", value: 1.2, ts, captured_at: ts, source: "live" },
     ];
     mount();
-    // Header: the snapshot rejected this VPD and no fallback brings it back.
+    // Header: the snapshot rejected this VPD and no fallback brings it back,
+    // including the resolver's rejection branch (Codex P1 at d6ef3a20).
+    expect(screen.queryByTestId("metric-chip-VPD")?.textContent ?? "").not.toContain("1.2");
     expect(screen.queryByTestId("tent-detail-vpd-stage-hint")).toBeNull();
     expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
     // Card: the rejected VPD is not graded.

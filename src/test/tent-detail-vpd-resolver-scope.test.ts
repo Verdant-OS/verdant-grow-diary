@@ -139,6 +139,89 @@ describe("resolveTentDetailVpd scopes rejections to their capture", () => {
   });
 });
 
+describe("resolveTentDetailVpd withholds a VPD from its rejected capture (Codex P1 at d6ef3a20)", () => {
+  // The header's own direct VPD: plausible, at the capture whose RH it rejected.
+  const headerVpd = { value: 1.2, capturedAt: at(0.1), source: "live", stale: false };
+
+  it("returns no VPD when existing is the rejected capture's own reading and Tonight is missing", () => {
+    const out = resolveTentDetailVpd({
+      tonight: { ...tonightAt(0.1), state: "missing", value: null },
+      existing: headerVpd,
+      rejectedMetrics: ["rh"],
+      rejectedCapturedAt: at(0.1),
+      contributors: null,
+      captureClimate: [],
+      nowMs: NOW,
+    });
+    expect(out.value).toBeNull();
+  });
+
+  it("does not let the newer-existing branch restore it over an older Tonight capture", () => {
+    const out = resolveTentDetailVpd({
+      tonight: tonightAt(2),
+      existing: headerVpd,
+      rejectedMetrics: ["rh"],
+      rejectedCapturedAt: at(0.1),
+      contributors: CONTRIBUTORS,
+      captureClimate: [{ at: at(2), temp: CONTRIBUTORS.temp, rh: CONTRIBUTORS.rh }],
+      nowMs: NOW,
+    });
+    expect(out.value).toBeNull();
+  });
+
+  it("does not restore it when Tonight's newer capture fails sensor truth either", () => {
+    const out = resolveTentDetailVpd({
+      tonight: { ...tonightAt(0.05), calculated: false },
+      existing: headerVpd,
+      rejectedMetrics: ["rh"],
+      rejectedCapturedAt: at(0.1),
+      contributors: null,
+      captureClimate: [{ at: at(0.05), temp: 24, rh: 150 }],
+      nowMs: NOW,
+    });
+    expect(out.value).toBeNull();
+  });
+
+  it("cannot prove independence from an unknown capture time", () => {
+    const out = resolveTentDetailVpd({
+      tonight: undefined,
+      existing: { ...headerVpd, capturedAt: null },
+      rejectedMetrics: ["temp"],
+      rejectedCapturedAt: at(0.1),
+      contributors: null,
+      captureClimate: [],
+      nowMs: NOW,
+    });
+    expect(out.value).toBeNull();
+  });
+
+  it("keeps an observation from an independent earlier capture", () => {
+    const out = resolveTentDetailVpd({
+      tonight: undefined,
+      existing: { value: 1.0, capturedAt: at(3), source: "manual", stale: false },
+      rejectedMetrics: ["rh"],
+      rejectedCapturedAt: at(0.1),
+      contributors: null,
+      captureClimate: [],
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.0);
+  });
+
+  it("leaves existing alone when the header rejected only a non-climate metric", () => {
+    const out = resolveTentDetailVpd({
+      tonight: undefined,
+      existing: headerVpd,
+      rejectedMetrics: ["co2"],
+      rejectedCapturedAt: at(0.1),
+      contributors: null,
+      captureClimate: [],
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.2);
+  });
+});
+
 describe("resolveTentDetailVpd honours intake quality at Tonight's capture", () => {
   // A stored vpd_kpa row Tonight selected directly, not calculated.
   const direct = (): TonightMetricView => ({ ...tonightAt(1), value: 1.2, calculated: false });

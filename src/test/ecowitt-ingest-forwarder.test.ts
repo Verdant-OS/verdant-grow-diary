@@ -126,8 +126,8 @@ describe("flags and env", () => {
     [["--mqtt-url", "mqtt://ok", "--mqtt-url", "--once"], "duplicate_option:--mqtt-url"],
     [["--topic", ""], "empty_option_value:--topic"],
     [["--mqtt-url", "   "], "empty_option_value:--mqtt-url"],
-    [["--write-report"], "unknown_option:--write-report"],
-    [["stray"], "unknown_option:stray"],
+    [["--write-report"], "unknown_option:argument_1"],
+    [["--once", "stray"], "unknown_option:argument_2"],
   ])(
     "refuses a repeated, empty or unknown argument before any connection (Codex P2 at bae4ae77): %j",
     (argv, message) => {
@@ -156,6 +156,37 @@ describe("flags and env", () => {
     const env = readEnv({ ECOWITT_INGEST_URL: "  ", VERDANT_BRIDGE_TOKEN: "" });
     expect(env.ingestUrl).toBeNull();
     expect(env.token).toBeNull();
+  });
+});
+
+describe("unknown arguments are reported without their text (Codex P1 at ed548103)", () => {
+  it.each([
+    "--password=hunter2-not-real",
+    "--mqtt-password=hunter2-not-real",
+    `--token=${FAKE_BRIDGE_TOKEN}`,
+    "hunter2-not-real",
+  ])("parseFlags and main never echo %s", async (arg) => {
+    let message = "";
+    try {
+      parseFlags(["--once", arg], {});
+    } catch (e) {
+      message = e instanceof Error ? e.message : String(e);
+    }
+    expect(message).toBe("unknown_option:argument_2");
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exit = vi.fn();
+    const connect = vi.fn();
+    try {
+      await main(["--once", arg], {}, { connect, exit });
+      const printed = err.mock.calls.flat().join(" ");
+      expect(printed).toContain("unknown_option:argument_2");
+      expect(printed).not.toContain("hunter2");
+      expect(printed).not.toContain(FAKE_BRIDGE_TOKEN);
+    } finally {
+      err.mockRestore();
+    }
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(connect).not.toHaveBeenCalled();
   });
 });
 
@@ -209,7 +240,6 @@ describe("prepareForwardPayload", () => {
       soil_channels: [2, 5, 6, 8],
       key_count: 20,
       dateutc: "2026-10-22 05:27:14",
-      station: "GW3000B_V1.2.4",
     });
   });
 
@@ -250,15 +280,7 @@ describe("prepareForwardPayload", () => {
     expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "payload_too_large" });
   });
 
-  it("drops a stationtype that carries the PASSKEY or is not a firmware id (Codex P1)", () => {
-    const copied = prepareForwardPayload(
-      JSON.stringify({
-        PASSKEY: FAKE_PASSKEY,
-        dateutc: "2026-10-22 05:27:14",
-        stationtype: FAKE_PASSKEY,
-      }),
-    );
-    expect(copied.ok && copied.summary.station).toBeNull();
+  it("caps a padded dateutc to its checked form", () => {
     const long = prepareForwardPayload(
       JSON.stringify({
         PASSKEY: FAKE_PASSKEY,
@@ -267,10 +289,7 @@ describe("prepareForwardPayload", () => {
       }),
     );
     expect(long.ok).toBe(true);
-    if (long.ok) {
-      expect(long.summary.station).toBeNull();
-      expect(long.summary.dateutc).toBe("2026-10-22 05:27:14");
-    }
+    if (long.ok) expect(long.summary.dateutc).toBe("2026-10-22 05:27:14");
   });
 
   it.each(["2026-10-22", "now", "2026-10-22 05:27:14 UTC", "MjAyNi0xMC0yMg=="])(
@@ -283,65 +302,28 @@ describe("prepareForwardPayload", () => {
     },
   );
 
-  it("keeps a firmware stationtype and omits anything free-form, encoded or echoing a short PASSKEY (Codex P1 at bae4ae77)", () => {
-    const station = (passkey: string, stationtype: string) => {
+  it.each([
+    ["abc", "GYWJj_V1.2.3"], // Base64 of the PASSKEY inside a firmware-shaped id
+    [FAKE_PASSKEY, "GW3000B_V1.2.4"],
+    [FAKE_PASSKEY, FAKE_PASSKEY],
+    [FAKE_PASSKEY, `GW3000B_${FAKE_BRIDGE_TOKEN}`],
+  ])(
+    "never echoes stationtype in the summary or its log line (Codex P1 at ed548103): %s / %s",
+    (passkey, stationtype) => {
       const r = prepareForwardPayload(
         JSON.stringify({ PASSKEY: passkey, dateutc: "2026-10-22 05:27:14", stationtype }),
       );
-      return r.ok ? r.summary.station : "rejected";
-    };
-    expect(station(FAKE_PASSKEY, "GW3000B_V1.2.4")).toBe("GW3000B_V1.2.4");
-    expect(station(FAKE_PASSKEY, "EasyWeatherPro_V5.1.6")).toBe("EasyWeatherPro_V5.1.6");
-    // A three-character PASSKEY is still this message's secret.
-    expect(station("abc", "GWabc_V1.0")).toBeNull();
-    expect(station("abc", "GWABC_V1.0")).toBeNull();
-    // Encodings and free text do not fit the firmware form.
-    expect(station(FAKE_PASSKEY, Buffer.from(FAKE_PASSKEY).toString("base64"))).toBeNull();
-    expect(station(FAKE_PASSKEY, encodeURIComponent(`${FAKE_PASSKEY}/x`))).toBeNull();
-    expect(station(FAKE_PASSKEY, "GW3000B V1.2.4 notes")).toBeNull();
-  });
-
-  it("judges each message by its own PASSKEY only; an earlier frame cannot poison a later one (Codex P1 at bae4ae77)", () => {
-    expect(
-      prepareForwardPayload(JSON.stringify({ PASSKEY: "2026", dateutc: "2026-10-22 05:27:14" })),
-    ).toEqual({ ok: false, reason: "invalid_dateutc" });
-    const next = prepareForwardPayload(
-      JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: "2026-10-22 05:27:14", temp2f: 80 }),
-    );
-    expect(next.ok).toBe(true);
-    expect(redactString("2026-10-22 05:27:14")).toBe("2026-10-22 05:27:14");
-  });
-
-  it("rejects a dateutc that carries the PASSKEY beside other text (Codex P1 at 3df0e691)", () => {
-    const out = prepareForwardPayload(
-      JSON.stringify({ PASSKEY: FAKE_HEX32, dateutc: `prefix${FAKE_HEX32}suffix`, temp1f: 70 }),
-    );
-    expect(out).toEqual({ ok: false, reason: "invalid_dateutc" });
-    // Even when the credential would be cut by the summary cap.
-    const cut = prepareForwardPayload(
-      JSON.stringify({ PASSKEY: FAKE_HEX32, dateutc: `${"x".repeat(60)}${FAKE_HEX32}` }),
-    );
-    expect(cut).toEqual({ ok: false, reason: "invalid_dateutc" });
-  });
-
-  it("counts only the channels the ingest router reads (Codex P2 at 3df0e691)", () => {
-    const out = prepareForwardPayload(
-      JSON.stringify({
-        PASSKEY: FAKE_PASSKEY,
-        dateutc: "2026-10-22 05:27:14",
-        temp1f: 70,
-        humidity1: 50,
-        temp2: 70,
-        humidity3f: 50,
-        soilmoisture4: 30,
-      }),
-    );
-    expect(out.ok).toBe(true);
-    if (out.ok) {
-      expect(out.summary.air_channels).toEqual([1]);
-      expect(out.summary.soil_channels).toEqual([4]);
-    }
-  });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(Object.keys(r.summary).sort()).toEqual([
+        "air_channels",
+        "dateutc",
+        "key_count",
+        "soil_channels",
+      ]);
+      expect(JSON.stringify(redactForLog({ summary: r.summary }))).not.toContain(stationtype);
+    },
+  );
 
   it("rejects a payload with two PASSKEY keys differing only in case (Codex P1 at 5a7accaf)", () => {
     const text = JSON.stringify({
@@ -351,17 +333,6 @@ describe("prepareForwardPayload", () => {
       stationtype: "SECOND-NOT-A-SHAPE",
     });
     expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "duplicate_passkey" });
-  });
-
-  it("omits a non-string stationtype instead of coercing it", () => {
-    const text = JSON.stringify({
-      PASSKEY: FAKE_PASSKEY,
-      dateutc: "2026-10-22 05:27:14",
-      stationtype: HOSTILE,
-    });
-    const out = prepareForwardPayload(text);
-    expect(out.ok).toBe(true);
-    if (out.ok) expect(out.summary.station).toBeNull();
   });
 });
 
@@ -655,7 +626,6 @@ describe("response summary and exit codes", () => {
       soil_channels: [],
       key_count: 5,
       dateutc: "x",
-      station: null,
     };
     for (const status of [401, 429, 500]) {
       expect(
@@ -675,7 +645,6 @@ describe("response summary and exit codes", () => {
       soil_channels: [],
       key_count: 5,
       dateutc: "x",
-      station: null,
     };
     expect(onceExitCode({ kind: "dry_run", summary })).toBe(0);
     expect(
@@ -805,7 +774,7 @@ describe("redaction", () => {
       const out = prepareForwardPayload(
         JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: "2026-10-22 05:27:14", stationtype }),
       );
-      expect(out.ok && out.summary.station).toBeNull();
+      expect(out.ok && "station" in out.summary).toBe(false);
     }
   });
 
@@ -820,7 +789,7 @@ describe("redaction", () => {
           stationtype: `GW-${mac}`,
         }),
       );
-      expect(out.ok && out.summary.station).toBeNull();
+      expect(out.ok && "station" in out.summary).toBe(false);
     }
     expect(JSON.stringify(redactForLog({ summary: { station: `GW-${macs[0]}` } }))).not.toContain(
       macs[0],
@@ -834,7 +803,7 @@ describe("redaction", () => {
         stationtype: "GWAA:BB:CC:DD:EE:FF",
       }),
     );
-    expect(glued.ok && glued.summary.station).toBeNull();
+    expect(glued.ok && "station" in glued.summary).toBe(false);
     // Twelve contiguous hex digits, glued or not (Codex P1 at 5a7accaf).
     expect(redactString("GWAABBCCDDEEFF")).toBe("GW(redacted)");
     const contiguous = prepareForwardPayload(
@@ -844,7 +813,7 @@ describe("redaction", () => {
         stationtype: "GWAABBCCDDEEFF",
       }),
     );
-    expect(contiguous.ok && contiguous.summary.station).toBeNull();
+    expect(contiguous.ok && "station" in contiguous.summary).toBe(false);
     // A plain firmware string is not a MAC.
     expect(redactString("GW3000B_V1.2.4")).toBe("GW3000B_V1.2.4");
   });
@@ -1312,10 +1281,11 @@ describe("main wiring (Codex P2 at acab6b12, bae4ae77)", () => {
     argv: string[],
     broker = fakeBroker(),
     extra: Partial<Parameters<typeof main>[2]> = {},
+    processEnv: NodeJS.ProcessEnv = {},
   ) {
     const exit = vi.fn();
     const connect = vi.fn(async () => broker);
-    const done = main(argv, {}, { connect, exit, ...extra });
+    const done = main(argv, processEnv, { connect, exit, ...extra });
     return { exit, connect, broker, done };
   }
   const quiet = () => {
@@ -1372,6 +1342,46 @@ describe("main wiring (Codex P2 at acab6b12, bae4ae77)", () => {
       restore();
     }
   });
+
+  it.each([
+    [200, '{"accepted":true,"inserted":2}', 0],
+    [200, '{"accepted":false,"reason":"no_eligible_tent"}', 1],
+  ] as const)(
+    "--live --once: one approved bearer POST through main, then shutdown and exit (Codex P2 at ed548103): %s %s",
+    async (status, body, expectedExit) => {
+      const restore = quiet();
+      const fetchImpl = vi.fn(async () => new Response(body, { status }));
+      try {
+        const { exit, broker, done } = run(
+          ["--live", "--once"],
+          fakeBroker(),
+          { fetchImpl: fetchImpl as unknown as typeof fetch },
+          { ECOWITT_INGEST_URL: INGEST_URL, VERDANT_BRIDGE_TOKEN: FAKE_BRIDGE_TOKEN },
+        );
+        await done;
+        broker.emit("connect");
+        broker.emit("message", "ecowitt/grow", Buffer.from(GATEWAY_MESSAGE));
+        await vi.waitFor(() => expect(exit).toHaveBeenCalledTimes(1));
+        expect(exit).toHaveBeenCalledWith(expectedExit);
+        expect(broker.ended).toBe(1);
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+        expect(url).toBe(INGEST_URL);
+        expect(init.method).toBe("POST");
+        expect(init.redirect).toBe("manual");
+        expect((init.headers as Record<string, string>).Authorization).toBe(
+          `Bearer ${FAKE_BRIDGE_TOKEN}`,
+        );
+        const sent = JSON.parse(String(init.body));
+        expect(sent.PASSKEY).toBe(FAKE_PASSKEY);
+        expect(sent.temp2f).toBe(81.68);
+        // The bridge wrapper is stripped before forwarding.
+        expect(sent).not.toHaveProperty("transport");
+      } finally {
+        restore();
+      }
+    },
+  );
 
   it("--once: the claimed message decides the exit; a close or error after the claim does not abort it", async () => {
     const restore = quiet();

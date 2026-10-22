@@ -90,6 +90,15 @@ describe("ecowitt-ingest-forwarder — static safety", () => {
     );
   });
 
+  it("cannot write files or bring back the report sink (Codex P2 at ed548103; CodeQL 280-282)", () => {
+    expect(SRC).not.toMatch(/["'](?:node:)?fs(?:\/promises)?["']/);
+    expect(CODE).not.toMatch(/\bBun\.(?:write|file)\b/);
+    expect(CODE).not.toMatch(
+      /\b(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|mkdir|mkdirSync|rename|renameSync|openSync)\s*\(/,
+    );
+    expect(CODE).not.toMatch(/write-report|writeReport|DEFAULT_REPORT_PATH/);
+  });
+
   it("uses the documented default broker and topic", () => {
     expect(SRC).toMatch(/mqtt:\/\/127\.0\.0\.1:1883/);
     expect(SRC).toMatch(/ecowitt\/grow/);

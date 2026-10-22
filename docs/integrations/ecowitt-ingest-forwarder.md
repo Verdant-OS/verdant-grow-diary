@@ -68,13 +68,10 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - `--once` exits `0` only for a dry run or a `2xx` response with
   `accepted: true`; a broker connect timeout (20 s), broker error or rejected
   subscription exits `2` instead of hanging.
-- A message over 64 KiB is rejected before it is parsed. MQTT.js reads a whole
-  packet before the forwarder sees it, so this bound protects the forwarder's
-  queue, not the socket: point it only at a broker you run.
 - The summary echoes only checked fields. `dateutc` must be the EcoWitt
   `YYYY-MM-DD HH:MM:SS` form `ecowitt-ingest` accepts, or the message is
-  rejected (`invalid_dateutc`). `stationtype` is shown only as a firmware id
-  such as `GW3000B_V1.2.4`; anything else is omitted.
+  rejected (`invalid_dateutc`). Free-form upload strings such as `stationtype`
+  are never shown.
 - A message without `PASSKEY` or `dateutc` (for example the runbook's
   hand-made sanity POST) is rejected locally and never forwarded. A `dateutc`
   that carries the PASSKEY is rejected too (`invalid_dateutc`), so the
@@ -122,7 +119,8 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   anything you share.
 - Arguments are read in order. An unknown argument, a repeated flag, or
   `--topic` / `--mqtt-url` without a non-empty value is refused before any
-  connection.
+  connection. An unknown argument is reported by position only, so a mistyped
+  `--password=…` is never printed.
 - A refused subscription (error, no grant, or QoS 128), a subscription that is
   never acknowledged within 20 s, and a refused connection (bad credentials)
   each exit `2` in continuous mode as well, instead of staying connected while

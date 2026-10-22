@@ -26,8 +26,8 @@
  *     buffered. A message over MAX_MESSAGE_BYTES is then rejected before it is
  *     decoded or queued.
  *   - Summaries carry only format-checked fields: `dateutc` must be the EcoWitt
- *     `YYYY-MM-DD HH:MM:SS` form and `stationtype` a firmware id; anything else
- *     is rejected or omitted rather than echoed.
+ *     `YYYY-MM-DD HH:MM:SS` form or the message is rejected. Free-form upload
+ *     strings such as `stationtype` are never echoed.
  *   - EcoWitt ingest is dry-run only until the gates in
  *     docs/ecowitt-future-real-ingest-gates.md are cleared by the owner.
  *     `--live` is the tool for the canary and for ingest after that; it is
@@ -107,8 +107,6 @@ const AIR_HUMIDITY_RE = /^humidity([1-8])$/i;
 const SOIL_CHANNEL_RE = /^soilmoisture([1-8])$/i;
 /** The only `dateutc` form `ecowitt-ingest` accepts (`parseEcoWittDateUtc`). */
 const DATEUTC_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;
-/** A gateway firmware id: letters and digits, `_V`, then a dotted version. */
-const STATIONTYPE_RE = /^[A-Za-z][A-Za-z0-9]{1,23}_V\d{1,3}(?:\.\d{1,3}){1,3}$/;
 
 export interface ForwarderFlags {
   live: boolean;
@@ -130,10 +128,12 @@ const VALUE_FLAGS = new Set(["--topic", "--mqtt-url"]);
 /**
  * Pure. Reads argv in order and throws on anything it does not recognise, so a
  * malformed invocation never reaches the broker: an unknown argument
- * (`unknown_option:<arg>`), a repeated flag (`duplicate_option:<flag>`), or a
- * value flag that is last, followed by another option
+ * (`unknown_option:argument_<n>`), a repeated flag (`duplicate_option:<flag>`),
+ * or a value flag that is last, followed by another option
  * (`missing_option_value:<flag>`) or given an empty value
  * (`empty_option_value:<flag>`) (Codex P2 on #2335 at acab6b12 and bae4ae77).
+ * An unknown argument is named by position only: `--password=…` must never be
+ * echoed (Codex P1 at ed548103). `<flag>` is always one of the known flags.
  * A bare `--` separator is skipped. Blank env values count as unset.
  */
 export function parseFlags(argv: readonly string[], env: NodeJS.ProcessEnv): ForwarderFlags {
@@ -143,7 +143,7 @@ export function parseFlags(argv: readonly string[], env: NodeJS.ProcessEnv): For
     const arg = argv[i];
     if (arg === "--") continue;
     if (!BOOLEAN_FLAGS.has(arg) && !VALUE_FLAGS.has(arg)) {
-      throw new Error(`unknown_option:${arg}`);
+      throw new Error(`unknown_option:argument_${i + 1}`);
     }
     if (seen.has(arg)) throw new Error(`duplicate_option:${arg}`);
     seen.add(arg);
@@ -236,7 +236,6 @@ export interface PayloadSummary {
   soil_channels: number[];
   key_count: number;
   dateutc: string;
-  station: string | null;
 }
 
 export type PreparedPayload =
@@ -316,20 +315,6 @@ export function prepareForwardPayload(text: string): PreparedPayload {
     const s = SOIL_CHANNEL_RE.exec(k);
     if (s) soil.add(Number(s[1]));
   }
-  const stationKey = findKey(payload, "stationtype");
-  const stationRaw = stationKey ? payload[stationKey] : undefined;
-  // A hostile upload can copy its PASSKEY, or any credential shape, into any
-  // text field; never let a credential value reach the summary (Codex P1 on
-  // #2335 at 79ce2801 and 0676e200).
-  // A firmware id such as `GW3000B_V1.2.4`, or nothing: no free-form text, no
-  // echo of this upload's PASSKEY in any case, and no credential shape.
-  const station =
-    typeof stationRaw === "string" &&
-    STATIONTYPE_RE.test(stationRaw) &&
-    !echoesPasskey(stationRaw) &&
-    redactString(stationRaw) === stationRaw
-      ? stationRaw
-      : null;
   return {
     ok: true,
     payload,
@@ -338,7 +323,6 @@ export function prepareForwardPayload(text: string): PreparedPayload {
       soil_channels: [...soil].sort((x, y) => x - y),
       key_count: Object.keys(payload).length,
       dateutc,
-      station,
     },
   };
 }

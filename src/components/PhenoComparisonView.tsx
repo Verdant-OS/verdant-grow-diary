@@ -12,6 +12,7 @@
  *    is visibly flagged; demo/stale/invalid sensor sources are never rendered
  *    as healthy. Never picks a phenotype.
  */
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { useMemo } from "react";
 import {
   buildPhenoComparisonView,
@@ -409,7 +410,9 @@ function CandidateColumn({
                   >
                     {s.sourceLabel}
                   </span>
-                  <span className="text-muted-foreground">{s.capturedAt ?? "no timestamp"}</span>
+                  <span className="text-muted-foreground">
+                    {s.capturedAt ? formatSnapshotTimestamp(s.capturedAt) : "no timestamp"}
+                  </span>
                 </div>
                 <ul className="grid grid-cols-3 gap-1 text-[11px]">
                   <li>Temp: {fmtMetric(s.tempF, "°F")}</li>

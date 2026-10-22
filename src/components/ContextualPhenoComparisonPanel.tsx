@@ -9,6 +9,7 @@
  *  - Demo / stale / invalid sources render as caution / untrusted
  *    and are never labeled healthy.
  */
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 import {
   type ContextualPhenoComparisonPlant,
@@ -276,7 +277,10 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
           <li>Avg PPFD: {fmtNum(env.avgPpfd, 0)}</li>
         </ul>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Last sensor: <span data-testid="plant-last-sensor-at">{env.lastSensorAt ?? "—"}</span>
+          Last sensor:{" "}
+          <span data-testid="plant-last-sensor-at">
+            {env.lastSensorAt ? formatSnapshotTimestamp(env.lastSensorAt) : "—"}
+          </span>
           {" · "}
           Trusted context:{" "}
           <span data-testid="plant-trusted-context">

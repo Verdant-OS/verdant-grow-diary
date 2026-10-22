@@ -25,6 +25,8 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { formatActionReasonForDisplay } from "@/lib/actionQueueRowView";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
 
@@ -203,15 +205,95 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
     setRecent({ status: "loading" });
     setPending({ status: "loading" });
 
-    // Recent activity and pending actions start together. A hung diary read
-    // must not keep the approval queue on loading. A later scope invalidates
-    // both writes, including the deadline rejection.
-    const recentWork = (async () => {
-      try {
-        const next = await withCriticalReadDeadline(readDashboardRecent(growId));
-        if (isCurrent()) setRecent(next);
-      } catch {
-        if (isCurrent()) setRecent({ status: "unavailable" });
+    // Recent activity: latest 5 diary + latest 5 manual grow_events +
+    // latest 5 action_queue_events.
+    try {
+      const [diaryRes, growEventsRes, eventsRes] = await Promise.all([
+        fetchDashboardDiaryRows(growId),
+        supabase
+          .from("grow_events")
+          .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
+          .eq("grow_id", growId)
+          .eq("source", "manual")
+          .eq("is_deleted", false)
+          .order("occurred_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("action_queue_events")
+          .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
+          .eq("grow_id", growId)
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
+
+      if (growEventsRes.error || eventsRes.error) {
+        setRecent({ status: "unavailable" });
+      } else {
+        // Companion diary rows dedupe against their grow_events parents so a
+        // single Quick Log save never shows up twice.
+        const activityRows = dedupeMergedManualGrowActivityRows({
+          diaryEntries: diaryRes as (ConnectedActivationDiaryEntryRow & {
+            stage?: string | null;
+            note?: string | null;
+          })[],
+          growEvents: (growEventsRes.data ?? []) as (ConnectedActivationGrowEventRow & {
+            note?: string | null;
+          })[],
+        });
+
+        const diaryItems: RecentItem[] = activityRows.diaryEntries.map((d) => ({
+          id: `diary-${d.id}`,
+          kind: "diary",
+          ts: d.entry_at ?? "",
+          title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
+          // Action Queue trace notes copy "Reading at <ISO>." from the alert reason.
+          detail: d.note ? localizeReadingAtTimestamps(d.note) : d.note,
+        }));
+
+        const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
+          const label = resolveQuickLogEventTimelineLabel({ eventType: e.event_type });
+          return {
+            id: `grow-event-${e.id}`,
+            kind: "diary",
+            ts: e.occurred_at ?? e.created_at ?? "",
+            title: label ? `Quick log (${label})` : "Quick log entry",
+            detail: e.note ?? null,
+          };
+        });
+
+        const actionIds = Array.from(
+          new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
+        );
+        let parents: Record<string, { suggested_change: string; reason: string }> = {};
+        if (actionIds.length > 0) {
+          const { data: pRows } = await supabase
+            .from("action_queue")
+            .select("id,suggested_change,reason")
+            .in("id", actionIds);
+          parents = Object.fromEntries(
+            (pRows ?? []).map((p) => [
+              p.id,
+              { suggested_change: p.suggested_change, reason: p.reason },
+            ]),
+          );
+        }
+
+        const eventItems: RecentItem[] = (eventsRes.data ?? []).map((e) => {
+          const parent = parents[e.action_queue_id];
+          return {
+            id: `event-${e.id}`,
+            kind: "action_event",
+            ts: e.created_at,
+            title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
+            detail: e.note ?? formatActionReasonForDisplay(parent?.reason),
+            href: `/actions/${e.action_queue_id}`,
+          };
+        });
+
+        setRecent({
+          status: "ok",
+          items: mergeRecent([...diaryItems, ...growEventItems, ...eventItems]),
+        });
       }
     })();
     const pendingWork = (async () => {

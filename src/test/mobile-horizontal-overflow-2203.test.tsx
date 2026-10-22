@@ -570,6 +570,7 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
             sourceLabel: null,
             capturedAt: null,
             ageText: null,
+            calculated: false,
           },
           {
             key: "rh",
@@ -580,6 +581,7 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
             sourceLabel: null,
             capturedAt: null,
             ageText: null,
+            calculated: false,
           },
           {
             key: "vpd",
@@ -590,6 +592,7 @@ describe("Issue #2203 — mobile (375px) horizontal overflow regression suite", 
             sourceLabel: null,
             capturedAt: null,
             ageText: null,
+            calculated: false,
           },
         ]}
         lastLog={{ kind: "none_today", text: "No log today" }}

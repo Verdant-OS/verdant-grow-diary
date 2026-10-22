@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { STAGES } from "@/lib/grow";
 import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
@@ -128,6 +129,20 @@ import {
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
+  collectTimelineDiaryPhotoIds,
+  dedupeAlertEventsForTimeline,
+  EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  applyTimelineDiaryPhotoEdit,
+  resolveTimelineDiaryPhotoReferenceSource,
+  type TimelineDiaryPhotoReferenceSource,
+  timelineDiaryRowsForChipCounts,
+  timelineEntryCountsAsPhoto,
+  timelineMeasurementChipCount,
+  timelineResultsCountReceiptSuffix,
+  timelineStageChipRows,
+  unionTimelineDiaryPhotoIds,
+} from "@/lib/timelineChipCountRules";
+import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
 } from "@/lib/effectiveSensorReadings";
@@ -137,6 +152,7 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { applyLinkedEventTypes, LINKED_SPINE_EVENT_TYPES } from "@/lib/diaryLinkedEventTypeRules";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import {
   collapseQuickLogSaveFanOut,
@@ -207,6 +223,7 @@ import {
 } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
@@ -272,6 +289,8 @@ interface Entry {
   entry_at: string;
   plant_id: string | null;
   tent_id: string | null;
+  /** Client-only: persisted field the displayed photo came from (not a column). */
+  photoReferenceSource?: TimelineDiaryPhotoReferenceSource;
 }
 
 interface TimelineDiaryPhotoDisplayRows {
@@ -292,15 +311,16 @@ function buildTimelineDiaryPhotoDisplayRows(
   const privatePhotoPathById = new Map<string, string>();
   const displayRows = rows.map((row) => {
     const reference = parseDiaryPhotoDisplayReferenceFromRow(row, { viewerUserId });
+    const photoReferenceSource = resolveTimelineDiaryPhotoReferenceSource(row, viewerUserId);
 
     if (reference.kind === "external") {
-      return { ...row, photo_url: reference.url };
+      return { ...row, photo_url: reference.url, photoReferenceSource };
     }
     if (reference.kind === "storage") {
       privatePhotoPathById.set(row.id, reference.path);
     }
 
-    return { ...row, photo_url: null };
+    return { ...row, photo_url: null, photoReferenceSource };
   });
 
   return { rows: displayRows, privatePhotoPathById };
@@ -340,9 +360,10 @@ interface AlertEventRow {
 
 type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
-function entryKinds(e: Entry): EventFilter[] {
-  const kinds: EventFilter[] = ["note"];
-  if (e.photo_url) kinds.push("photo");
+function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
+  const kinds: EventFilter[] = [];
+  if (!isTimelineSensorDerivedDiaryId(e.id)) kinds.push("note");
+  if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
   // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
   // manuals use the same LIVE window as the evidence drawer badge.
@@ -379,6 +400,25 @@ function entryKinds(e: Entry): EventFilter[] {
  * fetched". `onResolved`/`onPartial` own their scope-currency guards and the
  * merge into the supplemental collapse-only state.
  */
+/** Timeline-only. The shared root-zone select stays unchanged for the other readers. */
+const TIMELINE_SENSOR_GROW_EVENT_SELECT =
+  "id,plant_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+const TIMELINE_LINKED_ROOT_SELECT = "id,created_at,event_type,source,plant_id,occurred_at";
+
+function linkedEnvironmentEventIds(diaryRows: ReadonlyArray<{ details?: unknown }>): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const row of diaryRows) {
+    const details = row.details;
+    if (!details || typeof details !== "object" || Array.isArray(details)) continue;
+    const linked = (details as Record<string, unknown>).linked_grow_event_id;
+    if (typeof linked !== "string" || linked.length === 0 || seen.has(linked)) continue;
+    seen.add(linked);
+    ids.push(linked);
+  }
+  return ids;
+}
+
 async function resolveMissingLinkedGrowEventParents(input: {
   growId: string;
   diaryRows: ReadonlyArray<{ id: string; details?: unknown }>;
@@ -409,6 +449,62 @@ async function resolveMissingLinkedGrowEventParents(input: {
     input.onResolved(linkedResult.data as unknown as GrowEventRowForRecent[]);
   } catch {
     input.onPartial();
+  }
+}
+
+/** Roots outside the first grow-event page still need their created_at siblings. */
+async function loadLinkedRootSensorSiblings(input: {
+  growId: string;
+  rootIds: readonly string[];
+  isCurrent: () => boolean;
+  onRoots: (rows: GrowEventRowForRecent[]) => void;
+  onSiblings: (rows: GrowEventRowForRecent[]) => void;
+  onPartial: () => void;
+}): Promise<void> {
+  if (input.rootIds.length === 0) return;
+  try {
+    const rootResult = await supabase
+      .from("grow_events")
+      .select(TIMELINE_LINKED_ROOT_SELECT)
+      .eq("grow_id", input.growId)
+      .in("id", input.rootIds);
+    if (!input.isCurrent()) return;
+    if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
+      input.onPartial();
+      return;
+    }
+    const roots = rootResult.data as unknown as GrowEventRowForRecent[];
+    input.onRoots(roots);
+    const createdAts = [
+      ...new Set(
+        roots
+          .map((row) => {
+            const createdAt = (row as unknown as { created_at?: unknown }).created_at;
+            return typeof createdAt === "string" && createdAt.length > 0 ? createdAt : null;
+          })
+          .filter((value): value is string => value !== null),
+      ),
+    ];
+    if (createdAts.length === 0 || !input.isCurrent()) return;
+    const sensorSiblingResult = await supabase
+      .from("grow_events")
+      .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+      .eq("grow_id", input.growId)
+      .eq("event_type", "environment")
+      .eq("source", "manual")
+      .eq("is_deleted", false)
+      .in("created_at", createdAts);
+    if (!input.isCurrent()) return;
+    if (
+      hasTimelineRequiredReadError(sensorSiblingResult) ||
+      !Array.isArray(sensorSiblingResult.data)
+    ) {
+      input.onPartial();
+      return;
+    }
+    input.onSiblings(sensorSiblingResult.data as unknown as GrowEventRowForRecent[]);
+  } catch {
+    if (input.isCurrent()) input.onPartial();
   }
 }
 
@@ -472,6 +568,11 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [diaryPhotoIds, setDiaryPhotoIds] = useState<ReadonlySet<string>>(
+    () => EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  );
+  // Newest storage path an edit asked to sign, per entry id.
+  const editPhotoSignRef = useRef(new Map<string, string>());
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
@@ -481,6 +582,8 @@ export default function Timeline() {
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineLinkedRoots, setTimelineLinkedRoots] = useState<GrowEventRowForRecent[]>([]);
   const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   // Deleted or out-of-page grow_event parents that a loaded diary companion
   // references (details.linked_grow_event_id). Resolved separately from the
@@ -655,10 +758,13 @@ export default function Timeline() {
     const requestId = ++readRequestIdRef.current;
     if (!user || !activeGrowId) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -676,10 +782,13 @@ export default function Timeline() {
     // the network boundary instead of ever issuing an unscoped read.
     if (!activeReadKey) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -727,6 +836,16 @@ export default function Timeline() {
           entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
         return entriesQuery;
       });
+      if (!isCurrentRequest()) return;
+      if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
+
+      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
+      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
+        rows,
+        user,
+      );
+      const paths = [...new Set(privatePhotoPathById.values())];
 
       // Filtered by is_deleted here so the visible-event page (its 100-row
       // budget, and growEvents.length UI-copy gates below) never shows or
@@ -761,15 +880,37 @@ export default function Timeline() {
       );
       const paths = [...new Set(privatePhotoPathById.values())];
       const nextGrowEvents = growEventsResult.data as unknown as GrowEventRowForRecent[];
+      let sensorEventsQuery = orderNewestFirstStable(
+        supabase
+          .from("grow_events")
+          .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+          .eq("grow_id", activeGrowId)
+          .eq("event_type", "environment")
+          .eq("is_deleted", false),
+        "occurred_at",
+      ).limit(100);
+      if (timelineDateRangeBounds.startIso)
+        sensorEventsQuery = sensorEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        sensorEventsQuery = sensorEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
+      const sensorEventsResult = await sensorEventsQuery;
+      if (!isCurrentRequest()) return;
+      const sensorReadFailed = hasTimelineRequiredReadError(sensorEventsResult);
+      const nextSensorEvents = sensorReadFailed
+        ? []
+        : (sensorEventsResult.data as unknown as GrowEventRowForRecent[]);
 
       // Core plant memory is confirmed for the exact active scope. Make it
       // visible immediately; photos/action/alert context continues separately
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
+      setDiaryPhotoIds(nextDiaryPhotoIds);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
+      setTimelineSensorEvents(nextSensorEvents);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(
         typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       );
@@ -781,7 +922,7 @@ export default function Timeline() {
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
-      setPartialReadSources([]);
+      setPartialReadSources(sensorReadFailed ? ["manual_sensor_readings"] : []);
       setCoreRead({ status: "success", readKey: requestedReadKey });
       setLoading(false);
       // Manual sensor receipts are cleared with this commit. The directory
@@ -805,19 +946,47 @@ export default function Timeline() {
       // fetched" instead of guessing from a primary page that was never
       // meant to be exhaustive.
       supplementalTasks.push(
-        resolveMissingLinkedGrowEventParents({
-          growId: activeGrowId,
-          diaryRows: coreRows,
-          knownGrowEvents: nextGrowEvents,
-          isCurrent: isCurrentRequest,
-          onResolved: (rows) =>
-            setSupplementalLinkedGrowEvents((current) => {
-              const seen = new Set(current.map((row) => row.id));
-              const extra = rows.filter((row) => !seen.has(row.id));
-              return extra.length === 0 ? current : [...current, ...extra];
+        (async () => {
+          const diaryRows = coreRows.map((row) => ({
+            id: row.id,
+            details: (row.details ?? null) as Record<string, unknown> | null,
+          }));
+          await resolveMissingLinkedGrowEventParents({
+            growId: activeGrowId,
+            diaryRows: coreRows,
+            knownGrowEvents: nextGrowEvents,
+            isCurrent: isCurrentRequest,
+            onResolved: (rows) =>
+              setSupplementalLinkedGrowEvents((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onPartial: () => markPartial("linked_grow_events"),
+          });
+          if (!isCurrentRequest()) return;
+          await loadLinkedRootSensorSiblings({
+            growId: activeGrowId,
+            rootIds: findMissingLinkedGrowEventIds({
+              diaryEntries: diaryRows,
+              growEvents: nextGrowEvents,
             }),
-          onPartial: () => markPartial("linked_grow_events"),
-        }),
+            isCurrent: isCurrentRequest,
+            onRoots: (rows) =>
+              setTimelineLinkedRoots((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onSiblings: (rows) =>
+              setTimelineSensorEvents((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = rows.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              }),
+            onPartial: () => markPartial("manual_sensor_readings"),
+          });
+        })(),
       );
 
       if (paths.length > 0) {
@@ -1066,6 +1235,7 @@ export default function Timeline() {
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
       const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const olderPhotoIds = collectTimelineDiaryPhotoIds(rawOlder, user);
       const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rawOlder,
         user,
@@ -1099,6 +1269,7 @@ export default function Timeline() {
         }
       }
       if (isCurrentPage() && older.length) {
+        setDiaryPhotoIds((current) => unionTimelineDiaryPhotoIds(current, olderPhotoIds));
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
           return [...prev, ...older.filter((e) => !seen.has(e.id))];
@@ -1125,6 +1296,75 @@ export default function Timeline() {
             );
           },
         });
+        const knownRootIds = new Set(timelineLinkedRoots.map((row) => row.id));
+        const missingRootIds = linkedEnvironmentEventIds(older).filter(
+          (id) => !knownRootIds.has(id),
+        );
+        if (missingRootIds.length > 0 && isCurrentPage()) {
+          try {
+            const rootResult = await supabase
+              .from("grow_events")
+              .select(TIMELINE_LINKED_ROOT_SELECT)
+              .eq("grow_id", requestedGrowId)
+              .in("id", missingRootIds);
+            if (!isCurrentPage()) return;
+            if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
+              setPartialReadSources((current) =>
+                mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+              );
+            } else {
+              const roots = rootResult.data as unknown as GrowEventRowForRecent[];
+              setTimelineLinkedRoots((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = roots.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              });
+              const createdAts = [
+                ...new Set(
+                  roots
+                    .map((row) => {
+                      const createdAt = (row as unknown as { created_at?: unknown }).created_at;
+                      return typeof createdAt === "string" && createdAt.length > 0
+                        ? createdAt
+                        : null;
+                    })
+                    .filter((value): value is string => value !== null),
+                ),
+              ];
+              if (createdAts.length > 0 && isCurrentPage()) {
+                const sensorSiblingResult = await supabase
+                  .from("grow_events")
+                  .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+                  .eq("grow_id", requestedGrowId)
+                  .eq("event_type", "environment")
+                  .eq("source", "manual")
+                  .eq("is_deleted", false)
+                  .in("created_at", createdAts);
+                if (!isCurrentPage()) return;
+                if (
+                  hasTimelineRequiredReadError(sensorSiblingResult) ||
+                  !Array.isArray(sensorSiblingResult.data)
+                ) {
+                  setPartialReadSources((current) =>
+                    mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+                  );
+                } else {
+                  const siblings = sensorSiblingResult.data as unknown as GrowEventRowForRecent[];
+                  setTimelineSensorEvents((current) => {
+                    const seen = new Set(current.map((row) => row.id));
+                    const extra = siblings.filter((row) => row.id && !seen.has(row.id));
+                    return extra.length === 0 ? current : [...current, ...extra];
+                  });
+                }
+              }
+            }
+          } catch {
+            if (!isCurrentPage()) return;
+            setPartialReadSources((current) =>
+              mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+            );
+          }
+        }
       }
     } catch {
       if (isCurrentPage()) setLoadOlderError(true);
@@ -1174,33 +1414,79 @@ export default function Timeline() {
     0,
   );
 
+  const enrichedEntries = useMemo(() => {
+    const knownGrowEvents =
+      supplementalLinkedGrowEvents.length === 0
+        ? growEvents
+        : [...growEvents, ...supplementalLinkedGrowEvents];
+    if (knownGrowEvents.length === 0) return entries;
+    const mappedGrowEvents = mapGrowEventsToRecentRawEntries(knownGrowEvents);
+    const spineTypes = new Map(
+      mappedGrowEvents.map((r) => [r.id.trim().toLowerCase(), r.entry_type] as const),
+    );
+    const growMappedById = new Map(mappedGrowEvents.map((r) => [r.id, r] as const));
+    return applyLinkedEventTypes(entries, spineTypes).map((e) => {
+      const details = (e.details ?? null) as Record<string, unknown> | null;
+      if (!details) return e;
+      const link =
+        typeof details.linked_grow_event_id === "string"
+          ? details.linked_grow_event_id
+          : typeof details.grow_event_id === "string"
+            ? details.grow_event_id
+            : null;
+      if (!link) return e;
+      const mapped = growMappedById.get(link);
+      if (!mapped) return e;
+      let nextDetails = details;
+      const declaredType =
+        typeof (details.event_type ?? details.eventType) === "string"
+          ? String(details.event_type ?? details.eventType)
+              .trim()
+              .toLowerCase()
+          : "";
+      const hasType =
+        declaredType !== "" && declaredType !== "quick_log" && declaredType !== "note";
+      const mappedType =
+        typeof mapped.entry_type === "string" ? mapped.entry_type.trim().toLowerCase() : "";
+      if (!hasType && LINKED_SPINE_EVENT_TYPES.has(mappedType)) {
+        nextDetails = { ...nextDetails, event_type: mappedType };
+      }
+      const effectiveType =
+        typeof (nextDetails.event_type ?? nextDetails.eventType) === "string"
+          ? String(nextDetails.event_type ?? nextDetails.eventType)
+              .trim()
+              .toLowerCase()
+          : "";
+      const hasVol =
+        nextDetails.watering != null ||
+        nextDetails.feeding != null ||
+        nextDetails.watering_amount_ml != null ||
+        nextDetails.wateringAmountMl != null ||
+        nextDetails.volume_ml != null;
+      const vol = mapped.details?.watering_amount_ml;
+      if (
+        !hasVol &&
+        (effectiveType === "watering" || effectiveType === "feeding") &&
+        typeof vol === "number" &&
+        Number.isFinite(vol)
+      ) {
+        const volumeEnvelope = effectiveType === "feeding" ? "feeding" : "watering";
+        nextDetails = { ...nextDetails, [volumeEnvelope]: { volume_ml: vol } };
+      }
+      return nextDetails === details ? e : { ...e, details: nextDetails };
+    });
+  }, [entries, growEvents, supplementalLinkedGrowEvents]);
+
   const displayEntries = useMemo(
     () =>
       mergeTimelineMeasurementDisplayEntries(
-        entries,
+        enrichedEntries,
         manualSensorMeasurementEntries.map((entry) =>
           formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
         ),
       ),
-    [entries, manualSensorMeasurementEntries, temperatureUnit],
+    [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
   );
-
-  const eventCounts = useMemo(() => {
-    const m = {
-      all: displayEntries.length,
-      photo: 0,
-      note: 0,
-      measurement: 0,
-      followup: 0,
-      actionresponse: 0,
-    };
-    displayEntries.forEach((e) =>
-      entryKinds(e).forEach((k) => {
-        m[k] = (m[k] || 0) + 1;
-      }),
-    );
-    return m;
-  }, [displayEntries]);
 
   // Canonical Action Response Memory (read-only). One grower response renders
   // as ONE compact card inside its own evidence row — never an extra event.
@@ -1309,27 +1595,96 @@ export default function Timeline() {
     };
   }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);
 
+  const evidenceFilteredEntries = useMemo(
+    () =>
+      filterTimelineEvidenceRows(displayEntries, {
+        query: searchQuery,
+        plantId: plantFilter,
+        tentId: tentFilter,
+        eventType: eventTypeFilter,
+        sensorSources: sensorSourceFilter,
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+        timeZone: TIMELINE_LOCAL_TIME_ZONE,
+        plantNamesById,
+        tentNamesById,
+      }),
+    [
+      displayEntries,
+      searchQuery,
+      plantFilter,
+      tentFilter,
+      eventTypeFilter,
+      sensorSourceFilter,
+      effectiveStartDate,
+      effectiveEndDate,
+      plantNamesById,
+      tentNamesById,
+    ],
+  );
+
+  const diaryChipEntries = useMemo(
+    () => timelineDiaryRowsForChipCounts(evidenceFilteredEntries),
+    [evidenceFilteredEntries],
+  );
+
+  // Under Measurements the list carries sensor receipts, so the stage chips
+  // count them too (timelineStageChipRows); otherwise diary rows only.
+  const stageChipEntries = useMemo(
+    () => timelineStageChipRows(eventFilter, diaryChipEntries, evidenceFilteredEntries),
+    [eventFilter, diaryChipEntries, evidenceFilteredEntries],
+  );
+
+  const chipStageCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    stageChipEntries.forEach((e) => {
+      if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter)) return;
+      const stage = resolveTimelineDiaryEntryStage(e);
+      if (stage) m[stage] = (m[stage] || 0) + 1;
+    });
+    return m;
+  }, [stageChipEntries, eventFilter, diaryPhotoIds]);
+
+  const chipAllStagesCount = useMemo(() => {
+    if (eventFilter === "all") return stageChipEntries.length;
+    return stageChipEntries.filter((e) => entryKinds(e, diaryPhotoIds).includes(eventFilter))
+      .length;
+  }, [stageChipEntries, eventFilter, diaryPhotoIds]);
+
+  const eventCounts = useMemo(() => {
+    const stageMatchedDiary =
+      stageFilter === "all"
+        ? diaryChipEntries
+        : diaryChipEntries.filter((e) => resolveTimelineDiaryEntryStage(e) === stageFilter);
+    const stageMatchedAll =
+      stageFilter === "all"
+        ? evidenceFilteredEntries
+        : evidenceFilteredEntries.filter((e) => resolveTimelineDiaryEntryStage(e) === stageFilter);
+    const m = {
+      all: stageMatchedDiary.length,
+      photo: 0,
+      note: 0,
+      measurement: 0,
+      followup: 0,
+      actionresponse: 0,
+    };
+    stageMatchedDiary.forEach((e) =>
+      entryKinds(e, diaryPhotoIds).forEach((k) => {
+        m[k] = (m[k] || 0) + 1;
+      }),
+    );
+    m.measurement = timelineMeasurementChipCount(m.measurement, stageMatchedAll);
+    return m;
+  }, [diaryChipEntries, evidenceFilteredEntries, stageFilter, diaryPhotoIds]);
+
   const filtered = useMemo(() => {
-    const afterStageEvent = displayEntries.filter((e) => {
+    return evidenceFilteredEntries.filter((e) => {
       if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
-      if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
+      if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter))
+        return false;
       return true;
     });
-    return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
-  }, [
-    displayEntries,
-    stageFilter,
-    eventFilter,
-    searchQuery,
-    plantFilter,
-    tentFilter,
-    eventTypeFilter,
-    sensorSourceFilter,
-    effectiveStartDate,
-    effectiveEndDate,
-    plantNamesById,
-    tentNamesById,
-  ]);
+  }, [evidenceFilteredEntries, stageFilter, eventFilter, diaryPhotoIds]);
 
   const openLabelsById = useMemo(() => {
     const rows = filtered.map((e) => {
@@ -1627,8 +1982,10 @@ export default function Timeline() {
   // future-proof empty/limited disclosure. Includes invalid entries so
   // malformed diary rows still surface as "Limited data" instead of vanishing.
   const normalizedById = useMemo(() => {
+    // Built from enrichedEntries so a linked feeding companion's recovered
+    // type reaches DiaryEntryBadges and the FAQ model, not just the card.
     const items = buildGrowDiaryTimeline({
-      rawEntries: entries.map((e) => ({
+      rawEntries: enrichedEntries.map((e) => ({
         id: e.id,
         grow_id: activeGrowId ?? null,
         plant_id: e.plant_id,
@@ -1645,7 +2002,7 @@ export default function Timeline() {
     const map = new Map<string, (typeof items)[number]>();
     items.forEach((it) => map.set(it.id, it));
     return map;
-  }, [entries, activeGrowId]);
+  }, [enrichedEntries, activeGrowId]);
 
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
@@ -2156,6 +2513,7 @@ export default function Timeline() {
           {entriesTotal !== null && entriesTotal > entries.length
             ? ` (${entries.length} loaded)`
             : ""}
+          {timelineResultsCountReceiptSuffix(filtered)}
           {growEvents.length > 0
             ? " · Quick Log activity appears in the history panels below."
             : ""}
@@ -2282,7 +2640,7 @@ export default function Timeline() {
             active={stageFilter === "all"}
             onClick={() => setStageFilter("all")}
             label="All stages"
-            count={displayEntries.length}
+            count={chipAllStagesCount}
           />
           {STAGES.map((s) => (
             <FilterChip
@@ -2290,8 +2648,8 @@ export default function Timeline() {
               active={stageFilter === s.value}
               onClick={() => setStageFilter(s.value)}
               label={s.label}
-              count={stageCounts[s.value] || 0}
-              disabled={!stageCounts[s.value]}
+              count={chipStageCounts[s.value] || 0}
+              disabled={!chipStageCounts[s.value]}
             />
           ))}
         </div>
@@ -2739,6 +3097,13 @@ export default function Timeline() {
                                     plantId={e.plant_id ?? null}
                                     tentId={e.tent_id ?? null}
                                     growId={loopGrowId}
+                                    correctionValues={correctionValuesForTimelineDiaryEntry(e, [
+                                      ...timelineLinkedRoots,
+                                      ...growEvents,
+                                      ...supplementalLinkedGrowEvents,
+                                      ...timelineSensorEvents,
+                                    ])}
+                                    environmentCheckDetails={e.details}
                                     onChanged={() => void load()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (
@@ -2789,7 +3154,7 @@ export default function Timeline() {
                                   }
                                 }}
                               >
-                                {e.note}
+                                {localizeReadingAtTimestamps(e.note)}
                               </p>
                               {lightingGuideByEntryId.has(e.id) ? (
                                 <div
@@ -3135,11 +3500,53 @@ export default function Timeline() {
         onOpenChange={(o) => {
           if (!o) setEditingId(null);
         }}
-        onSaved={(patch) =>
+        onSaved={(patch) => {
+          const before = entries.find((r) => r.id === patch.id);
+          const photo =
+            before && patch.details !== undefined
+              ? applyTimelineDiaryPhotoEdit(diaryPhotoIds, before, patch.details, user)
+              : null;
+          if (photo) setDiaryPhotoIds(photo.photoIds);
+          const signPath = photo?.signStoragePath ?? null;
+          if (signPath) {
+            // The edit moved the photo to a new private path, so the old
+            // signed URL was cleared; sign the new one. A later edit of the
+            // same entry wins over this result.
+            editPhotoSignRef.current.set(patch.id, signPath);
+            void supabase.storage
+              .from("diary-photos")
+              .createSignedUrl(signPath, 3600)
+              .then(({ data }) => {
+                if (editPhotoSignRef.current.get(patch.id) !== signPath) return;
+                const url = data?.signedUrl;
+                if (!url) return;
+                setEntries((rows) =>
+                  rows.map((r) => (r.id === patch.id ? ({ ...r, photo_url: url } as Entry) : r)),
+                );
+              })
+              // An unsigned photo stays blank, as it would after a failed load.
+              .catch(() => undefined);
+          } else {
+            // Supersede any signing still in flight for this entry.
+            editPhotoSignRef.current.set(patch.id, "");
+          }
           setEntries((rows) =>
-            rows.map((r) => (r.id === patch.id ? ({ ...r, ...patch } as Entry) : r)),
-          )
-        }
+            rows.map((r) =>
+              r.id === patch.id
+                ? ({
+                    ...r,
+                    ...patch,
+                    ...(photo
+                      ? {
+                          photo_url: photo.photo_url,
+                          photoReferenceSource: photo.photoReferenceSource,
+                        }
+                      : {}),
+                  } as Entry)
+                : r,
+            ),
+          );
+        }}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
       />
       {lightboxIndex >= 0 && lightboxItems.length > 0 && (
@@ -3164,7 +3571,7 @@ export default function Timeline() {
           });
           return {
             id: row.id,
-            note: row.note,
+            note: localizeReadingAtTimestamps(row.note),
             photo_url: row.photo_url,
             stage: resolveTimelineDiaryEntryStage(row),
             entry_at: row.entry_at,
@@ -3306,7 +3713,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
             )}
             {e.action?.reason && (
               <p className="text-xs text-muted-foreground mt-1">
-                {stripBackPointerTokens(e.action.reason)}
+                {localizeReadingAtTimestamps(stripBackPointerTokens(e.action.reason))}
               </p>
             )}
             {e.note && <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>}
@@ -3334,10 +3741,9 @@ const ALERT_EVENT_TONE: Record<AlertEventType, string> = {
 
 function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
   if (!events?.length) return null;
-  // Defensive: sort newest-first regardless of fetch order.
-  const sorted = [...events].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  // Defensive: sort newest-first regardless of fetch order, and keep at most
+  // one CREATED event per alert_id.
+  const sorted = dedupeAlertEventsForTimeline(events);
   return (
     <section className="glass rounded-2xl p-4 mb-4" aria-label="Alert events">
       <div className="flex items-center gap-2 mb-3">

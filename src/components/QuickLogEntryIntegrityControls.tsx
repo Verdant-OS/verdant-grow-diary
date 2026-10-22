@@ -48,7 +48,11 @@ import {
   QUICKLOG_RETRACTION_REASON_CHIPS,
   QUICKLOG_REVISION_NOTE_MAX_LENGTH,
   QUICKLOG_REVISION_REASON_LABELS,
+  quickLogCorrectionEnvironmentCheckReadingsNote,
   quickLogRevisionFailureCopy,
+  type QuickLogCorrectionChanges,
+  type QuickLogCorrectionSensorValues,
+  type QuickLogCorrectionValueContext,
   type QuickLogRevisionReasonCode,
 } from "@/lib/quick-log/quickLogRevisionRules";
 import type { QuickLogEntryHandle } from "@/lib/quickLogRevisionService";
@@ -66,6 +70,10 @@ export interface QuickLogEntryIntegrityControlsProps {
   currentNote?: string | null;
   currentOccurredAt?: string | null;
   currentPlantId?: string | null;
+  /** Volume, dose, or sensor values for this entry type. Omitted for other types. */
+  correctionValues?: QuickLogCorrectionValueContext | null;
+  /** Saved `details`; Environment checks get a note on readings the dialog has no field for. */
+  environmentCheckDetails?: unknown;
   /** Invalidation scope (best-effort; broad prefixes are used regardless). */
   plantId?: string | null;
   tentId?: string | null;
@@ -95,6 +103,26 @@ function useOwnedPlantOptions(enabled: boolean, ownerId: string | null) {
       return (data ?? []).map((p) => ({ id: p.id, name: p.name }));
     },
   });
+}
+
+function draftSensor(
+  values: QuickLogCorrectionValueContext | null | undefined,
+  key: keyof QuickLogCorrectionSensorValues,
+): string {
+  const value =
+    values?.kind === "sensor" || values?.kind === "watering" ? values.sensor?.[key] : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+}
+
+function volumeDraftFrom(values: QuickLogCorrectionValueContext | null | undefined): string {
+  if (
+    (values?.kind === "watering" || values?.kind === "feeding") &&
+    values.volumeMl != null &&
+    Number.isFinite(values.volumeMl)
+  ) {
+    return String(values.volumeMl);
+  }
+  return "";
 }
 
 function toDatetimeLocalValue(iso: string | null | undefined): string {
@@ -176,6 +204,8 @@ function RevisionControls({
   currentNote,
   currentOccurredAt,
   currentPlantId,
+  correctionValues,
+  environmentCheckDetails,
   plantId,
   tentId,
   growId,
@@ -193,6 +223,26 @@ function RevisionControls({
   const [noteDraft, setNoteDraft] = useState<string>(currentNote ?? "");
   const [timeDraft, setTimeDraft] = useState<string>(toDatetimeLocalValue(currentOccurredAt));
   const [plantDraft, setPlantDraft] = useState<string>(currentPlantId ?? "");
+  // A watering log saved with readings corrects its volume and readings together.
+  const editsSensor =
+    correctionValues?.kind === "sensor" ||
+    (correctionValues?.kind === "watering" && correctionValues.sensor != null);
+  const readingsNote = quickLogCorrectionEnvironmentCheckReadingsNote(environmentCheckDetails, {
+    offersAirReadingFields: editsSensor,
+  });
+  const [volumeDraft, setVolumeDraft] = useState<string>(volumeDraftFrom(correctionValues));
+  const [doseDraft, setDoseDraft] = useState<string>(
+    correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
+      ? String(correctionValues.doseAmount)
+      : "",
+  );
+  const [temperatureDraft, setTemperatureDraft] = useState<string>(
+    draftSensor(correctionValues, "temperature_c"),
+  );
+  const [humidityDraft, setHumidityDraft] = useState<string>(
+    draftSensor(correctionValues, "humidity_pct"),
+  );
+  const [vpdDraft, setVpdDraft] = useState<string>(draftSensor(correctionValues, "vpd_kpa"));
   const [explain, setExplain] = useState("");
   const [correctFailureReason, setCorrectFailureReason] = useState<string | null>(null);
   const [retractFailureReason, setRetractFailureReason] = useState<string | null>(null);
@@ -236,6 +286,15 @@ function RevisionControls({
       return;
     }
     setNoteDraft(currentNote ?? "");
+    setVolumeDraft(volumeDraftFrom(correctionValues));
+    setDoseDraft(
+      correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
+        ? String(correctionValues.doseAmount)
+        : "",
+    );
+    setTemperatureDraft(draftSensor(correctionValues, "temperature_c"));
+    setHumidityDraft(draftSensor(correctionValues, "humidity_pct"));
+    setVpdDraft(draftSensor(correctionValues, "vpd_kpa"));
     setTimeDraft(toDatetimeLocalValue(currentOccurredAt));
     setPlantDraft(currentPlantId ?? "");
     setExplain("");
@@ -255,12 +314,7 @@ function RevisionControls({
       return;
     }
     setCorrectFailureReason(null);
-    const changes: {
-      note?: string | null;
-      occurredAt?: string;
-      targetType?: "plant" | "tent";
-      targetId?: string;
-    } = {};
+    const changes: QuickLogCorrectionChanges = {};
     if ((currentNote ?? "") !== noteDraft) changes.note = noteDraft;
     const originalTime = toDatetimeLocalValue(currentOccurredAt);
     if (timeDraft && timeDraft !== originalTime) {
@@ -270,6 +324,36 @@ function RevisionControls({
     if (plantDraft && plantDraft !== (currentPlantId ?? "")) {
       changes.targetType = "plant";
       changes.targetId = plantDraft;
+    }
+    if (
+      correctionValues?.kind === "watering" ||
+      (correctionValues?.kind === "feeding" && correctionValues.volumeMl != null)
+    ) {
+      const parsed = Number(volumeDraft);
+      if (volumeDraft.trim() !== "" && parsed !== correctionValues.volumeMl) {
+        changes.volumeMl = parsed;
+        changes.volumeKind = correctionValues.kind;
+      }
+    }
+    if (correctionValues?.kind === "feeding") {
+      const parsed = Number(doseDraft);
+      if (doseDraft.trim() !== "" && parsed !== correctionValues.doseAmount) {
+        changes.doseAmount = parsed;
+      }
+    }
+    if (editsSensor && correctionValues) {
+      const sensor: QuickLogCorrectionSensorValues = {};
+      const original = correctionValues.sensor ?? {};
+      const temperature = temperatureDraft.trim() === "" ? undefined : Number(temperatureDraft);
+      const humidity = humidityDraft.trim() === "" ? undefined : Number(humidityDraft);
+      const vpd = vpdDraft.trim() === "" ? undefined : Number(vpdDraft);
+      if (temperature !== undefined && temperature !== original.temperature_c) {
+        sensor.temperature_c = temperature;
+      }
+      if (humidity !== undefined && humidity !== original.humidity_pct)
+        sensor.humidity_pct = humidity;
+      if (vpd !== undefined && vpd !== original.vpd_kpa) sensor.vpd_kpa = vpd;
+      if (Object.keys(sensor).length > 0) changes.sensorValues = sensor;
     }
     const result = await submit("correction", correctReason, changes, explain);
     if (!result) return;
@@ -367,6 +451,95 @@ function RevisionControls({
               }}
               testIdPrefix="quicklog-correct"
             />
+            {(correctionValues?.kind === "watering" ||
+              (correctionValues?.kind === "feeding" && correctionValues.volumeMl != null)) && (
+              <label className="block text-xs text-muted-foreground">
+                Volume (ml)
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={volumeDraft}
+                  onChange={(e) => {
+                    setCorrectFailureReason(null);
+                    setVolumeDraft(e.target.value);
+                  }}
+                  data-testid="quicklog-correct-volume-input"
+                  className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                />
+              </label>
+            )}
+            {correctionValues?.kind === "feeding" && (
+              <label className="block text-xs text-muted-foreground">
+                Dose
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={doseDraft}
+                  onChange={(e) => {
+                    setCorrectFailureReason(null);
+                    setDoseDraft(e.target.value);
+                  }}
+                  data-testid="quicklog-correct-dose-input"
+                  className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                />
+              </label>
+            )}
+            {readingsNote && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="quicklog-correct-readings-note"
+              >
+                {readingsNote}
+              </p>
+            )}
+            {editsSensor && (
+              <div className="space-y-2">
+                <label className="block text-xs text-muted-foreground">
+                  Temperature (°C)
+                  <input
+                    type="number"
+                    step="any"
+                    value={temperatureDraft}
+                    onChange={(e) => {
+                      setCorrectFailureReason(null);
+                      setTemperatureDraft(e.target.value);
+                    }}
+                    data-testid="quicklog-correct-temperature-input"
+                    className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                  />
+                </label>
+                <label className="block text-xs text-muted-foreground">
+                  Humidity (%)
+                  <input
+                    type="number"
+                    step="any"
+                    value={humidityDraft}
+                    onChange={(e) => {
+                      setCorrectFailureReason(null);
+                      setHumidityDraft(e.target.value);
+                    }}
+                    data-testid="quicklog-correct-humidity-input"
+                    className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                  />
+                </label>
+                <label className="block text-xs text-muted-foreground">
+                  VPD (kPa)
+                  <input
+                    type="number"
+                    step="any"
+                    value={vpdDraft}
+                    onChange={(e) => {
+                      setCorrectFailureReason(null);
+                      setVpdDraft(e.target.value);
+                    }}
+                    data-testid="quicklog-correct-vpd-input"
+                    className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                  />
+                </label>
+              </div>
+            )}
             <label className="block text-xs text-muted-foreground">
               Note
               <textarea

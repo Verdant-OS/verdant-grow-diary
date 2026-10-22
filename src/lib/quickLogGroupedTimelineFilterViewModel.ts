@@ -90,22 +90,20 @@ export function quickLogActionLabel(kind: "water" | "note"): string {
   return QUICK_LOG_ACTION_LABELS[kind];
 }
 
+/** Viewer-local label with the zone named, e.g. "Oct 21, 2026, 10:53 AM CDT". */
 export function formatQuickLogOccurredAt(iso: string | null | undefined): string {
   if (typeof iso !== "string" || iso.length === 0) return "";
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return iso;
   try {
-    return (
-      new Intl.DateTimeFormat("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone: "UTC",
-      }).format(new Date(ms)) + " UTC"
-    );
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(new Date(ms));
   } catch {
     return iso;
   }

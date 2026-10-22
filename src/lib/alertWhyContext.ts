@@ -60,7 +60,17 @@ export interface AlertWhyContextOnly {
   text: string;
 }
 
-export type AlertWhyContext = AlertWhyStageContext | AlertWhyContextOnly | AlertWhyUnavailable;
+export interface AlertWhyConfiguredTargetContext {
+  kind: "configured";
+  metric: string;
+  text: string;
+}
+
+export type AlertWhyContext =
+  | AlertWhyStageContext
+  | AlertWhyContextOnly
+  | AlertWhyConfiguredTargetContext
+  | AlertWhyUnavailable;
 
 const UNAVAILABLE: AlertWhyUnavailable = {
   kind: "unavailable",
@@ -142,6 +152,43 @@ export interface AlertLike {
   reason: string;
 }
 
+function parseConfiguredTargetFromReason(
+  metric: string,
+  reason: string,
+  tempUnit: TemperatureUnitPreference,
+): AlertWhyConfiguredTargetContext | null {
+  const m = /configured target\s+([^)]+)/i.exec(reason);
+  if (!m) return null;
+  const raw = m[1].trim().replace(/\.+$/, "");
+  if (!raw) return null;
+  if (metric === "temp" || metric === "soil_temp") {
+    const pair = /^([+-]?\d+(?:\.\d+)?)–([+-]?\d+(?:\.\d+)?)°C$/i.exec(raw);
+    if (pair && tempUnit === "fahrenheit") {
+      const minF = roundTo1(celsiusToFahrenheit(Number(pair[1])));
+      const maxF = roundTo1(celsiusToFahrenheit(Number(pair[2])));
+      return {
+        kind: "configured",
+        metric,
+        text: `Configured target: ${fmtTemp(minF)}–${fmtTemp(maxF)}°F`,
+      };
+    }
+    const single = /^([≥≤])\s*([+-]?\d+(?:\.\d+)?)°C$/i.exec(raw);
+    if (single && tempUnit === "fahrenheit") {
+      const boundF = roundTo1(celsiusToFahrenheit(Number(single[2])));
+      return {
+        kind: "configured",
+        metric,
+        text: `Configured target: ${single[1]} ${fmtTemp(boundF)}°F`,
+      };
+    }
+  }
+  return {
+    kind: "configured",
+    metric,
+    text: `Configured target: ${raw}`,
+  };
+}
+
 /**
  * Derive the "Why this alert?" display context.
  *
@@ -158,6 +205,11 @@ export function deriveAlertWhyContext(
   if (!alert || typeof alert.title !== "string") return UNAVAILABLE;
   const metric = (alert.metric ?? "").toLowerCase();
   const isStageAware = /stage range/i.test(alert.title);
+
+  if (/\b(above|below)\s+target\b/i.test(alert.title)) {
+    const configured = parseConfiguredTargetFromReason(metric, alert.reason ?? "", tempUnit);
+    if (configured) return configured;
+  }
 
   let stage: EnvStage | null = null;
   if (metric === "vpd") {

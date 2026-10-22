@@ -30,8 +30,13 @@ const ALL_CLOSED: PlantDetailDisclosureOpenState = {
 
 /** How long a hash landing keeps correcting scroll while async cards above it mount. */
 const HASH_SCROLL_FOLLOW_MS = 3000;
+/**
+ * After the last smooth alignment starts, cancel listeners stay at most this long
+ * when `scrollend` never fires (older Safari, a no-op scroll, or an aligned target).
+ */
+export const HASH_SCROLL_CANCEL_CEILING_MS = 1200;
 
-function startHashScrollFollow(anchorId: string): () => void {
+function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () => void {
   if (
     typeof document === "undefined" ||
     typeof window === "undefined" ||
@@ -41,31 +46,109 @@ function startHashScrollFollow(anchorId: string): () => void {
   }
 
   let stopped = false;
-  const stop = () => {
-    if (stopped) return;
+  let observing = true;
+  // The landing alignment and each resize correction start a smooth scroll that
+  // can still be moving after observation ends. Listeners stay until that scroll
+  // finishes (scrollend), the ceiling elapses, or the grower cancels it.
+  let scrollInFlight = false;
+  let ceilingTimer: number | null = null;
+
+  const removeInputListeners = () => {
+    window.removeEventListener("wheel", stopOnUserInput);
+    window.removeEventListener("touchmove", stopOnUserInput);
+    window.removeEventListener("touchstart", stopOnUserInput);
+    window.removeEventListener("keydown", stopOnUserInput);
+    window.removeEventListener("pointerdown", stopOnUserInput);
+    window.removeEventListener("scrollend", onScrollFinished);
+    document.removeEventListener("scrollend", onScrollFinished);
+  };
+  const clearCeiling = () => {
+    if (ceilingTimer === null) return;
+    window.clearTimeout(ceilingTimer);
+    ceilingTimer = null;
+  };
+  const releaseInputListenersIfIdle = () => {
+    if (stopped || observing || scrollInFlight) return;
     stopped = true;
+    clearCeiling();
+    removeInputListeners();
+  };
+  const noteSmoothScroll = () => {
+    scrollInFlight = true;
+    clearCeiling();
+    ceilingTimer = window.setTimeout(() => {
+      ceilingTimer = null;
+      if (stopped) return;
+      scrollInFlight = false;
+      releaseInputListenersIfIdle();
+    }, HASH_SCROLL_CANCEL_CEILING_MS);
+  };
+  const endObservation = () => {
+    if (!observing) return;
+    observing = false;
     observer.disconnect();
     window.clearTimeout(timer);
-    window.removeEventListener("wheel", stop);
-    window.removeEventListener("touchmove", stop);
-    window.removeEventListener("keydown", stop);
-    window.removeEventListener("pointerdown", stop);
+    releaseInputListenersIfIdle();
+  };
+  const onScrollFinished = () => {
+    clearCeiling();
+    scrollInFlight = false;
+    releaseInputListenersIfIdle();
+  };
+  const haltInFlightScroll = () => {
+    try {
+      window.scrollTo({
+        top: window.scrollY,
+        left: window.scrollX,
+        behavior: "instant" as ScrollBehavior,
+      });
+    } catch {
+      window.scrollTo(window.scrollX, window.scrollY);
+    }
+  };
+  const stopOnUserInput = () => {
+    if (stopped) return;
+    stopped = true;
+    observing = false;
+    scrollInFlight = false;
+    clearCeiling();
+    observer.disconnect();
+    window.clearTimeout(timer);
+    removeInputListeners();
+    onUserInput?.();
+    haltInFlightScroll();
+  };
+  const release = () => {
+    if (stopped) return;
+    stopped = true;
+    observing = false;
+    scrollInFlight = false;
+    clearCeiling();
+    observer.disconnect();
+    window.clearTimeout(timer);
+    removeInputListeners();
   };
 
   const observer = new ResizeObserver(() => {
-    if (stopped) return;
+    if (stopped || !observing) return;
     const target = document.getElementById(anchorId);
-    if (target) safelyFocusAndScroll(target);
+    if (!target) return;
+    noteSmoothScroll();
+    safelyFocusAndScroll(target);
   });
   observer.observe(document.documentElement);
-  const timer = window.setTimeout(stop, HASH_SCROLL_FOLLOW_MS);
-  window.addEventListener("wheel", stop, { passive: true });
-  window.addEventListener("touchmove", stop, { passive: true });
-  window.addEventListener("keydown", stop);
+  const timer = window.setTimeout(endObservation, HASH_SCROLL_FOLLOW_MS);
+  window.addEventListener("wheel", stopOnUserInput, { passive: true });
+  window.addEventListener("touchmove", stopOnUserInput, { passive: true });
+  window.addEventListener("touchstart", stopOnUserInput, { passive: true });
+  window.addEventListener("keydown", stopOnUserInput);
   // Section-nav and quick-action buttons navigate without changing the hash,
   // so a pointer press is the grower taking over from the landing hash.
-  window.addEventListener("pointerdown", stop, { passive: true });
-  return stop;
+  window.addEventListener("pointerdown", stopOnUserInput, { passive: true });
+  window.addEventListener("scrollend", onScrollFinished);
+  document.addEventListener("scrollend", onScrollFinished);
+  noteSmoothScroll();
+  return release;
 }
 
 interface PlantDetailDisclosureState {
@@ -119,14 +202,6 @@ export function usePlantDetailDisclosureNavigation({
     stopFollowRef.current = null;
   }, []);
 
-  const beginHashScrollFollow = useCallback(
-    (anchorId: string) => {
-      endHashScrollFollow();
-      stopFollowRef.current = startHashScrollFollow(anchorId);
-    },
-    [endHashScrollFollow],
-  );
-
   const routeScopeChanged =
     disclosureState.plantId !== plantId || disclosureState.routeHash !== location.hash;
   const openGroups = routeScopeChanged
@@ -140,6 +215,14 @@ export function usePlantDetailDisclosureNavigation({
     }
     pendingFrameRef.current = null;
   }, []);
+
+  const beginHashScrollFollow = useCallback(
+    (anchorId: string) => {
+      endHashScrollFollow();
+      stopFollowRef.current = startHashScrollFollow(anchorId, cancelPendingFrame);
+    },
+    [cancelPendingFrame, endHashScrollFollow],
+  );
 
   const scheduleNavigation = useCallback(
     (anchorId: string, preferredTarget?: HTMLElement | null) => {

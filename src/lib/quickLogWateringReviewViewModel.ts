@@ -53,7 +53,7 @@ export function buildWateringReview(
   form: QuickLogWateringFormState,
   tempUnit: TemperatureUnitPreference = "celsius",
 ): WateringReviewModel {
-  // Same bounded parser as the warning and the save path, so the review never
+  // Same bounded parser as the warning and the save path (including the 50,000 ml ceiling), so the review never
   // shows a completed record for a volume that cannot save.
   const needsInput = assessWaterVolumeText(form.volumeMl).status !== "valid";
   const measurements: WateringReviewItem[] = [];

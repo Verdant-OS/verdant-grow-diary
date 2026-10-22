@@ -26,6 +26,9 @@ import {
   type SensorCaptureRef,
 } from "@/lib/sensorCaptureRefRules";
 
+/** Source label for a generic diary snapshot (historical, not a manual envelope). */
+export const DIARY_SOURCE_LABEL = "Diary note";
+
 export const TONIGHT_TENT_HOME_COPY = {
   missing: "Missing",
   unavailable: "Unavailable",
@@ -513,7 +516,10 @@ export function buildTonightTentMetrics(input: {
       state: invalid ? "invalid" : "value",
       value: invalid ? null : best.value,
       source,
-      sourceLabel: sensorSourceLabel(source),
+      // A generic diary snapshot is historical context, never an Environment
+      // Check: the card shows it as a diary note, not "Manual" (Codex P1 on
+      // #2303 at 0994ea2a).
+      sourceLabel: best.historical && !invalid ? DIARY_SOURCE_LABEL : sensorSourceLabel(source),
       capturedAt: best.at,
       ageText: formatAgeLabel(Math.max(0, ageMs)),
       calculated: best.calculated === true,

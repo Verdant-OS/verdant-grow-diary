@@ -19,7 +19,7 @@ import type {
 import { snapshotCaptureRef } from "@/lib/sensorCaptureRefRules";
 
 /** Label for a VPD from a generic diary snapshot: historical, not current. */
-export const DIARY_SOURCE_LABEL = "Diary note";
+export { DIARY_SOURCE_LABEL } from "@/lib/tonightTentHomeViewModel";
 
 /** The row source each snapshot source projects to; unavailable projects nothing. */
 const SNAPSHOT_ROW_SOURCE: Partial<Record<string, string>> = {
@@ -34,6 +34,7 @@ import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { tentDetailCaptureClimate, tonightCaptureRejected } from "@/lib/tentDetailVpdRules";
 import {
   buildTonightTentMetrics,
+  DIARY_SOURCE_LABEL,
   TONIGHT_FUTURE_SKEW_MS,
   type TonightSensorRow,
 } from "@/lib/tonightTentHomeViewModel";

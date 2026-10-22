@@ -135,3 +135,41 @@ describe("TonightTentHomeCard", () => {
     expect(screen.queryByTestId("tonight-tent-home-log")).toBeNull();
   });
 });
+
+describe("a generic diary snapshot reads as a diary note, never Manual (Codex P1 on #2303 at 0994ea2a)", () => {
+  const blob = (source: "diary" | "manual") =>
+    buildTonightTentMetrics({
+      rows: [],
+      rowsRead: { status: "success" },
+      snapshot: {
+        status: "ok",
+        snapshot: {
+          source,
+          ts: ago(30),
+          temp: (80 - 32) / 1.8,
+          rh: 50,
+          vpd: null,
+        } as never,
+      },
+      now: NOW,
+    });
+
+  it("labels each metric of a diary blob as a diary note", () => {
+    renderCard({ metrics: blob("diary") });
+    for (const key of ["temp", "rh", "vpd"]) {
+      const metric = screen.getByTestId(`tonight-tent-home-metric-${key}`);
+      expect(metric).toHaveTextContent("Diary note");
+      expect(metric).not.toHaveTextContent(/Manual/);
+    }
+  });
+
+  it("keeps a real manual envelope labelled Manual", () => {
+    renderCard({ metrics: blob("manual") });
+    // This manual envelope carries no VPD, so only temperature and RH show a source.
+    for (const key of ["temp", "rh"]) {
+      const metric = screen.getByTestId(`tonight-tent-home-metric-${key}`);
+      expect(metric).toHaveTextContent(/Manual/);
+      expect(metric).not.toHaveTextContent("Diary note");
+    }
+  });
+});

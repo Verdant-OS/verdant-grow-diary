@@ -252,10 +252,13 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   }
   const stationKey = findKey(payload, "stationtype");
   const stationRaw = stationKey ? payload[stationKey] : undefined;
-  // A hostile upload can copy its PASSKEY into any text field; never let the
-  // credential value reach the summary (Codex P1 on #2335 at 79ce2801).
+  // A hostile upload can copy its PASSKEY, or any credential shape, into any
+  // text field; never let a credential value reach the summary (Codex P1 on
+  // #2335 at 79ce2801 and 0676e200).
   const station =
-    typeof stationRaw === "string" && !stationRaw.includes(passkey)
+    typeof stationRaw === "string" &&
+    !stationRaw.includes(passkey) &&
+    redactString(stationRaw) === stationRaw
       ? stationRaw.slice(0, MAX_SUMMARY_STRING)
       : null;
   return {
@@ -330,8 +333,12 @@ export function summarizeResponse(status: number, bodyText: string): ResponseSum
   };
 }
 
-/** Token shapes that must never appear in output, wherever they sit in a string. */
-const EMBEDDED_SECRET_RE = /\b(?:vbt|sk|sbp)_[A-Za-z0-9_-]{4,}/g;
+/**
+ * Token shapes that must never appear in output, wherever they sit in a
+ * string: no leading word boundary, so a token glued to other text (for
+ * example inside `dateutc`) is still caught (Codex P1 on #2335 at 0676e200).
+ */
+const EMBEDDED_SECRET_RE = /(?:vbt|sk|sbp)_[A-Za-z0-9_-]{4,}/g;
 /**
  * An EcoWitt PASSKEY is a 32-hex digest; scrub that shape wherever it appears,
  * including inside a longer token with adjacent text (Codex P1 on #2335 at
@@ -500,6 +507,56 @@ export interface OnceClaim {
   claimed: boolean;
 }
 
+/** Continuous mode handles at most this many messages at once. */
+export const MAX_INFLIGHT = 4;
+/** Messages waiting for a slot beyond this are dropped, with a log line. */
+export const MAX_BACKLOG = 32;
+
+export interface BoundedRunner {
+  /** Starts the job now, queues it, or drops it when the backlog is full. */
+  submit(job: () => Promise<void>): "started" | "queued" | "dropped";
+  readonly inflight: number;
+  readonly backlog: number;
+}
+
+/**
+ * Pure scheduling. Jobs run at most `maxInflight` at a time, in arrival
+ * order; a job never throws (the handler catches), so a settled job frees its
+ * slot either way. A bounded backlog keeps a burst, or a slow ingest with
+ * retries, from growing concurrent POSTs and memory without limit (Codex P2
+ * on #2335 at 0676e200).
+ */
+export function createBoundedRunner(maxInflight: number, maxBacklog: number): BoundedRunner {
+  let inflight = 0;
+  const backlog: Array<() => Promise<void>> = [];
+  const start = (job: () => Promise<void>) => {
+    inflight += 1;
+    const finish = () => {
+      inflight -= 1;
+      const next = backlog.shift();
+      if (next) start(next);
+    };
+    void job().then(finish, finish);
+  };
+  return {
+    submit(job) {
+      if (inflight < maxInflight) {
+        start(job);
+        return "started";
+      }
+      if (backlog.length >= maxBacklog) return "dropped";
+      backlog.push(job);
+      return "queued";
+    },
+    get inflight() {
+      return inflight;
+    },
+    get backlog() {
+      return backlog.length;
+    },
+  };
+}
+
 export interface MessageHandlerDeps {
   flags: ForwarderFlags;
   env: ForwarderEnv;
@@ -509,19 +566,24 @@ export interface MessageHandlerDeps {
   onDone: (exitCode: number) => void;
   /** Shared claim; a private one is used when the caller passes none. */
   claim?: OnceClaim;
+  /** Continuous-mode scheduler; the default bounds are MAX_INFLIGHT / MAX_BACKLOG. */
+  runner?: BoundedRunner;
 }
 
 /**
  * The MQTT "message" listener. The EventEmitter does not await it, so in
  * `--once` mode the first message is claimed synchronously, before any
  * await, and every later delivery is ignored: one live POST at most
- * (Copilot on #2335). A throw inside the handler is logged, never left as an
- * unhandled rejection.
+ * (Copilot on #2335). In continuous mode every message goes through a
+ * bounded runner, so a burst never fans out into unbounded concurrent POSTs
+ * and retries (Codex P2 at 0676e200). A throw inside the handler is logged,
+ * never left as an unhandled rejection.
  */
 export function createMessageHandler(
   deps: MessageHandlerDeps,
 ): (topic: string, buf: Buffer | string) => void {
   const claim: OnceClaim = deps.claim ?? { claimed: false };
+  const runner = deps.runner ?? createBoundedRunner(MAX_INFLIGHT, MAX_BACKLOG);
   return (_topic, buf) => {
     if (deps.flags.once) {
       if (claim.claimed) {
@@ -531,7 +593,7 @@ export function createMessageHandler(
       claim.claimed = true;
     }
     const text = typeof buf === "string" ? buf : buf.toString("utf8");
-    void (async () => {
+    const job = async () => {
       let exitCode = 1;
       try {
         const outcome = await handleMessage({
@@ -548,7 +610,15 @@ export function createMessageHandler(
         log("handler_error", { error: e instanceof Error ? e.message : "unknown" });
       }
       if (deps.flags.once) deps.onDone(exitCode);
-    })();
+    };
+    if (runner.submit(job) === "dropped") {
+      log("dropped_backlog_full", {
+        inflight: runner.inflight,
+        backlog: runner.backlog,
+        max_inflight: MAX_INFLIGHT,
+        max_backlog: MAX_BACKLOG,
+      });
+    }
   };
 }
 
@@ -603,6 +673,17 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
     });
   });
   client.on("error", (e: Error) => fatal("mqtt_error", { error: e.message }));
+  // A broker disconnect in `--once` mode has nothing to reconnect for
+  // (reconnectPeriod is 0): end the run instead of idling until the connect
+  // timer, or forever once connected (Codex P2 on #2335 at 0676e200). After
+  // the one message is claimed `fatal` only logs. Continuous mode logs the
+  // event and leaves the client's own reconnect to it.
+  for (const event of ["close", "offline"] as const) {
+    client.on(event, () => {
+      if (deps.flags.once) fatal(`mqtt_${event}`);
+      else log(`mqtt_${event}`, { reconnecting: true });
+    });
+  }
 }
 
 async function connectMqtt(flags: ForwarderFlags, env: ForwarderEnv): Promise<any> {

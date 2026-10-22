@@ -11,6 +11,9 @@ import {
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
   buildForwardRequest,
+  createBoundedRunner,
+  MAX_BACKLOG,
+  MAX_INFLIGHT,
   createMessageHandler,
   fullJitterDelayMs,
   handleMessage,
@@ -552,6 +555,22 @@ describe("redaction", () => {
     expect(JSON.stringify(nested)).not.toContain(FAKE_HEX32);
   });
 
+  it("redacts a token glued to other text, with no word boundary before it (Codex P1 at 0676e200)", () => {
+    expect(redactString(`2026-10-22${FAKE_BRIDGE_TOKEN}`)).not.toMatch(/vbt_/);
+    expect(redactString(`x${NOT_A_BRIDGE_TOKEN}`)).not.toMatch(/sk_/);
+    const nested = redactForLog({ summary: { dateutc: `05:27:14${FAKE_BRIDGE_TOKEN}` } });
+    expect(JSON.stringify(nested)).not.toMatch(/vbt_/);
+  });
+
+  it("drops a stationtype that carries any credential shape, not only the PASSKEY (Codex P1 at 0676e200)", () => {
+    for (const stationtype of [`GW3000B_${FAKE_BRIDGE_TOKEN}`, `GW${FAKE_HEX32}`]) {
+      const out = prepareForwardPayload(
+        JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: "2026-10-22 05:27:14", stationtype }),
+      );
+      expect(out.ok && out.summary.station).toBeNull();
+    }
+  });
+
   it("redacts broker URL credentials in the startup fields", () => {
     expect(redactString(`wss://broker/mqtt?token=${FAKE_BRIDGE_TOKEN}`)).toBe(
       "wss://broker/mqtt?token=(redacted)",
@@ -597,6 +616,71 @@ describe("createMessageHandler (--once)", () => {
     });
     handle("ecowitt/grow", GATEWAY_MESSAGE);
     await vi.waitFor(() => expect(onDone).toHaveBeenCalledWith(1));
+  });
+});
+
+describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => {
+  it("runs at most maxInflight jobs, queues up to maxBacklog, drops the rest, in arrival order", async () => {
+    const runner = createBoundedRunner(2, 1);
+    const releases: Array<() => void> = [];
+    const started: number[] = [];
+    const job = (n: number) => () =>
+      new Promise<void>((resolve) => {
+        started.push(n);
+        releases.push(resolve);
+      });
+    expect(runner.submit(job(1))).toBe("started");
+    expect(runner.submit(job(2))).toBe("started");
+    expect(runner.submit(job(3))).toBe("queued");
+    expect(runner.submit(job(4))).toBe("dropped");
+    expect(started).toEqual([1, 2]);
+    expect(runner.inflight).toBe(2);
+    expect(runner.backlog).toBe(1);
+    releases[0]();
+    await vi.waitFor(() => expect(started).toEqual([1, 2, 3]));
+    expect(runner.backlog).toBe(0);
+    expect(runner.inflight).toBe(2);
+  });
+
+  it("a rejected job still frees its slot", async () => {
+    const runner = createBoundedRunner(1, 4);
+    runner.submit(() => Promise.reject(new Error("boom")));
+    const ran = vi.fn(async () => {});
+    runner.submit(ran);
+    await vi.waitFor(() => expect(ran).toHaveBeenCalledTimes(1));
+  });
+
+  it("the live handler never has more than MAX_INFLIGHT POSTs in flight and drops beyond the backlog", async () => {
+    const releases: Array<(r: Response) => void> = [];
+    const fetchImpl = vi.fn(() => new Promise<Response>((resolve) => releases.push(resolve)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const handle = createMessageHandler({
+        flags: flags({ live: true }),
+        env: LIVE_ENV,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        onDone: () => {},
+      });
+      const total = MAX_INFLIGHT + MAX_BACKLOG + 3;
+      for (let i = 0; i < total; i += 1) handle("ecowitt/grow", GATEWAY_MESSAGE);
+      await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(MAX_INFLIGHT));
+      const drops = logSpy.mock.calls.filter((c) => String(c[0]).includes("dropped_backlog_full"));
+      expect(drops).toHaveLength(3);
+      // Releasing one POST admits exactly one queued message.
+      releases[0](new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+      await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(MAX_INFLIGHT + 1));
+      // Each released POST admits one queued message, whose own resolver only
+      // appears after it starts; drain in rounds until the backlog is spent.
+      while (fetchImpl.mock.calls.length < MAX_INFLIGHT + MAX_BACKLOG) {
+        const seen = fetchImpl.mock.calls.length;
+        for (const release of releases.splice(0))
+          release(new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+        await vi.waitFor(() => expect(fetchImpl.mock.calls.length).toBeGreaterThan(seen));
+      }
+      expect(fetchImpl).toHaveBeenCalledTimes(MAX_INFLIGHT + MAX_BACKLOG);
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 });
 
@@ -646,6 +730,48 @@ describe("attachClientLifecycle (--once broker failures)", () => {
     handler("ecowitt/grow", SANITY_MESSAGE);
     expect(claim.claimed).toBe(true);
     client.emit("error", new Error("Connection lost"));
+    expect(onFatal).not.toHaveBeenCalled();
+  });
+
+  it.each(["close", "offline"] as const)(
+    "exits 2 once when the broker connection drops (%s) before a message is claimed (Codex P2 at 0676e200)",
+    (event) => {
+      const client = fakeClient();
+      const onFatal = vi.fn();
+      attachClientLifecycle(client, {
+        flags: flags({ once: true }),
+        onFatal,
+        connectTimeoutMs: 60_000,
+      });
+      client.emit("connect");
+      client.emit(event);
+      client.emit(event);
+      expect(onFatal).toHaveBeenCalledTimes(1);
+      expect(onFatal).toHaveBeenCalledWith(2);
+    },
+  );
+
+  it("logs instead of exiting when the connection drops after the --once message is claimed", () => {
+    const claim: OnceClaim = { claimed: true };
+    const client = fakeClient();
+    const onFatal = vi.fn();
+    attachClientLifecycle(client, {
+      flags: flags({ once: true }),
+      onFatal,
+      connectTimeoutMs: 60_000,
+      claim,
+    });
+    client.emit("close");
+    client.emit("offline");
+    expect(onFatal).not.toHaveBeenCalled();
+  });
+
+  it("never exits on close/offline in continuous mode; the client reconnects", () => {
+    const client = fakeClient();
+    const onFatal = vi.fn();
+    attachClientLifecycle(client, { flags: flags(), onFatal, connectTimeoutMs: 60_000 });
+    client.emit("close");
+    client.emit("offline");
     expect(onFatal).not.toHaveBeenCalled();
   });
 

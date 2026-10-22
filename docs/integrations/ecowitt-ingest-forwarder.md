@@ -76,6 +76,12 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
   arriving while the first is in flight is ignored, never forwarded. Once that
   message is claimed, a broker error is logged and does not abort its POST;
   the message's own result sets the exit code.
+- `--once` also exits `2` when the broker connection closes or goes offline
+  before a message is claimed; there is nothing to reconnect for.
+- Continuous mode handles at most 4 messages at once and queues at most 32
+  more; anything beyond that is dropped with a `dropped_backlog_full` log line,
+  so a burst or a slow ingest never fans out into unbounded POSTs and retries.
+  A broker close/offline is logged and left to the client's own reconnect.
 - Logs and reports pass through a redactor at every depth: `PASSKEY`, `MAC`,
   tokens (also when embedded in another string or a URL) and MQTT credentials
   never appear. The Mosquitto watcher window still shows the raw topic, so

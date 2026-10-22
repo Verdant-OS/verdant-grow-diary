@@ -6,7 +6,7 @@
  * local storage still held the Celsius override that a reload would restore.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import Settings from "@/pages/Settings";
 import {
@@ -55,5 +55,19 @@ describe("Settings · Units tile reset with a stored override", () => {
     expect(getLocalStorageItemForTest("verdant:temperatureUnit")).toBeNull();
     expect(screen.getByTestId("temperature-unit-option-fahrenheit")).toBeChecked();
     expect(screen.getByTestId("temperature-unit-reset")).toBeDisabled();
+  });
+
+  it("enables Reset when another tab saves an override, keeping the unsaved choice (Codex P2 at f752598a)", () => {
+    renderSettings();
+    expect(screen.getByTestId("temperature-unit-option-fahrenheit")).toBeChecked();
+    expect(screen.getByTestId("temperature-unit-reset")).toBeDisabled();
+
+    setLocalStorageItemForTest("verdant:temperatureUnit", "celsius");
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: "verdant:temperatureUnit" }));
+    });
+
+    expect(screen.getByTestId("temperature-unit-option-fahrenheit")).toBeChecked();
+    expect(screen.getByTestId("temperature-unit-reset")).toBeEnabled();
   });
 });

@@ -3,8 +3,9 @@
  *
  * Filming bug #9 (2026-10-22): with Celsius saved, the always-visible
  * "Use Fahrenheit default" button read like a status line contradicting the
- * checked Celsius radio. Reset is now a plain action, and it is disabled when
- * the default is already selected.
+ * checked Celsius radio. Reset is now a plain action, and it is disabled only
+ * when the default is selected and no non-default override is still stored
+ * (see temperature-unit-reset-stored-override.test.tsx).
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";

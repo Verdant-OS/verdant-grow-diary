@@ -432,8 +432,9 @@ describe("the capture gate joins climate by record identity (Codex P1 on #2303 a
 
 describe("the capture gate treats stuck humidity as fault telemetry (Codex P1 on #2303 at 4bd3fae7)", () => {
   const T = at(1);
-  // The shared RH_STUCK_VALUES (0 and 100), as every sensor-truth surface uses them.
-  it.each([0, 100])("rejects a direct VPD whose own capture holds RH %s%%", (rh) => {
+  // 0 and 100 are RH_STUCK_VALUES. 1 is the snapshot-quality sensor-fault
+  // value evaluateSensorQuality already flags, which Codex named alongside them.
+  it.each([0, 1, 100])("rejects a direct VPD whose own capture holds RH %s%%", (rh) => {
     const rows = [
       { metric: "vpd_kpa", value: 1.2, captured_at: T, source: "live" },
       { metric: "temperature_c", value: 24, captured_at: T, source: "live" },

@@ -400,6 +400,21 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     );
   });
 
+  it("withholds a cross-capture VPD whose capture holds stuck RH 1% (Codex P1 at 4bd3fae7)", () => {
+    const badAt = at(0.2);
+    const rows = [
+      row("temperature_c", 24, badAt, "live"),
+      row("humidity_pct", 1, badAt, "live"),
+      row("vpd_kpa", 1.2, badAt, "live"),
+      row("co2_ppm", 800, at(0.05), "live"),
+    ];
+    expect(dashboardVpd(rows)).toMatchObject({ state: "value", value: 1.2 });
+    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toMatchObject({ rejected: true });
+    const vpd = renderStrip(rows);
+    expect(vpd.textContent ?? "").not.toContain("1.2");
+    expect(vpd).not.toHaveAttribute("data-status", "ok");
+  });
+
   it("withholds a cross-capture VPD whose capture has an impossible RH (Codex P1 at 3d1e5800)", () => {
     const badAt = at(0.2);
     const rows = [

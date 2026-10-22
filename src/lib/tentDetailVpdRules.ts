@@ -154,9 +154,12 @@ function climateUnrealistic(climate: { temp: number | null; rh: number | null })
   return (
     !classifyManualMetric("temperature_c", climate.temp).valid ||
     !classifyManualMetric("humidity_pct", climate.rh).valid ||
-    // RH stuck at 0, 1 or 100 % is in range but known fault telemetry
-    // (Codex P1 on #2303 at 4bd3fae7).
-    isHumidityStuckExtreme(climate.rh)
+    // RH 0 and 100: shared isHumidityStuckExtreme (RH_STUCK_VALUES).
+    // RH 1: snapshot-quality sensor-fault set in evaluateSensorQuality,
+    // which Codex named with 0 and 100. Left out of RH_STUCK_VALUES so
+    // other sensor-truth surfaces stay unchanged (Codex P1 on #2303 at 4bd3fae7).
+    isHumidityStuckExtreme(climate.rh) ||
+    climate.rh === 1
   );
 }
 

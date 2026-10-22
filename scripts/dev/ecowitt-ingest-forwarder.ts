@@ -20,7 +20,12 @@
  *     VERDANT_BRIDGE_TOKEN has the `vbt_` shape. The POST never follows a
  *     redirect, times out after LIVE_REQUEST_TIMEOUT_MS, and retries only the
  *     transient cases in docs/bridge-client-retry-guidance.md with Full Jitter.
- *   - A message over MAX_MESSAGE_BYTES is rejected before it is parsed.
+ *   - A message over MAX_MESSAGE_BYTES is rejected before it is parsed. MQTT.js
+ *     buffers a whole PUBLISH before this check runs, so the broker you point
+ *     it at is part of the trust boundary.
+ *   - Summaries carry only format-checked fields: `dateutc` must be the EcoWitt
+ *     `YYYY-MM-DD HH:MM:SS` form and `stationtype` a firmware id; anything else
+ *     is rejected or omitted rather than echoed.
  *   - EcoWitt ingest is dry-run only until the gates in
  *     docs/ecowitt-future-real-ingest-gates.md are cleared by the owner.
  *     `--live` is the tool for the canary and for ingest after that; it is
@@ -29,7 +34,7 @@
  * Hard safety rules (enforced by src/test/ecowitt-ingest-forwarder-safety.test.ts):
  *   - No Supabase SDK import. No service_role. No direct DB writes.
  *   - No Action Queue writes. No alert creation. No automation. No device control.
- *   - Never logs or writes PASSKEY, MAC, the bridge token, or MQTT credentials.
+ *   - Never logs PASSKEY, MAC, the bridge token, or MQTT credentials. Writes no files.
  *   - Only ever POSTs to the approved `ecowitt-ingest` URL, and only with
  *     `--live`. An accepted live POST asks that edge function to persist
  *     sensor_readings and bridge-token usage; the forwarder itself has no
@@ -39,9 +44,10 @@
  *   --live             POST to ECOWITT_INGEST_URL. Default is dry-run: it still connects to
  *                      the MQTT broker and subscribes, but never sends the ingest POST.
  *   --once             Handle one message, then exit (0 = forwarded/accepted or dry-run; 1 otherwise).
- *   --write-report     Write a redacted report to ./tmp/ecowitt-forwarder-last-report.json.
  *   --topic <t>        MQTT topic (default ecowitt/grow or ECOWITT_MQTT_TOPIC).
  *   --mqtt-url <url>   Broker (default mqtt://127.0.0.1:1883 or ECOWITT_MQTT_URL).
+ *   Any other argument, a repeated flag, or a value flag without a non-empty
+ *   value is refused before any connection.
  *
  * Env:
  *   ECOWITT_INGEST_URL     https://<project-ref>.supabase.co/functions/v1/ecowitt-ingest (live only)
@@ -51,8 +57,6 @@
 
 export const DEFAULT_MQTT_URL = "mqtt://127.0.0.1:1883";
 export const DEFAULT_MQTT_TOPIC = "ecowitt/grow";
-export const DEFAULT_REPORT_PATH = "./tmp/ecowitt-forwarder-last-report.json";
-export const TRANSPORT = "ecowitt_mqtt_ingest_forwarder";
 /** The Verdant Supabase project (the same ref as VITE_SUPABASE_URL in .env). */
 export const VERDANT_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 /**
@@ -68,6 +72,10 @@ export const APPROVED_INGEST_URLS: readonly string[] = [
 export const MAX_MESSAGE_BYTES = 64 * 1024;
 /** Summary strings copied from the payload are capped before they are logged. */
 export const MAX_SUMMARY_STRING = 64;
+/** The ingest response is read up to this many bytes; a longer body is cancelled. */
+export const MAX_RESPONSE_BYTES = 16 * 1024;
+/** The dropped-reason aggregate names at most this many channel keys. */
+export const MAX_DROPPED_CHANNELS = 16;
 /** Live POST timeout and Full Jitter retry policy (docs/bridge-client-retry-guidance.md §4). */
 export const LIVE_REQUEST_TIMEOUT_MS = 15_000;
 export const LIVE_RETRY_POLICY = { maxRetries: 4, baseDelayMs: 3_000, maxDelayMs: 45_000 } as const;
@@ -76,7 +84,7 @@ export const MQTT_CONNECT_TIMEOUT_MS = 20_000;
 
 /** Keys the HTTP bridge wraps around the gateway payload; not gateway fields. */
 const BRIDGE_WRAPPER_KEYS = new Set(["received_at", "transport", "topic"]);
-/** Never logged, never written to a report. */
+/** Never logged. */
 const SECRET_KEY_RE = /passkey|^mac$|token|secret|password|api_key|application_key|app_key/i;
 // The same keys `supabase/functions/_shared/ecowittChannelTentRouter.ts` routes:
 // `temp{n}f` and `humidity{n}` for air, `soilmoisture{n}` for soil. Anything else
@@ -85,11 +93,14 @@ const SECRET_KEY_RE = /passkey|^mac$|token|secret|password|api_key|application_k
 const AIR_TEMP_F_RE = /^temp([1-8])f$/i;
 const AIR_HUMIDITY_RE = /^humidity([1-8])$/i;
 const SOIL_CHANNEL_RE = /^soilmoisture([1-8])$/i;
+/** The only `dateutc` form `ecowitt-ingest` accepts (`parseEcoWittDateUtc`). */
+const DATEUTC_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;
+/** A gateway firmware id: letters and digits, `_V`, then a dotted version. */
+const STATIONTYPE_RE = /^[A-Za-z][A-Za-z0-9]{1,23}_V\d{1,3}(?:\.\d{1,3}){1,3}$/;
 
 export interface ForwarderFlags {
   live: boolean;
   once: boolean;
-  writeReport: boolean;
   topic: string;
   mqttUrl: string;
 }
@@ -101,27 +112,44 @@ export interface ForwarderEnv {
   mqttPassword: string | null;
 }
 
+const BOOLEAN_FLAGS = new Set(["--live", "--once"]);
+const VALUE_FLAGS = new Set(["--topic", "--mqtt-url"]);
+
 /**
- * Pure. Throws `missing_option_value:<flag>` when a value-taking flag is last
- * or followed by another option, so `--mqtt-url --once` never reaches the
- * broker with `--once` as its URL (Codex P2 on #2335 at acab6b12).
+ * Pure. Reads argv in order and throws on anything it does not recognise, so a
+ * malformed invocation never reaches the broker: an unknown argument
+ * (`unknown_option:<arg>`), a repeated flag (`duplicate_option:<flag>`), or a
+ * value flag that is last, followed by another option
+ * (`missing_option_value:<flag>`) or given an empty value
+ * (`empty_option_value:<flag>`) (Codex P2 on #2335 at acab6b12 and bae4ae77).
+ * A bare `--` separator is skipped. Blank env values count as unset.
  */
 export function parseFlags(argv: readonly string[], env: NodeJS.ProcessEnv): ForwarderFlags {
-  const get = (name: string): string | undefined => {
-    const i = argv.indexOf(name);
-    if (i < 0) return undefined;
-    const value = argv[i + 1];
-    if (value === undefined || value.startsWith("--")) {
-      throw new Error(`missing_option_value:${name}`);
+  const seen = new Set<string>();
+  const values = new Map<string, string>();
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--") continue;
+    if (!BOOLEAN_FLAGS.has(arg) && !VALUE_FLAGS.has(arg)) {
+      throw new Error(`unknown_option:${arg}`);
     }
-    return value;
-  };
+    if (seen.has(arg)) throw new Error(`duplicate_option:${arg}`);
+    seen.add(arg);
+    if (VALUE_FLAGS.has(arg)) {
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith("--")) {
+        throw new Error(`missing_option_value:${arg}`);
+      }
+      if (!value.trim()) throw new Error(`empty_option_value:${arg}`);
+      values.set(arg, value);
+      i += 1;
+    }
+  }
   return {
-    live: argv.includes("--live"),
-    once: argv.includes("--once"),
-    writeReport: argv.includes("--write-report"),
-    topic: get("--topic") ?? env.ECOWITT_MQTT_TOPIC ?? DEFAULT_MQTT_TOPIC,
-    mqttUrl: get("--mqtt-url") ?? env.ECOWITT_MQTT_URL ?? DEFAULT_MQTT_URL,
+    live: seen.has("--live"),
+    once: seen.has("--once"),
+    topic: values.get("--topic") ?? (env.ECOWITT_MQTT_TOPIC?.trim() || DEFAULT_MQTT_TOPIC),
+    mqttUrl: values.get("--mqtt-url") ?? (env.ECOWITT_MQTT_URL?.trim() || DEFAULT_MQTT_URL),
   };
 }
 
@@ -244,9 +272,12 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   if (passkey === undefined || passkey === null) return { ok: false, reason: "missing_passkey" };
   if (typeof passkey !== "string") return { ok: false, reason: "invalid_passkey" };
   if (!passkey.trim()) return { ok: false, reason: "missing_passkey" };
-  // The extracted value is a credential whatever its shape: from here on the
-  // redactor scrubs it literally and case-insensitively (Codex P1 at acab6b12).
-  registerSecretValue(passkey);
+  // Message-scoped: this upload's PASSKEY, whatever its length or shape, is
+  // checked against this upload's own fields only, case-insensitively. Nothing
+  // is remembered across messages, so one frame cannot change how a later
+  // frame is judged (Codex P1 on #2335 at bae4ae77).
+  const passkeyLower = passkey.trim().toLowerCase();
+  const echoesPasskey = (value: string) => value.toLowerCase().includes(passkeyLower);
   const dateutcKey = findKey(payload, "dateutc");
   const dateutcRaw = dateutcKey ? payload[dateutcKey] : undefined;
   if (dateutcRaw === undefined || dateutcRaw === null) {
@@ -257,9 +288,13 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   // PASSKEY in `dateutc` beside other text would otherwise reach the summary,
   // where the standalone-shape redactor cannot see it (Codex P1 on #2335 at
   // 3df0e691). Checked before truncation so a cut fragment cannot slip through.
-  if (containsSecret(dateutcRaw)) return { ok: false, reason: "invalid_dateutc" };
-  const dateutc = dateutcRaw.trim().slice(0, MAX_SUMMARY_STRING);
+  if (echoesPasskey(dateutcRaw)) return { ok: false, reason: "invalid_dateutc" };
+  const dateutc = dateutcRaw.trim();
   if (!dateutc) return { ok: false, reason: "missing_dateutc" };
+  // Only the EcoWitt form `ecowitt-ingest` itself accepts
+  // (parseEcoWittDateUtc). A free-form value could carry any encoding of a
+  // secret, so it is refused here rather than echoed (Codex P1 at bae4ae77).
+  if (!DATEUTC_RE.test(dateutc)) return { ok: false, reason: "invalid_dateutc" };
 
   const air = new Set<number>();
   const soil = new Set<number>();
@@ -274,9 +309,14 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   // A hostile upload can copy its PASSKEY, or any credential shape, into any
   // text field; never let a credential value reach the summary (Codex P1 on
   // #2335 at 79ce2801 and 0676e200).
+  // A firmware id such as `GW3000B_V1.2.4`, or nothing: no free-form text, no
+  // echo of this upload's PASSKEY in any case, and no credential shape.
   const station =
-    typeof stationRaw === "string" && !containsSecret(stationRaw)
-      ? stationRaw.slice(0, MAX_SUMMARY_STRING)
+    typeof stationRaw === "string" &&
+    STATIONTYPE_RE.test(stationRaw) &&
+    !echoesPasskey(stationRaw) &&
+    redactString(stationRaw) === stationRaw
+      ? stationRaw
       : null;
   return {
     ok: true,
@@ -322,32 +362,105 @@ export function buildForwardRequest(
   };
 }
 
+export interface DroppedSummary {
+  /** Count per documented router reason code; anything else counts as `other`. */
+  reasons: Record<string, number>;
+  /** Router channel keys (`temp{n}f`, `humidity{n}`, `soilmoisture{n}`) that were dropped. */
+  channels: string[];
+}
+
 export interface ResponseSummary {
   status: number;
   accepted: boolean | null;
   inserted: number | null;
   skipped_duplicate: number | null;
   reason: string | null;
+  dropped: DroppedSummary | null;
 }
 
-/** Pure. Keeps only the documented response fields; never echoes the body. */
-export function summarizeResponse(status: number, bodyText: string): ResponseSummary {
+/** The reason codes `ecowittChannelTentRouter` puts in `dropped[]`. */
+const DROPPED_REASON_CODES = new Set([
+  "no_passkey_in_payload",
+  "fingerprint_mismatch",
+  "channel_value_missing_or_invalid",
+  "channel_value_out_of_plausible_range",
+  "no_eligible_tent_for_channel",
+]);
+const ROUTER_CHANNEL_KEY_RE = /^(?:temp[1-8]f|humidity[1-8]|soilmoisture[1-8])$/i;
+/** A reason or error code: lower-case words, never free text. */
+const RESPONSE_CODE_RE = /^[a-z0-9_]{1,64}$/;
+
+/**
+ * Pure. Why an upload stored nothing lives only in `dropped[]` (Codex P2 on
+ * #2335 at acab6b12): keep a count per documented reason code and the router
+ * channel keys involved. Tenant ids, metrics and any other text are never copied.
+ */
+function summarizeDropped(value: unknown): DroppedSummary | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const reasons: Record<string, number> = {};
+  const channels = new Set<string>();
+  for (const entry of value.slice(0, 256)) {
+    if (!entry || typeof entry !== "object") continue;
+    const { reason, channel_key: channelKey } = entry as Record<string, unknown>;
+    const code = typeof reason === "string" && DROPPED_REASON_CODES.has(reason) ? reason : "other";
+    reasons[code] = (reasons[code] ?? 0) + 1;
+    if (typeof channelKey === "string" && ROUTER_CHANNEL_KEY_RE.test(channelKey)) {
+      channels.add(channelKey.toLowerCase());
+    }
+  }
+  return { reasons, channels: [...channels].sort().slice(0, MAX_DROPPED_CHANNELS) };
+}
+
+/**
+ * Pure. Keeps only the documented response fields; never echoes the body.
+ * `bodyText` is null when the body exceeded MAX_RESPONSE_BYTES.
+ */
+export function summarizeResponse(status: number, bodyText: string | null): ResponseSummary {
   let body: Record<string, unknown> = {};
-  try {
-    const v = JSON.parse(bodyText);
-    if (v && typeof v === "object" && !Array.isArray(v)) body = v as Record<string, unknown>;
-  } catch {
-    body = {};
+  if (bodyText !== null) {
+    try {
+      const v = JSON.parse(bodyText);
+      if (v && typeof v === "object" && !Array.isArray(v)) body = v as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
   }
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-  const str = (v: unknown) => (typeof v === "string" && v.length <= 80 ? v : null);
+  const code = (v: unknown) => (typeof v === "string" && RESPONSE_CODE_RE.test(v) ? v : null);
   return {
     status,
     accepted: typeof body.accepted === "boolean" ? body.accepted : null,
     inserted: num(body.inserted),
     skipped_duplicate: num(body.skipped_duplicate),
-    reason: str(body.reason) ?? str(body.error),
+    reason: bodyText === null ? "response_too_large" : (code(body.reason) ?? code(body.error)),
+    dropped: summarizeDropped(body.dropped),
   };
+}
+
+/**
+ * Reads at most `maxBytes` of a response body and cancels the rest, so a large
+ * or endless body is never buffered whole (Codex P2 on #2335 at acab6b12 and
+ * bae4ae77). Returns null when the body is longer than `maxBytes`.
+ */
+export async function readBoundedText(
+  response: Response,
+  maxBytes: number = MAX_RESPONSE_BYTES,
+): Promise<string | null> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
 /**
@@ -385,48 +498,40 @@ const URL_USERINFO_RE = /(\/\/)[^/\s]*@/g;
 const URL_SECRET_QUERY_RE = /([?&](?:token|key|api_key|password|passkey|secret)=)[^&\s]*/gi;
 
 /**
- * Credential values known at run time: the PASSKEY extracted from each
- * message, and the MQTT username and password from the environment or the
- * broker URL. A PASSKEY need not be a 32-hex digest, and a hostile field can
- * echo it in another case or URI-encoded, so these are scrubbed literally,
- * case-insensitively and in their encoded form, ahead of the shape rules
- * (Codex P1 on #2335 at acab6b12). Values under 4 characters are not
- * registered: they would redact ordinary text.
+ * The MQTT username and password this run was configured with (environment
+ * or broker URL userinfo). They are scrubbed from every log line literally,
+ * case-insensitively and URI-encoded, at any length: over-redacting ordinary
+ * text in a log is harmless (Codex P1 on #2335 at acab6b12 and bae4ae77).
+ * Upload PASSKEYs are never stored here; they are checked per message.
  */
-const knownSecrets = new Set<string>();
+const configuredSecrets = new Set<string>();
 
-export function registerSecretValue(value: string | null | undefined): void {
-  if (typeof value !== "string" || value.length < 4) return;
-  knownSecrets.add(value);
-  const encoded = encodeURIComponent(value);
-  if (encoded !== value) knownSecrets.add(encoded);
-}
-
-/** Test seam: forgets every registered value. */
-export function clearSecretValues(): void {
-  knownSecrets.clear();
+/** Replaces the configured credential set. Called once by `main`. */
+export function setConfiguredSecrets(values: readonly string[]): void {
+  configuredSecrets.clear();
+  for (const value of values) {
+    if (!value) continue;
+    configuredSecrets.add(value);
+    const encoded = encodeURIComponent(value);
+    if (encoded !== value) configuredSecrets.add(encoded);
+  }
 }
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function redactKnownSecrets(value: string): string {
+function redactConfiguredSecrets(value: string): string {
   let out = value;
-  for (const secret of knownSecrets) {
+  for (const secret of configuredSecrets) {
     out = out.replace(new RegExp(escapeRegExp(secret), "gi"), "(redacted)");
   }
   return out;
 }
 
-/** Pure given the registry. True when the redactor would change the string. */
-export function containsSecret(value: string): boolean {
-  return redactString(value) !== value;
-}
-
-/** Pure given the registry. Redacts known values, credential shapes and URL credentials inside one string. */
+/** Redacts configured credentials, credential shapes and URL credentials inside one string. */
 export function redactString(value: string): string {
-  return redactKnownSecrets(value)
+  return redactConfiguredSecrets(value)
     .replace(EMBEDDED_SECRET_RE, "(redacted)")
     .replace(MAC_RE, "(redacted)")
     .replace(HEX32_RE, "(redacted)")
@@ -535,7 +640,7 @@ export async function handleMessage(args: {
           attempts: attempt + 1,
         };
       }
-      const response = summarizeResponse(r.status, await r.text());
+      const response = summarizeResponse(r.status, await readBoundedText(r));
       // A retryable status (408/429/5xx) with retries left falls through to the sleep below.
       if (!isRetryableStatus(r.status) || attempt >= maxRetries) {
         return { kind: "forwarded", summary: prepared.summary, response, attempts: attempt + 1 };
@@ -568,71 +673,6 @@ export function onceExitCode(outcome: ForwardOutcome): number {
 
 function log(event: string, fields: Record<string, unknown> = {}): void {
   console.log(`[ecowitt-forwarder] ${event}`, redactForLog(fields));
-}
-
-/**
- * Pure. The `--write-report` document, redacted as a whole: the configured
- * topic is operator input and can carry a token shape just as the outcome can
- * (Codex P1 on #2335 at 3c16b6a4).
- */
-export function buildReport(
-  outcome: ForwardOutcome,
-  flags: ForwarderFlags,
-  writtenAt: string,
-): Record<string, unknown> {
-  return redactForLog({
-    transport: TRANSPORT,
-    written_at: writtenAt,
-    live: flags.live,
-    topic: flags.topic,
-    outcome: outcome as unknown as Record<string, unknown>,
-  });
-}
-
-export interface SerialQueue {
-  /** Runs `task` after every task submitted before it has settled. */
-  run<T>(task: () => Promise<T>): Promise<T>;
-}
-
-/**
- * Pure scheduling. One shared file must not be written by two jobs at once:
- * the bounded runner allows up to MAX_INFLIGHT jobs, so report writes are
- * serialised separately (Codex P2 on #2335 at 5a7accaf). A failed task never
- * blocks the next.
- */
-export function createSerialQueue(): SerialQueue {
-  let tail: Promise<unknown> = Promise.resolve();
-  return {
-    run(task) {
-      const next = tail.then(task, task);
-      tail = next.then(
-        () => undefined,
-        () => undefined,
-      );
-      return next;
-    },
-  };
-}
-
-const reportWrites = createSerialQueue();
-
-/**
- * The production report writer: one write at a time through `reportWrites`,
- * and the previous report is replaced only once the new document is complete
- * (temporary file in the same directory, then rename), so an interrupted
- * write never leaves an empty or partial file (Codex P2 on #2335 at acab6b12).
- */
-export function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Promise<void> {
-  return reportWrites.run(async () => {
-    const { mkdir, rename, writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const report = buildReport(outcome, flags, new Date().toISOString());
-    await mkdir(path.dirname(DEFAULT_REPORT_PATH), { recursive: true });
-    const partial = `${DEFAULT_REPORT_PATH}.partial`;
-    await writeFile(partial, JSON.stringify(report, null, 2), "utf8");
-    await rename(partial, DEFAULT_REPORT_PATH);
-    log("report written", { path: DEFAULT_REPORT_PATH });
-  });
 }
 
 /**
@@ -698,7 +738,6 @@ export interface MessageHandlerDeps {
   flags: ForwarderFlags;
   env: ForwarderEnv;
   fetchImpl?: typeof fetch;
-  writeReportImpl?: (outcome: ForwardOutcome, flags: ForwarderFlags) => Promise<void>;
   /** Called exactly once in `--once` mode with the exit code. */
   onDone: (exitCode: number) => void;
   /** Shared claim; a private one is used when the caller passes none. */
@@ -735,8 +774,8 @@ function messageJob(deps: MessageHandlerDeps, text: string, finish: Finish): () 
  * `--once` mode the first message is claimed synchronously, before any
  * await, and every later delivery is ignored: one live POST at most
  * (Copilot on #2335). Every message, oversized ones included, goes through a
- * bounded runner, so a burst never fans out into unbounded concurrent POSTs,
- * retries or report writes (Codex P2 at 0676e200 and efeae597).
+ * bounded runner, so a burst never fans out into unbounded concurrent POSTs or
+ * retries (Codex P2 at 0676e200 and efeae597).
  */
 export function createMessageHandler(
   deps: MessageHandlerDeps,
@@ -756,8 +795,6 @@ export function createMessageHandler(
       try {
         if (outcome) {
           log(outcome.kind, outcome as unknown as Record<string, unknown>);
-          if (deps.flags.writeReport)
-            await (deps.writeReportImpl ?? writeReport)(outcome, deps.flags);
           exitCode = onceExitCode(outcome);
         }
       } catch (e) {
@@ -787,6 +824,7 @@ export function createMessageHandler(
 
 export interface MqttClientLike {
   on(event: string, listener: (...args: any[]) => void): unknown;
+  end?(): unknown;
   subscribe(
     topic: string,
     callback?: (
@@ -819,6 +857,7 @@ export interface ClientLifecycleDeps {
 export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecycleDeps): void {
   let connected = false;
   let ended = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   const fatal = (reason: string, fields: Record<string, unknown> = {}, terminal = false) => {
     if (deps.flags.once && deps.claim?.claimed) {
       // The one message is already in flight; its own result sets the exit
@@ -829,21 +868,28 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
     log("mqtt_fatal", { reason, ...fields });
     if ((deps.flags.once || terminal) && !ended) {
       ended = true;
+      if (timer) clearTimeout(timer);
       deps.onFatal(2);
     }
   };
   const timeoutMs = deps.connectTimeoutMs ?? MQTT_CONNECT_TIMEOUT_MS;
-  // One deadline covers both CONNACK and SUBACK: the client's connectTimeout
-  // waits only for CONNACK, and a broker that accepts the connection but never
-  // answers the subscription would otherwise hang a `--once` run forever
-  // (Codex P2 on #2335 at 3c16b6a4).
-  const timer = deps.flags.once
-    ? setTimeout(() => {
-        fatal(connected ? "subscribe_timeout" : "connect_timeout", { timeout_ms: timeoutMs });
-      }, timeoutMs)
-    : null;
+  // One deadline covers both CONNACK and SUBACK in `--once` mode: the
+  // client's connectTimeout waits only for CONNACK, and a broker that accepts
+  // the connection but never answers the subscription would otherwise hang
+  // the run forever (Codex P2 on #2335 at 3c16b6a4). Continuous mode keeps
+  // reconnecting until CONNACK, but each connection gets the same deadline for
+  // its SUBACK; a missing SUBACK is terminal there too (Codex P2 at bae4ae77).
+  const armDeadline = () => {
+    if (timer || ended) return;
+    timer = setTimeout(() => {
+      timer = null;
+      fatal(connected ? "subscribe_timeout" : "connect_timeout", { timeout_ms: timeoutMs }, true);
+    }, timeoutMs);
+  };
+  if (deps.flags.once) armDeadline();
   client.on("connect", () => {
     connected = true;
+    armDeadline();
     client.subscribe(deps.flags.topic, (err, granted) => {
       if (err) return fatal("subscribe_failed", { error: err.message }, true);
       // A broker can refuse the topic without an error: the SUBACK grant comes
@@ -856,10 +902,17 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
         return fatal("subscribe_failed", { error: "subscription refused by broker" }, true);
       }
       if (timer) clearTimeout(timer);
+      timer = null;
       log("subscribed", { topic: deps.flags.topic });
     });
   });
-  client.on("error", (e: Error) => fatal("mqtt_error", { error: e.message }));
+  // MQTT.js reports a refused CONNACK (bad credentials, not authorised) and an
+  // oversized packet as an error with a numeric reason code, and does not
+  // reconnect after either; network errors carry string codes and are retried.
+  // A numeric code is therefore terminal in every mode (Codex P2 at bae4ae77).
+  client.on("error", (e: Error & { code?: unknown }) =>
+    fatal("mqtt_error", { error: e.message }, typeof e.code === "number"),
+  );
   // A broker disconnect in `--once` mode has nothing to reconnect for
   // (reconnectPeriod is 0): end the run instead of idling until the connect
   // timer, or forever once connected (Codex P2 on #2335 at 0676e200). After
@@ -903,22 +956,47 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
   } catch {
     // An unparseable broker URL is the MQTT client's error to report.
   }
-  return values.filter((v): v is string => typeof v === "string" && v.length >= 4);
+  return values.filter((v): v is string => typeof v === "string" && v.length > 0);
 }
 
-export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEnv): Promise<void> {
+export interface MainDeps {
+  /** Opens the broker connection. Production: the `mqtt` package. */
+  connect: (flags: ForwarderFlags, env: ForwarderEnv) => Promise<MqttClientLike>;
+  /** Ends the process. Production: `process.exit`. */
+  exit: (code: number) => void;
+  fetchImpl?: typeof fetch;
+}
+
+const PRODUCTION_DEPS: MainDeps = {
+  connect: connectMqtt,
+  exit: (code) => process.exit(code),
+};
+
+/**
+ * Wires the run: argument and config checks, the broker connection, one
+ * shared `--once` claim between the lifecycle and the message handler, and a
+ * single `finish` that closes the client before exiting. `deps` exists so the
+ * real wiring can be driven under test (Codex P2 on #2335 at acab6b12 and
+ * bae4ae77).
+ */
+export async function main(
+  argv: readonly string[],
+  processEnv: NodeJS.ProcessEnv,
+  deps: MainDeps = PRODUCTION_DEPS,
+): Promise<void> {
   let flags: ForwarderFlags;
   try {
     flags = parseFlags(argv, processEnv);
   } catch (e) {
     console.error(
-      `[ecowitt-forwarder] refused: ${e instanceof Error ? e.message : "bad_arguments"}. ` +
-        "--topic and --mqtt-url each take a value.",
+      `[ecowitt-forwarder] refused: ${redactString(e instanceof Error ? e.message : "bad_arguments")}. ` +
+        "Flags: --live, --once, --topic <t>, --mqtt-url <url>; each at most once.",
     );
-    process.exit(2);
+    deps.exit(2);
+    return;
   }
   const env = readEnv(processEnv);
-  for (const value of configuredSecretValues(flags, env)) registerSecretValue(value);
+  setConfiguredSecrets(configuredSecretValues(flags, env));
 
   if (flags.live) {
     const problems = liveConfigProblems(env);
@@ -927,7 +1005,8 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
         `[ecowitt-forwarder] --live refused (fail closed): ${problems.join(", ")}. ` +
           `ECOWITT_INGEST_URL must be exactly ${APPROVED_INGEST_URLS.join(" or ")} and VERDANT_BRIDGE_TOKEN a vbt_ token.`,
       );
-      process.exit(2);
+      deps.exit(2);
+      return;
     }
   }
 
@@ -941,27 +1020,16 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
     once: flags.once,
   });
 
-  const client = await connectMqtt(flags, env);
+  const client = await deps.connect(flags, env);
   const claim: OnceClaim = { claimed: false };
-  attachClientLifecycle(client, {
-    flags,
-    claim,
-    onFatal: (exitCode) => {
-      client.end();
-      process.exit(exitCode);
-    },
-  });
+  const finish = (exitCode: number) => {
+    client.end?.();
+    deps.exit(exitCode);
+  };
+  attachClientLifecycle(client, { flags, claim, onFatal: finish });
   client.on(
     "message",
-    createMessageHandler({
-      flags,
-      env,
-      claim,
-      onDone: (exitCode) => {
-        client.end();
-        process.exit(exitCode);
-      },
-    }),
+    createMessageHandler({ flags, env, claim, fetchImpl: deps.fetchImpl, onDone: finish }),
   );
 }
 

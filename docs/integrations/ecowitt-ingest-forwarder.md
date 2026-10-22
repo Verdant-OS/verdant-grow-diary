@@ -41,16 +41,18 @@ $env:ECOWITT_MQTT_TOPIC="ecowitt/grow"
 
 # Dry run (default): parse and summarise channels. It connects to the MQTT
 # broker above and subscribes, but never POSTs to ecowitt-ingest.
-bun run dev:ecowitt-forwarder -- --once --write-report
+bun run dev:ecowitt-forwarder -- --once
 
 # Live (owner-gated): forward to ecowitt-ingest with a bridge token.
 $env:ECOWITT_INGEST_URL="https://<project-ref>.supabase.co/functions/v1/ecowitt-ingest"
 $env:VERDANT_BRIDGE_TOKEN="vbt_..."   # paste only into this window, never into chat
-bun run dev:ecowitt-forwarder:live -- --once --write-report
+bun run dev:ecowitt-forwarder:live -- --once
 ```
 
 `--once` exits `0` for a dry run or an `accepted: true` forward, `1` otherwise.
-`--write-report` writes a redacted report to `tmp/ecowitt-forwarder-last-report.json`.
+The outcome is printed to the console, redacted. The forwarder writes no files;
+an earlier version's `--write-report` option is gone and is now refused as an
+unknown argument. A report file an earlier run left in `tmp/` is not touched.
 
 ## Fail-closed rules
 
@@ -66,9 +68,13 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
 - `--once` exits `0` only for a dry run or a `2xx` response with
   `accepted: true`; a broker connect timeout (20 s), broker error or rejected
   subscription exits `2` instead of hanging.
-- A message over 64 KiB is rejected before it is parsed; summary strings are
-  capped at 64 characters, and a `stationtype` that contains the PASSKEY is
-  dropped.
+- A message over 64 KiB is rejected before it is parsed. MQTT.js reads a whole
+  packet before the forwarder sees it, so this bound protects the forwarder's
+  queue, not the socket: point it only at a broker you run.
+- The summary echoes only checked fields. `dateutc` must be the EcoWitt
+  `YYYY-MM-DD HH:MM:SS` form `ecowitt-ingest` accepts, or the message is
+  rejected (`invalid_dateutc`). `stationtype` is shown only as a firmware id
+  such as `GW3000B_V1.2.4`; anything else is omitted.
 - A message without `PASSKEY` or `dateutc` (for example the runbook's
   hand-made sanity POST) is rejected locally and never forwarded. A `dateutc`
   that carries the PASSKEY is rejected too (`invalid_dateutc`), so the
@@ -97,22 +103,25 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
   more; anything beyond that is dropped with a `dropped_backlog_full` log line,
   so a burst or a slow ingest never fans out into unbounded POSTs and retries.
   A broker close/offline is logged and left to the client's own reconnect.
-- Logs and reports pass through a redactor at every depth: `PASSKEY`, `MAC`,
+- Every log line passes through a redactor at every depth: `PASSKEY`, `MAC`,
   tokens (also when embedded in another string or a URL), MAC addresses in any
-  common form and MQTT credentials never appear, in the report's topic field
-  as much as in the outcome. The Mosquitto watcher window still shows the raw topic, so
-  crop it from anything you share.
-
-- The redactor also scrubs the credential values a run actually holds: the
-  PASSKEY extracted from each message, and the MQTT username and password from
-  the environment or the broker URL, literally, in any case and URI-encoded.
-  A `dateutc` or `stationtype` that echoes one of them is rejected or dropped.
-- `--topic` and `--mqtt-url` must be followed by a value; `--mqtt-url --once`
-  is refused before any connection (`missing_option_value`).
-- A refused subscription (error, no grant, or QoS 128) exits `2` in continuous
-  mode as well, instead of staying connected while consuming nothing.
-- The `--write-report` file is written to a `.partial` neighbour and renamed
-  into place, so an interrupted write never leaves an empty or truncated report.
+  common form, and the configured MQTT username and password (literally, in any
+  case, URI-encoded, at any length) never appear. Each upload is checked
+  against its own PASSKEY, in any case; nothing carries over between messages.
+  The Mosquitto watcher window still shows the raw topic, so crop it from
+  anything you share.
+- Arguments are read in order. An unknown argument, a repeated flag, or
+  `--topic` / `--mqtt-url` without a non-empty value is refused before any
+  connection.
+- A refused subscription (error, no grant, or QoS 128), a subscription that is
+  never acknowledged within 20 s, and a refused connection (bad credentials)
+  each exit `2` in continuous mode as well, instead of staying connected while
+  consuming nothing. Network errors and drops are left to the client's
+  reconnect.
+- The ingest response is read up to 16 KiB; a longer body is cancelled and
+  reported as `response_too_large`. When nothing is stored, the outcome counts
+  the documented `dropped[]` reason codes and names the router channel keys
+  involved (`temp2f`, `humidity2`, …), never tenant ids.
 
 ## What it never does
 

@@ -12,12 +12,8 @@ import {
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
   buildForwardRequest,
-  buildReport,
-  clearSecretValues,
   configuredSecretValues,
-  containsSecret,
   createBoundedRunner,
-  createSerialQueue,
   MAX_BACKLOG,
   MAX_INFLIGHT,
   createMessageHandler,
@@ -29,9 +25,12 @@ import {
   parseFlags,
   prepareForwardPayload,
   readEnv,
-  registerSecretValue,
   redactForLog,
   redactString,
+  readBoundedText,
+  main,
+  MAX_RESPONSE_BYTES,
+  setConfiguredSecrets,
   summarizeResponse,
   type ForwarderEnv,
   type ForwarderFlags,
@@ -96,7 +95,6 @@ const LIVE_ENV: ForwarderEnv = {
 const flags = (over: Partial<ForwarderFlags> = {}): ForwarderFlags => ({
   live: false,
   once: false,
-  writeReport: false,
   topic: "ecowitt/grow",
   mqttUrl: "mqtt://127.0.0.1:1883",
   ...over,
@@ -113,6 +111,30 @@ describe("flags and env", () => {
       expect(() => parseFlags(argv, {})).toThrow(`missing_option_value:${flag}`);
     },
   );
+
+  it.each([
+    [["--once", "--once"], "duplicate_option:--once"],
+    [["--mqtt-url", "mqtt://ok", "--mqtt-url", "--once"], "duplicate_option:--mqtt-url"],
+    [["--topic", ""], "empty_option_value:--topic"],
+    [["--mqtt-url", "   "], "empty_option_value:--mqtt-url"],
+    [["--write-report"], "unknown_option:--write-report"],
+    [["stray"], "unknown_option:stray"],
+  ])(
+    "refuses a repeated, empty or unknown argument before any connection (Codex P2 at bae4ae77): %j",
+    (argv, message) => {
+      expect(() => parseFlags(argv, {})).toThrow(message);
+    },
+  );
+
+  it("reads every flag once, in any order, and skips a bare -- separator", () => {
+    expect(
+      parseFlags(["--", "--topic", "t/x", "--live", "--mqtt-url", "mqtt://h:1", "--once"], {}),
+    ).toEqual({ live: true, once: true, topic: "t/x", mqttUrl: "mqtt://h:1" });
+    expect(parseFlags([], { ECOWITT_MQTT_TOPIC: "  ", ECOWITT_MQTT_URL: "" })).toMatchObject({
+      topic: "ecowitt/grow",
+      mqttUrl: "mqtt://127.0.0.1:1883",
+    });
+  });
 
   it("is dry-run by default and reads the documented defaults", () => {
     const f = parseFlags([], {});
@@ -219,7 +241,7 @@ describe("prepareForwardPayload", () => {
     expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "payload_too_large" });
   });
 
-  it("drops a stationtype that carries the PASSKEY and caps summary strings (Codex P1)", () => {
+  it("drops a stationtype that carries the PASSKEY or is not a firmware id (Codex P1)", () => {
     const copied = prepareForwardPayload(
       JSON.stringify({
         PASSKEY: FAKE_PASSKEY,
@@ -237,9 +259,48 @@ describe("prepareForwardPayload", () => {
     );
     expect(long.ok).toBe(true);
     if (long.ok) {
-      expect(long.summary.station).toHaveLength(64);
-      expect(long.summary.dateutc.length).toBeLessThanOrEqual(64);
+      expect(long.summary.station).toBeNull();
+      expect(long.summary.dateutc).toBe("2026-10-22 05:27:14");
     }
+  });
+
+  it.each(["2026-10-22", "now", "2026-10-22 05:27:14 UTC", "MjAyNi0xMC0yMg=="])(
+    "rejects a dateutc that is not the EcoWitt form ecowitt-ingest accepts (Codex P1 at bae4ae77): %s",
+    (dateutc) => {
+      expect(prepareForwardPayload(JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc }))).toEqual({
+        ok: false,
+        reason: "invalid_dateutc",
+      });
+    },
+  );
+
+  it("keeps a firmware stationtype and omits anything free-form, encoded or echoing a short PASSKEY (Codex P1 at bae4ae77)", () => {
+    const station = (passkey: string, stationtype: string) => {
+      const r = prepareForwardPayload(
+        JSON.stringify({ PASSKEY: passkey, dateutc: "2026-10-22 05:27:14", stationtype }),
+      );
+      return r.ok ? r.summary.station : "rejected";
+    };
+    expect(station(FAKE_PASSKEY, "GW3000B_V1.2.4")).toBe("GW3000B_V1.2.4");
+    expect(station(FAKE_PASSKEY, "EasyWeatherPro_V5.1.6")).toBe("EasyWeatherPro_V5.1.6");
+    // A three-character PASSKEY is still this message's secret.
+    expect(station("abc", "GWabc_V1.0")).toBeNull();
+    expect(station("abc", "GWABC_V1.0")).toBeNull();
+    // Encodings and free text do not fit the firmware form.
+    expect(station(FAKE_PASSKEY, Buffer.from(FAKE_PASSKEY).toString("base64"))).toBeNull();
+    expect(station(FAKE_PASSKEY, encodeURIComponent(`${FAKE_PASSKEY}/x`))).toBeNull();
+    expect(station(FAKE_PASSKEY, "GW3000B V1.2.4 notes")).toBeNull();
+  });
+
+  it("judges each message by its own PASSKEY only; an earlier frame cannot poison a later one (Codex P1 at bae4ae77)", () => {
+    expect(
+      prepareForwardPayload(JSON.stringify({ PASSKEY: "2026", dateutc: "2026-10-22 05:27:14" })),
+    ).toEqual({ ok: false, reason: "invalid_dateutc" });
+    const next = prepareForwardPayload(
+      JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: "2026-10-22 05:27:14", temp2f: 80 }),
+    );
+    expect(next.ok).toBe(true);
+    expect(redactString("2026-10-22 05:27:14")).toBe("2026-10-22 05:27:14");
   });
 
   it("rejects a dateutc that carries the PASSKEY beside other text (Codex P1 at 3df0e691)", () => {
@@ -477,6 +538,7 @@ describe("response summary and exit codes", () => {
       inserted: 0,
       skipped_duplicate: null,
       reason: "tent_lookup_failed",
+      dropped: null,
     });
     expect(summarizeResponse(401, "not json")).toEqual({
       status: 401,
@@ -484,7 +546,98 @@ describe("response summary and exit codes", () => {
       inserted: null,
       skipped_duplicate: null,
       reason: null,
+      dropped: null,
     });
+  });
+
+  it("keeps a bounded count of dropped reason codes and router channel keys, never tenant ids (Codex P2 at acab6b12, bae4ae77)", () => {
+    const s = summarizeResponse(
+      200,
+      JSON.stringify({
+        ok: true,
+        accepted: false,
+        inserted: 0,
+        per_tent: [{ tent_id: "tent-secret-id", rows: 0 }],
+        dropped: [
+          {
+            channel_key: "temp2f",
+            channel: 2,
+            metric: "air_temp",
+            reason: "no_eligible_tent_for_channel",
+          },
+          {
+            channel_key: "humidity2",
+            channel: 2,
+            metric: "rh",
+            reason: "no_eligible_tent_for_channel",
+          },
+          {
+            channel_key: "soilmoisture4",
+            channel: 4,
+            metric: "soil",
+            reason: "channel_value_out_of_plausible_range",
+          },
+          { channel_key: "passkey", channel: null, metric: null, reason: "fingerprint_mismatch" },
+          { channel_key: "x", reason: "tent-secret-id leaked as a reason" },
+          "not an object",
+        ],
+      }),
+    );
+    expect(s.reason).toBeNull();
+    expect(s.dropped).toEqual({
+      reasons: {
+        no_eligible_tent_for_channel: 2,
+        channel_value_out_of_plausible_range: 1,
+        fingerprint_mismatch: 1,
+        other: 1,
+      },
+      channels: ["humidity2", "soilmoisture4", "temp2f"],
+    });
+    expect(JSON.stringify(s)).not.toContain("tent-secret-id");
+    // Free text never rides in as a reason.
+    expect(
+      summarizeResponse(200, JSON.stringify({ reason: "Bearer vbt_x leaked" })).reason,
+    ).toBeNull();
+  });
+
+  it("reads at most MAX_RESPONSE_BYTES of a body and cancels the rest (Codex P2 at acab6b12, bae4ae77)", async () => {
+    let pulled = 0;
+    let cancelled = false;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(new Uint8Array(4096).fill(0x61));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    expect(await readBoundedText(new Response(endless))).toBeNull();
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThanOrEqual(MAX_RESPONSE_BYTES / 4096 + 2);
+    expect(await readBoundedText(new Response('{"accepted":true}'))).toBe('{"accepted":true}');
+    expect(summarizeResponse(502, null)).toMatchObject({
+      status: 502,
+      reason: "response_too_large",
+    });
+  });
+
+  it("the live path summarises an oversized body as response_too_large without buffering it", async () => {
+    const big = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(4096).fill(0x20));
+      },
+    });
+    const fetchImpl = vi.fn(async () => new Response(big, { status: 200 }));
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(out.kind).toBe("forwarded");
+    if (out.kind === "forwarded") expect(out.response.reason).toBe("response_too_large");
   });
 
   it("--once exits 1 when accepted: true rides a non-2xx status (Codex P2 at 79ce2801)", () => {
@@ -537,64 +690,30 @@ describe("response summary and exit codes", () => {
   });
 });
 
-describe("redaction of extracted and configured values (Codex P1 at acab6b12)", () => {
-  afterEach(() => clearSecretValues());
+describe("configured MQTT credentials are redacted (Codex P1 at acab6b12, bae4ae77)", () => {
+  afterEach(() => setConfiguredSecrets([]));
 
-  it("scrubs a non-shape PASSKEY from the summary and report in any case or URI-encoded form", () => {
-    const secret = ["Arbitrary", "Secret", "Value"].join("");
-    const prepared = prepareForwardPayload(
-      JSON.stringify({
-        PASSKEY: secret,
-        stationtype: `GW_${secret.toLowerCase()}`,
-        dateutc: "2026-10-22 05:27:14",
-        temp2f: 80,
-      }),
-    );
-    expect(prepared.ok).toBe(true);
-    if (!prepared.ok) return;
-    expect(prepared.summary.station).toBeNull();
-    const report = JSON.stringify(
-      buildReport(
-        {
-          kind: "dry_run",
-          summary: {
-            ...prepared.summary,
-            dateutc: `x ${secret.toUpperCase()} ${encodeURIComponent(`${secret}/`)}`,
-          },
-        },
-        flags({ topic: `bridge/${secret}` }),
-        "2026-10-22T05:27:14.000Z",
-      ),
-    );
-    expect(report.toLowerCase()).not.toContain(secret.toLowerCase());
-    expect(report).toContain("bridge/(redacted)");
-  });
-
-  it("rejects a dateutc that echoes the PASSKEY in another case", () => {
-    const secret = ["Arbitrary", "Secret", "Value"].join("");
-    expect(
-      prepareForwardPayload(
-        JSON.stringify({ PASSKEY: secret, dateutc: `2026 ${secret.toLowerCase()}`, temp2f: 80 }),
-      ),
-    ).toEqual({ ok: false, reason: "invalid_dateutc" });
-  });
-
-  it("registers the MQTT username and password from the environment and the broker URL", () => {
+  it("collects the MQTT username and password from the environment and the broker URL, at any length", () => {
     const values = configuredSecretValues(
       flags({ mqttUrl: "mqtt://grower:hunter%402@broker.local:1883" }),
       { ingestUrl: null, token: null, mqttUsername: "envuser", mqttPassword: "abc" },
     );
-    expect(values).toEqual(["envuser", "grower", "hunter@2"]);
-    for (const v of values) registerSecretValue(v);
-    expect(redactString("topic/grower/hunter@2/ENVUSER")).toBe(
-      "topic/(redacted)/(redacted)/(redacted)",
-    );
-    expect(containsSecret("abc")).toBe(false);
+    expect(values).toEqual(["envuser", "abc", "grower", "hunter@2"]);
   });
 
-  it("ignores values under four characters so ordinary text is not redacted", () => {
-    registerSecretValue("abc");
-    expect(redactString("abc abcd")).toBe("abc abcd");
+  it("scrubs each configured value literally, in any case and URI-encoded", () => {
+    setConfiguredSecrets(["grower", "hunter@2", "ab"]);
+    expect(redactString("topic/GROWER/hunter@2/hunter%402")).toBe(
+      "topic/(redacted)/(redacted)/(redacted)",
+    );
+    // Short values are scrubbed too; over-redacting a log line is harmless.
+    expect(redactString("tab")).toBe("t(redacted)");
+  });
+
+  it("does not keep an upload PASSKEY between messages", () => {
+    const secret = ["Arbitrary", "Secret", "Value"].join("");
+    prepareForwardPayload(JSON.stringify({ PASSKEY: secret, dateutc: "2026-10-22 05:27:14" }));
+    expect(redactString(`x ${secret}`)).toBe(`x ${secret}`);
   });
 });
 
@@ -721,30 +840,6 @@ describe("redaction", () => {
     expect(redactString("GW3000B_V1.2.4")).toBe("GW3000B_V1.2.4");
   });
 
-  it("redacts the whole --write-report document, topic included (Codex P1 at 3c16b6a4)", () => {
-    const report = buildReport(
-      {
-        kind: "dry_run",
-        summary: {
-          air_channels: [1],
-          soil_channels: [],
-          key_count: 3,
-          dateutc: "x",
-          station: null,
-        },
-      },
-      flags({ topic: `bridge/${FAKE_BRIDGE_TOKEN}` }),
-      "2026-10-22T05:27:14.000Z",
-    );
-    const text = JSON.stringify(report);
-    expect(text).not.toMatch(/vbt_/);
-    expect(text).toContain("bridge/(redacted)");
-    expect(report.transport).toBe("ecowitt_mqtt_ingest_forwarder");
-    expect(
-      (report.outcome as { summary: { air_channels: number[] } }).summary.air_channels,
-    ).toEqual([1]);
-  });
-
   it("redacts broker URL credentials in the startup fields", () => {
     expect(redactString(`wss://broker/mqtt?token=${FAKE_BRIDGE_TOKEN}`)).toBe(
       "wss://broker/mqtt?token=(redacted)",
@@ -784,20 +879,6 @@ describe("createMessageHandler (--once)", () => {
     expect(onDone).toHaveBeenCalledWith(0);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
-
-  it("logs a handler failure and exits 1 instead of leaving an unhandled rejection", async () => {
-    const onDone = vi.fn();
-    const handle = createMessageHandler({
-      flags: flags({ once: true, writeReport: true }),
-      env: LIVE_ENV,
-      writeReportImpl: async () => {
-        throw new Error("disk full");
-      },
-      onDone,
-    });
-    handle("ecowitt/grow", GATEWAY_MESSAGE);
-    await vi.waitFor(() => expect(onDone).toHaveBeenCalledWith(1));
-  });
 });
 
 describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => {
@@ -836,23 +917,23 @@ describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => 
     let release: (r: Response) => void = () => {};
     const fetchImpl = vi.fn(() => new Promise<Response>((resolve) => (release = resolve)));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    const writeReportImpl = vi.fn(async () => {});
     try {
       const handle = createMessageHandler({
-        flags: flags({ live: true, writeReport: true }),
+        flags: flags({ live: true }),
         env: LIVE_ENV,
         fetchImpl: fetchImpl as unknown as typeof fetch,
-        writeReportImpl,
         onDone: () => {},
         runner,
       });
       handle("ecowitt/grow", GATEWAY_MESSAGE);
       await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
-      // The slot is held: the oversized frame's rejection waits its turn, so
-      // its report write is bounded like any other job, and nothing is logged yet.
+      // The slot is held: the oversized frame's rejection waits its turn like
+      // any other job, and nothing is logged for it yet.
       handle("ecowitt/grow", Buffer.alloc(MAX_MESSAGE_BYTES + 1, 0x7b));
       expect(runner.backlog).toBe(1);
-      expect(writeReportImpl).not.toHaveBeenCalled();
+      expect(
+        logSpy.mock.calls.some((c) => JSON.stringify(c[1] ?? "").includes("payload_too_large")),
+      ).toBe(false);
       release(new Response(JSON.stringify({ accepted: true }), { status: 200 }));
       await vi.waitFor(() =>
         expect(
@@ -864,7 +945,6 @@ describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => 
         ).toBe(true),
       );
       expect(fetchImpl).toHaveBeenCalledTimes(1);
-      expect(writeReportImpl).toHaveBeenCalledTimes(2);
     } finally {
       logSpy.mockRestore();
     }
@@ -915,38 +995,6 @@ describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => 
     } finally {
       logSpy.mockRestore();
     }
-  });
-});
-
-describe("createSerialQueue (Codex P2 at 5a7accaf)", () => {
-  it("runs tasks one at a time in submission order, and a failure does not block the next", async () => {
-    const queue = createSerialQueue();
-    const events: string[] = [];
-    let releaseFirst: () => void = () => {};
-    const first = queue.run(
-      () =>
-        new Promise<void>((resolve) => {
-          events.push("first:start");
-          releaseFirst = () => {
-            events.push("first:end");
-            resolve();
-          };
-        }),
-    );
-    const second = queue.run(async () => {
-      events.push("second:start");
-      throw new Error("boom");
-    });
-    const third = queue.run(async () => {
-      events.push("third:start");
-    });
-    await Promise.resolve();
-    expect(events).toEqual(["first:start"]);
-    releaseFirst();
-    await first;
-    await expect(second).rejects.toThrow("boom");
-    await third;
-    expect(events).toEqual(["first:start", "first:end", "second:start", "third:start"]);
   });
 });
 
@@ -1155,6 +1203,48 @@ describe("attachClientLifecycle (--once broker failures)", () => {
     }
   });
 
+  it("exits 2 in continuous mode when a connection never gets its SUBACK (Codex P2 at bae4ae77)", () => {
+    vi.useFakeTimers();
+    try {
+      const handlers = new Map<string, (...args: unknown[]) => void>();
+      const silent = {
+        on: (event: string, listener: (...args: unknown[]) => void) =>
+          handlers.set(event, listener),
+        subscribe: () => undefined,
+      };
+      const onFatal = vi.fn();
+      attachClientLifecycle(silent, { flags: flags(), onFatal, connectTimeoutMs: 1000 });
+      // No deadline before CONNACK in continuous mode: the client keeps reconnecting.
+      vi.advanceTimersByTime(5000);
+      expect(onFatal).not.toHaveBeenCalled();
+      handlers.get("connect")?.();
+      vi.advanceTimersByTime(999);
+      expect(onFatal).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2);
+      expect(onFatal).toHaveBeenCalledTimes(1);
+      expect(onFatal).toHaveBeenCalledWith(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("exits 2 in continuous mode on a refused CONNACK, but leaves network errors to reconnect (Codex P2 at bae4ae77)", () => {
+    const client = fakeClient();
+    const onFatal = vi.fn();
+    attachClientLifecycle(client, { flags: flags(), onFatal, connectTimeoutMs: 60_000 });
+    client.emit(
+      "error",
+      Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+    );
+    expect(onFatal).not.toHaveBeenCalled();
+    client.emit(
+      "error",
+      Object.assign(new Error("Connection refused: Not authorized"), { code: 5 }),
+    );
+    expect(onFatal).toHaveBeenCalledTimes(1);
+    expect(onFatal).toHaveBeenCalledWith(2);
+  });
+
   it("stays quiet after a clean connect and subscribe, and never exits in continuous mode", () => {
     vi.useFakeTimers();
     try {
@@ -1181,6 +1271,166 @@ describe("attachClientLifecycle (--once broker failures)", () => {
       expect(onFatalCont).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe("main wiring (Codex P2 at acab6b12, bae4ae77)", () => {
+  type Grant = ReadonlyArray<{ topic: string; qos: number }> | undefined;
+  function fakeBroker(...args: [Grant?]) {
+    // An explicit `undefined` means the broker granted nothing.
+    const grant: Grant = args.length > 0 ? args[0] : [{ topic: "ecowitt/grow", qos: 0 }];
+    const handlers = new Map<string, Array<(...args: unknown[]) => void>>();
+    const client = {
+      ended: 0,
+      on(event: string, listener: (...args: unknown[]) => void) {
+        handlers.set(event, [...(handlers.get(event) ?? []), listener]);
+        return client;
+      },
+      subscribe(_topic: string, cb?: (err?: Error | null, g?: Grant) => void) {
+        cb?.(null, grant);
+      },
+      end() {
+        client.ended += 1;
+      },
+      emit(event: string, ...args: unknown[]) {
+        for (const l of handlers.get(event) ?? []) l(...args);
+      },
+    };
+    return client;
+  }
+  function run(
+    argv: string[],
+    broker = fakeBroker(),
+    extra: Partial<Parameters<typeof main>[2]> = {},
+  ) {
+    const exit = vi.fn();
+    const connect = vi.fn(async () => broker);
+    const done = main(argv, {}, { connect, exit, ...extra });
+    return { exit, connect, broker, done };
+  }
+  const quiet = () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    return () => {
+      log.mockRestore();
+      err.mockRestore();
+    };
+  };
+
+  it("refuses malformed arguments before connecting", async () => {
+    const restore = quiet();
+    try {
+      const { exit, connect, done } = run(["--mqtt-url", "--once"]);
+      await done;
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(connect).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it.each([
+    ["QoS 128", [{ topic: "ecowitt/grow", qos: 128 }]],
+    ["no grant", undefined],
+  ] as const)(
+    "ends the client and exits 2 on a refused subscription (%s), in both modes",
+    async (_l, grant) => {
+      const restore = quiet();
+      try {
+        for (const argv of [["--once"], []]) {
+          const { exit, broker, done } = run(argv, fakeBroker(grant as Grant));
+          await done;
+          broker.emit("connect");
+          expect(exit).toHaveBeenCalledTimes(1);
+          expect(exit).toHaveBeenCalledWith(2);
+          expect(broker.ended).toBe(1);
+        }
+      } finally {
+        restore();
+      }
+    },
+  );
+
+  it("refuses --live without approved config before connecting", async () => {
+    const restore = quiet();
+    try {
+      const { exit, connect, done } = run(["--once", "--live"]);
+      await done;
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(connect).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("--once: the claimed message decides the exit; a close or error after the claim does not abort it", async () => {
+    const restore = quiet();
+    try {
+      const { exit, broker, done } = run(["--once"]);
+      await done;
+      broker.emit("connect");
+      broker.emit("message", "ecowitt/grow", Buffer.from(GATEWAY_MESSAGE));
+      // The job is still running: these must not end the run.
+      broker.emit("close");
+      broker.emit("error", new Error("socket hang up"));
+      await vi.waitFor(() => expect(exit).toHaveBeenCalledTimes(1));
+      expect(exit).toHaveBeenCalledWith(0);
+      expect(broker.ended).toBe(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it("--once: a close before any message exits 2", async () => {
+    const restore = quiet();
+    try {
+      const { exit, broker, done } = run(["--once"]);
+      await done;
+      broker.emit("connect");
+      broker.emit("close");
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(broker.ended).toBe(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it("continuous mode keeps running through network errors and closes", async () => {
+    const restore = quiet();
+    try {
+      const { exit, broker, done } = run([]);
+      await done;
+      broker.emit("connect");
+      broker.emit("error", Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }));
+      broker.emit("close");
+      broker.emit("offline");
+      expect(exit).not.toHaveBeenCalled();
+      expect(broker.ended).toBe(0);
+    } finally {
+      restore();
+    }
+  });
+
+  it("registers the configured MQTT credentials so a topic echoing them is redacted", async () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      lines.push(JSON.stringify(a));
+    });
+    try {
+      const { done } = run([
+        "--mqtt-url",
+        "mqtt://broker-user-name:pw@h:1",
+        "--topic",
+        "t/broker-user-name",
+      ]);
+      await done;
+      const startup = lines.find((l) => l.includes("startup")) ?? "";
+      expect(startup).not.toContain("broker-user-name");
+      expect(startup).toContain("t/(redacted)");
+    } finally {
+      log.mockRestore();
+      setConfiguredSecrets([]);
     }
   });
 });

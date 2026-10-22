@@ -204,6 +204,24 @@ export function tonightCaptureRejected(
 }
 
 /**
+ * The header's record identities for `resolveTentDetailVpd`: the capture ref
+ * of each rejected metric, and of the stored VPD when it is the snapshot's own
+ * (a fallback series value has no known ref). Pure (Codex P2 on #2303 at
+ * 0994ea2a).
+ */
+export function tentDetailHeaderCaptureRefs(
+  snapshot: Parameters<typeof snapshotCaptureRef>[0] | null | undefined,
+  invalidFields: readonly string[],
+  opts: { existingIsSnapshotVpd: boolean },
+): { rejectedRefs?: (string | null)[]; existingRef?: string | null } {
+  if (!snapshot) return {};
+  return {
+    rejectedRefs: invalidFields.map((key) => snapshotCaptureRef(snapshot, key)),
+    existingRef: opts.existingIsSnapshotVpd ? snapshotCaptureRef(snapshot, "vpd") : null,
+  };
+}
+
+/**
  * The tent page's current VPD (VER-189, #2268): the same value the Dashboard
  * Tonight card shows for this tent, chosen by `buildTonightTentMetrics` over the
  * same stored rows and diary-inclusive snapshot. A temperature and RH pair from
@@ -239,6 +257,14 @@ export function resolveTentDetailVpd(input: {
   rejectedMetrics: readonly string[];
   /** Capture time of the snapshot those rejections belong to (header.capturedAt). */
   rejectedCapturedAt: string | null;
+  /**
+   * The capture ref of each `rejectedMetrics` entry, in the same order, from
+   * the header snapshot's per-metric refs. With `existingRef`, lets a VPD from
+   * another record at the same instant stand (Codex P2 on #2303 at 0994ea2a).
+   */
+  rejectedRefs?: readonly (string | null)[];
+  /** The capture ref of `existing`'s VPD, when known. */
+  existingRef?: string | null;
   /** Tonight's displayed temperature and RH: the inputs of a calculated VPD. */
   contributors: { temp: number | null; rh: number | null } | null;
   /** Temperature and RH by capture, from `tentDetailCaptureClimate`. */
@@ -257,10 +283,27 @@ export function resolveTentDetailVpd(input: {
   // row alone). Telemetry from a rejected capture is never restored: only an
   // observation proven to come from another capture may stand in (Codex P1 on
   // #2303 at d6ef3a20). An unknown capture time cannot prove independence.
+  // When every rejected climate metric and the existing VPD carry a known
+  // record identity, the capture is matched by identity: a valid VPD from
+  // another record at the same instant is not part of the rejected capture.
+  // Otherwise the instant decides, conservatively (Codex P2 at 0994ea2a).
+  const rejectedClimateRefs = input.rejectedMetrics
+    .map((key, index) =>
+      key === "temp" || key === "rh" || key === "vpd"
+        ? (input.rejectedRefs?.[index] ?? null)
+        : undefined,
+    )
+    .filter((ref): ref is string | null => ref !== undefined);
+  const identityKnown =
+    input.rejectedRefs !== undefined &&
+    typeof input.existingRef === "string" &&
+    captureRefsKnown(rejectedClimateRefs);
   const existingFromRejectedCapture =
     climateRejected &&
     input.existing.value !== null &&
-    (existingMs === null || rejectedMs === null || existingMs === rejectedMs);
+    (identityKnown
+      ? rejectedClimateRefs.includes(input.existingRef as string)
+      : existingMs === null || rejectedMs === null || existingMs === rejectedMs);
   const existingOrNothing = (): TentDetailVpdObservation =>
     existingFromRejectedCapture
       ? { value: null, capturedAt: null, source: null, stale: false, calculated: false }

@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveTentDetailVpd,
   tentDetailCaptureClimate,
+  tentDetailHeaderCaptureRefs,
   tentDetailVpdRowUntrusted,
   tonightCaptureRejected,
 } from "@/lib/tentDetailVpdRules";
@@ -534,5 +535,66 @@ describe("a generic diary blob keeps its own entry identity (Codex P2 on #2303 a
     expect(tonightCaptureRejected(vpdOf(snap), null, tentDetailCaptureClimate(ROWS, snap))).toBe(
       true,
     );
+  });
+});
+
+describe("the header rejection matches by capture identity (Codex P2 on #2303 at 0994ea2a)", () => {
+  const T = at(1);
+  // A valid live VPD and an unrelated invalid manual temperature at one instant.
+  const header = {
+    source: "manual",
+    ts: T,
+    temp: 99,
+    rh: 50,
+    vpd: 1.2,
+    metric_refs: {
+      temp: { id: "row-temp", captured_at: T, source: "manual" },
+      rh: { id: "row-rh", captured_at: T, source: "live" },
+      vpd: { id: "row-vpd", captured_at: T, source: "live" },
+    },
+  };
+  const existing = { value: 1.2, capturedAt: T, source: "manual", stale: false };
+  const resolve = (refs: ReturnType<typeof tentDetailHeaderCaptureRefs>) =>
+    resolveTentDetailVpd({
+      tonight: null,
+      existing,
+      rejectedMetrics: ["temp"],
+      rejectedCapturedAt: T,
+      ...refs,
+      contributors: null,
+      captureClimate: [],
+      nowMs: NOW,
+    });
+
+  it("derives each rejected metric's record and the snapshot VPD's record", () => {
+    expect(tentDetailHeaderCaptureRefs(header, ["temp"], { existingIsSnapshotVpd: true })).toEqual({
+      rejectedRefs: [sensorCaptureRef(T, "manual")],
+      existingRef: sensorCaptureRef(T, "live"),
+    });
+    expect(
+      tentDetailHeaderCaptureRefs(header, ["temp"], { existingIsSnapshotVpd: false }).existingRef,
+    ).toBeNull();
+  });
+
+  it("keeps a valid VPD from another record at the same instant", () => {
+    const out = resolve(
+      tentDetailHeaderCaptureRefs(header, ["temp"], { existingIsSnapshotVpd: true }),
+    );
+    expect(out.value).toBe(1.2);
+  });
+
+  it("withholds the VPD when the rejected metric is its own record", () => {
+    const own = { ...header, metric_refs: { ...header.metric_refs, temp: header.metric_refs.vpd } };
+    expect(
+      resolve(tentDetailHeaderCaptureRefs(own, ["temp"], { existingIsSnapshotVpd: true })).value,
+    ).toBeNull();
+  });
+
+  it("withholds conservatively when either identity is unknown", () => {
+    expect(resolve({}).value).toBeNull();
+    expect(
+      resolve(tentDetailHeaderCaptureRefs(header, ["temp"], { existingIsSnapshotVpd: false }))
+        .value,
+    ).toBeNull();
   });
 });

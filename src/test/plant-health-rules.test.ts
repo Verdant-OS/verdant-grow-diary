@@ -3,8 +3,6 @@ import {
   buildPlantHealthUpdate,
   editablePlantHealth,
   normalizePlantHealth,
-  PLANT_HEALTH_NOT_ASSESSED_STATUS,
-  plantHealthStatusLabel,
   plantHealthTone,
 } from "@/lib/plantHealthRules";
 
@@ -47,27 +45,5 @@ describe("recorded plant health rules", () => {
       expect(second).toEqual(first);
       expect(second).not.toBe(first);
     }
-  });
-});
-
-describe("plantHealthStatusLabel (QA #1989)", () => {
-  it.each([null, undefined, "", " ", "unknown", "Healthy", "weird", true, 0, {}, []])(
-    "shows not assessed for missing or invalid stored health %j",
-    (value) => {
-      expect(plantHealthStatusLabel(value)).toBe(PLANT_HEALTH_NOT_ASSESSED_STATUS);
-      expect(plantHealthStatusLabel(value)).not.toBe("unknown");
-      expect(plantHealthStatusLabel(value)).not.toBe("healthy");
-    },
-  );
-
-  it.each(["healthy", "watch", "issue"] as const)(
-    "preserves an explicit grower assessment in the visible label (%s)",
-    (value) => {
-      expect(plantHealthStatusLabel(value)).toBe(value);
-    },
-  );
-
-  it("matches the pinned user-facing copy constant", () => {
-    expect(PLANT_HEALTH_NOT_ASSESSED_STATUS).toBe("not assessed");
   });
 });

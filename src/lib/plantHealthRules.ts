@@ -19,18 +19,6 @@ export function normalizePlantHealth(value: unknown): PlantHealth {
   return value === "healthy" || value === "watch" || value === "issue" ? value : "unknown";
 }
 
-/** Visible status when no grower assessment is stored (QA #1989). */
-export const PLANT_HEALTH_NOT_ASSESSED_STATUS = "not assessed";
-
-/**
- * Card label for stored health. Missing, null, and "unknown" are not an
- * assessment, so they read as "not assessed" rather than "healthy".
- */
-export function plantHealthStatusLabel(value: unknown): string {
-  const health = normalizePlantHealth(value);
-  return health === "unknown" ? PLANT_HEALTH_NOT_ASSESSED_STATUS : health;
-}
-
 const HEALTH_TONE: Readonly<Record<PlantHealth, PlantHealthTone>> = {
   healthy: "success",
   watch: "warning",

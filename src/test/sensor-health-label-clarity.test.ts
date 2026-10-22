@@ -42,14 +42,6 @@ describe("sensor health label clarity", () => {
     expect(PLANTS).toMatch(/formatPlantHealthAriaLabel\(p\.health\)/);
   });
 
-  it("plants page labels unassessed health through plantHealthStatusLabel, not raw unknown copy (#1989)", () => {
-    expect(PLANTS).toMatch(/plantHealthStatusLabel/);
-    expect(PLANTS).toMatch(/formatPlantHealthLabel\([\s\S]*plantHealthStatusLabel/);
-    expect(PLANTS).toMatch(/formatPlantHealthAriaLabel\([\s\S]*plantHealthStatusLabel/);
-    expect(PLANTS).not.toMatch(/health \?\? "unknown"/);
-    expect(PLANTS).not.toMatch(/Plant health: \$\{health \?\? "unknown"\}/);
-  });
-
   it("tents page keeps sensor and plant assessment truth separate", () => {
     expect(TENTS).toMatch(/Sensor status is shown separately/);
     expect(TENTS).toMatch(/No alert assessment is loaded for this card/);

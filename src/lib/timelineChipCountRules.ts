@@ -249,3 +249,8 @@ export function timelineEntryCountsAsPhoto(
 export function timelineEntryHasNoteText(note: unknown): boolean {
   return typeof note === "string" && note.trim().length > 0;
 }
+
+/** Whether a diary row belongs in the Timeline Notes chip (Pollen #1). */
+export function timelineEntryQualifiesForNotesChip(entry: { id: string; note?: unknown }): boolean {
+  return !isTimelineSensorDerivedDiaryId(entry.id) && timelineEntryHasNoteText(entry.note);
+}

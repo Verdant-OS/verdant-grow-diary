@@ -346,10 +346,15 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
         action_queue_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         outcome: "improved",
       }),
+      diaryEntry("water-only-1", "", "2026-07-20T06:00:00.000Z", null, {
+        event_type: "watering",
+        source: "quick_log",
+        watering: { volume_ml: 500 },
+      }),
     ];
     const readings = receiptReadings(4);
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
-      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 6 };
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 7 };
       if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
       if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
       return defaultResult(spec);
@@ -359,11 +364,11 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
 
     expect(await screen.findByText("Plain diary note")).toBeInTheDocument();
 
-    expect(chipCount("All")).toBe(6);
-    expect(chipCount("All stages")).toBe(6);
+    expect(chipCount("All")).toBe(7);
+    expect(chipCount("All stages")).toBe(7);
     expect(chipCount("Notes")).toBe(6);
     expect(chipCount("Photos")).toBe(1);
-    expect(chipCount("Measurements")).toBe(5);
+    expect(chipCount("Measurements")).toBe(6);
     expect(chipCount("Follow-ups")).toBe(2);
     expect(chipCount("Action responses")).toBe(1);
 
@@ -384,21 +389,21 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
         expect(listedEntries(), "Measurements chip count includes sensor receipts").toHaveLength(
           count,
         );
-        expect(listedDiaryEntries()).toHaveLength(1);
+        expect(listedDiaryEntries()).toHaveLength(2);
         // Codex P2 at 558d7ec3: the active All stages chip counts the same
         // receipt-inclusive list that Measurements renders.
         expect(chipCount("All stages"), "All stages under Measurements includes receipts").toBe(
           listedEntries().length,
         );
         expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
-          "Detailed diary: showing 1 of 6 entries",
+          "Detailed diary: showing 2 of 7 entries",
         );
       } else {
         expect(listedDiaryEntries(), `chip ${label} listed diary count must match`).toHaveLength(
           count,
         );
         expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
-          `Detailed diary: showing ${count} of 6 entries`,
+          `Detailed diary: showing ${count} of 7 entries`,
         );
       }
     }

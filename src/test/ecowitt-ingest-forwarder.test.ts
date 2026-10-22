@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { Duplex } from "node:stream";
 import { parseEcoWittDateUtc } from "../../supabase/functions/_shared/ecowittRoutedRowBuilder.ts";
+import { buildMqttMessage, parseEcowittBody } from "../../scripts/dev/ecowitt-http-local-bridge";
 import {
   GUARD_MALFORMED_PACKET,
   GUARD_PACKET_TOO_LARGE,
@@ -21,6 +22,7 @@ import {
   APPROVED_INGEST_URLS,
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
+  brokerUrlIsHierarchical,
   buildForwardRequest,
   configuredSecretValues,
   createBoundedRunner,
@@ -226,6 +228,36 @@ describe("live config fails closed", () => {
     [{ token: NOT_A_BRIDGE_TOKEN }, "bridge_token_shape"],
   ])("reports %j as %s", (over, problem) => {
     expect(liveConfigProblems({ ...LIVE_ENV, ...over })).toContain(problem);
+  });
+});
+
+describe("brokerUrlIsHierarchical (--mqtt-url admission)", () => {
+  it.each<[string, boolean]>([
+    ["mqtt://127.0.0.1:1883", true],
+    ["mqtt://broker.example:8883", true],
+    ["mqtt://user:pass@127.0.0.1:1883", true],
+    ["not-a-url", false],
+    ["mqtt:user:pass@broker.invalid", false],
+  ])("%s → %s", (url, expected) => {
+    expect(brokerUrlIsHierarchical(url)).toBe(expected);
+  });
+});
+
+describe("HTTP bridge → forwarder (digits-only PASSKEY)", () => {
+  it("accepts the MQTT JSON the bridge publishes for a digits-only PASSKEY upload", () => {
+    const parsed = parseEcowittBody(
+      "PASSKEY=000012345678&temp1f=70&dateutc=2026-10-22+05%3A27%3A14",
+      "application/x-www-form-urlencoded",
+    );
+    expect(parsed?.PASSKEY).toBe("000012345678");
+    const msg = buildMqttMessage(parsed!, "ecowitt/grow", new Date("2026-10-22T12:00:00.000Z"));
+    const out = prepareForwardPayload(msg.payload, new Date("2026-10-22T12:00:00.000Z"));
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.payload.PASSKEY).toBe("000012345678");
+      expect(out.payload.dateutc).toBe("2026-10-22 05:27:14");
+      expect(out.summary.air_channels).toEqual([1]);
+    }
   });
 });
 

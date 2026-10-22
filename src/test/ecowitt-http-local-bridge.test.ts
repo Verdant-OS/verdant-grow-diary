@@ -106,6 +106,11 @@ describe("parseEcowittBody", () => {
 });
 
 describe("parseEcowittBody PASSKEY", () => {
+  it("still coerces non-PASSKEY numeric fields when PASSKEY is digits-only", () => {
+    const parsed = parseEcowittBody("PASSKEY=000012345678&co2=721&temp1f=70.5", undefined);
+    expect(parsed).toEqual({ PASSKEY: "000012345678", co2: 721, temp1f: 70.5 });
+  });
+
   it("keeps a digits-only PASSKEY as the exact string the forwarder accepts (Codex P2 on #2335)", () => {
     const parsed = parseEcowittBody("PASSKEY=000012345678&temp1f=70", undefined);
     expect(parsed).toEqual({ PASSKEY: "000012345678", temp1f: 70 });

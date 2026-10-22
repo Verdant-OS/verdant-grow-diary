@@ -517,10 +517,32 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Marks every occurrence of every configured value, overlapping ones included,
+ * then replaces each merged run once. Replacing one value at a time let a
+ * shorter value that prefixes a longer one (username `mqtt-user`, password
+ * `mqtt-user-password`) cut the longer one first and leak its tail
+ * (Codex P1 on #2335 at ac8be57b).
+ */
 function redactConfiguredSecrets(value: string): string {
-  let out = value;
+  if (configuredSecrets.size === 0 || value.length === 0) return value;
+  const covered = new Uint8Array(value.length);
   for (const secret of configuredSecrets) {
-    out = out.replace(new RegExp(escapeRegExp(secret), "gi"), "(redacted)");
+    const re = new RegExp(escapeRegExp(secret), "gi");
+    for (let m = re.exec(value); m !== null; m = re.exec(value)) {
+      covered.fill(1, m.index, m.index + m[0].length);
+      re.lastIndex = m.index + 1;
+    }
+  }
+  let out = "";
+  let i = 0;
+  while (i < value.length) {
+    if (!covered[i]) {
+      out += value[i++];
+      continue;
+    }
+    while (i < value.length && covered[i]) i++;
+    out += "(redacted)";
   }
   return out;
 }
@@ -1073,6 +1095,12 @@ export async function connectMqtt(
     reconnectPeriod: flags.once ? 0 : 5000,
     connectTimeout: MQTT_CONNECT_TIMEOUT_MS,
     manualConnect: true,
+    // The lifecycle subscribes on every `connect` and needs a real SUBACK each
+    // time. With MQTT.js's default `resubscribe: true` a repeat subscribe to a
+    // remembered topic answers `[]` without asking the broker, which reads as
+    // a refusal and ended continuous mode after an ordinary reconnect
+    // (Codex P2 on #2335 at ac8be57b).
+    resubscribe: false,
   });
   const buildStream = client.streamBuilder;
   if (typeof buildStream !== "function" || typeof client.connect !== "function") {
@@ -1161,7 +1189,18 @@ export async function main(
     once: flags.once,
   });
 
-  const client = await deps.connect(flags, env);
+  let client: MqttClientLike;
+  try {
+    client = await deps.connect(flags, env);
+  } catch {
+    // MQTT.js throws ERR_INVALID_URL for a malformed broker URL with the whole
+    // URL, userinfo included, in `.input`; an escaped rejection prints it. Log
+    // a fixed line without the error, the URL or any field of it, and exit
+    // (Codex P1 on #2335 at ac8be57b).
+    log("mqtt_connect_failed");
+    deps.exit(2);
+    return;
+  }
   const claim: OnceClaim = { claimed: false };
   const finish = (exitCode: number) => {
     client.end?.();

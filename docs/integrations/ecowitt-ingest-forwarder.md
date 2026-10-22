@@ -109,7 +109,8 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - Continuous mode handles at most 4 messages at once and queues at most 32
   more; anything beyond that is dropped with a `dropped_backlog_full` log line,
   so a burst or a slow ingest never fans out into unbounded POSTs and retries.
-  A broker close/offline is logged and left to the client's own reconnect.
+  A broker close/offline is logged and left to the client's own reconnect;
+  each reconnect subscribes again and waits for the broker's own acknowledgement.
 - Every log line passes through a redactor at every depth: `PASSKEY`, `MAC`,
   tokens (also when embedded in another string or a URL), MAC addresses in any
   common form, and the configured MQTT username and password (literally, in any
@@ -120,7 +121,9 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - Arguments are read in order. An unknown argument, a repeated flag, or
   `--topic` / `--mqtt-url` without a non-empty value is refused before any
   connection. An unknown argument is reported by position only, so a mistyped
-  `--password=…` is never printed.
+  `--password=…` is never printed. A broker URL the MQTT client cannot open
+  (for example a malformed one) exits `2` with a fixed `mqtt_connect_failed`
+  line that carries neither the URL nor the error text.
 - A refused subscription (error, no grant, or QoS 128), a subscription that is
   never acknowledged within 20 s, and a refused connection (bad credentials)
   each exit `2` in continuous mode as well, instead of staying connected while

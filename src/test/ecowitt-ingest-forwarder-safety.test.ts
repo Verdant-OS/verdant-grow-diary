@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { DEFAULT_MQTT_TOPIC, DEFAULT_MQTT_URL } from "../../scripts/dev/ecowitt-ingest-forwarder";
 
 const SCRIPT_PATH = resolve(__dirname, "../../scripts/dev/ecowitt-ingest-forwarder.ts");
 const SRC = readFileSync(SCRIPT_PATH, "utf8");
@@ -100,7 +101,8 @@ describe("ecowitt-ingest-forwarder — static safety", () => {
   });
 
   it("uses the documented default broker and topic", () => {
-    expect(SRC).toMatch(/mqtt:\/\/127\.0\.0\.1:1883/);
-    expect(SRC).toMatch(/ecowitt\/grow/);
+    // Resolved values, not source text (AGENTS.md; Codex P2 on #2335 at ac8be57b).
+    expect(DEFAULT_MQTT_URL).toBe("mqtt://127.0.0.1:1883");
+    expect(DEFAULT_MQTT_TOPIC).toBe("ecowitt/grow");
   });
 });

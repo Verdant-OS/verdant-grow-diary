@@ -693,6 +693,143 @@ describe("configured MQTT credentials are redacted (Codex P1 at acab6b12, bae4ae
     prepareForwardPayload(JSON.stringify({ PASSKEY: secret, dateutc: "2026-10-22 05:27:14" }));
     expect(redactString(`x ${secret}`)).toBe(`x ${secret}`);
   });
+
+  it.each([
+    ["username first", ["mqtt-user", "mqtt-user-password"]],
+    ["password first", ["mqtt-user-password", "mqtt-user"]],
+  ])(
+    "redacts a password that a configured username prefixes, whole (%s; Codex P1 at ac8be57b)",
+    (_l, values) => {
+      setConfiguredSecrets(values);
+      expect(redactString("t/mqtt-user-password/x")).toBe("t/(redacted)/x");
+      expect(redactString("t/MQTT-USER-PASSWORD")).toBe("t/(redacted)");
+      expect(redactString("t/mqtt-user/x")).toBe("t/(redacted)/x");
+    },
+  );
+
+  it.each([
+    ["username first", ["grow er", "grow er@pw"]],
+    ["password first", ["grow er@pw", "grow er"]],
+  ])("redacts the URI-encoded form of an overlapping pair whole (%s)", (_l, values) => {
+    setConfiguredSecrets(values);
+    expect(redactString("t/grow%20er%40pw/x")).toBe("t/(redacted)/x");
+    expect(redactString("t/grow er@pw/x")).toBe("t/(redacted)/x");
+  });
+
+  it("redacts two partly overlapping values without leaving either's edge", () => {
+    setConfiguredSecrets(["alpha-beta", "beta-gamma"]);
+    expect(redactString("t/alpha-beta-gamma/x")).toBe("t/(redacted)/x");
+  });
+
+  it("main registers an overlapping URL username and password so a topic echo stays whole", async () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+    });
+    try {
+      const client = { on: () => client, subscribe: () => {}, end: () => {} };
+      await main(
+        [
+          "--mqtt-url",
+          "mqtt://mqtt-user:mqtt-user-password@h:1",
+          "--topic",
+          "t/mqtt-user-password",
+        ],
+        {},
+        { connect: async () => client, exit: vi.fn() },
+      );
+      const startup = lines.find((l) => l.includes("startup")) ?? "";
+      expect(startup).toContain("t/(redacted)");
+      expect(startup).not.toMatch(/password/i);
+    } finally {
+      log.mockRestore();
+    }
+  });
+});
+
+describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)", () => {
+  afterEach(() => setConfiguredSecrets([]));
+  const USER = "leaky-mqtt-user";
+  const PASS = "leaky-mqtt-pass";
+  // A bracketed host that is not an IPv6 address: WHATWG URL (and so MQTT.js)
+  // rejects it with ERR_INVALID_URL and the whole input on the error.
+  const BAD_URL = `mqtt://${USER}:${PASS}@[not-a-host]:1883`;
+  function capture() {
+    const lines: string[] = [];
+    const rec = (...a: unknown[]) => {
+      lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+    };
+    const log = vi.spyOn(console, "log").mockImplementation(rec);
+    const err = vi.spyOn(console, "error").mockImplementation(rec);
+    return {
+      lines,
+      restore: () => {
+        log.mockRestore();
+        err.mockRestore();
+      },
+    };
+  }
+
+  it("the fixture URL really is malformed", () => {
+    expect(() => new URL(BAD_URL)).toThrow();
+  });
+
+  it("a malformed credential-bearing --mqtt-url through connectMqtt exits 2 and never rejects", async () => {
+    const thrown = Object.assign(new TypeError("Invalid URL"), {
+      code: "ERR_INVALID_URL",
+      input: BAD_URL,
+    });
+    const mod = {
+      connect: vi.fn(() => {
+        throw thrown;
+      }),
+    };
+    const exit = vi.fn();
+    const { lines, restore } = capture();
+    try {
+      await expect(
+        main(
+          ["--mqtt-url", BAD_URL],
+          {},
+          {
+            connect: (f, e) => connectMqtt(f, e, async () => mod),
+            exit,
+          },
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(mod.connect).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(lines.some((l) => l.includes("mqtt_connect_failed"))).toBe(true);
+    for (const l of lines) {
+      expect(l).not.toContain(USER);
+      expect(l).not.toContain(PASS);
+    }
+  });
+
+  it("a rejecting connect dependency exits 2 with a fixed line and never rejects", async () => {
+    const exit = vi.fn();
+    const connect = vi.fn(async () => {
+      throw Object.assign(new Error(`connect ${BAD_URL} failed`), { input: BAD_URL });
+    });
+    const { lines, restore } = capture();
+    try {
+      await expect(main(["--once"], {}, { connect, exit })).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(2);
+    for (const l of lines) {
+      expect(l).not.toContain(USER);
+      expect(l).not.toContain(PASS);
+      expect(l).not.toContain("failed`");
+    }
+    expect(lines.filter((l) => l.includes("mqtt_connect_failed"))).toHaveLength(1);
+  });
 });
 
 describe("redaction", () => {
@@ -1629,7 +1766,15 @@ describe("inbound packet guard — production wiring", () => {
         client.url = url;
         client.opts = opts;
         client.connectCalls = 0;
-        client.subscribe = vi.fn();
+        // Mirrors MQTT.js 5.16.1 client.js: with `resubscribe` on (its default)
+        // a topic is remembered, and a repeat subscribe to it answers `[]`
+        // without a SUBACK. With `resubscribe: false` every call is a real one.
+        const remembered = new Set<string>();
+        client.subscribe = vi.fn((topic: string, cb?: (err: null, g: unknown[]) => void) => {
+          if (opts.resubscribe !== false && remembered.has(topic)) return cb?.(null, []);
+          if (opts.resubscribe !== false) remembered.add(topic);
+          cb?.(null, [{ topic, qos: 0 }]);
+        });
         client.end = vi.fn();
         if (!options.noStreamBuilder) {
           client.streamBuilder = () => {
@@ -1667,6 +1812,7 @@ describe("inbound packet guard — production wiring", () => {
     const { mod, sockets, clients } = fakeMqtt();
     const client: any = await connectMqtt(baseFlags(), baseEnv(), async () => mod);
     expect(clients[0].opts.manualConnect).toBe(true);
+    expect(clients[0].opts.resubscribe).toBe(false);
     expect(client.connectCalls).toBe(1);
     expect(sockets).toHaveLength(1);
     expect(client.stream).not.toBe(sockets[0]);
@@ -1690,6 +1836,34 @@ describe("inbound packet guard — production wiring", () => {
     await tick();
     await tick();
     expect(sockets[1].destroyed).toBe(true);
+  });
+
+  it("main wiring: continuous mode resubscribes for real after an ordinary reconnect (Codex P2 at ac8be57b)", async () => {
+    const { mod, clients } = fakeMqtt();
+    const exit = vi.fn();
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+    });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await main([], {}, { connect: (f, e) => connectMqtt(f, e, async () => mod), exit });
+      const client = clients[0];
+      client.emit("connect");
+      client.emit("close");
+      client.emit("offline");
+      client.emit("connect");
+      expect(client.subscribe).toHaveBeenCalledTimes(2);
+      expect(exit).not.toHaveBeenCalled();
+      expect(lines.filter((l) => l.includes("] subscribed"))).toHaveLength(2);
+      client.emit("message", "ecowitt/grow", Buffer.from(GATEWAY_MESSAGE));
+      await vi.waitFor(() => expect(lines.some((l) => l.includes("] dry_run"))).toBe(true));
+      expect(exit).not.toHaveBeenCalled();
+      expect(client.end).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+      err.mockRestore();
+    }
   });
 
   it("refuses to connect when the client has no stream builder to guard", async () => {

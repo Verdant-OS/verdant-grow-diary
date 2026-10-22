@@ -194,14 +194,20 @@ function StartScreenTile({ userId }: { userId: string }) {
 
 function TemperatureUnitTile() {
   const [choice, setChoice] = useState<TemperatureUnitPreference>(DEFAULT_TEMPERATURE_UNIT);
+  // What this device has stored, tracked apart from the unsaved radio choice so
+  // Reset stays available while a non-default override is still persisted.
+  const [stored, setStored] = useState<TemperatureUnitPreference>(DEFAULT_TEMPERATURE_UNIT);
   const [feedback, setFeedback] = useState<PreferenceFeedback | null>(null);
 
   useEffect(() => {
-    setChoice(loadTemperatureUnitPreference());
+    const loaded = loadTemperatureUnitPreference();
+    setChoice(loaded);
+    setStored(loaded);
   }, []);
 
   function onSave() {
     const persisted = saveTemperatureUnitPreference(choice);
+    if (persisted) setStored(choice);
     setFeedback(
       persisted
         ? { kind: "success", message: "Display temperature preference saved." }
@@ -216,6 +222,7 @@ function TemperatureUnitTile() {
     const cleared = clearTemperatureUnitPreference();
     if (cleared) {
       setChoice(DEFAULT_TEMPERATURE_UNIT);
+      setStored(DEFAULT_TEMPERATURE_UNIT);
       setFeedback({ kind: "success", message: "Reverted to Fahrenheit default." });
       return;
     }
@@ -275,7 +282,7 @@ function TemperatureUnitTile() {
           size="sm"
           variant="outline"
           onClick={onReset}
-          disabled={choice === DEFAULT_TEMPERATURE_UNIT}
+          disabled={choice === DEFAULT_TEMPERATURE_UNIT && stored === DEFAULT_TEMPERATURE_UNIT}
           data-testid="temperature-unit-reset"
         >
           Reset to default

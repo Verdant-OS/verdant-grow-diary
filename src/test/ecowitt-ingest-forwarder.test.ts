@@ -6,13 +6,16 @@
  * one bearer-authenticated JSON POST per attempt, and never leak
  * PASSKEY / MAC / token into logs or reports.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APPROVED_INGEST_URLS,
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
   buildForwardRequest,
   buildReport,
+  clearSecretValues,
+  configuredSecretValues,
+  containsSecret,
   createBoundedRunner,
   createSerialQueue,
   MAX_BACKLOG,
@@ -26,6 +29,7 @@ import {
   parseFlags,
   prepareForwardPayload,
   readEnv,
+  registerSecretValue,
   redactForLog,
   redactString,
   summarizeResponse,
@@ -99,6 +103,17 @@ const flags = (over: Partial<ForwarderFlags> = {}): ForwarderFlags => ({
 });
 
 describe("flags and env", () => {
+  it.each([
+    [["--mqtt-url", "--once"], "--mqtt-url"],
+    [["--topic", "--write-report"], "--topic"],
+    [["--once", "--topic"], "--topic"],
+  ])(
+    "rejects a value-taking flag with no value instead of reading the next option as its value (Codex P2 at acab6b12): %j",
+    (argv, flag) => {
+      expect(() => parseFlags(argv, {})).toThrow(`missing_option_value:${flag}`);
+    },
+  );
+
   it("is dry-run by default and reads the documented defaults", () => {
     const f = parseFlags([], {});
     expect(f.live).toBe(false);
@@ -519,6 +534,67 @@ describe("response summary and exit codes", () => {
     ).toBe(1);
     expect(onceExitCode({ kind: "rejected_locally", reason: "missing_passkey" })).toBe(1);
     expect(onceExitCode({ kind: "network_error", summary, error: "x", attempts: 1 })).toBe(1);
+  });
+});
+
+describe("redaction of extracted and configured values (Codex P1 at acab6b12)", () => {
+  afterEach(() => clearSecretValues());
+
+  it("scrubs a non-shape PASSKEY from the summary and report in any case or URI-encoded form", () => {
+    const secret = ["Arbitrary", "Secret", "Value"].join("");
+    const prepared = prepareForwardPayload(
+      JSON.stringify({
+        PASSKEY: secret,
+        stationtype: `GW_${secret.toLowerCase()}`,
+        dateutc: "2026-10-22 05:27:14",
+        temp2f: 80,
+      }),
+    );
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(prepared.summary.station).toBeNull();
+    const report = JSON.stringify(
+      buildReport(
+        {
+          kind: "dry_run",
+          summary: {
+            ...prepared.summary,
+            dateutc: `x ${secret.toUpperCase()} ${encodeURIComponent(`${secret}/`)}`,
+          },
+        },
+        flags({ topic: `bridge/${secret}` }),
+        "2026-10-22T05:27:14.000Z",
+      ),
+    );
+    expect(report.toLowerCase()).not.toContain(secret.toLowerCase());
+    expect(report).toContain("bridge/(redacted)");
+  });
+
+  it("rejects a dateutc that echoes the PASSKEY in another case", () => {
+    const secret = ["Arbitrary", "Secret", "Value"].join("");
+    expect(
+      prepareForwardPayload(
+        JSON.stringify({ PASSKEY: secret, dateutc: `2026 ${secret.toLowerCase()}`, temp2f: 80 }),
+      ),
+    ).toEqual({ ok: false, reason: "invalid_dateutc" });
+  });
+
+  it("registers the MQTT username and password from the environment and the broker URL", () => {
+    const values = configuredSecretValues(
+      flags({ mqttUrl: "mqtt://grower:hunter%402@broker.local:1883" }),
+      { ingestUrl: null, token: null, mqttUsername: "envuser", mqttPassword: "abc" },
+    );
+    expect(values).toEqual(["envuser", "grower", "hunter@2"]);
+    for (const v of values) registerSecretValue(v);
+    expect(redactString("topic/grower/hunter@2/ENVUSER")).toBe(
+      "topic/(redacted)/(redacted)/(redacted)",
+    );
+    expect(containsSecret("abc")).toBe(false);
+  });
+
+  it("ignores values under four characters so ordinary text is not redacted", () => {
+    registerSecretValue("abc");
+    expect(redactString("abc abcd")).toBe("abc abcd");
   });
 });
 
@@ -1023,6 +1099,32 @@ describe("attachClientLifecycle (--once broker failures)", () => {
       handlers.get("connect")?.();
       expect(onFatal).toHaveBeenCalledTimes(1);
       expect(onFatal).toHaveBeenCalledWith(2);
+    },
+  );
+
+  it.each([
+    ["QoS 128 grant", null, [{ topic: "ecowitt/grow", qos: 128 }]],
+    ["subscribe error", new Error("not authorised"), undefined],
+  ] as const)(
+    "exits 2 in continuous mode too when the subscription is refused, instead of idling with no messages (Codex P2 at acab6b12): %s",
+    (_label, err, granted) => {
+      const handlers = new Map<string, (...args: unknown[]) => void>();
+      const client = {
+        on: (event: string, listener: (...args: unknown[]) => void) =>
+          handlers.set(event, listener),
+        subscribe: (
+          _topic: string,
+          cb?: (err?: Error | null, g?: ReadonlyArray<{ topic: string; qos: number }>) => void,
+        ) => cb?.(err, granted as ReadonlyArray<{ topic: string; qos: number }> | undefined),
+      };
+      const onFatal = vi.fn();
+      attachClientLifecycle(client, { flags: flags({ once: false }), onFatal });
+      handlers.get("connect")?.();
+      expect(onFatal).toHaveBeenCalledTimes(1);
+      expect(onFatal).toHaveBeenCalledWith(2);
+      // A later close in continuous mode is still left to the client's reconnect.
+      handlers.get("close")?.();
+      expect(onFatal).toHaveBeenCalledTimes(1);
     },
   );
 

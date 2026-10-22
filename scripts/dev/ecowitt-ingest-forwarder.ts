@@ -101,10 +101,20 @@ export interface ForwarderEnv {
   mqttPassword: string | null;
 }
 
+/**
+ * Pure. Throws `missing_option_value:<flag>` when a value-taking flag is last
+ * or followed by another option, so `--mqtt-url --once` never reaches the
+ * broker with `--once` as its URL (Codex P2 on #2335 at acab6b12).
+ */
 export function parseFlags(argv: readonly string[], env: NodeJS.ProcessEnv): ForwarderFlags {
   const get = (name: string): string | undefined => {
     const i = argv.indexOf(name);
-    return i >= 0 && i + 1 < argv.length ? argv[i + 1] : undefined;
+    if (i < 0) return undefined;
+    const value = argv[i + 1];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`missing_option_value:${name}`);
+    }
+    return value;
   };
   return {
     live: argv.includes("--live"),
@@ -234,6 +244,9 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   if (passkey === undefined || passkey === null) return { ok: false, reason: "missing_passkey" };
   if (typeof passkey !== "string") return { ok: false, reason: "invalid_passkey" };
   if (!passkey.trim()) return { ok: false, reason: "missing_passkey" };
+  // The extracted value is a credential whatever its shape: from here on the
+  // redactor scrubs it literally and case-insensitively (Codex P1 at acab6b12).
+  registerSecretValue(passkey);
   const dateutcKey = findKey(payload, "dateutc");
   const dateutcRaw = dateutcKey ? payload[dateutcKey] : undefined;
   if (dateutcRaw === undefined || dateutcRaw === null) {
@@ -244,7 +257,7 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   // PASSKEY in `dateutc` beside other text would otherwise reach the summary,
   // where the standalone-shape redactor cannot see it (Codex P1 on #2335 at
   // 3df0e691). Checked before truncation so a cut fragment cannot slip through.
-  if (dateutcRaw.includes(passkey)) return { ok: false, reason: "invalid_dateutc" };
+  if (containsSecret(dateutcRaw)) return { ok: false, reason: "invalid_dateutc" };
   const dateutc = dateutcRaw.trim().slice(0, MAX_SUMMARY_STRING);
   if (!dateutc) return { ok: false, reason: "missing_dateutc" };
 
@@ -262,9 +275,7 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   // text field; never let a credential value reach the summary (Codex P1 on
   // #2335 at 79ce2801 and 0676e200).
   const station =
-    typeof stationRaw === "string" &&
-    !stationRaw.includes(passkey) &&
-    redactString(stationRaw) === stationRaw
+    typeof stationRaw === "string" && !containsSecret(stationRaw)
       ? stationRaw.slice(0, MAX_SUMMARY_STRING)
       : null;
   return {
@@ -373,9 +384,49 @@ const URL_USERINFO_RE = /(\/\/)[^/\s]*@/g;
 /** `?token=…`, `&password=…` and similar query credentials. */
 const URL_SECRET_QUERY_RE = /([?&](?:token|key|api_key|password|passkey|secret)=)[^&\s]*/gi;
 
-/** Pure. Redacts embedded tokens and URL credentials inside one string. */
+/**
+ * Credential values known at run time: the PASSKEY extracted from each
+ * message, and the MQTT username and password from the environment or the
+ * broker URL. A PASSKEY need not be a 32-hex digest, and a hostile field can
+ * echo it in another case or URI-encoded, so these are scrubbed literally,
+ * case-insensitively and in their encoded form, ahead of the shape rules
+ * (Codex P1 on #2335 at acab6b12). Values under 4 characters are not
+ * registered: they would redact ordinary text.
+ */
+const knownSecrets = new Set<string>();
+
+export function registerSecretValue(value: string | null | undefined): void {
+  if (typeof value !== "string" || value.length < 4) return;
+  knownSecrets.add(value);
+  const encoded = encodeURIComponent(value);
+  if (encoded !== value) knownSecrets.add(encoded);
+}
+
+/** Test seam: forgets every registered value. */
+export function clearSecretValues(): void {
+  knownSecrets.clear();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function redactKnownSecrets(value: string): string {
+  let out = value;
+  for (const secret of knownSecrets) {
+    out = out.replace(new RegExp(escapeRegExp(secret), "gi"), "(redacted)");
+  }
+  return out;
+}
+
+/** Pure given the registry. True when the redactor would change the string. */
+export function containsSecret(value: string): boolean {
+  return redactString(value) !== value;
+}
+
+/** Pure given the registry. Redacts known values, credential shapes and URL credentials inside one string. */
 export function redactString(value: string): string {
-  return value
+  return redactKnownSecrets(value)
     .replace(EMBEDDED_SECRET_RE, "(redacted)")
     .replace(MAC_RE, "(redacted)")
     .replace(HEX32_RE, "(redacted)")
@@ -565,13 +616,21 @@ export function createSerialQueue(): SerialQueue {
 
 const reportWrites = createSerialQueue();
 
-function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Promise<void> {
+/**
+ * The production report writer: one write at a time through `reportWrites`,
+ * and the previous report is replaced only once the new document is complete
+ * (temporary file in the same directory, then rename), so an interrupted
+ * write never leaves an empty or partial file (Codex P2 on #2335 at acab6b12).
+ */
+export function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Promise<void> {
   return reportWrites.run(async () => {
-    const { mkdir, writeFile } = await import("node:fs/promises");
+    const { mkdir, rename, writeFile } = await import("node:fs/promises");
     const path = await import("node:path");
     const report = buildReport(outcome, flags, new Date().toISOString());
     await mkdir(path.dirname(DEFAULT_REPORT_PATH), { recursive: true });
-    await writeFile(DEFAULT_REPORT_PATH, JSON.stringify(report, null, 2), "utf8");
+    const partial = `${DEFAULT_REPORT_PATH}.partial`;
+    await writeFile(partial, JSON.stringify(report, null, 2), "utf8");
+    await rename(partial, DEFAULT_REPORT_PATH);
     log("report written", { path: DEFAULT_REPORT_PATH });
   });
 }
@@ -739,7 +798,12 @@ export interface MqttClientLike {
 
 export interface ClientLifecycleDeps {
   flags: ForwarderFlags;
-  /** Called once in `--once` mode when the broker connection or subscription fails. */
+  /**
+   * Called once when the run cannot continue: in `--once` mode on any broker
+   * failure before the claim; in every mode when the subscription is refused,
+   * since a connected client with no subscription would idle forever and
+   * silently lose readings (Codex P2 on #2335 at acab6b12).
+   */
   onFatal: (exitCode: number) => void;
   connectTimeoutMs?: number;
   /** The handler's `--once` claim; once set, a broker error no longer ends the run. */
@@ -755,7 +819,7 @@ export interface ClientLifecycleDeps {
 export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecycleDeps): void {
   let connected = false;
   let ended = false;
-  const fatal = (reason: string, fields: Record<string, unknown> = {}) => {
+  const fatal = (reason: string, fields: Record<string, unknown> = {}, terminal = false) => {
     if (deps.flags.once && deps.claim?.claimed) {
       // The one message is already in flight; its own result sets the exit
       // code, so a broker error now is logged, not fatal (Codex P2 at 3df0e691).
@@ -763,7 +827,7 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
       return;
     }
     log("mqtt_fatal", { reason, ...fields });
-    if (deps.flags.once && !ended) {
+    if ((deps.flags.once || terminal) && !ended) {
       ended = true;
       deps.onFatal(2);
     }
@@ -781,14 +845,16 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
   client.on("connect", () => {
     connected = true;
     client.subscribe(deps.flags.topic, (err, granted) => {
-      if (err) return fatal("subscribe_failed", { error: err.message });
+      if (err) return fatal("subscribe_failed", { error: err.message }, true);
       // A broker can refuse the topic without an error: the SUBACK grant comes
       // back with QoS 128, or with no grant at all (Codex P2 on #2335 at 5a7accaf).
       const refused =
         !Array.isArray(granted) ||
         granted.length === 0 ||
         granted.some((grant) => !grant || grant.qos === 128);
-      if (refused) return fatal("subscribe_failed", { error: "subscription refused by broker" });
+      if (refused) {
+        return fatal("subscribe_failed", { error: "subscription refused by broker" }, true);
+      }
       if (timer) clearTimeout(timer);
       log("subscribed", { topic: deps.flags.topic });
     });
@@ -824,9 +890,35 @@ async function connectMqtt(flags: ForwarderFlags, env: ForwarderEnv): Promise<an
   });
 }
 
+/**
+ * Pure. The credential values a run knows before any message arrives: the
+ * MQTT username and password from the environment and from the broker URL's
+ * userinfo, so a topic or payload that echoes them is redacted literally.
+ */
+export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv): string[] {
+  const values = [env.mqttUsername, env.mqttPassword];
+  try {
+    const url = new URL(flags.mqttUrl);
+    values.push(decodeURIComponent(url.username), decodeURIComponent(url.password));
+  } catch {
+    // An unparseable broker URL is the MQTT client's error to report.
+  }
+  return values.filter((v): v is string => typeof v === "string" && v.length >= 4);
+}
+
 export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEnv): Promise<void> {
-  const flags = parseFlags(argv, processEnv);
+  let flags: ForwarderFlags;
+  try {
+    flags = parseFlags(argv, processEnv);
+  } catch (e) {
+    console.error(
+      `[ecowitt-forwarder] refused: ${e instanceof Error ? e.message : "bad_arguments"}. ` +
+        "--topic and --mqtt-url each take a value.",
+    );
+    process.exit(2);
+  }
   const env = readEnv(processEnv);
+  for (const value of configuredSecretValues(flags, env)) registerSecretValue(value);
 
   if (flags.live) {
     const problems = liveConfigProblems(env);

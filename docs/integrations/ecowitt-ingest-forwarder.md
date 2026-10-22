@@ -103,6 +103,17 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
   as much as in the outcome. The Mosquitto watcher window still shows the raw topic, so
   crop it from anything you share.
 
+- The redactor also scrubs the credential values a run actually holds: the
+  PASSKEY extracted from each message, and the MQTT username and password from
+  the environment or the broker URL, literally, in any case and URI-encoded.
+  A `dateutc` or `stationtype` that echoes one of them is rejected or dropped.
+- `--topic` and `--mqtt-url` must be followed by a value; `--mqtt-url --once`
+  is refused before any connection (`missing_option_value`).
+- A refused subscription (error, no grant, or QoS 128) exits `2` in continuous
+  mode as well, instead of staying connected while consuming nothing.
+- The `--write-report` file is written to a `.partial` neighbour and renamed
+  into place, so an interrupted write never leaves an empty or truncated report.
+
 ## What it never does
 
 No Supabase SDK, no `service_role`, no direct database access, no Action

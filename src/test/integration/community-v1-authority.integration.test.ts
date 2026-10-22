@@ -517,6 +517,18 @@ function everyClientCall(context: {
     ["community_profile_deactivate", {}],
   ];
 }
+/**
+ * One digest of every Community table's rows except the switch itself, so a
+ * call that writes and then reports `unavailable` is still caught.
+ */
+function communityStateFingerprint(): string {
+  const parts = TABLES.filter(([table]) => table !== "community_feature_state").map(
+    ([table]) =>
+      `(SELECT coalesce(string_agg(x::text, '|' ORDER BY x::text), '') FROM public.${table} x)`,
+  );
+  return sql(`SELECT md5(concat_ws('#', ${parts.join(", ")}));`);
+}
+
 /** Returns every call whose result was not the generic `unavailable`. */
 async function notUnavailable(
   client: SupabaseClient,
@@ -992,9 +1004,20 @@ d("community v1 authority (local DB)", () => {
       );
     const delivered = ok(await read(viewer, collection)).items;
     expect(delivered.map(display)).toEqual(shown.entries.map(display));
-    expect(delivered[0].measurements).toEqual(
-      expect.arrayContaining([expect.objectContaining({ provenance: "manual" })]),
-    );
+    // The three selected measurements, each against the seeded watering row
+    // (500 ml, pH 6.2, EC 1.4), all manual: never invented, zeroed or swapped.
+    const measured: Json[] = delivered[0].measurements;
+    expect(measured).toHaveLength(3);
+    for (const m of measured) {
+      expect(m.provenance).toBe("manual");
+      expect(typeof m.name).toBe("string");
+      expect(typeof m.unit).toBe("string");
+    }
+    const valueOf = (pattern: RegExp) =>
+      measured.filter((m) => pattern.test(String(m.name))).map((m) => m.value);
+    expect(valueOf(/volume/i)).toEqual([500]);
+    expect(valueOf(/(^|[._\s])ph($|[._\s])/i)).toEqual([6.2]);
+    expect(valueOf(/(^|[._\s])ec($|[._\s])/i)).toEqual([1.4]);
     // Exact reader-facing fields: no full instant, source id, preview binding or private key.
     const publicationKeys = [
       "action",
@@ -1163,14 +1186,22 @@ d("community v1 authority (local DB)", () => {
       draft(kept, { sharedNote: "same" }),
       draft(changed, { sharedNote: "v1" }),
     ]);
-    const first = handlesOf(ok(await read(viewer, collection)).items);
+    const byNote = (items: Json[]) =>
+      new Map(items.map((item) => [item.note as string, item.publicationHandle as string]));
+    const first = byNote(ok(await read(viewer, collection)).items);
     await publish(owner, collection, [
       draft(kept, { sharedNote: "same" }),
       draft(changed, { sharedNote: "v2" }),
     ]);
-    const second = handlesOf(ok(await read(viewer, collection)).items);
+    const secondItems = ok(await read(viewer, collection)).items;
+    const second = handlesOf(secondItems);
+    const renewed = byNote(secondItems);
     expect(second).toHaveLength(2);
-    expect(second.filter((h) => first.includes(h))).toHaveLength(1);
+    // The unchanged slot keeps its handle; only the changed slot is renewed.
+    expect(renewed.get("same")).toBe(first.get("same"));
+    expect(renewed.get("v2")).toEqual(expect.any(String));
+    expect(renewed.get("v2")).not.toBe(first.get("v1"));
+    expect(renewed.has("v1")).toBe(false);
     const digestHandles = handlesOf((await digest(viewer)).items);
     expect([...digestHandles].sort()).toEqual([...second].sort());
   }, 60_000);
@@ -1409,6 +1440,8 @@ d("community v1 authority (local DB)", () => {
         p_reason_text: "",
       }),
     );
+    // A valid preview minted before the removal: publish must recheck it.
+    const pending = await preview(owner, collection, [draft(diaryEntry(owner))]);
     const moderator = await participant("mod3m");
     sql(`INSERT INTO public.community_moderators (user_id) VALUES (${lit(moderator.id)});`);
     expect(
@@ -1420,6 +1453,14 @@ d("community v1 authority (local DB)", () => {
         }),
       ).status,
     ).toBe("removed");
+    denied(await read(reader, collection), "unavailable");
+    denied(
+      await rpc(owner.client, "community_publish", {
+        p_collection_handle: collection,
+        p_preview_token: pending.previewToken,
+      }),
+      "unavailable",
+    );
     denied(await read(reader, collection), "unavailable");
     denied(
       await rpc(owner.client, "community_preview_create", {
@@ -1467,6 +1508,12 @@ d("community v1 authority (local DB)", () => {
     );
     await publish(owner, collection, ties);
     const all = (await digest(viewer)).items;
+    // The oracle must be complete: exactly the five tie entries, each once.
+    expect(all).toHaveLength(5);
+    expect(new Set(handlesOf(all)).size).toBe(5);
+    expect(all.map((item: Json) => item.publication.note).sort()).toEqual(
+      Array.from({ length: 5 }, (_, i) => `tie ${i}`),
+    );
     expect(new Set(all.map((item: Json) => item.publication.publishedAt)).size).toBe(1);
     const expected = handlesOf(all);
     expect(expected).toEqual([...expected].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)));
@@ -1525,7 +1572,45 @@ d("community v1 authority (local DB)", () => {
     const { preview: shown, published } = await publish(owner, collection, [
       draft(diaryEntry(owner)),
     ]);
-    const bodies = [shown, published, ok(await read(viewer, collection)), await digest(viewer)];
+    // At least one successful response from every RPC response shape (Codex P2 at d0a009fb).
+    const requester = await participant("fmt1q");
+    const accessRequested = ok(
+      await rpc(requester.client, "community_access_request", { p_collection_handle: collection }),
+    );
+    const reported = ok(
+      await rpc(viewer.client, "community_report_create", {
+        p_publication_handle: ok(await read(viewer, collection)).items[0].publicationHandle,
+        p_reason_code: "other",
+        p_reason_text: "",
+      }),
+    );
+    const moderator = await participant("fmt1m");
+    sql(`INSERT INTO public.community_moderators (user_id) VALUES (${lit(moderator.id)});`);
+    const bodies = [
+      shown,
+      published,
+      ok(await read(viewer, collection)),
+      await digest(viewer),
+      ok(await rpc(owner.client, "community_source_entries", { p_cursor: null, p_limit: 20 })),
+      accessRequested,
+      reported,
+      ok(await rpc(moderator.client, "community_moderation_list", { p_cursor: null, p_limit: 20 })),
+      ok(
+        await rpc(owner.client, "community_profile_upsert", {
+          p_username: owner.username,
+          p_display_name: "Format check",
+          p_bio: "",
+        }),
+      ),
+      ok(
+        await rpc(owner.client, "community_collection_draft", {
+          p_collection_handle: collection,
+          p_title: "Tent log",
+          p_source_label: "Main tent",
+          p_description: "",
+        }),
+      ),
+    ];
     const stamps: string[] = [];
     const walk = (node: Json) => {
       if (Array.isArray(node)) node.forEach(walk);
@@ -1554,6 +1639,11 @@ d("community v1 authority (local DB)", () => {
         targets.push(await participant(`rl1t${i}`));
       }
     }
+    const followsBefore = Number(
+      sql(
+        `SELECT count(*) FROM public.community_follows WHERE follower_id = ${lit(actor.communityId)};`,
+      ),
+    );
     const follows = await race(
       await holdRowLock("community_profiles", "id", actor.communityId),
       targets.map((target) => () => follow(actor, target)),
@@ -1562,7 +1652,18 @@ d("community v1 authority (local DB)", () => {
     expect(follows.filter((r) => !r.ok).map((r) => (r as { code: string }).code)).toEqual([
       "rate_limited",
     ]);
+    // The limit holds in storage, not only in the returned codes (Codex P1 at d0a009fb).
+    expect(
+      Number(
+        sql(
+          `SELECT count(*) FROM public.community_follows WHERE follower_id = ${lit(actor.communityId)};`,
+        ),
+      ) - followsBefore,
+    ).toBe(20);
 
+    const accessRowsBefore = Number(
+      sql(`SELECT count(*) FROM public.community_collection_access;`),
+    );
     const requests = await race(
       await holdRowLock("community_profiles", "id", actor.communityId),
       collections.map(
@@ -1574,6 +1675,9 @@ d("community v1 authority (local DB)", () => {
     expect(requests.filter((r) => !r.ok).map((r) => (r as { code: string }).code)).toEqual([
       "rate_limited",
     ]);
+    expect(
+      Number(sql(`SELECT count(*) FROM public.community_collection_access;`)) - accessRowsBefore,
+    ).toBe(10);
   }, 240_000);
 
   it("T-RL-02 the 31st search in a minute is rate limited and prefixes never match", async () => {
@@ -1631,13 +1735,15 @@ d("community v1 authority (local DB)", () => {
     const moderator = await participant("ks1m");
     sql(`INSERT INTO public.community_moderators (user_id) VALUES (${lit(moderator.id)});`);
     const quitter = await participant("ks1d");
-    const pending = await preview(owner, collection, [draft(diaryEntry(owner))]);
+    // The publish probe runs on `second`, so the reader and report fixtures on
+    // `collection` keep a current publication handle (Copilot on #2301 at d0a009fb).
+    const pending = await preview(owner, second, [draft(diaryEntry(owner))]);
 
     const calls: Array<[Actor, string, () => Record<string, unknown>]> = [
       [
         owner,
         "community_publish",
-        () => ({ p_collection_handle: collection, p_preview_token: pending.previewToken }),
+        () => ({ p_collection_handle: second, p_preview_token: pending.previewToken }),
       ],
       [
         owner,
@@ -1721,20 +1827,26 @@ d("community v1 authority (local DB)", () => {
     ];
     expect(new Set(calls.map(([, fn]) => fn)).size).toBe(20);
     const leaks: string[] = [];
-    const baselineUnavailable: string[] = [];
+    const mutatedWhileOff: string[] = [];
+    const baselineFailed: string[] = [];
     try {
       for (const [actor, fn, args] of calls) {
         sql(`UPDATE public.community_feature_state SET enabled = false;`);
+        const before = communityStateFingerprint();
         const off = await rpc(actor.client, fn, args());
         if (!(off.ok === false && off.code === "unavailable")) leaks.push(fn);
+        // A call may not write and then report unavailable (Codex P1 at d0a009fb).
+        if (communityStateFingerprint() !== before) mutatedWhileOff.push(fn);
         sql(`UPDATE public.community_feature_state SET enabled = true;`);
         const on = await rpc(actor.client, fn, args());
-        if (on.ok === false && on.code === "unavailable") baselineUnavailable.push(fn);
+        // With the switch on, every probe is an authorized, valid call that succeeds.
+        if (!on.ok) baselineFailed.push(`${fn}:${(on as { code: string }).code}`);
       }
     } finally {
       sql(`UPDATE public.community_feature_state SET enabled = true;`);
     }
     expect(leaks).toEqual([]);
-    expect(baselineUnavailable).toEqual([]);
+    expect(mutatedWhileOff).toEqual([]);
+    expect(baselineFailed).toEqual([]);
   }, 180_000);
 });

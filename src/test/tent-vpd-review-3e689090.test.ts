@@ -229,3 +229,32 @@ describe("a calculated VPD is checked against the pair it came from (P2 at 3e689
     expect(canonical?.kpa).toBeCloseTo(1.19, 2);
   });
 });
+
+describe("raw rejected siblings withhold a raw VPD without the snapshot (P1 at 413fdbd2)", () => {
+  it.each([
+    ["degraded RH", row("humidity_pct", 55, T, "live", "degraded")],
+    ["invalid-source RH", row("humidity_pct", 55, T, "invalid", null)],
+    ["stale-source temperature", row("temperature_c", 24, T, "stale", "ok")],
+  ])(
+    "withholds a live raw VPD beside a %s while the snapshot is unavailable",
+    (_label, sibling) => {
+      const vpd = tonightVpd({
+        rows: [row("vpd_kpa", 1.2, T), sibling],
+        status: "success",
+        snapshot: null,
+      });
+      expect(vpd.state).toBe("invalid");
+      expect(vpd.value).toBeNull();
+    },
+  );
+
+  it("keeps the raw VPD when the rejected raw sibling belongs to another capture", () => {
+    const vpd = tonightVpd({
+      rows: [row("vpd_kpa", 1.2, T), row("humidity_pct", 55, at(60), "live", "degraded")],
+      status: "success",
+      snapshot: null,
+    });
+    expect(vpd.state).toBe("value");
+    expect(vpd.value).toBe(1.2);
+  });
+});

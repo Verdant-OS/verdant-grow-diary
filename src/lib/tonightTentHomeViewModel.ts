@@ -14,13 +14,17 @@ import {
 } from "@/lib/sensor/sensorSourceRules";
 import {
   selectDashboardSensorEvidenceRows,
+  selectRejectedQualityRows,
   type DashboardSensorEvidenceRow,
 } from "@/lib/dashboardSensorEvidenceRules";
 import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
-import type { SensorSnapshotCaptureEvidence } from "@/lib/sensorSnapshotCaptureEvidence";
+import type {
+  SensorSnapshotCaptureEvidence,
+  SensorSnapshotRejectedQualityRow,
+} from "@/lib/sensorSnapshotCaptureEvidence";
 import {
   rowCaptureRef,
   snapshotCaptureRef,
@@ -437,11 +441,10 @@ function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | nu
  * capture, the raw row as well as the snapshot copy (Codex P1 at b2606eca).
  */
 function captureHasRejectedSibling(
-  snap: TonightSnapshot | null,
+  rejected: readonly SensorSnapshotRejectedQualityRow[],
   ref: SensorCaptureRef | null,
   atMs: number,
 ): boolean {
-  const rejected = snap?.rejected_quality_rows ?? [];
   return rejected.some((row) => {
     const rowRef = sensorCaptureRef(row.captured_at, row.source);
     if (ref && rowRef) return ref === rowRef;
@@ -470,6 +473,13 @@ export function buildTonightTentMetrics(input: {
   for (const metric of METRICS) byKey.set(metric.key, []);
 
   const snap = input.snapshot.status === "ok" ? input.snapshot.snapshot : null;
+  // Rejected siblings come from the raw rows as well as the snapshot, so a raw
+  // candidate is withheld even while the snapshot is loading or unavailable
+  // (Codex P1 on #2303 at 413fdbd2).
+  const rejectedSiblings: SensorSnapshotRejectedQualityRow[] = [
+    ...(snap?.rejected_quality_rows ?? []),
+    ...(rowsFailed(input.rowsRead.status) ? [] : selectRejectedQualityRows(input.rows ?? [])),
+  ];
   for (const { key, readingMetric } of METRICS) {
     const candidates = byKey.get(key)!;
     for (const row of evidenceRows) {
@@ -480,7 +490,7 @@ export function buildTonightTentMetrics(input: {
       const ref = rowCaptureRef(row);
       candidates.push({
         value: row.value,
-        source: captureHasRejectedSibling(snap, ref, when.epochMs)
+        source: captureHasRejectedSibling(rejectedSiblings, ref, when.epochMs)
           ? "invalid"
           : normalizeSensorSource(row.source),
         ...when,
@@ -503,7 +513,7 @@ export function buildTonightTentMetrics(input: {
     ) {
       const snapRef = snapshotCaptureRef(snap, key);
       const atMs = Date.parse(snap.metric_refs?.[key]?.captured_at ?? snap.ts ?? "");
-      const metricSource = captureHasRejectedSibling(snap, snapRef, atMs)
+      const metricSource = captureHasRejectedSibling(rejectedSiblings, snapRef, atMs)
         ? "invalid"
         : snapshotMetricSource(snap, key, snapSource);
       candidates.push({

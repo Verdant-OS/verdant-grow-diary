@@ -1923,3 +1923,33 @@ describe("inbound packet guard — production wiring", () => {
     expect(clients[0].end).toHaveBeenCalled();
   });
 });
+
+describe("attachClientLifecycle (continuous reconnect before SUBACK)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("gives a reconnect its own SUBACK deadline after a close before SUBACK (Codex P1 at 95f5dfe7)", () => {
+    vi.useFakeTimers();
+    const handlers = new Map<string, (...args: unknown[]) => void>();
+    const pending: Array<
+      (err?: Error | null, granted?: ReadonlyArray<{ topic: string; qos: number }>) => void
+    > = [];
+    const client = {
+      on: (event: string, listener: (...args: unknown[]) => void) => handlers.set(event, listener),
+      subscribe: (_topic: string, cb?: (typeof pending)[number]) => void (cb && pending.push(cb)),
+    };
+    const onFatal = vi.fn();
+    attachClientLifecycle(client, { flags: flags({ once: false }), onFatal, connectTimeoutMs: 40 });
+    handlers.get("connect")?.();
+    vi.advanceTimersByTime(25);
+    handlers.get("close")?.();
+    vi.advanceTimersByTime(5);
+    handlers.get("connect")?.();
+    vi.advanceTimersByTime(20);
+    // The dropped connection's callback is stale: it must neither fail nor clear the new deadline.
+    pending[0](new Error("Connection closed"));
+    expect(onFatal).not.toHaveBeenCalled();
+    pending[1](null, [{ topic: "ecowitt/grow", qos: 0 }]);
+    vi.advanceTimersByTime(1_000);
+    expect(onFatal).not.toHaveBeenCalled();
+  });
+});

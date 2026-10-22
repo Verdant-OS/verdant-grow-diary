@@ -875,6 +875,9 @@ export interface ClientLifecycleDeps {
 export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecycleDeps): void {
   let connected = false;
   let ended = false;
+  // Bumped on every connect and on close/offline, so a SUBACK callback from a
+  // connection that has since dropped cannot clear or trip the new deadline.
+  let generation = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const fatal = (reason: string, fields: Record<string, unknown> = {}, terminal = false) => {
     if (deps.flags.once && deps.claim?.claimed) {
@@ -907,8 +910,10 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
   if (deps.flags.once) armDeadline();
   client.on("connect", () => {
     connected = true;
+    const gen = ++generation;
     armDeadline();
     client.subscribe(deps.flags.topic, (err, granted) => {
+      if (gen !== generation) return;
       if (err) return fatal("subscribe_failed", { error: err.message }, true);
       // A broker can refuse the topic without an error: the SUBACK grant comes
       // back with QoS 128, or with no grant at all (Codex P2 on #2335 at 5a7accaf).
@@ -938,8 +943,14 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
   // event and leaves the client's own reconnect to it.
   for (const event of ["close", "offline"] as const) {
     client.on(event, () => {
-      if (deps.flags.once) fatal(`mqtt_${event}`);
-      else log(`mqtt_${event}`, { reconnecting: true });
+      if (deps.flags.once) return fatal(`mqtt_${event}`);
+      // A connection lost before its SUBACK must not leave its deadline armed:
+      // the next connect would inherit only the time left (Codex P1 at 95f5dfe7).
+      connected = false;
+      generation += 1;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      log(`mqtt_${event}`, { reconnecting: true });
     });
   }
 }

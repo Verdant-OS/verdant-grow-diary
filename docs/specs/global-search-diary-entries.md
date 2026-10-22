@@ -45,11 +45,12 @@ switch know only grow / tent / plant / cultivar.
      every grower's diary entries (`20260517010926_65004f70-….sql:67–74`), so RLS alone is not
      owner scoping.
 2. Each result shows a ~80-character note excerpt with the match, the plant or tent name
-   when known, and the local date (`formatSnapshotTimestamp`). Names come from the same
-   owner-scoped read (a relation select on `plants(name)` / `tents(name)`, or one batched
-   owner-scoped lookup of the result ids); when a name is unavailable the result shows
-   "Plant" or "Tent", never a raw id. Selecting a result opens the Timeline for **that
-   entry's grow** with the `timeline-entry-<id>` hash:
+   when known, and the local date (`formatSnapshotTimestamp`). Names come from one batched
+   owner-scoped lookup of the result ids (session identity; generated `diary_entries` /
+   `grow_events` relationship metadata has no plants/tents embed, so a relation select
+   cannot supply them). When a name is unavailable the result shows "Plant" or "Tent",
+   never a raw id. Selecting a result opens the Timeline for **that entry's grow**
+   with the `timeline-entry-<id>` hash:
    - Before anchoring, the handoff clears any active Timeline filter (plant, tent, type,
      search, date) that would hide the entry.
    - A diary companion that `collapseQuickLogSaveFanOut` (`src/lib/timelineMergeRules.ts:312`,
@@ -96,7 +97,14 @@ ordered `occurred_at desc, id desc`) and over
 limit, matching `orderNewestFirstStable` (`src/lib/timelineQueryOrderRules.ts:16`), so ties on
 `entry_at` cannot select different rows on successive reads. The `user_id` filter uses the
 authenticated session's id (never a value from the UI) and only narrows the operator case
-above. Cost: one extra request per search; `%q%` scans are unindexed (acceptable at current
+above. That select returns plant and tent ids only. Generated relationship metadata has no
+plants/tents embed (`diary_entries` → grows only; `grow_events` has none), so names cannot
+come from this query. Fill them with one batched owner-scoped lookup of the result ids,
+using session identity (the same `user_id` filter `useTimelineNameDirectory` uses, because
+operator RLS can otherwise return every grower's names):
+`.from("plants"|"tents").select("id,name").in("id", ids).eq("user_id", <session user id>)`.
+Missing names show "Plant" or "Tent", never a raw id. Cost: the diary/spine reads plus at
+most one batched name lookup; `%q%` scans are unindexed (acceptable at current
 diary sizes; `NOT_MEASURED` at scale). **Privacy:** PostgREST reads are GET requests, so the
 `ilike` filter, and with it the grower's search text, is in the request URL. Option A is
 acceptable only if the owner explicitly accepts that.

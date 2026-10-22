@@ -128,4 +128,43 @@ describe("Sensors VPD card with only a calculated VPD", () => {
     mount();
     expect(screen.getByTestId("chart-vpd")).toBeInTheDocument();
   });
+
+  it("uses the derived-only empty copy, not the generic no-value copy", () => {
+    state.sensors = [{ ...manual(), vpd: 0, observedMetrics: ["temp", "rh"] }];
+    state.manuals.data = [];
+    mount();
+    expect(screen.getByTestId("sensors-empty-vpd")).toHaveTextContent(
+      "No recorded VPD history to chart yet. The value below is calculated from temperature and humidity.",
+    );
+  });
+
+  it("does not use the derived chart copy when VPD cannot be calculated yet", () => {
+    state.sensors = [];
+    state.manuals.data = [];
+    mount();
+    expect(screen.queryByTestId("sensors-vpd-derived-value")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sensors-empty-vpd")).toHaveTextContent(
+      "Needs temperature + humidity",
+    );
+  });
+
+  it("still charts when an older capture recorded VPD but the newest capture did not", () => {
+    const older: SensorReading = {
+      ...manual(),
+      ts: new Date(Date.now() - 60_000).toISOString(),
+      capturedAt: new Date(Date.now() - 60_000).toISOString(),
+      vpd: 1.05,
+      observedMetrics: ["temp", "rh", "vpd"],
+    };
+    const newer: SensorReading = {
+      ...manual(),
+      vpd: 0,
+      observedMetrics: ["temp", "rh"],
+    };
+    state.sensors = [newer, older];
+    state.manuals.data = [];
+    mount();
+    expect(screen.queryByTestId("sensors-vpd-derived-value")).not.toBeInTheDocument();
+    expect(screen.getByTestId("chart-vpd")).toBeInTheDocument();
+  });
 });

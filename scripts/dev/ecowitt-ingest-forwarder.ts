@@ -1119,13 +1119,24 @@ export async function connectMqtt(
  */
 export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv): string[] {
   const values = [env.mqttUsername, env.mqttPassword];
+  let url: URL | null = null;
   try {
-    const url = new URL(flags.mqttUrl);
-    values.push(decodeURIComponent(url.username), decodeURIComponent(url.password));
+    url = new URL(flags.mqttUrl);
   } catch {
     // An unparseable broker URL is the MQTT client's error to report.
   }
-  return values.filter((v): v is string => typeof v === "string" && v.length > 0);
+  // Each URL credential is kept as written and, separately, decoded: one
+  // malformed escape (`bad%ZZ`) must not drop the other credential or itself
+  // from redaction (Codex P1 on #2335 at d344f8e4).
+  for (const part of url ? [url.username, url.password] : []) {
+    values.push(part);
+    try {
+      values.push(decodeURIComponent(part));
+    } catch {
+      // Not decodable: the form as written, pushed above, is what appears.
+    }
+  }
+  return [...new Set(values.filter((v): v is string => typeof v === "string" && v.length > 0))];
 }
 
 export interface MainDeps {

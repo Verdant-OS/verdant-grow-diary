@@ -676,7 +676,8 @@ describe("configured MQTT credentials are redacted (Codex P1 at acab6b12, bae4ae
       flags({ mqttUrl: "mqtt://grower:hunter%402@broker.local:1883" }),
       { ingestUrl: null, token: null, mqttUsername: "envuser", mqttPassword: "abc" },
     );
-    expect(values).toEqual(["envuser", "abc", "grower", "hunter@2"]);
+    // Each URL credential as written and decoded (Codex P1 at d344f8e4), once each.
+    expect(values).toEqual(["envuser", "abc", "grower", "hunter%402", "hunter@2"]);
   });
 
   it("scrubs each configured value literally, in any case and URI-encoded", () => {
@@ -741,6 +742,38 @@ describe("configured MQTT credentials are redacted (Codex P1 at acab6b12, bae4ae
       const startup = lines.find((l) => l.includes("startup")) ?? "";
       expect(startup).toContain("t/(redacted)");
       expect(startup).not.toMatch(/password/i);
+    } finally {
+      log.mockRestore();
+    }
+  });
+});
+
+describe("a malformed escape in one URL credential keeps both redacted (Codex P1 on #2335 at d344f8e4)", () => {
+  afterEach(() => setConfiguredSecrets([]));
+  const URL_WITH_BAD_ESCAPE = "mqtt://mqtt-user:bad%ZZ@host:1883";
+
+  it("keeps the valid username and the malformed password", () => {
+    const values = configuredSecretValues(flags({ mqttUrl: URL_WITH_BAD_ESCAPE }), readEnv({}));
+    expect(values).toContain("mqtt-user");
+    expect(values).toContain("bad%ZZ");
+  });
+
+  it("main redacts both in a topic echoed at startup", async () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+    });
+    try {
+      const client = { on: () => client, subscribe: () => {}, end: () => {} };
+      await main(
+        ["--mqtt-url", URL_WITH_BAD_ESCAPE, "--topic", "topic/mqtt-user/bad%ZZ"],
+        {},
+        { connect: async () => client, exit: vi.fn() },
+      );
+      const out = lines.join("\n");
+      expect(out).toContain("topic/(redacted)/(redacted)");
+      expect(out).not.toContain("mqtt-user");
+      expect(out).not.toContain("bad%ZZ");
     } finally {
       log.mockRestore();
     }

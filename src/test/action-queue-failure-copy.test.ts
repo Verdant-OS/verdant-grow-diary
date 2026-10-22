@@ -19,7 +19,7 @@ describe("Action Queue failure copy", () => {
     const copy = safeActionQueueFailureCopy("transition", raw);
 
     expect(copy).toBe(
-      "Action status couldn't be saved. No new transition was recorded. Try again.",
+      "Action status couldn't be saved. Nothing was changed. Try again.",
     );
     expect(copy).not.toMatch(/action_queue|approved_at|rejected_at|operators/i);
   });
@@ -42,7 +42,7 @@ describe("Action Queue failure copy", () => {
         ok: false,
         reason: "attacker-supplied-detail",
       }),
-    ).toBe("Action status couldn't be saved. No new transition was recorded. Try again.");
+    ).toBe("Action status couldn't be saved. Nothing was changed. Try again.");
     const rpcMissing = safeActionQueueFailureCopy("transition", {
       ok: false,
       reason: "rpc_missing",

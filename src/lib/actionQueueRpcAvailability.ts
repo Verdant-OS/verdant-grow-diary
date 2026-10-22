@@ -180,16 +180,16 @@ export function areActionQueueTransitionMutationsBlocked(
  * must not claim a check is running, and must not look like an outage.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY = {
-  title: "Action transitions have not been confirmed yet",
-  label: "Not confirmed yet",
+  title: "Status changes haven't been tried yet on this visit",
+  label: "Not tried yet",
 } as const;
 
 /**
  * Grower-safe copy for the confirmed "reachable" state.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY = {
-  title: "Action transitions are available",
-  label: "Transitions ready",
+  title: "Status changes are working",
+  label: "Updates working",
 } as const;
 
 /**

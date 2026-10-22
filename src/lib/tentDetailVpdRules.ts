@@ -101,16 +101,32 @@ function climateUnrealistic(climate: { temp: number | null; rh: number | null })
  * same-capture row whose intake quality flag is not ok fails too, however
  * plausible its number (Codex P1 on #2303 at 69de43db).
  */
-function tonightVpdPassesTruth(
+export function tonightVpdPassesTruth(
   tonight: TonightMetricView,
   contributors: { temp: number | null; rh: number | null } | null,
   captureClimate: readonly TentDetailCaptureClimate[],
 ): boolean {
   if (!classifyManualMetric("vpd_kpa", tonight.value).valid) return false;
-  if (tonight.calculated && (!contributors || climateUnrealistic(contributors))) return false;
+  return !tonightCaptureRejected(tonight, contributors, captureClimate);
+}
+
+/**
+ * Whether the capture behind Tonight's VPD is rejected on grounds other than
+ * the VPD's own value: a calculated VPD without realistic contributors, an
+ * unknown capture instant, or any same-instant temperature or RH that is
+ * unrealistic or carries an intake quality flag. The tents list uses this
+ * alone, because it grades an out-of-range VPD value as Invalid itself
+ * (Codex P1 on #2303 at 3d1e5800).
+ */
+export function tonightCaptureRejected(
+  tonight: TonightMetricView,
+  contributors: { temp: number | null; rh: number | null } | null,
+  captureClimate: readonly TentDetailCaptureClimate[],
+): boolean {
+  if (tonight.calculated && (!contributors || climateUnrealistic(contributors))) return true;
   const selectedMs = instantMs(tonight.capturedAt);
-  if (selectedMs === null) return false;
-  return !captureClimate.some(
+  if (selectedMs === null) return true;
+  return captureClimate.some(
     (climate) =>
       instantMs(climate.at) === selectedMs &&
       (climate.untrusted === true || climateUnrealistic(climate)),

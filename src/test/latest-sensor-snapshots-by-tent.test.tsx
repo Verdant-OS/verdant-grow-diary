@@ -10,6 +10,8 @@
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSnapshotBatcher,
@@ -274,14 +276,51 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(bulk[TENT_B]).toEqual(await fetchLatestSensorSnapshot(GROW, [TENT_B]));
   });
 
-  it("marks only the tents whose own read fails unavailable", async () => {
+  it("keeps one shared diary window when the sensor read fails, marking only evidence-less tents unavailable (Codex P2 at 3d1e5800)", async () => {
     threeTentFixture();
     io.failSensor = true;
-    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B]);
-    // B still has diary evidence; A has no evidence and a failed sensor read.
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B, TENT_C]);
+    // B still has diary evidence; A and C have none and a failed sensor read.
     expect(bulk[TENT_B]).toMatchObject({ source: "diary", temp: 26 });
     expect(bulk[TENT_A]).toBeNull();
+    expect(bulk[TENT_C]).toBeNull();
+    // The outage is not amplified: one failed window, one diary window, no per-tent reads.
+    expect(sensorCalls()).toBe(1);
+    expect(diaryCalls()).toBe(1);
     await expect(fetchLatestSensorSnapshot(GROW, [TENT_A])).rejects.toThrow("unavailable");
+  });
+
+  it("treats a window at the PostgREST row ceiling as truncated (Codex P1 at 3d1e5800)", async () => {
+    // 21 tents would ask for 1,050 rows; the window asks for 1,000. Tent A fills
+    // it with newer rows, so every other tent is read on its own.
+    const tents = Array.from(
+      { length: 21 },
+      (_, i) => `aaaaaaaa-0000-4000-8000-${String(100 + i).padStart(12, "0")}`,
+    );
+    const [a, b] = tents;
+    io.sensorRows = [
+      ...Array.from({ length: 1000 }, (_, i) =>
+        sensorRow(a, "temperature_c", 24, minutesAgo(1 + i * 0.001)),
+      ),
+      sensorRow(b, "temperature_c", 22, minutesAgo(5)),
+    ];
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, tents);
+    expect(bulk[a]).toMatchObject({ source: "live", temp: 24 });
+    expect(bulk[b]).toMatchObject({ source: "live", temp: 22 });
+    expect(bulk[tents[2]]).toEqual(EMPTY_SNAPSHOT);
+    expect(sensorCalls()).toBe(1 + 20);
+  });
+
+  it("orders both sensor reads by a unique final key before the limit (Codex P1 at 3d1e5800)", () => {
+    const source = readFileSync(resolve(__dirname, "../hooks/useLatestSensorSnapshot.ts"), "utf8");
+    const sensorQueries = source.split("effectiveSensorReadingsQuery()").slice(1);
+    expect(sensorQueries).toHaveLength(2);
+    for (const query of sensorQueries) {
+      const head = query.slice(0, query.indexOf(".limit("));
+      expect(head).toMatch(
+        /\.order\("created_at"[^)]*\)\s*(?:\/\/[^\n]*\n\s*)*\.order\("id", \{ ascending: false \}\)/,
+      );
+    }
   });
 });
 

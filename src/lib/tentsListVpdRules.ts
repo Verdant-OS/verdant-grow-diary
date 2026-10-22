@@ -17,6 +17,7 @@ import type {
   CanonicalTentVpd,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
+import { tentDetailCaptureClimate, tonightCaptureRejected } from "@/lib/tentDetailVpdRules";
 import {
   buildTonightTentMetrics,
   TONIGHT_FUTURE_SKEW_MS,
@@ -36,13 +37,36 @@ export function tentsListCanonicalVpd(
     ...(id ? { id } : {}),
     tent_id: row.tent_id ?? tentId,
   }));
-  const vpd = buildTonightTentMetrics({
+  const metrics = buildTonightTentMetrics({
     rows: tonightRows,
     rowsRead: { status: "success" },
     snapshot,
     now: new Date(nowMs),
-  }).find((metric) => metric.key === "vpd");
+  });
+  const vpd = metrics.find((metric) => metric.key === "vpd");
   if (vpd?.state !== "value" || typeof vpd.value !== "number") return null;
+  // Tonight runs no realism check. The same capture gate the tent page applies
+  // decides here too: the pair a calculated VPD came from, and every
+  // temperature and RH at its capture (realism and intake quality). A rejected
+  // capture yields no canonical VPD, so the list never shows telemetry the
+  // tent page withholds (Codex P1 on #2303 at 3d1e5800). The VPD's own value
+  // is still passed through: buildTentSnapshotView grades it Invalid.
+  const metricValue = (key: string) => {
+    const metric = metrics.find((m) => m.key === key);
+    return metric?.state === "value" && typeof metric.value === "number" ? metric.value : null;
+  };
+  const climate = tentDetailCaptureClimate(
+    rows.map((row) => ({
+      metric: row.metric,
+      value: typeof row.value === "number" ? row.value : null,
+      ts: row.ts,
+      captured_at: row.captured_at ?? null,
+      quality: row.quality ?? null,
+    })),
+    snapshot.status === "ok" ? snapshot.snapshot : null,
+  );
+  if (tonightCaptureRejected(vpd, { temp: metricValue("temp"), rh: metricValue("rh") }, climate))
+    return null;
   return {
     kpa: vpd.value,
     capturedAt: vpd.capturedAt,

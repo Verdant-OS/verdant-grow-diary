@@ -328,6 +328,9 @@ export function buildTentSnapshotView(
   // (Codex P1 on #2303 at 85ec1e78).
   const canonicalVpdInvalid =
     useCanonicalVpd && typeof vpdKpa === "number" && !classifyManualMetric("vpd_kpa", vpdKpa).valid;
+  // A VPD Tonight derived from a CSV capture is historical context on this
+  // path too, never a healthy cue (Codex P1 on #2303 at 3d1e5800).
+  const canonicalVpdHistorical = useCanonicalVpd && canonical.source === "csv";
   const invalid =
     flaggedInvalid ||
     canonicalVpdInvalid ||
@@ -377,6 +380,9 @@ export function buildTentSnapshotView(
     } else if (stale || rowFlag === "stale") {
       status = "stale";
       statusLabel = "Stale";
+    } else if (key === "vpd" && canonicalVpdHistorical) {
+      status = "degraded";
+      statusLabel = "Historical";
     } else if (rowFlag === "degraded") {
       status = "degraded";
       statusLabel = "Degraded";

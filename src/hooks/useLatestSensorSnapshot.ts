@@ -41,7 +41,12 @@ import {
 } from "@/lib/sensorSnapshot";
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
 import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
-import { partitionWindowByTent, resolveDiaryWindow } from "@/lib/latestSensorSnapshotBatchRules";
+import {
+  diaryWindowLimit,
+  partitionWindowByTent,
+  resolveDiaryWindow,
+  sensorWindowLimit,
+} from "@/lib/latestSensorSnapshotBatchRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import {
   EFFECTIVE_SENSOR_QUERY_VERSION,
@@ -133,6 +138,10 @@ export async function fetchLatestSensorSnapshot(
           .order("captured_at", { ascending: false, nullsFirst: false })
           .order("ts", { ascending: false })
           .order("created_at", { ascending: false })
+          // A unique final key: rows sharing every timestamp (one imported
+          // capture) must cut identically here and in the bulk window
+          // (Codex P1 on #2303 at 3d1e5800).
+          .order("id", { ascending: false })
           .limit(SENSOR_ROWS_PER_TENT);
         if (error) throw error;
         evidenceRows = selectDashboardSensorEvidenceRows(requireEffectiveSensorReadings(data));
@@ -189,19 +198,25 @@ export async function fetchLatestSensorSnapshotsByTent(
   if (unique.length === 0) return result;
   const fallback = new Set<string>();
   const staleByTent = new Map<string, SensorSnapshot | null>();
-  const needDiary: string[] = [];
+  let needDiary: string[] = [];
+  // The per-tent read treats a failed sensor read as "diary evidence or
+  // unavailable". The bulk read does the same through one shared diary window
+  // instead of N per-tent reads, so a backend failure never multiplies the
+  // reads it would otherwise have saved (Codex P2 on #2303 at 3d1e5800).
+  let sensorReadFailed = false;
   if (unique.length === 1) {
     fallback.add(unique[0]);
   } else {
     // 1) One sensor window over every tent.
     try {
-      const windowLimit = SENSOR_ROWS_PER_TENT * unique.length;
+      const windowLimit = sensorWindowLimit(unique.length, SENSOR_ROWS_PER_TENT);
       const { data, error } = await effectiveSensorReadingsQuery()
         .select("*")
         .in("tent_id", unique)
         .order("captured_at", { ascending: false, nullsFirst: false })
         .order("ts", { ascending: false })
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(windowLimit);
       if (error) throw error;
       const rows = requireEffectiveSensorReadings(data);
@@ -223,9 +238,10 @@ export async function fetchLatestSensorSnapshotsByTent(
         needDiary.push(tentId);
       }
     } catch {
-      // The per-tent read decides between diary evidence and unavailable.
-      unique.forEach((tentId) => fallback.add(tentId));
-      needDiary.length = 0;
+      sensorReadFailed = true;
+      fallback.clear();
+      staleByTent.clear();
+      needDiary = [...unique];
     }
     // 2) One diary window over the tents without a fresh sensor capture.
     if (needDiary.length > 0) {
@@ -233,7 +249,7 @@ export async function fetchLatestSensorSnapshotsByTent(
         for (const tentId of needDiary) result[tentId] = staleByTent.get(tentId) ?? EMPTY_SNAPSHOT;
       } else {
         try {
-          const windowLimit = DIARY_EVIDENCE_PAGE_SIZE * needDiary.length;
+          const windowLimit = diaryWindowLimit(needDiary.length, DIARY_EVIDENCE_PAGE_SIZE);
           const diaryRows = await readDiaryEvidenceCandidates(growId, needDiary, windowLimit);
           const windowFull = diaryRows.length > windowLimit;
           const partition = partitionWindowByTent(
@@ -254,7 +270,9 @@ export async function fetchLatestSensorSnapshotsByTent(
             if (verdict.kind === "found") {
               result[tentId] = preferNewer(staleByTent.get(tentId) ?? null, verdict.snapshot);
             } else if (verdict.kind === "none") {
-              result[tentId] = staleByTent.get(tentId) ?? EMPTY_SNAPSHOT;
+              result[tentId] = sensorReadFailed
+                ? null
+                : (staleByTent.get(tentId) ?? EMPTY_SNAPSHOT);
             } else {
               fallback.add(tentId);
             }

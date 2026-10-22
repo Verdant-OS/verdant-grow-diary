@@ -4,7 +4,13 @@
  * that read; every other tent falls back to its own read.
  */
 import { describe, expect, it } from "vitest";
-import { partitionWindowByTent, resolveDiaryWindow } from "@/lib/latestSensorSnapshotBatchRules";
+import {
+  diaryWindowLimit,
+  partitionWindowByTent,
+  POSTGREST_MAX_ROWS,
+  resolveDiaryWindow,
+  sensorWindowLimit,
+} from "@/lib/latestSensorSnapshotBatchRules";
 
 const A = "tent-a";
 const B = "tent-b";
@@ -72,5 +78,18 @@ describe("resolveDiaryWindow", () => {
   it("falls back when the complete set exceeds the per-tent candidate bound", () => {
     const many = Array.from({ length: 3 }, (_, n) => ({ ok: false, n }));
     expect(resolveDiaryWindow(many, false, 2, first)).toEqual({ kind: "fallback" });
+  });
+});
+
+describe("window limits stay under the PostgREST row ceiling (Codex P1 at 3d1e5800)", () => {
+  it("asks for per-tent × tents up to the ceiling, never past it", () => {
+    expect(sensorWindowLimit(3, 50)).toBe(150);
+    expect(sensorWindowLimit(20, 50)).toBe(1000);
+    expect(sensorWindowLimit(21, 50)).toBe(POSTGREST_MAX_ROWS);
+  });
+
+  it("leaves room for the diary read's one-row lookahead", () => {
+    expect(diaryWindowLimit(3, 20)).toBe(60);
+    expect(diaryWindowLimit(60, 20)).toBe(POSTGREST_MAX_ROWS - 1);
   });
 });

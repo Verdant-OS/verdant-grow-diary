@@ -219,6 +219,46 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     );
   });
 
+  it("degrades a VPD Tonight derives from a same-capture CSV pair (Codex P1 at 3d1e5800)", () => {
+    // Newest capture is the CSV pair itself: the canonical VPD shares its timestamp.
+    const rows = FIRST.map((r) => ({ ...r, ts: at(0.1), captured_at: at(0.1), source: "csv" }));
+    expect(dashboardVpd(rows)?.value).toBeCloseTo(1.75, 2);
+    const vpd = renderStrip(rows);
+    expect(vpd).toHaveTextContent("1.75");
+    expect(vpd).toHaveAttribute("data-status", "degraded");
+    expect(vpd).not.toHaveAttribute("data-chip", "ok");
+    expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(
+      /Historical/,
+    );
+  });
+
+  it("withholds a cross-capture VPD whose capture has an impossible RH (Codex P1 at 3d1e5800)", () => {
+    const badAt = at(0.2);
+    const rows = [
+      row("temperature_c", 24, badAt, "live"),
+      row("humidity_pct", 150, badAt, "live"),
+      row("vpd_kpa", 1.2, badAt, "live"),
+      row("co2_ppm", 800, at(0.05), "live"),
+    ];
+    // Tonight itself still selects the direct VPD; the list must not.
+    expect(dashboardVpd(rows)).toMatchObject({ state: "value", value: 1.2 });
+    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toBeNull();
+    const vpd = renderStrip(rows);
+    expect(vpd.textContent ?? "").not.toContain("1.2");
+    expect(vpd).not.toHaveAttribute("data-status", "ok");
+  });
+
+  it("withholds a cross-capture VPD whose plausible sibling is quality-flagged", () => {
+    const badAt = at(0.2);
+    const rows = [
+      { ...row("temperature_c", 24, badAt, "live"), quality: "degraded" },
+      row("vpd_kpa", 1.2, badAt, "live"),
+      row("co2_ppm", 800, at(0.05), "live"),
+    ];
+    expect(tentsListCanonicalVpd(rows, "tent-1", NOW.getTime())).toBeNull();
+    expect(renderStrip(rows).textContent ?? "").not.toContain("1.2");
+  });
+
   it("shows the Dashboard's diary-only VPD when the tent has no stored rows (Codex P2 at 69de43db)", () => {
     const diary: SensorSnapshot = {
       ...EMPTY_SNAPSHOT,

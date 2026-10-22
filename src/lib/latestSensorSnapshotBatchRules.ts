@@ -64,3 +64,22 @@ export function resolveDiaryWindow<R, S>(
   if (windowFull || own.length > maxCandidates) return { kind: "fallback" };
   return { kind: "none" };
 }
+
+/**
+ * PostgREST caps one response at this many rows unless the deployment raises
+ * it. A window that asks for more would come back capped and still shorter
+ * than it asked for, so it would read as complete while tents were crowded
+ * out (Codex P1 on #2303 at 3d1e5800). Windows never ask for more than this,
+ * so "shorter than requested" keeps meaning "complete".
+ */
+export const POSTGREST_MAX_ROWS = 1000;
+
+/** Rows to request for one sensor window over `tentCount` tents. */
+export function sensorWindowLimit(tentCount: number, perTentLimit: number): number {
+  return Math.min(perTentLimit * tentCount, POSTGREST_MAX_ROWS);
+}
+
+/** Candidate rows for one diary window over `tentCount` tents; one lookahead row is added by the read. */
+export function diaryWindowLimit(tentCount: number, pageSize: number): number {
+  return Math.min(pageSize * tentCount, POSTGREST_MAX_ROWS - 1);
+}

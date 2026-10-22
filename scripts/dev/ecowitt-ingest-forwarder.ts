@@ -421,25 +421,22 @@ export async function handleMessage(args: {
   const timeoutMs = args.retry?.timeoutMs ?? LIVE_REQUEST_TIMEOUT_MS;
   const sleep = args.retry?.sleep ?? realSleep;
   const random = args.retry?.random ?? Math.random;
-  let lastError = "unknown";
   for (let attempt = 0; ; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const r = await fetchImpl(req.url, { ...req.init, signal: controller.signal });
       const response = summarizeResponse(r.status, await r.text());
-      if (isRetryableStatus(r.status) && attempt < maxRetries) {
-        lastError = `http_${r.status}`;
-      } else {
+      // A retryable status (408/429/5xx) with retries left falls through to the sleep below.
+      if (!isRetryableStatus(r.status) || attempt >= maxRetries) {
         return { kind: "forwarded", summary: prepared.summary, response, attempts: attempt + 1 };
       }
     } catch (e) {
-      lastError = e instanceof Error ? e.message : "unknown";
       if (attempt >= maxRetries) {
         return {
           kind: "network_error",
           summary: prepared.summary,
-          error: lastError,
+          error: e instanceof Error ? e.message : "unknown",
           attempts: attempt + 1,
         };
       }

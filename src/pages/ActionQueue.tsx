@@ -665,7 +665,14 @@ export default function ActionQueue() {
     });
     // Only write when something actually changes — avoids replace loops.
     if (next.toString() !== searchParams.toString()) {
-      setSearchParams(next, { replace: true });
+      // Filter/search updates keep the scroll position; a page transition
+      // replaces the visible rows, so it scrolls back to the top (#2348 review).
+      const pageChanged =
+        next.get(ACTION_QUEUE_URL_KEYS.page) !== searchParams.get(ACTION_QUEUE_URL_KEYS.page);
+      setSearchParams(next, {
+        replace: true,
+        ...(pageChanged ? { preventScrollReset: false } : {}),
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, traceExtraFilter, page, pageSize]);

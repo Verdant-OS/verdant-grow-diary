@@ -358,8 +358,10 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       // Mirrors the product shim: a search-param update keeps the scroll
-      // position unless the caller passes `preventScrollReset: false`.
+      // position unless the caller passes `preventScrollReset: false`, and
+      // does not scroll back to a preserved `#anchor` while keeping it.
       resetScroll: options?.preventScrollReset === false,
+      ...(options?.preventScrollReset === false ? {} : { hashScrollIntoView: false }),
     } as never);
   };
 

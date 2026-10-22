@@ -26,6 +26,7 @@
  * No device-control surface. No elevated keys. RLS enforces ownership.
  */
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import type { SensorReadingRow } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
@@ -40,6 +41,7 @@ import {
 } from "@/lib/sensorSnapshot";
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
 import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
+import { partitionWindowByTent, resolveDiaryWindow } from "@/lib/latestSensorSnapshotBatchRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import {
   EFFECTIVE_SENSOR_QUERY_VERSION,
@@ -95,13 +97,21 @@ export function latestSensorSnapshotQueryKey(
   ] as const;
 }
 
+/** The per-tent sensor read is the newest rows of that tent, capped here. */
+const SENSOR_ROWS_PER_TENT = 50;
+
+type DiaryEvidenceRow = {
+  id: string | null;
+  entry_at: string;
+  details: unknown;
+  tent_id: string | null;
+};
+
 /**
  * The read behind `useLatestSensorSnapshot`, as one function so a page that
- * shows several tents can run the same per-tent read once at page level
- * (`useLatestSensorSnapshotsByTent`) instead of once per card (Codex P2 on
- * #2303 at 0c19a9e0). The sensor step is a per-tent `limit(50)` and the diary
- * step a per-tent bounded scan, so a single cross-tent query cannot stand in
- * for it without a server-side per-tent limit.
+ * shows several tents can run the same per-tent semantics once at page level
+ * (`fetchLatestSensorSnapshotsByTent`) instead of once per card (Codex P2 on
+ * #2303 at 0c19a9e0 and d6ef3a20).
  */
 export async function fetchLatestSensorSnapshot(
   growId: string | null | undefined,
@@ -123,7 +133,7 @@ export async function fetchLatestSensorSnapshot(
           .order("captured_at", { ascending: false, nullsFirst: false })
           .order("ts", { ascending: false })
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(SENSOR_ROWS_PER_TENT);
         if (error) throw error;
         evidenceRows = selectDashboardSensorEvidenceRows(requireEffectiveSensorReadings(data));
       } catch {
@@ -132,104 +142,18 @@ export async function fetchLatestSensorSnapshot(
         sensorReadFailed = true;
       }
       if (evidenceRows.length > 0) {
-        const snap = snapshotFromReadings(
-          evidenceRows.map((r) => ({
-            id: (r as { id?: string | null }).id ?? null,
-            ts: r.ts,
-            captured_at: (r as { captured_at?: string | null }).captured_at ?? null,
-            metric: r.metric,
-            value: r.value as number | string | null,
-            source: r.source as string | null,
-            // Carry the row's tent so snapshotFromReadings can attribute
-            // the snapshot when every contributing row agrees. Dropping
-            // it here is what left every persisted environment alert
-            // tent-less, which in turn left the Plant Detail
-            // assigned-tent alerts panel permanently empty.
-            tent_id: (r as { tent_id?: string | null }).tent_id ?? null,
-            raw_payload: (r as { raw_payload?: unknown }).raw_payload,
-          })),
-        );
+        const snap = snapshotFromEvidenceRows(evidenceRows);
         if (snap && !isSnapshotStale(snap)) return snap;
         staleSensorCandidate = snap;
       }
     }
     // 2) Fall back to latest diary_entries evidence for this grow.
-    // Select `id` so Environment Check snapshots can carry a diary
-    // evidence ref for alert persistence (#603). Select `tent_id` so
-    // tent-scoped views reject foreign/null attribution (#602).
     if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
     for (const candidateLimit of [DIARY_EVIDENCE_PAGE_SIZE, DIARY_EVIDENCE_MAX_CANDIDATES]) {
-      const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
-        (withRetractionFilter) => {
-          let query = supabase.from("diary_entries").select("id,entry_at,details,tent_id");
-          if (withRetractionFilter) query = query.is("retracted_at", null);
-          query = query.eq("grow_id", growId);
-          // Filter and scope before paging: ordinary notes in this or
-          // another tent must not crowd out saved environment evidence.
-          if (tentIds.length > 0) query = query.in("tent_id", tentIds);
-          return (
-            query
-              .or(DIARY_EVIDENCE_OR_FILTER)
-              .order("entry_at", { ascending: false })
-              .order("id", { ascending: true })
-              // Each read is one consistent candidate set. The lookahead
-              // distinguishes an exhausted set from an unexamined tail.
-              .limit(candidateLimit + 1)
-          );
-        },
-      );
-      if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
+      const diaryRows = await readDiaryEvidenceCandidates(growId, tentIds, candidateLimit);
       for (const row of diaryRows.slice(0, candidateLimit)) {
-        const details = (row.details ?? null) as Record<string, unknown> | null;
-        if (!details || typeof details !== "object") continue;
-        // #602 / #601: tent-scoped views only accept diary rows attributed
-        // to one of those tents — null/foreign tent_id is not this tent's
-        // evidence (every diary snapshot envelope shares this gate).
-        if (!isDiaryRowInTentScope(row.tent_id, tentIds)) continue;
-        // Past that gate the row is proven in scope, so its own tent is the
-        // honest attribution for whichever snapshot this row yields. (This
-        // replaces an earlier local `envScopeOk` hoist from this branch:
-        // #602 made the gate a hard skip for BOTH diary paths, so the
-        // in-scope check no longer needs restating here.)
-        const rowTentInScope = row.tent_id ?? null;
-        const snap = snapshotFromDiary(
-          row.entry_at,
-          details.sensor_snapshot as Record<string, unknown> | undefined,
-        );
-        if (hasFiniteSnapshotMetric(snap)) {
-          snap.tent_id = rowTentInScope;
-          return preferNewer(staleSensorCandidate, snap);
-        }
-        // Plant Quick Log stores its manual sensor payload directly on the
-        // companion diary row. It is manual evidence, not a synthetic
-        // sensor_readings row: preserve its source and only surface it
-        // after the shared tent-scope gate above has proved attribution.
-        const diaryEntryId =
-          typeof (row as { id?: string | null }).id === "string"
-            ? (row as { id: string }).id
-            : null;
-        const manualSnap = snapshotFromManualSensorSnapshot(
-          row.entry_at,
-          details.manual_sensor_snapshot as Record<string, unknown> | undefined,
-          { diaryEntryId },
-        );
-        if (manualSnap) {
-          manualSnap.tent_id = rowTentInScope;
-          return preferNewer(staleSensorCandidate, manualSnap);
-        }
-        // #596: a Quick Log Environment Check is grower-entered manual
-        // evidence; within the same row a full sensor_snapshot blob wins,
-        // and rows are already newest-first.
-        const envSnap = snapshotFromEnvironmentCheck(
-          row.entry_at,
-          details.environment_check as Record<string, unknown> | undefined,
-          { diaryEntryId },
-        );
-        if (envSnap) {
-          // Already proven in-scope by the isDiaryRowInTentScope gate above.
-          envSnap.tent_id = rowTentInScope;
-          return preferNewer(staleSensorCandidate, envSnap);
-        }
+        const snap = snapshotFromDiaryEvidenceRow(row, tentIds);
+        if (snap) return preferNewer(staleSensorCandidate, snap);
       }
       // A candidate key alone does not prove a usable reading. Re-read
       // from the beginning instead of trusting offsets in a changing set.
@@ -246,6 +170,216 @@ export async function fetchLatestSensorSnapshot(
   } catch {
     throw new Error("unavailable");
   }
+}
+
+/**
+ * Every tent's Dashboard snapshot for one grow, with the per-tent semantics of
+ * `fetchLatestSensorSnapshot` and as few reads as those semantics allow: one
+ * sensor window over all tents, one diary window over the tents that still
+ * need diary evidence, and a per-tent read only for a tent the windows cannot
+ * stand in for (see latestSensorSnapshotBatchRules). `null` marks a tent whose
+ * own read is unavailable (Codex P2 on #2303 at d6ef3a20).
+ */
+export async function fetchLatestSensorSnapshotsByTent(
+  growId: string | null | undefined,
+  tentIds: readonly string[],
+): Promise<Record<string, SensorSnapshot | null>> {
+  const result: Record<string, SensorSnapshot | null> = {};
+  const unique = [...new Set(tentIds)];
+  if (unique.length === 0) return result;
+  const fallback = new Set<string>();
+  const staleByTent = new Map<string, SensorSnapshot | null>();
+  const needDiary: string[] = [];
+  if (unique.length === 1) {
+    fallback.add(unique[0]);
+  } else {
+    // 1) One sensor window over every tent.
+    try {
+      const windowLimit = SENSOR_ROWS_PER_TENT * unique.length;
+      const { data, error } = await effectiveSensorReadingsQuery()
+        .select("*")
+        .in("tent_id", unique)
+        .order("captured_at", { ascending: false, nullsFirst: false })
+        .order("ts", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(windowLimit);
+      if (error) throw error;
+      const rows = requireEffectiveSensorReadings(data);
+      const partition = partitionWindowByTent(
+        rows,
+        unique,
+        SENSOR_ROWS_PER_TENT,
+        rows.length >= windowLimit,
+      );
+      partition.fallback.forEach((tentId) => fallback.add(tentId));
+      for (const [tentId, own] of partition.exact) {
+        const evidenceRows = selectDashboardSensorEvidenceRows(own);
+        const snap = evidenceRows.length > 0 ? snapshotFromEvidenceRows(evidenceRows) : null;
+        if (snap && !isSnapshotStale(snap)) {
+          result[tentId] = snap;
+          continue;
+        }
+        staleByTent.set(tentId, snap);
+        needDiary.push(tentId);
+      }
+    } catch {
+      // The per-tent read decides between diary evidence and unavailable.
+      unique.forEach((tentId) => fallback.add(tentId));
+      needDiary.length = 0;
+    }
+    // 2) One diary window over the tents without a fresh sensor capture.
+    if (needDiary.length > 0) {
+      if (!growId) {
+        for (const tentId of needDiary) result[tentId] = staleByTent.get(tentId) ?? EMPTY_SNAPSHOT;
+      } else {
+        try {
+          const windowLimit = DIARY_EVIDENCE_PAGE_SIZE * needDiary.length;
+          const diaryRows = await readDiaryEvidenceCandidates(growId, needDiary, windowLimit);
+          const windowFull = diaryRows.length > windowLimit;
+          const partition = partitionWindowByTent(
+            diaryRows
+              .slice(0, windowLimit)
+              .filter((row) => isDiaryRowInTentScope(row.tent_id, needDiary)),
+            needDiary,
+            Number.POSITIVE_INFINITY,
+            false,
+          );
+          for (const tentId of needDiary) {
+            const verdict = resolveDiaryWindow(
+              partition.exact.get(tentId) ?? [],
+              windowFull,
+              DIARY_EVIDENCE_MAX_CANDIDATES,
+              (row) => snapshotFromDiaryEvidenceRow(row, [tentId]),
+            );
+            if (verdict.kind === "found") {
+              result[tentId] = preferNewer(staleByTent.get(tentId) ?? null, verdict.snapshot);
+            } else if (verdict.kind === "none") {
+              result[tentId] = staleByTent.get(tentId) ?? EMPTY_SNAPSHOT;
+            } else {
+              fallback.add(tentId);
+            }
+          }
+        } catch {
+          needDiary.forEach((tentId) => fallback.add(tentId));
+        }
+      }
+    }
+  }
+  // 3) Per-tent reads only where a window could not reproduce one.
+  await Promise.all(
+    [...fallback].map(async (tentId) => {
+      try {
+        result[tentId] = await fetchLatestSensorSnapshot(growId, [tentId]);
+      } catch {
+        result[tentId] = null;
+      }
+    }),
+  );
+  return result;
+}
+
+/**
+ * One consistent candidate set of diary evidence rows, newest first, with a
+ * one-row lookahead so a caller can tell an exhausted set from an unexamined
+ * tail. Select `id` so Environment Check snapshots can carry a diary evidence
+ * ref for alert persistence (#603); select `tent_id` so tent-scoped views
+ * reject foreign/null attribution (#602).
+ */
+async function readDiaryEvidenceCandidates(
+  growId: string,
+  tentIds: readonly string[],
+  candidateLimit: number,
+): Promise<DiaryEvidenceRow[]> {
+  const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
+    (withRetractionFilter) => {
+      let query = supabase.from("diary_entries").select("id,entry_at,details,tent_id");
+      if (withRetractionFilter) query = query.is("retracted_at", null);
+      query = query.eq("grow_id", growId);
+      // Filter and scope before paging: ordinary notes in this or
+      // another tent must not crowd out saved environment evidence.
+      if (tentIds.length > 0) query = query.in("tent_id", [...tentIds]);
+      return (
+        query
+          .or(DIARY_EVIDENCE_OR_FILTER)
+          .order("entry_at", { ascending: false })
+          .order("id", { ascending: true })
+          // Each read is one consistent candidate set. The lookahead
+          // distinguishes an exhausted set from an unexamined tail.
+          .limit(candidateLimit + 1)
+      );
+    },
+  );
+  if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
+  return diaryRows as DiaryEvidenceRow[];
+}
+
+/**
+ * The snapshot one diary row yields for a tent scope, or null. #602 / #601:
+ * tent-scoped views only accept diary rows attributed to one of those tents;
+ * null/foreign tent_id is not this tent's evidence (every diary snapshot
+ * envelope shares this gate). Past the gate the row's own tent is the honest
+ * attribution. Within one row a full sensor_snapshot blob wins, then the Plant
+ * Quick Log manual envelope, then a Quick Log Environment Check (#596).
+ */
+function snapshotFromDiaryEvidenceRow(
+  row: DiaryEvidenceRow,
+  tentIds: readonly string[],
+): SensorSnapshot | null {
+  const details = (row.details ?? null) as Record<string, unknown> | null;
+  if (!details || typeof details !== "object") return null;
+  if (!isDiaryRowInTentScope(row.tent_id, tentIds)) return null;
+  const rowTentInScope = row.tent_id ?? null;
+  const snap = snapshotFromDiary(
+    row.entry_at,
+    details.sensor_snapshot as Record<string, unknown> | undefined,
+  );
+  if (hasFiniteSnapshotMetric(snap)) {
+    snap.tent_id = rowTentInScope;
+    return snap;
+  }
+  const diaryEntryId = typeof row.id === "string" ? row.id : null;
+  const manualSnap = snapshotFromManualSensorSnapshot(
+    row.entry_at,
+    details.manual_sensor_snapshot as Record<string, unknown> | undefined,
+    { diaryEntryId },
+  );
+  if (manualSnap) {
+    manualSnap.tent_id = rowTentInScope;
+    return manualSnap;
+  }
+  const envSnap = snapshotFromEnvironmentCheck(
+    row.entry_at,
+    details.environment_check as Record<string, unknown> | undefined,
+    { diaryEntryId },
+  );
+  if (envSnap) {
+    envSnap.tent_id = rowTentInScope;
+    return envSnap;
+  }
+  return null;
+}
+
+/** The latest-capture snapshot of already filtered evidence rows. */
+function snapshotFromEvidenceRows(
+  evidenceRows: readonly SensorReadingRow[],
+): SensorSnapshot | null {
+  return snapshotFromReadings(
+    evidenceRows.map((r) => ({
+      id: (r as { id?: string | null }).id ?? null,
+      ts: r.ts,
+      captured_at: (r as { captured_at?: string | null }).captured_at ?? null,
+      metric: r.metric,
+      value: r.value as number | string | null,
+      source: r.source as string | null,
+      // Carry the row's tent so snapshotFromReadings can attribute
+      // the snapshot when every contributing row agrees. Dropping
+      // it here is what left every persisted environment alert
+      // tent-less, which in turn left the Plant Detail
+      // assigned-tent alerts panel permanently empty.
+      tent_id: (r as { tent_id?: string | null }).tent_id ?? null,
+      raw_payload: (r as { raw_payload?: unknown }).raw_payload,
+    })),
+  );
 }
 
 type SnapshotQueryLike = Pick<
@@ -309,22 +443,67 @@ export interface TentSnapshotScope {
   growId: string | null | undefined;
 }
 
+export interface SnapshotBatcher {
+  /** The tent's snapshot, read through the bulk read shared by every load in the same tick. */
+  load(growId: string, tentId: string): Promise<SensorSnapshot>;
+}
+
 /**
- * The per-tent snapshot for a list of tents, read once at page level and keyed
- * by tent id. Each tent's query key and read are exactly `useLatestSensorSnapshot`'s
- * for `(growId, [tentId])`, so the Dashboard, Tent Detail and the tents list
- * share one cache entry per tent (Codex P2 on #2303 at 0c19a9e0). A tent with no
+ * Coalesces the per-tent reads TanStack Query starts in one tick (a cold
+ * `/tents` load starts one per uncached tent) into one
+ * `fetchLatestSensorSnapshotsByTent` call per grow. Each tent keeps its own
+ * cache entry, so a warm entry is never read again and the Dashboard and Tent
+ * Detail share it (Codex P2 on #2303 at d6ef3a20).
+ */
+export function createSnapshotBatcher(
+  fetchBulk: typeof fetchLatestSensorSnapshotsByTent = fetchLatestSensorSnapshotsByTent,
+): SnapshotBatcher {
+  const pending = new Map<
+    string,
+    { tentIds: Set<string>; promise: Promise<Record<string, SensorSnapshot | null>> }
+  >();
+  return {
+    load(growId, tentId) {
+      let batch = pending.get(growId);
+      if (!batch) {
+        const tentIds = new Set<string>();
+        const promise = Promise.resolve().then(() => {
+          pending.delete(growId);
+          return fetchBulk(growId, [...tentIds]);
+        });
+        batch = { tentIds, promise };
+        pending.set(growId, batch);
+      }
+      batch.tentIds.add(tentId);
+      return batch.promise.then((byTent) => {
+        const snapshot = byTent[tentId];
+        if (!snapshot) throw new Error("unavailable");
+        return snapshot;
+      });
+    },
+  };
+}
+
+const snapshotBatcher = createSnapshotBatcher();
+
+/**
+ * The per-tent snapshot for a list of tents, keyed by tent id. Each tent's
+ * query key is exactly `useLatestSensorSnapshot`'s for `(growId, [tentId])`,
+ * so the Dashboard, Tent Detail and the tents list share one cache entry per
+ * tent (Codex P2 on #2303 at 0c19a9e0); the reads a cold load starts are
+ * coalesced into one bulk read per grow (Codex P2 at d6ef3a20). A tent with no
  * grow is `idle`.
  */
 export function useLatestSensorSnapshotsByTent(
   tents: readonly TentSnapshotScope[],
+  batcher: SnapshotBatcher = snapshotBatcher,
 ): Record<string, SnapshotState> {
   const { user } = useAuth();
   const results = useQueries({
     queries: tents.map((tent) => ({
       queryKey: latestSensorSnapshotQueryKey(user?.id, tent.growId, [tent.tentId]),
       enabled: !!user && !!tent.growId,
-      queryFn: () => fetchLatestSensorSnapshot(tent.growId, [tent.tentId]),
+      queryFn: () => batcher.load(tent.growId as string, tent.tentId),
     })),
   });
   const byTent: Record<string, SnapshotState> = {};

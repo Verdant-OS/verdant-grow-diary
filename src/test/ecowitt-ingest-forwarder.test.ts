@@ -9,6 +9,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { Duplex } from "node:stream";
+import { parseEcoWittDateUtc } from "../../supabase/functions/_shared/ecowittRoutedRowBuilder.ts";
 import {
   GUARD_MALFORMED_PACKET,
   GUARD_PACKET_TOO_LARGE,
@@ -26,6 +27,7 @@ import {
   MAX_BACKLOG,
   MAX_INFLIGHT,
   createMessageHandler,
+  dateutcAccepted,
   fullJitterDelayMs,
   handleMessage,
   isRetryableStatus,
@@ -1995,5 +1997,36 @@ describe("admission before decoding (Codex P2 on #2335 at 95f5dfe7)", () => {
     } finally {
       log.mockRestore();
     }
+  });
+});
+
+describe("dateutc matches what ecowitt-ingest accepts (Codex P2 on #2335 at 95f5dfe7)", () => {
+  const NOW = new Date("2026-10-22T12:00:00.000Z");
+  const CASES = [
+    "2026-10-22 05:27:14",
+    "2026-10-22T05:27:14",
+    "2026-02-30 05:27:14",
+    "2026-02-29 00:00:00",
+    "2024-02-29 00:00:00",
+    "2026-13-01 00:00:00",
+    "2026-10-22 24:00:00",
+    "1970-01-01 00:00:00",
+    "2019-12-31 23:59:59",
+    "2020-01-01 00:00:00",
+    "2026-10-23 12:00:00",
+    "2026-10-23 12:00:01",
+    "2026-10-22 5:27:14",
+  ];
+
+  it.each(CASES)("agrees with parseEcoWittDateUtc for %s", (value) => {
+    expect(dateutcAccepted(value, NOW)).toBe(parseEcoWittDateUtc(value, NOW) !== null);
+  });
+
+  it("a dry run refuses a calendar-invalid date the ingest parser rejects", () => {
+    const out = prepareForwardPayload(
+      JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: "2026-02-30 05:27:14", temp2f: 81.68 }),
+      NOW,
+    );
+    expect(out).toMatchObject({ ok: false, reason: "invalid_dateutc" });
   });
 });

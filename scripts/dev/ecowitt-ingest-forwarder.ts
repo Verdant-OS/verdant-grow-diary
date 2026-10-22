@@ -106,7 +106,26 @@ const AIR_TEMP_F_RE = /^temp([1-8])f$/i;
 const AIR_HUMIDITY_RE = /^humidity([1-8])$/i;
 const SOIL_CHANNEL_RE = /^soilmoisture([1-8])$/i;
 /** The only `dateutc` form `ecowitt-ingest` accepts (`parseEcoWittDateUtc`). */
-const DATEUTC_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;
+const DATEUTC_RE = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/;
+/** Mirrors `ECOWITT_DATEUTC_MIN_ISO` / `_FUTURE_SKEW_MS` in ecowittRoutedRowBuilder.ts. */
+const DATEUTC_MIN_MS = Date.parse("2020-01-01T00:00:00.000Z");
+const DATEUTC_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * True only for a `dateutc` production `parseEcoWittDateUtc` accepts: the
+ * EcoWitt shape, a real calendar date (no 2026-02-30), and inside its clock
+ * window. A parity test pins this against the production parser (Codex P2 on
+ * #2335 at 95f5dfe7).
+ */
+export function dateutcAccepted(dateutc: string, now: Date = new Date()): boolean {
+  const m = DATEUTC_RE.exec(dateutc);
+  if (!m) return false;
+  const [, y, mo, d, h, mi, sec] = m;
+  const iso = `${y}-${mo}-${d}T${h}:${mi}:${sec}.000Z`;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t) || new Date(t).toISOString() !== iso) return false;
+  return t >= DATEUTC_MIN_MS && t <= now.getTime() + DATEUTC_FUTURE_SKEW_MS;
+}
 
 export interface ForwarderFlags {
   live: boolean;
@@ -253,7 +272,7 @@ function findKey(obj: Record<string, unknown>, name: string): string | undefined
  * message that could not be a real gateway upload (no PASSKEY or no
  * dateutc), since the edge function would only answer `accepted: false`.
  */
-export function prepareForwardPayload(text: string): PreparedPayload {
+export function prepareForwardPayload(text: string, now: Date = new Date()): PreparedPayload {
   if (Buffer.byteLength(text, "utf8") > MAX_MESSAGE_BYTES) {
     return { ok: false, reason: "payload_too_large" };
   }
@@ -305,7 +324,7 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   // Only the EcoWitt form `ecowitt-ingest` itself accepts
   // (parseEcoWittDateUtc). A free-form value could carry any encoding of a
   // secret, so it is refused here rather than echoed (Codex P1 at bae4ae77).
-  if (!DATEUTC_RE.test(dateutc)) return { ok: false, reason: "invalid_dateutc" };
+  if (!dateutcAccepted(dateutc, now)) return { ok: false, reason: "invalid_dateutc" };
 
   const air = new Set<number>();
   const soil = new Set<number>();

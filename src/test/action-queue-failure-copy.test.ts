@@ -18,9 +18,7 @@ describe("Action Queue failure copy", () => {
     );
     const copy = safeActionQueueFailureCopy("transition", raw);
 
-    expect(copy).toBe(
-      "Action status couldn't be saved. Nothing was changed. Try again.",
-    );
+    expect(copy).toBe("Action status couldn't be saved. Nothing was changed. Try again.");
     expect(copy).not.toMatch(/action_queue|approved_at|rejected_at|operators/i);
   });
 
@@ -43,13 +41,24 @@ describe("Action Queue failure copy", () => {
         reason: "attacker-supplied-detail",
       }),
     ).toBe("Action status couldn't be saved. Nothing was changed. Try again.");
-    const rpcMissing = safeActionQueueFailureCopy("transition", {
-      ok: false,
-      reason: "rpc_missing",
-    });
-    expect(rpcMissing).not.toMatch(/no status was updated/i);
-    expect(rpcMissing).not.toMatch(/queue is unchanged/i);
-    expect(rpcMissing).toMatch(/That decision was not saved/i);
+    expect(
+      safeActionQueueFailureCopy("transition", {
+        ok: false,
+        reason: "rpc_missing",
+      }),
+    ).toBe(
+      "That decision was not saved. Try again. Any status you already saved is kept. " +
+        "Verdant never sends commands to your equipment from this queue.",
+    );
+  });
+
+  it("uses plain language for audit write failures without naming internal audit rows", () => {
+    expect(safeActionQueueFailureCopy("audit", null)).toBe(
+      "The status was saved, but its history note couldn't be recorded.",
+    );
+    expect(safeActionQueueFailureCopy("audit", new Error("audit_trail insert failed"))).not.toMatch(
+      /audit entry|audit_trail/i,
+    );
   });
 
   it.each<ActionQueueFailureOperation>(["load", "transition", "audit", "outcome", "followup"])(

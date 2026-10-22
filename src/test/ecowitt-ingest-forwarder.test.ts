@@ -25,6 +25,7 @@ import {
   summarizeResponse,
   type ForwarderEnv,
   type ForwarderFlags,
+  type OnceClaim,
 } from "../../scripts/dev/ecowitt-ingest-forwarder";
 
 // Fake credentials, assembled at runtime so nothing in this file reads as a real one.
@@ -34,6 +35,8 @@ const NOT_A_BRIDGE_TOKEN = ["sk", "live", "not_a_bridge_token"].join("_");
 // The approved destination; any other host is refused (Codex P1 at 79ce2801).
 const INGEST_URL = APPROVED_INGEST_URLS[0];
 const NO_SLEEP = { sleep: async () => {} };
+// A 32-hex PASSKEY shape, built at runtime, for the embedded-credential cases.
+const FAKE_HEX32 = "0123456789abcdef".repeat(2);
 
 // Shape of a GW3000B upload after the HTTP bridge wrapped it.
 const GATEWAY_MESSAGE = JSON.stringify({
@@ -215,6 +218,37 @@ describe("prepareForwardPayload", () => {
     if (long.ok) {
       expect(long.summary.station).toHaveLength(64);
       expect(long.summary.dateutc.length).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it("rejects a dateutc that carries the PASSKEY beside other text (Codex P1 at 3df0e691)", () => {
+    const out = prepareForwardPayload(
+      JSON.stringify({ PASSKEY: FAKE_HEX32, dateutc: `prefix${FAKE_HEX32}suffix`, temp1f: 70 }),
+    );
+    expect(out).toEqual({ ok: false, reason: "invalid_dateutc" });
+    // Even when the credential would be cut by the summary cap.
+    const cut = prepareForwardPayload(
+      JSON.stringify({ PASSKEY: FAKE_HEX32, dateutc: `${"x".repeat(60)}${FAKE_HEX32}` }),
+    );
+    expect(cut).toEqual({ ok: false, reason: "invalid_dateutc" });
+  });
+
+  it("counts only the channels the ingest router reads (Codex P2 at 3df0e691)", () => {
+    const out = prepareForwardPayload(
+      JSON.stringify({
+        PASSKEY: FAKE_PASSKEY,
+        dateutc: "2026-10-22 05:27:14",
+        temp1f: 70,
+        humidity1: 50,
+        temp2: 70,
+        humidity3f: 50,
+        soilmoisture4: 30,
+      }),
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.summary.air_channels).toEqual([1]);
+      expect(out.summary.soil_channels).toEqual([4]);
     }
   });
 
@@ -510,6 +544,14 @@ describe("redaction", () => {
     expect(JSON.stringify(redactForLog({ summary: { station: hex } }))).not.toContain(hex);
   });
 
+  it("redacts a 32-hex run inside a longer string, not only a standalone one (Codex P1 at 3df0e691)", () => {
+    const out = redactString(`prefix${FAKE_HEX32}suffix`);
+    expect(out).not.toContain(FAKE_HEX32);
+    expect(out).toContain("(redacted)");
+    const nested = redactForLog({ summary: { dateutc: `a${FAKE_HEX32}b` } });
+    expect(JSON.stringify(nested)).not.toContain(FAKE_HEX32);
+  });
+
   it("redacts broker URL credentials in the startup fields", () => {
     expect(redactString(`wss://broker/mqtt?token=${FAKE_BRIDGE_TOKEN}`)).toBe(
       "wss://broker/mqtt?token=(redacted)",
@@ -582,6 +624,29 @@ describe("attachClientLifecycle (--once broker failures)", () => {
     client.emit("error", new Error("Not authorized"));
     expect(onFatal).toHaveBeenCalledTimes(1);
     expect(onFatal).toHaveBeenCalledWith(2);
+  });
+
+  it("logs instead of exiting when a broker error follows the claimed --once message (Codex P2 at 3df0e691)", () => {
+    const claim: OnceClaim = { claimed: false };
+    const client = fakeClient();
+    const onFatal = vi.fn();
+    attachClientLifecycle(client, {
+      flags: flags({ once: true }),
+      onFatal,
+      connectTimeoutMs: 60_000,
+      claim,
+    });
+    // The handler shares the claim: delivering a message sets it before any await.
+    const handler = createMessageHandler({
+      flags: flags({ once: true }),
+      env: LIVE_ENV,
+      onDone: () => {},
+      claim,
+    });
+    handler("ecowitt/grow", SANITY_MESSAGE);
+    expect(claim.claimed).toBe(true);
+    client.emit("error", new Error("Connection lost"));
+    expect(onFatal).not.toHaveBeenCalled();
   });
 
   it("exits 2 when the subscription is rejected", () => {

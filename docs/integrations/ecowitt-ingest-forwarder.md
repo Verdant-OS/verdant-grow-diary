@@ -61,14 +61,21 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
   capped at 64 characters, and a `stationtype` that contains the PASSKEY is
   dropped.
 - A message without `PASSKEY` or `dateutc` (for example the runbook's
-  hand-made sanity POST) is rejected locally and never forwarded.
+  hand-made sanity POST) is rejected locally and never forwarded. A `dateutc`
+  that carries the PASSKEY is rejected too (`invalid_dateutc`), so the
+  credential value never reaches a summary string, and any 32-hex run inside a
+  logged string is redacted whether or not it stands alone.
+- The dry-run channel summary counts only the keys `ecowitt-ingest` routes:
+  `temp{n}f` and `humidity{n}` for air, `soilmoisture{n}` for soil.
 - The live POST is sent with `redirect: "error"`: a redirect from the
   validated URL is reported as `network_error`, never followed with the
   PASSKEY and token.
 - A message whose `PASSKEY` or `dateutc` is not a string is rejected locally
   (`invalid_passkey` / `invalid_dateutc`); nothing is coerced.
 - `--once` claims the first message before any await, so a second upload
-  arriving while the first is in flight is ignored, never forwarded.
+  arriving while the first is in flight is ignored, never forwarded. Once that
+  message is claimed, a broker error is logged and does not abort its POST;
+  the message's own result sets the exit code.
 - Logs and reports pass through a redactor at every depth: `PASSKEY`, `MAC`,
   tokens (also when embedded in another string or a URL) and MQTT credentials
   never appear. The Mosquitto watcher window still shows the raw topic, so

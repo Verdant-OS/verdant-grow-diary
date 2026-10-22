@@ -36,7 +36,8 @@
  *     database access.
  *
  * CLI flags:
- *   --live             POST to ECOWITT_INGEST_URL. Default is dry-run (no network).
+ *   --live             POST to ECOWITT_INGEST_URL. Default is dry-run: it still connects to
+ *                      the MQTT broker and subscribes, but never sends the ingest POST.
  *   --once             Handle one message, then exit (0 = forwarded/accepted or dry-run; 1 otherwise).
  *   --write-report     Write a redacted report to ./tmp/ecowitt-forwarder-last-report.json.
  *   --topic <t>        MQTT topic (default ecowitt/grow or ECOWITT_MQTT_TOPIC).
@@ -77,7 +78,12 @@ export const MQTT_CONNECT_TIMEOUT_MS = 20_000;
 const BRIDGE_WRAPPER_KEYS = new Set(["received_at", "transport", "topic"]);
 /** Never logged, never written to a report. */
 const SECRET_KEY_RE = /passkey|^mac$|token|secret|password|api_key|application_key|app_key/i;
-const AIR_CHANNEL_RE = /^(?:temp|humidity)([1-8])f?$/i;
+// The same keys `supabase/functions/_shared/ecowittChannelTentRouter.ts` routes:
+// `temp{n}f` and `humidity{n}` for air, `soilmoisture{n}` for soil. Anything else
+// (`temp2`, `humidity3f`) is not a channel, so the dry-run summary never claims
+// one that live ingest would not read (Codex P2 on #2335 at 3df0e691).
+const AIR_TEMP_F_RE = /^temp([1-8])f$/i;
+const AIR_HUMIDITY_RE = /^humidity([1-8])$/i;
 const SOIL_CHANNEL_RE = /^soilmoisture([1-8])$/i;
 
 export interface ForwarderFlags {
@@ -228,13 +234,18 @@ export function prepareForwardPayload(text: string): PreparedPayload {
     return { ok: false, reason: "missing_dateutc" };
   }
   if (typeof dateutcRaw !== "string") return { ok: false, reason: "invalid_dateutc" };
+  // A date never contains the credential. A hostile upload that embeds the
+  // PASSKEY in `dateutc` beside other text would otherwise reach the summary,
+  // where the standalone-shape redactor cannot see it (Codex P1 on #2335 at
+  // 3df0e691). Checked before truncation so a cut fragment cannot slip through.
+  if (dateutcRaw.includes(passkey)) return { ok: false, reason: "invalid_dateutc" };
   const dateutc = dateutcRaw.trim().slice(0, MAX_SUMMARY_STRING);
   if (!dateutc) return { ok: false, reason: "missing_dateutc" };
 
   const air = new Set<number>();
   const soil = new Set<number>();
   for (const k of Object.keys(payload)) {
-    const a = AIR_CHANNEL_RE.exec(k);
+    const a = AIR_TEMP_F_RE.exec(k) ?? AIR_HUMIDITY_RE.exec(k);
     if (a) air.add(Number(a[1]));
     const s = SOIL_CHANNEL_RE.exec(k);
     if (s) soil.add(Number(s[1]));
@@ -321,8 +332,12 @@ export function summarizeResponse(status: number, bodyText: string): ResponseSum
 
 /** Token shapes that must never appear in output, wherever they sit in a string. */
 const EMBEDDED_SECRET_RE = /\b(?:vbt|sk|sbp)_[A-Za-z0-9_-]{4,}/g;
-/** An EcoWitt PASSKEY is a 32-hex digest; scrub that shape wherever it appears. */
-const HEX32_RE = /\b[0-9a-f]{32}\b/gi;
+/**
+ * An EcoWitt PASSKEY is a 32-hex digest; scrub that shape wherever it appears,
+ * including inside a longer token with adjacent text (Codex P1 on #2335 at
+ * 3df0e691). Over-redacting another long hex string in a log is harmless.
+ */
+const HEX32_RE = /[0-9a-f]{32}/gi;
 /** `scheme://user:password@host` → `scheme://(redacted)@host`. */
 const URL_USERINFO_RE = /(\/\/)[^/\s@]+@/g;
 /** `?token=…`, `&password=…` and similar query credentials. */
@@ -476,6 +491,15 @@ async function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Prom
   log("report written", { path: DEFAULT_REPORT_PATH });
 }
 
+/**
+ * The `--once` claim, shared between the message handler and the client
+ * lifecycle so a broker error after the one message is claimed cannot abort
+ * its in-flight POST (Codex P2 on #2335 at 3df0e691).
+ */
+export interface OnceClaim {
+  claimed: boolean;
+}
+
 export interface MessageHandlerDeps {
   flags: ForwarderFlags;
   env: ForwarderEnv;
@@ -483,6 +507,8 @@ export interface MessageHandlerDeps {
   writeReportImpl?: (outcome: ForwardOutcome, flags: ForwarderFlags) => Promise<void>;
   /** Called exactly once in `--once` mode with the exit code. */
   onDone: (exitCode: number) => void;
+  /** Shared claim; a private one is used when the caller passes none. */
+  claim?: OnceClaim;
 }
 
 /**
@@ -495,14 +521,14 @@ export interface MessageHandlerDeps {
 export function createMessageHandler(
   deps: MessageHandlerDeps,
 ): (topic: string, buf: Buffer | string) => void {
-  let claimed = false;
+  const claim: OnceClaim = deps.claim ?? { claimed: false };
   return (_topic, buf) => {
     if (deps.flags.once) {
-      if (claimed) {
+      if (claim.claimed) {
         log("ignored_extra_message", { reason: "--once is already handling a message" });
         return;
       }
-      claimed = true;
+      claim.claimed = true;
     }
     const text = typeof buf === "string" ? buf : buf.toString("utf8");
     void (async () => {
@@ -536,6 +562,8 @@ export interface ClientLifecycleDeps {
   /** Called once in `--once` mode when the broker connection or subscription fails. */
   onFatal: (exitCode: number) => void;
   connectTimeoutMs?: number;
+  /** The handler's `--once` claim; once set, a broker error no longer ends the run. */
+  claim?: OnceClaim;
 }
 
 /**
@@ -548,6 +576,12 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
   let connected = false;
   let ended = false;
   const fatal = (reason: string, fields: Record<string, unknown> = {}) => {
+    if (deps.flags.once && deps.claim?.claimed) {
+      // The one message is already in flight; its own result sets the exit
+      // code, so a broker error now is logged, not fatal (Codex P2 at 3df0e691).
+      log("mqtt_error_after_claim", { reason, ...fields });
+      return;
+    }
     log("mqtt_fatal", { reason, ...fields });
     if (deps.flags.once && !ended) {
       ended = true;
@@ -614,8 +648,10 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
   });
 
   const client = await connectMqtt(flags, env);
+  const claim: OnceClaim = { claimed: false };
   attachClientLifecycle(client, {
     flags,
+    claim,
     onFatal: (exitCode) => {
       client.end();
       process.exit(exitCode);
@@ -626,6 +662,7 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
     createMessageHandler({
       flags,
       env,
+      claim,
       onDone: (exitCode) => {
         client.end();
         process.exit(exitCode);

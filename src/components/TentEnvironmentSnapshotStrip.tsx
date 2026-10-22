@@ -58,7 +58,12 @@ export default function TentEnvironmentSnapshotStrip({
     now,
   });
 
-  if (selection.kind === "sensor_loading") {
+  // A failed raw read is not "unavailable" while the Dashboard's own snapshot
+  // read, which may still back it, is in flight (Codex P2 on #2303 at 0994ea2a).
+  if (
+    selection.kind === "sensor_loading" ||
+    (selection.kind === "sensor_unavailable" && tonightSnapshot.status === "loading")
+  ) {
     return (
       <p
         className="text-xs text-muted-foreground animate-pulse"

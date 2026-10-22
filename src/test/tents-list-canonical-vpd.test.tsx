@@ -349,6 +349,24 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-sensor-source-tent-1")).toHaveTextContent(/Live/);
   });
 
+  it("waits for a pending snapshot read before calling a failed raw read unavailable (Codex P2 at 0994ea2a)", () => {
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={{ status: "loading", snapshot: EMPTY_SNAPSHOT }}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="error"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[]}
+        manualStatus="success"
+      />,
+    );
+    expect(screen.getByTestId("tents-list-sensor-loading-tent-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("tents-list-sensor-unavailable-tent-1")).toBeNull();
+  });
+
   it("keeps a degraded sibling's rejection through the snapshot fallback (Codex P1 at 0994ea2a)", () => {
     const t = at(0.05);
     // The raw-row path withholds this capture: the RH beside the VPD is degraded.

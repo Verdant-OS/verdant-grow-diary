@@ -5,10 +5,9 @@
  * no caller ever opted out. A search-param update now keeps the scroll
  * position unless the caller explicitly passes `preventScrollReset: false`.
  *
- * The product shim is exercised by relative path (bypassing the Vitest
- * alias) against a REAL TanStack router. The Vitest override keeps its old
- * reset-scroll default until its scorer lock is renegotiated; jsdom never
- * scrolls, so component tests are unaffected either way.
+ * Both setters are exercised against a REAL TanStack router: the product
+ * shim by relative path (bypassing the Vitest alias) and the Vitest override
+ * via the `@/` alias, which every component test uses.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -20,6 +19,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { useSearchParams as productUseSearchParams } from "../lib/react-router-compat";
+import { useSearchParams as aliasUseSearchParams } from "@/lib/react-router-compat";
 
 type UseSearchParams = typeof productUseSearchParams;
 
@@ -72,8 +72,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("product shim setSearchParams scroll behaviour", () => {
-  const useSearchParams = productUseSearchParams;
+describe.each([
+  ["product shim", productUseSearchParams],
+  ["vitest override", aliasUseSearchParams],
+])("%s setSearchParams scroll behaviour", (_name, useSearchParams) => {
   it("keeps the scroll position when a chip changes a search param", async () => {
     expect((await clickChip(useSearchParams))?.resetScroll).toBe(false);
   });

@@ -357,7 +357,9 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
       ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
-      resetScroll: options?.preventScrollReset !== true,
+      // Mirrors the product shim: a search-param update keeps the scroll
+      // position unless the caller passes `preventScrollReset: false`.
+      resetScroll: options?.preventScrollReset === false,
     } as never);
   };
 

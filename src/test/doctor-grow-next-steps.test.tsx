@@ -52,8 +52,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 vi.mock("@/components/AiCreditLimitNotice", () => ({
-  default: (props: { "data-testid"?: string }) => (
-    <div data-testid={props["data-testid"]}>credit limit</div>
+  default: (props: { "data-testid"?: string; returnTo?: string | null }) => (
+    <div data-testid={props["data-testid"]} data-return-to={props.returnTo ?? ""}>
+      credit limit
+    </div>
   ),
 }));
 
@@ -205,6 +207,82 @@ describe("/doctor grow-level next steps", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(screen.getByText("Next steps for Spring Run")).toBeTruthy();
     expect(screen.queryByTestId("doctor-grow-next-steps-result")).toBeNull();
+  });
+
+  it("reports a transport failure as unconfirmed and retries with the same key (Codex P1 at 8eb6da06)", async () => {
+    state.invoke.mockResolvedValue({ data: null, error: new Error("network") });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await screen.findByTestId("doctor-grow-next-steps-uncertain");
+    expect(screen.queryByTestId("doctor-grow-next-steps-failed")).toBeNull();
+    expect(screen.queryByText(/Nothing was changed/)).toBeNull();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await waitFor(() => expect(state.invoke).toHaveBeenCalledTimes(2));
+    const keys = state.invoke.mock.calls.map((c) => c[1].body.idempotencyKey);
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  it("caps confidence at low for a sparse grow (Codex P1 at 8eb6da06)", async () => {
+    state.invoke.mockResolvedValue({
+      data: { ok: true, result: { sparse: true, analysis: { ...ANALYSIS, confidence: "high" } } },
+    });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await screen.findByTestId("doctor-grow-next-steps-result");
+    expect(screen.getByTestId("doctor-grow-next-steps-confidence").textContent).toBe(
+      "Confidence: low",
+    );
+    expect(screen.getByTestId("doctor-grow-next-steps-sparse")).toBeTruthy();
+  });
+
+  it("shows evidence, risk, missing information and the 3-day plan (Codex P1 at 8eb6da06)", async () => {
+    state.invoke.mockResolvedValue({
+      data: {
+        ok: true,
+        result: {
+          analysis: {
+            ...ANALYSIS,
+            likely_issue: "Mild underwatering",
+            risk_level: "medium",
+            evidence: ["Last watering was 4 days ago."],
+            possible_causes: ["Larger pot drying slower than expected."],
+            follow_up_3_day: "Keep the schedule and log runoff daily.",
+          },
+          diagnosis: { missingInformation: ["Pot size"] },
+        },
+      },
+    });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await screen.findByTestId("doctor-grow-next-steps-result");
+    for (const text of [
+      "Likely issue: Mild underwatering",
+      "Risk: medium",
+      "Last watering was 4 days ago.",
+      "Pot size",
+      "Larger pot drying slower than expected.",
+      "Keep the schedule and log runoff daily.",
+    ]) {
+      expect(screen.getByText(text)).toBeTruthy();
+    }
+  });
+
+  it("returns from checkout to the grow whose request was denied (Codex P2 at 8eb6da06)", async () => {
+    state.invoke.mockResolvedValue({
+      data: { ok: false, reason: "credit_denied", credit: { plan_id: "free", remaining: 0 } },
+    });
+    renderPage("/doctor?growId=grow-2&tentId=tent-b");
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    const notice = await screen.findByTestId("doctor-grow-next-steps-credit-limit");
+    expect(notice.getAttribute("data-return-to")).toBe("/doctor?growId=grow-2");
+  });
+
+  it("announces results and credit notices inside the live region (Codex P2 at 8eb6da06)", async () => {
+    state.invoke.mockResolvedValue({ data: { ok: true, result: { analysis: ANALYSIS } } });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    const result = await screen.findByTestId("doctor-grow-next-steps-result");
+    expect(screen.getByTestId("doctor-grow-next-steps-status").contains(result)).toBe(true);
   });
 
   it("offers nothing while the grows read is pending or failed", () => {

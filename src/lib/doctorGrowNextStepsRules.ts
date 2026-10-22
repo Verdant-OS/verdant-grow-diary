@@ -50,12 +50,23 @@ export function resolveDoctorGrowNextStepsTarget(input: {
   return { growId: grow.id, growName: name || DOCTOR_GROW_NEXT_STEPS_FALLBACK_GROW_NAME };
 }
 
+export type DoctorNextStepsLevel = "low" | "medium" | "high";
+
 export interface DoctorNextStepsAnalysis {
   summary: string;
-  confidence: string | null;
+  likelyIssue: string | null;
+  /** Displayed confidence; capped to "low" when the server marks the grow sparse. */
+  confidence: DoctorNextStepsLevel | null;
+  /** True when the server reported too few logs for a confident answer. */
+  sparse: boolean;
+  riskLevel: DoctorNextStepsLevel | "unknown" | null;
+  evidence: string[];
+  missingInformation: string[];
+  possibleCauses: string[];
   recommendedActions: string[];
   doNotDo: string[];
   followUp24h: string | null;
+  followUp3Day: string | null;
 }
 
 export type DoctorNextStepsOutcome =
@@ -64,6 +75,8 @@ export type DoctorNextStepsOutcome =
   | { kind: "credit_denied"; credit: AiCreditDenial | null }
   | { kind: "upstream_exhausted" }
   | { kind: "pending" }
+  /** The connection failed, so whether the server finished (and spent) is unknown. */
+  | { kind: "uncertain" }
   | { kind: "failed" };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -78,6 +91,11 @@ function stringList(v: unknown): string[] {
 
 function optionalString(v: unknown): string | null {
   return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+}
+
+function level(v: unknown): DoctorNextStepsLevel | null {
+  const s = optionalString(v)?.toLowerCase();
+  return s === "low" || s === "medium" || s === "high" ? s : null;
 }
 
 /** Classify an adapted `ai-coach` response. Unknown shapes fail closed. */
@@ -100,14 +118,27 @@ export function classifyDoctorNextStepsResponse(
   if (!isRecord(analysis)) return { kind: "failed" };
   const summary = optionalString(analysis.summary);
   if (!summary) return { kind: "failed" };
+  // The model is asked for low confidence on thin evidence, but only the
+  // server's sparse flag is enforced: a sparse grow never shows above "low".
+  const sparse = result.sparse === true;
+  const confidence = level(analysis.confidence);
+  const risk = optionalString(analysis.risk_level)?.toLowerCase();
+  const diagnosis = isRecord(result.diagnosis) ? result.diagnosis : null;
   return {
     kind: "result",
     analysis: {
       summary,
-      confidence: optionalString(analysis.confidence),
+      likelyIssue: optionalString(analysis.likely_issue),
+      confidence: sparse && confidence ? "low" : confidence,
+      sparse,
+      riskLevel: risk === "unknown" ? "unknown" : level(risk),
+      evidence: stringList(analysis.evidence),
+      missingInformation: stringList(diagnosis?.missingInformation),
+      possibleCauses: stringList(analysis.possible_causes),
       recommendedActions: stringList(analysis.recommended_actions),
       doNotDo: stringList(analysis.do_not_do),
       followUp24h: optionalString(analysis.follow_up_24h),
+      followUp3Day: optionalString(analysis.follow_up_3_day),
     },
   };
 }

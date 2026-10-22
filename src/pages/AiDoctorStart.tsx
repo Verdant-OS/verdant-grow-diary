@@ -1,9 +1,12 @@
 /**
  * Canonical grower entry for AI Doctor.
  *
- * This page is navigation only. It never invokes a model, spends a credit,
- * persists a session, or selects a plant implicitly. The grower explicitly
- * chooses an active plant, then lands on the existing plant-scoped review.
+ * Rendering never invokes a model, spends a credit, persists a session, or
+ * selects a plant implicitly. The plant list is navigation only: the grower
+ * explicitly chooses an active plant, then lands on the existing plant-scoped
+ * review. The one exception is the grow-level "Next steps" card: an explicit
+ * click there calls `ai-coach` for the named grow and may spend one AI credit
+ * (the server decides credits and refunds an empty grow).
  */
 import { useMemo } from "react";
 import { ArrowRight, History, Sprout, Stethoscope } from "lucide-react";

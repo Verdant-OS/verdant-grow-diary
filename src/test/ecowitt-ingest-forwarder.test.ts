@@ -21,6 +21,7 @@ import {
   APPROVED_INGEST_URLS,
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
+  brokerUrlIsHierarchical,
   buildForwardRequest,
   configuredSecretValues,
   createBoundedRunner,
@@ -192,6 +193,19 @@ describe("unknown arguments are reported without their text (Codex P1 at ed54810
   });
 });
 
+describe("brokerUrlIsHierarchical", () => {
+  it.each([
+    ["mqtt://127.0.0.1:1883", true],
+    ["mqtts://broker.example:8883", true],
+    ["wss://broker.example/mqtt", true],
+    ["mqtt:user:pass@broker.invalid", false],
+    ["not-a-url", false],
+    ["", false],
+  ] as const)("%s → %s", (url, expected) => {
+    expect(brokerUrlIsHierarchical(url)).toBe(expected);
+  });
+});
+
 describe("live config fails closed", () => {
   it("accepts the ecowitt-ingest https URL with a vbt_ token", () => {
     expect(liveConfigProblems(LIVE_ENV)).toEqual([]);
@@ -257,8 +271,21 @@ describe("prepareForwardPayload", () => {
     expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "missing_dateutc" });
   });
 
-  it.each(["not json", "[1,2]", "null", '"str"'])("refuses %s", (text) => {
-    expect(prepareForwardPayload(text).ok).toBe(false);
+  it.each([
+    ["not json", "malformed_json"],
+    ["[1,2]", "not_an_object"],
+    ["null", "not_an_object"],
+    ['"str"', "not_an_object"],
+  ] as const)("refuses %s as %s", (text, reason) => {
+    expect(prepareForwardPayload(text)).toEqual({ ok: false, reason });
+  });
+
+  it("rejects dateutc that embeds this message's PASSKEY (Codex P1 at 3df0e691)", () => {
+    const text = JSON.stringify({
+      PASSKEY: FAKE_PASSKEY,
+      dateutc: `2026-10-22 05:27:14 ${FAKE_PASSKEY}`,
+    });
+    expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "invalid_dateutc" });
   });
 
   // Copilot on #2335: `String(x)` on these throws; they must be local rejections.

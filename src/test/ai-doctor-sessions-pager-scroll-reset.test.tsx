@@ -89,3 +89,29 @@ describe("AI Doctor Sessions pager scroll", () => {
     });
   });
 });
+
+describe("AI Doctor Sessions saved-view scroll", () => {
+  const chip = "ai-doctor-sessions-index-needs-follow-up-visible-chip";
+
+  it("a saved view that changes the page resets scroll", async () => {
+    currentSearch = "page=2";
+    setSearchParamsSpy.mockClear();
+    await renderSessionsIndex();
+    fireEvent.click(screen.getByTestId(chip));
+    expect(setSearchParamsSpy).toHaveBeenCalledTimes(1);
+    expect((setSearchParamsSpy.mock.calls[0][0] as URLSearchParams).get("page")).toBeNull();
+    expect(setSearchParamsSpy.mock.calls[0][1]).toEqual({
+      replace: true,
+      preventScrollReset: false,
+    });
+  });
+
+  it("a saved view on the same page keeps the scroll position", async () => {
+    currentSearch = "";
+    setSearchParamsSpy.mockClear();
+    await renderSessionsIndex();
+    fireEvent.click(screen.getByTestId(chip));
+    expect(setSearchParamsSpy).toHaveBeenCalledTimes(1);
+    expect(setSearchParamsSpy.mock.calls[0][1]).toEqual({ replace: true });
+  });
+});

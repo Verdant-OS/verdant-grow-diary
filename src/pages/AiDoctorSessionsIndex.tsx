@@ -496,7 +496,15 @@ export default function AiDoctorSessionsIndex() {
       : findSavedView(savedViews, id);
     if (!view) return;
     const next = savedViewToSearchParams(view, searchParams);
-    setSearchParams(next, { replace: true });
+    // A saved view that lands on another page replaces the results, so it
+    // scrolls back to the top like the pager; one on the same page keeps the
+    // scroll position (#2348 review).
+    const pageChanged =
+      next.get(FILTER_PARAM_KEYS.page) !== searchParams.get(FILTER_PARAM_KEYS.page);
+    setSearchParams(next, {
+      replace: true,
+      ...(pageChanged ? { preventScrollReset: false } : {}),
+    });
   };
 
   const handleSaveView = () => {

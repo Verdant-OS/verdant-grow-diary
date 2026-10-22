@@ -37,9 +37,9 @@ describe("Action Queue status copy speaks plainly", () => {
 
   it("names what the status pill is about", () => {
     expect(ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.title).toBe(
-      "Status changes haven't been tried yet on this visit",
+      "Verdant hasn't confirmed status updates are working yet",
     );
-    expect(ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label).toBe("Not tried yet");
+    expect(ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label).toBe("Updates unverified");
     expect(ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.title).toBe("Status changes are working");
     expect(ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.label).toBe("Updates working");
   });

@@ -180,8 +180,8 @@ export function areActionQueueTransitionMutationsBlocked(
  * must not claim a check is running, and must not look like an outage.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY = {
-  title: "Status changes haven't been tried yet on this visit",
-  label: "Not tried yet",
+  title: "Verdant hasn't confirmed status updates are working yet",
+  label: "Updates unverified",
 } as const;
 
 /**

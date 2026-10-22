@@ -92,8 +92,11 @@ cross-project imports and heads fail, and another project's ID is absent.
 
 Each read requires explicit `now`. Optional `headsJSON` is exactly
 `{projectId, heads:[{type,location,commit}]}` with at most 128 unique sources.
-Heads are caller assertions, never discovered or cached. Exact-head claims become
-stale/unverified if a head is missing or changes. Expired records (including the
+Heads are caller assertions, never discovered or cached. Any record becomes
+stale/unverified when its supplied source head differs from the recorded commit;
+exact-head claims are also stale when no head is supplied. A `fact` or
+`constraint` read without a head keeps its declared verification, so callers
+that need it checked must supply the head. Expired records (including the
 exact expiry instant) and future observations are stale. Superseded and conflicted
 records become effectively unverified; one-sided conflict references label both
 records. Supersession cycles fail; relationships remain immutable source data.

@@ -1,0 +1,37 @@
+name: Shared project context spike
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "spikes/shared-project-context/**"
+      - ".github/workflows/shared-project-context-spike.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  spike-tests:
+    name: Shared context node:test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+
+      - name: Spike tests
+        run: node --test spikes/shared-project-context/context.test.mjs
+
+      - name: Restricted demo
+        run: node --permission --allow-fs-read="$GITHUB_WORKSPACE/spikes/shared-project-context" spikes/shared-project-context/demo.mjs

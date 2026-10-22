@@ -145,6 +145,19 @@ test('project isolation applies to imports, reads, searches, and head assertions
   assert.equal(JSON.parse(store.exportJSON()).projectId, PROJECT);
 });
 
+test('a changed supplied head stales verified facts and constraints, not only exact-head claims', () => {
+  for (const kind of ['fact', 'constraint']) {
+    const record = make({ kind });
+    const store = storeWith([record]);
+    assert.equal(store.read(record.id, { now: NOW, headsJSON: headJSON(record) }).effectiveVerification, 'verified');
+    const moved = store.read(record.id, { now: NOW, headsJSON: headJSON(record, OTHER_COMMIT) });
+    assert.equal(moved.stale, true);
+    assertUnverified(moved, 'source-head-changed');
+    // Without a supplied head, only exact-head claims require one.
+    assert.equal(store.read(record.id, { now: NOW }).effectiveVerification, 'verified');
+  }
+});
+
 test('exact-head verification is recomputed for matching, changed, and missing heads', () => {
   const record = make({ kind: 'exact-head' });
   const store = storeWith([record]);

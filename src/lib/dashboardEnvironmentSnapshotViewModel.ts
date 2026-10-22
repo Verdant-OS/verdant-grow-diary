@@ -203,7 +203,8 @@ export interface BuildTentSnapshotViewOptions {
 
 /** The Dashboard Tonight VPD for a tent, with its own provenance. */
 export interface CanonicalTentVpd {
-  kpa: number;
+  /** Null only on a rejected result whose capture Tonight withheld as invalid. */
+  kpa: number | null;
   capturedAt: string | null;
   /** Canonical source of the VPD's own capture (live / manual / csv / demo / stale / invalid). */
   source: string | null;
@@ -237,8 +238,15 @@ function sameInstant(a: string | null | undefined, b: string | null | undefined)
   return Number.isFinite(aMs) && aMs === Date.parse(b);
 }
 
+/** True when `a` is a known instant strictly before `b`; unknown is never older. */
+function olderThan(a: string | null | undefined, b: string | null | undefined): boolean {
+  const aMs = a ? Date.parse(a) : Number.NaN;
+  const bMs = b ? Date.parse(b) : Number.NaN;
+  return Number.isFinite(aMs) && Number.isFinite(bMs) && aMs < bMs;
+}
+
 function ownCaptureVpdMetric(
-  canonical: CanonicalTentVpd,
+  canonical: CanonicalTentVpd & { kpa: number },
   stage: string | null | undefined,
   now: number,
 ): MetricView {
@@ -297,7 +305,8 @@ export function buildTentSnapshotView(
   if (!snap) return EMPTY;
   const latestRows = rows.filter((r) => resolveSensorObservationTime(r) === snap.ts);
   const canonical =
-    options.canonicalVpd != null && Number.isFinite(options.canonicalVpd.kpa)
+    options.canonicalVpd != null &&
+    (Number.isFinite(options.canonicalVpd.kpa) || options.canonicalVpd.rejected === true)
       ? options.canonicalVpd
       : null;
   // Source resolution is strict across the whole latest timestamp. A mixed
@@ -475,8 +484,29 @@ export function buildTentSnapshotView(
   ];
 
   // A canonical VPD from another capture keeps its own source and age.
-  if (canonical !== null && !canonicalRejected && !useCanonicalVpd) {
-    metrics[2] = ownCaptureVpdMetric(canonical, stage, now);
+  if (canonical !== null && !canonicalRejected && !useCanonicalVpd && canonical.kpa !== null) {
+    metrics[2] = ownCaptureVpdMetric({ ...canonical, kpa: canonical.kpa }, stage, now);
+  }
+  // A rejected canonical VPD from a capture no older than the cohort is the
+  // tent's latest VPD evidence: the cohort's older stored VPD must not stand
+  // in for it as a healthy value (Codex P1 on #2303 at 3e689090).
+  if (
+    canonical !== null &&
+    canonicalRejected &&
+    !sameCapture &&
+    !olderThan(canonical.capturedAt, snap.ts)
+  ) {
+    metrics[2] = {
+      key: "vpd",
+      label: "VPD",
+      display: formatNumber(null, 2),
+      unit: " kPa",
+      chipStatus: "bad",
+      status: "invalid",
+      statusLabel: ["Invalid", canonical.ageText]
+        .filter((part): part is string => !!part)
+        .join(" · "),
+    };
   }
 
   return {

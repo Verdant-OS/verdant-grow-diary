@@ -12,8 +12,8 @@
  *   `sensor_readings` row with its own id and no shared capture id, so one
  *   ingest's rows are tied by their captured instant and source (live and
  *   stale are one family). This is the only identity the sensor store has.
- * - `null`: unknown (no diary ref, no per-metric ref, or no source). Callers
- *   fall back to their conservative instant match.
+ * - `null`: unknown (no diary ref, no per-metric ref, or no recognised
+ *   source). Callers fall back to their conservative instant match.
  *
  * Pure.
  */
@@ -30,6 +30,11 @@ export function sensorCaptureRef(
   const ms = Date.parse(at);
   if (!Number.isFinite(ms)) return null;
   const normalized = normalizeSensorSource(source);
+  // An invalid or unrecognised source (`invalid`, `unverified`, …) names no
+  // ingest family, so the row's capture is unknown and callers match it by
+  // instant: an explicitly invalid sibling still rejects a live capture at its
+  // instant (Codex P1 on #2303 at b2606eca).
+  if (normalized === "invalid") return null;
   return `sensor:${ms}:${normalized === "stale" ? "live" : normalized}`;
 }
 

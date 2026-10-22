@@ -103,6 +103,9 @@ function canonicalDashboardSource(source: string): DashboardChartReading["source
   }
 }
 
+/** Raw sources that are themselves a downgrade of the row they label. */
+const REJECTED_SOURCES = new Set(["stale", "invalid"]);
+
 /** Explicit quality flags other than `ok` cannot feed unlabeled telemetry. */
 function hasUsableDashboardQuality(quality: unknown): boolean {
   if (quality == null) return true; // Preserve legacy rows created before quality was exposed.
@@ -138,8 +141,9 @@ export function selectDashboardSensorEvidenceRows<T extends DashboardSensorEvide
 }
 
 /**
- * Telemetry rows the evidence filter drops for their intake quality alone:
- * a known telemetry source, not diagnostic provenance, quality not ok. A
+ * Telemetry rows the evidence filter drops for their intake quality (a known
+ * telemetry source, quality not ok) or their explicit stale/invalid source,
+ * never for diagnostic provenance. A
  * snapshot built from the surviving rows carries these so a fallback
  * projection can reject their capture the way the raw-row path does (Codex
  * P1 on #2303 at 0994ea2a).
@@ -150,9 +154,16 @@ export function selectRejectedQualityRows(
   if (!Array.isArray(rows)) return [];
   const out: SensorSnapshotRejectedQualityRow[] = [];
   for (const row of rows) {
-    if (!row || typeof row.source !== "string" || typeof row.quality !== "string") continue;
-    if (!DASHBOARD_TELEMETRY_SOURCES.has(row.source.trim().toLowerCase())) continue;
-    if (hasUsableDashboardQuality(row.quality)) continue;
+    if (!row || typeof row.source !== "string") continue;
+    const source = row.source.trim().toLowerCase();
+    // An explicit stale/invalid source is an authoritative downgrade on the
+    // raw-row path, like a quality flag, so it is carried too (Codex P1 on
+    // #2303 at b2606eca). Its quality names the downgrade when the row's own
+    // quality does not.
+    const explicitSource = REJECTED_SOURCES.has(source);
+    if (!explicitSource && !DASHBOARD_TELEMETRY_SOURCES.has(source)) continue;
+    const qualityRejected = !hasUsableDashboardQuality(row.quality);
+    if (!explicitSource && (typeof row.quality !== "string" || !qualityRejected)) continue;
     if (withoutDiagnosticSensorRows([row]).length !== 1) continue;
     const value = row.value;
     out.push({
@@ -160,7 +171,7 @@ export function selectRejectedQualityRows(
       value: typeof value === "number" || typeof value === "string" ? value : null,
       captured_at: row.captured_at ?? row.ts,
       source: row.source,
-      quality: row.quality,
+      quality: qualityRejected && typeof row.quality === "string" ? row.quality : source,
     });
   }
   return out;

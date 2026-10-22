@@ -228,7 +228,10 @@ export async function fetchLatestSensorSnapshotsByTent(
   // unavailable". The bulk read does the same through one shared diary window
   // instead of N per-tent reads, so a backend failure never multiplies the
   // reads it would otherwise have saved (Codex P2 on #2303 at 3d1e5800).
-  let sensorReadFailed = false;
+  // Tents whose sensor read failed. A later page's failure covers only the
+  // tents it and the queue still held: tents an earlier page settled keep
+  // their result (Codex P2 on #2303 at 3e689090).
+  const sensorReadFailed = new Set<string>();
   if (unique.length === 1) {
     fallback.add(unique[0]);
   } else {
@@ -244,9 +247,10 @@ export async function fetchLatestSensorSnapshotsByTent(
     // ceiling again (Codex P2 on #2303 at 4a304fe3). Only a single tent that
     // still makes no progress takes its own read.
     const sensorQueue: string[][] = [unique];
+    let pending: string[] = [];
     try {
       while (sensorQueue.length > 0) {
-        const pending = sensorQueue.shift()!;
+        pending = sensorQueue.shift()!;
         const windowLimit = sensorWindowLimit(pending.length, SENSOR_ROWS_PER_TENT);
         const { data, error } = await effectiveSensorReadingsQuery()
           .select("*")
@@ -290,13 +294,17 @@ export async function fetchLatestSensorSnapshotsByTent(
         sensorQueue.push(partition.fallback);
       }
     } catch {
-      // A failure on any page fails the whole sensor read, as one window did:
-      // every tent goes to the shared diary windows.
-      sensorReadFailed = true;
+      // The failed page, the pages still queued and the tents waiting for
+      // their own read go to the shared diary windows, as one failed window
+      // did; tents already settled keep their result.
+      const failed = [...pending, ...sensorQueue.flat(), ...fallback];
+      for (const tentId of failed) {
+        sensorReadFailed.add(tentId);
+        staleByTent.delete(tentId);
+        delete result[tentId];
+      }
       fallback.clear();
-      staleByTent.clear();
-      for (const tentId of unique) delete result[tentId];
-      needDiary = [...unique];
+      needDiary = [...needDiary.filter((tentId) => !sensorReadFailed.has(tentId)), ...failed];
     }
     // 2) Shared diary windows over the tents without a fresh sensor capture.
     // A tent a full window leaves unsettled is read again with the others
@@ -343,7 +351,7 @@ export async function fetchLatestSensorSnapshotsByTent(
               if (verdict.kind === "found") {
                 result[tentId] = preferNewer(staleByTent.get(tentId) ?? null, verdict.snapshot);
               } else if (verdict.kind === "none") {
-                result[tentId] = sensorReadFailed
+                result[tentId] = sensorReadFailed.has(tentId)
                   ? null
                   : (staleByTent.get(tentId) ?? EMPTY_SNAPSHOT);
               } else if (verdict.kind === "unavailable") {
@@ -384,7 +392,7 @@ export async function fetchLatestSensorSnapshotsByTent(
   // 3) Per-tent reads only where the shared windows could not settle a tent.
   // After a failed sensor window no per-tent read starts at all, so an outage
   // never fans out into one read per tent (Codex P2 on #2303 at fa8edcff).
-  if (sensorReadFailed) {
+  if (sensorReadFailed.size > 0) {
     for (const tentId of fallback) result[tentId] = null;
     return result;
   }

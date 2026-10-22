@@ -184,6 +184,13 @@ export interface TonightMetricView {
    * at 4bd3fae7). Tonight itself still labels it Manual.
    */
   historical?: true;
+  /**
+   * The temperature (°C) and RH (%) a calculated VPD was derived from, which
+   * can be an older same-capture pair than the temperature and RH the card
+   * shows. Capture checks validate these, not the displayed values (Codex P2
+   * on #2303 at 3e689090).
+   */
+  inputs?: { temp: number; rh: number };
 }
 
 /** Allowed clock skew before a capture time counts as "in the future". */
@@ -212,6 +219,8 @@ interface Candidate {
   refs: readonly (SensorCaptureRef | null)[];
   /** From a generic diary snapshot (raw source `diary`). */
   historical?: true;
+  /** The temperature and RH a calculated VPD came from. */
+  inputs?: { temp: number; rh: number };
 }
 
 /** A generic diary snapshot, as opposed to an Environment Check or manual-snapshot envelope. */
@@ -364,6 +373,7 @@ function calculatedVpdCandidate(
     calculated: true as const,
     ownSource: true,
     refs: [...temp.refs, ...rh.refs],
+    inputs: { temp: temp.value, rh: rh.value },
     ...(temp.historical || rh.historical ? { historical: true as const } : {}),
   };
   // RH pinned at 0% or 100% is a stuck sensor, not a reading (same guard as the Environment ribbon).
@@ -418,17 +428,20 @@ function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | nu
 }
 
 /**
- * Whether a snapshot metric's own capture carries a sibling row the snapshot
- * read dropped for intake quality. Matched by record identity when both are
- * known, else by instant (ambiguous captures are withheld). Such a capture is
- * never shown as current, as the raw-row capture gate already decides for the
- * tents list and Tent Detail (Codex P1 on #2303 at 4a304fe3).
+ * Whether the capture at `ref` / `atMs` carries a sibling row the snapshot
+ * read dropped for intake quality or an explicit stale/invalid source.
+ * Matched by record identity when both are known, else by instant (ambiguous
+ * captures are withheld). Such a capture is never shown as current, as the
+ * raw-row capture gate already decides for the tents list and Tent Detail
+ * (Codex P1 on #2303 at 4a304fe3). It applies to every candidate from that
+ * capture, the raw row as well as the snapshot copy (Codex P1 at b2606eca).
  */
-function snapshotCaptureHasRejectedSibling(snap: TonightSnapshot, key: TonightMetricKey): boolean {
-  const rejected = snap.rejected_quality_rows ?? [];
-  if (rejected.length === 0) return false;
-  const ref = snapshotCaptureRef(snap, key);
-  const atMs = Date.parse(snap.metric_refs?.[key]?.captured_at ?? snap.ts ?? "");
+function captureHasRejectedSibling(
+  snap: TonightSnapshot | null,
+  ref: SensorCaptureRef | null,
+  atMs: number,
+): boolean {
+  const rejected = snap?.rejected_quality_rows ?? [];
   return rejected.some((row) => {
     const rowRef = sensorCaptureRef(row.captured_at, row.source);
     if (ref && rowRef) return ref === rowRef;
@@ -456,6 +469,7 @@ export function buildTonightTentMetrics(input: {
   const byKey = new Map<TonightMetricKey, Candidate[]>();
   for (const metric of METRICS) byKey.set(metric.key, []);
 
+  const snap = input.snapshot.status === "ok" ? input.snapshot.snapshot : null;
   for (const { key, readingMetric } of METRICS) {
     const candidates = byKey.get(key)!;
     for (const row of evidenceRows) {
@@ -463,18 +477,20 @@ export function buildTonightTentMetrics(input: {
       if (typeof row.value !== "number" || !Number.isFinite(row.value)) continue;
       const when = parseAt(row.captured_at ?? row.ts);
       if (!when) continue;
+      const ref = rowCaptureRef(row);
       candidates.push({
         value: row.value,
-        source: normalizeSensorSource(row.source),
+        source: captureHasRejectedSibling(snap, ref, when.epochMs)
+          ? "invalid"
+          : normalizeSensorSource(row.source),
         ...when,
         origin: 0,
         ownSource: true,
-        refs: [rowCaptureRef(row)],
+        refs: [ref],
         ...(isDiarySource(row.source) ? { historical: true as const } : {}),
       });
     }
 
-    const snap = input.snapshot.status === "ok" ? input.snapshot.snapshot : null;
     const snapValue = snap ? snap[key] : null;
     const snapSource = snap ? snapshotSource(snap.source) : null;
     const snapWhen = snap ? parseAt(snap.ts) : null;
@@ -485,7 +501,9 @@ export function buildTonightTentMetrics(input: {
       typeof snapValue === "number" &&
       Number.isFinite(snapValue)
     ) {
-      const metricSource = snapshotCaptureHasRejectedSibling(snap, key)
+      const snapRef = snapshotCaptureRef(snap, key);
+      const atMs = Date.parse(snap.metric_refs?.[key]?.captured_at ?? snap.ts ?? "");
+      const metricSource = captureHasRejectedSibling(snap, snapRef, atMs)
         ? "invalid"
         : snapshotMetricSource(snap, key, snapSource);
       candidates.push({
@@ -494,7 +512,7 @@ export function buildTonightTentMetrics(input: {
         ...snapWhen,
         origin: 1,
         ownSource: snapshotMetricSourceProven(snap, key, metricSource),
-        refs: [snapshotCaptureRef(snap, key)],
+        refs: [snapRef],
         ...(isDiarySource(snap.source) ? { historical: true as const } : {}),
       });
     }
@@ -568,6 +586,7 @@ export function buildTonightTentMetrics(input: {
       calculated: best.calculated === true,
       captureRefs: best.refs,
       ...(best.historical ? { historical: true as const } : {}),
+      ...(best.inputs ? { inputs: best.inputs } : {}),
     };
   });
 }

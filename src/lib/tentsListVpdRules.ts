@@ -59,6 +59,7 @@ import {
   buildTonightTentMetrics,
   DIARY_SOURCE_LABEL,
   TONIGHT_FUTURE_SKEW_MS,
+  type TonightRowsReadStatus,
   type TonightSensorRow,
 } from "@/lib/tonightTentHomeViewModel";
 
@@ -69,6 +70,10 @@ export function tentsListCanonicalVpd(
   tentId: string,
   nowMs: number,
   snapshot: TonightSnapshotInput = { status: "idle", snapshot: null },
+  // The raw read's own status, so a failed refresh of cached rows follows
+  // Tonight's refresh-error semantics instead of reading as a success (Codex
+  // P2 on #2303 at b2606eca).
+  rowsReadStatus: TonightRowsReadStatus = "success",
 ): CanonicalTentVpd | null {
   const tonightRows: TonightSensorRow[] = rows.map(({ id, ...row }) => ({
     ...row,
@@ -77,11 +82,25 @@ export function tentsListCanonicalVpd(
   }));
   const metrics = buildTonightTentMetrics({
     rows: tonightRows,
-    rowsRead: { status: "success" },
+    rowsRead: { status: rowsReadStatus },
     snapshot,
     now: new Date(nowMs),
   });
   const vpd = metrics.find((metric) => metric.key === "vpd");
+  // Tonight withholds its newest VPD as invalid (a quality-rejected capture):
+  // an explicit rejection, so the list never falls back to an older value
+  // that would read healthy (Codex P1 on #2303 at 3e689090).
+  if (vpd?.state === "invalid") {
+    return {
+      kpa: null,
+      capturedAt: vpd.capturedAt,
+      source: vpd.source,
+      sourceLabel: vpd.sourceLabel,
+      captureRefs: vpd.captureRefs,
+      ageText: vpd.ageText,
+      rejected: true,
+    };
+  }
   if (vpd?.state !== "value" || typeof vpd.value !== "number") return null;
   // Tonight runs no realism check. The same capture gate the tent page applies
   // decides here too: the pair a calculated VPD came from, and every
@@ -89,10 +108,6 @@ export function tentsListCanonicalVpd(
   // capture is returned flagged, never shown, so the list never shows telemetry
   // the tent page withholds (Codex P1 on #2303 at 3d1e5800). The VPD's own
   // value is still passed through: buildTentSnapshotView grades it Invalid.
-  const metricValue = (key: string) => {
-    const metric = metrics.find((m) => m.key === key);
-    return metric?.state === "value" && typeof metric.value === "number" ? metric.value : null;
-  };
   const climate = tentDetailCaptureClimate(
     rows.map((row) => ({
       metric: row.metric,
@@ -105,11 +120,9 @@ export function tentsListCanonicalVpd(
     })),
     snapshot.status === "ok" ? snapshot.snapshot : null,
   );
-  const rejected = tonightCaptureRejected(
-    vpd,
-    { temp: metricValue("temp"), rh: metricValue("rh") },
-    climate,
-  );
+  // A calculated VPD is checked against the pair it came from, not the
+  // newer temperature and RH the card may show (Codex P2 on #2303 at 3e689090).
+  const rejected = tonightCaptureRejected(vpd, vpd.inputs ?? null, climate);
   return {
     kpa: vpd.value,
     capturedAt: vpd.capturedAt,

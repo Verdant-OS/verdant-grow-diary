@@ -18,6 +18,9 @@ const io = vi.hoisted(() => {
     sensorRows: [] as Row[],
     diaryRows: [] as Row[],
     failSensor: false,
+    /** 1-based sensor call from which every sensor read fails. */
+    failSensorFromCall: Number.POSITIVE_INFINITY,
+    sensorCallCount: 0,
     failDiary: false,
     // A chainable, thenable PostgREST stand-in: fixtures are pre-sorted newest
     // first; `.in` filters by the named column and `.limit` slices.
@@ -29,6 +32,8 @@ const io = vi.hoisted(() => {
             ? state.diaryRows
             : [];
       let limit = Number.POSITIVE_INFINITY;
+      const sensorCall =
+        table === "sensor_readings_effective" ? ++state.sensorCallCount : Number.NaN;
       const b = {
         select: () => b,
         order: () => b,
@@ -45,7 +50,8 @@ const io = vi.hoisted(() => {
         },
         then: (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
           Promise.resolve(
-            table === "sensor_readings_effective" && state.failSensor
+            table === "sensor_readings_effective" &&
+              (state.failSensor || sensorCall >= state.failSensorFromCall)
               ? { data: null, error: { message: "sensor read failed" } }
               : table === "diary_entries" && state.failDiary
                 ? { data: null, error: { message: "diary read failed" } }
@@ -99,12 +105,13 @@ const diaryRow = (tentId: string, iso: string, temp: number, rh: number): Row =>
 });
 const sensorCalls = () =>
   io.from.mock.calls.filter(([table]) => table === "sensor_readings_effective").length;
-const diaryCalls = () => io.from.mock.calls.filter(([table]) => table === "diary_entries").length;
 
 beforeEach(() => {
   io.sensorRows = [];
   io.diaryRows = [];
   io.failSensor = false;
+  io.failSensorFromCall = Number.POSITIVE_INFINITY;
+  io.sensorCallCount = 0;
   io.failDiary = false;
 });
 afterEach(() => {
@@ -161,5 +168,26 @@ describe("capped shared windows split instead of fanning out", () => {
       expect(bulk[tent]).toMatchObject({ source: "diary", temp: 20 + t, rh: 55 }),
     );
     expect(bulk[tents[2]]).toEqual(await fetchLatestSensorSnapshot(GROW, [tents[2]]));
+  });
+});
+
+describe("a later sensor page's failure keeps the tents earlier pages settled", () => {
+  it("keeps a tent the first window settled when the follow-up window fails", async () => {
+    // Codex P2 on #2303 at 3e689090. A busy tent fills the first window and
+    // settles from it; the quiet tent needs a second window, which fails.
+    const [busy, quiet] = tentIds(2, 400);
+    io.sensorRows = [
+      ...Array.from({ length: 120 }, (_, i) =>
+        sensorRow(busy, "temperature_c", 24, minutesAgo(1 + i * 0.01)),
+      ),
+      sensorRow(quiet, "temperature_c", 21, minutesAgo(30)),
+    ];
+    io.diaryRows = [diaryRow(quiet, minutesAgo(5), 22, 50)];
+    io.failSensorFromCall = 2;
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [busy, quiet]);
+    expect(io.sensorCallCount).toBe(2);
+    expect(bulk[busy]).toMatchObject({ source: "live", temp: 24 });
+    // The failed tent still takes the shared diary window, as before.
+    expect(bulk[quiet]).toMatchObject({ source: "diary", temp: 22, rh: 50 });
   });
 });

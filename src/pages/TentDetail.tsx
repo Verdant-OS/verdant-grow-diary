@@ -231,8 +231,6 @@ export default function TentDetail() {
     snapshot: { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
     now: new Date(nowMs),
   });
-  const tonightValue = (key: string) =>
-    tonightMetrics.find((metric) => metric.key === key)?.value ?? null;
   const headerVpdObservation = resolveTentDetailVpd({
     tonight: tonightMetrics.find((metric) => metric.key === "vpd"),
     existing: storedVpdObservation,
@@ -242,7 +240,9 @@ export default function TentDetail() {
     ...tentDetailHeaderCaptureRefs(snap, header.truth?.invalidFields ?? [], {
       existingIsSnapshotVpd: !storedVpdRowUntrusted && Number.isFinite(snap?.vpd ?? NaN),
     }),
-    contributors: { temp: tonightValue("temp"), rh: tonightValue("rh") },
+    // The pair a calculated VPD came from, not the displayed temperature and
+    // RH (Codex P2 on #2303 at 3e689090).
+    contributors: tonightMetrics.find((metric) => metric.key === "vpd")?.inputs ?? null,
     captureClimate: tentDetailCaptureClimate(
       readings,
       tonightSnapshot.status === "ok" ? tonightSnapshot.snapshot : null,

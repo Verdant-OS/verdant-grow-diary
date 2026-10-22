@@ -199,10 +199,13 @@ export default function TentEnvironmentSnapshotStrip({
 
   const snapView = buildTentSnapshotView(rows, stage, now, {
     temperatureUnit,
-    canonicalVpd: tentsListCanonicalVpd(rows, tentId, now, {
-      status: tonightSnapshot.status,
-      snapshot: tonightSnapshot.snapshot,
-    }),
+    canonicalVpd: tentsListCanonicalVpd(
+      rows,
+      tentId,
+      now,
+      { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+      sensorStatus,
+    ),
   });
   const vpdMetric = snapView.metrics.find((metric) => metric.key === "vpd");
   const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";

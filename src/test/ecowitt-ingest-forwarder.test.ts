@@ -364,6 +364,18 @@ describe("prepareForwardPayload", () => {
       ).toEqual({ ok: false, reason: "invalid_dateutc" });
     },
   );
+
+  it.each([
+    ["2026", "2026-10-22 05:27:14"],
+    ["t", "2026-10-22T05:27:14"],
+  ])("rejects an otherwise-valid dateutc containing PASSKEY %s", (passkey, dateutc) => {
+    expect(
+      prepareForwardPayload(
+        JSON.stringify({ PASSKEY: passkey, dateutc }),
+        new Date("2026-10-22T12:00:00.000Z"),
+      ),
+    ).toEqual({ ok: false, reason: "invalid_dateutc" });
+  });
 });
 
 describe("handleMessage", () => {

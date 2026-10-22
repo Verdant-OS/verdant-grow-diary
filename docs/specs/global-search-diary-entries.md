@@ -35,11 +35,19 @@ switch know only grow / tent / plant / cultivar.
    - `quicklog_save_manual` always inserts a linked `diary_entries` mirror, even without
      details (`20260927160000_quicklog_manual_plant_tent_lineage.sql:211–229`). Empty notes
      become `'(quick log)'` on the mirror (`v_diary_note`).
-   - `quicklog_save_event` mirrors only when `v_needs_diary` is true: sensor snapshot, photo
-     URL, extra details, water, or feed
-     (`20260725023000_core_schema_forward_repair.sql:383–387`). A **current** note-only event
-     save is spine-only. When it does mirror, empty notes use the same placeholder
+   - The current `quicklog_save_event` wrapper always mirrors a write it accepts. It passes the
+     delegate a non-empty internal details envelope (`__verdant_request_details_hash_v1` and
+     `logged_at`; `20261001140000_quicklog_event_replay_mirrorless_legacy.sql:382–425`), so the
+     delegate's `v_has_extra_details` check (`20260725023000_core_schema_forward_repair.sql:345–349`)
+     is always true and `v_needs_diary` (lines 383–387) always holds. The envelope keys are
+     stripped from the mirror's `details` afterwards (line 502). The wrapper's only other calls
+     to the delegate (lines 132 and 312) pass validation failures through, and those write
+     nothing. Empty notes use the same placeholder
      (`COALESCE(NULLIF(btrim(p_note), ''), '(quick log)')`).
+   - The `v_needs_diary` gate (sensor snapshot, photo URL, extra details, water, or feed) decided
+     mirroring only for event saves made before the dual-timestamp foundation
+     (`20260725024026_quicklog_dual_timestamp_foundation.sql`). A note-only event saved then is
+     spine-only.
    - Legacy rows can also be spine-only (the case `src/hooks/useGrowDetailData.ts:11–15`
      describes).
 
@@ -183,15 +191,17 @@ The function must:
 - Query shape, Option B (chosen; RPC-side, against a local database): with more than 10
   matches sharing one timestamp, two calls return the same 10 ids, ordered by
   `occurred_at desc, id desc` before the limit; the search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
-  with `grow_id` and `occurred_at`; `max_results` of `null`, `0`, `-5` and `500` each return at
-  most 10 rows; `100%` does not match `100 ml` server-side; `anon`
+  with `grow_id` and `occurred_at`; `max_results` of `null` and `500` each return at most 10
+  rows, and `0` and `-5` each return exactly 1 row, the newest matching fixture id; `100%` does not match `100 ml` server-side; `anon`
   cannot execute it.
 - Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
   `verdant_search` results still render; a failing `verdant_search` does not hide diary
   results.
 - Short queries: "OG" still returns cultivar and entity results and makes no diary read.
-- Sources: a legacy spine-only Quick Log note is found; a current `quicklog_save_event`
-  note-only save (no snapshot, photo, details, water, or feed) is found via the spine; a
+- Sources: a legacy spine-only Quick Log note is found; a note-only
+  `quicklog_save_event` save from before the dual-timestamp foundation (spine-only) is found via
+  the spine; a current note-only `quicklog_save_event` save (spine plus its mirror) is one
+  result; a
   current `quicklog_save_manual` save (spine plus its unconditional mirror) that matches is
   one result; a legacy pair linked only by `details.grow_event_id`, and a legacy unlinked
   manual companion at the same plant and instant as its spine, are each one result carrying

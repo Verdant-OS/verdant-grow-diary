@@ -11,6 +11,7 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import Settings from "@/pages/Settings";
 import {
   clearLocalStorageForTest,
+  getLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -45,13 +46,13 @@ describe("Settings · Units tile reset with a stored override", () => {
 
     fireEvent.click(screen.getByTestId("temperature-unit-option-fahrenheit"));
     expect(screen.getByTestId("temperature-unit-option-fahrenheit")).toBeChecked();
-    expect(window.localStorage.getItem("verdant:temperatureUnit")).toBe("celsius");
+    expect(getLocalStorageItemForTest("verdant:temperatureUnit")).toBe("celsius");
 
     const reset = screen.getByTestId("temperature-unit-reset");
     expect(reset).toBeEnabled();
     fireEvent.click(reset);
 
-    expect(window.localStorage.getItem("verdant:temperatureUnit")).toBeNull();
+    expect(getLocalStorageItemForTest("verdant:temperatureUnit")).toBeNull();
     expect(screen.getByTestId("temperature-unit-option-fahrenheit")).toBeChecked();
     expect(screen.getByTestId("temperature-unit-reset")).toBeDisabled();
   });

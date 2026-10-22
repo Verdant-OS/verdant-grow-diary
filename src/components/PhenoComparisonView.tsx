@@ -13,6 +13,7 @@
  *    as healthy. Never picks a phenotype.
  */
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { useHydrated } from "@/hooks/useHydrated";
 import { useMemo } from "react";
 import {
   buildPhenoComparisonView,
@@ -254,6 +255,8 @@ function CandidateColumn({
   expression?: PhenoExpressionView | null;
 }) {
   const headingId = `pheno-candidate-${c.candidateId}-heading`;
+  // Local time differs between the SSR host and the browser; format only after hydration.
+  const hydrated = useHydrated();
   return (
     <section
       data-testid={`pheno-candidate-${c.candidateId}`}
@@ -411,7 +414,11 @@ function CandidateColumn({
                     {s.sourceLabel}
                   </span>
                   <span className="text-muted-foreground">
-                    {s.capturedAt ? formatSnapshotTimestamp(s.capturedAt) : "no timestamp"}
+                    {s.capturedAt
+                      ? hydrated
+                        ? formatSnapshotTimestamp(s.capturedAt)
+                        : "…"
+                      : "no timestamp"}
                   </span>
                 </div>
                 <ul className="grid grid-cols-3 gap-1 text-[11px]">

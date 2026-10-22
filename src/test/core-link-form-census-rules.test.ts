@@ -45,12 +45,12 @@ const CENSUS_SPEC_SOURCE = readFileSync(
 describe("core link and form census rules", () => {
   it("schedules every authenticated route once with its original contract and ordered tail", () => {
     const routes = AUTHENTICATED_CORE_CENSUS_BATCHES.flat();
-    expect(AUTHENTICATED_CORE_CENSUS_ROUTES).toHaveLength(46);
+    expect(AUTHENTICATED_CORE_CENSUS_ROUTES).toHaveLength(47);
     expect(AUTHENTICATED_CORE_CENSUS_BATCHES.map((batch) => batch.length)).toEqual([
-      12, 12, 12, 10,
+      12, 12, 12, 11,
     ]);
     expect(routes).toEqual(AUTHENTICATED_CORE_CENSUS_ROUTES);
-    expect(new Set(routes.map((route) => route.path)).size).toBe(46);
+    expect(new Set(routes.map((route) => route.path)).size).toBe(47);
     routes.forEach((route, index) => {
       expect(route).toBe(AUTHENTICATED_CORE_CENSUS_ROUTES[index]);
     });

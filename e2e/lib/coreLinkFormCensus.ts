@@ -339,6 +339,12 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
   },
   { path: "/grow-lineage", label: "Grow lineage", fieldPolicy: "audit-only" },
   {
+    path: "/growers/5b0f6c1e-2a43-4c1d-9b7e-0d6a1f2e3c4d",
+    label: "Grower badge profile",
+    fieldPolicy: "audit-only",
+    expectedContent: [{ kind: "heading", value: "Grower badges" }],
+  },
+  {
     path: "/grows/11111111-1111-4111-8111-111111111111",
     label: "Grow detail",
     fieldPolicy: "fill-safe-fields",

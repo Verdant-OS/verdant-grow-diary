@@ -101,7 +101,10 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   in either mode. The guard works on every transport MQTT.js builds and on
   every reconnect. It holds no data itself; what can be in memory at once is
   the socket's current read chunk (set by the runtime, not by the guard), the
-  guard's 16 KiB readable buffer, and one partial packet of at most 65 KiB.
+  guard's readable buffer, and one partial packet of at most 65 KiB. The
+  readable buffer pauses the socket at the runtime's default high-water mark
+  (64 KiB on Node 22 and Bun), but a chunk is pushed whole first, so it can
+  hold up to that mark plus one full socket chunk.
   This does not depend on MQTT 5 `maximumPacketSize`, which a broker may ignore
   and MQTT.js checks only after buffering the whole packet.
 - The 64 KiB message bound is then applied to the raw frame before it is

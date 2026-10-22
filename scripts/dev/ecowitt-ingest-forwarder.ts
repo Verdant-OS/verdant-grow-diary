@@ -1046,11 +1046,13 @@ export function createInboundPacketScanner(
  * MQTT.js re-emits on the client, which `attachClientLifecycle` treats as
  * terminal. Outgoing writes go straight to the socket.
  *
- * Memory bound: the guard itself holds no data. What can sit in memory is
- * the socket's current read chunk (the runtime's read size; the guard cannot
- * shrink it), this stream's readable buffer (its 16 KiB high-water mark, then
- * the socket is paused), and the parser's one partial packet, which the guard
- * caps at `maxPacketBytes`.
+ * Memory bound: the guard holds no data of its own. What can sit in memory
+ * is the socket's current read chunk (the runtime's read size; the guard
+ * cannot shrink it), this stream's readable buffer, and the parser's one
+ * partial packet, which the guard caps at `maxPacketBytes`. The readable
+ * buffer uses the runtime's default high-water mark (64 KiB on Node 22 and
+ * Bun), and a chunk is pushed whole before the socket pauses, so it can hold
+ * up to that mark plus one full socket chunk (Codex P2 on #2335 at 95f5dfe7).
  */
 export function guardInboundStream(
   socket: Duplex,

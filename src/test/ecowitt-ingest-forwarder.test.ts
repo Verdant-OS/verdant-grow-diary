@@ -2030,3 +2030,23 @@ describe("dateutc matches what ecowitt-ingest accepts (Codex P2 on #2335 at 95f5
     expect(out).toMatchObject({ ok: false, reason: "invalid_dateutc" });
   });
 });
+
+describe("the guard's readable buffer bound is what the docs state (Codex P2 on #2335 at 95f5dfe7)", () => {
+  it("holds one whole oversized chunk of valid frames, then pauses the socket", () => {
+    const socket = new Duplex({
+      read() {},
+      write(_c, _e, cb) {
+        cb();
+      },
+    });
+    const guarded = guardInboundStream(socket);
+    // 50,000 PINGRESP frames (0xD0 0x00): every packet valid, 100,000 bytes.
+    const chunk = Buffer.alloc(100_000);
+    for (let i = 0; i < chunk.length; i += 2) chunk[i] = 0xd0;
+    socket.emit("data", chunk);
+    expect(guarded.readableHighWaterMark).toBe(64 * 1024);
+    expect(guarded.readableLength).toBe(100_000);
+    expect(socket.isPaused()).toBe(true);
+    guarded.destroy();
+  });
+});

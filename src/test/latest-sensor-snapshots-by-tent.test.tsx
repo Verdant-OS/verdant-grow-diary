@@ -254,6 +254,32 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     }
   });
 
+  it("carries a quality-rejected sibling on the snapshot, in bulk and per tent alike (Codex P1 on #2303 at 0994ea2a)", async () => {
+    const capture = minutesAgo(2);
+    io.sensorRows = [
+      sensorRow(TENT_A, "vpd_kpa", 1.2, capture),
+      sensorRow(TENT_A, "temperature_c", 24, capture),
+      { ...sensorRow(TENT_A, "humidity_pct", 55, capture), quality: "degraded" },
+      sensorRow(TENT_B, "temperature_c", 20, capture),
+      sensorRow(TENT_B, "humidity_pct", 50, capture),
+    ];
+    const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B]);
+    expect(bulk[TENT_A]?.rh).toBeNull();
+    expect(bulk[TENT_A]?.rejected_quality_rows).toEqual([
+      {
+        metric: "humidity_pct",
+        value: 55,
+        captured_at: capture,
+        source: "live",
+        quality: "degraded",
+      },
+    ]);
+    expect(bulk[TENT_B]?.rejected_quality_rows).toBeUndefined();
+    for (const tentId of [TENT_A, TENT_B]) {
+      expect(bulk[tentId]).toEqual(await fetchLatestSensorSnapshot(GROW, [tentId]));
+    }
+  });
+
   it("fills the per-tent cache entries the Dashboard and Tent Detail read", async () => {
     threeTentFixture();
     const client = freshClient();

@@ -349,6 +349,55 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-sensor-source-tent-1")).toHaveTextContent(/Live/);
   });
 
+  it("keeps a degraded sibling's rejection through the snapshot fallback (Codex P1 at 0994ea2a)", () => {
+    const t = at(0.05);
+    // The raw-row path withholds this capture: the RH beside the VPD is degraded.
+    const raw = [
+      row("vpd_kpa", 1.2, t, "live"),
+      row("temperature_c", 24, t, "live"),
+      { ...row("humidity_pct", 55, t, "live"), quality: "degraded" },
+    ];
+    const rawVpd = renderStrip(raw);
+    expect(rawVpd).not.toHaveAttribute("data-status", "ok");
+    const rawText = rawVpd.textContent;
+    const rawStatus = rawVpd.getAttribute("data-status");
+    cleanup();
+    // The same capture as a snapshot (the degraded RH dropped by the evidence
+    // filter but carried as a rejected sibling), with the raw read failed.
+    const snap: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "live",
+      ts: t,
+      temp: 24,
+      vpd: 1.2,
+      tent_id: "tent-1",
+      metric_refs: {
+        temp: { id: "row-temp", captured_at: t, source: "live" },
+        vpd: { id: "row-vpd", captured_at: t, source: "live" },
+      },
+      rejected_quality_rows: [
+        { metric: "humidity_pct", value: 55, captured_at: t, source: "live", quality: "degraded" },
+      ],
+    };
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={{ status: "ok", snapshot: snap }}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="error"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[]}
+        manualStatus="success"
+      />,
+    );
+    const vpd = screen.getByTestId("tents-list-metric-tent-1-vpd");
+    // The fallback renders exactly what the raw-row path renders.
+    expect(vpd).toHaveAttribute("data-status", rawStatus ?? "");
+    expect(vpd.textContent).toBe(rawText);
+  });
+
   it("marks an older live VPD stale even beside a fresh live capture (Codex P1)", () => {
     const rows = [
       row("temperature_c", (80 - 32) / 1.8, at(2), "live"),

@@ -53,6 +53,15 @@ export type SensorSnapshotMetricRefKey =
  * already selected by {@link snapshotFromReadings} for that metric.
  * Never carries raw_payload, never inferred, never "nearest" matched.
  */
+/** A telemetry row dropped for intake quality; see `rejected_quality_rows`. */
+export interface SensorSnapshotRejectedQualityRow {
+  metric: string;
+  value: number | string | null;
+  captured_at: string;
+  source: string;
+  quality: string;
+}
+
 export interface SensorSnapshotMetricRef {
   id: string;
   captured_at: string;
@@ -108,6 +117,13 @@ export interface SensorSnapshot {
    * row carried an `id`. Diary-derived snapshots never populate this.
    */
   metric_refs?: Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>;
+  /**
+   * Telemetry rows from the same read that the evidence filter dropped for
+   * their intake quality (degraded/stale/invalid). Carried so a fallback
+   * projection can still reject a capture they belong to, as the raw-row
+   * path does (Codex P1 on #2303 at 0994ea2a). Never used as a value.
+   */
+  rejected_quality_rows?: readonly SensorSnapshotRejectedQualityRow[];
   /**
    * Diary-row provenance for manual Environment Check or Quick Log manual
    * sensor snapshots. Populated only when the adapter receives the exact

@@ -16,7 +16,7 @@ import {
   evaluateSensorQuality,
   type SensorQualityResult,
 } from "@/lib/sensorQuality";
-import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import type { SensorSnapshot, SensorSnapshotRejectedQualityRow } from "@/lib/sensorSnapshot";
 import {
   resolveSensorObservationTime,
   type SensorObservationTimeLike,
@@ -131,6 +131,45 @@ export function selectDashboardSensorEvidenceRows<T extends DashboardSensorEvide
 ): T[] {
   if (!Array.isArray(rows)) return [];
   return rows.filter((row) => isDashboardSensorEvidenceRow(row));
+}
+
+/**
+ * Telemetry rows the evidence filter drops for their intake quality alone:
+ * a known telemetry source, not diagnostic provenance, quality not ok. A
+ * snapshot built from the surviving rows carries these so a fallback
+ * projection can reject their capture the way the raw-row path does (Codex
+ * P1 on #2303 at 0994ea2a).
+ */
+export function selectRejectedQualityRows(
+  rows: readonly DashboardSensorEvidenceRow[] | null | undefined,
+): SensorSnapshotRejectedQualityRow[] {
+  if (!Array.isArray(rows)) return [];
+  const out: SensorSnapshotRejectedQualityRow[] = [];
+  for (const row of rows) {
+    if (!row || typeof row.source !== "string" || typeof row.quality !== "string") continue;
+    if (!DASHBOARD_TELEMETRY_SOURCES.has(row.source.trim().toLowerCase())) continue;
+    if (hasUsableDashboardQuality(row.quality)) continue;
+    if (withoutDiagnosticSensorRows([row]).length !== 1) continue;
+    const value = row.value;
+    out.push({
+      metric: row.metric,
+      value: typeof value === "number" || typeof value === "string" ? value : null,
+      captured_at: row.captured_at ?? row.ts,
+      source: row.source,
+      quality: row.quality,
+    });
+  }
+  return out;
+}
+
+/** The snapshot with `rows`' quality-rejected siblings attached, when there are any. */
+export function withRejectedQualityRows(
+  snapshot: SensorSnapshot | null,
+  rows: readonly DashboardSensorEvidenceRow[] | null | undefined,
+): SensorSnapshot | null {
+  if (!snapshot) return snapshot;
+  const rejected = selectRejectedQualityRows(rows);
+  return rejected.length > 0 ? { ...snapshot, rejected_quality_rows: rejected } : snapshot;
 }
 
 /**

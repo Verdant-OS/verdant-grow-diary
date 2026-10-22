@@ -16,7 +16,7 @@ import type {
   BuildTentSnapshotInput,
   CanonicalTentVpd,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
-import { snapshotCaptureRef } from "@/lib/sensorCaptureRefRules";
+import { sensorCaptureRef, snapshotCaptureRef } from "@/lib/sensorCaptureRefRules";
 
 /** Label for a VPD from a generic diary snapshot: historical, not current. */
 export { DIARY_SOURCE_LABEL } from "@/lib/tonightTentHomeViewModel";
@@ -160,5 +160,21 @@ export function tentsListDiarySnapshotRows(
   push("temperature_c", "temp", snap.temp);
   push("humidity_pct", "rh", snap.rh);
   push("vpd_kpa", "vpd", snap.vpd);
+  // Siblings the snapshot read dropped for intake quality ride along with
+  // their quality, so the capture gate rejects their capture here exactly as
+  // it does on the raw-row path (Codex P1 on #2303 at 0994ea2a).
+  for (const rejected of snap.rejected_quality_rows ?? []) {
+    const captureRef = sensorCaptureRef(rejected.captured_at, rejected.source);
+    rows.push({
+      metric: rejected.metric,
+      value: rejected.value,
+      ts: rejected.captured_at,
+      captured_at: rejected.captured_at,
+      tent_id: tentId,
+      source: SNAPSHOT_ROW_SOURCE[rejected.source] ?? "unverified",
+      quality: rejected.quality,
+      ...(captureRef ? { capture_ref: captureRef } : {}),
+    });
+  }
   return rows;
 }

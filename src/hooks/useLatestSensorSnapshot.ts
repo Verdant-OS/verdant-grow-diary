@@ -40,7 +40,10 @@ import {
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
-import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
+import {
+  selectDashboardSensorEvidenceRows,
+  withRejectedQualityRows,
+} from "@/lib/dashboardSensorEvidenceRules";
 import {
   diaryWindowLimit,
   partitionWindowByTent,
@@ -131,6 +134,7 @@ export async function fetchLatestSensorSnapshot(
     // 1) Prefer live sensor_readings if any tents are scoped.
     if (tentIds.length > 0) {
       let evidenceRows: ReturnType<typeof requireEffectiveSensorReadings> = [];
+      let rawRows: ReturnType<typeof requireEffectiveSensorReadings> = [];
       try {
         const { data, error } = await effectiveSensorReadingsQuery()
           .select("*")
@@ -144,6 +148,7 @@ export async function fetchLatestSensorSnapshot(
           .order("id", { ascending: false })
           .limit(SENSOR_ROWS_PER_TENT);
         if (error) throw error;
+        rawRows = requireEffectiveSensorReadings(data);
         evidenceRows = selectDashboardSensorEvidenceRows(requireEffectiveSensorReadings(data));
       } catch {
         // A separate, usable diary read may survive this failure. If no
@@ -151,7 +156,7 @@ export async function fetchLatestSensorSnapshot(
         sensorReadFailed = true;
       }
       if (evidenceRows.length > 0) {
-        const snap = snapshotFromEvidenceRows(evidenceRows);
+        const snap = withRejectedQualityRows(snapshotFromEvidenceRows(evidenceRows), rawRows);
         if (snap && !isSnapshotStale(snap)) return snap;
         staleSensorCandidate = snap;
       }
@@ -248,7 +253,10 @@ export async function fetchLatestSensorSnapshotsByTent(
       partition.fallback.forEach((tentId) => fallback.add(tentId));
       for (const [tentId, own] of partition.exact) {
         const evidenceRows = selectDashboardSensorEvidenceRows(own);
-        const snap = evidenceRows.length > 0 ? snapshotFromEvidenceRows(evidenceRows) : null;
+        const snap =
+          evidenceRows.length > 0
+            ? withRejectedQualityRows(snapshotFromEvidenceRows(evidenceRows), own)
+            : null;
         if (snap && !isSnapshotStale(snap)) {
           result[tentId] = snap;
           continue;

@@ -52,6 +52,28 @@ export interface EnvironmentCheckEnvelope {
   note: string | null;
 }
 
+/** Every reading key the writer persists in the envelope (all keys but `note`). */
+export const ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS = [
+  "room_temp_f",
+  "temp_c",
+  "humidity_pct",
+  "vpd_kpa",
+  "water_temp_f",
+  "water_temp_c",
+  "ec_mscm",
+] as const satisfies readonly Exclude<keyof EnvironmentCheckEnvelope, "note">[];
+
+type UnlistedEnvelopeReadingKey = Exclude<
+  Exclude<keyof EnvironmentCheckEnvelope, "note">,
+  (typeof ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS)[number]
+>;
+/** Fails typecheck when a reading is added to the envelope without listing it above. */
+export const ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS_COMPLETE: [
+  UnlistedEnvelopeReadingKey,
+] extends [never]
+  ? true
+  : false = true;
+
 /** Calm helper copy when no optional measurement has been entered. */
 export const ENVIRONMENT_CHECK_HELPER_COPY =
   "Add any measurements you have. A note alone is okay." as const;

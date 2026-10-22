@@ -506,6 +506,34 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-metric-status-tent-1-vpd")).toHaveTextContent(/Invalid/);
   });
 
+  it("keeps each projected metric's own source from a mixed-source snapshot (Codex P1 at 0994ea2a)", () => {
+    const ts = at(0.1);
+    const mixed: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual",
+      ts,
+      temp: 25,
+      rh: 55,
+      vpd: 1.2,
+      tent_id: "tent-1",
+      metric_refs: {
+        temp: { id: "row-t", captured_at: ts, source: "manual" },
+        vpd: { id: "row-v", captured_at: ts, source: "csv" },
+      },
+    };
+    const rows = tentsListDiarySnapshotRows(
+      { status: "ok", snapshot: mixed },
+      "tent-1",
+      NOW.getTime(),
+    );
+    const sourceOf = (metric: string) => rows.find((r) => r.metric === metric)?.source;
+    expect(sourceOf("temperature_c")).toBe("manual");
+    // The CSV VPD never becomes a Manual row...
+    expect(sourceOf("vpd_kpa")).toBe("csv");
+    // ...and a metric with no ref falls back to unverified, never healthy Manual.
+    expect(sourceOf("humidity_pct")).toBe("unverified");
+  });
+
   it("shows nothing for a diary capture stamped in the future (Codex P1 at 85ec1e78)", () => {
     const diary: SensorSnapshot = {
       ...EMPTY_SNAPSHOT,

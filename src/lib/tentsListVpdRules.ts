@@ -136,13 +136,23 @@ export function tentsListDiarySnapshotRows(
     // or the exact sensor row in metric_refs), so no capture check joins it
     // to another record by time.
     const captureRef = snapshotCaptureRef(snap, key);
+    // A snapshot built from sensor rows can mix sources (a manual temperature
+    // beside a CSV VPD classifies as `manual`), so each row takes its own
+    // metric ref's source. A row-built snapshot without a ref for this metric,
+    // or a ref source this list does not know, falls back to `unverified`,
+    // which never reads as healthy (Codex P1 on #2303 at 0994ea2a).
+    const refs = (snap as { metric_refs?: Partial<Record<string, { source: string }>> })
+      .metric_refs;
+    const rowSource = refs
+      ? (SNAPSHOT_ROW_SOURCE[refs[key]?.source ?? ""] ?? "unverified")
+      : source;
     rows.push({
       metric,
       value,
       ts: snap.ts as string,
       captured_at: snap.ts,
       tent_id: tentId,
-      source,
+      source: rowSource,
       ...(captureRef ? { capture_ref: captureRef } : {}),
     });
   };

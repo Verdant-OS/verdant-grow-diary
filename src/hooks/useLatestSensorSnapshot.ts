@@ -390,11 +390,14 @@ function snapshotFromDiaryEvidenceRow(
     row.entry_at,
     details.sensor_snapshot as Record<string, unknown> | undefined,
   );
+  const diaryEntryId = typeof row.id === "string" ? row.id : null;
   if (hasFiniteSnapshotMetric(snap)) {
     snap.tent_id = rowTentInScope;
+    // Identity for capture matching only; the blob stays alert-ineligible
+    // (Codex P2 on #2303 at 0994ea2a).
+    if (diaryEntryId) snap.diary_capture_id = diaryEntryId;
     return snap;
   }
-  const diaryEntryId = typeof row.id === "string" ? row.id : null;
   const manualSnap = snapshotFromManualSensorSnapshot(
     row.entry_at,
     details.manual_sensor_snapshot as Record<string, unknown> | undefined,

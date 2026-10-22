@@ -149,6 +149,8 @@ export interface TonightSnapshotInput {
     metric_refs?: SensorSnapshot["metric_refs"];
     /** Present when the whole snapshot came from one diary row. */
     diary_evidence_ref?: SensorSnapshot["diary_evidence_ref"];
+    /** The diary entry a generic blob came from: capture identity only. */
+    diary_capture_id?: SensorSnapshot["diary_capture_id"];
     rejected_quality_rows?: SensorSnapshot["rejected_quality_rows"];
   } | null;
 }

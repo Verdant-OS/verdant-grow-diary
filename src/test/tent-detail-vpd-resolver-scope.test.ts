@@ -501,3 +501,38 @@ describe("a generic diary snapshot is historical, never current (Codex P1 on #23
     expect(resolve("manual").stale).toBe(false);
   });
 });
+
+describe("a generic diary blob keeps its own entry identity (Codex P2 on #2303 at 0994ea2a)", () => {
+  const T = at(1);
+  const blob = (id?: string) => ({
+    source: "diary",
+    ts: T,
+    temp: 24,
+    rh: 55,
+    vpd: 1.1,
+    ...(id ? { diary_capture_id: id } : {}),
+  });
+  // An unrelated live RH row with an impossible value at the same instant.
+  const ROWS = [{ metric: "humidity_pct", value: 150, captured_at: T, source: "live" }];
+  const vpdOf = (snapshot: ReturnType<typeof blob>) =>
+    buildTonightTentMetrics({
+      rows: [],
+      rowsRead: { status: "success" },
+      snapshot: { status: "ok", snapshot },
+      now: new Date(NOW),
+    }).find((m) => m.key === "vpd")!;
+
+  it("is not rejected by unrelated climate at its timestamp once its entry id is known", () => {
+    const snap = blob("diary-entry-7");
+    const vpd = vpdOf(snap);
+    expect(vpd.captureRefs).toEqual(["diary:diary-entry-7"]);
+    expect(tonightCaptureRejected(vpd, null, tentDetailCaptureClimate(ROWS, snap))).toBe(false);
+  });
+
+  it("still rejects conservatively when the entry id is unknown", () => {
+    const snap = blob();
+    expect(tonightCaptureRejected(vpdOf(snap), null, tentDetailCaptureClimate(ROWS, snap))).toBe(
+      true,
+    );
+  });
+});

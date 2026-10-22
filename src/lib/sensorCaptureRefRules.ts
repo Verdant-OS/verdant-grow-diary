@@ -5,7 +5,8 @@
  * capture behind this VPD" joins on identity rather than on a shared
  * timestamp:
  *
- * - `diary:<id>`: one diary entry (`diary_evidence_ref`). Every metric in it
+ * - `diary:<id>`: one diary entry (`diary_evidence_ref`, or a generic blob's
+ *   `diary_capture_id`). Every metric in it
  *   is one capture; another diary entry, or any sensor row, is another.
  * - `sensor:<epoch ms>:<source family>`: sensor rows. Each metric is its own
  *   `sensor_readings` row with its own id and no shared capture id, so one
@@ -55,11 +56,12 @@ export function diaryCaptureRef(id: string | null | undefined): SensorCaptureRef
 export function snapshotCaptureRef(
   snapshot: {
     diary_evidence_ref?: { id: string } | null;
+    diary_capture_id?: string | null;
     metric_refs?: Partial<Record<string, { captured_at: string; source: string }>>;
   },
   key: string,
 ): SensorCaptureRef | null {
-  const diary = diaryCaptureRef(snapshot.diary_evidence_ref?.id);
+  const diary = diaryCaptureRef(snapshot.diary_evidence_ref?.id ?? snapshot.diary_capture_id);
   if (diary) return diary;
   const ref = snapshot.metric_refs?.[key];
   return ref ? sensorCaptureRef(ref.captured_at, ref.source) : null;

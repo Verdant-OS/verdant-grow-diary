@@ -254,6 +254,13 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     }
   });
 
+  it("gives a generic diary blob its entry id as capture identity, never as alert evidence (Codex P2 on #2303 at 0994ea2a)", async () => {
+    io.diaryRows = [diaryRow(TENT_A, minutesAgo(30), 26, 60)];
+    const snap = await fetchLatestSensorSnapshot(GROW, [TENT_A]);
+    expect(snap).toMatchObject({ source: "diary", diary_capture_id: io.diaryRows[0].id });
+    expect(snap?.diary_evidence_ref).toBeUndefined();
+  });
+
   it("carries a quality-rejected sibling on the snapshot, in bulk and per tent alike (Codex P1 on #2303 at 0994ea2a)", async () => {
     const capture = minutesAgo(2);
     io.sensorRows = [

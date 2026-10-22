@@ -132,6 +132,13 @@ export interface SensorSnapshot {
    */
   diary_evidence_ref?: SensorSnapshotDiaryEvidenceRef;
   /**
+   * The `diary_entries.id` a generic diary `sensor_snapshot` blob came from.
+   * Capture identity only (`sensorCaptureRefRules`): it never links an alert
+   * and never makes a blob eligible for alert persistence, unlike
+   * {@link diary_evidence_ref} (Codex P2 on #2303 at 0994ea2a).
+   */
+  diary_capture_id?: string;
+  /**
    * Whether this evidence may back an automatically persisted environment
    * alert. Omitted preserves the existing eligibility contract; only the
    * Plant Quick Log manual snapshot adapter sets this to false because its

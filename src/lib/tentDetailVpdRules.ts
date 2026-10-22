@@ -66,6 +66,7 @@ export function tentDetailCaptureClimate(
         temp: number | null;
         rh: number | null;
         diary_evidence_ref?: { id: string } | null;
+        diary_capture_id?: string | null;
         metric_refs?: Partial<Record<string, { captured_at: string; source: string }>>;
       }
     | null

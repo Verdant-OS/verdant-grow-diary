@@ -354,6 +354,34 @@ describe("Tent detail VPD agrees with the Dashboard Tonight card", () => {
     }).find((metric) => metric.key === "vpd");
   const shown = (value: number) => formatSensorValue("vpd_kpa", value).replace(/\s*kPa$/, "");
 
+  it("QA #2268 (2/2 on ebaf1b6a): 80°F/50% then 85°F/45% read 1.75 then 2.26 kPa, never the stored 1.30", () => {
+    // 80°F = 26.667°C, 85°F = 29.444°C; the Dashboard shows 1.75 then 2.26.
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(24)),
+      row("temperature_c", (80 - 32) / 1.8, hoursAgo(2)),
+      row("humidity_pct", 50, hoursAgo(2)),
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", calculated: true });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("1.75");
+    expect(screen.getByTestId("metric-chip-VPD")).not.toHaveTextContent("1.3");
+    expect(screen.getByTestId("metric-chip-VPD").textContent).not.toMatch(
+      /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
+    );
+    cleanup();
+
+    state.rows = [
+      ...state.rows,
+      row("temperature_c", (85 - 32) / 1.8, hoursAgo(1)),
+      row("humidity_pct", 45, hoursAgo(1)),
+    ];
+    mount();
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("2.26");
+    expect(screen.getByTestId("tent-detail-vpd-provenance").textContent).not.toMatch(
+      /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
+    );
+  });
+
   it("replaces a day-old stored VPD with a newer same-capture temperature and RH pair", () => {
     const pairAt = hoursAgo(16);
     state.rows = [

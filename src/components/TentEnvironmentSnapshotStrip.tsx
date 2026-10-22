@@ -14,6 +14,7 @@ import {
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
+import { tentsListCanonicalVpdKpa } from "@/lib/tentsListVpdRules";
 
 export interface TentEnvironmentSnapshotStripProps {
   tentId: string;
@@ -143,7 +144,10 @@ export default function TentEnvironmentSnapshotStrip({
     );
   }
 
-  const snapView = buildTentSnapshotView(selection.rows, stage, now, { temperatureUnit });
+  const snapView = buildTentSnapshotView(selection.rows, stage, now, {
+    temperatureUnit,
+    canonicalVpdKpa: tentsListCanonicalVpdKpa(selection.rows, tentId, now),
+  });
   const vpdMetric = snapView.metrics.find((metric) => metric.key === "vpd");
   const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";
 

@@ -693,7 +693,8 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
 
     expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("71.6");
     expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-rh`)).toHaveTextContent("55.0");
-    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveTextContent("—");
+    // #2268: VPD is the Dashboard's, calculated from this manual pair (22°C, 55% → 1.19 kPa).
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveTextContent("1.19");
     expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
     expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveAttribute(
       "data-captured-at",
@@ -1087,11 +1088,13 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(rh).toHaveTextContent("56.0");
     expect(rh).not.toHaveTextContent("58");
 
-    // VPD missing at the newest ts → unavailable, never 0 kPa.
+    // #2268: no stored VPD at the newest ts → the Dashboard's VPD calculated from
+    // the newest temperature/RH pair (21.78°C, 56% → 1.15 kPa); never the older
+    // stored 0.9 and never 0 kPa.
     const vpd = screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`);
-    expect(vpd).toHaveTextContent("—");
-    expect(vpd).toHaveTextContent("Unknown");
+    expect(vpd).toHaveTextContent("1.15");
     expect(vpd).not.toHaveTextContent("0.9");
+    expect(vpd).not.toHaveTextContent("0.00");
 
     // Honest freshness/source context, consistent with the detail page.
     expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveTextContent(

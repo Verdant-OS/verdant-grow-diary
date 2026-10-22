@@ -770,12 +770,18 @@ type Finish = (outcome: ForwardOutcome | null) => Promise<void>;
  * The runner job for one decoded frame: parse, forward in live mode, finish.
  * A throw inside is logged, never left as an unhandled rejection.
  */
-function messageJob(deps: MessageHandlerDeps, text: string, finish: Finish): () => Promise<void> {
+function messageJob(
+  deps: MessageHandlerDeps,
+  payload: Buffer | string,
+  finish: Finish,
+): () => Promise<void> {
   return async () => {
     let outcome: ForwardOutcome | null = null;
     try {
       outcome = await handleMessage({
-        text,
+        // Decoded only once the runner starts the job, never for a frame the
+        // full backlog drops (Codex P2 on #2335 at 95f5dfe7).
+        text: typeof payload === "string" ? payload : payload.toString("utf8"),
         flags: deps.flags,
         env: deps.env,
         fetchImpl: deps.fetchImpl,
@@ -828,7 +834,7 @@ export function createMessageHandler(
     const job =
       bytes > MAX_MESSAGE_BYTES
         ? () => finish({ kind: "rejected_locally", reason: "payload_too_large" })
-        : messageJob(deps, typeof buf === "string" ? buf : buf.toString("utf8"), finish);
+        : messageJob(deps, buf, finish);
     if (runner.submit(job) === "dropped") {
       log("dropped_backlog_full", {
         inflight: runner.inflight,

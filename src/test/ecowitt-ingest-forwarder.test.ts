@@ -1945,3 +1945,55 @@ describe("attachClientLifecycle (continuous reconnect before SUBACK)", () => {
     expect(onFatal).not.toHaveBeenCalled();
   });
 });
+
+describe("admission before decoding (Codex P2 on #2335 at 95f5dfe7)", () => {
+  function spiedFrame() {
+    const frame = Buffer.from(SANITY_MESSAGE, "utf8");
+    const toString = vi.spyOn(frame, "toString");
+    return { frame, toString };
+  }
+
+  it("never decodes a frame the full backlog drops", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const handler = createMessageHandler({
+        flags: flags(),
+        env: readEnv({}),
+        onDone: () => {},
+        runner: { submit: () => "dropped", inflight: MAX_INFLIGHT, backlog: MAX_BACKLOG },
+      });
+      const { frame, toString } = spiedFrame();
+      handler("ecowitt/grow", frame);
+      expect(toString).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("decodes an accepted frame when the runner starts it", async () => {
+    let started: (() => Promise<void>) | null = null;
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const handler = createMessageHandler({
+        flags: flags(),
+        env: readEnv({}),
+        onDone: () => {},
+        runner: {
+          submit: (job) => {
+            started = job;
+            return "queued";
+          },
+          inflight: MAX_INFLIGHT,
+          backlog: 0,
+        },
+      });
+      const { frame, toString } = spiedFrame();
+      handler("ecowitt/grow", frame);
+      expect(toString).not.toHaveBeenCalled();
+      await started!();
+      expect(toString).toHaveBeenCalledWith("utf8");
+    } finally {
+      log.mockRestore();
+    }
+  });
+});

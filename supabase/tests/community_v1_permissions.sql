@@ -180,7 +180,7 @@ BEGIN
       format('T-CAT-06 %I declares %s defaulted argument(s); approved RPCs take none', fn.proname, fn.pronargdefaults);
     checked := checked + 1;
   END LOOP;
-  ASSERT checked = 17, format('T-CAT-06 expected 17 approved community RPCs, checked %s', checked);
+  ASSERT checked = 22, format('T-CAT-06 expected 22 approved community RPCs (20 client, 2 server), checked %s', checked);
   RAISE NOTICE '✓ T-CAT-06 approved community RPCs declare no defaulted arguments';
 END $$;
 

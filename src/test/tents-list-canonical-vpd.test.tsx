@@ -203,6 +203,59 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(label).not.toMatch(/Live/i);
   });
 
+  it("keeps a live VPD beside an unrelated manual diary capture with impossible RH at the same instant (Codex P1 at fa8edcff)", () => {
+    const t = at(0.05);
+    const stored = [
+      row("vpd_kpa", 1.2, t, "live"),
+      row("temperature_c", 24, t, "live"),
+      row("humidity_pct", 55, t, "live"),
+    ];
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts: t,
+      temp: 24,
+      rh: 150,
+      tent_id: "tent-1",
+    };
+    hook.state = { status: "ok", snapshot: diary };
+    const vpd = renderStrip(stored);
+    expect(vpd).toHaveTextContent("1.20");
+    expect(vpd).toHaveAttribute("data-status", "ok");
+  });
+
+  it("shows the Dashboard's resolved capture when the raw readings read failed (Codex P2 at fa8edcff)", () => {
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "diary",
+      ts: at(0.5),
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    };
+    const renderFailed = (state: SnapshotState) =>
+      render(
+        <TentEnvironmentSnapshotStrip
+          tentId="tent-1"
+          tonightSnapshot={state}
+          stage="flower"
+          sensorRows={[]}
+          sensorStatus="error"
+          now={NOW.getTime()}
+          temperatureUnit="fahrenheit"
+          manualCards={[]}
+          manualStatus="success"
+        />,
+      );
+    renderFailed({ status: "ok", snapshot: diary });
+    expect(screen.getByTestId("tents-list-metric-tent-1-vpd")).toHaveTextContent("1.75");
+    expect(screen.queryByTestId("tents-list-sensor-unavailable-tent-1")).toBeNull();
+    cleanup();
+    // Both reads failed: still unavailable.
+    renderFailed({ status: "unavailable", snapshot: EMPTY_SNAPSHOT });
+    expect(screen.getByTestId("tents-list-sensor-unavailable-tent-1")).toBeInTheDocument();
+  });
+
   it("marks an older live VPD stale even beside a fresh live capture (Codex P1)", () => {
     const rows = [
       row("temperature_c", (80 - 32) / 1.8, at(2), "live"),

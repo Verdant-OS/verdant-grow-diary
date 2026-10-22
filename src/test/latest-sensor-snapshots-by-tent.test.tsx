@@ -214,9 +214,12 @@ describe("useLatestSensorSnapshotsByTent (warm cache)", () => {
 describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () => {
   // A: fresh live pair. B: a stale live row plus a newer diary capture. C: nothing.
   function threeTentFixture() {
+    // One timestamp for A's pair: two minutesAgo calls can straddle a
+    // millisecond and split the capture into two cohorts.
+    const aCapture = minutesAgo(2);
     io.sensorRows = [
-      sensorRow(TENT_A, "temperature_c", 24, minutesAgo(2)),
-      sensorRow(TENT_A, "humidity_pct", 55, minutesAgo(2)),
+      sensorRow(TENT_A, "temperature_c", 24, aCapture),
+      sensorRow(TENT_A, "humidity_pct", 55, aCapture),
       sensorRow(TENT_B, "temperature_c", 20, minutesAgo(180)),
     ];
     io.diaryRows = [diaryRow(TENT_B, minutesAgo(30), 26, 60)];
@@ -318,7 +321,7 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(bulk[tents[1]]).toEqual(EMPTY_SNAPSHOT);
   });
 
-  it("never repeats a failed sensor read per tent when the diary window is crowded (Codex P2 at 108e3eab)", async () => {
+  it("starts no per-tent read during a sensor outage, even when the diary window is crowded (Codex P2 at 108e3eab, fa8edcff)", async () => {
     // Sensor read fails. Three tents need diary evidence (window of 60). Tent A
     // fills the window with unusable candidates; B's usable row is pushed out.
     io.failSensor = true;
@@ -332,12 +335,13 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
       diaryRow(TENT_B, minutesAgo(300), 26, 60),
     ];
     const bulk = await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B, TENT_C]);
-    expect(bulk[TENT_B]).toMatchObject({ source: "diary", temp: 26 });
+    // B's row is outside the shared window: unavailable for now, not read on its own.
+    expect(bulk[TENT_B]).toBeNull();
     expect(bulk[TENT_A]).toBeNull();
     expect(bulk[TENT_C]).toBeNull();
-    // One failed sensor window, then diary-only reads: the sensor query is never retried.
+    // One failed sensor window and one shared diary window; nothing fans out per tent.
     expect(sensorCalls()).toBe(1);
-    expect(diaryCalls()).toBeGreaterThanOrEqual(2);
+    expect(diaryCalls()).toBe(1);
   });
 
   it("marks tents unavailable, with no per-tent reads, when the shared diary read fails", async () => {

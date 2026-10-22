@@ -68,7 +68,15 @@ export default function TentEnvironmentSnapshotStrip({
       </p>
     );
   }
-  if (selection.kind === "sensor_unavailable") {
+  // The raw read failed but the Dashboard's own snapshot read resolved a
+  // capture: show that capture, as the Dashboard and Tent Detail do, rather
+  // than claim nothing could be loaded (Codex P2 on #2303 at fa8edcff).
+  const diaryRows = tentsListDiarySnapshotRows(
+    { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+    tentId,
+    now,
+  );
+  if (selection.kind === "sensor_unavailable" && diaryRows.length === 0) {
     return sensorStatus === "refresh_error" ? (
       <p
         className="text-xs text-muted-foreground"
@@ -170,12 +178,8 @@ export default function TentEnvironmentSnapshotStrip({
     );
   }
   const rows =
-    selection.kind === "empty"
-      ? tentsListDiarySnapshotRows(
-          { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
-          tentId,
-          now,
-        )
+    selection.kind === "empty" || selection.kind === "sensor_unavailable"
+      ? diaryRows
       : selection.rows;
   if (rows.length === 0) {
     return (
@@ -219,7 +223,7 @@ export default function TentEnvironmentSnapshotStrip({
           Refreshing saved manual snapshot…
         </p>
       ) : null}
-      {selection.kind !== "empty" && selection.refreshWarning ? (
+      {(selection.kind === "sensor" || selection.kind === "manual") && selection.refreshWarning ? (
         <p
           className="text-xs text-amber-600"
           data-testid={

@@ -62,6 +62,7 @@ export function tentsListCanonicalVpd(
       ts: row.ts,
       captured_at: row.captured_at ?? null,
       quality: row.quality ?? null,
+      source: row.source ?? null,
     })),
     snapshot.status === "ok" ? snapshot.snapshot : null,
   );

@@ -308,14 +308,17 @@ export async function fetchLatestSensorSnapshotsByTent(
     }
   }
   // 3) Per-tent reads only where a window could not reproduce one. After a
-  // failed sensor window the per-tent read is diary-only, so the failed
-  // sensor query is never repeated per tent.
+  // failed sensor window no per-tent read starts at all: a tent the shared
+  // diary window could not settle is unavailable, so an outage never fans out
+  // into one diary read per tent (Codex P2 on #2303 at fa8edcff).
+  if (sensorReadFailed) {
+    for (const tentId of fallback) result[tentId] = null;
+    return result;
+  }
   await Promise.all(
     [...fallback].map(async (tentId) => {
       try {
-        result[tentId] = sensorReadFailed
-          ? await resolveDiaryEvidence(growId, [tentId], null, true)
-          : await fetchLatestSensorSnapshot(growId, [tentId]);
+        result[tentId] = await fetchLatestSensorSnapshot(growId, [tentId]);
       } catch {
         result[tentId] = null;
       }

@@ -1159,9 +1159,11 @@ describe("Tents list sensor truth — static wiring", () => {
     expect(TENTS_SRC).toMatch(/sensorRows=\{readingsByTent\[t\.id\] \?\? \[\]\}/);
     expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(rows, stage, now/);
     // The rows are the fallback selection's, or the Dashboard's diary-only
-    // capture when the selection is empty (Codex P2 on #2303 at 69de43db).
+    // capture when the selection is empty (Codex P2 on #2303 at 69de43db) or
+    // the raw read failed (Codex P2 on #2303 at fa8edcff).
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/const diaryRows = tentsListDiarySnapshotRows\(/);
     expect(SNAPSHOT_STRIP_SRC).toMatch(
-      /const rows =\s*selection\.kind === "empty"\s*\? tentsListDiarySnapshotRows\([\s\S]*?\)\s*: selection\.rows;/,
+      /const rows =\s*selection\.kind === "empty" \|\| selection\.kind === "sensor_unavailable"\s*\? diaryRows\s*: selection\.rows;/,
     );
     expect(SNAPSHOT_STRIP_SRC).not.toMatch(
       /useManualSnapshotTimelineCards|useTentManualSnapshotBatch/,

@@ -181,7 +181,7 @@ interface Candidate {
 }
 
 /** Snapshot sources map onto the canonical vocabulary; "unavailable" carries no reading. */
-function snapshotSource(raw: string): SensorSource | null {
+export function snapshotSource(raw: string): SensorSource | null {
   switch (raw) {
     case "live":
       return "live";

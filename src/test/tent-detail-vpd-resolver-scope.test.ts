@@ -13,6 +13,7 @@ import {
   resolveTentDetailVpd,
   tentDetailCaptureClimate,
   tentDetailVpdRowUntrusted,
+  tonightCaptureRejected,
 } from "@/lib/tentDetailVpdRules";
 import type { TonightMetricView } from "@/lib/tonightTentHomeViewModel";
 
@@ -345,5 +346,60 @@ describe("tentDetailVpdRowUntrusted (Codex P1 at 307b10f4)", () => {
     ).toBe(false);
     expect(tentDetailVpdRowUntrusted([vpdRow(1, "invalid")], null)).toBe(false);
     expect(tentDetailVpdRowUntrusted(null, at(1))).toBe(false);
+  });
+});
+
+describe("the capture gate matches climate by source as well as instant (Codex P1 on #2303 at fa8edcff)", () => {
+  const liveDirect = (): TonightMetricView => ({
+    ...tonightAt(1),
+    value: 1.2,
+    source: "live",
+    sourceLabel: "Live",
+    calculated: false,
+  });
+  const diaryAt = (hoursAgo: number, source: string) => ({
+    ts: at(hoursAgo),
+    temp: 24,
+    rh: 150,
+    source,
+  });
+  const liveRows = [
+    { metric: "vpd_kpa", value: 1.2, captured_at: at(1), source: "live" },
+    { metric: "temperature_c", value: 24, captured_at: at(1), source: "live" },
+    { metric: "humidity_pct", value: 55, captured_at: at(1), source: "live" },
+  ];
+
+  it("keeps a live VPD beside a separate manual diary snapshot with impossible RH at the same instant", () => {
+    const climate = tentDetailCaptureClimate(liveRows, diaryAt(1, "diary"));
+    expect(tonightCaptureRejected(liveDirect(), null, climate)).toBe(false);
+    const out = resolveTentDetailVpd({
+      tonight: liveDirect(),
+      existing: NO_VPD,
+      rejectedMetrics: [],
+      rejectedCapturedAt: null,
+      contributors: null,
+      captureClimate: climate,
+      nowMs: NOW,
+    });
+    expect(out.value).toBe(1.2);
+  });
+
+  it("still rejects when the impossible RH comes from the VPD's own source", () => {
+    const manualDirect = { ...liveDirect(), source: "manual" as const, sourceLabel: "Manual" };
+    const climate = tentDetailCaptureClimate([], diaryAt(1, "diary"));
+    expect(tonightCaptureRejected(manualDirect, null, climate)).toBe(true);
+    // A live row aged past its window is still the live record.
+    const staleDirect = { ...liveDirect(), source: "stale" as const };
+    const staleRows = [{ metric: "humidity_pct", value: 150, captured_at: at(1), source: "live" }];
+    expect(
+      tonightCaptureRejected(staleDirect, null, tentDetailCaptureClimate(staleRows, null)),
+    ).toBe(true);
+  });
+
+  it("rejects conservatively when a same-instant row's source is unknown", () => {
+    const rows = [{ metric: "humidity_pct", value: 150, captured_at: at(1) }];
+    expect(tonightCaptureRejected(liveDirect(), null, tentDetailCaptureClimate(rows, null))).toBe(
+      true,
+    );
   });
 });

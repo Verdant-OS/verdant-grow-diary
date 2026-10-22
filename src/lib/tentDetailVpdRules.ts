@@ -1,6 +1,7 @@
 import { isStale } from "@/lib/sensorSnapshot";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
-import type { TonightMetricView } from "@/lib/tonightTentHomeViewModel";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { snapshotSource, type TonightMetricView } from "@/lib/tonightTentHomeViewModel";
 import type { DisplayedVpdObservation } from "@/lib/vpdStabilityInputRules";
 
 /** Only live and manual readings may read as current on the tent page. */
@@ -21,6 +22,12 @@ export interface TentDetailCaptureClimate {
    * number is still untrusted (Codex P1 on #2303 at 69de43db).
    */
   untrusted?: boolean;
+  /**
+   * Canonical source of the record this value came from, as Tonight labels it.
+   * Only climate from the same source family can belong to the VPD's capture;
+   * null (unknown) is matched conservatively (Codex P1 on #2303 at fa8edcff).
+   */
+  source?: string | null;
 }
 
 interface TentDetailClimateRow {
@@ -29,6 +36,7 @@ interface TentDetailClimateRow {
   ts?: string | null;
   captured_at?: string | null;
   quality?: string | null;
+  source?: string | null;
 }
 
 /** Same gate as the Dashboard's evidence rows: null, "" and "ok" are trusted. */
@@ -45,17 +53,28 @@ function trustedIntakeQuality(quality: string | null | undefined): boolean {
  */
 export function tentDetailCaptureClimate(
   rows: readonly TentDetailClimateRow[] | null | undefined,
-  snapshot: { ts: string | null; temp: number | null; rh: number | null } | null | undefined,
+  snapshot:
+    | { ts: string | null; temp: number | null; rh: number | null; source?: string | null }
+    | null
+    | undefined,
 ): TentDetailCaptureClimate[] {
   const out: TentDetailCaptureClimate[] = [];
   for (const row of rows ?? []) {
     if (typeof row.value !== "number") continue;
     const at = row.captured_at ?? row.ts ?? null;
     const untrusted = !trustedIntakeQuality(row.quality);
-    if (row.metric === "temperature_c") out.push({ at, temp: row.value, rh: null, untrusted });
-    if (row.metric === "humidity_pct") out.push({ at, temp: null, rh: row.value, untrusted });
+    const source = row.source == null ? null : normalizeSensorSource(row.source);
+    if (row.metric === "temperature_c") {
+      out.push({ at, temp: row.value, rh: null, untrusted, source });
+    }
+    if (row.metric === "humidity_pct") {
+      out.push({ at, temp: null, rh: row.value, untrusted, source });
+    }
   }
-  if (snapshot) out.push({ at: snapshot.ts, temp: snapshot.temp, rh: snapshot.rh });
+  if (snapshot) {
+    const source = snapshot.source == null ? null : snapshotSource(snapshot.source);
+    out.push({ at: snapshot.ts, temp: snapshot.temp, rh: snapshot.rh, source });
+  }
   return out;
 }
 
@@ -85,6 +104,28 @@ function instantMs(at: string | null | undefined): number | null {
   if (!at) return null;
   const ms = Date.parse(at);
   return Number.isFinite(ms) ? ms : null;
+}
+
+/** A live reading past its window is still the live record: one family. */
+function sourceFamily(source: string): string {
+  return source === "stale" ? "live" : source;
+}
+
+/**
+ * Whether a climate entry can belong to the capture behind Tonight's VPD: the
+ * same instant and, when both sources are known, the same source family. A
+ * shared timestamp alone does not tie a manual diary snapshot to a live sensor
+ * VPD (Codex P1 on #2303 at fa8edcff); an unknown source still counts, so an
+ * ambiguous capture is withheld rather than shown.
+ */
+function sameCaptureClimate(
+  climate: TentDetailCaptureClimate,
+  selectedMs: number,
+  selectedSource: string | null,
+): boolean {
+  if (instantMs(climate.at) !== selectedMs) return false;
+  if (climate.source == null || selectedSource == null) return true;
+  return sourceFamily(climate.source) === sourceFamily(selectedSource);
 }
 
 function climateUnrealistic(climate: { temp: number | null; rh: number | null }): boolean {
@@ -128,7 +169,7 @@ export function tonightCaptureRejected(
   if (selectedMs === null) return true;
   return captureClimate.some(
     (climate) =>
-      instantMs(climate.at) === selectedMs &&
+      sameCaptureClimate(climate, selectedMs, tonight.source) &&
       (climate.untrusted === true || climateUnrealistic(climate)),
   );
 }

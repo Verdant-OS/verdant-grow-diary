@@ -92,8 +92,10 @@ $env:ECOWITT_MQTT_TOPIC="ecowitt/grow"
 bun run dev:ecowitt-mqtt:dry-run -- --once --write-report
 ```
 
-Wait for `[ecowitt-mqtt-runner] subscribed ecowitt/grow`, then go to
-Terminal 4. The runner exits after the first message and writes a
+Wait for `[ecowitt-mqtt-runner] subscribed ecowitt/grow`, give it a
+second, then go to Terminal 4. The runner prints that line as it sends the
+subscribe request, before the broker confirms it, so a POST sent in the same
+instant can still be missed. The runner exits after the first message and writes a
 redacted report to `./tmp/ecowitt-last-ingest-report.json`. Paste it
 into `/operator/ecowitt-bridge-status` for inspection. No live ingest
 occurs in dry-run mode.
@@ -115,8 +117,11 @@ This hand-made payload checks the transport only. It carries no
 `reasons: ["missing_captured_at"]` and an empty `metric_keys` list.
 That is the expected fail-closed result, not a healthy reading. A real
 gateway upload carries `dateutc`; its report should show
-`payload_kind: "real_ecowitt_gateway"`, the mapped `metric_keys`, and
-empty `reasons`.
+`payload_kind: "real_ecowitt_gateway"` and the mapped `metric_keys`.
+`reasons` is empty only for a fresh, valid reading. A stale reading reports
+`stale_reading`, and an out-of-range value reports an `invalid_*` reason
+such as `invalid_rh`. Those are correct fail-closed results, not a broken
+dry run.
 
 ---
 

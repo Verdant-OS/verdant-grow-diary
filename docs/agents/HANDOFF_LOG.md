@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### STOP-SELLING-FOUNDER-LIFETIME
+
+```text
+TASK STOP-SELLING-FOUNDER-LIFETIME  priority: P1  status: OPEN
+goal: Stop selling Founder Lifetime on public sales surfaces. Keep existing Founder entitlements until a separate PR and migration.
+branch: cursor/stop-selling-founder-lifetime-0628
+base: verdant-grow-diary
+checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (draft)
+head_sha: read the PR head after push (base merge of c0ce65cb by Claude, 2026-10-19); this handoff commit cannot name itself
+state: draft PR open; base merged 2026-10-19 (governance re-bumped to 2026-10-19.1); waiting on required checks and a fresh exact-head review
+next_action: keep the PR draft; fix in-scope required-check failures only
+files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md
+blockers: none for the draft; entitlement removal is a later PR plus migration
+artifacts: .claude/scorer-unlock.json is gitignored and must not be committed
+reviewer_seat: Blue Dream (.tsx product files)
+claimed_by: Claude, 2026-10-19 22:43 UTC (VER-216 close-out, assigned by Matthew)
+last_updated: 2026-10-19 17:50 CT, by Claude
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text

@@ -116,6 +116,8 @@ export const PRICING_TIERS: PricingTier[] = [
     features: [...CRAFT_UNLOCKED_FEATURES, "Annual billing value"],
   },
   {
+    // Not for sale. Settings still looks this id up so an existing Founder
+    // holder sees the right plan name. Upgrade filters it out of purchase UI.
     id: "founder_lifetime",
     name: "Founder Lifetime",
     priceDisplay: `$${FOUNDER_LIFETIME_PRICE_USD}`,
@@ -130,6 +132,11 @@ export const PRICING_TIERS: PricingTier[] = [
     ],
   },
 ];
+
+/** Tiers a grower can still buy. Founder Lifetime stays in PRICING_TIERS for account display only. */
+export const PURCHASABLE_PRICING_TIERS = PRICING_TIERS.filter(
+  (tier) => tier.id !== "founder_lifetime",
+);
 
 /**
  * Plan comparison rows.
@@ -152,7 +159,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: `$${PRO_ANNUAL_PRICE_USD} / yr`,
       craft_monthly: `$${CRAFT_MONTHLY_PRICE_USD} / mo`,
       craft_annual: `$${CRAFT_ANNUAL_PRICE_USD} / yr`,
-      founder_lifetime: `$${FOUNDER_LIFETIME_PRICE_USD} once`,
     },
   },
 
@@ -164,7 +170,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: "Annual",
       craft_monthly: "Monthly",
       craft_annual: "Annual",
-      founder_lifetime: "One-time",
     },
   },
   {
@@ -175,7 +180,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: true,
       craft_monthly: true,
       craft_annual: true,
-      founder_lifetime: true,
     },
   },
   {
@@ -186,7 +190,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: "Unlimited grows · Multi-tent",
       craft_monthly: "Unlimited grows · Multi-tent",
       craft_annual: "Unlimited grows · Multi-tent",
-      founder_lifetime: "Unlimited grows · Multi-tent",
     },
   },
   {
@@ -197,7 +200,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: true,
       craft_monthly: true,
       craft_annual: true,
-      founder_lifetime: true,
     },
   },
   {
@@ -208,7 +210,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: true,
       craft_monthly: true,
       craft_annual: true,
-      founder_lifetime: true,
     },
   },
   {
@@ -219,7 +220,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: "Full history",
       craft_monthly: "Full history",
       craft_annual: "Full history",
-      founder_lifetime: "Full history",
     },
   },
   {
@@ -230,7 +230,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: "100 / mo",
       craft_monthly: "300 / mo",
       craft_annual: "300 / mo",
-      founder_lifetime: "100 / mo",
     },
   },
   {
@@ -241,7 +240,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: false,
       craft_monthly: true,
       craft_annual: true,
-      founder_lifetime: true,
     },
   },
   {
@@ -252,7 +250,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: true,
       craft_monthly: true,
       craft_annual: true,
-      founder_lifetime: true,
     },
   },
   {
@@ -263,7 +260,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: true,
       craft_monthly: true,
       craft_annual: true,
-      founder_lifetime: true,
     },
   },
   {
@@ -274,18 +270,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: true,
       craft_monthly: true,
       craft_annual: true,
-      founder_lifetime: true,
-    },
-  },
-  {
-    label: "Founder badge & early-supporter perks",
-    values: {
-      free: false,
-      pro_monthly: false,
-      pro_annual: false,
-      craft_monthly: false,
-      craft_annual: false,
-      founder_lifetime: true,
     },
   },
   {
@@ -296,7 +280,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       pro_annual: "Available",
       craft_monthly: "Available",
       craft_annual: "Available",
-      founder_lifetime: "Available",
     },
   },
 ];
@@ -439,10 +422,6 @@ export const UPGRADE_FAQ: UpgradeFaqItem[] = [
   {
     q: "Do I own my grow data?",
     a: "Yes. Your grow history, diary entries, photos, and sensor snapshots stay yours. Verdant does not sell grower data. Pro adds advanced exports and date-range reports so you can take your history with you.",
-  },
-  {
-    q: "What do Founder Lifetime supporters get?",
-    a: "Founder Lifetime is a limited early-supporter tier: one payment, ongoing Pro-level access, a founder badge, and early-supporter status. The claimed / total counter shown on the card is informational — there is no artificial urgency.",
   },
   {
     q: "What happens if I cancel Pro?",

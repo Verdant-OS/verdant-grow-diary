@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-19.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-19.1**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
@@ -438,7 +438,7 @@ Current billing foundation:
 - Absence of an entitling `public.subscriptions` row resolves to Free.
 - Client entitlement reads are presentation-only.
 - Server-side checks are authoritative for paid/costly features.
-- Founder Lifetime is Pro-like access with capped AI credits, never unlimited AI.
+- Founder Lifetime is no longer sold. Existing Founder entitlements stay until a separate PR and migration remove them. While those rows remain, Founder Lifetime is Pro-like access with capped AI credits, never unlimited AI.
 - Do not add checkout, webhook, provider SDKs, pricing copy, PaywallCta edits, or UI gating unless specifically requested.
 
 Capability logic belongs in:
@@ -475,8 +475,8 @@ Rules:
 - Free: 3 AI credits per grow.
 - Pro monthly: 100 AI credits per UTC calendar month.
 - Pro annual: 100 AI credits per UTC calendar month.
-- Founder lifetime: 100 AI credits per UTC calendar month.
-- Founder AI credits are capped, never unlimited.
+- Founder lifetime (no longer sold; existing rows only): 100 AI credits per UTC calendar month.
+- Founder AI credits stay capped, never unlimited. Removing the entitlement is a separate PR plus migration.
 - Client cannot set `user_id`, weight, model tier, or plan.
 - Edge functions decide model tier/weight.
 - Refund failed model calls with append-only reversal rows.

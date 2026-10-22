@@ -72,15 +72,14 @@ describe("Pricing tiers in constants", () => {
     expect(CONSTANTS).toMatch(/annualPrice:\s*99/);
   });
 
-  it("renders Founder Lifetime at $129 one-time with first-100 limit", () => {
-    expect(CONSTANTS).toMatch(/price:\s*129/);
-    expect(CONSTANTS).toMatch(/limit:\s*100/);
-    expect(CONSTANTS).toMatch(/one-time/);
+  it("does not offer Founder Lifetime as a purchasable pricing tier", () => {
+    expect(CONSTANTS).not.toMatch(/name:\s*"Founder Lifetime"/);
+    expect(CONSTANTS).toMatch(/no longer sold/);
   });
 
-  it("describes Founder Lifetime as a limited early-supporter offer", () => {
-    expect(PAGE).toMatch(/limited early-supporter offer/i);
-    expect(PAGE).toMatch(/not a separate recurring plan/i);
+  it("does not describe Founder Lifetime as a current offer on the pricing page", () => {
+    expect(PAGE).not.toMatch(/limited early-supporter offer/i);
+    expect(PAGE).not.toMatch(/Founder Lifetime/);
   });
 
   it("does not render Premium tier or language", () => {
@@ -148,7 +147,9 @@ describe("AI credit packs (top-up surface)", () => {
     // Still the canonical checkout hook with the pack SKU, now carrying an
     // explicit successUrl — the shared default forwards `returnTo`, which
     // /checkout/success auto-redirects on before a pack grant has landed.
-    expect(PAGE).toMatch(/openCheckout\(\{ priceId: sku, successUrl: packSuccessUrlFor\(sku\) \}\)/);
+    expect(PAGE).toMatch(
+      /openCheckout\(\{ priceId: sku, successUrl: packSuccessUrlFor\(sku\) \}\)/,
+    );
     expect(PAGE).toMatch(/pricing_cta_credit_pack_clicked/);
     expect(ANALYTICS).toMatch(/pricing_cta_credit_pack_clicked/);
   });
@@ -182,7 +183,7 @@ describe("Pricing page imports constants", () => {
   });
 });
 
-describe("Free vs Pro vs Founder Lifetime comparison", () => {
+describe("Free vs Pro vs Craft comparison", () => {
   const freeBasics = ["Plant profiles & grow diary", "Photo logs", "Manual sensor snapshots"];
 
   it("Free tier includes the basic diary features in the comparison table", () => {
@@ -210,17 +211,16 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
     expect(UPGRADE_CONFIG).not.toContain("priority support");
   });
 
-  it("comparison table renders all four columns (Free / Pro / Craft / Founder Lifetime)", () => {
+  it("comparison table renders Free, Pro and Craft and not Founder Lifetime", () => {
     expect(PAGE).toMatch(/data-testid="pricing-comparison-table"/);
     expect(PAGE).toMatch(/>Free<\/th>/);
     expect(PAGE).toMatch(/>Pro<\/th>/);
     expect(PAGE).toMatch(/>Craft<\/th>/);
-    expect(PAGE).toMatch(/Founder Lifetime\s*<\/th>/);
+    expect(PAGE).not.toMatch(/Founder Lifetime\s*<\/th>/);
   });
 
-  it("comparison rows expose a founder column", () => {
-    expect(PAGE).toMatch(/founder:\s*(true|false|"|')/);
-    expect(PAGE).toMatch(/row\.founder/);
+  it("comparison rows do not expose a founder column", () => {
+    expect(PAGE).not.toMatch(/row\.founder/);
   });
 
   it("comparison rows expose a craft column", () => {
@@ -258,7 +258,12 @@ describe("AI Doctor credits", () => {
     expect(CONSTANTS).toMatch(/100 AI Doctor credits \/ month/);
   });
 
-  it("Founder Lifetime card mentions 100 AI Doctor credits / month", () => {
+  it("AI credit copy does not sell Founder Lifetime", () => {
+    const explainer = CONSTANTS.slice(
+      CONSTANTS.indexOf("export const AI_CREDIT_EXPLAINER"),
+      CONSTANTS.indexOf("export const CREDIT_PACKS"),
+    );
+    expect(explainer).not.toMatch(/Founder/);
     expect(CONSTANTS).toMatch(/100 AI Doctor credits \/ month/);
   });
 
@@ -279,9 +284,8 @@ describe("Trust strip", () => {
 
 describe("Mobile-first pricing layout", () => {
   it("tier card grid uses extra vertical spacing on mobile", () => {
-    // Four tiers (Free / Pro / Craft / Founder): 1-up on mobile, 2-up on md,
-    // 4-up from xl. Extra mobile gap (gap-8) still guards vertical spacing.
-    expect(PAGE).toMatch(/grid\s+gap-8\s+md:gap-6\s+md:grid-cols-2\s+xl:grid-cols-4/);
+    // Three tiers (Free / Pro / Craft): 1-up on mobile, 2-up on md, 3-up from xl.
+    expect(PAGE).toMatch(/grid\s+gap-8\s+md:gap-6\s+md:grid-cols-2\s+xl:grid-cols-3/);
   });
 
   it("comparison table is horizontally scrollable on small screens", () => {
@@ -293,7 +297,7 @@ describe("Mobile-first pricing layout", () => {
   it('CTA buttons use size="lg" for comfortable tap targets', () => {
     const ctaButtons = PAGE.match(/<Button[\s\S]*?<\/Button>/g) ?? [];
     expect(ctaButtons.length).toBeGreaterThan(0);
-    const ctaText = /(Start Free|Upgrade to Pro|Upgrade to Craft|Claim Founder Lifetime)/;
+    const ctaText = /(Start Free|Upgrade to Pro|Upgrade to Craft)/;
     for (const b of ctaButtons) {
       if (ctaText.test(b)) {
         expect(b).toMatch(/size="lg"/);
@@ -309,10 +313,11 @@ describe("Forbidden tier/offer language", () => {
 });
 
 describe("CTAs", () => {
-  it("renders Start Free, Upgrade to Pro, and Claim Founder Lifetime buttons", () => {
+  it("renders Start Free, Upgrade to Pro, and Upgrade to Craft, and no Founder CTA", () => {
     expect(PAGE).toMatch(/Start Free/);
     expect(PAGE).toMatch(/Upgrade to Pro/);
-    expect(PAGE).toMatch(/Claim Founder Lifetime/);
+    expect(PAGE).toMatch(/Upgrade to Craft/);
+    expect(PAGE).not.toMatch(/Claim Founder Lifetime/);
   });
 
   it("wires CTAs to attributed signup and Paddle checkout price keys", () => {
@@ -329,7 +334,8 @@ describe("CTAs", () => {
     expect(PAGE).toMatch(/pro_annual/);
     expect(PAGE).toMatch(/craft_monthly/);
     expect(PAGE).toMatch(/craft_annual/);
-    expect(PAGE).toMatch(/founder_lifetime/);
+    expect(PAGE).toMatch(/isFounderLifetimeCheckoutSku/);
+    expect(PAGE).not.toMatch(/pricing-cta-founder/);
   });
 
   it("fires analytics events for each CTA", () => {
@@ -339,7 +345,7 @@ describe("CTAs", () => {
     expect(PAGE).toMatch(/pricing_cta_pro_annual_clicked/);
     expect(PAGE).toMatch(/pricing_cta_craft_monthly_clicked/);
     expect(PAGE).toMatch(/pricing_cta_craft_annual_clicked/);
-    expect(PAGE).toMatch(/pricing_cta_founder_lifetime_clicked/);
+    expect(PAGE).not.toMatch(/pricing_cta_founder_lifetime_clicked/);
     expect(PAGE).toMatch(/pricing_faq_opened/);
   });
 });
@@ -356,8 +362,8 @@ describe("FAQ + trust/data ownership copy", () => {
     expect(PAGE).toMatch(/Grower stays in control/);
   });
 
-  it("FAQ covers founder lifetime, hardware, AI safety, and cancellation", () => {
-    expect(PAGE).toMatch(/Founder Lifetime Offer work/);
+  it("FAQ covers hardware, AI safety, and cancellation, and does not sell Founder", () => {
+    expect(PAGE).not.toMatch(/Founder Lifetime Offer work/);
     expect(PAGE).toMatch(/Do I need specific hardware/);
     expect(PAGE).toMatch(/control my equipment or grow for me/);
     expect(PAGE).toMatch(/Can I cancel anytime/);
@@ -544,8 +550,8 @@ describe("Pricing manifest snapshot (narrow)", () => {
       },
       {
         path: "/founder",
-        access: "public",
-        description: "Public Founder Lifetime acquisition and offer explainer.",
+        access: "redirect",
+        description: "→ /pricing. Founder Lifetime is no longer sold.",
       },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },

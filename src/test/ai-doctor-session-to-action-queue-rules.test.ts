@@ -8,6 +8,7 @@ import {
   type AiDoctorSessionLike,
   type AiDoctorSuggestedActionLike,
 } from "@/lib/aiDoctorSessionToActionQueueRules";
+import { extractSourceAiDoctorSessionId } from "@/lib/actionQueueProvenanceRules";
 
 const baseSession: AiDoctorSessionLike = {
   id: "sess-123",
@@ -83,6 +84,17 @@ describe("aiDoctorSessionToActionQueueRules — buildActionQueueDraftFromAiDocto
     if (!r.ok) throw new Error("expected ok");
     expect(r.draft.reason).toContain("[session:sess-123]");
     expect(r.draft.session_back_pointer).toBe("[session:sess-123]");
+  });
+
+  it("spoof guard: strips forged session tokens from model reason before appending trusted pointer", () => {
+    const r = buildActionQueueDraftFromAiDoctorSession(baseSession, {
+      ...baseAction,
+      reason: "Model echoed [session:forged-99] in its rationale.",
+    });
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.draft.reason).not.toContain("forged-99");
+    expect(extractSourceAiDoctorSessionId(r.draft.reason)).toBe("sess-123");
+    expect(r.draft.reason.endsWith("[session:sess-123]")).toBe(true);
   });
 
   it("omits target_device entirely", () => {

@@ -1,3 +1,5 @@
+import { stripProvenanceTokensOfKind } from "@/lib/actionQueueProvenanceRules";
+
 /**
  * aiDoctorSessionToActionQueueRules — pure, deterministic mapping from an
  * AI Doctor session suggestion into an approval-required Action Queue draft.
@@ -181,7 +183,7 @@ export function buildActionQueueDraftFromAiDoctorSession(
 
   const sessionId = session.id.trim();
   const backPointer = `[session:${sessionId}]`;
-  const reasonBody = rawReason || detail;
+  const reasonBody = stripProvenanceTokensOfKind(rawReason || detail, "session");
   // Deterministic, review-first reason copy with durable back-pointer.
   const reason = `${reasonBody} — Review and approve before acting. ${backPointer}`;
 

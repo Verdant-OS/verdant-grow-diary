@@ -372,6 +372,36 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
       "timeline-entry-water-2",
     ]);
   });
+
+  it('keeps the stored "(quick log)" placeholder out of Notes but under All', async () => {
+    const diaryRows = [
+      diaryEntry("note-1", "topped in the quick log", "2026-07-20T12:00:00.000Z"),
+      diaryEntry("water-1", "(quick log)", "2026-07-20T11:00:00.000Z", null, {
+        event_type: "watering",
+        source: "quick_log",
+        watering: { volume_ml: 750 },
+      }),
+      diaryEntry("water-2", " (Quick Log) ", "2026-07-20T10:00:00.000Z", null, {
+        event_type: "watering",
+        source: "quick_log",
+        watering: { volume_ml: 500 },
+      }),
+    ];
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 3 };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("topped in the quick log")).toBeInTheDocument();
+
+    expect(chipCount("All")).toBe(3);
+    expect(chipCount("Notes")).toBe(1);
+
+    fireEvent.click(chipButton("Notes"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(1));
+    expect(listedDiaryEntries()[0].id).toBe("timeline-entry-note-1");
+  });
 });
 
 describe("timelineEntryHasNoteText", () => {
@@ -381,5 +411,8 @@ describe("timelineEntryHasNoteText", () => {
     expect(timelineEntryHasNoteText("   ")).toBe(false);
     expect(timelineEntryHasNoteText(null)).toBe(false);
     expect(timelineEntryHasNoteText(undefined)).toBe(false);
+    expect(timelineEntryHasNoteText("(quick log)")).toBe(false);
+    expect(timelineEntryHasNoteText(" (Quick Log) ")).toBe(false);
+    expect(timelineEntryHasNoteText("topped in the quick log")).toBe(true);
   });
 });

@@ -1,8 +1,10 @@
 # Spec — Global search over diary entries
 
 Status: **proposed spec only** (filming bug #17, 2026-10-22). No code in this slice.
-Owner decision needed before implementation: Option A vs Option B below. The privacy
-requirement (6) now favours Option B, which needs a migration.
+**Owner decision (Matthew, 2026-10-22): Option B.** The implementing slice extends
+`verdant_search` through a new additive migration, drafted on its own branch for the protected
+migration review. No agent applies it; production apply stays with the owner. Option A is
+recorded below only as the rejected alternative.
 
 ## Problem
 
@@ -83,7 +85,7 @@ switch know only grow / tent / plant / cultivar.
 
 ## Options
 
-**Option A — client reads, no migration. Fails requirement 6.**
+**Option A — client reads, no migration. Rejected: fails requirement 6.**
 A new `src/lib/globalSearchDiaryRules.ts` (pure: literal-pattern escaping, excerpting,
 ordering, label shaping, companion dedupe) and extra queries in `useGlobalSearch`: the same
 owner-scoped literal `ilike` over `grow_events` (`is_deleted = false`, `deleted_at is null`,
@@ -101,7 +103,7 @@ diary sizes; `NOT_MEASURED` at scale). **Privacy:** PostgREST reads are GET requ
 `ilike` filter, and with it the grower's search text, is in the request URL. Option A is
 acceptable only if the owner explicitly accepts that.
 
-**Option B — extend `verdant_search` (recommended).** Add a `'diary'` branch to the RPC so
+**Option B — extend `verdant_search` (chosen).** Add a `'diary'` branch to the RPC so
 the search text stays in the POST body (requirement 6) and one round trip serves all private
 entities. Requires a new additive migration (owner-gated: migrations/RLS are off-limits without
 Matthew's approval) and a trigram index for scale. The branch must:

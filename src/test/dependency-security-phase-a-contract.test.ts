@@ -137,7 +137,7 @@ describe("dependency security Phase A resolution floors", () => {
 
   it("declares the direct security floors", () => {
     expect(
-      isAtLeast(parseVersion(packageJson.devDependencies.vite), [6, 4, 3]),
+      isAtLeast(parseVersion(packageJson.devDependencies.vite), [8, 3, 3]),
       packageJson.devDependencies.vite,
     ).toBe(true);
     expect(
@@ -151,11 +151,14 @@ describe("dependency security Phase A resolution floors", () => {
   });
 
   it.each([
-    ["vite", [6, 4, 3] as const],
+    ["vite", [8, 3, 3] as const],
+    ["launch-editor", [2, 14, 2] as const],
     ["postcss", [8, 5, 18] as const],
     ["esbuild", [0, 28, 1] as const],
     ["fast-uri", [3, 1, 8] as const],
     ["form-data", [4, 0, 6] as const],
+    ["follow-redirects", [1, 16, 1] as const],
+    ["@modelcontextprotocol/sdk", [1, 32, 0] as const],
     ["js-yaml", [4, 3, 2] as const],
     ["hono", [4, 13, 11] as const],
     ["qs", [6, 16, 0] as const],
@@ -238,7 +241,10 @@ describe("dependency security Phase A resolution floors", () => {
       esbuild: "0.28.1",
       "fast-uri": "3.1.8",
       "form-data": "4.0.6",
+      "follow-redirects": "1.16.1",
+      "@modelcontextprotocol/sdk": "1.32.0",
       "js-yaml": "4.3.2",
+      "launch-editor": "2.14.2",
       hono: "4.13.11",
       qs: "6.16.0",
       nanoid: "3.3.18",

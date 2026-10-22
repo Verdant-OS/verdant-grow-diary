@@ -1,10 +1,11 @@
 # Spec — Global search over diary entries
 
 Status: **proposed spec only** (filming bug #17, 2026-10-22). No code in this slice.
-**Owner decision (Matthew, 2026-10-22): Option B.** The implementing slice extends
-`verdant_search` through a new additive migration, drafted on its own branch for the protected
-migration review. No agent applies it; production apply stays with the owner. Option A is
-recorded below only as the rejected alternative.
+**Owner decision (Matthew, 2026-10-22): Option B** — a server-side RPC, so the search text
+travels in a POST body. The implementing slice adds it through a new additive migration,
+drafted on its own branch for the protected migration review. No agent applies it;
+production apply stays with the owner. Option A is recorded below only as the rejected
+alternative.
 
 ## Problem
 
@@ -29,11 +30,15 @@ switch know only grow / tent / plant / cultivar.
 ## Requirements
 
 1. Match the grower's **own** logged notes on `note` text in **both** places a log lives:
-   `grow_events` (every confirmed Quick Log save writes this spine row) and `diary_entries`
-   (a companion exists only when structured details exist; `src/hooks/useGrowDetailData.ts:11–15`).
-   Searching `diary_entries` alone would leave plain Quick Logs undiscoverable, which is the
-   filming bug itself. A diary companion linked to a matching spine
-   (`details.linked_grow_event_id`) is one result, not two.
+   `grow_events` (every confirmed Quick Log save writes this spine row) and `diary_entries`.
+   The current manual writer `quicklog_save_manual` always inserts a linked `diary_entries`
+   mirror, even without details (`20260927160000_quicklog_manual_plant_tent_lineage.sql:211–229`,
+   note `'(quick log)'` when empty), but other paths do not: the `quicklog_save_event` path
+   mirrors conditionally, and legacy rows can be spine-only (the case
+   `src/hooks/useGrowDetailData.ts:11–15` describes). So searching `diary_entries` alone would
+   miss spine-only logs. A diary row linked to a matching spine
+   (`details.linked_grow_event_id`) is one result, not two, and the placeholder note
+   `'(quick log)'` never matches on its own.
    - Matching is a case-insensitive literal substring: `%`, `_` and `\` in the query match
      themselves.
    - Order is newest first (`occurred_at` / `entry_at`) with an `id` tie-break, bounded to
@@ -47,10 +52,10 @@ switch know only grow / tent / plant / cultivar.
      every grower's diary entries (`20260517010926_65004f70-….sql:67–74`), so RLS alone is not
      owner scoping.
 2. Each result shows a ~80-character note excerpt with the match, the plant or tent name
-   when known, and the local date (`formatSnapshotTimestamp`). Names come from one batched
-   owner-scoped lookup of the result ids (session identity; generated `diary_entries` /
-   `grow_events` relationship metadata has no plants/tents embed, so a relation select
-   cannot supply them). When a name is unavailable the result shows "Plant" or "Tent",
+   when known, and the local date (`formatSnapshotTimestamp`). Under the chosen Option B the
+   RPC returns the names from owner-scoped joins; Option A would need one batched
+   owner-scoped lookup (generated `diary_entries` / `grow_events` relationship metadata has
+   no plants/tents embed, so a relation select cannot supply them). When a name is unavailable the result shows "Plant" or "Tent",
    never a raw id. Selecting a result opens the Timeline for **that entry's grow**
    with the `timeline-entry-<id>` hash:
    - Before anchoring, the handoff clears any active Timeline filter (plant, tent, type,
@@ -114,24 +119,40 @@ diary sizes; `NOT_MEASURED` at scale). **Privacy:** PostgREST reads are GET requ
 `ilike` filter, and with it the grower's search text, is in the request URL. Option A is
 acceptable only if the owner explicitly accepts that.
 
-**Option B — extend `verdant_search` (chosen).** Add a `'diary'` branch to the RPC so
-the search text stays in the POST body (requirement 6) and one round trip serves all private
-entities. Requires a new additive migration (owner-gated: migrations/RLS are off-limits without
-Matthew's approval) and a trigram index for scale. The branch must:
+**Option B — a separate diary search RPC (chosen).** A new function
+`public.verdant_search_diary(q text, max_results int default 10)`, called with
+`supabase.rpc(...)` (a POST body, requirement 6) **alongside** the unchanged `verdant_search`
+call. Keeping it separate, rather than adding a branch to `verdant_search`:
 
-- return `grow_id` (and `plant_id` / `tent_id`) in the RPC's result contract, so a result can
-  open its own grow's Timeline; the current return table has no such column;
-- cap diary rows at 10 **inside the branch**, so diary matches can never crowd grows, tents
-  and plants out of `max_results`;
+- isolates failure, as requirement 3 needs: `verdant_search` is one SQL statement, so an error
+  in a diary branch would abort the whole RPC and `useGlobalSearch` would drop every private
+  result. With two calls, a failed diary RPC shows "Diary results unavailable" while grow,
+  tent and plant results still render;
+- leaves `verdant_search` byte-for-byte unchanged, including its `plants.strain` match and
+  non-archived plant filter, and avoids changing its `RETURNS TABLE` contract, which
+  `CREATE OR REPLACE` cannot do (it would need a drop and recreate);
+- caps diary rows at 10 in its own `limit`, so they never compete for `verdant_search`'s
+  `max_results`.
+
+The function must:
+
+- be `language sql`, `security invoker` (as `verdant_search` is), `stable`, with
+  `set search_path = public, pg_temp`; after `create function`, run
+  `revoke all … from public`, `revoke all … from anon` and
+  `grant execute … to authenticated`, mirroring `verdant_search`
+  (`20260723000807_…sql:83–85`), so it never keeps PostgreSQL's default PUBLIC execute;
+- return `source` (`'grow_event'` or `'diary_entry'`), `id`, `note`, `occurred_at`
+  (`grow_events.occurred_at` / `diary_entries.entry_at`, raw `timestamptz`), `grow_id`,
+  `plant_id`, `tent_id`, `plant_name`, `tent_name`. The client formats `occurred_at` with
+  `formatSnapshotTimestamp` in the browser's zone; names come from owner-scoped joins, so no
+  second lookup is needed;
 - match the raw `note` literally (`ilike '%' || escaped || '%' escape '\'`, escaping `\`,
   `%` and `_`), not through `verdant_normalize_search_text`: that normalizer replaces every
   non-alphanumeric run with a space (`20260723000807_…sql:12`), so `100%` or `a_b` could not
   match literally;
-- search both `grow_events` and `diary_entries` and dedupe linked companions, applying
-  `user_id = auth.uid()`, the deletion/retraction exclusions, the active-grow rule and
-  newest-first `id`-tie-broken ordering, as in requirement 1;
-- keep every existing branch unchanged, including the `plants.strain` match and the
-  non-archived plant filter; the implementing slice pins both in its regression tests.
+- search both tables and dedupe linked companions, applying `user_id = auth.uid()`, the
+  deletion/retraction exclusions, the active-grow rule and newest-first `id`-tie-broken
+  ordering, as in requirement 1, then `limit least(max_results, 10)`.
 
 ## Acceptance tests (for the implementing slice)
 
@@ -140,12 +161,17 @@ Matthew's approval) and a trigram index for scale. The branch must:
   `c:\x` are escaped so they match only literally (`100%` must not match `100 ml`).
 - Query shape (stubbed client): `.order("id", desc)` is applied before `.limit(10)`; with more
   than 10 matches sharing one `entry_at`, two reads return the same 10 ids. Option B: the
-  search text is sent only in the RPC body; the diary branch returns at most 10 rows and
-  `grow_id`; `100%` does not match `100 ml` server-side.
+  search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
+  with `grow_id` and `occurred_at`; `100%` does not match `100 ml` server-side; `anon`
+  cannot execute it.
+- Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
+  `verdant_search` results still render; a failing `verdant_search` does not hide diary
+  results.
 - Short queries: "OG" still returns cultivar and entity results and makes no diary read.
-- Sources: a plain Quick Log note (spine row, no companion) is found; a spine with a linked
-  diary companion that both match is one result; a deleted spine and a retracted entry are not
-  returned. Option B: a plant found by its `strain` is still returned.
+- Sources: a legacy spine-only Quick Log note is found; a current manual Quick Log (spine plus
+  its unconditional mirror) that matches is one result; a `'(quick log)'` placeholder note
+  alone does not match; a deleted spine and a retracted entry are not returned. Option B:
+  `verdant_search` is unchanged, so a plant found by its `strain` is still returned.
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed

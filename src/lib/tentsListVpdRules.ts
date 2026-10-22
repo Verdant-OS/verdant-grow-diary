@@ -4,16 +4,28 @@
  * calculates VPD from a same-capture temperature/RH pair when no newer stored
  * vpd_kpa exists, so a manual reading shows a VPD here instead of "—".
  *
+ * It reads the same inputs as the Dashboard: the tent's stored rows and its
+ * diary-inclusive snapshot (`useLatestSensorSnapshot`), so a newer Quick Log or
+ * Environment Check capture is not missed (Codex P2 on #2303). The VPD keeps
+ * its own source and capture time, so the strip never grades it with another
+ * capture's freshness (Codex P1 on #2303).
+ *
  * Pure: the clock is injected.
  */
-import type { BuildTentSnapshotInput } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import type {
+  BuildTentSnapshotInput,
+  CanonicalTentVpd,
+} from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import { buildTonightTentMetrics, type TonightSensorRow } from "@/lib/tonightTentHomeViewModel";
 
-export function tentsListCanonicalVpdKpa(
+type TonightSnapshotInput = Parameters<typeof buildTonightTentMetrics>[0]["snapshot"];
+
+export function tentsListCanonicalVpd(
   rows: readonly BuildTentSnapshotInput[],
   tentId: string,
   nowMs: number,
-): number | null {
+  snapshot: TonightSnapshotInput = { status: "idle", snapshot: null },
+): CanonicalTentVpd | null {
   const tonightRows: TonightSensorRow[] = rows.map(({ id, ...row }) => ({
     ...row,
     ...(id ? { id } : {}),
@@ -22,8 +34,15 @@ export function tentsListCanonicalVpdKpa(
   const vpd = buildTonightTentMetrics({
     rows: tonightRows,
     rowsRead: { status: "success" },
-    snapshot: { status: "idle", snapshot: null },
+    snapshot,
     now: new Date(nowMs),
   }).find((metric) => metric.key === "vpd");
-  return vpd?.state === "value" ? vpd.value : null;
+  if (vpd?.state !== "value" || typeof vpd.value !== "number") return null;
+  return {
+    kpa: vpd.value,
+    capturedAt: vpd.capturedAt,
+    source: vpd.source,
+    sourceLabel: vpd.sourceLabel,
+    ageText: vpd.ageText,
+  };
 }

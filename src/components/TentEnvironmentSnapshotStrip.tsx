@@ -14,10 +14,13 @@ import {
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
-import { tentsListCanonicalVpdKpa } from "@/lib/tentsListVpdRules";
+import { tentsListCanonicalVpd } from "@/lib/tentsListVpdRules";
+import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 
 export interface TentEnvironmentSnapshotStripProps {
   tentId: string;
+  /** The tent's grow, for the Dashboard's diary-inclusive snapshot (#2268). */
+  growId?: string | null;
   stage: string | null | undefined;
   sensorRows: readonly BuildTentSnapshotInput[];
   sensorStatus: TentSensorReadStatus;
@@ -30,6 +33,7 @@ export interface TentEnvironmentSnapshotStripProps {
 
 export default function TentEnvironmentSnapshotStrip({
   tentId,
+  growId = null,
   stage,
   sensorRows,
   sensorStatus,
@@ -39,6 +43,9 @@ export default function TentEnvironmentSnapshotStrip({
   manualStatus,
   manualUnavailableReason,
 }: TentEnvironmentSnapshotStripProps) {
+  // The same tent-scoped, diary-inclusive snapshot the Dashboard and Tent
+  // Detail read (one shared query), so the list's VPD sees the same evidence.
+  const tonightSnapshot = useLatestSensorSnapshot(growId, [tentId]);
   const selection = selectTentEnvironmentSnapshotFallback({
     sensorRows,
     sensorStatus,
@@ -146,7 +153,10 @@ export default function TentEnvironmentSnapshotStrip({
 
   const snapView = buildTentSnapshotView(selection.rows, stage, now, {
     temperatureUnit,
-    canonicalVpdKpa: tentsListCanonicalVpdKpa(selection.rows, tentId, now),
+    canonicalVpd: tentsListCanonicalVpd(selection.rows, tentId, now, {
+      status: tonightSnapshot.status,
+      snapshot: tonightSnapshot.snapshot,
+    }),
   });
   const vpdMetric = snapView.metrics.find((metric) => metric.key === "vpd");
   const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";

@@ -635,6 +635,7 @@ export default function Tents() {
 
                       <TentEnvironmentSnapshotStrip
                         tentId={t.id}
+                        growId={t.growId ?? null}
                         stage={envStage}
                         sensorRows={readingsByTent[t.id] ?? []}
                         sensorStatus={sensorReadStatus}

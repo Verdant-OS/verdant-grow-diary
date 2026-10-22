@@ -91,17 +91,24 @@ function tonightVpdPassesTruth(
  * - Tonight has nothing yet (loading, missing, unavailable): keep the tent
  *   page's own observation, which also covers manual-history VPD that Tonight
  *   does not read.
- * - The tent's sensor-truth check rejected the stored temperature, RH or VPD,
- *   or Tonight's chosen VPD fails realism on its own value, its calculation
- *   inputs or its capture's temperature and RH: keep the tent page's own
- *   observation, which only admits realistic readings. Tonight does not run
- *   that realism check itself.
+ * - The tent page's own observation is newer than Tonight's capture (a Quick
+ *   Log manual VPD, which Tonight does not read): keep it rather than replace
+ *   newer evidence with older (Codex P2 on #2303).
+ * - The tent's sensor-truth check rejected the stored temperature, RH or VPD
+ *   at a capture no older than Tonight's, or Tonight's chosen VPD fails
+ *   realism on its own value, its calculation inputs or its capture's
+ *   temperature and RH: keep the tent page's own observation, which only
+ *   admits realistic readings. Tonight does not run that realism check
+ *   itself. A rejection at an older capture does not block a newer one
+ *   (Codex P2 on #2303).
  */
 export function resolveTentDetailVpd(input: {
   tonight: TonightMetricView | null | undefined;
   existing: DisplayedVpdObservation;
   /** Snapshot metrics the tent's sensor-truth check rejected (header.truth.invalidFields). */
   rejectedMetrics: readonly string[];
+  /** Capture time of the snapshot those rejections belong to (header.capturedAt). */
+  rejectedCapturedAt: string | null;
   /** Tonight's displayed temperature and RH: the inputs of a calculated VPD. */
   contributors: { temp: number | null; rh: number | null } | null;
   /** Temperature and RH by capture, from `tentDetailCaptureClimate`. */
@@ -109,7 +116,17 @@ export function resolveTentDetailVpd(input: {
   nowMs: number;
 }): TentDetailVpdObservation {
   const { tonight } = input;
-  if (input.rejectedMetrics.some((key) => key === "temp" || key === "rh" || key === "vpd")) {
+  const tonightMs = tonight ? instantMs(tonight.capturedAt) : null;
+  const existingMs = input.existing.value === null ? null : instantMs(input.existing.capturedAt);
+  if (existingMs !== null && tonightMs !== null && existingMs > tonightMs) {
+    return { ...input.existing, calculated: false };
+  }
+  const rejectedMs = instantMs(input.rejectedCapturedAt);
+  const rejectionApplies = rejectedMs === null || tonightMs === null || tonightMs <= rejectedMs;
+  if (
+    rejectionApplies &&
+    input.rejectedMetrics.some((key) => key === "temp" || key === "rh" || key === "vpd")
+  ) {
     return { ...input.existing, calculated: false };
   }
   if (tonight?.state === "invalid") {

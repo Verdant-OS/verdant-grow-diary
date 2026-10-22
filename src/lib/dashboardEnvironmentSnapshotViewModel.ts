@@ -187,13 +187,73 @@ export interface BuildTentSnapshotViewOptions {
    */
   temperatureUnit?: TemperatureUnitPreference;
   /**
-   * The tent's canonical VPD (kPa), as the Dashboard's Tonight card derives it
-   * (VER-189, docs/specs/dashboard-canonical-tent-vpd.md). When a finite
-   * number, it replaces the latest-cohort stored vpd_kpa, which is absent when
-   * the newest capture is a manual temperature/RH pair (#2268). Omitted, the
-   * stored value is used as before.
+   * The tent's canonical VPD, as the Dashboard's Tonight card derives it
+   * (VER-189, docs/specs/dashboard-canonical-tent-vpd.md; #2268). It replaces
+   * the latest-cohort stored vpd_kpa. From the cohort's own capture it is
+   * graded like the cohort's other metrics. From any other capture it is
+   * graded and labelled with its own source and age, never the cohort's
+   * (Codex P1 on #2303). Omitted, the stored value is used.
    */
-  canonicalVpdKpa?: number | null;
+  canonicalVpd?: CanonicalTentVpd | null;
+}
+
+/** The Dashboard Tonight VPD for a tent, with its own provenance. */
+export interface CanonicalTentVpd {
+  kpa: number;
+  capturedAt: string | null;
+  /** Canonical source of the VPD's own capture (live / manual / csv / demo / stale / invalid). */
+  source: string | null;
+  sourceLabel: string | null;
+  ageText: string | null;
+}
+
+const CANONICAL_ELIGIBLE_SOURCES = new Set(["live", "manual", "csv"]);
+
+function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const aMs = Date.parse(a);
+  return Number.isFinite(aMs) && aMs === Date.parse(b);
+}
+
+function ownCaptureVpdMetric(
+  canonical: CanonicalTentVpd,
+  stage: string | null | undefined,
+  now: number,
+): MetricView {
+  const chipStatus = vpdMetricChipStatus(classifyVpdAgainstStage({ value: canonical.kpa, stage }));
+  let status: MetricStatus = "ok";
+  let word: string | null = null;
+  if (canonical.kpa < 0 || canonical.kpa > 5 || canonical.source === "invalid") {
+    status = "invalid";
+    word = "Invalid";
+  } else if (
+    canonical.source === "stale" ||
+    canonical.capturedAt === null ||
+    isStale(canonical.capturedAt, now, undefined, canonical.source ?? undefined)
+  ) {
+    status = "stale";
+    word = "Stale";
+  } else if (canonical.source === null || !CANONICAL_ELIGIBLE_SOURCES.has(canonical.source)) {
+    status = "degraded";
+    word = "Needs verification";
+  }
+  const statusLabel = [word ?? canonical.sourceLabel ?? "Unknown source", canonical.ageText]
+    .filter((part): part is string => !!part)
+    .join(" · ");
+  return {
+    key: "vpd",
+    label: "VPD",
+    display: formatNumber(canonical.kpa, 2),
+    unit: " kPa",
+    chipStatus:
+      status === "invalid"
+        ? "bad"
+        : (status === "stale" || status === "degraded") && chipStatus === "ok"
+          ? "warn"
+          : chipStatus,
+    status,
+    statusLabel,
+  };
 }
 
 export function buildTentSnapshotView(
@@ -206,10 +266,12 @@ export function buildTentSnapshotView(
   const snap = snapshotFromReadings(rows);
   if (!snap) return EMPTY;
   const latestRows = rows.filter((r) => resolveSensorObservationTime(r) === snap.ts);
-  const vpdKpa =
-    typeof options.canonicalVpdKpa === "number" && Number.isFinite(options.canonicalVpdKpa)
-      ? options.canonicalVpdKpa
-      : snap.vpd;
+  const canonical =
+    options.canonicalVpd != null && Number.isFinite(options.canonicalVpd.kpa)
+      ? options.canonicalVpd
+      : null;
+  const useCanonicalVpd = canonical !== null && sameInstant(canonical.capturedAt, snap.ts);
+  const vpdKpa = useCanonicalVpd ? canonical.kpa : snap.vpd;
 
   // Source resolution is strict across the whole latest timestamp. A mixed
   // or unknown cohort stays visible but is never promoted to healthy/live.
@@ -232,7 +294,7 @@ export function buildTentSnapshotView(
   });
 
   const capturedAt = resolveCapturedAt(latestRows, snap.ts);
-  const quality = evaluateSensorQuality(snap, now);
+  const quality = evaluateSensorQuality(useCanonicalVpd ? { ...snap, vpd: vpdKpa } : snap, now);
   // Explicit intake flags on the contributing rows are authoritative
   // downgrades: flagged-invalid data must never render OK/Live and
   // flagged-stale data must never render fresh, regardless of how
@@ -347,6 +409,11 @@ export function buildTentSnapshotView(
       2,
     ),
   ];
+
+  // A canonical VPD from another capture keeps its own source and age.
+  if (canonical !== null && !useCanonicalVpd) {
+    metrics[2] = ownCaptureVpdMetric(canonical, stage, now);
+  }
 
   return {
     hasReading: true,

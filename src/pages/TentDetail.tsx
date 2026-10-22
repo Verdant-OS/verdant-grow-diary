@@ -229,6 +229,7 @@ export default function TentDetail() {
     tonight: tonightMetrics.find((metric) => metric.key === "vpd"),
     existing: storedVpdObservation,
     rejectedMetrics: header.truth?.invalidFields ?? [],
+    rejectedCapturedAt: header.capturedAt,
     contributors: { temp: tonightValue("temp"), rh: tonightValue("rh") },
     captureClimate: tentDetailCaptureClimate(
       readings,

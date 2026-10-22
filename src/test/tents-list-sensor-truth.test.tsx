@@ -141,6 +141,11 @@ const H = vi.hoisted(() => {
   };
 });
 
+// The tents list VPD reads the Dashboard's diary-inclusive snapshot (#2268).
+// Idle keeps this harness on stored rows only, as before.
+vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
+  useLatestSensorSnapshot: () => ({ status: "idle", snapshot: null }),
+}));
 vi.mock("@/hooks/useGrowData", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/useGrowData")>();
   return {

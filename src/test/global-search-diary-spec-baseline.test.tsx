@@ -21,18 +21,44 @@ import {
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { clearGlobalSearchPrivateState } from "@/lib/globalSearchSession";
 
-const KNOWN_ENTITY_TYPES: GlobalSearchEntityType[] = ["grow", "tent", "plant", "cultivar"];
+const KNOWN_ENTITY_TYPES = [
+  "grow",
+  "tent",
+  "plant",
+  "cultivar",
+] as const satisfies readonly GlobalSearchEntityType[];
+// Compile-time lock: adding an entity type (for example "diary") to the union
+// fails typecheck here until this baseline is updated with it.
+type UnlistedEntityType = Exclude<GlobalSearchEntityType, (typeof KNOWN_ENTITY_TYPES)[number]>;
+const everyEntityTypeListed: [UnlistedEntityType] extends [never] ? true : never = true;
+void everyEntityTypeListed;
 
-let rpcImpl: (name: string, args: unknown) => Promise<{ data: unknown; error: unknown }>;
-const rpcSpy = vi.fn((name: string, args: unknown) => rpcImpl(name, args));
-const fromSpy = vi.fn((_table: string) => {
-  throw new Error("diary_entries client read is not implemented in this baseline");
+type RpcResult = { data: unknown; error: unknown };
+// Hoisted with vi.mock so the mock factory never reads an uninitialized binding.
+const supabaseMock = vi.hoisted(() => {
+  const state = {
+    rpcImpl: (async () => ({ data: [], error: null })) as (
+      name: string,
+      args: unknown,
+    ) => Promise<RpcResult>,
+  };
+  return {
+    state,
+    rpcSpy: vi.fn((name: string, args: unknown) => state.rpcImpl(name, args)),
+    fromSpy: vi.fn((_table: string) => {
+      throw new Error("diary_entries client read is not implemented in this baseline");
+    }),
+  };
 });
+const { rpcSpy, fromSpy } = supabaseMock;
+const setRpcImpl = (impl: (name: string, args: unknown) => Promise<RpcResult>) => {
+  supabaseMock.state.rpcImpl = impl;
+};
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    rpc: (name: string, args: unknown) => rpcSpy(name, args),
-    from: fromSpy,
+    rpc: (name: string, args: unknown) => supabaseMock.rpcSpy(name, args),
+    from: (table: string) => supabaseMock.fromSpy(table),
   },
 }));
 
@@ -48,7 +74,7 @@ function createWrapper() {
 beforeEach(() => {
   rpcSpy.mockClear();
   fromSpy.mockClear();
-  rpcImpl = async () => ({ data: [], error: null });
+  setRpcImpl(async () => ({ data: [], error: null }));
 });
 
 afterEach(() => {
@@ -105,7 +131,7 @@ describe("global search diary spec baseline — merge entity groups", () => {
 
 describe("global search diary spec baseline — useGlobalSearch private path", () => {
   it("queries verdant_search via RPC only and never reads diary_entries", async () => {
-    rpcImpl = async () => ({
+    setRpcImpl(async () => ({
       data: [
         {
           entity_type: "plant",
@@ -118,7 +144,7 @@ describe("global search diary spec baseline — useGlobalSearch private path", (
         },
       ] satisfies PrivateSearchRow[],
       error: null,
-    });
+    }));
 
     const { result } = renderHook(() => useGlobalSearch("yellow"), {
       wrapper: createWrapper(),
@@ -138,7 +164,7 @@ describe("global search diary spec baseline — useGlobalSearch private path", (
   });
 
   it("does not retain private results after the private-state epoch clears", async () => {
-    rpcImpl = async () => ({
+    setRpcImpl(async () => ({
       data: [
         {
           entity_type: "tent",
@@ -151,7 +177,7 @@ describe("global search diary spec baseline — useGlobalSearch private path", (
         },
       ] satisfies PrivateSearchRow[],
       error: null,
-    });
+    }));
 
     const { result, rerender } = renderHook(({ q }) => useGlobalSearch(q), {
       wrapper: createWrapper(),
@@ -161,17 +187,21 @@ describe("global search diary spec baseline — useGlobalSearch private path", (
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     });
-    await waitFor(() => expect(result.current.results.length).toBeGreaterThan(0));
+    await waitFor(() => expect(result.current.results.some((r) => r.id === "t1")).toBe(true));
 
+    // Keep the same query, so only the cleared epoch can drop the results; a
+    // follow-up read never settles, so nothing can refill them.
+    setRpcImpl(() => new Promise<RpcResult>(() => {}));
     act(() => {
       clearGlobalSearchPrivateState();
     });
-    rerender({ q: "" });
+    rerender({ q: "flower" });
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     });
 
-    expect(result.current.results).toEqual([]);
+    // Public cultivar matches for "flower" may remain; the private tent may not.
+    expect(result.current.results.filter((r) => r.entity_type !== "cultivar")).toEqual([]);
   });
 });

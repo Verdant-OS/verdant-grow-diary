@@ -4,9 +4,11 @@
  * still listed every plant's logs, because they were fed the unfiltered grow
  * page. The lanes now follow the same plant/tent scope as the main list.
  */
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const probes = vi.hoisted(() => ({ calendarMounts: 0, navTarget: "/timeline" }));
 
 const harness = vi.hoisted(() => ({
   executeQuery: vi.fn(),
@@ -195,7 +197,14 @@ vi.mock("@/components/FeedingHistoryPanel", () => ({
     />
   ),
 }));
-vi.mock("@/components/PhotoHistoryPanel", () => ({ default: () => null }));
+vi.mock("@/components/PhotoHistoryPanel", () => ({
+  default: ({ rawEntries = [] }: { rawEntries?: Array<{ id?: string }> }) => (
+    <output
+      data-testid="timeline-photo-lane-probe"
+      data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+    />
+  ),
+}));
 vi.mock("@/components/QuickLogHistoryPanels", () => ({
   RecentQuickLogActivityPanel: ({
     rawEntries = [],
@@ -211,11 +220,40 @@ vi.mock("@/components/QuickLogHistoryPanels", () => ({
       }
     />
   ),
-  PestDiseaseHistoryPanel: () => null,
-  TrainingHistoryPanel: () => null,
-  MeasurementHistoryPanel: () => null,
+  PestDiseaseHistoryPanel: ({ rawEntries = [] }: { rawEntries?: Array<{ id?: string }> }) => (
+    <output
+      data-testid="timeline-pest-lane-probe"
+      data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+    />
+  ),
+  TrainingHistoryPanel: ({ rawEntries = [] }: { rawEntries?: Array<{ id?: string }> }) => (
+    <output
+      data-testid="timeline-training-lane-probe"
+      data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+    />
+  ),
+  MeasurementHistoryPanel: ({ rawEntries = [] }: { rawEntries?: Array<{ id?: string }> }) => (
+    <output
+      data-testid="timeline-measurement-lane-probe"
+      data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+    />
+  ),
 }));
-vi.mock("@/components/DiaryCalendarSection", () => ({ default: () => null }));
+vi.mock("@/components/DiaryCalendarSection", async () => {
+  const { useState } = await import("react");
+  return {
+    default: function CalendarProbe({ rawEntries = [] }: { rawEntries?: Array<{ id?: string }> }) {
+      const [mount] = useState(() => ++probes.calendarMounts);
+      return (
+        <output
+          data-testid="timeline-calendar-lane-probe"
+          data-mount={mount}
+          data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+        />
+      );
+    },
+  };
+});
 vi.mock("@/components/TimelineCsvContextPanel", () => ({ default: () => null }));
 vi.mock("@/components/PhenoHuntTimelineSection", () => ({ default: () => null }));
 vi.mock("@/components/TimelinePhotoLightbox", () => ({ default: () => null }));
@@ -232,13 +270,6 @@ const GROW_A = {
   name: "Current Run A",
   stage: "vegetative",
   started_at: "2026-07-01T00:00:00.000Z",
-};
-
-const GROW_B = {
-  id: "grow-b",
-  name: "Current Run B",
-  stage: "flowering",
-  started_at: "2026-07-10T00:00:00.000Z",
 };
 
 function diaryEntry(id: string, note: string, entryAt = "2026-07-20T12:00:00.000Z") {
@@ -268,15 +299,6 @@ function growEvent(id = "grow-event-1") {
   };
 }
 
-function growIdFrom(spec: QuerySpec): string | null {
-  const filter = spec.filters.find((item) => item.op === "eq" && item.column === "grow_id");
-  return typeof filter?.value === "string" ? filter.value : null;
-}
-
-function isOlderPage(spec: QuerySpec): boolean {
-  return spec.filters.some((item) => item.op === "lt" && item.column === "entry_at");
-}
-
 function defaultResult(spec: QuerySpec): QueryResult {
   if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
   return { data: [], error: null };
@@ -300,47 +322,12 @@ function LocationProbe() {
       <button
         type="button"
         data-testid="timeline-external-plant-navigation"
-        onClick={() =>
-          navigate("/timeline?sensorSources=csv&plantId=plant-a&from=2026-07-01&to=2026-07-31")
-        }
+        onClick={() => navigate(probes.navTarget)}
       >
-        Navigate to Plant A
+        Navigate
       </button>
     </>
   );
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
-function expectNoTimelineContinuation() {
-  expect(screen.queryByTestId("timeline-one-tent-loop-next-step-card")).not.toBeInTheDocument();
-}
-
-function expectNoTimelineDirectoryReads() {
-  const directoryReads = harness.executeQuery.mock.calls
-    .map(([spec]) => spec as QuerySpec)
-    .filter(
-      (spec) =>
-        spec.table === "plants" ||
-        spec.table === "tents" ||
-        spec.table === "sensor_readings" ||
-        spec.table === "sensor_readings_effective",
-    );
-  expect(directoryReads).toHaveLength(0);
-}
-
-function expectNoFalseEmptyOrResults() {
-  expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
-  expect(screen.queryByText("No matching entries")).not.toBeInTheDocument();
-  expect(screen.queryByTestId("timeline-results-count")).not.toBeInTheDocument();
 }
 
 describe("Timeline Quick Log lanes follow the plant/tent filter", () => {
@@ -447,5 +434,62 @@ describe("Timeline Quick Log lanes follow the plant/tent filter", () => {
     mockTwoPlantRows();
     renderTimeline();
     expect(await laneIds()).toEqual(["diary-a", "diary-b", "event-a", "event-b"]);
+  });
+
+  function probeIds(testId: string): string[] {
+    return (screen.getByTestId(testId).getAttribute("data-entry-ids") ?? "")
+      .split(",")
+      .filter(Boolean)
+      .sort();
+  }
+
+  it("scopes the calendar and the remaining history lanes to the filtered plant", async () => {
+    mockTwoPlantRows();
+    renderTimeline(`/timeline?plantId=${PLANT_A}`);
+    await laneIds();
+    expect(probeIds("timeline-calendar-lane-probe")).toEqual(["diary-a", "event-a"]);
+    for (const id of [
+      "timeline-pest-lane-probe",
+      "timeline-training-lane-probe",
+      "timeline-measurement-lane-probe",
+      "timeline-photo-lane-probe",
+    ]) {
+      expect(probeIds(id)).not.toContain("diary-b");
+      expect(probeIds(id)).toContain("diary-a");
+    }
+  });
+
+  it("scopes the calendar to the filtered tent and keeps everything unfiltered", async () => {
+    mockTwoPlantRows();
+    const { unmount } = renderTimeline(`/timeline?tentId=${TENT_2}`);
+    await laneIds();
+    expect(probeIds("timeline-calendar-lane-probe")).toEqual(["diary-b", "event-b"]);
+    unmount();
+    mockTwoPlantRows();
+    renderTimeline();
+    await laneIds();
+    expect(probeIds("timeline-calendar-lane-probe")).toEqual([
+      "diary-a",
+      "diary-b",
+      "event-a",
+      "event-b",
+    ]);
+  });
+
+  it("remounts the calendar when the plant filter changes in place", async () => {
+    mockTwoPlantRows();
+    renderTimeline(`/timeline?plantId=${PLANT_A}`);
+    await laneIds();
+    const firstMount = screen
+      .getByTestId("timeline-calendar-lane-probe")
+      .getAttribute("data-mount");
+    probes.navTarget = `/timeline?plantId=${PLANT_B}`;
+    fireEvent.click(screen.getByTestId("timeline-external-plant-navigation"));
+    await waitFor(() =>
+      expect(probeIds("timeline-calendar-lane-probe")).toEqual(["diary-b", "event-b"]),
+    );
+    expect(screen.getByTestId("timeline-calendar-lane-probe").getAttribute("data-mount")).not.toBe(
+      firstMount,
+    );
   });
 });

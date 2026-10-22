@@ -1867,6 +1867,15 @@ export default function Timeline() {
       }),
     [recentLaneRawEntries, plantFilter, tentFilter],
   );
+  const scopedHistoryEntries = useMemo(
+    () => scopeTimelineQuickLogLaneRows(entries, { plantId: plantFilter, tentId: tentFilter }),
+    [entries, plantFilter, tentFilter],
+  );
+  const scopedMeasurementEntries = useMemo(
+    () =>
+      scopeTimelineQuickLogLaneRows(displayEntries, { plantId: plantFilter, tentId: tentFilter }),
+    [displayEntries, plantFilter, tentFilter],
+  );
 
   const symptomEvidenceByEntryId = useMemo(() => {
     const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
@@ -2710,6 +2719,8 @@ export default function Timeline() {
 
       <div className="mt-4">
         <DiaryCalendarSection
+          // Remount on a scope change so the month snaps to the new scope's activity.
+          key={`${plantFilter ?? ""}|${tentFilter ?? ""}`}
           rawEntries={scopedRecentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
           plantStartedAt={activeGrow?.started_at ?? null}
@@ -2740,7 +2751,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <PestDiseaseHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2750,7 +2761,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <TrainingHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2760,7 +2771,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <MeasurementHistoryPanel
-          rawEntries={displayEntries}
+          rawEntries={scopedMeasurementEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2770,7 +2781,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <PhotoHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={24}
           onEntryChanged={() => {
             void load();

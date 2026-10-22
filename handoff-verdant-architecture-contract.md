@@ -11,7 +11,7 @@ You are continuing work from a previous chat. That chat is gone; this file is th
 3. Use the values in section 8 exactly. Never round, re-estimate, or "correct" them.
 4. Do not suggest anything listed in section 7 (Changed / rejected) again unless the user brings it up.
 5. Code word: None active. If the user types /amcodeword, start every reply with the phrase they choose (default "Yes Boss!").
-6. Your first reply: at most 5 lines covering the goal, the current state, and the next step (section 11). Mention any files from section 13 that were not attached. Ask the questions in section 12 if there are any. End with "Ready to continue with <next step>?" Then wait for the user's go.
+6. Return the full `SENTINEL_ACK` block first (hard rule 20; it is exempt from the five-line limit). The collision audit (section 4 rule 1) is the first action after that. The summary that follows is at most 5 lines covering the goal, the current state, and the next step (section 11). Mention any files from section 13 that were not attached. Ask the questions in section 12 if there are any. End with "Ready to continue with <next step>?" Then wait for the user's go.
 
 ## 1. Mission
 - **Goal:** "Create a source-grounded, Verdant-specific Current Architecture Contract and, in a separate approved slice, an Authoritative Release Topology Specification." Repository `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`.

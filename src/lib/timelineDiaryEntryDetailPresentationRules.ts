@@ -166,7 +166,7 @@ function friendlyAttachedAction(value: unknown): string | null {
 
 const TYPED_ACTIVITY_ENVELOPES = ["watering", "feeding"] as const;
 
-const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
+export const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
   ph: "pH",
   ec_ms_cm: "EC",
   ec_in: "EC in",
@@ -175,7 +175,24 @@ const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
   runoff_ph: "Runoff pH",
   runoff_ec: "Runoff EC",
   water_temp_c: "Water temperature",
+  watering_amount_ml: "Water Volume",
+  wateringAmountMl: "Water Volume",
+  watering_amount: "Water Volume",
+  wateringAmount: "Water Volume",
+  volume_ml: "Water Volume",
 };
+
+const ML_VOLUME_KEYS: ReadonlySet<string> = new Set([
+  "volume_ml",
+  "runoff_ml",
+  "watering_amount_ml",
+  "wateringAmountMl",
+  "watering_amount",
+  "wateringAmount",
+]);
+
+/** A bare finite number written as text (EntryEditDialog saves details as strings). */
+const BARE_NUMBER_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
 
 function typedActivityScalar(
   key: string,
@@ -183,7 +200,9 @@ function typedActivityScalar(
   tempUnit: TemperatureUnitPreference,
 ): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
-    if (key === "volume_ml" || key === "runoff_ml") return `${value} ml`;
+    if (ML_VOLUME_KEYS.has(key)) {
+      return `${value} ml`;
+    }
     if (key === "water_temp_c") {
       const displayed = tempUnit === "fahrenheit" ? celsiusToFahrenheit(value) : value;
       const shown = String(Math.round(displayed * 10) / 10);
@@ -194,6 +213,8 @@ function typedActivityScalar(
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "" || trimmed === "default") return null;
+    // Unit-bearing text ("500 ml", "2 L") is kept verbatim.
+    if (ML_VOLUME_KEYS.has(key) && BARE_NUMBER_RE.test(trimmed)) return `${trimmed} ml`;
     return trimmed;
   }
   return null;
@@ -314,12 +335,48 @@ export function presentTimelineDiaryEntryDetails(
   for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
     detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
   }
+  // snake_case and legacy camelCase type keys, as the diary normalizer accepts.
+  const rawEventType =
+    [record.event_type, record.eventType, record.entry_type, record.entryType]
+      .find((v): v is string => typeof v === "string" && v.trim() !== "")
+      ?.trim()
+      .toLowerCase() ?? "";
+  const flatVolumeEnvelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number] =
+    rawEventType === "feeding" ? "feeding" : "watering";
+  const hasVolumeLine = detailLines.some(
+    (line) => line.key === "watering.volume_ml" || line.key === "feeding.volume_ml",
+  );
+  if (!hasVolumeLine) {
+    for (const flatVolKey of [
+      "watering_amount_ml",
+      "wateringAmountMl",
+      "watering_amount",
+      "wateringAmount",
+      "volume_ml",
+    ] as const) {
+      if (!(flatVolKey in record)) continue;
+      const text = typedActivityScalar(flatVolKey, record[flatVolKey], tempUnit);
+      if (text) {
+        detailLines.push({
+          key: `${flatVolumeEnvelope}.volume_ml`,
+          label: typedVolumeLabel(flatVolumeEnvelope),
+          value: text,
+        });
+        break;
+      }
+    }
+  }
   const extra = Object.entries(record)
     .filter(
       ([k]) =>
         !HIDDEN_DIARY_DETAIL_KEYS.has(k) &&
         !QUICK_LOG_DETAIL_FIELD_KEYS.has(k) &&
-        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]),
+        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]) &&
+        k !== "watering_amount_ml" &&
+        k !== "wateringAmountMl" &&
+        k !== "watering_amount" &&
+        k !== "wateringAmount" &&
+        k !== "volume_ml",
     )
     .map(([k, v]) => {
       const text = plainDetailValue(v);

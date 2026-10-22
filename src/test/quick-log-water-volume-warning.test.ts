@@ -83,16 +83,16 @@ describe("large water amount warning", () => {
     expect(second.save).toBe(false);
   });
 
-  it("keeps the 1,000,000 ml hard limit and finite positive checks", () => {
+  it("keeps the 50,000 ml hard limit and finite positive checks", () => {
     const overHard = buildWateringFormPayload({
       ...baseInput,
-      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "1000001" },
+      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "50001" },
     });
-    expect(overHard).toEqual({ ok: false, reason: "volume_ml:invalid" });
+    expect(overHard).toEqual({ ok: false, reason: "volume_ml:too_large" });
 
     const atHard = buildWateringFormPayload({
       ...baseInput,
-      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "1000000" },
+      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "50000" },
     });
     expect(atHard.ok).toBe(true);
 

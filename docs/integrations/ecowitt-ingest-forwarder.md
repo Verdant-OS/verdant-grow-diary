@@ -73,18 +73,22 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   rejected (`invalid_dateutc`). Free-form upload strings such as `stationtype`
   are never shown.
 - A message without `PASSKEY` or `dateutc` (for example the runbook's
-  hand-made sanity POST) is rejected locally and never forwarded. A `dateutc`
-  that carries the PASSKEY is rejected too (`invalid_dateutc`), so the
-  credential value never reaches a summary string, and any 32-hex run inside a
-  logged string is redacted whether or not it stands alone.
+  hand-made sanity POST) is rejected locally and never forwarded. A valid
+  `dateutc` that contains the PASSKEY (a short or date-shaped key such as `-`)
+  is still forwarded unchanged; only the summary's copy is replaced with
+  `[redacted: contains PASSKEY]`, so the credential value never reaches a
+  summary string. Any 32-hex run inside a logged string is redacted whether or
+  not it stands alone.
 - The dry-run channel summary counts only the keys `ecowitt-ingest` routes:
   `temp{n}f` and `humidity{n}` for air, `soilmoisture{n}` for soil.
 - The live POST is sent with `redirect: "manual"`: a redirect from the
   validated URL is reported as `network_error` (`redirect_refused_<status>`)
   after the first attempt, never followed and never retried with the PASSKEY
-  and token.
+  and token. Its unread body is cancelled before the result is reported.
 - A message whose `PASSKEY` or `dateutc` is not a string is rejected locally
   (`invalid_passkey` / `invalid_dateutc`); nothing is coerced.
+  The HTTP bridge keeps `PASSKEY` as the exact string it received, so a
+  digits-only key such as `000012345678` arrives unchanged.
 - `--once` claims the first message before any await, so a second upload
   arriving while the first is in flight is ignored, never forwarded. Once that
   message is claimed, a broker error is logged and does not abort its POST;

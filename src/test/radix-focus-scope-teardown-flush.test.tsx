@@ -55,6 +55,18 @@ describe("shared test teardown and Radix FocusScope", () => {
     expect(received[0]).toBeInstanceOf(window.Event);
   });
 
+  // vi.isFakeTimers() is true for any fake-timer config, but with only Date
+  // faked FocusScope's setTimeout is still real and still has to be flushed.
+  it("still runs FocusScope's unmount timer when only Date is faked", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const onCloseAutoFocus = vi.fn();
+    renderOpenDialog(onCloseAutoFocus);
+
+    await teardownDomForTest();
+
+    expect(onCloseAutoFocus).toHaveBeenCalledTimes(1);
+  });
+
   it("does not wait on a timer that fake timers would never fire", async () => {
     vi.useFakeTimers();
     renderOpenDialog(vi.fn());

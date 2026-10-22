@@ -69,7 +69,12 @@ switch know only grow / tent / plant / cultivar.
    - Order is newest first (`occurred_at` / `entry_at`) with an `id` tie-break, bounded to
      **10** results in total.
    - Excluded: `grow_events` rows with `is_deleted` or `deleted_at` set, `diary_entries` rows
-     with `retracted_at` set, and entries in archived grows. `useGrows().grows` holds active
+     with `retracted_at` set, and entries in archived grows. A non-retracted diary companion
+     whose linked spine (by either link above) is deleted is excluded too: Timeline fetches a
+     referenced-but-missing parent, finds it gone, and drops the companion
+     (`src/pages/Timeline.tsx:907–915`, `resolveCompanion` in
+     `src/lib/timelineMergeRules.ts:368–382`), so neither the spine id nor the diary id would
+     open a visible entry. `useGrows().grows` holds active
      grows only (archived ones are partitioned out in `src/store/grows.tsx`) and
      `useScopedGrow` resolves `?growId=` against that list, so an archived-grow result could
      not open its Timeline.
@@ -207,7 +212,9 @@ The function must:
   manual companion at the same plant and instant as its spine, are each one result carrying
   the spine id; an exact `'(quick log)'` placeholder does not match query `"quick"` or
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
-  a deleted spine and a retracted entry are not returned. Option B: `verdant_search` is
+  a deleted spine and a retracted entry are not returned, and neither is a non-retracted
+  companion whose linked spine (`linked_grow_event_id` or legacy `grow_event_id`) is
+  deleted. Option B: `verdant_search` is
   unchanged, so a plant found by its `strain` is still returned.
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to

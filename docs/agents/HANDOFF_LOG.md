@@ -86,6 +86,26 @@ last_updated: 2026-10-16 18:19 UTC, by Codex
 limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Deferred ordering risk: cancellation updates acknowledge zero matched rows; stale subscription upserts have no occurred_at guard. No ordering/replay changes, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
 ```
 
+### FIX-2171-PLANT-CREATE-INSERT-ERROR
+
+```text
+TASK FIX-2171-PLANT-CREATE-INSERT-ERROR  priority: P2  status: OPEN
+goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the "not assessed" plants-list label; that is open PR #2140. Fixes #2171.
+branch: cursor/plant-create-insert-error-99b8
+base: verdant-grow-diary
+checkout: git fetch origin cursor/plant-create-insert-error-99b8 verdant-grow-diary && git switch cursor/plant-create-insert-error-99b8 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2192 (open, ready for review; not merged)
+head_sha: 71be93f03ec13e4ad9d8378a2c10f076f719dd52, remote observed 2026-10-19 17:32 UTC (close-out merges of deploy 722592527 and 26951e5ad plus the retry-clear fix 293005fb6). This files-list update follows it as its child; re-read the PR for the current exact head before resuming.
+state: review. Not merged, so this block stays OPEN; move it to Closed with the landing SHA when #2192 merges.
+next_action: Exact-head Codex review of PR #2192 at its current head, then independent review. No merge from this block.
+files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-failure-notice.test.ts; src/test/plant-create-insert-failure-notice.test.tsx; src/test/plant-create-retry-recovery-notice.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. The plants-list health label stays with #2140. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
+artifacts: PR #2192 body (RED/GREEN counts for the retry-clear fix); earlier toast-target fail-first 1 failed / 3 skipped before the notifications-region lookup, 10 passed / 0 failed after
+reviewer_seat: Blue Dream (CreatePlantDialog.tsx)
+claimed_by: Claude (close-out session), 2026-10-19 16:14 UTC (VER-216, Matthew 2026-10-19)
+last_updated: 2026-10-19 17:32 UTC, by Claude (close-out session)
+```
+
 ### QUICKLOG-EVENT-REQUEST-HASH-UTC
 
 ```text
@@ -236,6 +256,26 @@ last_updated: 2026-10-06 16:05 CT, by Claude
 ```
 
 ## Closed
+
+### QUICKLOG-CORRECTION-EDITABLE-VALUES
+
+```text
+TASK QUICKLOG-CORRECTION-EDITABLE-VALUES  priority: P2  status: CLOSED
+goal: Make the Correct this Quick Log dialog edit volume, dose, or sensor values for that entry type, and keep the original value in the correction history. Keep the Wrong value reason. Do not follow closed #2116.
+branch: cursor/quicklog-correction-editable-values-fc1d
+base: verdant-grow-diary
+checkout: none; merged. Start new work from origin/verdant-grow-diary.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118
+head_sha: e732a157d387d38d9ac76b71b1ed6208d9145744, the final head of #2118 (32 files).
+state: #2118 squash-merged through the merge queue from head e732a157 as 48b6134462bf3b2a04046c82af646fdfc1da5b8f. The merge queue created that commit at 2026-10-20 18:25:12 UTC (committer timestamp); it reached verdant-grow-diary and GitHub closed the PR as merged at 2026-10-20 18:55:50 UTC, after the queued #2272 group ahead of it passed on verdant-grow-diary (sole parent 0f9d1a5ce). Migration 20261014210000_quicklog_correction_editable_values.sql is NOT applied to production; applying it is Matthew's separate decision. NOT deployed: live /version.json still reports c0ce65cb. Production acceptance NOT_MEASURED.
+next_action: CLOSED for the repository change. Production migration apply and publish only on Matthew's separate explicit yes; then signed-in verification on the disposable QA account.
+files: .github/workflows/ci.yml; docs/agents/HANDOFF_LOG.md; scripts/assert-required-core-migrations-applied.mjs; scripts/prove-quicklog-correction-measured-values.mjs; scripts/prove-quicklog-correction-owner-fence.mjs; src/components/FeedingHistoryPanel.tsx; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/WateringHistoryPanel.tsx; src/lib/quick-log/quickLogRevisionRules.ts; src/pages/Timeline.tsx; src/test/ci-pr-concurrency.test.ts; src/test/quicklog-correction-copilot-followup.test.tsx; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-environment-check-envelope.test.ts; src/test/quicklog-correction-environment-link-match.test.ts; src/test/quicklog-correction-fast-check-companion.test.ts; src/test/quicklog-correction-quick-log-envelope-sensor.test.ts; src/test/quicklog-correction-unresolved-linked-root.test.ts; src/test/quicklog-correction-watering-volume-cap.test.tsx; src/test/quicklog-feeding-correction-volume-context.test.ts; src/test/quicklog-feeding-correction-volume.test.tsx; src/test/quicklog-grouped-feeding-correction.test.tsx; src/test/quicklog-watering-sensor-correction.test.tsx; src/test/quicklog-watering-tied-sibling-correction.test.ts; src/test/timeline-correction-sensor-wiring.test.tsx; src/test/timeline-first-page-linked-roots.test.tsx; src/test/timeline-load-older-sensor-siblings.test.tsx; src/test/timeline-supplemental-root-sensor-siblings.test.tsx; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql
+blockers: none for the merged change. Production migration apply and publish not approved.
+artifacts: PR #2118 body (unlock receipts); merge commit 48b6134462bf3b2a04046c82af646fdfc1da5b8f
+reviewer_seat: Codex exact-head review. Matthew decided on 2026-10-20 (~18:33 UTC, VER-216) that a clean Codex review replaces the Graft half of the Oct 15 12:38 PM CT receipt condition.
+claimed_by: claude, 2026-10-20 18:40 UTC
+last_updated: 2026-10-20 19:04 UTC, by Claude (VER-216 close-out; block closed after merge, follow-up to Codex r4328730607)
+```
 
 ### FIX-2033-LOCKFILE-POLICY-INNGEST
 

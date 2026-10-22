@@ -20,6 +20,7 @@
  *     via the returned state, never silently retried into automation.
  */
 import { useEffect, useRef, useState } from "react";
+import { resolveAlertContextRefresh } from "@/lib/alertContextRefreshRules";
 import type { SensorSnapshot, SensorSnapshotMetricRefKey } from "@/lib/sensorSnapshot";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
@@ -30,7 +31,7 @@ import {
   selectPersistableAlerts,
   snapshotPersistenceBlockReason,
 } from "@/lib/environmentAlertPersistence";
-import { listAlerts, saveAlert, logAlertEvent } from "@/lib/alerts";
+import { listAlerts, saveAlert, logAlertEvent, updateOpenAlertContext } from "@/lib/alerts";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 import { buildDiaryEntryEvidenceRefs } from "@/lib/diaryEntryEvidenceRefRules";
 import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEventRules";
@@ -61,6 +62,12 @@ export interface PersistEnvironmentAlertsInput {
   /** Default false. Setting false short-circuits the hook entirely. */
   enabled?: boolean;
   /**
+   * True while the grow-targets read is still loading or unavailable so the
+   * persistence hook does not evaluate against a false `missing_targets`
+   * fallback before real targets arrive.
+   */
+  targetsPending?: boolean;
+  /**
    * Plant/grow/tent stage. When provided, VPD alerts are evaluated against
    * stage-aware bands instead of the legacy generic 0.6–1.6 kPa default.
    */
@@ -68,6 +75,46 @@ export interface PersistEnvironmentAlertsInput {
 }
 
 const SOURCE = "environment_alerts";
+
+// Shared across mounted hook instances within the same active view,
+// keyed with snapshot capture time so concurrent evaluations of the same
+// snapshot observation never duplicate an alert or its CREATED audit event
+// before `listAlerts` reflects the new open row. Reservations stay held
+// while any write is still in flight, even if the last hook instance
+// unmounts mid-write, and clear only once both mounted instances and
+// active writes reach zero.
+let mountedPersistHookCount = 0;
+let activePersistWriteCount = 0;
+const globalInFlightSnapshotKeys = new Set<string>();
+const globalCreatedEventLoggedKeys = new Set<string>();
+// Mounted instances that skipped a candidate because another write held its
+// snapshot reservation. A failed write releases the reservation and notifies
+// them once so they retry; a successful write notifies no one (no duplicate).
+const reservationReleaseListeners = new Set<(snapKey: string) => void>();
+
+function maybeClearGlobalSnapshotReservations(): void {
+  if (mountedPersistHookCount <= 0 && activePersistWriteCount <= 0) {
+    mountedPersistHookCount = 0;
+    activePersistWriteCount = 0;
+    globalInFlightSnapshotKeys.clear();
+    globalCreatedEventLoggedKeys.clear();
+  }
+}
+
+function thresholdDirectionKey(
+  growId: string | null,
+  tentId: string | null,
+  source: string,
+  metric: string | null | undefined,
+  title: string | null | undefined,
+): string | null {
+  const m = (metric ?? "").toString().trim().toLowerCase();
+  const t = (title ?? "").toString().trim().toLowerCase();
+  if (!m || !t) return null;
+  const match = t.match(/\b(above|below)\s+(target|stage range|default range)\b/);
+  if (!match) return null;
+  return `${growId ?? ""}::${tentId ?? ""}::${source.trim().toLowerCase()}::${m}::${match[1]}`;
+}
 
 /**
  * Resolve originating timeline refs for a derived alert.
@@ -123,8 +170,13 @@ export function usePersistEnvironmentAlerts(
   // Bumped once when a future-dated observation reaches its eligibility
   // boundary, so the gate below is asked again with nothing else changed.
   const [eligibilityWake, setEligibilityWake] = useState(0);
+  // Bumped when a write this instance deferred to fails and frees its key.
+  const [reservationWake, setReservationWake] = useState(0);
 
   // Stable deps — recompute on snapshot ts / quality / targets identity.
+  // Configured bounds are part of the targets key: persisted reasons quote
+  // the configured range, so an edit that leaves a metric's low/high state
+  // unchanged must still re-run the effect and refresh the open alert.
   const tsKey = input.snapshot?.ts ?? "";
   const sourceKey = input.snapshot?.source ?? "unavailable";
   const diaryRefKey = input.snapshot?.diary_evidence_ref?.id ?? "";
@@ -132,11 +184,12 @@ export function usePersistEnvironmentAlerts(
   const targetsKey =
     input.targets?.status === "out_of_range"
       ? input.targets.metrics
-          .map((m) => `${m.metric}:${m.state}`)
+          .map((m) => `${m.metric}:${m.state}:${m.min ?? ""}:${m.max ?? ""}`)
           .sort()
           .join("|")
       : (input.targets?.status ?? "missing_targets");
   const enabled = input.enabled !== false;
+  const targetsPending = input.targetsPending === true;
   const growId = input.growId ?? null;
   const isDemoData = input.isDemoData === true;
   // Part of the dedupe key, so a tent change must re-run the effect.
@@ -145,17 +198,32 @@ export function usePersistEnvironmentAlerts(
   const stageKey = stageProvided ? (input.stage ?? "__unknown__") : "__legacy__";
 
   useEffect(() => {
-    if (!enabled || !growId) {
+    mountedPersistHookCount += 1;
+    return () => {
+      mountedPersistHookCount -= 1;
+      maybeClearGlobalSnapshotReservations();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || targetsPending || !growId) {
       setState({ status: "skipped", persistedCount: 0, lastError: null });
       return;
     }
 
+    const pendingSnapshotKeys = new Set<string>();
     let cancelled = false;
     let wakeId: number | null = null;
     const activeKeys = inFlightKeys.current;
     // Reservations belong to this read until its request actually starts.
     // Release unstarted work on cleanup so a newer confirmed read can proceed.
     const pendingKeys = new Set<string>();
+    // Snapshot keys this run skipped because another write held them.
+    const blockedSnapshotKeys = new Set<string>();
+    const onReservationReleased = (snapKey: string) => {
+      if (!cancelled && blockedSnapshotKeys.has(snapKey)) setReservationWake((n) => n + 1);
+    };
+    reservationReleaseListeners.add(onReservationReleased);
 
     (async () => {
       // One decision clock per run. The gate below and the wake computed from
@@ -173,6 +241,7 @@ export function usePersistEnvironmentAlerts(
         snapshot: input.snapshot,
         quality: input.quality,
         targets: input.targets,
+        includeConfiguredRangeInTargetBreachReason: true,
         ...(stageProvided ? { stage: input.stage ?? null } : {}),
       });
 
@@ -212,17 +281,21 @@ export function usePersistEnvironmentAlerts(
       // 3. Load currently-open alerts for this grow and dedupe by rule key,
       //    scoped to the tent the breach was observed in.
       let openRows: {
+        id: string;
         metric: string | null;
         source: string | null;
         title: string;
+        reason: string;
         tent: string | null;
       }[] = [];
       try {
         const rows = await listAlerts({ growId, status: "open" });
         openRows = rows.map((r) => ({
+          id: typeof r.id === "string" ? r.id : "",
           metric: r.metric ?? null,
           source: r.source ?? null,
           title: r.title,
+          reason: r.reason ?? "",
           tent: r.tent_id ?? null,
         }));
       } catch (err) {
@@ -280,14 +353,79 @@ export function usePersistEnvironmentAlerts(
         ),
       );
 
+      const existingDirections = new Set<string>();
+      const openRowByDirection = new Map<string, (typeof openRows)[number]>();
+      for (const r of openRows) {
+        const dirKey = thresholdDirectionKey(growId, r.tent, r.source ?? SOURCE, r.metric, r.title);
+        if (dirKey) {
+          existingDirections.add(dirKey);
+          if (!openRowByDirection.has(dirKey)) openRowByDirection.set(dirKey, r);
+        }
+      }
+      // A configured-target candidate blocked by an open stage/default-range
+      // row, or by an open configured-target row quoting an edited range, in
+      // the same direction refreshes that row's wording instead of inserting
+      // a second alert (the #2179 one-per-direction guard stays).
+      const contextRefreshes: {
+        id: string;
+        title: string;
+        reason: string;
+        refs: OriginatingTimelineEventRef[];
+      }[] = [];
+
       const toInsert = persistable.filter((a) => {
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
-        if (existing.has(key)) return false;
+        const snapKey = `${key}::${tsKey}`;
+        const dirKey = thresholdDirectionKey(
+          growId,
+          observedTentId,
+          SOURCE,
+          typeof a.metric === "string" ? a.metric : null,
+          a.title,
+        );
+        // Checked even when the exact rule key is already open: a target edit
+        // keeps the same title, so only the reason (its range) differs.
+        if (dirKey !== null) {
+          const openRow = openRowByDirection.get(dirKey);
+          const refresh = openRow ? resolveAlertContextRefresh(openRow, a) : null;
+          // The refreshed reason quotes this candidate's observation, so it
+          // carries this candidate's evidence refs; without refs it is skipped.
+          const refs = refresh ? resolveEnvironmentAlertEvidenceRefs(a, input.snapshot) : [];
+          if (
+            openRow?.id &&
+            refresh &&
+            refs.length > 0 &&
+            !contextRefreshes.some((c) => c.id === openRow.id)
+          ) {
+            contextRefreshes.push({ id: openRow.id, ...refresh, refs });
+          }
+        }
+        if (existing.has(key) || (dirKey !== null && existingDirections.has(dirKey))) return false;
         if (activeKeys.has(key)) return false;
+        if (globalInFlightSnapshotKeys.has(snapKey)) {
+          blockedSnapshotKeys.add(snapKey);
+          return false;
+        }
         activeKeys.add(key);
         pendingKeys.add(key);
+        globalInFlightSnapshotKeys.add(snapKey);
+        pendingSnapshotKeys.add(snapKey);
+        if (dirKey) existingDirections.add(dirKey);
         return true;
       });
+
+      for (const refresh of contextRefreshes) {
+        if (cancelled) return;
+        try {
+          await updateOpenAlertContext(refresh.id, {
+            title: refresh.title,
+            reason: refresh.reason,
+            originating_timeline_events: refresh.refs,
+          });
+        } catch {
+          // Best effort: the open alert stays as it was; the next run retries.
+        }
+      }
 
       if (toInsert.length === 0) {
         if (!cancelled) {
@@ -306,7 +444,10 @@ export function usePersistEnvironmentAlerts(
       for (const a of toInsert) {
         if (cancelled) return;
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
+        const snapKey = `${key}::${tsKey}`;
         pendingKeys.delete(key);
+        pendingSnapshotKeys.delete(snapKey);
+        activePersistWriteCount += 1;
         try {
           // Explicit refs only: metric_refs (sensor_readings) first, then
           // diary_evidence_ref (Environment Check diary row). Never
@@ -322,21 +463,31 @@ export function usePersistEnvironmentAlerts(
             source: SOURCE,
             originating_timeline_events: refs,
           });
-          try {
-            await logAlertEvent({
-              alert_id: saved.id,
-              grow_id: growId,
-              event_type: "created",
-              new_status: "open",
-            });
-          } catch (logErr) {
-            lastError = `audit log failed: ${(logErr as Error).message}`;
+          const logDedupKey = `${saved?.id ?? ""}::${snapKey}`;
+          if (!globalCreatedEventLoggedKeys.has(logDedupKey)) {
+            globalCreatedEventLoggedKeys.add(logDedupKey);
+            try {
+              await logAlertEvent({
+                alert_id: saved.id,
+                grow_id: growId,
+                event_type: "created",
+                new_status: "open",
+              });
+            } catch (logErr) {
+              globalCreatedEventLoggedKeys.delete(logDedupKey);
+              lastError = `audit log failed: ${(logErr as Error).message}`;
+            }
           }
           persistedCount += 1;
         } catch (err) {
           // Release the in-flight guard so a later real attempt can retry.
           activeKeys.delete(key);
+          globalInFlightSnapshotKeys.delete(snapKey);
+          for (const notify of [...reservationReleaseListeners]) notify(snapKey);
           lastError = (err as Error).message ?? "insert failed";
+        } finally {
+          activePersistWriteCount -= 1;
+          maybeClearGlobalSnapshotReservations();
         }
       }
 
@@ -351,13 +502,17 @@ export function usePersistEnvironmentAlerts(
 
     return () => {
       cancelled = true;
+      reservationReleaseListeners.delete(onReservationReleased);
       if (wakeId !== null) window.clearTimeout(wakeId);
       for (const key of pendingKeys) activeKeys.delete(key);
       pendingKeys.clear();
+      for (const snapKey of pendingSnapshotKeys) globalInFlightSnapshotKeys.delete(snapKey);
+      pendingSnapshotKeys.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     enabled,
+    targetsPending,
     growId,
     tsKey,
     sourceKey,
@@ -369,6 +524,7 @@ export function usePersistEnvironmentAlerts(
     stageProvided,
     tentKey,
     eligibilityWake,
+    reservationWake,
   ]);
 
   return state;

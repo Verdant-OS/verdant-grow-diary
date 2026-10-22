@@ -29,6 +29,7 @@ import {
 } from "@/lib/growDiaryPdfExport";
 import {
   buildQuickLogEntryHandleIndex,
+  correctionValuePropsFromDiaryDetails,
   handleRootId,
   type QuickLogEntryHandleRef,
 } from "@/lib/quick-log/quickLogRevisionRules";
@@ -78,11 +79,74 @@ function fmtDate(iso: string | null, fallback: string): string {
   }
 }
 
+function asObjectRecord(v: unknown): Record<string, unknown> | null {
+  return v != null && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
+function liftNestedTypedActivityFields(details: Record<string, unknown>): Record<string, unknown> {
+  const wObj = asObjectRecord(details.watering);
+  const fObj = asObjectRecord(details.feeding);
+  if (!wObj && !fObj) return details;
+  let next: Record<string, unknown> | null = null;
+  const ensureNext = () => {
+    if (!next) next = { ...details };
+    return next;
+  };
+  const vol = wObj?.volume_ml ?? fObj?.volume_ml ?? details.volume_ml;
+  if (
+    vol != null &&
+    details.watering_amount_ml == null &&
+    details.wateringAmountMl == null &&
+    details.watering_amount == null &&
+    details.wateringAmount == null
+  ) {
+    ensureNext().watering_amount_ml = vol;
+  }
+  const ph = wObj?.ph ?? fObj?.ph;
+  if (ph != null && details.ph == null && details.pH == null) {
+    ensureNext().ph = ph;
+  }
+  const ec = wObj?.ec_ms_cm ?? fObj?.ec_in ?? fObj?.ec_ms_cm;
+  if (ec != null && details.ec == null && details.EC == null) {
+    ensureNext().ec = ec;
+  }
+  const runoffPh = wObj?.runoff_ph ?? fObj?.runoff_ph;
+  if (runoffPh != null && details.runoff_ph == null && details.runoffPh == null) {
+    ensureNext().runoff_ph = runoffPh;
+  }
+  const runoffEc = wObj?.runoff_ec ?? fObj?.runoff_ec;
+  if (runoffEc != null && details.runoff_ec == null && details.runoffEc == null) {
+    ensureNext().runoff_ec = runoffEc;
+  }
+  const runoffMl = wObj?.runoff_ml ?? fObj?.runoff_ml;
+  if (runoffMl != null && details.runoff_ml == null && details.runoffMl == null) {
+    ensureNext().runoff_ml = runoffMl;
+  }
+  const waterTempC = wObj?.water_temp_c ?? fObj?.water_temp_c;
+  if (waterTempC != null && details.water_temp_c == null && details.waterTempC == null) {
+    ensureNext().water_temp_c = waterTempC;
+  }
+  const products = fObj?.products ?? fObj?.nutrients;
+  if (products != null && details.nutrients == null) {
+    ensureNext().nutrients = products;
+  }
+  return next ?? details;
+}
+
 function liftEntries(rawEntries: NormalizeDiaryInput["rawEntries"]) {
   return (rawEntries ?? []).map((raw) => {
     const r = (raw ?? {}) as Record<string, unknown>;
     const effectiveCareType = resolveEffectiveQuickLogCareType(r);
-    return effectiveCareType ? { ...r, entry_type: effectiveCareType } : r;
+    const detailsObj = asObjectRecord(r.details);
+    const liftedDetails = detailsObj ? liftNestedTypedActivityFields(detailsObj) : r.details;
+    if (!effectiveCareType && liftedDetails === r.details) return r;
+    return {
+      ...r,
+      ...(effectiveCareType ? { entry_type: effectiveCareType } : {}),
+      ...(liftedDetails !== r.details ? { details: liftedDetails } : {}),
+    };
   });
 }
 
@@ -169,11 +233,15 @@ export function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
 function Row({
   row,
   integrityHandle,
+  correctionValues,
+  environmentCheckDetails,
   correctionCount,
   onEntryChanged,
 }: {
   row: QuickLogHistoryRow;
   integrityHandle?: QuickLogEntryHandleRef | null;
+  correctionValues?: ReturnType<typeof correctionValuePropsFromDiaryDetails>;
+  environmentCheckDetails?: unknown;
   correctionCount?: number;
   onEntryChanged?: () => void;
 }) {
@@ -195,6 +263,7 @@ function Row({
           >
             <Icon className="h-3 w-3" />
             {et.label}
+            {row.summarySuffix ? ` · ${row.summarySuffix}` : ""}
           </span>
           <span className="text-foreground/90 font-medium">
             {fmtDate(row.occurredAt, row.occurredAtLabel)}
@@ -209,6 +278,8 @@ function Row({
             currentPlantId={row.plantId}
             plantId={row.plantId}
             tentId={row.tentId}
+            correctionValues={correctionValues ?? null}
+            environmentCheckDetails={environmentCheckDetails}
             onChanged={onEntryChanged}
           />
         )}
@@ -340,11 +411,20 @@ function QuickLogHistorySection({
           {rows.map((r) => {
             const handle = handleIndex.get(r.id) ?? null;
             const badge = handle ? badges.get(handleRootId(handle)) : undefined;
+            const raw = (rawEntries ?? []).find(
+              (entry) =>
+                !!entry &&
+                typeof entry === "object" &&
+                "id" in entry &&
+                (entry as { id?: unknown }).id === r.id,
+            ) as { details?: unknown } | undefined;
             return (
               <Row
                 key={r.id}
                 row={r}
                 integrityHandle={handle}
+                correctionValues={correctionValuePropsFromDiaryDetails(raw?.details)}
+                environmentCheckDetails={raw?.details}
                 // Edited chrome only after a successful resolve (status === "ok").
                 // pending and unavailable must not look like confident edits/no-edits.
                 correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}

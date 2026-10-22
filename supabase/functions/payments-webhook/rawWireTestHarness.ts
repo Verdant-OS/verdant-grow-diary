@@ -230,6 +230,7 @@ export function harness() {
       timestamp?: number;
       environment?: string;
       signature?: string;
+      method?: string;
     } = {},
   ) {
     const body = options.body ?? JSON.stringify(payload, null, 2);
@@ -237,13 +238,17 @@ export function harness() {
     const digest = createHmac("sha256", options.secret ?? SECRET)
       .update(`${timestamp}:${options.signedBody ?? body}`)
       .digest("hex");
+    const method = options.method ?? "POST";
     const response = await handler(
       new Request(
         `https://fixture.invalid/payments-webhook?env=${options.environment ?? "sandbox"}`,
         {
-          method: "POST",
-          body,
-          headers: { "paddle-signature": options.signature ?? `ts=${timestamp};h1=${digest}` },
+          method,
+          body: method === "POST" ? body : undefined,
+          headers:
+            method === "POST"
+              ? { "paddle-signature": options.signature ?? `ts=${timestamp};h1=${digest}` }
+              : {},
         },
       ),
     );

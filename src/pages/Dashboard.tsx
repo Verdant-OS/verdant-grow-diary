@@ -60,6 +60,15 @@ import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRul
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import {
+  mergeVpdStabilityInputs,
+  quickLogManualsForTent,
+  QUICK_LOG_MANUAL_HISTORY_COPY,
+  resolveManualHistoryReadState,
+  vpdStabilityInputsFromWideReadings,
+} from "@/lib/vpdStabilityInputRules";
+import QuickLogManualHistoryNotice from "@/components/QuickLogManualHistoryNotice";
 import { useNowTick } from "@/hooks/useNowTick";
 import { describeCurrentStateStaleWindow } from "@/lib/sensorTruthCanon";
 import { isUuid } from "@/lib/isUuid";
@@ -113,7 +122,6 @@ import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import AlertReasonText from "@/components/AlertReasonText";
-import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { mergeDashboardChartReadingsWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 
 import { Button } from "@/components/ui/button";
@@ -157,6 +165,7 @@ import {
   buildTonightTentMetrics,
   resolveTonightTentSelection,
 } from "@/lib/tonightTentHomeViewModel";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Renders the grower's overview for a valid URL-selected grow or the full account.
@@ -203,6 +212,12 @@ export default function Dashboard() {
   // absence is established (same guard as the Tents list).
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
   const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
+  // Every tent's strip grade uses this same multi-tent manual read (per-tent
+  // windows). A pending or failed read is disclosed beside the stored
+  // readings, never read as "no manual history".
+  const stripManuals = chartQuickLogManualQuery;
+  const stripManualsReadState =
+    tentIds.length > 0 ? resolveManualHistoryReadState(stripManuals) : "ready";
   const quickLogManualsIncomplete =
     chartQuickLogManualQuery.isPending ||
     chartQuickLogManualQuery.isError ||
@@ -274,7 +289,8 @@ export default function Dashboard() {
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
-  const targetsState = useGrowTargets(scopedGrowId ?? null);
+  const targetsState = useGrowTargets(scopedGrowId ?? null, { retryOnUnavailable: true });
+  const targetsPending = targetsState.status !== "ok";
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);
   const currentSensorSnapshot = snapshotReadState.confirmedSnapshot;
@@ -406,6 +422,7 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
+    targetsPending,
     // Gated on current tent and plant reads; see stageReadsCurrentForWrite.
     enabled: !!scopedGrowId && stageReadsCurrentForWrite,
     stage: alertContextStage,
@@ -431,6 +448,10 @@ export default function Dashboard() {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
+    const stabilityReadings = mergeVpdStabilityInputs(
+      rs,
+      vpdStabilityInputsFromWideReadings(quickLogManualsForTent(stripManuals.data, t.id)),
+    );
     const envStage = resolveTentEnvironmentStage({
       tentId: t.id,
       tentGrowId: t.growId ?? null,
@@ -443,7 +464,7 @@ export default function Dashboard() {
       }),
       plants: plantsForStage,
     });
-    const stability = computeEnvironmentStability(rs, { stage: envStage });
+    const stability = computeEnvironmentStability(stabilityReadings, { stage: envStage });
     return {
       tent: t,
       envStage,
@@ -531,7 +552,7 @@ export default function Dashboard() {
   // Non-landmark container: AppShell already owns the <main> landmark around
   // the route Outlet, so the page root must not nest another.
   return (
-    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+    <div className="min-w-0 max-w-full space-y-4 md:space-y-6" data-testid="dashboard-root">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -932,6 +953,14 @@ export default function Dashboard() {
                         })()}
                       </div>
 
+                      <QuickLogManualHistoryNotice
+                        state={stripManualsReadState}
+                        onRetry={() => {
+                          void stripManuals.refetch();
+                        }}
+                        testIdPrefix="dashboard-manual-history"
+                        className="mb-2"
+                      />
                       <div className="space-y-2.5">
                         {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
@@ -958,9 +987,16 @@ export default function Dashboard() {
                                     ? "sensor refresh unavailable, last loaded readings shown"
                                     : "sensor refresh unavailable, no last loaded readings"
                                   : null;
+                          const manualHistoryLabel =
+                            !isUuid(tent.id) || stripManualsReadState === "ready"
+                              ? null
+                              : stripManualsReadState === "unavailable"
+                                ? QUICK_LOG_MANUAL_HISTORY_COPY.ariaUnavailable
+                                : QUICK_LOG_MANUAL_HISTORY_COPY.ariaPending;
                           const ariaParts = [
                             tent.name,
                             sensorReadStatusLabel,
+                            manualHistoryLabel,
                             snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
                             snapView.hasReading
                               ? `last updated ${snapView.lastUpdatedDisplay}`
@@ -1846,9 +1882,9 @@ export default function Dashboard() {
           >
             Recent activity
           </h2>
-          <div className="grid lg:grid-cols-2 gap-4 mt-2">
-            <section className="glass rounded-2xl p-4" aria-label="Recent activity">
-              <div className="flex items-center justify-between mb-3">
+          <div className="grid min-w-0 lg:grid-cols-2 gap-4 mt-2">
+            <section className="min-w-0 glass rounded-2xl p-4" aria-label="Recent activity">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="font-display font-semibold">Recent Activity</h2>
                 <Link
                   to={timelinePath(scopedGrowId)}
@@ -1883,7 +1919,7 @@ export default function Dashboard() {
                         <Badge variant="outline" className="text-[10px] uppercase">
                           {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
                         </Badge>
-                        <span className="text-xs truncate">{item.title}</span>
+                        <span className="min-w-0 text-xs truncate">{item.title}</span>
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(item.ts), {
                             addSuffix: true,
@@ -1905,7 +1941,7 @@ export default function Dashboard() {
             </section>
 
             <section
-              className="glass rounded-2xl p-4"
+              className="min-w-0 glass rounded-2xl p-4"
               aria-label="Pending actions"
               data-testid="dashboard-approval-queue-section"
             >
@@ -1962,7 +1998,7 @@ export default function Dashboard() {
                           <Badge variant="outline" className="text-[10px] uppercase">
                             {a.risk_level} risk
                           </Badge>
-                          <span className="text-xs font-medium truncate">
+                          <span className="min-w-0 text-xs font-medium truncate">
                             {sanitizeActionCopy(a.suggested_change)}
                           </span>
                           <span className="ml-auto text-xs text-muted-foreground">
@@ -2000,7 +2036,9 @@ export default function Dashboard() {
                         </div>
                         {a.reason && (
                           <p className="text-xs mt-2 italic text-muted-foreground">
-                            {sanitizeActionCopy(stripBackPointerTokens(a.reason))}
+                            {localizeReadingAtTimestamps(
+                              sanitizeActionCopy(stripBackPointerTokens(a.reason)),
+                            )}
                           </p>
                         )}
                         <div className="mt-2 flex items-center gap-2 flex-wrap">

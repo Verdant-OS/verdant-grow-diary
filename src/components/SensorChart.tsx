@@ -88,6 +88,9 @@ export default function SensorChart({
     [exportData, filteredData, range],
   );
 
+  // A timestamp without a finite value for this metric stays in the data as a
+  // null point, so the line breaks there instead of bridging a period with
+  // no measurement. The legend counts only the finite plotted points.
   const chartData = useMemo(() => {
     return filteredData.map((r) => {
       const raw = r[metric as keyof SensorReading] as number | null | undefined;
@@ -95,9 +98,13 @@ export default function SensorChart({
         metric === "temp" && typeof raw === "number"
           ? convertCelsiusForDisplay(raw, temperatureUnit)
           : raw;
-      return { ts: r.ts, value: v };
+      return { ts: r.ts, value: typeof v === "number" && Number.isFinite(v) ? v : null };
     });
   }, [filteredData, metric, temperatureUnit]);
+  const plottedPointCount = useMemo(
+    () => chartData.filter((point) => point.value !== null).length,
+    [chartData],
+  );
 
   const handleExport = () => {
     if (exportDisabled) return;
@@ -121,9 +128,9 @@ export default function SensorChart({
   >;
   const id = `grad-${metric}`;
   return (
-    <div className="w-full">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <div className="w-full min-w-0 overflow-hidden">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span
             data-testid="sensor-chart-legend"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -133,7 +140,7 @@ export default function SensorChart({
               className="inline-block h-2 w-2 rounded-full"
               style={{ background: axisMeta.color }}
             />
-            {legendLabel}
+            {legendLabel} · {plottedPointCount} {plottedPointCount === 1 ? "point" : "points"}
           </span>
           {!hideExportButton && (
             <button
@@ -159,7 +166,7 @@ export default function SensorChart({
             role="radiogroup"
             aria-label="Chart time range"
             data-testid="sensor-chart-range-selector"
-            className="flex gap-1"
+            className="flex flex-wrap gap-1"
           >
             {SENSOR_CHART_TIME_RANGES.map((r) => {
               const selected = r.value === range;

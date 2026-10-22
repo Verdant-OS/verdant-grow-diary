@@ -7,7 +7,16 @@
  * PASSKEY / MAC / token into logs or reports.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { EventEmitter } from "node:events";
+import { Duplex } from "node:stream";
 import {
+  GUARD_MALFORMED_PACKET,
+  GUARD_PACKET_TOO_LARGE,
+  MAX_INBOUND_PACKET_BYTES,
+  PRODUCTION_DEPS,
+  connectMqtt,
+  createInboundPacketScanner,
+  guardInboundStream,
   APPROVED_INGEST_URLS,
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
@@ -1432,5 +1441,268 @@ describe("main wiring (Codex P2 at acab6b12, bae4ae77)", () => {
       log.mockRestore();
       setConfiguredSecrets([]);
     }
+  });
+});
+
+// --- Inbound packet guard (Codex P2 on #2335; Matthew's scope at 11:37 UTC) ---
+
+function memorySocket() {
+  const written: Buffer[] = [];
+  const socket = new Duplex({
+    read() {},
+    write(chunk, _encoding, callback) {
+      written.push(Buffer.from(chunk));
+      callback();
+    },
+  });
+  return { socket, written };
+}
+
+function remainingLength(n: number): number[] {
+  const out: number[] = [];
+  do {
+    let byte = n % 128;
+    n = Math.floor(n / 128);
+    if (n > 0) byte |= 0x80;
+    out.push(byte);
+  } while (n > 0);
+  return out;
+}
+
+/** One MQTT packet: type byte, remaining length, `bodyBytes` of body. */
+function mqttPacket(type: number, bodyBytes: number): Buffer {
+  return Buffer.concat([
+    Buffer.from([type, ...remainingLength(bodyBytes)]),
+    Buffer.alloc(bodyBytes, 0x61),
+  ]);
+}
+
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+/** Feeds `chunks` through a guarded in-memory socket, as the broker would. */
+async function throughGuard(chunks: Buffer[], maxPacketBytes?: number, endAfter = true) {
+  const { socket, written } = memorySocket();
+  const guarded = guardInboundStream(socket, maxPacketBytes);
+  const received: Buffer[] = [];
+  let error = null as (Error & { code?: unknown }) | null;
+  let ended = false;
+  guarded.on("data", (c: Buffer) => received.push(c));
+  guarded.on("error", (e) => (error = e));
+  guarded.on("end", () => (ended = true));
+  for (const chunk of chunks) {
+    socket.push(chunk);
+    await tick();
+  }
+  if (endAfter) socket.push(null);
+  for (let i = 0; i < 5; i++) await tick();
+  return { socket, guarded, written, received: Buffer.concat(received), error, ended };
+}
+
+describe("inbound packet guard — real stream path, in-memory duplex", () => {
+  it("passes legitimate traffic byte-exact, even one byte per chunk", async () => {
+    const traffic = Buffer.concat([
+      Buffer.from([0x20, 0x02, 0x00, 0x00]), // CONNACK
+      Buffer.from([0x90, 0x03, 0x00, 0x01, 0x00]), // SUBACK
+      mqttPacket(0x30, 300), // PUBLISH, two-byte remaining length
+      Buffer.from([0xd0, 0x00]), // PINGRESP, zero-length body
+    ]);
+    const chunks = [...traffic].map((b) => Buffer.from([b]));
+    const r = await throughGuard(chunks);
+    expect(r.error).toBeNull();
+    expect(r.ended).toBe(true);
+    expect(r.received.equals(traffic)).toBe(true);
+  });
+
+  it("passes several whole frames in one chunk", async () => {
+    const chunk = Buffer.concat([mqttPacket(0x30, 10), mqttPacket(0x30, 0), mqttPacket(0x30, 200)]);
+    const r = await throughGuard([chunk]);
+    expect(r.error).toBeNull();
+    expect(r.received.equals(chunk)).toBe(true);
+  });
+
+  it("passes a packet of exactly the limit with its body fragmented", async () => {
+    const packet = mqttPacket(0x30, 100 - 2); // 1 type + 1 length + 98 body = 100
+    const r = await throughGuard(
+      [packet.subarray(0, 2), packet.subarray(2, 40), packet.subarray(40)],
+      100,
+    );
+    expect(r.error).toBeNull();
+    expect(r.received.equals(packet)).toBe(true);
+  });
+
+  it("refuses a packet one byte over the limit before any of its body is read", async () => {
+    const packet = mqttPacket(0x30, 100 - 1); // declares 101
+    const r = await throughGuard([packet.subarray(0, 2), packet.subarray(2)], 100, false);
+    expect(r.error?.code).toBe(GUARD_PACKET_TOO_LARGE);
+    expect(r.received.length).toBe(0);
+    expect(r.socket.destroyed).toBe(true);
+  });
+
+  it("refuses an oversized declaration split across chunks, at the last length byte", async () => {
+    // 0x80 0x80 0x80 0x08 = 8 * 128^3 = 16 MiB declared.
+    const r = await throughGuard(
+      [Buffer.from([0x30, 0x80]), Buffer.from([0x80]), Buffer.from([0x80, 0x08])],
+      undefined,
+      false,
+    );
+    expect(r.error?.code).toBe(GUARD_PACKET_TOO_LARGE);
+    // Only the two header fragments before the deciding byte reached the parser.
+    expect(r.received.equals(Buffer.from([0x30, 0x80, 0x80]))).toBe(true);
+  });
+
+  it("uses MAX_INBOUND_PACKET_BYTES by default and refuses the first byte past it", async () => {
+    const atLimit = Buffer.from([0x30, ...remainingLength(MAX_INBOUND_PACKET_BYTES - 4)]);
+    expect(atLimit.length).toBe(4); // 1 type + 3 length bytes
+    const ok = await throughGuard([atLimit], undefined, false);
+    expect(ok.error).toBeNull();
+    const over = Buffer.from([0x30, ...remainingLength(MAX_INBOUND_PACKET_BYTES - 3)]);
+    const bad = await throughGuard([over], undefined, false);
+    expect(bad.error?.code).toBe(GUARD_PACKET_TOO_LARGE);
+  });
+
+  it("refuses a whole chunk when a valid frame is followed by an oversized one", async () => {
+    const first = mqttPacket(0x30, 10);
+    const chunk = Buffer.concat([mqttPacket(0x30, 5), Buffer.from([0x30, 0xff, 0xff, 0x7f])]);
+    const r = await throughGuard([first, chunk], undefined, false);
+    expect(r.error?.code).toBe(GUARD_PACKET_TOO_LARGE);
+    expect(r.received.equals(first)).toBe(true);
+  });
+
+  it("refuses a remaining length that runs past four bytes as malformed", async () => {
+    const r = await throughGuard(
+      [Buffer.from([0x30, 0x80, 0x80, 0x80, 0x80, 0x01])],
+      undefined,
+      false,
+    );
+    expect(r.error?.code).toBe(GUARD_MALFORMED_PACKET);
+    expect(r.received.length).toBe(0);
+  });
+
+  it("delivers nothing more once a packet is refused", async () => {
+    const r = await throughGuard(
+      [Buffer.from([0x30, 0xff, 0xff, 0x7f]), mqttPacket(0x30, 4), mqttPacket(0x30, 4)],
+      undefined,
+      false,
+    );
+    expect(r.error?.code).toBe(GUARD_PACKET_TOO_LARGE);
+    expect(r.received.length).toBe(0);
+  });
+
+  it("forwards writes to the socket and propagates socket errors", async () => {
+    const { socket, written } = memorySocket();
+    const guarded = guardInboundStream(socket);
+    const errors: unknown[] = [];
+    guarded.on("error", (e) => errors.push(e));
+    await new Promise<void>((resolve) => guarded.write(Buffer.from([0xc0, 0x00]), () => resolve()));
+    expect(Buffer.concat(written).equals(Buffer.from([0xc0, 0x00]))).toBe(true);
+    socket.destroy(Object.assign(new Error("reset"), { code: "ECONNRESET" }));
+    await tick();
+    await tick();
+    expect((errors[0] as { code?: unknown })?.code).toBe("ECONNRESET");
+  });
+
+  it("scanner tracks a body that ends mid-chunk and the next header after it", () => {
+    const scan = createInboundPacketScanner(100);
+    expect(scan(Buffer.from([0x30, 0x05, 0x61, 0x61]))).toBeNull();
+    // Three body bytes finish the first packet; the next header declares 200.
+    expect(scan(Buffer.from([0x61, 0x61, 0x61, 0x30, 0xc8, 0x01]))?.declaredBytes).toBe(203);
+  });
+});
+
+describe("inbound packet guard — production wiring", () => {
+  function fakeMqtt(options: { noStreamBuilder?: boolean } = {}) {
+    const sockets: Duplex[] = [];
+    const clients: any[] = [];
+    const mod = {
+      connect(url: string, opts: Record<string, unknown>) {
+        const client: any = new EventEmitter();
+        client.url = url;
+        client.opts = opts;
+        client.connectCalls = 0;
+        client.subscribe = vi.fn();
+        client.end = vi.fn();
+        if (!options.noStreamBuilder) {
+          client.streamBuilder = () => {
+            const { socket } = memorySocket();
+            sockets.push(socket);
+            return socket;
+          };
+        }
+        // Mirrors MQTT.js 5.16.1 client.js: build the stream on every
+        // (re)connect, read from it, and re-emit stream errors that carry a code.
+        client.connect = () => {
+          client.connectCalls += 1;
+          client.stream = client.streamBuilder(client);
+          client.stream.on("data", () => {});
+          client.stream.on("error", (e: Error & { code?: unknown }) => {
+            if (e.code) client.emit("error", e);
+          });
+          return client;
+        };
+        clients.push(client);
+        return client;
+      },
+    };
+    return { mod, sockets, clients };
+  }
+
+  const baseFlags = () => parseFlags([], {});
+  const baseEnv = () => readEnv({});
+
+  it("production deps connect through connectMqtt", () => {
+    expect(PRODUCTION_DEPS.connect).toBe(connectMqtt);
+  });
+
+  it("creates the client with manualConnect and connects through the guard", async () => {
+    const { mod, sockets, clients } = fakeMqtt();
+    const client: any = await connectMqtt(baseFlags(), baseEnv(), async () => mod);
+    expect(clients[0].opts.manualConnect).toBe(true);
+    expect(client.connectCalls).toBe(1);
+    expect(sockets).toHaveLength(1);
+    expect(client.stream).not.toBe(sockets[0]);
+    const errors: Array<Error & { code?: unknown }> = [];
+    client.on("error", (e: Error & { code?: unknown }) => errors.push(e));
+    sockets[0].push(Buffer.from([0x30, 0xff, 0xff, 0x7f]));
+    await tick();
+    await tick();
+    expect(errors[0]?.code).toBe(GUARD_PACKET_TOO_LARGE);
+    expect(sockets[0].destroyed).toBe(true);
+  });
+
+  it("guards the stream of every reconnect, not only the first", async () => {
+    const { mod, sockets } = fakeMqtt();
+    const client: any = await connectMqtt(baseFlags(), baseEnv(), async () => mod);
+    client.connect();
+    expect(sockets).toHaveLength(2);
+    expect(client.stream).not.toBe(sockets[1]);
+    client.on("error", () => {});
+    sockets[1].push(Buffer.from([0x30, 0x80, 0x80, 0x80, 0x80, 0x01]));
+    await tick();
+    await tick();
+    expect(sockets[1].destroyed).toBe(true);
+  });
+
+  it("refuses to connect when the client has no stream builder to guard", async () => {
+    const { mod, clients } = fakeMqtt({ noStreamBuilder: true });
+    await expect(connectMqtt(baseFlags(), baseEnv(), async () => mod)).rejects.toThrow(
+      /no stream builder/,
+    );
+    expect(clients[0].end).toHaveBeenCalled();
+  });
+
+  it("main ends a continuous run with exit 2 when the guard refuses a packet", async () => {
+    const { mod, sockets, clients } = fakeMqtt();
+    const exit = vi.fn();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await main([], {}, { connect: (f, e) => connectMqtt(f, e, async () => mod), exit });
+      sockets[0].push(Buffer.from([0x30, 0xff, 0xff, 0x7f]));
+      await tick();
+      await tick();
+    } finally {
+      logSpy.mockRestore();
+    }
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(clients[0].end).toHaveBeenCalled();
   });
 });

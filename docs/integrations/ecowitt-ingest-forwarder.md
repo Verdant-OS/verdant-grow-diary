@@ -97,8 +97,18 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - The `--once` deadline (20 s) covers both the connection and the subscription
   acknowledgement; a broker that connects but never answers the subscribe
   ends the run with exit `2` instead of hanging.
-- The 64 KiB bound is applied to the raw frame before it is decoded or queued,
-  so the backlog never holds more than 32 bounded messages.
+- Every inbound MQTT packet passes a stream guard before MQTT.js parses it. A
+  fixed header declaring more than 65 KiB (one 64 KiB message plus 1 KiB for
+  its header, topic and packet id), or a remaining length longer than four
+  bytes, closes the connection before the body is read, and the run exits `2`
+  in either mode. The guard works on every transport MQTT.js builds and on
+  every reconnect. It holds no data itself; what can be in memory at once is
+  the socket's current read chunk (set by the runtime, not by the guard), the
+  guard's 16 KiB readable buffer, and one partial packet of at most 65 KiB.
+  This does not depend on MQTT 5 `maximumPacketSize`, which a broker may ignore
+  and MQTT.js checks only after buffering the whole packet.
+- The 64 KiB message bound is then applied to the raw frame before it is
+  decoded or queued, so the backlog never holds more than 32 bounded messages.
 - Continuous mode handles at most 4 messages at once and queues at most 32
   more; anything beyond that is dropped with a `dropped_backlog_full` log line,
   so a burst or a slow ingest never fans out into unbounded POSTs and retries.

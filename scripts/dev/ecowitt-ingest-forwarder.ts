@@ -20,9 +20,11 @@
  *     VERDANT_BRIDGE_TOKEN has the `vbt_` shape. The POST never follows a
  *     redirect, times out after LIVE_REQUEST_TIMEOUT_MS, and retries only the
  *     transient cases in docs/bridge-client-retry-guidance.md with Full Jitter.
- *   - A message over MAX_MESSAGE_BYTES is rejected before it is parsed. MQTT.js
- *     buffers a whole PUBLISH before this check runs, so the broker you point
- *     it at is part of the trust boundary.
+ *   - Every inbound MQTT packet passes a stream guard before MQTT.js parses it:
+ *     a fixed header declaring more than MAX_INBOUND_PACKET_BYTES, or a
+ *     malformed remaining length, closes the connection before the body is
+ *     buffered. A message over MAX_MESSAGE_BYTES is then rejected before it is
+ *     decoded or queued.
  *   - Summaries carry only format-checked fields: `dateutc` must be the EcoWitt
  *     `YYYY-MM-DD HH:MM:SS` form and `stationtype` a firmware id; anything else
  *     is rejected or omitted rather than echoed.
@@ -55,6 +57,8 @@
  *   ECOWITT_MQTT_USERNAME / ECOWITT_MQTT_PASSWORD   optional broker credentials
  */
 
+import { Duplex } from "node:stream";
+
 export const DEFAULT_MQTT_URL = "mqtt://127.0.0.1:1883";
 export const DEFAULT_MQTT_TOPIC = "ecowitt/grow";
 /** The Verdant Supabase project (the same ref as VITE_SUPABASE_URL in .env). */
@@ -70,6 +74,14 @@ export const APPROVED_INGEST_URLS: readonly string[] = [
 ];
 /** Broker-controlled input is bounded before it is parsed (Codex P2 on #2335). */
 export const MAX_MESSAGE_BYTES = 64 * 1024;
+/**
+ * The largest MQTT packet the stream guard lets through to the parser: one
+ * MAX_MESSAGE_BYTES payload plus room for its fixed header, topic and packet id.
+ */
+export const MAX_INBOUND_PACKET_BYTES = MAX_MESSAGE_BYTES + 1024;
+/** MQTT 5 reason codes the guard reports; numeric, so the lifecycle treats them as terminal. */
+export const GUARD_PACKET_TOO_LARGE = 149;
+export const GUARD_MALFORMED_PACKET = 129;
 /** Summary strings copied from the payload are capped before they are logged. */
 export const MAX_SUMMARY_STRING = 64;
 /** The ingest response is read up to this many bytes; a longer body is cancelled. */
@@ -926,21 +938,166 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
   }
 }
 
-async function connectMqtt(flags: ForwarderFlags, env: ForwarderEnv): Promise<any> {
-  let mqtt: any;
+export interface GuardViolation {
+  code: number;
+  reason: "packet_too_large" | "malformed_remaining_length";
+  declaredBytes?: number;
+}
+
+/**
+ * Pure apart from its own counters. Walks the MQTT fixed header of every
+ * packet in the inbound byte stream - one type byte, a 1-4 byte remaining
+ * length, then the body - and reports the first packet that declares more
+ * than `maxPacketBytes` in total, or whose remaining length runs past four
+ * bytes. It decides from the header alone, so no body is held to decide.
+ */
+export function createInboundPacketScanner(
+  maxPacketBytes: number,
+): (chunk: Uint8Array) => GuardViolation | null {
+  let phase: "type" | "length" | "body" = "type";
+  let length = 0;
+  let multiplier = 1;
+  let lengthBytes = 0;
+  let bodyLeft = 0;
+  return (chunk) => {
+    let i = 0;
+    while (i < chunk.length) {
+      if (phase === "body") {
+        const take = Math.min(bodyLeft, chunk.length - i);
+        bodyLeft -= take;
+        i += take;
+        if (bodyLeft === 0) phase = "type";
+        continue;
+      }
+      const byte = chunk[i++];
+      if (phase === "type") {
+        phase = "length";
+        length = 0;
+        multiplier = 1;
+        lengthBytes = 0;
+        continue;
+      }
+      length += (byte & 0x7f) * multiplier;
+      multiplier *= 128;
+      lengthBytes += 1;
+      if (byte & 0x80) {
+        if (lengthBytes === 4) {
+          return { code: GUARD_MALFORMED_PACKET, reason: "malformed_remaining_length" };
+        }
+        continue;
+      }
+      const declaredBytes = 1 + lengthBytes + length;
+      if (declaredBytes > maxPacketBytes) {
+        return { code: GUARD_PACKET_TOO_LARGE, reason: "packet_too_large", declaredBytes };
+      }
+      bodyLeft = length;
+      phase = length === 0 ? "type" : "body";
+    }
+    return null;
+  };
+}
+
+/**
+ * Wraps the broker socket so MQTT.js only ever reads bytes the scanner has
+ * passed. Each socket chunk is scanned whole before it is handed on; the
+ * first violation destroys both streams with an error whose numeric `code`
+ * MQTT.js re-emits on the client, which `attachClientLifecycle` treats as
+ * terminal. Outgoing writes go straight to the socket.
+ *
+ * Memory bound: the guard itself holds no data. What can sit in memory is
+ * the socket's current read chunk (the runtime's read size; the guard cannot
+ * shrink it), this stream's readable buffer (its 16 KiB high-water mark, then
+ * the socket is paused), and the parser's one partial packet, which the guard
+ * caps at `maxPacketBytes`.
+ */
+export function guardInboundStream(
+  socket: Duplex,
+  maxPacketBytes: number = MAX_INBOUND_PACKET_BYTES,
+): Duplex {
+  const scan = createInboundPacketScanner(maxPacketBytes);
+  const guarded = new Duplex({
+    read() {
+      socket.resume();
+    },
+    write(chunk, _encoding, callback) {
+      socket.write(chunk, callback);
+    },
+    final(callback) {
+      socket.end(callback);
+    },
+    destroy(error, callback) {
+      socket.destroy();
+      callback(error);
+    },
+  });
+  socket.on("data", (chunk: Buffer) => {
+    if (guarded.destroyed) return;
+    const violation = scan(chunk);
+    if (violation) {
+      log("mqtt_packet_refused", {
+        reason: violation.reason,
+        declared_bytes: violation.declaredBytes,
+        limit_bytes: maxPacketBytes,
+      });
+      guarded.destroy(
+        Object.assign(new Error(`inbound MQTT packet refused: ${violation.reason}`), {
+          code: violation.code,
+        }),
+      );
+      return;
+    }
+    if (!guarded.push(chunk)) socket.pause();
+  });
+  socket.on("end", () => guarded.push(null));
+  socket.on("error", (e) => guarded.destroy(e));
+  socket.on("close", () => {
+    if (!guarded.destroyed) guarded.destroy();
+  });
+  return guarded;
+}
+
+/** Loads the optional `mqtt` package; null when it is not installed. */
+async function loadMqttModule(): Promise<any> {
   try {
-    mqtt = await (Function("m", "return import(m)") as any)("mqtt");
+    return await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
+    return null;
+  }
+}
+
+/**
+ * Opens the broker connection with every transport MQTT.js builds wrapped in
+ * `guardInboundStream`, on the first connect and on each reconnect. The client
+ * is created with `manualConnect` so its stream builder can be wrapped before
+ * the first socket opens. A client without a stream builder to wrap is refused
+ * (fail closed) rather than run unguarded. `loadMqtt` exists for tests.
+ */
+export async function connectMqtt(
+  flags: ForwarderFlags,
+  env: ForwarderEnv,
+  loadMqtt: () => Promise<any> = loadMqttModule,
+): Promise<MqttClientLike> {
+  const mqtt = await loadMqtt();
+  if (!mqtt) {
     console.error("[ecowitt-forwarder] mqtt package not installed. Run `bun add --no-save mqtt`.");
     process.exit(2);
   }
-  return mqtt.connect(flags.mqttUrl, {
+  const client = mqtt.connect(flags.mqttUrl, {
     username: env.mqttUsername ?? undefined,
     password: env.mqttPassword ?? undefined,
     // One-shot runs fail fast instead of reconnecting with nothing to handle.
     reconnectPeriod: flags.once ? 0 : 5000,
     connectTimeout: MQTT_CONNECT_TIMEOUT_MS,
+    manualConnect: true,
   });
+  const buildStream = client.streamBuilder;
+  if (typeof buildStream !== "function" || typeof client.connect !== "function") {
+    client.end?.(true);
+    throw new Error("mqtt client exposes no stream builder to guard; refusing to connect");
+  }
+  client.streamBuilder = (c: unknown) => guardInboundStream(buildStream(c));
+  client.connect();
+  return client;
 }
 
 /**
@@ -967,7 +1124,7 @@ export interface MainDeps {
   fetchImpl?: typeof fetch;
 }
 
-const PRODUCTION_DEPS: MainDeps = {
+export const PRODUCTION_DEPS: MainDeps = {
   connect: connectMqtt,
   exit: (code) => process.exit(code),
 };

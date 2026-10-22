@@ -10,6 +10,9 @@ import {
   plantStartDateSaveMessage,
 } from "@/lib/plantStartDateRules";
 import { useTents } from "@/hooks/use-tents";
+import { useGrows } from "@/store/grows";
+import { buildPlantStageFollowUp } from "@/lib/plantStageFollowUpRules";
+import { applyPlantStageFollowUp } from "@/lib/plantStageFollowUpService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,9 +68,11 @@ import {
  *
  * RLS enforces ownership; user_id is never touched here. grow_id is only
  * written when re-homing from an empty-grow tent fallback (copy from the
- * selected tent). This dialog writes only to `plants` and only uploads to
- * the private `diary-photos` bucket. No alerts, Action Queue, sensor,
- * AI, Edge Function, or device writes.
+ * selected tent). The save writes only to `plants` and only uploads to
+ * the private `diary-photos` bucket. After a stage change it may OFFER to
+ * move a lagging tent/grow `stage` along; that write happens only if the
+ * grower taps the prompt's action (plantStageFollowUpService). No alerts,
+ * Action Queue, sensor, AI, Edge Function, or device writes.
  */
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -114,6 +119,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { data: allTents = [] } = useTents();
+  const { grows: knownGrows, refresh: refreshGrows } = useGrows();
   const tentOptions = useMemo(
     () =>
       resolvePlantEditTentOptions(
@@ -321,6 +327,45 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     qc.invalidateQueries({ queryKey: ["grow", "plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plant", plant.id] });
     qc.invalidateQueries({ queryKey: ["tent-detail"] });
+    // Plant, tent and grow store their own stage. Offer (never force) to bring
+    // a lagging tent/grow along so headers and alert targets agree (#12).
+    const tentRow = (
+      allTents as Array<{ id: string; name?: string | null; stage?: string | null }>
+    ).find((t) => t.id === resolvedTentId);
+    const growRow = knownGrows?.find((g) => g.id === plant.growId);
+    const followUp = buildPlantStageFollowUp({
+      plantName: form.name || plant.name,
+      previousStage: plant.stage ?? null,
+      newStage: form.stage,
+      tent: tentRow
+        ? { id: tentRow.id, name: tentRow.name ?? null, stage: tentRow.stage ?? null }
+        : null,
+      grow: growRow
+        ? { id: growRow.id, name: growRow.name ?? null, stage: growRow.stage ?? null }
+        : null,
+    });
+    if (followUp) {
+      toast.message(followUp.message, {
+        id: `plant-stage-follow-up-${plant.id}`,
+        duration: 15000,
+        action: {
+          label: followUp.actionLabel,
+          onClick: () => {
+            void applyPlantStageFollowUp(followUp).then((result) => {
+              qc.invalidateQueries({ queryKey: ["tents"] });
+              qc.invalidateQueries({ queryKey: ["grow", "tents"] });
+              qc.invalidateQueries({ queryKey: ["grow", "tent"] });
+              void refreshGrows?.();
+              if (result.tentUpdated === false || result.growUpdated === false) {
+                toast.error("Couldn't update the stage. Edit the tent or grow to change it.");
+              } else {
+                toast.success("Stage updated.");
+              }
+            });
+          },
+        },
+      });
+    }
     resetLocalPhotoState();
     setOpen(false);
   }

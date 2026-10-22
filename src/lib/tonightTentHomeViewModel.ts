@@ -432,6 +432,12 @@ function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | nu
   return null;
 }
 
+const CLIMATE_METRIC_PATTERN = /^(temp|temperature|humidity|rh|vpd)(_|$)/i;
+
+function isClimateMetric(metric: unknown): boolean {
+  return typeof metric === "string" && CLIMATE_METRIC_PATTERN.test(metric.trim());
+}
+
 /**
  * Whether the capture at `ref` / `atMs` carries a sibling row the snapshot
  * read dropped for intake quality or an explicit stale/invalid source.
@@ -447,6 +453,10 @@ function captureHasRejectedSibling(
   atMs: number,
 ): boolean {
   return rejected.some((row) => {
+    // Only a climate sibling (temperature, RH, VPD) taints the capture: a
+    // degraded CO2 or soil reading says nothing about the air metrics (Copilot
+    // on #2303 at b49c32ae).
+    if (!isClimateMetric(row.metric)) return false;
     const rowRef = sensorCaptureRef(row.captured_at, row.source);
     if (ref && rowRef) return ref === rowRef;
     return Number.isFinite(atMs) && Date.parse(row.captured_at) === atMs;

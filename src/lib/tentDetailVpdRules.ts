@@ -353,11 +353,15 @@ export function resolveTentDetailVpd(input: {
     captureRefsKnown(rejectedClimateRefs) &&
     captureRefsKnown(tonightRefs) &&
     !tonightRefs.some((ref) => rejectedClimateRefs.includes(ref));
-  if (rejectionApplies && climateRejected && !tonightIndependent) {
-    return existingOrNothing();
-  }
+  // Tonight's newest VPD evidence being invalid is terminal before any
+  // header-rejection fallback: an older observation never stands beside it.
+  // A genuinely newer `existing` already returned above (Copilot on #2303 at
+  // b49c32ae).
   if (tonight?.state === "invalid") {
     return { value: null, capturedAt: null, source: null, stale: false, calculated: false };
+  }
+  if (rejectionApplies && climateRejected && !tonightIndependent) {
+    return existingOrNothing();
   }
   if (
     tonight?.state === "value" &&
@@ -387,12 +391,13 @@ export function resolveTentDetailVpd(input: {
   // stands in only when it is a different capture: the Environment header
   // grades the same direct VPD without the row quality flag, so at the same
   // instant it is the rejected reading itself (Codex P1 on #2303 at 0c19a9e0).
-  if (
-    tonight?.state === "value" &&
-    existingMs !== null &&
-    tonightMs !== null &&
-    existingMs === tonightMs
-  ) {
+  // When both identities are known, the records decide; the instant decides
+  // only when either is unknown (Copilot on #2303 at b49c32ae).
+  const existingIsTonightCapture =
+    typeof input.existingRef === "string" && captureRefsKnown(tonightRefs)
+      ? tonightRefs.includes(input.existingRef)
+      : existingMs !== null && tonightMs !== null && existingMs === tonightMs;
+  if (tonight?.state === "value" && existingIsTonightCapture) {
     return { value: null, capturedAt: null, source: null, stale: false, calculated: false };
   }
   return existingOrNothing();

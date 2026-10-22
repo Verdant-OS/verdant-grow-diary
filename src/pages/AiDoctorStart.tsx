@@ -11,6 +11,7 @@ import { Link, useSearchParams } from "@/lib/react-router-compat";
 
 import EmptyState from "@/components/EmptyState";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
+import DoctorGrowNextStepsCard from "@/components/DoctorGrowNextStepsCard";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   partitionDoctorEntryOptionsByTent,
   resolveDoctorStartScope,
 } from "@/lib/doctorStartContextRules";
+import { resolveDoctorGrowNextStepsTarget } from "@/lib/doctorGrowNextStepsRules";
 import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { plantsPath } from "@/lib/routes";
 import { useGrows } from "@/store/grows";
@@ -35,7 +37,13 @@ export default function AiDoctorStart() {
   // the grower's loaded options + carried tent. An id in a URL is a request,
   // not a grant — and an unacceptable plant is messaged, never silently dropped.
   const [searchParams] = useSearchParams();
-  const { grows, loading: growsLoading, error: growsError, refresh: refreshGrows } = useGrows();
+  const {
+    grows,
+    activeGrowId,
+    loading: growsLoading,
+    error: growsError,
+    refresh: refreshGrows,
+  } = useGrows();
   const tentsQuery = useGrowTents();
 
   // Ownership reads start EMPTY, not absent: `grows` is `[]` while loading and
@@ -157,6 +165,16 @@ export default function AiDoctorStart() {
     scopeReadsSettled &&
     !scopeReadFailed;
 
+  // Grow-level next steps (owner decision 2026-10-22): the grow is named on
+  // screen and the AI runs only on an explicit click. No plant is chosen here.
+  const nextStepsTarget = resolveDoctorGrowNextStepsTarget({
+    grows,
+    growsLoading,
+    growsError,
+    carriedGrowId: resolvedScope.growId,
+    activeGrowId,
+  });
+
   return (
     <div className="mx-auto w-full max-w-4xl">
       <PageHeader
@@ -179,6 +197,8 @@ export default function AiDoctorStart() {
         testId="ai-doctor-start-one-tent-loop-next-step-card"
         className="mb-3"
       />
+
+      {nextStepsTarget ? <DoctorGrowNextStepsCard target={nextStepsTarget} /> : null}
 
       <section
         className="glass rounded-2xl p-4 sm:p-6"

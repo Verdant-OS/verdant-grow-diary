@@ -56,7 +56,11 @@ describe("ecowitt-ingest-forwarder — static safety", () => {
   });
 
   it("never follows a redirect with the credential-bearing POST", () => {
-    expect(CODE).toMatch(/redirect: "error"/);
+    // `manual` hands a 3xx back instead of following it; the loop then returns
+    // before any retry (Codex P2 at efeae597).
+    expect(CODE).toMatch(/redirect: "manual"/);
+    expect(CODE).not.toMatch(/redirect: "follow"/);
+    expect(CODE).toMatch(/redirect_refused_/);
   });
 
   it("claims the --once message synchronously, before the first await", () => {

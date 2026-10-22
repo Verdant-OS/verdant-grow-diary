@@ -281,7 +281,7 @@ export interface ForwardRequest {
     headers: Record<string, string>;
     body: string;
     /** A redirect would resend PASSKEY and the bearer token elsewhere; refuse it. */
-    redirect: "error";
+    redirect: "manual";
   };
 }
 
@@ -300,7 +300,7 @@ export function buildForwardRequest(
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
-      redirect: "error",
+      redirect: "manual",
     },
   };
 }
@@ -346,11 +346,12 @@ const EMBEDDED_SECRET_RE = /(?:vbt|sk|sbp)_[A-Za-z0-9_-]{4,}/g;
  */
 const HEX32_RE = /[0-9a-f]{32}/gi;
 /**
- * MAC addresses in the colon, hyphen and dotted forms. A gateway identifier
- * copied into a text field such as `stationtype` must never be echoed
- * (Codex P1 on #2335 at 3c16b6a4).
+ * MAC addresses in the colon, hyphen and dotted forms, with no word boundary
+ * so one glued to identifier text (`GWAA:BB:…`) is still caught. A gateway
+ * identifier copied into a text field such as `stationtype` must never be
+ * echoed (Codex P1 on #2335 at 3c16b6a4 and efeae597).
  */
-const MAC_RE = /\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|\b(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}\b/gi;
+const MAC_RE = /(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}|(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}/gi;
 /** `scheme://user:password@host` → `scheme://(redacted)@host`. */
 const URL_USERINFO_RE = /(\/\/)[^/\s@]+@/g;
 /** `?token=…`, `&password=…` and similar query credentials. */
@@ -455,6 +456,17 @@ export async function handleMessage(args: {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const r = await fetchImpl(req.url, { ...req.init, signal: controller.signal });
+      // `redirect: "manual"` hands a 3xx back instead of following it. The
+      // destination is fixed, so a redirect is final: never followed, never
+      // retried with the credential-bearing body (Codex P2 at efeae597).
+      if (r.status >= 300 && r.status < 400) {
+        return {
+          kind: "network_error",
+          summary: prepared.summary,
+          error: `redirect_refused_${r.status}`,
+          attempts: attempt + 1,
+        };
+      }
       const response = summarizeResponse(r.status, await r.text());
       // A retryable status (408/429/5xx) with retries left falls through to the sleep below.
       if (!isRetryableStatus(r.status) || attempt >= maxRetries) {
@@ -590,14 +602,36 @@ export interface MessageHandlerDeps {
   runner?: BoundedRunner;
 }
 
+type Finish = (outcome: ForwardOutcome | null) => Promise<void>;
+
+/**
+ * The runner job for one decoded frame: parse, forward in live mode, finish.
+ * A throw inside is logged, never left as an unhandled rejection.
+ */
+function messageJob(deps: MessageHandlerDeps, text: string, finish: Finish): () => Promise<void> {
+  return async () => {
+    let outcome: ForwardOutcome | null = null;
+    try {
+      outcome = await handleMessage({
+        text,
+        flags: deps.flags,
+        env: deps.env,
+        fetchImpl: deps.fetchImpl,
+      });
+    } catch (e) {
+      log("handler_error", { error: e instanceof Error ? e.message : "unknown" });
+    }
+    await finish(outcome);
+  };
+}
+
 /**
  * The MQTT "message" listener. The EventEmitter does not await it, so in
  * `--once` mode the first message is claimed synchronously, before any
  * await, and every later delivery is ignored: one live POST at most
- * (Copilot on #2335). In continuous mode every message goes through a
- * bounded runner, so a burst never fans out into unbounded concurrent POSTs
- * and retries (Codex P2 at 0676e200). A throw inside the handler is logged,
- * never left as an unhandled rejection.
+ * (Copilot on #2335). Every message, oversized ones included, goes through a
+ * bounded runner, so a burst never fans out into unbounded concurrent POSTs,
+ * retries or report writes (Codex P2 at 0676e200 and efeae597).
  */
 export function createMessageHandler(
   deps: MessageHandlerDeps,
@@ -612,7 +646,7 @@ export function createMessageHandler(
       }
       claim.claimed = true;
     }
-    const finish = async (outcome: ForwardOutcome | null) => {
+    const finish: Finish = async (outcome) => {
       let exitCode = 1;
       try {
         if (outcome) {
@@ -626,29 +660,15 @@ export function createMessageHandler(
       }
       if (deps.flags.once) deps.onDone(exitCode);
     };
-    // The size bound applies before the frame is decoded or queued, so the
+    // The size bound applies to the raw frame before it is decoded, so the
     // backlog holds at most MAX_BACKLOG × MAX_MESSAGE_BYTES of text and an
-    // oversized frame is never retained by a waiting closure (Codex P2 at 3c16b6a4).
+    // oversized frame is never retained by a waiting closure (Codex P2 at
+    // 3c16b6a4). Its rejection still runs through the runner (Codex P2 at efeae597).
     const bytes = typeof buf === "string" ? Buffer.byteLength(buf, "utf8") : buf.byteLength;
-    if (bytes > MAX_MESSAGE_BYTES) {
-      void finish({ kind: "rejected_locally", reason: "payload_too_large" });
-      return;
-    }
-    const text = typeof buf === "string" ? buf : buf.toString("utf8");
-    const job = async () => {
-      let outcome: ForwardOutcome | null = null;
-      try {
-        outcome = await handleMessage({
-          text,
-          flags: deps.flags,
-          env: deps.env,
-          fetchImpl: deps.fetchImpl,
-        });
-      } catch (e) {
-        log("handler_error", { error: e instanceof Error ? e.message : "unknown" });
-      }
-      await finish(outcome);
-    };
+    const job =
+      bytes > MAX_MESSAGE_BYTES
+        ? () => finish({ kind: "rejected_locally", reason: "payload_too_large" })
+        : messageJob(deps, typeof buf === "string" ? buf : buf.toString("utf8"), finish);
     if (runner.submit(job) === "dropped") {
       log("dropped_backlog_full", {
         inflight: runner.inflight,

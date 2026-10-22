@@ -25,6 +25,15 @@ it is an owner decision, never an agent's.
 
 ## Commands
 
+The script imports the `mqtt` package at run time; it is deliberately not a
+repository dependency. Install it once per checkout without touching
+`package.json` or the lockfile:
+
+```powershell
+cd "<repo>"
+bun add --no-save mqtt
+```
+
 ```powershell
 cd "<repo>"
 $env:ECOWITT_MQTT_URL="mqtt://127.0.0.1:1883"
@@ -67,9 +76,10 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
   logged string is redacted whether or not it stands alone.
 - The dry-run channel summary counts only the keys `ecowitt-ingest` routes:
   `temp{n}f` and `humidity{n}` for air, `soilmoisture{n}` for soil.
-- The live POST is sent with `redirect: "error"`: a redirect from the
-  validated URL is reported as `network_error`, never followed with the
-  PASSKEY and token.
+- The live POST is sent with `redirect: "manual"`: a redirect from the
+  validated URL is reported as `network_error` (`redirect_refused_<status>`)
+  after the first attempt, never followed and never retried with the PASSKEY
+  and token.
 - A message whose `PASSKEY` or `dateutc` is not a string is rejected locally
   (`invalid_passkey` / `invalid_dateutc`); nothing is coerced.
 - `--once` claims the first message before any await, so a second upload

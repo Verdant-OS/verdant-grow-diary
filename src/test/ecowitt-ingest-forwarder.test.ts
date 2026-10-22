@@ -1,9 +1,10 @@
 /**
  * Behaviour of scripts/dev/ecowitt-ingest-forwarder.ts: the PC-side step that
  * forwards bridge-published gateway uploads to the `ecowitt-ingest` edge
- * function. Dry-run must never touch the network; live must fail closed on
- * bad config, send exactly one bearer-authenticated JSON POST per message,
- * and never leak PASSKEY / MAC / token into logs or reports.
+ * function. Dry-run connects to the configured MQTT broker and subscribes but
+ * must never POST to ingest; live must fail closed on bad config, send exactly
+ * one bearer-authenticated JSON POST per attempt, and never leak
+ * PASSKEY / MAC / token into logs or reports.
  */
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -303,7 +304,7 @@ describe("handleMessage", () => {
     expect(headers.Authorization).toBe(`Bearer ${FAKE_BRIDGE_TOKEN}`);
     expect(headers["Content-Type"]).toBe("application/json");
     // A redirect would resend PASSKEY and the token to an unvalidated target.
-    expect(init.redirect).toBe("error");
+    expect(init.redirect).toBe("manual");
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
     expect(body.PASSKEY).toBe(FAKE_PASSKEY);
     expect(body.temp2f).toBe(81.68);
@@ -528,7 +529,28 @@ describe("redaction", () => {
     const req = buildForwardRequest({ PASSKEY: FAKE_PASSKEY }, INGEST_URL, FAKE_BRIDGE_TOKEN);
     expect(req.init.body).not.toContain(FAKE_BRIDGE_TOKEN);
     expect(req.init.headers.Authorization).toContain(FAKE_BRIDGE_TOKEN);
-    expect(req.init.redirect).toBe("error");
+    expect(req.init.redirect).toBe("manual");
+  });
+
+  it("refuses a redirect from the approved URL and never retries it (Codex P2 at efeae597)", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(null, { status: 307, headers: { location: "https://evil.example/collect" } }),
+    );
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(out).toMatchObject({
+      kind: "network_error",
+      error: "redirect_refused_307",
+      attempts: 1,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(out)).not.toContain("evil.example");
   });
 
   // Copilot on #2335: outcomes nest the summary; the broker URL may carry credentials.
@@ -588,6 +610,16 @@ describe("redaction", () => {
     expect(JSON.stringify(redactForLog({ summary: { station: `GW-${macs[0]}` } }))).not.toContain(
       macs[0],
     );
+    // Glued to identifier text, with no boundary before it (Codex P1 at efeae597).
+    expect(redactString("GWAA:BB:CC:DD:EE:FF")).toBe("GW(redacted)");
+    const glued = prepareForwardPayload(
+      JSON.stringify({
+        PASSKEY: FAKE_PASSKEY,
+        dateutc: "2026-10-22 05:27:14",
+        stationtype: "GWAA:BB:CC:DD:EE:FF",
+      }),
+    );
+    expect(glued.ok && glued.summary.station).toBeNull();
     // A plain firmware string is not a MAC.
     expect(redactString("GW3000B_V1.2.4")).toBe("GW3000B_V1.2.4");
   });
@@ -695,24 +727,29 @@ describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => 
     await vi.waitFor(() => expect(ran).toHaveBeenCalledTimes(1));
   });
 
-  it("rejects an oversized frame before decoding or queueing it (Codex P2 at 3c16b6a4)", async () => {
+  it("never decodes an oversized frame and runs its rejection through the runner (Codex P2 at 3c16b6a4, efeae597)", async () => {
     const runner = createBoundedRunner(1, 4);
-    const fetchImpl = vi.fn(() => new Promise<Response>(() => {}));
+    let release: (r: Response) => void = () => {};
+    const fetchImpl = vi.fn(() => new Promise<Response>((resolve) => (release = resolve)));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const writeReportImpl = vi.fn(async () => {});
     try {
       const handle = createMessageHandler({
-        flags: flags({ live: true }),
+        flags: flags({ live: true, writeReport: true }),
         env: LIVE_ENV,
         fetchImpl: fetchImpl as unknown as typeof fetch,
+        writeReportImpl,
         onDone: () => {},
         runner,
       });
       handle("ecowitt/grow", GATEWAY_MESSAGE);
       await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
-      // The slot is held; an oversized frame must not join the backlog.
-      const oversized = Buffer.alloc(MAX_MESSAGE_BYTES + 1, 0x7b);
-      handle("ecowitt/grow", oversized);
-      expect(runner.backlog).toBe(0);
+      // The slot is held: the oversized frame's rejection waits its turn, so
+      // its report write is bounded like any other job, and nothing is logged yet.
+      handle("ecowitt/grow", Buffer.alloc(MAX_MESSAGE_BYTES + 1, 0x7b));
+      expect(runner.backlog).toBe(1);
+      expect(writeReportImpl).not.toHaveBeenCalled();
+      release(new Response(JSON.stringify({ accepted: true }), { status: 200 }));
       await vi.waitFor(() =>
         expect(
           logSpy.mock.calls.some(
@@ -723,6 +760,7 @@ describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => 
         ).toBe(true),
       );
       expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(writeReportImpl).toHaveBeenCalledTimes(2);
     } finally {
       logSpy.mockRestore();
     }

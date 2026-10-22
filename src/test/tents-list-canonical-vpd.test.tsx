@@ -203,25 +203,53 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(label).not.toMatch(/Live/i);
   });
 
-  it("keeps a live VPD beside an unrelated manual diary capture with impossible RH at the same instant (Codex P1 at fa8edcff)", () => {
+  it("keeps a live VPD beside an unrelated diary entry with impossible RH at the same instant (Codex P1 at fa8edcff)", () => {
     const t = at(0.05);
     const stored = [
       row("vpd_kpa", 1.2, t, "live"),
       row("temperature_c", 24, t, "live"),
       row("humidity_pct", 55, t, "live"),
     ];
-    const diary: SensorSnapshot = {
+    const diary = (id?: string): SensorSnapshot => ({
       ...EMPTY_SNAPSHOT,
       source: "diary",
       ts: t,
       temp: 24,
       rh: 150,
       tent_id: "tent-1",
-    };
-    hook.state = { status: "ok", snapshot: diary };
-    const vpd = renderStrip(stored);
+      ...(id ? { diary_evidence_ref: { id, entry_at: t } } : {}),
+    });
+    // A different record (its own diary entry): the live VPD stands.
+    hook.state = { status: "ok", snapshot: diary("diary-entry-1") };
+    let vpd = renderStrip(stored);
     expect(vpd).toHaveTextContent("1.20");
     expect(vpd).toHaveAttribute("data-status", "ok");
+    cleanup();
+    // Without the entry id the record is unknown: withheld, never shown as ok.
+    hook.state = { status: "ok", snapshot: diary() };
+    vpd = renderStrip(stored);
+    expect(vpd).not.toHaveAttribute("data-status", "ok");
+  });
+
+  it("grades a calculated VPD from a diary entry by the entry, not a same-instant live cohort (Codex P1 at fa8edcff)", () => {
+    // Live CO2-only cohort and a diary entry with 80°F/50% at the same instant.
+    const t = at(0.05);
+    hook.state = {
+      status: "ok",
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        source: "diary",
+        ts: t,
+        temp: (80 - 32) / 1.8,
+        rh: 50,
+        tent_id: "tent-1",
+        diary_evidence_ref: { id: "diary-entry-9", entry_at: t },
+      },
+    };
+    renderStrip([row("co2_ppm", 800, t, "live")]);
+    const label = screen.getByTestId("tents-list-metric-status-tent-1-vpd").textContent ?? "";
+    expect(label).toMatch(/Manual/);
+    expect(label).not.toMatch(/Live/i);
   });
 
   it("shows the Dashboard's resolved capture when the raw readings read failed (Codex P2 at fa8edcff)", () => {

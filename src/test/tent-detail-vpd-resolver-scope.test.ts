@@ -15,7 +15,8 @@ import {
   tentDetailVpdRowUntrusted,
   tonightCaptureRejected,
 } from "@/lib/tentDetailVpdRules";
-import type { TonightMetricView } from "@/lib/tonightTentHomeViewModel";
+import { sensorCaptureRef } from "@/lib/sensorCaptureRefRules";
+import { buildTonightTentMetrics, type TonightMetricView } from "@/lib/tonightTentHomeViewModel";
 
 const NOW = Date.parse("2026-10-22T03:00:00.000Z");
 const at = (hoursAgo: number) => new Date(NOW - hoursAgo * 3_600_000).toISOString();
@@ -349,31 +350,42 @@ describe("tentDetailVpdRowUntrusted (Codex P1 at 307b10f4)", () => {
   });
 });
 
-describe("the capture gate matches climate by source as well as instant (Codex P1 on #2303 at fa8edcff)", () => {
-  const liveDirect = (): TonightMetricView => ({
-    ...tonightAt(1),
-    value: 1.2,
-    source: "live",
-    sourceLabel: "Live",
-    calculated: false,
-  });
-  const diaryAt = (hoursAgo: number, source: string) => ({
-    ts: at(hoursAgo),
+describe("the capture gate joins climate by record identity (Codex P1 on #2303 at fa8edcff)", () => {
+  const T = at(1);
+  const LIVE_ROWS = [
+    { metric: "vpd_kpa", value: 1.2, captured_at: T, source: "live" },
+    { metric: "temperature_c", value: 24, captured_at: T, source: "live" },
+    { metric: "humidity_pct", value: 55, captured_at: T, source: "live" },
+  ];
+  const diary = (id?: string) => ({
+    source: "diary",
+    ts: T,
     temp: 24,
     rh: 150,
-    source,
+    vpd: null as number | null,
+    ...(id ? { diary_evidence_ref: { id, entry_at: T } } : {}),
   });
-  const liveRows = [
-    { metric: "vpd_kpa", value: 1.2, captured_at: at(1), source: "live" },
-    { metric: "temperature_c", value: 24, captured_at: at(1), source: "live" },
-    { metric: "humidity_pct", value: 55, captured_at: at(1), source: "live" },
-  ];
+  // Tonight's real VPD view, with the capture refs it assigns.
+  const tonightVpd = (
+    rows: ReadonlyArray<{ metric: string; value: number; captured_at: string; source?: string }>,
+    snapshot: ReturnType<typeof diary> | null,
+  ) =>
+    buildTonightTentMetrics({
+      rows: rows.map((r) => ({ ...r, tent_id: "tent-1", ts: r.captured_at })),
+      rowsRead: { status: "success" },
+      snapshot: { status: snapshot ? "ok" : "idle", snapshot },
+      now: new Date(NOW),
+    }).find((m) => m.key === "vpd")!;
 
-  it("keeps a live VPD beside a separate manual diary snapshot with impossible RH at the same instant", () => {
-    const climate = tentDetailCaptureClimate(liveRows, diaryAt(1, "diary"));
-    expect(tonightCaptureRejected(liveDirect(), null, climate)).toBe(false);
+  it("keeps a live sensor VPD beside a separate diary entry with impossible RH at the same instant", () => {
+    const snap = diary("diary-entry-1");
+    const vpd = tonightVpd(LIVE_ROWS, snap);
+    expect(vpd.value).toBe(1.2);
+    expect(vpd.captureRefs).toEqual([sensorCaptureRef(T, "live")]);
+    const climate = tentDetailCaptureClimate(LIVE_ROWS, snap);
+    expect(tonightCaptureRejected(vpd, null, climate)).toBe(false);
     const out = resolveTentDetailVpd({
-      tonight: liveDirect(),
+      tonight: vpd,
       existing: NO_VPD,
       rejectedMetrics: [],
       rejectedCapturedAt: null,
@@ -384,22 +396,36 @@ describe("the capture gate matches climate by source as well as instant (Codex P
     expect(out.value).toBe(1.2);
   });
 
-  it("still rejects when the impossible RH comes from the VPD's own source", () => {
-    const manualDirect = { ...liveDirect(), source: "manual" as const, sourceLabel: "Manual" };
-    const climate = tentDetailCaptureClimate([], diaryAt(1, "diary"));
-    expect(tonightCaptureRejected(manualDirect, null, climate)).toBe(true);
-    // A live row aged past its window is still the live record.
-    const staleDirect = { ...liveDirect(), source: "stale" as const };
-    const staleRows = [{ metric: "humidity_pct", value: 150, captured_at: at(1), source: "live" }];
-    expect(
-      tonightCaptureRejected(staleDirect, null, tentDetailCaptureClimate(staleRows, null)),
-    ).toBe(true);
+  it("rejects when the impossible RH is in the VPD's own record", () => {
+    // The diary entry itself carries the VPD and the impossible RH.
+    const snap = { ...diary("diary-entry-2"), vpd: 1.1 };
+    const vpd = tonightVpd([], snap);
+    expect(vpd.captureRefs).toEqual(["diary:diary-entry-2"]);
+    expect(tonightCaptureRejected(vpd, null, tentDetailCaptureClimate([], snap))).toBe(true);
+    // A sensor RH row from the VPD's own ingest (same instant, live family).
+    const rows = [
+      LIVE_ROWS[0],
+      { metric: "humidity_pct", value: 150, captured_at: T, source: "live" },
+    ];
+    const live = tonightVpd(rows, null);
+    expect(tonightCaptureRejected(live, null, tentDetailCaptureClimate(rows, null))).toBe(true);
   });
 
-  it("rejects conservatively when a same-instant row's source is unknown", () => {
-    const rows = [{ metric: "humidity_pct", value: 150, captured_at: at(1) }];
-    expect(tonightCaptureRejected(liveDirect(), null, tentDetailCaptureClimate(rows, null))).toBe(
+  it("rejects conservatively when either identity is unknown", () => {
+    // A diary snapshot without its entry id is an unknown record at the same instant.
+    const vpd = tonightVpd(LIVE_ROWS, diary());
+    expect(tonightCaptureRejected(vpd, null, tentDetailCaptureClimate(LIVE_ROWS, diary()))).toBe(
       true,
     );
+    // A row with no source has no identity.
+    const sourceless = [{ metric: "humidity_pct", value: 150, captured_at: T }];
+    expect(tonightCaptureRejected(vpd, null, tentDetailCaptureClimate(sourceless, null))).toBe(
+      true,
+    );
+    // A Tonight view without refs falls back to the instant.
+    const noRefs: TonightMetricView = { ...vpd, captureRefs: undefined };
+    expect(
+      tonightCaptureRejected(noRefs, null, tentDetailCaptureClimate(LIVE_ROWS, diary("d-3"))),
+    ).toBe(true);
   });
 });

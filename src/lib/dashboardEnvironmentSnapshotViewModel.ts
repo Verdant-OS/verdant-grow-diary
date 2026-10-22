@@ -14,6 +14,7 @@
  *
  * No I/O, no React, no automation, no device control.
  */
+import { captureRefsKnown, rowCaptureRef } from "@/lib/sensorCaptureRefRules";
 import { format } from "date-fns";
 import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
@@ -77,6 +78,8 @@ export interface BuildTentSnapshotInput extends SensorReadingLike {
    * flags win over value plausibility and age). Never an upgrade.
    */
   quality?: string | null;
+  /** Capture identity when the row stands in for another record (`sensorCaptureRefRules`). */
+  capture_ref?: string | null;
 }
 
 /**
@@ -214,6 +217,11 @@ export interface CanonicalTentVpd {
    * too (Codex P1 on #2303 at 108e3eab).
    */
   rejected?: boolean;
+  /**
+   * The stored records behind the VPD (`sensorCaptureRefRules`); null entries
+   * are unknown. Decides whether it is the cohort's own capture.
+   */
+  captureRefs?: readonly (string | null)[];
 }
 
 /**
@@ -296,15 +304,18 @@ export function buildTentSnapshotView(
   // readings; diagnostics carrying that label are classified as demo first.
   const provenance = classifyLatestGroupProvenance(latestRows);
   const canonicalRejected = canonical?.rejected === true;
-  // The canonical VPD is the cohort's own capture only when it shares both the
-  // instant and the source. A matching timestamp from another source (a manual
-  // pair beside a live CO2-only row) is graded with its own provenance
-  // (Codex P1 on #2303 at be0fe2f5).
+  // The canonical VPD is the cohort's own capture only when it comes from one
+  // of the cohort's own records (Codex P1 on #2303 at fa8edcff). With an
+  // unknown identity on either side it must share both the instant and the
+  // source (Codex P1 at be0fe2f5); a matching timestamp alone never makes it
+  // the cohort's capture.
+  const cohortRefs = latestRows.map(rowCaptureRef);
   const sameCapture =
     canonical !== null &&
     sameInstant(canonical.capturedAt, snap.ts) &&
-    canonical.source !== null &&
-    canonical.source === provenance;
+    (captureRefsKnown(canonical.captureRefs) && captureRefsKnown(cohortRefs)
+      ? canonical.captureRefs.some((ref) => cohortRefs.includes(ref))
+      : canonical.source !== null && canonical.source === provenance);
   const useCanonicalVpd = sameCapture && !canonicalRejected;
   // The capture gate rejected the cohort's own capture: its stored VPD is the
   // rejected reading and must not fall back to "ok" (Codex P1 at 108e3eab).

@@ -16,6 +16,7 @@ import type {
   BuildTentSnapshotInput,
   CanonicalTentVpd,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import { diaryCaptureRef } from "@/lib/sensorCaptureRefRules";
 import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { tentDetailCaptureClimate, tonightCaptureRejected } from "@/lib/tentDetailVpdRules";
 import {
@@ -63,6 +64,7 @@ export function tentsListCanonicalVpd(
       captured_at: row.captured_at ?? null,
       quality: row.quality ?? null,
       source: row.source ?? null,
+      capture_ref: row.capture_ref ?? null,
     })),
     snapshot.status === "ok" ? snapshot.snapshot : null,
   );
@@ -76,6 +78,7 @@ export function tentsListCanonicalVpd(
     capturedAt: vpd.capturedAt,
     source: vpd.source,
     sourceLabel: vpd.sourceLabel,
+    captureRefs: vpd.captureRefs,
     ageText: vpd.ageText,
     // An explicit rejection, not null: the strip must also withhold its own
     // stored VPD when the rejected capture is its latest cohort
@@ -106,6 +109,9 @@ export function tentsListDiarySnapshotRows(
   if (Date.parse(snap.ts) - nowMs > TONIGHT_FUTURE_SKEW_MS) return [];
   if (snap.source !== "diary" && !snap.diary_evidence_ref) return [];
   const rows: BuildTentSnapshotInput[] = [];
+  // These rows are the diary entry itself, not sensor rows: they carry its
+  // identity so no capture check joins them to a sensor row by time.
+  const captureRef = diaryCaptureRef(snap.diary_evidence_ref?.id);
   const push = (metric: string, value: number | null) => {
     if (typeof value !== "number" || !Number.isFinite(value)) return;
     rows.push({
@@ -115,6 +121,7 @@ export function tentsListDiarySnapshotRows(
       captured_at: snap.ts,
       tent_id: tentId,
       source: "manual",
+      ...(captureRef ? { capture_ref: captureRef } : {}),
     });
   };
   push("temperature_c", snap.temp);

@@ -1,7 +1,12 @@
 import { isStale } from "@/lib/sensorSnapshot";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
-import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
-import { snapshotSource, type TonightMetricView } from "@/lib/tonightTentHomeViewModel";
+import {
+  captureRefsKnown,
+  rowCaptureRef,
+  snapshotCaptureRef,
+  type SensorCaptureRef,
+} from "@/lib/sensorCaptureRefRules";
+import type { TonightMetricView } from "@/lib/tonightTentHomeViewModel";
 import type { DisplayedVpdObservation } from "@/lib/vpdStabilityInputRules";
 
 /** Only live and manual readings may read as current on the tent page. */
@@ -23,11 +28,12 @@ export interface TentDetailCaptureClimate {
    */
   untrusted?: boolean;
   /**
-   * Canonical source of the record this value came from, as Tonight labels it.
-   * Only climate from the same source family can belong to the VPD's capture;
-   * null (unknown) is matched conservatively (Codex P1 on #2303 at fa8edcff).
+   * Identity of the record this value came from (`sensorCaptureRefRules`).
+   * Only climate from the VPD's own record(s) belongs to its capture; null
+   * (unknown) is matched conservatively by instant (Codex P1 on #2303 at
+   * fa8edcff).
    */
-  source?: string | null;
+  ref?: SensorCaptureRef | null;
 }
 
 interface TentDetailClimateRow {
@@ -37,6 +43,7 @@ interface TentDetailClimateRow {
   captured_at?: string | null;
   quality?: string | null;
   source?: string | null;
+  capture_ref?: string | null;
 }
 
 /** Same gate as the Dashboard's evidence rows: null, "" and "ok" are trusted. */
@@ -54,7 +61,13 @@ function trustedIntakeQuality(quality: string | null | undefined): boolean {
 export function tentDetailCaptureClimate(
   rows: readonly TentDetailClimateRow[] | null | undefined,
   snapshot:
-    | { ts: string | null; temp: number | null; rh: number | null; source?: string | null }
+    | {
+        ts: string | null;
+        temp: number | null;
+        rh: number | null;
+        diary_evidence_ref?: { id: string } | null;
+        metric_refs?: Partial<Record<string, { captured_at: string; source: string }>>;
+      }
     | null
     | undefined,
 ): TentDetailCaptureClimate[] {
@@ -63,17 +76,29 @@ export function tentDetailCaptureClimate(
     if (typeof row.value !== "number") continue;
     const at = row.captured_at ?? row.ts ?? null;
     const untrusted = !trustedIntakeQuality(row.quality);
-    const source = row.source == null ? null : normalizeSensorSource(row.source);
+    const ref = rowCaptureRef(row);
     if (row.metric === "temperature_c") {
-      out.push({ at, temp: row.value, rh: null, untrusted, source });
+      out.push({ at, temp: row.value, rh: null, untrusted, ref });
     }
     if (row.metric === "humidity_pct") {
-      out.push({ at, temp: null, rh: row.value, untrusted, source });
+      out.push({ at, temp: null, rh: row.value, untrusted, ref });
     }
   }
   if (snapshot) {
-    const source = snapshot.source == null ? null : snapshotSource(snapshot.source);
-    out.push({ at: snapshot.ts, temp: snapshot.temp, rh: snapshot.rh, source });
+    // Each metric keeps its own record: a readings snapshot can take
+    // temperature and RH from different rows.
+    out.push({
+      at: snapshot.ts,
+      temp: snapshot.temp,
+      rh: null,
+      ref: snapshotCaptureRef(snapshot, "temp"),
+    });
+    out.push({
+      at: snapshot.ts,
+      temp: null,
+      rh: snapshot.rh,
+      ref: snapshotCaptureRef(snapshot, "rh"),
+    });
   }
   return out;
 }
@@ -106,26 +131,23 @@ function instantMs(at: string | null | undefined): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-/** A live reading past its window is still the live record: one family. */
-function sourceFamily(source: string): string {
-  return source === "stale" ? "live" : source;
-}
-
 /**
- * Whether a climate entry can belong to the capture behind Tonight's VPD: the
- * same instant and, when both sources are known, the same source family. A
- * shared timestamp alone does not tie a manual diary snapshot to a live sensor
- * VPD (Codex P1 on #2303 at fa8edcff); an unknown source still counts, so an
+ * Whether a climate entry belongs to the capture behind Tonight's VPD. When
+ * both identities are known it is the same stored record (`captureRefs`), not
+ * a shared timestamp or source: a manual diary entry and a live sensor row are
+ * different captures whatever their times (Codex P1 on #2303 at fa8edcff).
+ * With either identity unknown it falls back to the same instant, so an
  * ambiguous capture is withheld rather than shown.
  */
 function sameCaptureClimate(
   climate: TentDetailCaptureClimate,
   selectedMs: number,
-  selectedSource: string | null,
+  selectedRefs: TonightMetricView["captureRefs"],
 ): boolean {
-  if (instantMs(climate.at) !== selectedMs) return false;
-  if (climate.source == null || selectedSource == null) return true;
-  return sourceFamily(climate.source) === sourceFamily(selectedSource);
+  if (climate.ref != null && captureRefsKnown(selectedRefs)) {
+    return selectedRefs.includes(climate.ref);
+  }
+  return instantMs(climate.at) === selectedMs;
 }
 
 function climateUnrealistic(climate: { temp: number | null; rh: number | null }): boolean {
@@ -169,7 +191,7 @@ export function tonightCaptureRejected(
   if (selectedMs === null) return true;
   return captureClimate.some(
     (climate) =>
-      sameCaptureClimate(climate, selectedMs, tonight.source) &&
+      sameCaptureClimate(climate, selectedMs, tonight.captureRefs) &&
       (climate.untrusted === true || climateUnrealistic(climate)),
   );
 }

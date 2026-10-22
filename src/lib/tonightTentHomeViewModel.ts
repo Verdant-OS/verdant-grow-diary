@@ -20,6 +20,11 @@ import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  rowCaptureRef,
+  snapshotCaptureRef,
+  type SensorCaptureRef,
+} from "@/lib/sensorCaptureRefRules";
 
 export const TONIGHT_TENT_HOME_COPY = {
   missing: "Missing",
@@ -121,7 +126,11 @@ const METRICS: ReadonlyArray<{ key: TonightMetricKey; label: string; readingMetr
   { key: "vpd", label: "VPD", readingMetric: "vpd_kpa" },
 ];
 
-export type TonightSensorRow = DashboardSensorEvidenceRow & { id?: string };
+export type TonightSensorRow = DashboardSensorEvidenceRow & {
+  id?: string;
+  /** Capture identity when the row stands in for another record (a diary entry). */
+  capture_ref?: string | null;
+};
 
 export type TonightRowsReadStatus = "loading" | "error" | "refresh_error" | "success";
 
@@ -154,6 +163,12 @@ export interface TonightMetricView {
   ageText: string | null;
   /** True only for VPD derived from temperature and RH (no stored vpd_kpa). */
   calculated: boolean;
+  /**
+   * The stored records behind the value (`sensorCaptureRefRules`): the row or
+   * diary entry it was read from, or both inputs of a calculated VPD. A null
+   * entry is an unknown identity (Codex P1 on #2303 at fa8edcff).
+   */
+  captureRefs?: readonly (SensorCaptureRef | null)[];
 }
 
 /** Allowed clock skew before a capture time counts as "in the future". */
@@ -178,10 +193,12 @@ interface Candidate {
    * still shown on their own but never feed a calculated VPD.
    */
   ownSource: boolean;
+  /** Capture identity of the record(s) behind this candidate. */
+  refs: readonly (SensorCaptureRef | null)[];
 }
 
 /** Snapshot sources map onto the canonical vocabulary; "unavailable" carries no reading. */
-export function snapshotSource(raw: string): SensorSource | null {
+function snapshotSource(raw: string): SensorSource | null {
   switch (raw) {
     case "live":
       return "live";
@@ -308,6 +325,7 @@ function calculatedVpdCandidate(
     origin: 0 as const,
     calculated: true as const,
     ownSource: true,
+    refs: [...temp.refs, ...rh.refs],
   };
   // RH pinned at 0% or 100% is a stuck sensor, not a reading (same guard as the Environment ribbon).
   const vpd = rhIsPinned(rh.value)
@@ -393,6 +411,7 @@ export function buildTonightTentMetrics(input: {
         ...when,
         origin: 0,
         ownSource: true,
+        refs: [rowCaptureRef(row)],
       });
     }
 
@@ -413,6 +432,7 @@ export function buildTonightTentMetrics(input: {
         ...snapWhen,
         origin: 1,
         ownSource: snapshotMetricSourceProven(snap, key, snapSource),
+        refs: [snapshotCaptureRef(snap, key)],
       });
     }
     candidates.sort(newestFirst);
@@ -480,6 +500,7 @@ export function buildTonightTentMetrics(input: {
       capturedAt: best.at,
       ageText: formatAgeLabel(Math.max(0, ageMs)),
       calculated: best.calculated === true,
+      captureRefs: best.refs,
     };
   });
 }

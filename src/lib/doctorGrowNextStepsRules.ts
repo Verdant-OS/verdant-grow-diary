@@ -26,15 +26,19 @@ export interface DoctorGrowNextStepsTarget {
  * A pending or failed grows read yields null: an unknown answer is never
  * presented as "no grow". A validated carried grow (from the page's URL scope)
  * wins over the stored active grow so the card matches the page's context.
+ * While a carried scope is still being checked, or its check failed, there is
+ * no target: falling back to the active grow would spend a credit on a grow
+ * the link did not ask for.
  */
 export function resolveDoctorGrowNextStepsTarget(input: {
   grows: readonly DoctorGrowNextStepsGrow[] | null | undefined;
   growsLoading: boolean;
   growsError: unknown;
+  carriedScopeUnresolved?: boolean;
   carriedGrowId?: string | null;
   activeGrowId?: string | null;
 }): DoctorGrowNextStepsTarget | null {
-  if (input.growsLoading || input.growsError) return null;
+  if (input.growsLoading || input.growsError || input.carriedScopeUnresolved) return null;
   const grows = input.grows ?? [];
   const find = (id: string | null | undefined) => {
     const wanted = (id ?? "").trim();

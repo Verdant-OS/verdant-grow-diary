@@ -13,6 +13,9 @@ const state = vi.hoisted(() => ({
   activeGrowId: null as string | null,
   growsLoading: false,
   growsError: null as string | null,
+  tents: [] as Array<Record<string, unknown>>,
+  tentsPending: false,
+  tentsError: false,
   invoke: vi.fn(),
 }));
 
@@ -25,10 +28,10 @@ vi.mock("@/hooks/useGrowData", () => ({
     refetch: vi.fn(),
   }),
   useGrowTents: () => ({
-    data: [],
-    isLoading: false,
-    isPending: false,
-    isError: false,
+    data: state.tentsPending ? undefined : state.tents,
+    isLoading: state.tentsPending,
+    isPending: state.tentsPending,
+    isError: state.tentsError,
     isFetching: false,
     refetch: vi.fn(),
   }),
@@ -62,14 +65,18 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={["/doctor"]}>
+function page(entry = "/doctor") {
+  return (
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/doctor" element={<AiDoctorStart />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderPage(entry = "/doctor") {
+  return render(page(entry));
 }
 
 const ANALYSIS = {
@@ -89,6 +96,9 @@ beforeEach(() => {
     { id: "grow-2", name: "Spring Run" },
   ];
   state.activeGrowId = "grow-1";
+  state.tents = [{ id: "tent-b", name: "Tent B", grow_id: "grow-2" }];
+  state.tentsPending = false;
+  state.tentsError = false;
   state.growsLoading = false;
   state.growsError = null;
   state.invoke.mockReset();
@@ -154,6 +164,47 @@ describe("/doctor grow-level next steps", () => {
     await waitFor(() => expect(state.invoke).toHaveBeenCalledTimes(2));
     const keys = state.invoke.mock.calls.map((c) => c[1].body.idempotencyKey);
     expect(keys[0]).toBe(keys[1]);
+  });
+
+  it("waits for a carried grow scope instead of falling back to the active grow", () => {
+    const carried = "/doctor?growId=grow-2&tentId=tent-b";
+    state.tentsPending = true;
+    renderPage(carried);
+    expect(screen.queryByTestId("doctor-grow-next-steps")).toBeNull();
+    cleanup();
+    state.tentsPending = false;
+    state.tentsError = true;
+    renderPage(carried);
+    expect(screen.queryByTestId("doctor-grow-next-steps")).toBeNull();
+    cleanup();
+    state.tentsError = false;
+    renderPage(carried);
+    expect(screen.getByText("Next steps for Spring Run")).toBeTruthy();
+    expect(state.invoke).not.toHaveBeenCalled();
+  });
+
+  it("drops a finished result when the target grow changes", async () => {
+    state.invoke.mockResolvedValue({ data: { ok: true, result: { analysis: ANALYSIS } } });
+    const view = renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await screen.findByTestId("doctor-grow-next-steps-result");
+    state.activeGrowId = "grow-2";
+    view.rerender(page());
+    expect(screen.getByText("Next steps for Spring Run")).toBeTruthy();
+    expect(screen.queryByTestId("doctor-grow-next-steps-result")).toBeNull();
+  });
+
+  it("never shows an in-flight answer under a different grow", async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    state.invoke.mockReturnValue(new Promise((r) => (resolve = r)));
+    const view = renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    state.activeGrowId = "grow-2";
+    view.rerender(page());
+    resolve({ data: { ok: true, result: { analysis: ANALYSIS } } });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.getByText("Next steps for Spring Run")).toBeTruthy();
+    expect(screen.queryByTestId("doctor-grow-next-steps-result")).toBeNull();
   });
 
   it("offers nothing while the grows read is pending or failed", () => {

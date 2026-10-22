@@ -171,6 +171,7 @@ export default function AiDoctorStart() {
     grows,
     growsLoading,
     growsError,
+    carriedScopeUnresolved: scopeOrderingPending || (carriedScopeRequested && scopeReadFailed),
     carriedGrowId: resolvedScope.growId,
     activeGrowId,
   });
@@ -198,7 +199,11 @@ export default function AiDoctorStart() {
         className="mb-3"
       />
 
-      {nextStepsTarget ? <DoctorGrowNextStepsCard target={nextStepsTarget} /> : null}
+      {nextStepsTarget ? (
+        // Keyed by grow so a result or in-flight request never shows under
+        // another grow's name.
+        <DoctorGrowNextStepsCard key={nextStepsTarget.growId} target={nextStepsTarget} />
+      ) : null}
 
       <section
         className="glass rounded-2xl p-4 sm:p-6"

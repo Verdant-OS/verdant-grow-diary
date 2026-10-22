@@ -179,8 +179,22 @@ vi.mock("@/components/EnvironmentCheckSnapshotLinkButton", () => ({
 }));
 vi.mock("@/components/AiDoctorCheckInTimelineBadge", () => ({ default: () => null }));
 vi.mock("@/components/AiDoctorReadinessTimelineBadge", () => ({ default: () => null }));
-vi.mock("@/components/WateringHistoryPanel", () => ({ default: () => null }));
-vi.mock("@/components/FeedingHistoryPanel", () => ({ default: () => null }));
+vi.mock("@/components/WateringHistoryPanel", () => ({
+  default: ({ rawEntries = [] }: { rawEntries?: Array<{ id?: string }> }) => (
+    <output
+      data-testid="timeline-watering-lane-probe"
+      data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+    />
+  ),
+}));
+vi.mock("@/components/FeedingHistoryPanel", () => ({
+  default: ({ rawEntries = [] }: { rawEntries?: Array<{ id?: string }> }) => (
+    <output
+      data-testid="timeline-feeding-lane-probe"
+      data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+    />
+  ),
+}));
 vi.mock("@/components/PhotoHistoryPanel", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogHistoryPanels", () => ({
   RecentQuickLogActivityPanel: ({
@@ -408,6 +422,19 @@ describe("Timeline Quick Log lanes follow the plant/tent filter", () => {
     mockTwoPlantRows();
     renderTimeline(`/timeline?plantId=${PLANT_A}`);
     expect(await laneIds()).toEqual(["diary-a", "event-a"]);
+  });
+
+  it("scopes the watering and feeding history lanes to the filtered plant", async () => {
+    mockTwoPlantRows();
+    renderTimeline(`/timeline?plantId=${PLANT_A}`);
+    await laneIds();
+    for (const id of ["timeline-watering-lane-probe", "timeline-feeding-lane-probe"]) {
+      const ids = (screen.getByTestId(id).getAttribute("data-entry-ids") ?? "")
+        .split(",")
+        .filter(Boolean)
+        .sort();
+      expect(ids).toEqual(["diary-a", "event-a"]);
+    }
   });
 
   it("shows only the filtered tent's quick logs", async () => {

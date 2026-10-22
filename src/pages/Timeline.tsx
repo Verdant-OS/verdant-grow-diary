@@ -1856,9 +1856,9 @@ export default function Timeline() {
     }
     return out;
   }, [displayEntries, growEvents, supplementalLinkedGrowEvents]);
-  // Recent Quick Logs and the calendar follow the same plant/tent filter as the
-  // main list (filming bug #3); unscoped `recentLaneRawEntries` still feeds
-  // grow-wide evidence counts and the pinned watering/feeding history wiring.
+  // The Quick Log history lanes follow the same plant/tent filter as the main
+  // list (filming bug #3); unscoped `recentLaneRawEntries` still feeds the
+  // grow-wide evidence counts.
   const scopedRecentLaneRawEntries = useMemo(
     () =>
       scopeTimelineQuickLogLaneRows(recentLaneRawEntries, {
@@ -2718,7 +2718,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <WateringHistoryPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
@@ -2729,7 +2729,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <FeedingHistoryPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {

@@ -16,7 +16,11 @@ import {
   evaluateSensorQuality,
   type SensorQualityResult,
 } from "@/lib/sensorQuality";
-import type { SensorSnapshot, SensorSnapshotRejectedQualityRow } from "@/lib/sensorSnapshot";
+import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import type {
+  CaptureEvidenceSnapshot,
+  SensorSnapshotRejectedQualityRow,
+} from "@/lib/sensorSnapshotCaptureEvidence";
 import {
   resolveSensorObservationTime,
   type SensorObservationTimeLike,
@@ -166,7 +170,7 @@ export function selectRejectedQualityRows(
 export function withRejectedQualityRows(
   snapshot: SensorSnapshot | null,
   rows: readonly DashboardSensorEvidenceRow[] | null | undefined,
-): SensorSnapshot | null {
+): CaptureEvidenceSnapshot | null {
   if (!snapshot) return snapshot;
   const rejected = selectRejectedQualityRows(rows);
   return rejected.length > 0 ? { ...snapshot, rejected_quality_rows: rejected } : snapshot;

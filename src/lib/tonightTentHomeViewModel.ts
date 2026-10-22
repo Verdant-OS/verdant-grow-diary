@@ -20,6 +20,7 @@ import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import type { SensorSnapshotCaptureEvidence } from "@/lib/sensorSnapshotCaptureEvidence";
 import {
   rowCaptureRef,
   snapshotCaptureRef,
@@ -151,8 +152,8 @@ export interface TonightSnapshotInput {
     /** Present when the whole snapshot came from one diary row. */
     diary_evidence_ref?: SensorSnapshot["diary_evidence_ref"];
     /** The diary entry a generic blob came from: capture identity only. */
-    diary_capture_id?: SensorSnapshot["diary_capture_id"];
-    rejected_quality_rows?: SensorSnapshot["rejected_quality_rows"];
+    diary_capture_id?: SensorSnapshotCaptureEvidence["diary_capture_id"];
+    rejected_quality_rows?: SensorSnapshotCaptureEvidence["rejected_quality_rows"];
   } | null;
 }
 

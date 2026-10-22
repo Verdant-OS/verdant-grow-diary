@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import type { CaptureEvidenceSnapshot } from "@/lib/sensorSnapshotCaptureEvidence";
 
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 
@@ -382,7 +383,7 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     cleanup();
     // The same capture as a snapshot (the degraded RH dropped by the evidence
     // filter but carried as a rejected sibling), with the raw read failed.
-    const snap: SensorSnapshot = {
+    const snap: CaptureEvidenceSnapshot = {
       ...EMPTY_SNAPSHOT,
       source: "live",
       ts: t,

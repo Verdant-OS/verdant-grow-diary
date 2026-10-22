@@ -39,6 +39,7 @@ import {
   snapshotFromManualSensorSnapshot,
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
+import type { CaptureEvidenceSnapshot } from "@/lib/sensorSnapshotCaptureEvidence";
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
 import {
   selectDashboardSensorEvidenceRows,
@@ -216,8 +217,8 @@ async function resolveDiaryEvidence(
 export async function fetchLatestSensorSnapshotsByTent(
   growId: string | null | undefined,
   tentIds: readonly string[],
-): Promise<Record<string, SensorSnapshot | null>> {
-  const result: Record<string, SensorSnapshot | null> = {};
+): Promise<Record<string, CaptureEvidenceSnapshot | null>> {
+  const result: Record<string, CaptureEvidenceSnapshot | null> = {};
   const unique = [...new Set(tentIds)];
   if (unique.length === 0) return result;
   const fallback = new Set<string>();
@@ -450,7 +451,7 @@ function snapshotFromDiaryEvidenceRow(
   if (!details || typeof details !== "object") return null;
   if (!isDiaryRowInTentScope(row.tent_id, tentIds)) return null;
   const rowTentInScope = row.tent_id ?? null;
-  const snap = snapshotFromDiary(
+  const snap: CaptureEvidenceSnapshot | null = snapshotFromDiary(
     row.entry_at,
     details.sensor_snapshot as Record<string, unknown> | undefined,
   );

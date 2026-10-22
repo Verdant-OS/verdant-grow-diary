@@ -224,4 +224,89 @@ describe("usePersistEnvironmentAlerts review follow-ups (#2267 at 4dcba2be)", ()
 
     blocked.unmount();
   });
+
+  it("lets a still-mounted instance persist a breach again after the grower closed the alert another instance wrote (Codex P1 at 705072e0)", async () => {
+    const listGate = deferred<unknown[]>();
+    alertsIo.list.mockReturnValueOnce(listGate.promise).mockReturnValueOnce(listGate.promise);
+    const now = Date.now();
+    const writer = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: stageOnlyInput(new Date(now - 60_000).toISOString()),
+    });
+    const other = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: stageOnlyInput(new Date(now - 60_000).toISOString()),
+    });
+    await waitFor(() => expect(alertsIo.list).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      listGate.resolve([]);
+      await listGate.promise;
+    });
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    await waitFor(() => expect(other.result.current.status).toBe("done"));
+
+    // The grower closed the alert; a new reading shows the same breach. The
+    // list (default mock) now returns no open row.
+    other.rerender(stageOnlyInput(new Date(now).toISOString()));
+    await waitFor(() => expect(savesFor("temp")).toBe(2));
+    await settle();
+    expect(savesFor("temp")).toBe(2);
+
+    writer.unmount();
+    other.unmount();
+  });
+
+  it("does not insert a duplicate from an open-alert list requested before another instance's insert committed (Codex P1 at 705072e0)", async () => {
+    const firstSave = deferred<{ id: string }>();
+    const lateList = deferred<unknown[]>();
+    alertsIo.save.mockReturnValueOnce(firstSave.promise).mockResolvedValue({ id: "alert-2" });
+    alertsIo.list.mockResolvedValueOnce([]).mockReturnValueOnce(lateList.promise);
+    const input = stageOnlyInput(new Date().toISOString());
+
+    const writer = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    // This instance's list is requested while the insert is still in flight.
+    const late = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
+    await waitFor(() => expect(alertsIo.list).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      firstSave.resolve({ id: "alert-1" });
+      await firstSave.promise;
+    });
+    await waitFor(() => expect(alertsIo.log).toHaveBeenCalledTimes(1));
+    // Its list was read before the insert committed, so it cannot show the row.
+    await act(async () => {
+      lateList.resolve([]);
+      await lateList.promise;
+    });
+    await waitFor(() => expect(late.result.current.status).toBe("done"));
+    await settle();
+    expect(savesFor("temp")).toBe(1);
+
+    writer.unmount();
+    late.unmount();
+  });
+
+  it("gives a new refresh context its own retry budget after an earlier one was spent (Codex P2 at 705072e0)", async () => {
+    alertsIo.list.mockResolvedValue([OPEN_STAGE_RH]);
+    alertsIo.update.mockRejectedValue(new Error("network down"));
+    const input = refreshAndInsertInput();
+    const hook = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
+    await waitFor(() => expect(alertsIo.update).toHaveBeenCalledTimes(4));
+    await settle();
+
+    // The grower edits the RH target: a new context, a new budget.
+    const snapshot = input.snapshot as SensorSnapshot;
+    hook.rerender({
+      ...input,
+      targets: compareSnapshotToTargets(snapshot, {
+        rh: { min: 50, max: 72 },
+        temp: { min: 20, max: 28 },
+      }),
+    });
+    await waitFor(() => expect(alertsIo.update).toHaveBeenCalledTimes(8));
+    await settle();
+    expect(alertsIo.update).toHaveBeenCalledTimes(8);
+    expect(hook.result.current.status).toBe("error");
+
+    hook.unmount();
+  });
 });

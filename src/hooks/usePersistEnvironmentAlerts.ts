@@ -92,6 +92,12 @@ let mountedPersistHookCount = 0;
 let activePersistWriteCount = 0;
 const globalInFlightAlertKeys = new Set<string>();
 const globalCreatedEventLoggedKeys = new Set<string>();
+// A successful insert releases its reservation at once, so a later breach of
+// a closed alert can be persisted again. Until then-current list reads catch
+// up, it records a write sequence: a run whose open-alert list was requested
+// before that insert committed skips the key instead of inserting a duplicate.
+let globalAlertWriteSeq = 0;
+const globalCommittedAlertSeq = new Map<string, number>();
 // Mounted instances that skipped a candidate because another write held its
 // alert reservation. A failed write, or a run cleaned up before its write
 // started, releases the reservation and notifies them once so they retry; a
@@ -109,6 +115,7 @@ function maybeClearGlobalSnapshotReservations(): void {
     activePersistWriteCount = 0;
     globalInFlightAlertKeys.clear();
     globalCreatedEventLoggedKeys.clear();
+    globalCommittedAlertSeq.clear();
   }
 }
 
@@ -185,8 +192,10 @@ export function usePersistEnvironmentAlerts(
   const [reservationWake, setReservationWake] = useState(0);
   // Bumped by the bounded retry after an open alert's context refresh fails.
   const [refreshRetryWake, setRefreshRetryWake] = useState(0);
-  // Consecutive failed context-refresh runs; reset by a successful refresh.
+  // Consecutive failed context-refresh runs; reset by a successful refresh or
+  // when the grow, tent, targets, stage or enablement change.
   const refreshFailures = useRef(0);
+  const refreshContext = useRef<string | null>(null);
 
   // Stable deps — recompute on snapshot ts / quality / targets identity.
   // Configured bounds are part of the targets key: persisted reasons quote
@@ -221,6 +230,18 @@ export function usePersistEnvironmentAlerts(
   }, []);
 
   useEffect(() => {
+    const refreshContextKey = [
+      growId ?? "",
+      tentKey,
+      targetsKey,
+      stageKey,
+      enabled ? "on" : "off",
+      targetsPending ? "pending" : "ready",
+    ].join("|");
+    if (refreshContext.current !== refreshContextKey) {
+      refreshContext.current = refreshContextKey;
+      refreshFailures.current = 0;
+    }
     if (!enabled || targetsPending || !growId) {
       setState({ status: "skipped", persistedCount: 0, lastError: null });
       return;
@@ -304,6 +325,8 @@ export function usePersistEnvironmentAlerts(
         reason: string;
         tent: string | null;
       }[] = [];
+      // Inserts committed after this point may be missing from the list below.
+      const listSeq = globalAlertWriteSeq;
       try {
         const rows = await listAlerts({ growId, status: "open" });
         openRows = rows.map((r) => ({
@@ -421,6 +444,9 @@ export function usePersistEnvironmentAlerts(
           blockedAlertKeys.add(key);
           return false;
         }
+        // Another instance inserted this alert after our list was requested;
+        // the row exists even though the list above cannot show it.
+        if ((globalCommittedAlertSeq.get(key) ?? -1) > listSeq) return false;
         activeKeys.add(key);
         pendingKeys.add(key);
         globalInFlightAlertKeys.add(key);
@@ -495,6 +521,11 @@ export function usePersistEnvironmentAlerts(
             source: SOURCE,
             originating_timeline_events: refs,
           });
+          // The row is committed: release the reservation without waking
+          // blocked instances (their stale lists are fenced by the sequence).
+          globalAlertWriteSeq += 1;
+          globalCommittedAlertSeq.set(key, globalAlertWriteSeq);
+          globalInFlightAlertKeys.delete(key);
           const logDedupKey = `${saved?.id ?? ""}::${key}`;
           if (!globalCreatedEventLoggedKeys.has(logDedupKey)) {
             globalCreatedEventLoggedKeys.add(logDedupKey);

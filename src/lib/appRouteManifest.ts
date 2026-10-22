@@ -217,6 +217,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
       "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected).",
   },
   { path: "/grow-room", access: "redirect", description: "→ /" },
+  {
+    path: "/growers/:userId",
+    access: "auth",
+    description: "A grower's active badges, as a signed-in member sees them. No evidence photos.",
+  },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
   {

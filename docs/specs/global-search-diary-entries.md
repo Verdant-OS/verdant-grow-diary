@@ -12,42 +12,54 @@ cultivar references only.
 
 ## Current behaviour (established fact, deploy tip `7b30f121`)
 
-| Piece            | Source                                                                                               | What it searches                                                         |
-| ---------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Private results  | `src/hooks/useGlobalSearch.ts:83` → RPC `verdant_search` (`supabase/migrations/20260723000807_…sql`) | `grows.name`, `tents.name`, `plants.name` for `auth.uid()` (lines 41–57) |
-| Public results   | `searchCultivarReferences` (`src/lib/globalSearchResults.ts:63`)                                     | bundled cultivar constants                                               |
-| Navigation items | `GLOBAL_SEARCH_ITEMS` (`src/lib/globalSearchItems.ts:22`)                                            | fixed page links; "diary" is only a keyword on the Quick Log item        |
-| Merge            | `mergeGlobalSearchResults` (`src/lib/globalSearchResults.ts:143`)                                    | exact → prefix → fuzzy ordering is preserved                             |
+| Piece            | Source                                                                                               | What it searches                                                                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Private results  | `src/hooks/useGlobalSearch.ts:83` → RPC `verdant_search` (`supabase/migrations/20260723000807_…sql`) | `grows.name`, `tents.name`, `plants.name` **and `plants.strain`** for `auth.uid()`, non-archived plants (lines 41–65)                                                                   |
+| Public results   | `searchCultivarReferences` (`src/lib/globalSearchResults.ts:63`)                                     | bundled cultivar constants                                                                                                                                                              |
+| Navigation items | `GLOBAL_SEARCH_ITEMS` (`src/lib/globalSearchItems.ts:22`)                                            | **dormant data**: no runtime code imports it (`GlobalSearchDialog` and `useGlobalSearch` do not), so page links are not searched today; "diary" is only a keyword on its Quick Log item |
+| Merge            | `mergeGlobalSearchResults` (`src/lib/globalSearchResults.ts:143`)                                    | exact → prefix → fuzzy ordering is preserved                                                                                                                                            |
 
-`diary_entries` is never read by search.
+Neither `diary_entries` nor `grow_events` is read by search. `GlobalSearchDialog` shows a row
+only when `enabledTypes[row.entity_type]` is on (`src/components/GlobalSearchDialog.tsx:236`),
+and its group order, default filters, restored session filters, icons, headings and route
+switch know only grow / tent / plant / cultivar.
 
 ## Requirements
 
-1. Match the grower's **own** diary entries on `note` text (case-insensitive literal
-   substring: `%`, `_` and `\` in the query match themselves), newest first with an `id`
-   tie-break, bounded to **10** results and to entries the timeline would show
-   (`retracted_at IS NULL`) in a grow the app can open: entries in archived grows are
-   excluded, because `useGrows().grows` holds active grows only (archived ones are
-   partitioned out in `src/store/grows.tsx`) and `useScopedGrow` resolves `?growId=` against
-   that list, so an archived-grow result could not open its Timeline. "Own" means
-   `user_id = auth.uid()` even for operators: RLS grants operators SELECT on every grower's
-   diary entries (`20260517010926_65004f70-….sql:67–74`), so RLS alone is not owner scoping.
-2. Each result shows: a ~80-character note excerpt with the match, the plant or tent name
+1. Match the grower's **own** logged notes on `note` text in **both** places a log lives:
+   `grow_events` (every confirmed Quick Log save writes this spine row) and `diary_entries`
+   (a companion exists only when structured details exist; `src/hooks/useGrowDetailData.ts:11–15`).
+   Searching `diary_entries` alone would leave plain Quick Logs undiscoverable, which is the
+   filming bug itself. A diary companion linked to a matching spine
+   (`details.linked_grow_event_id`) is one result, not two.
+   - Matching is a case-insensitive literal substring: `%`, `_` and `\` in the query match
+     themselves.
+   - Order is newest first (`occurred_at` / `entry_at`) with an `id` tie-break, bounded to
+     **10** results in total.
+   - Excluded: `grow_events` rows with `is_deleted` or `deleted_at` set, `diary_entries` rows
+     with `retracted_at` set, and entries in archived grows. `useGrows().grows` holds active
+     grows only (archived ones are partitioned out in `src/store/grows.tsx`) and
+     `useScopedGrow` resolves `?growId=` against that list, so an archived-grow result could
+     not open its Timeline.
+   - "Own" means `user_id = auth.uid()` even for operators: RLS grants operators SELECT on
+     every grower's diary entries (`20260517010926_65004f70-….sql:67–74`), so RLS alone is not
+     owner scoping.
+2. Each result shows a ~80-character note excerpt with the match, the plant or tent name
    when known, and the local date (`formatSnapshotTimestamp`). Names come from the same
    owner-scoped read (a relation select on `plants(name)` / `tents(name)`, or one batched
    owner-scoped lookup of the result ids); when a name is unavailable the result shows
-   "Plant" or "Tent" and never a raw id. Selecting it opens the
-   Timeline for **that entry's grow** with the `timeline-entry-<id>` hash. Before anchoring,
-   the implementing slice clears any active Timeline filter (plant, tent, type, search) that
-   would hide the entry. When the entry is a Quick Log companion that
-   `collapseQuickLogSaveFanOut` (`src/lib/timelineMergeRules.ts:312`, called at
-   `src/pages/Timeline.tsx:1814`) folds into another row, the anchor targets the visible
-   row that carries it. The existing hash
-   handoff (`useTimelineHashAnchorHandoff.ts:50–63`) only scrolls to a row that is already
-   mounted, and Timeline initially loads the selected grow's newest 100 entries, so the
-   implementing slice must add a bounded "load until this entry or give up" step (for
-   example one targeted read of the entry plus its page, capped) and a calm "This entry is
-   no longer on the timeline" notice when it cannot be found.
+   "Plant" or "Tent", never a raw id. Selecting a result opens the Timeline for **that
+   entry's grow** with the `timeline-entry-<id>` hash:
+   - Before anchoring, the handoff clears any active Timeline filter (plant, tent, type,
+     search, date) that would hide the entry.
+   - A diary companion that `collapseQuickLogSaveFanOut` (`src/lib/timelineMergeRules.ts:312`,
+     called at `src/pages/Timeline.tsx:1814`) folds into its spine anchors to the spine's id,
+     the row that is actually rendered.
+   - The existing hash handoff (`useTimelineHashAnchorHandoff.ts:50–63`) only scrolls to a row
+     that is already mounted, and Timeline initially loads the selected grow's newest 100
+     entries. The implementing slice adds a bounded "load until this entry or give up" step
+     (for example one targeted read of the entry plus its page, capped) and a calm "This
+     entry is no longer on the timeline" notice when it cannot be found.
 3. A failed diary read is shown as "Diary results unavailable", never as "no results"
    (same rule the private RPC already follows).
 4. No new data exposure: rows come only through RLS-scoped reads; no service role. RLS is
@@ -63,12 +75,19 @@ cultivar references only.
    rank, then score, then label (`src/lib/globalSearchResults.ts:158–162`), which would
    reorder them, so diary results render as their own group after the entity results (or
    carry a rank that encodes their recency order); they are not passed through that sort.
+8. The result reaches the grower: the implementing slice adds a `'diary'` entity type to
+   `GlobalSearchDialog` (group order, default and restored filter state, icon, heading,
+   preview and route switch), so a diary row is not filtered out by `enabledTypes`. The
+   dormant `GLOBAL_SEARCH_ITEMS` catalog stays out of scope; wiring page links into search is
+   a separate change.
 
 ## Options
 
-**Option A — client read, no migration. Fails requirement 6.**
+**Option A — client reads, no migration. Fails requirement 6.**
 A new `src/lib/globalSearchDiaryRules.ts` (pure: literal-pattern escaping, excerpting,
-ordering, label shaping) and a second query in `useGlobalSearch` that reads
+ordering, label shaping, companion dedupe) and extra queries in `useGlobalSearch`: the same
+owner-scoped literal `ilike` over `grow_events` (`is_deleted = false`, `deleted_at is null`,
+ordered `occurred_at desc, id desc`) and over
 `diary_entries.select("id,note,entry_at,plant_id,tent_id,grow_id")`
 `.eq("user_id", <session user id>).ilike("note", "%" + escapeLike(q) + "%")`
 `.is("retracted_at", null).order("entry_at", desc).order("id", desc).limit(10)`.
@@ -95,8 +114,11 @@ Matthew's approval) and a trigram index for scale. The branch must:
   `%` and `_`), not through `verdant_normalize_search_text`: that normalizer replaces every
   non-alphanumeric run with a space (`20260723000807_…sql:12`), so `100%` or `a_b` could not
   match literally;
-- apply `user_id = auth.uid()`, `retracted_at is null`, the active-grow rule and
-  `entry_at desc, id desc` ordering, as in requirement 1.
+- search both `grow_events` and `diary_entries` and dedupe linked companions, applying
+  `user_id = auth.uid()`, the deletion/retraction exclusions, the active-grow rule and
+  newest-first `id`-tie-broken ordering, as in requirement 1;
+- keep every existing branch unchanged, including the `plants.strain` match and the
+  non-archived plant filter; the implementing slice pins both in its regression tests.
 
 ## Acceptance tests (for the implementing slice)
 
@@ -108,6 +130,13 @@ Matthew's approval) and a trigram index for scale. The branch must:
   search text is sent only in the RPC body; the diary branch returns at most 10 rows and
   `grow_id`; `100%` does not match `100 ml` server-side.
 - Short queries: "OG" still returns cultivar and entity results and makes no diary read.
+- Sources: a plain Quick Log note (spine row, no companion) is found; a spine with a linked
+  diary companion that both match is one result; a deleted spine and a retracted entry are not
+  returned. Option B: a plant found by its `strain` is still returned.
+- Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
+  with restored session filter state; selecting it navigates to
+  `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
+  companion), including for a grow other than the active one.
 - Ordering: diary results render in newest-first order after merging with entity results.
 - Archived grows: a matching entry in an archived grow is not returned.
 - Operator regression: a session with the operator role and diary rows from several owners

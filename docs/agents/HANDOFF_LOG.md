@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PROTECTED-PREFLIGHT-RERUN-2320
+
+```text
+TASK PROTECTED-PREFLIGHT-RERUN-2320  priority: P2  status: OPEN
+goal: Explain protected Quick Log revision replay rerun rejection without weakening production authorization.
+branch: copilot/fix-failing-github-actions-job-please-work
+base: verdant-grow-diary
+checkout: git switch copilot/fix-failing-github-actions-job-please-work
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2320
+head_sha: Last inspected checkout 3962a4573e7ee304642cc220fe5f9cb538353399; repair commit follows. Re-read PR head before resuming.
+state: Job 119586062887 (run 38091479457 attempt 4) reused successful attempt-1 validation and failed the authorization runner's first-attempt-only policy. Added a job-local guard before API calls with fresh-dispatch guidance in the error and sanitized report. Policy unchanged.
+next_action: Run targeted Vitest in a provisioned environment, then obtain independent exact-head review; no production rerun or dispatch by this agent.
+files: .github/workflows/apply-quicklog-revision-idempotent-replay.yml; src/test/quicklog-revision-replay-rerun-guard.test.ts; docs/agents/HANDOFF_LOG.md
+blockers: Bun and node_modules absent. Vitest BLOCKED (bunx: command not found). Production operation remains unauthorized.
+artifacts: Linked Actions job logs; actual YAML shell executed locally with stubbed gh: RED 1 PASS / 7 FAIL, GREEN 8 PASS / 0 FAIL; bash syntax and git diff --check PASS. No database process or real API call in these tests.
+reviewer_seat: Blue Dream or Durban Poison; author cannot supply independent acceptance.
+claimed_by: GitHub Copilot, explicit issue assignment, 2026-10-22 UTC; no claim comment posted because the current operating-state gate requires separate comment approval.
+last_updated: 2026-10-22 01:35 UTC, by GitHub Copilot
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text

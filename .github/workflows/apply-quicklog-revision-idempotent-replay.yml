@@ -193,6 +193,12 @@ jobs:
               > "$AUDIT_PATH"
           }
           trap authorization_failure ERR
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then
+            authorization_failure
+            echo "::error::Protected workflow reruns are forbidden; use a fresh dispatch."
+            printf '\nProtected workflow reruns are forbidden; use a fresh dispatch.\n' >> "$REPORT_PATH"
+            exit 1
+          fi
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --jq '{id,run_attempt,event,path,head_branch,head_sha,repository:{id:.repository.id,full_name:.repository.full_name},head_repository:{id:.head_repository.id,full_name:.head_repository.full_name},actor:{id:.actor.id,login:.actor.login},triggering_actor:{id:.triggering_actor.id,login:.triggering_actor.login}}' \
             > "$CURRENT_RUN_JSON" 2>/dev/null

@@ -64,6 +64,7 @@ import {
   classifyDoctorNextStepsResponse,
   resolveDoctorGrowNextStepsTarget,
 } from "@/lib/doctorGrowNextStepsRules";
+import { DOCTOR_GROW_NEXT_STEPS_COPY as COPY } from "@/constants/doctorGrowNextStepsCopy";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -295,6 +296,47 @@ describe("/doctor grow-level next steps", () => {
     renderPage();
     expect(screen.queryByTestId("doctor-grow-next-steps")).toBeNull();
   });
+
+  it("shows the generic failure copy when the coach response is not usable", async () => {
+    state.invoke.mockResolvedValue({ data: { ok: false, reason: "http_502" } });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    const failed = await screen.findByTestId("doctor-grow-next-steps-failed");
+    expect(failed.textContent).toBe(COPY.failed);
+    expect(screen.queryByTestId("doctor-grow-next-steps-uncertain")).toBeNull();
+  });
+
+  it("shows the generic failure copy when credit is denied without a credit payload", async () => {
+    state.invoke.mockResolvedValue({ data: { ok: false, reason: "credit_denied" } });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    const failed = await screen.findByTestId("doctor-grow-next-steps-failed");
+    expect(failed.textContent).toBe(COPY.failed);
+    expect(screen.queryByTestId("doctor-grow-next-steps-credit-limit")).toBeNull();
+  });
+
+  it("reuses the same request key for credit_rpc pending retries", async () => {
+    state.invoke.mockResolvedValue({ data: { ok: false, reason: "credit_rpc" } });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await screen.findByTestId("doctor-grow-next-steps-pending");
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await waitFor(() => expect(state.invoke).toHaveBeenCalledTimes(2));
+    const keys = state.invoke.mock.calls.map((c) => c[1].body.idempotencyKey);
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  it("issues a fresh idempotency key after a completed result", async () => {
+    state.invoke.mockResolvedValue({ data: { ok: true, result: { analysis: ANALYSIS } } });
+    renderPage();
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await screen.findByTestId("doctor-grow-next-steps-result");
+    state.invoke.mockResolvedValue({ data: { ok: true, result: { analysis: ANALYSIS } } });
+    fireEvent.click(screen.getByTestId("doctor-grow-next-steps-run"));
+    await waitFor(() => expect(state.invoke).toHaveBeenCalledTimes(2));
+    const keys = state.invoke.mock.calls.map((c) => c[1].body.idempotencyKey);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
 });
 
 describe("doctorGrowNextStepsRules", () => {
@@ -344,6 +386,96 @@ describe("doctorGrowNextStepsRules", () => {
     });
     expect(classifyDoctorNextStepsResponse({ ok: false, reason: "http" })).toEqual({
       kind: "failed",
+    });
+  });
+
+  it("returns null while carried scope is unresolved even when an active grow exists", () => {
+    expect(
+      resolveDoctorGrowNextStepsTarget({
+        grows: [
+          { id: "a", name: "Active" },
+          { id: "b", name: "Carried" },
+        ],
+        growsLoading: false,
+        growsError: null,
+        carriedScopeUnresolved: true,
+        carriedGrowId: "b",
+        activeGrowId: "a",
+      }),
+    ).toBeNull();
+  });
+
+  it("classifies empty, credit, upstream and pending coach outcomes", () => {
+    const creditDenial = {
+      ok: false as const,
+      status: "denied" as const,
+      reason: "limit_reached",
+      scope: "per_grow",
+      plan_id: "free",
+      remaining: 0,
+    };
+    expect(classifyDoctorNextStepsResponse({ ok: true, result: { empty: true } })).toEqual({
+      kind: "empty",
+    });
+    expect(
+      classifyDoctorNextStepsResponse({
+        ok: false,
+        reason: "credit_denied",
+        credit: creditDenial,
+      }),
+    ).toEqual({
+      kind: "credit_denied",
+      credit: creditDenial,
+    });
+    expect(classifyDoctorNextStepsResponse({ ok: false, reason: "credit_denied" })).toEqual({
+      kind: "credit_denied",
+      credit: null,
+    });
+    expect(
+      classifyDoctorNextStepsResponse({ ok: false, reason: "upstream_credit_exhausted" }),
+    ).toEqual({ kind: "upstream_exhausted" });
+    expect(classifyDoctorNextStepsResponse({ ok: false, reason: "credit_rpc" })).toEqual({
+      kind: "pending",
+    });
+  });
+
+  it("normalizes a full analysis payload and preserves unknown risk", () => {
+    expect(
+      classifyDoctorNextStepsResponse({
+        ok: true,
+        result: {
+          sparse: true,
+          analysis: {
+            summary: " Steady. ",
+            likely_issue: "  ",
+            confidence: "HIGH",
+            risk_level: "unknown",
+            evidence: [" good ", "", 3],
+            possible_causes: ["cause"],
+            recommended_actions: ["act"],
+            do_not_do: ["stop"],
+            follow_up_24h: "tomorrow",
+            follow_up_3_day: " three days ",
+          },
+          diagnosis: { missingInformation: ["pot size", ""] },
+        },
+      }),
+    ).toEqual({
+      kind: "result",
+      analysis: {
+        summary: "Steady.",
+        likelyIssue: null,
+        confidence: "low",
+        sparse: true,
+        riskLevel: "unknown",
+        evidence: ["good"],
+        missingInformation: ["pot size"],
+        possibleCauses: ["cause"],
+        recommendedActions: ["act"],
+        doNotDo: ["stop"],
+        followUp24h: "tomorrow",
+        followUp3Day: "three days",
+      },
     });
   });
 });

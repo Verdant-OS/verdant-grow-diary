@@ -360,6 +360,17 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
     await waitFor(() => expect(listedDiaryEntries()).toHaveLength(1));
     expect(chipButton("Notes")).toHaveAttribute("aria-pressed", "true");
     expect(listedDiaryEntries()[0].id).toBe("timeline-entry-note-1");
+
+    // Switching back to All restores the blank and whitespace watering rows.
+    fireEvent.click(chipButton("All"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(3));
+    expect(chipButton("All")).toHaveAttribute("aria-pressed", "true");
+    expect(chipButton("Notes")).toHaveAttribute("aria-pressed", "false");
+    expect(listedDiaryEntries().map((n) => n.id)).toEqual([
+      "timeline-entry-note-1",
+      "timeline-entry-water-1",
+      "timeline-entry-water-2",
+    ]);
   });
 });
 

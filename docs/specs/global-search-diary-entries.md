@@ -73,8 +73,11 @@ switch know only grow / tent / plant / cultivar.
    not. The existing `verdant_search` RPC already sends `q` in a POST body.
 7. Diary results keep their own newest-first order. `mergeGlobalSearchResults` sorts by
    rank, then score, then label (`src/lib/globalSearchResults.ts:158–162`), which would
-   reorder them, so diary results render as their own group after the entity results (or
-   carry a rank that encodes their recency order); they are not passed through that sort.
+   reorder equal-rank excerpts alphabetically (`"alpha…"` before `"zeta…"` even when zeta
+   is newer). Diary rows are composed **after** that merge as their own group after the
+   entity results and are never arguments to `mergeGlobalSearchResults`. Encoding recency
+   in `rank` is an allowed alternative only if the implementing slice still asserts the
+   same final composed list order.
 8. The result reaches the grower: the implementing slice adds a `'diary'` entity type to
    `GlobalSearchDialog` (group order, default and restored filter state, icon, heading,
    preview and route switch), so a diary row is not filtered out by `enabledTypes`. The
@@ -137,7 +140,14 @@ Matthew's approval) and a trigram index for scale. The branch must:
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
   companion), including for a grow other than the active one.
-- Ordering: diary results render in newest-first order after merging with entity results.
+- Ordering: assert the **final composed list** (hook `results` after entity+diary
+  composition, or the dialog's rendered groups), not only the diary helper's return
+  value. Entity ids stay in `mergeGlobalSearchResults` order; diary ids then follow
+  newest-first with `id` tie-break. Trap: equal-rank diary rows
+  `id: "newer-zeta"` / `label: "zeta yellow leaves"` (newer) and
+  `id: "older-alpha"` / `label: "alpha yellow leaves"` (older) still yield
+  `[...entityIds, "newer-zeta", "older-alpha"]` after composition. Passing those two
+  rows through `mergeGlobalSearchResults` today puts `"older-alpha"` first.
 - Archived grows: a matching entry in an archived grow is not returned.
 - Operator regression: a session with the operator role and diary rows from several owners
   returns only its own rows.

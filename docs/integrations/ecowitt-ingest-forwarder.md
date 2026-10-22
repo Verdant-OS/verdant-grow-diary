@@ -50,9 +50,17 @@ bun run dev:ecowitt-forwarder:live -- --once --write-report
   anywhere else.
 - A message without `PASSKEY` or `dateutc` (for example the runbook's
   hand-made sanity POST) is rejected locally and never forwarded.
-- Logs and reports pass through a redactor: `PASSKEY`, `MAC`, tokens and MQTT
-  credentials never appear. The Mosquitto watcher window still shows the raw
-  topic, so crop it from anything you share.
+- The live POST is sent with `redirect: "error"`: a redirect from the
+  validated URL is reported as `network_error`, never followed with the
+  PASSKEY and token.
+- A message whose `PASSKEY` or `dateutc` is not a string is rejected locally
+  (`invalid_passkey` / `invalid_dateutc`); nothing is coerced.
+- `--once` claims the first message before any await, so a second upload
+  arriving while the first is in flight is ignored, never forwarded.
+- Logs and reports pass through a redactor at every depth: `PASSKEY`, `MAC`,
+  tokens (also when embedded in another string or a URL) and MQTT credentials
+  never appear. The Mosquitto watcher window still shows the raw topic, so
+  crop it from anything you share.
 
 ## What it never does
 

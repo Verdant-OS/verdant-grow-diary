@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildForwardRequest,
+  createMessageHandler,
   handleMessage,
   liveConfigProblems,
   onceExitCode,
@@ -15,6 +16,7 @@ import {
   prepareForwardPayload,
   readEnv,
   redactForLog,
+  redactString,
   summarizeResponse,
   type ForwarderEnv,
   type ForwarderFlags,
@@ -148,6 +150,29 @@ describe("prepareForwardPayload", () => {
   it.each(["not json", "[1,2]", "null", '"str"'])("refuses %s", (text) => {
     expect(prepareForwardPayload(text).ok).toBe(false);
   });
+
+  // Copilot on #2335: `String(x)` on these throws; they must be local rejections.
+  const HOSTILE = { toString: null };
+  it("rejects a non-string PASSKEY without throwing", () => {
+    const text = JSON.stringify({ PASSKEY: HOSTILE, dateutc: "2026-10-22 05:27:14" });
+    expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "invalid_passkey" });
+  });
+
+  it("rejects a non-string dateutc without throwing", () => {
+    const text = JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: HOSTILE });
+    expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "invalid_dateutc" });
+  });
+
+  it("omits a non-string stationtype instead of coercing it", () => {
+    const text = JSON.stringify({
+      PASSKEY: FAKE_PASSKEY,
+      dateutc: "2026-10-22 05:27:14",
+      stationtype: HOSTILE,
+    });
+    const out = prepareForwardPayload(text);
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.summary.station).toBeNull();
+  });
 });
 
 describe("handleMessage", () => {
@@ -184,6 +209,8 @@ describe("handleMessage", () => {
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe(`Bearer ${FAKE_BRIDGE_TOKEN}`);
     expect(headers["Content-Type"]).toBe("application/json");
+    // A redirect would resend PASSKEY and the token to an unvalidated target.
+    expect(init.redirect).toBe("error");
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
     expect(body.PASSKEY).toBe(FAKE_PASSKEY);
     expect(body.temp2f).toBe(81.68);
@@ -204,6 +231,21 @@ describe("handleMessage", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
     expect(out).toEqual({ kind: "rejected_locally", reason: "missing_passkey" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    JSON.stringify({ PASSKEY: { toString: null }, dateutc: "2026-10-22 05:27:14" }),
+    JSON.stringify({ PASSKEY: FAKE_PASSKEY, dateutc: { toString: null } }),
+  ])("live with a hostile field never calls fetch and never throws", async (text) => {
+    const fetchImpl = vi.fn();
+    const out = await handleMessage({
+      text,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(out.kind).toBe("rejected_locally");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -307,5 +349,64 @@ describe("redaction", () => {
     const req = buildForwardRequest({ PASSKEY: FAKE_PASSKEY }, INGEST_URL, FAKE_BRIDGE_TOKEN);
     expect(req.init.body).not.toContain(FAKE_BRIDGE_TOKEN);
     expect(req.init.headers.Authorization).toContain(FAKE_BRIDGE_TOKEN);
+    expect(req.init.redirect).toBe("error");
+  });
+
+  // Copilot on #2335: outcomes nest the summary; the broker URL may carry credentials.
+  it("redacts a token embedded in a nested outcome summary", () => {
+    const out = redactForLog({
+      kind: "dry_run",
+      summary: { station: FAKE_BRIDGE_TOKEN, air_channels: [2], note: [FAKE_BRIDGE_TOKEN] },
+      response: { reason: `rejected ${FAKE_BRIDGE_TOKEN}` },
+    });
+    expect(JSON.stringify(out)).not.toMatch(/vbt_/);
+    expect((out.summary as { air_channels: number[] }).air_channels).toEqual([2]);
+  });
+
+  it("redacts broker URL credentials in the startup fields", () => {
+    expect(redactString(`wss://broker/mqtt?token=${FAKE_BRIDGE_TOKEN}`)).toBe(
+      "wss://broker/mqtt?token=(redacted)",
+    );
+    expect(redactString("mqtt://grower:hunter2@192.168.68.67:1883")).toBe(
+      "mqtt://(redacted)@192.168.68.67:1883",
+    );
+    const out = redactForLog({ broker: `mqtts://u:p@host/?password=${FAKE_BRIDGE_TOKEN}` });
+    expect(JSON.stringify(out)).not.toMatch(/vbt_|u:p/);
+  });
+});
+
+describe("createMessageHandler (--once)", () => {
+  it("forwards at most one message while the first POST is still pending", async () => {
+    let release: (r: Response) => void = () => {};
+    const fetchImpl = vi.fn(() => new Promise<Response>((resolve) => (release = resolve)));
+    const onDone = vi.fn();
+    const handle = createMessageHandler({
+      flags: flags({ live: true, once: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onDone,
+    });
+    handle("ecowitt/grow", Buffer.from(GATEWAY_MESSAGE));
+    handle("ecowitt/grow", Buffer.from(GATEWAY_MESSAGE));
+    await Promise.resolve();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    release(new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(onDone).toHaveBeenCalledWith(0);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a handler failure and exits 1 instead of leaving an unhandled rejection", async () => {
+    const onDone = vi.fn();
+    const handle = createMessageHandler({
+      flags: flags({ once: true, writeReport: true }),
+      env: LIVE_ENV,
+      writeReportImpl: async () => {
+        throw new Error("disk full");
+      },
+      onDone,
+    });
+    handle("ecowitt/grow", GATEWAY_MESSAGE);
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalledWith(1));
   });
 });

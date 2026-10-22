@@ -55,6 +55,17 @@ describe("ecowitt-ingest-forwarder — static safety", () => {
     expect(body.indexOf("if (!args.flags.live) return")).toBeLessThan(body.indexOf("fetchImpl("));
   });
 
+  it("never follows a redirect with the credential-bearing POST", () => {
+    expect(CODE).toMatch(/redirect: "error"/);
+  });
+
+  it("claims the --once message synchronously, before the first await", () => {
+    const body = CODE.slice(CODE.indexOf("export function createMessageHandler"));
+    const claim = body.indexOf("claimed = true");
+    expect(claim).toBeGreaterThan(-1);
+    expect(claim).toBeLessThan(body.indexOf("await"));
+  });
+
   it("requires the vbt_ token shape and https before going live", () => {
     expect(CODE).toMatch(/\^vbt_/);
     expect(CODE).toMatch(/protocol !== "https:"/);

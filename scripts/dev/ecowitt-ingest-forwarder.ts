@@ -122,7 +122,12 @@ export function liveConfigProblems(env: ForwarderEnv): LiveConfigProblem[] {
 }
 
 export type PrepareReason =
-  "malformed_json" | "not_an_object" | "missing_passkey" | "missing_dateutc";
+  | "malformed_json"
+  | "not_an_object"
+  | "missing_passkey"
+  | "invalid_passkey"
+  | "missing_dateutc"
+  | "invalid_dateutc";
 
 export interface PayloadSummary {
   /** Air channels present as temp{n}f / humidity{n}. */
@@ -163,12 +168,21 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
     if (!BRIDGE_WRAPPER_KEYS.has(k)) payload[k] = v;
   }
+  // Untrusted input: only a string is ever read (Copilot on #2335). `String(x)`
+  // on an object with a null `toString` throws, which would escape the MQTT
+  // listener as an unhandled rejection.
   const passkeyKey = findKey(payload, "PASSKEY");
-  if (!passkeyKey || !String(payload[passkeyKey] ?? "").trim()) {
-    return { ok: false, reason: "missing_passkey" };
-  }
+  const passkey = passkeyKey ? payload[passkeyKey] : undefined;
+  if (passkey === undefined || passkey === null) return { ok: false, reason: "missing_passkey" };
+  if (typeof passkey !== "string") return { ok: false, reason: "invalid_passkey" };
+  if (!passkey.trim()) return { ok: false, reason: "missing_passkey" };
   const dateutcKey = findKey(payload, "dateutc");
-  const dateutc = dateutcKey ? String(payload[dateutcKey] ?? "").trim() : "";
+  const dateutcRaw = dateutcKey ? payload[dateutcKey] : undefined;
+  if (dateutcRaw === undefined || dateutcRaw === null) {
+    return { ok: false, reason: "missing_dateutc" };
+  }
+  if (typeof dateutcRaw !== "string") return { ok: false, reason: "invalid_dateutc" };
+  const dateutc = dateutcRaw.trim();
   if (!dateutc) return { ok: false, reason: "missing_dateutc" };
 
   const air = new Set<number>();
@@ -180,6 +194,7 @@ export function prepareForwardPayload(text: string): PreparedPayload {
     if (s) soil.add(Number(s[1]));
   }
   const stationKey = findKey(payload, "stationtype");
+  const stationRaw = stationKey ? payload[stationKey] : undefined;
   return {
     ok: true,
     payload,
@@ -188,14 +203,20 @@ export function prepareForwardPayload(text: string): PreparedPayload {
       soil_channels: [...soil].sort((x, y) => x - y),
       key_count: Object.keys(payload).length,
       dateutc,
-      station: stationKey ? String(payload[stationKey]) : null,
+      station: typeof stationRaw === "string" ? stationRaw : null,
     },
   };
 }
 
 export interface ForwardRequest {
   url: string;
-  init: { method: "POST"; headers: Record<string, string>; body: string };
+  init: {
+    method: "POST";
+    headers: Record<string, string>;
+    body: string;
+    /** A redirect would resend PASSKEY and the bearer token elsewhere; refuse it. */
+    redirect: "error";
+  };
 }
 
 /** Pure. The exact request the live path sends: JSON body, bearer auth. */
@@ -213,6 +234,7 @@ export function buildForwardRequest(
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
+      redirect: "error",
     },
   };
 }
@@ -245,15 +267,41 @@ export function summarizeResponse(status: number, bodyText: string): ResponseSum
   };
 }
 
-/** Drops any key that could carry a credential or device identifier. */
-export function redactForLog(fields: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(fields)) {
-    if (SECRET_KEY_RE.test(k)) out[k] = "(redacted)";
-    else if (typeof v === "string" && /^(vbt_|sk_|sbp_)/.test(v)) out[k] = "(redacted)";
-    else out[k] = v;
+/** Token shapes that must never appear in output, wherever they sit in a string. */
+const EMBEDDED_SECRET_RE = /\b(?:vbt|sk|sbp)_[A-Za-z0-9_-]{4,}/g;
+/** `scheme://user:password@host` → `scheme://(redacted)@host`. */
+const URL_USERINFO_RE = /(\/\/)[^/\s@]+@/g;
+/** `?token=…`, `&password=…` and similar query credentials. */
+const URL_SECRET_QUERY_RE = /([?&](?:token|key|api_key|password|passkey|secret)=)[^&\s]*/gi;
+
+/** Pure. Redacts embedded tokens and URL credentials inside one string. */
+export function redactString(value: string): string {
+  return value
+    .replace(EMBEDDED_SECRET_RE, "(redacted)")
+    .replace(URL_USERINFO_RE, "$1(redacted)@")
+    .replace(URL_SECRET_QUERY_RE, "$1(redacted)");
+}
+
+function redactValue(value: unknown): unknown {
+  if (typeof value === "string") return redactString(value);
+  if (Array.isArray(value)) return value.map(redactValue);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = SECRET_KEY_RE.test(k) ? "(redacted)" : redactValue(v);
+    }
+    return out;
   }
-  return out;
+  return value;
+}
+
+/**
+ * Drops any key that could carry a credential or device identifier, at every
+ * depth, and scrubs token shapes and URL credentials from every string
+ * (Copilot on #2335: outcome summaries and the broker URL are nested).
+ */
+export function redactForLog(fields: Record<string, unknown>): Record<string, unknown> {
+  return redactValue(fields) as Record<string, unknown>;
 }
 
 export type ForwardOutcome =
@@ -325,6 +373,56 @@ async function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Prom
   log("report written", { path: DEFAULT_REPORT_PATH });
 }
 
+export interface MessageHandlerDeps {
+  flags: ForwarderFlags;
+  env: ForwarderEnv;
+  fetchImpl?: typeof fetch;
+  writeReportImpl?: (outcome: ForwardOutcome, flags: ForwarderFlags) => Promise<void>;
+  /** Called exactly once in `--once` mode with the exit code. */
+  onDone: (exitCode: number) => void;
+}
+
+/**
+ * The MQTT "message" listener. The EventEmitter does not await it, so in
+ * `--once` mode the first message is claimed synchronously, before any
+ * await, and every later delivery is ignored: one live POST at most
+ * (Copilot on #2335). A throw inside the handler is logged, never left as an
+ * unhandled rejection.
+ */
+export function createMessageHandler(
+  deps: MessageHandlerDeps,
+): (topic: string, buf: Buffer | string) => void {
+  let claimed = false;
+  return (_topic, buf) => {
+    if (deps.flags.once) {
+      if (claimed) {
+        log("ignored_extra_message", { reason: "--once is already handling a message" });
+        return;
+      }
+      claimed = true;
+    }
+    const text = typeof buf === "string" ? buf : buf.toString("utf8");
+    void (async () => {
+      let exitCode = 1;
+      try {
+        const outcome = await handleMessage({
+          text,
+          flags: deps.flags,
+          env: deps.env,
+          fetchImpl: deps.fetchImpl,
+        });
+        log(outcome.kind, outcome as unknown as Record<string, unknown>);
+        if (deps.flags.writeReport)
+          await (deps.writeReportImpl ?? writeReport)(outcome, deps.flags);
+        exitCode = onceExitCode(outcome);
+      } catch (e) {
+        log("handler_error", { error: e instanceof Error ? e.message : "unknown" });
+      }
+      if (deps.flags.once) deps.onDone(exitCode);
+    })();
+  };
+}
+
 async function connectMqtt(flags: ForwarderFlags, env: ForwarderEnv): Promise<any> {
   let mqtt: any;
   try {
@@ -360,7 +458,7 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
       ? "LIVE — forwarding to ecowitt-ingest"
       : "dry-run — nothing leaves this machine",
     topic: flags.topic,
-    broker: flags.mqttUrl.replace(/\/\/[^@]*@/, "//"),
+    broker: flags.mqttUrl,
     ingest_url: flags.live ? env.ingestUrl : "(none — dry-run)",
     once: flags.once,
   });
@@ -371,15 +469,17 @@ export async function main(argv: readonly string[], processEnv: NodeJS.ProcessEn
     client.subscribe(flags.topic);
   });
   client.on("error", (e: Error) => log("mqtt_error", { error: e.message }));
-  client.on("message", async (_topic: string, buf: Buffer) => {
-    const outcome = await handleMessage({ text: buf.toString("utf8"), flags, env });
-    log(outcome.kind, outcome as unknown as Record<string, unknown>);
-    if (flags.writeReport) await writeReport(outcome, flags);
-    if (flags.once) {
-      client.end();
-      process.exit(onceExitCode(outcome));
-    }
-  });
+  client.on(
+    "message",
+    createMessageHandler({
+      flags,
+      env,
+      onDone: (exitCode) => {
+        client.end();
+        process.exit(exitCode);
+      },
+    }),
+  );
 }
 
 const invokedDirectly =

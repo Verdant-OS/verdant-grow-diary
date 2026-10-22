@@ -14,6 +14,7 @@ import {
   buildForwardRequest,
   buildReport,
   createBoundedRunner,
+  createSerialQueue,
   MAX_BACKLOG,
   MAX_INFLIGHT,
   createMessageHandler,
@@ -255,6 +256,16 @@ describe("prepareForwardPayload", () => {
       expect(out.summary.air_channels).toEqual([1]);
       expect(out.summary.soil_channels).toEqual([4]);
     }
+  });
+
+  it("rejects a payload with two PASSKEY keys differing only in case (Codex P1 at 5a7accaf)", () => {
+    const text = JSON.stringify({
+      PASSKEY: FAKE_PASSKEY,
+      passkey: "SECOND-NOT-A-SHAPE",
+      dateutc: "2026-10-22 05:27:14",
+      stationtype: "SECOND-NOT-A-SHAPE",
+    });
+    expect(prepareForwardPayload(text)).toEqual({ ok: false, reason: "duplicate_passkey" });
   });
 
   it("omits a non-string stationtype instead of coercing it", () => {
@@ -620,6 +631,16 @@ describe("redaction", () => {
       }),
     );
     expect(glued.ok && glued.summary.station).toBeNull();
+    // Twelve contiguous hex digits, glued or not (Codex P1 at 5a7accaf).
+    expect(redactString("GWAABBCCDDEEFF")).toBe("GW(redacted)");
+    const contiguous = prepareForwardPayload(
+      JSON.stringify({
+        PASSKEY: FAKE_PASSKEY,
+        dateutc: "2026-10-22 05:27:14",
+        stationtype: "GWAABBCCDDEEFF",
+      }),
+    );
+    expect(contiguous.ok && contiguous.summary.station).toBeNull();
     // A plain firmware string is not a MAC.
     expect(redactString("GW3000B_V1.2.4")).toBe("GW3000B_V1.2.4");
   });
@@ -654,6 +675,13 @@ describe("redaction", () => {
     );
     expect(redactString("mqtt://grower:hunter2@192.168.68.67:1883")).toBe(
       "mqtt://(redacted)@192.168.68.67:1883",
+    );
+    // A password that itself contains `@` is consumed whole (Codex P1 at 5a7accaf).
+    expect(redactString("mqtt://user:pa@ss@broker.example/x")).toBe(
+      "mqtt://(redacted)@broker.example/x",
+    );
+    expect(redactString("mqtt://user:pa@ss@broker.example")).toBe(
+      "mqtt://(redacted)@broker.example",
     );
     const out = redactForLog({ broker: `mqtts://u:p@host/?password=${FAKE_BRIDGE_TOKEN}` });
     expect(JSON.stringify(out)).not.toMatch(/vbt_|u:p/);
@@ -814,13 +842,48 @@ describe("bounded concurrency in continuous mode (Codex P2 at 0676e200)", () => 
   });
 });
 
+describe("createSerialQueue (Codex P2 at 5a7accaf)", () => {
+  it("runs tasks one at a time in submission order, and a failure does not block the next", async () => {
+    const queue = createSerialQueue();
+    const events: string[] = [];
+    let releaseFirst: () => void = () => {};
+    const first = queue.run(
+      () =>
+        new Promise<void>((resolve) => {
+          events.push("first:start");
+          releaseFirst = () => {
+            events.push("first:end");
+            resolve();
+          };
+        }),
+    );
+    const second = queue.run(async () => {
+      events.push("second:start");
+      throw new Error("boom");
+    });
+    const third = queue.run(async () => {
+      events.push("third:start");
+    });
+    await Promise.resolve();
+    expect(events).toEqual(["first:start"]);
+    releaseFirst();
+    await first;
+    await expect(second).rejects.toThrow("boom");
+    await third;
+    expect(events).toEqual(["first:start", "first:end", "second:start", "third:start"]);
+  });
+});
+
 describe("attachClientLifecycle (--once broker failures)", () => {
   function fakeClient() {
     const handlers = new Map<string, (...args: unknown[]) => void>();
     let subscribeErr: Error | null = null;
     return {
       on: (event: string, listener: (...args: unknown[]) => void) => handlers.set(event, listener),
-      subscribe: (_topic: string, cb?: (err?: Error | null) => void) => cb?.(subscribeErr),
+      subscribe: (
+        topic: string,
+        cb?: (err?: Error | null, granted?: ReadonlyArray<{ topic: string; qos: number }>) => void,
+      ) => cb?.(subscribeErr, subscribeErr ? undefined : [{ topic, qos: 0 }]),
       emit: (event: string, ...args: unknown[]) => handlers.get(event)?.(...args),
       failSubscribe: (e: Error) => (subscribeErr = e),
     };
@@ -934,6 +997,34 @@ describe("attachClientLifecycle (--once broker failures)", () => {
       vi.useRealTimers();
     }
   });
+
+  it.each([
+    ["QoS 128 grant", [{ topic: "ecowitt/grow", qos: 128 }]],
+    ["no grant", undefined],
+    ["empty grant list", []],
+  ] as const)(
+    "exits 2 when the broker refuses the topic via the SUBACK grant: %s (Codex P2 at 5a7accaf)",
+    (_label, granted) => {
+      const handlers = new Map<string, (...args: unknown[]) => void>();
+      const client = {
+        on: (event: string, listener: (...args: unknown[]) => void) =>
+          handlers.set(event, listener),
+        subscribe: (
+          _topic: string,
+          cb?: (err?: Error | null, g?: ReadonlyArray<{ topic: string; qos: number }>) => void,
+        ) => cb?.(null, granted as ReadonlyArray<{ topic: string; qos: number }> | undefined),
+      };
+      const onFatal = vi.fn();
+      attachClientLifecycle(client, {
+        flags: flags({ once: true }),
+        onFatal,
+        connectTimeoutMs: 60_000,
+      });
+      handlers.get("connect")?.();
+      expect(onFatal).toHaveBeenCalledTimes(1);
+      expect(onFatal).toHaveBeenCalledWith(2);
+    },
+  );
 
   it("exits 2 when the broker connects but never answers the subscription (Codex P2 at 3c16b6a4)", () => {
     vi.useFakeTimers();

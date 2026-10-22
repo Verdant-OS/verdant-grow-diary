@@ -176,6 +176,7 @@ export type PrepareReason =
   | "invalid_passkey"
   | "missing_dateutc"
   | "invalid_dateutc"
+  | "duplicate_passkey"
   | "payload_too_large";
 
 export interface PayloadSummary {
@@ -223,6 +224,11 @@ export function prepareForwardPayload(text: string): PreparedPayload {
   // Untrusted input: only a string is ever read (Copilot on #2335). `String(x)`
   // on an object with a null `toString` throws, which would escape the MQTT
   // listener as an unhandled rejection.
+  // Two keys that differ only in case would leave a second credential value
+  // the summary checks never see (Codex P1 on #2335 at 5a7accaf).
+  if (Object.keys(payload).filter((k) => k.toLowerCase() === "passkey").length > 1) {
+    return { ok: false, reason: "duplicate_passkey" };
+  }
   const passkeyKey = findKey(payload, "PASSKEY");
   const passkey = passkeyKey ? payload[passkeyKey] : undefined;
   if (passkey === undefined || passkey === null) return { ok: false, reason: "missing_passkey" };
@@ -352,8 +358,18 @@ const HEX32_RE = /[0-9a-f]{32}/gi;
  * echoed (Codex P1 on #2335 at 3c16b6a4 and efeae597).
  */
 const MAC_RE = /(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}|(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}/gi;
-/** `scheme://user:password@host` → `scheme://(redacted)@host`. */
-const URL_USERINFO_RE = /(\/\/)[^/\s@]+@/g;
+/**
+ * A MAC written as 12 contiguous hex digits (Codex P1 on #2335 at 5a7accaf).
+ * Any 12-hex run is scrubbed, glued or not; over-redacting another hex string
+ * in a log is harmless.
+ */
+const MAC12_RE = /[0-9a-f]{12}/gi;
+/**
+ * `scheme://user:password@host` → `scheme://(redacted)@host`. Greedy up to the
+ * last `@` before the path, so a password that itself contains `@` is consumed
+ * whole (Codex P1 on #2335 at 5a7accaf).
+ */
+const URL_USERINFO_RE = /(\/\/)[^/\s]*@/g;
 /** `?token=…`, `&password=…` and similar query credentials. */
 const URL_SECRET_QUERY_RE = /([?&](?:token|key|api_key|password|passkey|secret)=)[^&\s]*/gi;
 
@@ -363,6 +379,7 @@ export function redactString(value: string): string {
     .replace(EMBEDDED_SECRET_RE, "(redacted)")
     .replace(MAC_RE, "(redacted)")
     .replace(HEX32_RE, "(redacted)")
+    .replace(MAC12_RE, "(redacted)")
     .replace(URL_USERINFO_RE, "$1(redacted)@")
     .replace(URL_SECRET_QUERY_RE, "$1(redacted)");
 }
@@ -521,13 +538,42 @@ export function buildReport(
   });
 }
 
-async function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Promise<void> {
-  const { mkdir, writeFile } = await import("node:fs/promises");
-  const path = await import("node:path");
-  const report = buildReport(outcome, flags, new Date().toISOString());
-  await mkdir(path.dirname(DEFAULT_REPORT_PATH), { recursive: true });
-  await writeFile(DEFAULT_REPORT_PATH, JSON.stringify(report, null, 2), "utf8");
-  log("report written", { path: DEFAULT_REPORT_PATH });
+export interface SerialQueue {
+  /** Runs `task` after every task submitted before it has settled. */
+  run<T>(task: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * Pure scheduling. One shared file must not be written by two jobs at once:
+ * the bounded runner allows up to MAX_INFLIGHT jobs, so report writes are
+ * serialised separately (Codex P2 on #2335 at 5a7accaf). A failed task never
+ * blocks the next.
+ */
+export function createSerialQueue(): SerialQueue {
+  let tail: Promise<unknown> = Promise.resolve();
+  return {
+    run(task) {
+      const next = tail.then(task, task);
+      tail = next.then(
+        () => undefined,
+        () => undefined,
+      );
+      return next;
+    },
+  };
+}
+
+const reportWrites = createSerialQueue();
+
+function writeReport(outcome: ForwardOutcome, flags: ForwarderFlags): Promise<void> {
+  return reportWrites.run(async () => {
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    const path = await import("node:path");
+    const report = buildReport(outcome, flags, new Date().toISOString());
+    await mkdir(path.dirname(DEFAULT_REPORT_PATH), { recursive: true });
+    await writeFile(DEFAULT_REPORT_PATH, JSON.stringify(report, null, 2), "utf8");
+    log("report written", { path: DEFAULT_REPORT_PATH });
+  });
 }
 
 /**
@@ -682,7 +728,13 @@ export function createMessageHandler(
 
 export interface MqttClientLike {
   on(event: string, listener: (...args: any[]) => void): unknown;
-  subscribe(topic: string, callback?: (err?: Error | null) => void): unknown;
+  subscribe(
+    topic: string,
+    callback?: (
+      err?: Error | null,
+      granted?: ReadonlyArray<{ topic: string; qos: number }>,
+    ) => void,
+  ): unknown;
 }
 
 export interface ClientLifecycleDeps {
@@ -728,12 +780,17 @@ export function attachClientLifecycle(client: MqttClientLike, deps: ClientLifecy
     : null;
   client.on("connect", () => {
     connected = true;
-    client.subscribe(deps.flags.topic, (err) => {
-      if (err) fatal("subscribe_failed", { error: err.message });
-      else {
-        if (timer) clearTimeout(timer);
-        log("subscribed", { topic: deps.flags.topic });
-      }
+    client.subscribe(deps.flags.topic, (err, granted) => {
+      if (err) return fatal("subscribe_failed", { error: err.message });
+      // A broker can refuse the topic without an error: the SUBACK grant comes
+      // back with QoS 128, or with no grant at all (Codex P2 on #2335 at 5a7accaf).
+      const refused =
+        !Array.isArray(granted) ||
+        granted.length === 0 ||
+        granted.some((grant) => !grant || grant.qos === 128);
+      if (refused) return fatal("subscribe_failed", { error: "subscription refused by broker" });
+      if (timer) clearTimeout(timer);
+      log("subscribed", { topic: deps.flags.topic });
     });
   });
   client.on("error", (e: Error) => fatal("mqtt_error", { error: e.message }));

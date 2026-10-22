@@ -271,8 +271,14 @@ function TemperatureUnitTile() {
         >
           Save
         </Button>
-        <Button size="sm" variant="outline" onClick={onReset} data-testid="temperature-unit-reset">
-          Use Fahrenheit default
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onReset}
+          disabled={choice === DEFAULT_TEMPERATURE_UNIT}
+          data-testid="temperature-unit-reset"
+        >
+          Reset to default
         </Button>
       </div>
       {feedback ? (

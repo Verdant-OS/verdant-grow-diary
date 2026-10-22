@@ -159,9 +159,9 @@ The function must:
 - Pure rules: excerpt centres the match and never exceeds the bound; ordering is newest-first
   with `id` tie-break; whitespace-only and <3-char queries return nothing; `100%`, `a_b` and
   `c:\x` are escaped so they match only literally (`100%` must not match `100 ml`).
-- Query shape (stubbed client): `.order("id", desc)` is applied before `.limit(10)`; with more
-  than 10 matches sharing one `entry_at`, two reads return the same 10 ids. Option B: the
-  search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
+- Query shape, Option B (chosen; RPC-side, against a local database): with more than 10
+  matches sharing one timestamp, two calls return the same 10 ids, ordered by
+  `occurred_at desc, id desc` before the limit; the search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
   with `grow_id` and `occurred_at`; `100%` does not match `100 ml` server-side; `anon`
   cannot execute it.
 - Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
@@ -187,6 +187,10 @@ The function must:
 - Archived grows: a matching entry in an archived grow is not returned.
 - Operator regression: a session with the operator role and diary rows from several owners
   returns only its own rows.
+- Cross-owner negative: an ordinary user A searching for text that only user B's note
+  contains gets no row.
+- Option A only (rejected; kept for reference): the stubbed client query applies
+  `.order("entry_at", desc).order("id", desc)` before `.limit(10)`.
 - Hook (rendered with stubbed client): a matching entry appears with its local date; a failed
   diary read renders the unavailable notice while grow/plant results still show; clearing the
   private-state epoch drops diary results.

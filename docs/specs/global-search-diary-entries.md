@@ -55,7 +55,15 @@ switch know only grow / tent / plant / cultivar.
    are one result, not two, under the same rules Timeline uses
    (`src/lib/timelineMergeRules.ts`):
    - linked by `details.linked_grow_event_id`, or by the legacy alias `details.grow_event_id`
-     (`pickLogicalGrowEventLink`, lines 168–175);
+     (`pickLogicalGrowEventLink`, lines 168–175), where the linked spine has the diary row's
+     owner **and** `grow_id`. Timeline only ever resolves a link inside the selected grow
+     (`src/pages/Timeline.tsx:437–441`), and the dual-timestamp backfill joins on owner and
+     grow (`20260725024026_quicklog_dual_timestamp_foundation.sql:205–209`); a stale or
+     malformed link to the same owner's event in another grow must not replace or suppress
+     this grow's result. Link values are historical JSON text, so they are parsed with
+     `quicklog_try_parse_uuid` (same migration) or an equally non-throwing comparison: a
+     direct `::uuid` cast would let one malformed legacy row abort the whole RPC and show
+     "Diary results unavailable";
    - or, for an older unlinked manual companion, sharing the exact (grow, plant, instant)
      triple with a manual spine, plants compared null-safely (`is not distinct from`). Timeline
      pairs on (plant, instant) (lines 405–407) only because it filters both sources to one
@@ -87,10 +95,13 @@ switch know only grow / tent / plant / cultivar.
 
 2. Each result shows a ~80-character note excerpt with the match, the plant or tent name
    when known, and the local date (`formatSnapshotTimestamp`). Under the chosen Option B the
-   RPC returns the names from owner-scoped joins; Option A would need one batched
+   RPC returns the plant, tent **and grow** names from owner-scoped joins; Option A would need one batched
    owner-scoped lookup (generated `diary_entries` / `grow_events` relationship metadata has
    no plants/tents embed, so a relation select cannot supply them). When a name is unavailable the result shows "Plant" or "Tent",
-   never a raw id. Selecting a result opens the Timeline for **that entry's grow**
+   never a raw id. A row whose `plant_id` and `tent_id` are both null is a valid grow-level
+   log, not a missing target: `quicklog_save_event` accepts that shape and the typed watering
+   path emits it (`src/lib/writeQuickLogWateringTypedEvent.ts:256–269`). Such a row is
+   labelled with its grow name (or "Grow" when that is unavailable), never "Plant" or "Tent". Selecting a result opens the Timeline for **that entry's grow**
    with the `timeline-entry-<id>` hash:
    - Before anchoring, the handoff clears every active Timeline filter that could hide the
      entry: plant, tent, type, search and date, plus the sensor-source filter
@@ -104,13 +115,25 @@ switch know only grow / tent / plant / cultivar.
      entries. The implementing slice adds a bounded "load until this entry or give up" step
      (for example one targeted read of the entry plus its page, capped) and a calm "This
      entry is no longer on the timeline" notice when it cannot be found.
+   - A spine-only result needs a mounted anchor too. Timeline assigns `timeline-entry-<id>`
+     only while rendering its primary diary-derived list (`src/pages/Timeline.tsx:2801–2823`);
+     standalone grow events appear only in `RecentQuickLogActivityPanel`, whose rows carry no
+     DOM id and are capped. Loading the spine alone therefore scrolls nowhere. The
+     implementing slice must render the target spine as an anchored row (or give the panel
+     row the anchor and load it past the cap), and the navigation acceptance test covers a
+     spine-only result.
 3. A failed diary read is shown as "Diary results unavailable", never as "no results"
    (same rule the private RPC already follows).
 4. No new data exposure: rows come only through RLS-scoped reads; no service role. RLS is
    the authorization boundary; the owner filter in requirement 1 only narrows an operator's
    personal search and must never be relied on as authorization.
 5. Minimum query length 3 characters **for the diary read only**; grows, tents, plants and
-   cultivars keep their current short-query behaviour (for example "OG"). Same debounce and
+   cultivars keep their current short-query behaviour (for example "OG"). Maximum 120
+   characters, enforced by `verdant_search_diary` itself (the same cap as
+   `MAX_QUERY_LENGTH` in `src/lib/globalSearchSession.ts:21`, which today bounds only the
+   persisted state). A longer query returns no rows with an invalid-query status, before any
+   pattern is built, so a direct authenticated caller cannot make an unbounded `%…%` scan
+   over both tables. The dialog input also gets `maxLength={120}`, so the UI never sends one. Same debounce and
    private-state epoch as the existing hook, so cleared/sign-out state cannot leak results.
 6. Diary search text never appears in a request URL. A note search term is private grower
    content; URLs reach access logs, proxies and observability tools that request bodies do
@@ -140,6 +163,14 @@ switch know only grow / tent / plant / cultivar.
      toggle stay distinct.
    - `readGlobalSearchLastSelected` checks `VALID_TYPES`. It must accept `diary`, so a
      persisted diary selection restores its preview instead of being dropped.
+   - The preview follows the excerpt. Diary labels depend on the query, but
+     `resultsContentKey` keys rows by entity type and id only
+     (`src/components/GlobalSearchDialog.tsx:119–122`), and preview sync keeps the previous
+     row whenever that id is still visible (lines 269–275). Changing from one matching term
+     to another in the same note would leave the preview on the old excerpt. The key
+     includes a diary row's displayed label, and the sync replaces the previewed row with the
+     visible row of the same id when its content differs, without reintroducing the render
+     loop the key prevents.
 
 ## Options
 
@@ -221,7 +252,9 @@ The function must:
   `occurred_at desc, id desc` before the limit; the search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
   with `grow_id` and `occurred_at`; `max_results` of `null` and `500` each return at most 10
   rows, and `0` and `-5` each return exactly 1 row, the newest matching fixture id; `100%` does not match `100 ml` server-side; `anon`
-  cannot execute it.
+  cannot execute it; a 120-character query runs and a 121-character query returns no rows
+  with the invalid-query status; a legacy row whose link value is not a UUID does not fail
+  the call and is matched as unlinked.
 - Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
   `verdant_search` results still render; a failing `verdant_search` does not hide diary
   results.
@@ -234,7 +267,10 @@ The function must:
   one result; a legacy pair linked only by `details.grow_event_id`, and a legacy unlinked
   manual companion at the same plant and instant as its spine, are each one result carrying
   the spine id; two grows each holding a null-plant unlinked companion and spine at the same
-  instant return two results, each with its own grow's spine id; an exact `'(quick log)'` placeholder does not match query `"quick"` or
+  instant return two results, each with its own grow's spine id; a diary row in grow A
+  whose explicit link points at the same owner's event in grow B stays its own grow A
+  result, and B's deleted event does not suppress it; a grow-level row (null plant and
+  tent) is labelled with its grow name, not "Plant" or "Tent"; an exact `'(quick log)'` placeholder does not match query `"quick"` or
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
   a deleted spine and a retracted entry are not returned, and neither is a non-retracted
   companion whose linked spine (`linked_grow_event_id` or legacy `grow_event_id`) is
@@ -243,10 +279,12 @@ The function must:
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
-  companion), including for a grow other than the active one. With eleven or more entity and
+  companion), including for a grow other than the active one, and for a spine-only result,
+  whose anchored row is mounted and scrolled to. With eleven or more entity and
   cultivar matches, the first diary match is still on the first page. A history entry that
   differs only in the diary toggle is kept as its own entry. A persisted diary last-selection
-  restores its preview.
+  restores its preview. Changing the query to another term in the same note updates the
+  preview to the new excerpt, and the input accepts at most 120 characters.
 - Ordering: assert the **final composed list** (hook `results` after entity+diary
   composition, or the dialog's rendered groups), not only the diary helper's return
   value. Entity ids stay in `mergeGlobalSearchResults` order; diary ids then follow

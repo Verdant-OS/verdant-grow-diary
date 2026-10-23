@@ -149,7 +149,9 @@ export function tentDetailVpdRowUntrusted(
 ): boolean {
   const atMs = instantMs(at);
   if (atMs === null) return false;
-  return (rows ?? []).some(
+  // Diagnostic rows are fenced out here as in the capture climate, so a
+  // testbench VPD cannot withhold a physical one (Copilot P1 on #2417).
+  return withoutDiagnosticSensorRows(rows).some(
     (row) =>
       row.metric === "vpd_kpa" &&
       typeof row.value === "number" &&
@@ -358,12 +360,30 @@ export function resolveTentDetailVpd(input: {
     input.rejectedRefs !== undefined &&
     typeof input.existingRef === "string" &&
     captureRefsKnown(rejectedClimateRefs);
-  const existingFromRejectedCapture =
-    climateRejected &&
+  // The existing observation is held to its own capture too: a temperature
+  // or RH at that capture that is unrealistic or quality-flagged withholds
+  // it, as it would Tonight's VPD. The header grades realism only, so after a
+  // failed refresh a cached VPD could otherwise stand beside a flagged
+  // sibling (Copilot P1 on #2417 at 066f72a2). Another capture is unaffected.
+  const existingCaptureUntrusted =
     input.existing.value !== null &&
-    (identityKnown
-      ? rejectedClimateRefs.includes(input.existingRef as string)
-      : existingMs === null || rejectedMs === null || existingMs === rejectedMs);
+    existingMs !== null &&
+    input.captureClimate.some(
+      (climate) =>
+        sameCaptureClimate(
+          climate,
+          existingMs,
+          typeof input.existingRef === "string" ? [input.existingRef] : undefined,
+        ) &&
+        (climate.untrusted === true || climateUnrealistic(climate)),
+    );
+  const existingFromRejectedCapture =
+    existingCaptureUntrusted ||
+    (climateRejected &&
+      input.existing.value !== null &&
+      (identityKnown
+        ? rejectedClimateRefs.includes(input.existingRef as string)
+        : existingMs === null || rejectedMs === null || existingMs === rejectedMs));
   const existingOrNothing = (): TentDetailVpdObservation =>
     existingFromRejectedCapture
       ? { value: null, capturedAt: null, source: null, stale: false, calculated: false }

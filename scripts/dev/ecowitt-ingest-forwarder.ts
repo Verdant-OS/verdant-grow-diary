@@ -539,23 +539,49 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Marks `[start, end)` of `covered` for every match of a global `re`, overlapping ones included. */
+function markMatches(
+  value: string,
+  re: RegExp,
+  covered: Uint8Array,
+  span: (m: RegExpExecArray) => [number, number] = (m) => [m.index, m.index + m[0].length],
+): void {
+  re.lastIndex = 0;
+  for (let m = re.exec(value); m !== null; m = re.exec(value)) {
+    const [start, end] = span(m);
+    if (end > start) covered.fill(1, start, end);
+    re.lastIndex = m.index + 1;
+  }
+}
+
 /**
- * Marks every occurrence of every configured value, overlapping ones included,
- * then replaces each merged run once. Replacing one value at a time let a
- * shorter value that prefixes a longer one (username `mqtt-user`, password
- * `mqtt-user-password`) cut the longer one first and leak its tail
- * (Codex P1 on #2335 at ac8be57b).
+ * Marks every configured credential and every credential shape against the
+ * original string, then replaces each merged run once. Replacing pass by pass
+ * let one pass split the text another pass had to match: username `key` turned
+ * `?key=<secret>` into `?(redacted)=<secret>` before the query matcher ran, and
+ * username `vbt` cut `vbt_<token>` so its suffix survived (Copilot P1 on #2403
+ * at 5b45c9f5). Earlier, one configured value prefixing another leaked the
+ * longer one's tail (Codex P1 on #2335 at ac8be57b).
  */
-function redactConfiguredSecrets(value: string): string {
-  if (configuredSecrets.size === 0 || value.length === 0) return value;
+export function redactString(value: string): string {
+  if (value.length === 0) return value;
   const covered = new Uint8Array(value.length);
   for (const secret of configuredSecrets) {
-    const re = new RegExp(escapeRegExp(secret), "gi");
-    for (let m = re.exec(value); m !== null; m = re.exec(value)) {
-      covered.fill(1, m.index, m.index + m[0].length);
-      re.lastIndex = m.index + 1;
-    }
+    markMatches(value, new RegExp(escapeRegExp(secret), "gi"), covered);
   }
+  markMatches(value, EMBEDDED_SECRET_RE, covered);
+  markMatches(value, MAC_RE, covered);
+  markMatches(value, HEX32_RE, covered);
+  markMatches(value, MAC12_RE, covered);
+  // Keep the `//` and `@` around URL userinfo, and the `?key=` before a query credential.
+  markMatches(value, URL_USERINFO_RE, covered, (m) => [
+    m.index + m[1].length,
+    m.index + m[0].length - 1,
+  ]);
+  markMatches(value, URL_SECRET_QUERY_RE, covered, (m) => [
+    m.index + m[1].length,
+    m.index + m[0].length,
+  ]);
   let out = "";
   let i = 0;
   while (i < value.length) {
@@ -567,17 +593,6 @@ function redactConfiguredSecrets(value: string): string {
     out += "(redacted)";
   }
   return out;
-}
-
-/** Redacts configured credentials, credential shapes and URL credentials inside one string. */
-export function redactString(value: string): string {
-  return redactConfiguredSecrets(value)
-    .replace(EMBEDDED_SECRET_RE, "(redacted)")
-    .replace(MAC_RE, "(redacted)")
-    .replace(HEX32_RE, "(redacted)")
-    .replace(MAC12_RE, "(redacted)")
-    .replace(URL_USERINFO_RE, "$1(redacted)@")
-    .replace(URL_SECRET_QUERY_RE, "$1(redacted)");
 }
 
 function redactValue(value: unknown): unknown {

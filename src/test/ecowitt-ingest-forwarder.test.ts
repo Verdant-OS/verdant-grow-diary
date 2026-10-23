@@ -775,6 +775,56 @@ describe("configured MQTT credentials are redacted (Codex P1 at acab6b12, bae4ae
   });
 });
 
+describe("overlapping configured values and credential shapes are redacted together (Copilot P1 on #2403 at 5b45c9f5)", () => {
+  afterEach(() => setConfiguredSecrets([]));
+  const privateValue = ["synthetic", "private", "value"].join("-");
+
+  it("a configured value that names a query key does not hide the query credential", () => {
+    setConfiguredSecrets(["key"]);
+    const out = redactString(`wss://broker/mqtt?key=${privateValue}`);
+    expect(out).not.toContain(privateValue);
+    expect(out).toBe("wss://broker/mqtt?(redacted)=(redacted)");
+  });
+
+  it("a configured value that prefixes a token does not leave the token suffix", () => {
+    setConfiguredSecrets(["vbt"]);
+    const out = redactString("t/vbt_abcdefgh");
+    expect(out).not.toContain("abcdefgh");
+    expect(out).toBe("t/(redacted)");
+  });
+
+  it("a configured value inside a MAC does not leave the MAC's other octets", () => {
+    setConfiguredSecrets(["AA:BB"]);
+    const out = redactString("GW AA:BB:CC:DD:EE:FF up");
+    expect(out).not.toMatch(/CC:DD|EE:FF/);
+    expect(out).toBe("GW (redacted) up");
+  });
+
+  it("a configured value inside URL userinfo keeps the whole userinfo redacted", () => {
+    setConfiguredSecrets(["gro"]);
+    expect(redactString("mqtt://grower:hunter2@h:1")).toBe("mqtt://(redacted)@h:1");
+  });
+
+  it("the dry-run startup log never carries a query credential when the username names its key", async () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+    });
+    try {
+      const client = { on: () => client, subscribe: () => {}, end: () => {} };
+      await main(
+        ["--mqtt-url", `wss://broker/mqtt?key=${privateValue}`],
+        { ECOWITT_MQTT_USERNAME: "key" },
+        { connect: async () => client, exit: vi.fn() },
+      );
+      expect(lines.length).toBeGreaterThan(0);
+      expect(lines.join("\n")).not.toContain(privateValue);
+    } finally {
+      log.mockRestore();
+    }
+  });
+});
+
 describe("a malformed escape in one URL credential keeps both redacted (Codex P1 on #2335 at d344f8e4)", () => {
   afterEach(() => setConfiguredSecrets([]));
   const URL_WITH_BAD_ESCAPE = "mqtt://mqtt-user:bad%ZZ@host:1883";

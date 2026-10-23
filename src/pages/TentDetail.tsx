@@ -208,7 +208,11 @@ export default function TentDetail() {
   // intake quality flag is not ok. The Dashboard selector drops that row, so
   // the tent page withholds it the same way the header withholds a realism
   // rejection: no snapshot value, rejection noted (Codex P1 on #2303 at 307b10f4).
-  const storedVpdRowUntrusted = tentDetailVpdRowUntrusted(readings, header.capturedAt);
+  const storedVpdRowUntrusted = tentDetailVpdRowUntrusted(
+    readings,
+    header.capturedAt,
+    snap?.source ?? null,
+  );
   const storedVpdObservation = resolveDisplayedVpdObservation({
     snapshotVpd: storedVpdRowUntrusted ? null : snap?.vpd,
     snapshotVpdRejected:

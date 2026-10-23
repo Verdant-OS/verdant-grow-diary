@@ -182,14 +182,15 @@ export async function fetchLatestSensorSnapshot(
 
 /**
  * A diary-sourced result keeps the sensor read's rejected rows, so the capture
- * gate still sees a newer rejected reading behind older diary evidence. The
- * empty snapshot stays empty.
+ * gate still sees a newer rejected reading behind older diary evidence. An
+ * empty result keeps them too: with every row rejected and no diary evidence,
+ * Tonight must read invalid, not unavailable (Copilot P1 on #2422 at
+ * bcdf2ea6). An empty result with no rejected rows stays EMPTY_SNAPSHOT.
  */
 function withDiaryRejectedRows(
   snapshot: SensorSnapshot,
   rawRows: Parameters<typeof withRejectedQualityRows>[1],
 ): SensorSnapshot {
-  if (snapshot === EMPTY_SNAPSHOT) return snapshot;
   return withRejectedQualityRows(snapshot, rawRows) ?? snapshot;
 }
 
@@ -339,7 +340,12 @@ export async function fetchLatestSensorSnapshotsByTent(
     // read (Codex P2 on #2303 at 0994ea2a).
     if (needDiary.length > 0) {
       if (!growId) {
-        for (const tentId of needDiary) result[tentId] = staleByTent.get(tentId) ?? EMPTY_SNAPSHOT;
+        for (const tentId of needDiary) {
+          result[tentId] = withDiaryRejectedRows(
+            staleByTent.get(tentId) ?? EMPTY_SNAPSHOT,
+            rawRowsByTent.get(tentId) ?? [],
+          );
+        }
       } else {
         // Same rule for the diary windows: once the deepest window is capped
         // by the row ceiling and settles no tent, split the set in half rather
@@ -386,7 +392,10 @@ export async function fetchLatestSensorSnapshotsByTent(
               } else if (verdict.kind === "none") {
                 result[tentId] = sensorReadFailed.has(tentId)
                   ? null
-                  : (staleByTent.get(tentId) ?? EMPTY_SNAPSHOT);
+                  : withDiaryRejectedRows(
+                      staleByTent.get(tentId) ?? EMPTY_SNAPSHOT,
+                      rawRowsByTent.get(tentId) ?? [],
+                    );
               } else if (verdict.kind === "unavailable") {
                 // The per-tent read gives up past its candidate bound too.
                 result[tentId] = null;

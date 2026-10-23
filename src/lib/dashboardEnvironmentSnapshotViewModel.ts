@@ -287,7 +287,14 @@ function ownCaptureVpdMetric(
     status = "degraded";
     word = "Needs verification";
   }
-  const statusLabel = [word ?? canonical.sourceLabel ?? "Unknown source", canonical.ageText]
+  // The status word joins the VPD's own source rather than replacing it: the
+  // strip's footer badge describes the temperature/RH cohort, so a CSV, diary
+  // or demo VPD must still name its source (Codex P1 on #2422 at bcdf2ea6).
+  const statusLabel = [
+    word,
+    canonical.sourceLabel ?? (word ? null : "Unknown source"),
+    canonical.ageText,
+  ]
     .filter((part): part is string => !!part)
     .join(" · ");
   return {
@@ -430,14 +437,16 @@ export function buildTentSnapshotView(
     const rowFlag = contributingRow ? explicitRowFlag(contributingRow) : null;
     let status: MetricStatus = "ok";
     let statusLabel: string | null = null;
-    if (value === null) {
+    // A VPD the canonical selector rejected stays Invalid even with no value:
+    // a rejected calculated VPD carries `kpa: null` (Codex P2 on #2422 at
+    // bcdf2ea6).
+    if (key === "vpd" && (canonicalVpdInvalid || cohortVpdRejected)) {
+      status = "invalid";
+      statusLabel = "Invalid";
+    } else if (value === null) {
       status = "unknown";
       statusLabel = "Unknown";
-    } else if (
-      rowFlag === "invalid" ||
-      quality.suspiciousFields.includes(suspiciousKey) ||
-      (key === "vpd" && (canonicalVpdInvalid || cohortVpdRejected))
-    ) {
+    } else if (rowFlag === "invalid" || quality.suspiciousFields.includes(suspiciousKey)) {
       status = "invalid";
       statusLabel = "Invalid";
     } else if (stale || rowFlag === "stale") {

@@ -531,3 +531,45 @@ describe("createSnapshotBatcher", () => {
     expect(b).toMatchObject({ status: "rejected", reason: new Error("unavailable") });
   });
 });
+
+// Copilot P1 on #2422 at bcdf2ea6: with every sensor row rejected and no diary
+// evidence, the result keeps the rejection evidence in both readers, so a
+// failed raw refresh still reads Tonight's VPD as invalid, not unavailable.
+describe("an all-rejected read with no diary evidence keeps its rejected rows", () => {
+  const rejectedVpd = (tentId: string) => ({
+    ...sensorRow(tentId, "vpd_kpa", 1.2, minutesAgo(5)),
+    quality: "degraded",
+  });
+
+  it("single reader", async () => {
+    io.sensorRows = [rejectedVpd(TENT_A)];
+    io.diaryRows = [];
+    const snap = await fetchLatestSensorSnapshot(GROW, [TENT_A]);
+    expect(snap.ts).toBeNull();
+    expect((snap as { rejected_quality_rows?: unknown[] }).rejected_quality_rows).toEqual([
+      expect.objectContaining({ metric: "vpd_kpa", quality: "degraded" }),
+    ]);
+    const vpd = buildTonightTentMetrics({
+      rows: [],
+      rowsRead: { status: "error" },
+      snapshot: { status: "ok", snapshot: snap as never },
+      now: new Date(),
+    }).find((m) => m.key === "vpd")!;
+    expect(vpd.state).toBe("invalid");
+  });
+
+  it.each([GROW, null])("bulk reader (grow %s)", async (grow) => {
+    io.sensorRows = [rejectedVpd(TENT_A)];
+    io.diaryRows = [];
+    const bulk = await fetchLatestSensorSnapshotsByTent(grow, [TENT_A]);
+    expect(
+      (bulk[TENT_A] as { rejected_quality_rows?: unknown[] } | null)?.rejected_quality_rows,
+    ).toEqual([expect.objectContaining({ metric: "vpd_kpa", quality: "degraded" })]);
+  });
+
+  it("a read with nothing rejected stays EMPTY_SNAPSHOT", async () => {
+    io.sensorRows = [];
+    io.diaryRows = [];
+    expect(await fetchLatestSensorSnapshot(GROW, [TENT_A])).toBe(EMPTY_SNAPSHOT);
+  });
+});

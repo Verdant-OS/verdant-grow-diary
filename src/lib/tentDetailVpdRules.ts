@@ -95,7 +95,9 @@ export function tentDetailCaptureClimate(
   for (const row of withoutDiagnosticSensorRows(rows)) {
     if (typeof row.value !== "number") continue;
     const at = row.captured_at ?? row.ts ?? null;
-    const untrusted = !trustedIntakeQuality(row.quality);
+    // An explicit stale or invalid source is a downgrade whatever the quality
+    // flag says, as on the VPD row itself (Copilot P1 on #2422 at bcdf2ea6).
+    const untrusted = !trustedIntakeQuality(row.quality) || downgradedSource(row.source);
     const ref = rowCaptureRef(row);
     if (row.metric === "temperature_c") {
       out.push({ at, temp: row.value, rh: null, untrusted, ref });
@@ -146,9 +148,17 @@ export function tentDetailCaptureClimate(
 export function tentDetailVpdRowUntrusted(
   rows: readonly TentDetailClimateRow[] | null | undefined,
   at: string | null | undefined,
+  /**
+   * The source of the VPD the header selected. With it, a flagged VPD row at
+   * the same instant counts only when it is the same capture: a rejected
+   * manual or CSV row cannot blank a valid live one (Codex P2 on #2422 at
+   * bcdf2ea6). Unknown identity on either side falls back to the instant.
+   */
+  selectedSource?: string | null,
 ): boolean {
   const atMs = instantMs(at);
   if (atMs === null) return false;
+  const selectedRef = sensorCaptureRef(at, selectedSource);
   // Diagnostic rows are fenced out here as in the capture climate, so a
   // testbench VPD cannot withhold a physical one (Copilot P1 on #2417).
   return withoutDiagnosticSensorRows(rows).some(
@@ -156,14 +166,18 @@ export function tentDetailVpdRowUntrusted(
       row.metric === "vpd_kpa" &&
       typeof row.value === "number" &&
       instantMs(row.captured_at ?? row.ts) === atMs &&
+      (selectedRef === null || rowCaptureRef(row) === null || rowCaptureRef(row) === selectedRef) &&
       // An explicit stale/invalid source is a downgrade whatever the quality,
       // as selectRejectedQualityRows treats it (Codex P1 on #2412 at 8d8c4900).
-      (!trustedIntakeQuality(row.quality) ||
-        DOWNGRADED_SOURCES.has(row.source?.trim().toLowerCase() ?? "")),
+      (!trustedIntakeQuality(row.quality) || downgradedSource(row.source)),
   );
 }
 
 const DOWNGRADED_SOURCES = new Set(["stale", "invalid"]);
+
+function downgradedSource(source: string | null | undefined): boolean {
+  return DOWNGRADED_SOURCES.has(source?.trim().toLowerCase() ?? "");
+}
 
 function instantMs(at: string | null | undefined): number | null {
   if (!at) return null;

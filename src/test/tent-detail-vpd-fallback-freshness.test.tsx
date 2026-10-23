@@ -15,6 +15,7 @@ const OWNED_TENT = {
 
 const state = vi.hoisted(() => ({
   rows: [] as SensorReadingLike[],
+  rowsError: false,
   manuals: [] as SensorReading[],
   tent: null as unknown,
   manualArgs: [] as unknown[],
@@ -45,7 +46,7 @@ vi.mock("@/hooks/useGrowData", async (original) => ({
   }),
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadings: () => ({ data: state.rows, isPending: false, isError: false }),
+  useSensorReadings: () => ({ data: state.rows, isPending: false, isError: state.rowsError }),
 }));
 vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
   useSensorsQuickLogManualReadings: (tentId: unknown) => {
@@ -157,6 +158,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   state.rows = [];
+  state.rowsError = false;
   state.manuals = [];
   state.tent = OWNED_TENT;
   state.manualArgs = [];
@@ -207,6 +209,31 @@ describe("Tent detail fallback VPD freshness", () => {
     mount();
     expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
     expect(screen.queryByTestId("tent-detail-vpd-stage-hint")).toBeNull();
+    expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
+  });
+
+  it("checks a flagged live VPD against its own source, not the cohort's manual aggregate (Copilot P1 on #2430)", () => {
+    const ts = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+    // A valid manual temperature makes the header snapshot's aggregate source
+    // manual; the VPD row itself is live and quality-invalid.
+    state.rows = [
+      { id: "r-temp", metric: "temperature_c", value: 24, ts, captured_at: ts, source: "manual" },
+      {
+        id: "r-vpd",
+        metric: "vpd_kpa",
+        value: 1.2,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "invalid",
+      } as never,
+    ];
+    // The raw refresh failed: the cached rows stay, Tonight carries no
+    // rejection evidence from them.
+    state.rowsError = true;
+    state.snapshot = { status: "unavailable", snapshot: null };
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
     expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
   });
 

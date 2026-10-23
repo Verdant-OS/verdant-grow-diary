@@ -209,7 +209,7 @@ interface Candidate {
   at: string;
   epochMs: number;
   /** 0 = sensor row, 1 = diary-inclusive snapshot; deterministic tie-break. */
-  origin: 0 | 1;
+  origin: 0 | 1 | 2;
   /** Set only on a VPD candidate derived from temperature and RH. */
   calculated?: true;
   /**
@@ -549,7 +549,11 @@ export function buildTonightTentMetrics(input: {
           value: 0,
           source: "invalid",
           ...when,
-          origin: 0,
+          // Last on an equal-time tie: a same-capture candidate is already
+          // invalid through captureHasRejectedSibling, so a tie means an
+          // independent capture, which stays valid; a strictly newer rejection
+          // still wins (Copilot P1 on #2430 at fcd86356).
+          origin: 2,
           ownSource: false,
           refs: [sensorCaptureRef(rejected.captured_at, rejected.source)],
         });

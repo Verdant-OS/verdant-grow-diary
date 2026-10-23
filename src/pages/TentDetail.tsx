@@ -208,10 +208,12 @@ export default function TentDetail() {
   // intake quality flag is not ok. The Dashboard selector drops that row, so
   // the tent page withholds it the same way the header withholds a realism
   // rejection: no snapshot value, rejection noted (Codex P1 on #2303 at 307b10f4).
+  // The VPD's own source, not the snapshot's aggregate: one manual metric in
+  // the cohort makes `snap.source` manual (Copilot P1 on #2430 at fcd86356).
   const storedVpdRowUntrusted = tentDetailVpdRowUntrusted(
     readings,
     header.capturedAt,
-    snap?.source ?? null,
+    snap?.metric_refs?.vpd?.source ?? null,
   );
   const storedVpdObservation = resolveDisplayedVpdObservation({
     snapshotVpd: storedVpdRowUntrusted ? null : snap?.vpd,

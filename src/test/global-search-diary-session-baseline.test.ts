@@ -34,16 +34,8 @@ describe("global search diary session baseline — query cap", () => {
 
 describe("global search diary session baseline — filter keys", () => {
   it("ignores a pre-diary `diary` toggle in stored filters until normalizeFilters lists it", () => {
-    writeGlobalSearchSession({
-      query: "yellow",
-      filters: {
-        grow: true,
-        tent: true,
-        plant: true,
-        cultivar: true,
-        diary: false,
-      } as Record<string, boolean>,
-    });
+    const storedFilters = { grow: true, tent: true, plant: true, cultivar: true, diary: false };
+    writeGlobalSearchSession({ query: "yellow", filters: storedFilters });
     const { filters } = readGlobalSearchSession();
     expect(filters).toEqual({
       grow: true,
@@ -62,10 +54,8 @@ describe("global search diary session baseline — filter keys", () => {
       cultivar: true,
     };
     pushGlobalSearchHistory({ query: "cal-mag", filters: base });
-    pushGlobalSearchHistory({
-      query: "cal-mag",
-      filters: { ...base, diary: false } as Record<string, boolean>,
-    });
+    const withDiary = { ...base, diary: false };
+    pushGlobalSearchHistory({ query: "cal-mag", filters: withDiary });
     expect(readGlobalSearchHistory()).toHaveLength(1);
   });
 });

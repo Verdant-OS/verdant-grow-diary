@@ -1,6 +1,6 @@
 # Spec — Global search over diary entries
 
-Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds three spec-baseline Vitest files.
+Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds five spec-baseline Vitest files (14 tests).
 **Owner decision (Matthew, 2026-10-22): Option B** — a server-side RPC, so the search text
 travels in a POST body. The implementing slice adds it through a new additive migration,
 drafted on its own branch for the protected migration review. No agent applies it;
@@ -133,7 +133,9 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      **10** results in total.
    - Excluded: `grow_events` rows with `is_deleted` or `deleted_at` set, `diary_entries` rows
      with `retracted_at` set, and entries in archived grows. A non-retracted diary companion
-     whose preferred link names a deleted spine is excluded too. This is a rule of this
+     is excluded too when its preferred link resolves to a deleted spine owned by the diary
+     row's owner and in the diary row's `grow_id`. A link to another grow is unresolved for
+     this search and leaves the diary row standalone, even when that spine is deleted. This is a rule of this
      search, not a description of existing Timeline behaviour: the result's id would be the
      deleted spine's, and no visible Timeline row is addressable by it, so the result would
      open to nothing. `useGrows().grows` holds active
@@ -172,10 +174,17 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      paired by (grow, plant, instant), has only its diary-id anchor, and a hash with the spine
      id scrolls nowhere. The implementing slice must give that card an alias for the spine id
      it was paired with, using the same pairing rule as the search.
-     Exactly one card owns each spine alias: when several mirrors resolve to one spine, the
-     alias goes to the card whose note supplied the excerpt (the first matching companion by
-     `entry_at desc, id desc`, requirement 1), or to the first by that order when none
-     matched. Duplicate DOM ids would let `getElementById` pick the wrong card.
+     Exactly one card owns each spine alias, chosen without the query: when several mirrors
+     resolve to one spine, the alias goes to the first by `entry_at desc, id desc`. Duplicate
+     DOM ids would let `getElementById` pick the wrong card. The alias is what a reload or a
+     shared link lands on.
+   - The card that matched is carried separately. The RPC returns `matched_diary_entry_id`:
+     the companion whose note supplied the excerpt (requirement 1), or null when the spine's
+     own note did or there is no companion. The dialog passes it in router navigation state,
+     never in the URL, so the private query never reaches the address bar. When that state
+     names one of the target spine's rendered mirror cards, Timeline scrolls to that card's
+     own `timeline-entry-<diary-id>` anchor instead of the spine alias. When it is absent
+     (reload, shared link) or names no rendered mirror, Timeline uses the spine alias.
      The existing alias also keeps the link's spelling, and `getElementById` is case-sensitive,
      while the search returns the spine's canonical lowercase id. So every alias, explicit or
      paired, uses the resolved canonical spine id (lowercased, as the search compares it), not
@@ -321,7 +330,8 @@ The function must:
   `revoke all … from public`, `revoke all … from anon` and
   `grant execute … to authenticated`, mirroring `verdant_search`
   (`20260723000807_…sql:83–85`), so it never keeps PostgreSQL's default PUBLIC execute;
-- return `source` (`'grow_event'` or `'diary_entry'`), `id`, `note`, `occurred_at`
+- return `source` (`'grow_event'` or `'diary_entry'`), `id`, `matched_diary_entry_id`
+  (requirement 2; null when the spine's own note supplied the excerpt), `note`, `occurred_at`
   (`grow_events.occurred_at` / `diary_entries.entry_at`, raw `timestamptz`), `grow_id`,
   `plant_id`, `tent_id`, `grow_name`, `plant_name`, `tent_name`. The client formats `occurred_at` with
   `formatSnapshotTimestamp` in the browser's zone; names come from owner-scoped joins, so no
@@ -332,7 +342,11 @@ The function must:
   match literally;
 - search both tables and dedupe linked companions, applying `user_id = auth.uid()`, the
   deletion/retraction exclusions, the active-grow rule and newest-first `id`-tie-broken
-  ordering, as in requirement 1, then
+  ordering, as in requirement 1. No candidate query on either table is windowed, paged or
+  limited before link and `(owner, grow_id, plant_id, tent_id, instant)` resolution finishes:
+  a spine joins its companion whether or not the spine's own note matches or falls among the
+  newest rows, as `findMissingLinkedGrowEventIds` and `collapseQuickLogSaveFanOut` require
+  (`src/lib/timelineMergeRules.ts:271–277`). Only then
   `limit greatest(1, least(coalesce(max_results, 10), 10))`: a null or out-of-range
   `max_results` from the client still caps at 10, as `verdant_search` clamps its own
   (`20260723000807_…sql:78`). Postgres `least` ignores nulls, so `least(NULL, 10)` is already
@@ -397,19 +411,24 @@ The function must:
   tent) is labelled with its grow name, not "Plant" or "Tent"; an exact `'(quick log)'` placeholder does not match query `"quick"` or
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
   a deleted spine and a retracted entry are not returned, and neither is a non-retracted
-  companion whose linked spine (`linked_grow_event_id` or legacy `grow_event_id`) is
-  deleted. Option B: `verdant_search` is
+  companion whose linked spine (`linked_grow_event_id` or legacy `grow_event_id`), in the
+  same owner and grow, is deleted; a companion whose note matches, with more than ten newer
+  matching spines in the same grow and a spine whose own note does not match, still returns
+  one result carrying its spine id (resolution happens before the limit). Option B: `verdant_search` is
   unchanged, so a plant found by its `strain` is still returned.
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
   companion), including for a grow other than the active one. Rendered Timeline navigation
-  tests cover four hash targets by spine id, each asserting a mounted element with that id
+  tests cover five hash targets by spine id, each asserting a mounted element with that id
   is scrolled to: an explicitly linked companion (existing alias), two mirrors of one spine (only the
-  excerpt's card carries the alias), a legacy unlinked manual
+  first by `entry_at desc, id desc` carries the alias), a legacy unlinked manual
   companion paired by (grow, plant, tent, instant) (new alias), a companion whose explicit
   link is written in uppercase (alias uses the canonical lowercase id), and a spine-only result
-  (new anchored row). The spine-only fixture is older than both the initial grow-event page
+  (new anchored row). A further rendered test selects, in succession, two results whose
+  `matched_diary_entry_id` names different mirrors of one spine, and asserts each selection
+  scrolls to its own mirror card, and that a reload of the same URL without navigation state
+  lands on the alias owner. The spine-only fixture is older than both the initial grow-event page
   and the history-panel cap, so a capped panel cannot pass it. With exactly ten entity and
   cultivar matches (the `INITIAL_VISIBLE` boundary), the first diary match is among the
   first ten rendered rows. A history entry that

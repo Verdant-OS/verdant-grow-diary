@@ -436,10 +436,11 @@ The function must:
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
   a deleted spine and a retracted entry are not returned, and neither is a non-retracted
   companion whose linked spine (`linked_grow_event_id` or legacy `grow_event_id`), in the
-  same owner and grow, is deleted; the newest matching companion, whose spine's own note does not match the query, still
+  same owner and grow, is deleted; a matching companion whose spine is newest by
+  `occurred_at` and whose spine's own note does not match the query, still
   returns one result carrying its spine id while more than ten older matching spines exist
   in the same grow (resolution does not depend on the spine being a matching or windowed
-  candidate; the result is newest, so the final 10-row limit keeps it). Option B: `verdant_search` is
+  candidate; its spine `occurred_at` is the newest matching spine, so the final 10-row limit keeps it). Option B: `verdant_search` is
   unchanged, so a plant found by its `strain` is still returned.
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to

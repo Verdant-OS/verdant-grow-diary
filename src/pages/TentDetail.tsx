@@ -116,7 +116,7 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
 import {
   resolveTentDetailVpd,
-  tentDetailHeaderCaptureRefs,
+  tentDetailHeaderRejection,
   tentDetailVpdRowUntrusted,
   tentDetailCaptureClimate,
   tentDetailVpdNeedsOwnProvenance,
@@ -234,10 +234,9 @@ export default function TentDetail() {
   const headerVpdObservation = resolveTentDetailVpd({
     tonight: tonightMetrics.find((metric) => metric.key === "vpd"),
     existing: storedVpdObservation,
-    rejectedMetrics: header.truth?.invalidFields ?? [],
     rejectedCapturedAt: header.capturedAt,
     // The stored VPD is the snapshot's own exactly when that value was passed in.
-    ...tentDetailHeaderCaptureRefs(snap, header.truth?.invalidFields ?? [], {
+    ...tentDetailHeaderRejection(header.truth, snap, {
       existingIsSnapshotVpd: !storedVpdRowUntrusted && Number.isFinite(snap?.vpd ?? NaN),
     }),
     // The pair a calculated VPD came from, not the displayed temperature and

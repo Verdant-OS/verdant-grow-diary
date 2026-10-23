@@ -361,6 +361,56 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
     expect(chipButton("Notes")).toHaveAttribute("aria-pressed", "true");
     expect(listedDiaryEntries()[0].id).toBe("timeline-entry-note-1");
   });
+
+  it("does not count manual sensor measurement receipts toward Notes even when the receipt note is non-empty", async () => {
+    const diaryRows = [diaryEntry("note-1", "Grower diary note", "2026-07-20T12:00:00.000Z")];
+    const readings = receiptReadings(2);
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 1 };
+      if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("Grower diary note")).toBeInTheDocument();
+
+    await waitFor(() => expect(chipCount("Measurements")).toBeGreaterThan(1));
+    expect(chipCount("All")).toBe(1);
+    expect(chipCount("Notes")).toBe(1);
+
+    fireEvent.click(chipButton("Notes"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(1));
+    expect(listedDiaryEntries()[0].id).toBe("timeline-entry-note-1");
+  });
+
+  it("counts one diary row toward Photos and Notes when it has both a photo and note text", async () => {
+    const diaryRows = [
+      diaryEntry(
+        "photo-note-1",
+        "Canopy check caption",
+        "2026-07-20T12:00:00.000Z",
+        "https://cdn.example/canopy.jpg",
+      ),
+    ];
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 1 };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("Canopy check caption")).toBeInTheDocument();
+
+    expect(chipCount("Photos")).toBe(1);
+    expect(chipCount("Notes")).toBe(1);
+
+    fireEvent.click(chipButton("Photos"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(1));
+
+    fireEvent.click(chipButton("Notes"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(1));
+    expect(listedDiaryEntries()[0].id).toBe("timeline-entry-photo-note-1");
+  });
 });
 
 describe("timelineEntryHasNoteText", () => {
@@ -370,5 +420,7 @@ describe("timelineEntryHasNoteText", () => {
     expect(timelineEntryHasNoteText("   ")).toBe(false);
     expect(timelineEntryHasNoteText(null)).toBe(false);
     expect(timelineEntryHasNoteText(undefined)).toBe(false);
+    expect(timelineEntryHasNoteText(42)).toBe(false);
+    expect(timelineEntryHasNoteText({ text: "nope" })).toBe(false);
   });
 });

@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { buildTonightTentMetrics, type TonightMetricView } from "@/lib/tonightTentHomeViewModel";
 import { buildTentSnapshotView } from "@/lib/dashboardEnvironmentSnapshotViewModel";
-import { resolveTentDetailVpd } from "@/lib/tentDetailVpdRules";
+import { resolveTentDetailVpd, tentDetailCaptureClimate } from "@/lib/tentDetailVpdRules";
 import { sensorCaptureRef } from "@/lib/sensorCaptureRefRules";
 
 const NOW = Date.parse("2026-10-23T19:00:00.000Z");
@@ -141,10 +141,15 @@ describe("Tent Detail reports a withheld VPD as rejected", () => {
   });
 
   it("still withholds when the rejected capture had a temperature + RH pair", () => {
+    // Codex P2 on #2499: the production helper emits temperature and RH as
+    // separate entries, so build the climate from rows, as the page does.
     const observation = resolveTentDetailVpd({
       ...base,
       tonight: null,
-      captureClimate: [{ at: T, temp: 60, rh: 55 }],
+      captureClimate: tentDetailCaptureClimate(
+        [row("temperature_c", 60, "gw-a"), row("humidity_pct", 55, "gw-a")] as never,
+        null,
+      ),
       rejectedMetrics: ["temp"],
       rejectedCapturedAt: T,
     });

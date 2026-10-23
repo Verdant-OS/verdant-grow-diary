@@ -221,6 +221,23 @@ function sameCaptureClimate(
   return instantMs(climate.at) === selectedMs;
 }
 
+/**
+ * True when one capture carries both a temperature and an RH. The readings
+ * emit each metric as its own entry (`tentDetailCaptureClimate`), so the pair
+ * is found across entries of that capture (Codex P2 on #2499 at 11e38f80).
+ */
+function capturePairsTempAndRh(
+  captureClimate: readonly TentDetailCaptureClimate[],
+  capturedMs: number,
+  refs: readonly (string | null)[],
+): boolean {
+  const entries = captureClimate.filter((climate) => sameCaptureClimate(climate, capturedMs, refs));
+  return (
+    entries.some((climate) => climate.temp !== null) &&
+    entries.some((climate) => climate.rh !== null)
+  );
+}
+
 function climateUnrealistic(climate: { temp: number | null; rh: number | null }): boolean {
   return (
     !classifyManualMetric("temperature_c", climate.temp).valid ||
@@ -477,10 +494,7 @@ export function resolveTentDetailVpd(input: {
     tonight?.state === "value" ||
     (input.rejectedMetrics.includes("temp") && input.rejectedMetrics.includes("rh")) ||
     (rejectedMs !== null &&
-      input.captureClimate.some(
-        (climate) =>
-          instantMs(climate.at) === rejectedMs && climate.temp !== null && climate.rh !== null,
-      ));
+      capturePairsTempAndRh(input.captureClimate, rejectedMs, rejectedClimateRefs));
   if (rejectionApplies && climateRejected && !tonightIndependent) {
     const observation = existingOrNothing();
     return vpdInPlay ? withheld(observation) : observation;

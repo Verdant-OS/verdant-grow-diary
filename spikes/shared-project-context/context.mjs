@@ -11,6 +11,8 @@ const PROJECT = /^[a-z][a-z0-9-]{0,47}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const fail = (message) => { throw new TypeError(message); };
+// Code-point order: locale-independent for ISO timestamps and hex IDs.
+const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const optional = (value, key) => Object.hasOwn(value, key) ? value[key] : undefined;
 
 function object(value, fields, optional = []) {
@@ -128,7 +130,7 @@ function record(value) {
 }
 const envelope = (projectId, records) => ({ version: 1, synthetic: true, projectId, records });
 function serialize(projectId, records) {
-  const sorted = [...records].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...records].sort((a, b) => order(a.id, b.id));
   const json = `${JSON.stringify(envelope(projectId, sorted), null, 2)}\n`;
   if (Buffer.byteLength(json, 'utf8') > LIMITS.jsonBytes) fail('Accumulated export exceeds byte limit');
   return json;
@@ -202,8 +204,6 @@ export class ContextStore {
       if (value.projectId !== this.#projectId) fail('Record belongs to another project');
       if (batch.has(value.id)) fail('Duplicate record in import');
       batch.add(value.id);
-      const previous = next.get(value.id);
-      if (previous && JSON.stringify(previous) !== JSON.stringify(value)) fail('Immutable ID collision');
       next.set(value.id, value);
     }
     if (next.size > LIMITS.records) fail('Accumulated record count exceeds limit');
@@ -218,11 +218,10 @@ export class ContextStore {
     const reasons = [];
     if (Date.parse(value.observedAt) > now) reasons.push('future-observation');
     if (value.expiresAt !== null && now >= Date.parse(value.expiresAt)) reasons.push('expired');
-    if (value.kind === 'exact-head') {
-      const current = currentHeads.get(`${value.source.type}:${value.source.location}`);
-      if (current === undefined) reasons.push('source-head-missing');
-      else if (current !== value.source.commit) reasons.push('source-head-changed');
-    }
+    // A supplied head that moved stales every kind; only exact-head claims also require one.
+    const current = currentHeads.get(`${value.source.type}:${value.source.location}`);
+    if (current !== undefined && current !== value.source.commit) reasons.push('source-head-changed');
+    else if (current === undefined && value.kind === 'exact-head') reasons.push('source-head-missing');
     const supersededBy = [], conflictIds = new Set(value.conflictsWith);
     for (const candidate of this.#records.values()) {
       if (candidate.supersedes.includes(value.id)) supersededBy.push(candidate.id);
@@ -250,7 +249,7 @@ export class ContextStore {
     const needle = query.toLowerCase();
     return freeze([...this.#records.values()]
       .filter((value) => value.text.toLowerCase().includes(needle))
-      .sort((a, b) => b.observedAt.localeCompare(a.observedAt) || a.id.localeCompare(b.id))
+      .sort((a, b) => order(b.observedAt, a.observedAt) || order(a.id, b.id))
       .slice(0, context.limit).map((value) => this.#view(value, context)));
   }
 }

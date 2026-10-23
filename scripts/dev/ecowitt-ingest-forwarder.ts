@@ -656,7 +656,13 @@ export function isRetryableStatus(status: number): boolean {
  * (Codex on #2439 at 59bf4d7d).
  */
 export function isRetryableResponse(response: ResponseSummary): boolean {
-  return isRetryableStatus(response.status) || response.reason === "insert_failed";
+  return (
+    isRetryableStatus(response.status) ||
+    response.reason === "insert_failed" ||
+    // A failed tent lookup answers 200 before anything is written (Copilot on
+    // #2450 at a232bb31).
+    response.reason === "tent_lookup_failed"
+  );
 }
 
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -1284,7 +1290,21 @@ export function brokerPlaintextRemote(value: string): boolean {
   const url = new URL(value);
   if (url.protocol === "mqtts:" || url.protocol === "wss:") return false;
   const host = url.hostname.toLowerCase();
-  return !(host === "localhost" || host === "[::1]" || /^127\.\d+\.\d+\.\d+$/.test(host));
+  return !(host === "localhost" || host === "[::1]" || loopbackIpv4(host));
+}
+
+/**
+ * True for a canonical dotted-quad 127.x.x.x with every octet 0-255. A
+ * non-special `mqtt:` URL keeps `127.0.0.256` as a hostname, which would be
+ * resolved rather than treated as loopback (Copilot on #2450 at a232bb31).
+ */
+function loopbackIpv4(host: string): boolean {
+  const octets = host.split(".");
+  return (
+    octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((o) => /^(0|[1-9]\d{0,2})$/.test(o) && Number(o) <= 255)
+  );
 }
 
 /** The broker URL as the startup line shows it: scheme, host and port only. */

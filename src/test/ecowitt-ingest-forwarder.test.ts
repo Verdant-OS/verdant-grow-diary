@@ -490,6 +490,28 @@ describe("handleMessage", () => {
   });
 
   // Codex on #2439 at 59bf4d7d: a failed upsert answers 200 with error insert_failed.
+  it("retries a 200 tent_lookup_failed (Copilot on #2450)", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ ok: true, accepted: false, inserted: 0, reason: "tent_lookup_failed" }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ accepted: true, inserted: 1 }), { status: 200 }),
+      );
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(out).toMatchObject({ kind: "forwarded", attempts: 2, response: { accepted: true } });
+  });
+
   it("retries a 200 insert_failed and keeps timestamp_stale final", async () => {
     const insertFailed = () =>
       new Response(
@@ -1063,15 +1085,18 @@ describe("broker transport is refused unless it is an explicit MQTT transport", 
   });
 
   // Codex on #2439 at 59bf4d7d: only loopback may skip TLS.
-  it.each(["mqtt://broker.example:1883", "ws://10.0.0.5/mqtt", "mqtt://127.example.com"])(
-    "refuses plaintext %s for a remote broker",
-    async (url) => {
-      const { out, connect, exit } = await run(url);
-      expect(connect).not.toHaveBeenCalled();
-      expect(exit).toHaveBeenCalledWith(2);
-      expect(out).toContain("mqtts:// or wss://");
-    },
-  );
+  it.each([
+    "mqtt://broker.example:1883",
+    "ws://10.0.0.5/mqtt",
+    "mqtt://127.example.com",
+    "mqtt://127.0.0.256:1883",
+    "mqtt://127.0.0.01:1883",
+  ])("refuses plaintext %s for a remote broker", async (url) => {
+    const { out, connect, exit } = await run(url);
+    expect(connect).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(out).toContain("mqtts:// or wss://");
+  });
 
   it("logs only the broker scheme, host and port at startup (Codex on #2439 at 59bf4d7d)", async () => {
     // A path or fragment is not a registered secret, so only dropping it keeps it out.

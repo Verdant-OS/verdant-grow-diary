@@ -64,8 +64,8 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - The live POST times out after 15 s and retries only the transient cases in
   `docs/bridge-client-retry-guidance.md` (timeout, network failure, HTTP 408,
   429, 5xx) with Full Jitter, at most 4 retries. A `200` carrying
-  `error: "insert_failed"` is retried the same way (the write is an idempotent
-  upsert). 4xx auth and payload errors and the other `200` reasons, such as
+  `error: "insert_failed"` (the write is an idempotent upsert) or
+  `reason: "tent_lookup_failed"` (nothing was written yet) is retried the same way. 4xx auth and payload errors and the other `200` reasons, such as
   `timestamp_stale`, are final.
 - `--once` exits `0` only for a dry run or a `2xx` response with
   `accepted: true`; a broker connect timeout (20 s), broker error or rejected
@@ -97,7 +97,7 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - `--mqtt-url` must use `mqtt://`, `mqtts://`, `ws://` or `wss://`. MQTT.js
   sends any other scheme (for example `https://`) as plaintext MQTT, so it is
   refused before connecting. `mqtt://` and `ws://` are accepted only for a
-  loopback broker (`localhost`, `127.x.x.x`, `[::1]`); a remote broker needs
+  loopback broker (`localhost`, a canonical `127.x.x.x` with octets 0–255, `[::1]`); a remote broker needs
   `mqtts://` or `wss://`, because the credentials and PASSKEY uploads would
   otherwise travel unencrypted.
 - The startup line shows the broker as scheme, host and port only; the path,

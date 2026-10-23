@@ -1,6 +1,6 @@
 # Spec — Global search over diary entries
 
-Status: **proposed spec only** (filming bug #17, 2026-10-22). No code in this slice.
+Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds three spec-baseline Vitest files.
 **Owner decision (Matthew, 2026-10-22): Option B** — a server-side RPC, so the search text
 travels in a POST body. The implementing slice adds it through a new additive migration,
 drafted on its own branch for the protected migration review. No agent applies it;
@@ -88,7 +88,10 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
    pairs can carry different notes, so projecting the spine's note alone could return an
    excerpt without the match.
 
-   The result keeps the spine's id, the canonical id for one save. (Timeline's collapse feeds
+   The result keeps the spine's id, the canonical id for one save, and is projected as the
+   spine: `source` is `'grow_event'` and `occurred_at` is the spine's `occurred_at`, so the
+   returned source owns the returned id and the result orders and dates by it. Only `note`
+   may come from the companion. (Timeline's collapse feeds
    only the recent-activity lane; the main list still renders the diary card, so requirement 2
    says how the spine id is made addressable there.) The placeholder
    `'(quick log)'` is not grower-authored text: exclude it only when
@@ -117,7 +120,9 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      every grower's diary entries (`20260517010926_65004f70-….sql:67–74`), so RLS alone is not
      owner scoping.
 
-2. Each result shows a ~80-character note excerpt with the match, the plant or tent name
+2. Each result shows a note excerpt containing the whole match: 80 characters by default,
+   widened to the match's own length when the match is longer (so at most 120, the query
+   cap), with an ellipsis on each clipped side, the plant or tent name
    when known, and the local date (`formatSnapshotTimestamp`). Under the chosen Option B the
    RPC returns the plant, tent **and grow** names from owner-scoped joins; Option A would need one batched
    owner-scoped lookup (generated `diary_entries` / `grow_events` relationship metadata has
@@ -170,11 +175,17 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
    `MAX_QUERY_LENGTH` in `src/lib/globalSearchSession.ts:21`, which today bounds only the
    persisted state). A longer query raises SQLSTATE `22023` with message
    `diary_query_too_long` before any pattern is built, so a direct authenticated caller cannot
-   make an unbounded `%…%` scan over both tables. An empty result set cannot carry a status,
+   send an oversized pattern. The cap bounds the pattern, not the work: a leading-wildcard
+   `ilike` still reads every eligible row the owner has, and `limit 10` does not bound that,
+   so scan cost at scale is `NOT_MEASURED`. An empty result set cannot carry a status,
    so the error is the channel: the hook maps exactly that code and message to an
    invalid-query state ("Diary search is limited to 120 characters") and every other error to
    "Diary results unavailable". The dialog input also gets `maxLength={120}`, so the UI never sends one. Same debounce and
    private-state epoch as the existing hook, so cleared/sign-out state cannot leak results.
+   The hook calls `verdant_search_diary` only for a signed-in session: the public
+   `/cultivars` page mounts `GlobalSearchDialog` (`src/pages/CultivarsIndex.tsx:340`) and the
+   RPC is revoked from `anon`, so a signed-out search makes no diary request and shows no diary
+   state at all, neither results nor "Diary results unavailable".
 6. Diary search text never appears in a request URL. A note search term is private grower
    content; URLs reach access logs, proxies and observability tools that request bodies do
    not. The existing `verdant_search` RPC already sends `q` in a POST body.
@@ -286,7 +297,8 @@ The function must:
 
 ## Acceptance tests (for the implementing slice)
 
-- Pure rules: excerpt centres the match and never exceeds the bound; ordering is newest-first
+- Pure rules: excerpt centres the match and never exceeds the bound, and a 120-character
+  match is shown whole in a 120-character excerpt; ordering is newest-first
   with `id` tie-break; whitespace-only and <3-char queries return nothing; `100%`, `a_b` and
   `c:\x` are escaped so they match only literally (`100%` must not match `100 ml`).
 - Query shape, Option B (chosen; RPC-side, against a local database): with more than 10
@@ -302,6 +314,9 @@ The function must:
   different owned same-grow spines pairs only with the `linked_grow_event_id` spine (the
   other spine stays its own result), and a row with a non-UUID `linked_grow_event_id` and a
   valid `grow_event_id` is matched as unlinked, not paired through the legacy key.
+- Collapsed projection: a linked pair whose companion note matches, whose spine note does
+  not, and whose `entry_at` differs from the spine's `occurred_at` returns one row with
+  `source = 'grow_event'`, the spine's id and `occurred_at`, and the companion's note.
 - Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
   `verdant_search` results still render; a failing `verdant_search` does not hide diary
   results.
@@ -338,7 +353,9 @@ The function must:
   (new anchored row). The spine-only fixture is older than both the initial grow-event page
   and the history-panel cap, so a capped panel cannot pass it. With eleven or more entity and
   cultivar matches, the first diary match is still on the first page. A history entry that
-  differs only in the diary toggle is kept as its own entry. A persisted diary last-selection
+  differs only in the diary toggle is kept as its own entry. A restored session or history
+  filter object saved before this change, holding only the four pre-diary fields, normalizes
+  the missing diary toggle to enabled, and the diary result is visible with it. A persisted diary last-selection
   restores its preview. Changing the query to another term in the same note updates the
   preview to the new excerpt, and the input accepts at most 120 characters.
 - Ordering: assert the **final composed list** (hook `results` after entity+diary
@@ -367,7 +384,12 @@ The function must:
   "no longer on the timeline" notice instead of scrolling nowhere, and a targeted read that
   errors or times out shows the retryable "Couldn't load this entry" state, never that
   notice.
-- Names: a result shows its plant or tent name, and "Plant" / "Tent" when the name read fails.
+- Names: a result shows its plant or tent name, and "Plant" / "Tent" when the name read fails;
+  a grow-level result (null plant and tent) shows its grow name, and "Grow" when the grow
+  name is unavailable.
+- Signed out (the public `/cultivars` palette): a 3+ character search makes no
+  `verdant_search_diary` call and shows no diary unavailable notice, while cultivar results
+  still render.
 - RED-first proof for each test; no source-text scans as behaviour tests.
 
 ## Out of scope

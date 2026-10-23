@@ -60,15 +60,27 @@ switch know only grow / tent / plant / cultivar.
      (`src/pages/Timeline.tsx:437–441`), and the dual-timestamp backfill joins on owner and
      grow (`20260725024026_quicklog_dual_timestamp_foundation.sql:205–209`); a stale or
      malformed link to the same owner's event in another grow must not replace or suppress
-     this grow's result. Link values are historical JSON text, so they are parsed with
-     `quicklog_try_parse_uuid` (same migration) or an equally non-throwing comparison: a
-     direct `::uuid` cast would let one malformed legacy row abort the whole RPC and show
-     "Diary results unavailable";
-   - or, for an older unlinked manual companion, sharing the exact (grow, plant, instant)
-     triple with a manual spine, plants compared null-safely (`is not distinct from`). Timeline
-     pairs on (plant, instant) (lines 405–407) only because it filters both sources to one
-     `activeGrowId` first (`src/pages/Timeline.tsx:812,843`); this search spans every owned
-     grow, so it must add `grow_id` or two grows' null-plant rows at one instant would collapse.
+     this grow's result. Link values are historical JSON text, so they are compared as text:
+     `ge.id::text = lower(btrim(d.details->>'linked_grow_event_id'))` (likewise for
+     `grow_event_id`). That comparison never throws and needs no extra privilege. A direct
+     `::uuid` cast would let one malformed legacy row abort the whole RPC and show "Diary
+     results unavailable", and `quicklog_try_parse_uuid` cannot be used: the same migration
+     revokes its EXECUTE from `authenticated` (lines 132–134), so this `security invoker` RPC
+     would fail with a permission error;
+   - or, for an older unlinked manual companion, sharing the exact (grow, plant, tent,
+     instant) key with a manual spine, plant and tent compared null-safely (`is not distinct
+from`). Timeline pairs on (plant, instant) (lines 405–407) only because it filters both
+     sources to one `activeGrowId` first (`src/pages/Timeline.tsx:812,843`); this search spans
+     every owned grow, so it must add `grow_id` or two grows' null-plant rows at one instant
+     would collapse. It adds `tent_id` because `quicklog_save_manual` writes tent-level logs
+     with a null plant and a caller-supplied time
+     (`20260927160000_quicklog_manual_plant_tent_lineage.sql`), so two tents of one grow can
+     share (grow, null plant, instant).
+
+   When a spine and its companion collapse into one result, the returned `note` is the note
+   that matched: the diary companion's when it matches, otherwise the spine's. Historical
+   pairs can carry different notes, so projecting the spine's note alone could return an
+   excerpt without the match.
 
    The result keeps the spine's id, the canonical id for one save. (Timeline's collapse feeds
    only the recent-activity lane; the main list still renders the diary card, so requirement 2
@@ -76,7 +88,12 @@ switch know only grow / tent / plant / cultivar.
    `'(quick log)'` is not grower-authored text: exclude it only when
    `isQuickLogPlaceholderNote` (`src/lib/plantFeedingDisplayRules.ts:54`) is true (exact,
    trimmed, case-insensitive). A grower note that merely contains those words still matches.
-   Naive `ilike '%quick%'` would otherwise hit empty-note mirrors.
+   Naive `ilike '%quick%'` would otherwise hit empty-note mirrors. The synthetic attachment
+   notes are not grower-authored either: a diary row whose `details.event_type` is
+   `quicklog_photo_attachment` or `photo` with the exact note `QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE`
+   (`src/lib/quickLogPhotoDiaryEntry.ts:71`), or `quicklog_video_attachment` with
+   `QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE` (`src/lib/quickLogVideoDiaryEntry.ts:50`), is
+   excluded. A grower-written caption on an attachment still matches.
    - Matching is a case-insensitive literal substring: `%`, `_` and `\` in the query match
      themselves.
    - Order is newest first (`occurred_at` / `entry_at`) with an `id` tie-break, bounded to
@@ -122,8 +139,10 @@ switch know only grow / tent / plant / cultivar.
    - The existing hash handoff (`useTimelineHashAnchorHandoff.ts:50–63`) only scrolls to a row
      that is already mounted, and Timeline initially loads the selected grow's newest 100
      entries. The implementing slice adds a bounded "load until this entry or give up" step
-     (for example one targeted read of the entry plus its page, capped) and a calm "This
-     entry is no longer on the timeline" notice when it cannot be found.
+     (for example one targeted read of the entry plus its page, capped). "This entry is no
+     longer on the timeline" is shown only when that read **succeeds** and returns no eligible
+     row. A read that errors or times out has not established absence: it shows a separate,
+     retryable "Couldn't load this entry" state instead.
    - A spine-only result has no diary card at all. Its `QuickLogHistoryPanels` row
      (`src/components/QuickLogHistoryPanels.tsx:250–255`) carries no DOM id, and that panel is
      capped, so loading more records cannot create the destination. The implementing slice
@@ -140,9 +159,12 @@ switch know only grow / tent / plant / cultivar.
    cultivars keep their current short-query behaviour (for example "OG"). Maximum 120
    characters, enforced by `verdant_search_diary` itself (the same cap as
    `MAX_QUERY_LENGTH` in `src/lib/globalSearchSession.ts:21`, which today bounds only the
-   persisted state). A longer query returns no rows with an invalid-query status, before any
-   pattern is built, so a direct authenticated caller cannot make an unbounded `%…%` scan
-   over both tables. The dialog input also gets `maxLength={120}`, so the UI never sends one. Same debounce and
+   persisted state). A longer query raises SQLSTATE `22023` with message
+   `diary_query_too_long` before any pattern is built, so a direct authenticated caller cannot
+   make an unbounded `%…%` scan over both tables. An empty result set cannot carry a status,
+   so the error is the channel: the hook maps exactly that code and message to an
+   invalid-query state ("Diary search is limited to 120 characters") and every other error to
+   "Diary results unavailable". The dialog input also gets `maxLength={120}`, so the UI never sends one. Same debounce and
    private-state epoch as the existing hook, so cleared/sign-out state cannot leak results.
 6. Diary search text never appears in a request URL. A note search term is private grower
    content; URLs reach access logs, proxies and observability tools that request bodies do
@@ -234,7 +256,7 @@ The function must:
   (`20260723000807_…sql:83–85`), so it never keeps PostgreSQL's default PUBLIC execute;
 - return `source` (`'grow_event'` or `'diary_entry'`), `id`, `note`, `occurred_at`
   (`grow_events.occurred_at` / `diary_entries.entry_at`, raw `timestamptz`), `grow_id`,
-  `plant_id`, `tent_id`, `plant_name`, `tent_name`. The client formats `occurred_at` with
+  `plant_id`, `tent_id`, `grow_name`, `plant_name`, `tent_name`. The client formats `occurred_at` with
   `formatSnapshotTimestamp` in the browser's zone; names come from owner-scoped joins, so no
   second lookup is needed;
 - match the raw `note` literally (`ilike '%' || escaped || '%' escape '\'`, escaping `\`,
@@ -261,9 +283,11 @@ The function must:
   `occurred_at desc, id desc` before the limit; the search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
   with `grow_id` and `occurred_at`; `max_results` of `null` and `500` each return at most 10
   rows, and `0` and `-5` each return exactly 1 row, the newest matching fixture id; `100%` does not match `100 ml` server-side; `anon`
-  cannot execute it; a 120-character query runs and a 121-character query returns no rows
-  with the invalid-query status; a legacy row whose link value is not a UUID does not fail
-  the call and is matched as unlinked.
+  cannot execute it; a 120-character query runs and a 121-character query raises
+  `22023` / `diary_query_too_long`, which the hook shows as the invalid-query state, not as
+  "Diary results unavailable"; run **as `authenticated`**, a legacy row with a valid link
+  pairs with its spine and one whose link value is not a UUID does not fail the call and is
+  matched as unlinked.
 - Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
   `verdant_search` results still render; a failing `verdant_search` does not hide diary
   results.
@@ -278,7 +302,11 @@ The function must:
   the spine id; two grows each holding a null-plant unlinked companion and spine at the same
   instant return two results, each with its own grow's spine id; a diary row in grow A
   whose explicit link points at the same owner's event in grow B stays its own grow A
-  result, and B's deleted event does not suppress it; a grow-level row (null plant and
+  result, and B's deleted event does not suppress it; two tent-level unlinked companions in
+  different tents of one grow, each at the same instant as its own tent's spine, return two
+  results with their own spine ids; a pair whose diary note matches and whose spine note does
+  not returns an excerpt containing the match; a note-less photo or video attachment does
+  not match `"photo"` or `"video"`, while a grower caption on one still matches; a grow-level row (null plant and
   tent) is labelled with its grow name, not "Plant" or "Tent"; an exact `'(quick log)'` placeholder does not match query `"quick"` or
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
   a deleted spine and a retracted entry are not returned, and neither is a non-retracted
@@ -291,8 +319,9 @@ The function must:
   companion), including for a grow other than the active one. Rendered Timeline navigation
   tests cover three hash targets by spine id, each asserting a mounted element with that id
   is scrolled to: an explicitly linked companion (existing alias), a legacy unlinked manual
-  companion paired by (grow, plant, instant) (new alias), and a spine-only result (new
-  anchored row). With eleven or more entity and
+  companion paired by (grow, plant, tent, instant) (new alias), and a spine-only result
+  (new anchored row). The spine-only fixture is older than both the initial grow-event page
+  and the history-panel cap, so a capped panel cannot pass it. With eleven or more entity and
   cultivar matches, the first diary match is still on the first page. A history entry that
   differs only in the diary toggle is kept as its own entry. A persisted diary last-selection
   restores its preview. Changing the query to another term in the same note updates the
@@ -319,8 +348,10 @@ The function must:
   and scrolls to it; selecting a result from a different grow switches to that grow first; an
   active filter that hides the entry is cleared first, for each of plant, tent, type, search,
   date, sensor source, stage and event chip; a collapsed Quick Log companion scrolls
-  to its visible row; an entry that cannot be found shows the calm notice instead of scrolling
-  nowhere.
+  to its visible row; an entry whose targeted read succeeds with no eligible row shows the
+  "no longer on the timeline" notice instead of scrolling nowhere, and a targeted read that
+  errors or times out shows the retryable "Couldn't load this entry" state, never that
+  notice.
 - Names: a result shows its plant or tent name, and "Plant" / "Tent" when the name read fails.
 - RED-first proof for each test; no source-text scans as behaviour tests.
 

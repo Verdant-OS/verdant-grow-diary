@@ -165,6 +165,7 @@ import {
   buildTonightTentMetrics,
   resolveTonightTentSelection,
 } from "@/lib/tonightTentHomeViewModel";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Renders the grower's overview for a valid URL-selected grow or the full account.
@@ -288,7 +289,8 @@ export default function Dashboard() {
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
-  const targetsState = useGrowTargets(scopedGrowId ?? null);
+  const targetsState = useGrowTargets(scopedGrowId ?? null, { retryOnUnavailable: true });
+  const targetsPending = targetsState.status !== "ok";
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);
   const currentSensorSnapshot = snapshotReadState.confirmedSnapshot;
@@ -420,6 +422,7 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
+    targetsPending,
     // Gated on current tent and plant reads; see stageReadsCurrentForWrite.
     enabled: !!scopedGrowId && stageReadsCurrentForWrite,
     stage: alertContextStage,
@@ -2033,7 +2036,9 @@ export default function Dashboard() {
                         </div>
                         {a.reason && (
                           <p className="text-xs mt-2 italic text-muted-foreground">
-                            {sanitizeActionCopy(stripBackPointerTokens(a.reason))}
+                            {localizeReadingAtTimestamps(
+                              sanitizeActionCopy(stripBackPointerTokens(a.reason)),
+                            )}
                           </p>
                         )}
                         <div className="mt-2 flex items-center gap-2 flex-wrap">

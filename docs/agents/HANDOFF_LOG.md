@@ -45,6 +45,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### REVIEWER-ROUTING-20261022
+
+```text
+TASK REVIEWER-ROUTING-20261022  priority: P2  status: OPEN
+goal: Matthew-approved bounded reviewer routing: retire Blue Dream/Critical Mass for future requests, allow available eligible independent sessions, preserve all acceptance and production gates.
+branch: codex/reviewer-routing-20261022
+base: verdant-grow-diary at ebaf1b6afa7fb8cfa7fb8090914c8633f7537a98, verified 2026-10-22 UTC
+checkout: git fetch origin codex/reviewer-routing-20261022 verdant-grow-diary && git switch codex/reviewer-routing-20261022 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2328 (draft; preserve draft; no existing branch or PR taken over)
+head_sha: e71049cec2214784a26b3a47c7075ab3a24d0ae9 (ownership checkpoint pushed and draft #2328 opened 2026-10-22 03:02 UTC); routing implementation commit follows. Read current full PR head before any review; this commit cannot record its own resulting SHA.
+state: bounded routing implemented after pushed ownership checkpoint/draft #2328. Local 31 governance regression tests and 71 focused Vitest cases pass; twelve-file version/parity, mirror, format, docs-safety and strict scorer report pass. This commit follows the ownership checkpoint; consult the PR for its resulting full head and hosted CI. Original checkout and #1971/#2086 branches untouched.
+next_action: Verify draft #2328 at its resulting full implementation head and hosted CI; assign one actually available independent Claude/Grok review session through permitted transport. Keep draft; no merge, ready/enqueue or production action.
+files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/{claude,codex,council-chair,gemini,grok,security}.md; docs/agents/OWNERSHIP.md; docs/agents/CURRENT_STATE.md (active header only); .agents/skills/verdant-exact-sha-review/SKILL.md; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Broad governance overlaps remain; Matthew approved this session as sole writer for only the narrow reviewer-routing correction on 2026-10-22 (parent question: designate this task sole writer while leaving #1971/#2086 unrelated work and branches untouched; Matthew: "Yeah"). This designation resolves the routing-slice collision, grants no takeover or review PASS, and changes no other assignments. Rechecked overlaps: #1971 canopy/constitution-clash-fixes at 82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e (51 files), #2086 claude/new-session-nms5b8 at 98b660ab13d2e3087364d1bc5faeb333b20590c8 (35 files). No fresh 24-hour claim or matching deploy HANDOFF_LOG block observed; staleness is not reassignment. #1971 issuecomment-6222081602 preserves the existing governance writer after last Canopy claim issuecomment-6102182294. The 12-file parity bump also overlaps #2028/#1879/#1876. Shared live-session registry unavailable. No claim/release comment posted; existing comment-approval gate remains.
+artifacts: draft #2328 body records current full head and actual local/hosted evidence; local supporting receipts in /workspace/reviewer-routing-deliverables/. Sentinel-Version 2026-10-22.1 across exactly 12 files; no parity expansion or checker/test/pin edits. Original proposal hash retained separately; it is not this implementation commit identity.
+reviewer_seat: BLOCKED — no independent available Claude/Grok session assigned; Codex is proposal author and cannot accept it; Graft governance lane excluded
+review_request: not sent; owner: Codex reviewer-routing session; permalink: NOT_MEASURED; state: blocked (no independent session/approved transport assigned); fallback transfers: 0
+claimed_by: Codex reviewer-routing session, 2026-10-22 03:01 UTC (Matthew direct bounded sole-writer designation; no claim on #1971/#2086; no GitHub claim comment posted because separate comment-approval gate remains)
+last_updated: 2026-10-22 03:04 UTC, by Codex reviewer-routing session
+limits: #2303/#2304 existing independent PASSes are preserved and are not review work here. #2312 moved to 588fe03c; the old 720e9b3 PASS cannot transfer. No merge, ready, auto-merge, enqueue, deploy, production dispatch, SQL, runtime automation, hooks, GitHub settings, security, billing, secret or protected-scorer changes.
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text
@@ -236,6 +258,26 @@ last_updated: 2026-10-06 16:05 CT, by Claude
 ```
 
 ## Closed
+
+### QUICKLOG-CORRECTION-EDITABLE-VALUES
+
+```text
+TASK QUICKLOG-CORRECTION-EDITABLE-VALUES  priority: P2  status: CLOSED
+goal: Make the Correct this Quick Log dialog edit volume, dose, or sensor values for that entry type, and keep the original value in the correction history. Keep the Wrong value reason. Do not follow closed #2116.
+branch: cursor/quicklog-correction-editable-values-fc1d
+base: verdant-grow-diary
+checkout: none; merged. Start new work from origin/verdant-grow-diary.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118
+head_sha: e732a157d387d38d9ac76b71b1ed6208d9145744, the final head of #2118 (32 files).
+state: #2118 squash-merged through the merge queue from head e732a157 as 48b6134462bf3b2a04046c82af646fdfc1da5b8f. The merge queue created that commit at 2026-10-20 18:25:12 UTC (committer timestamp); it reached verdant-grow-diary and GitHub closed the PR as merged at 2026-10-20 18:55:50 UTC, after the queued #2272 group ahead of it passed on verdant-grow-diary (sole parent 0f9d1a5ce). Migration 20261014210000_quicklog_correction_editable_values.sql is NOT applied to production; applying it is Matthew's separate decision. NOT deployed: live /version.json still reports c0ce65cb. Production acceptance NOT_MEASURED.
+next_action: CLOSED for the repository change. Production migration apply and publish only on Matthew's separate explicit yes; then signed-in verification on the disposable QA account.
+files: .github/workflows/ci.yml; docs/agents/HANDOFF_LOG.md; scripts/assert-required-core-migrations-applied.mjs; scripts/prove-quicklog-correction-measured-values.mjs; scripts/prove-quicklog-correction-owner-fence.mjs; src/components/FeedingHistoryPanel.tsx; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/WateringHistoryPanel.tsx; src/lib/quick-log/quickLogRevisionRules.ts; src/pages/Timeline.tsx; src/test/ci-pr-concurrency.test.ts; src/test/quicklog-correction-copilot-followup.test.tsx; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-environment-check-envelope.test.ts; src/test/quicklog-correction-environment-link-match.test.ts; src/test/quicklog-correction-fast-check-companion.test.ts; src/test/quicklog-correction-quick-log-envelope-sensor.test.ts; src/test/quicklog-correction-unresolved-linked-root.test.ts; src/test/quicklog-correction-watering-volume-cap.test.tsx; src/test/quicklog-feeding-correction-volume-context.test.ts; src/test/quicklog-feeding-correction-volume.test.tsx; src/test/quicklog-grouped-feeding-correction.test.tsx; src/test/quicklog-watering-sensor-correction.test.tsx; src/test/quicklog-watering-tied-sibling-correction.test.ts; src/test/timeline-correction-sensor-wiring.test.tsx; src/test/timeline-first-page-linked-roots.test.tsx; src/test/timeline-load-older-sensor-siblings.test.tsx; src/test/timeline-supplemental-root-sensor-siblings.test.tsx; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql
+blockers: none for the merged change. Production migration apply and publish not approved.
+artifacts: PR #2118 body (unlock receipts); merge commit 48b6134462bf3b2a04046c82af646fdfc1da5b8f
+reviewer_seat: Codex exact-head review. Matthew decided on 2026-10-20 (~18:33 UTC, VER-216) that a clean Codex review replaces the Graft half of the Oct 15 12:38 PM CT receipt condition.
+claimed_by: claude, 2026-10-20 18:40 UTC
+last_updated: 2026-10-20 19:04 UTC, by Claude (VER-216 close-out; block closed after merge, follow-up to Codex r4328730607)
+```
 
 ### FIX-2033-LOCKFILE-POLICY-INNGEST
 

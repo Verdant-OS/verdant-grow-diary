@@ -20,7 +20,10 @@
  *     via the returned state, never silently retried into automation.
  */
 import { useEffect, useRef, useState } from "react";
-import { resolveAlertContextRefresh } from "@/lib/alertContextRefreshRules";
+import {
+  alertContextRefreshRetryDelayMs,
+  resolveAlertContextRefresh,
+} from "@/lib/alertContextRefreshRules";
 import type { SensorSnapshot, SensorSnapshotMetricRefKey } from "@/lib/sensorSnapshot";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
@@ -76,27 +79,35 @@ export interface PersistEnvironmentAlertsInput {
 
 const SOURCE = "environment_alerts";
 
-// Shared across mounted hook instances within the same active view,
-// keyed with snapshot capture time so concurrent evaluations of the same
-// snapshot observation never duplicate an alert or its CREATED audit event
+// Shared across mounted hook instances within the same active view, keyed
+// by the scoped logical alert key (grow, tent, rule). Two instances that see
+// the same breach through snapshots with different capture times must not
+// both insert it, so the snapshot time is deliberately not part of the key:
+// concurrent evaluations never duplicate an alert or its CREATED audit event
 // before `listAlerts` reflects the new open row. Reservations stay held
 // while any write is still in flight, even if the last hook instance
 // unmounts mid-write, and clear only once both mounted instances and
 // active writes reach zero.
 let mountedPersistHookCount = 0;
 let activePersistWriteCount = 0;
-const globalInFlightSnapshotKeys = new Set<string>();
+const globalInFlightAlertKeys = new Set<string>();
 const globalCreatedEventLoggedKeys = new Set<string>();
 // Mounted instances that skipped a candidate because another write held its
-// snapshot reservation. A failed write releases the reservation and notifies
-// them once so they retry; a successful write notifies no one (no duplicate).
-const reservationReleaseListeners = new Set<(snapKey: string) => void>();
+// alert reservation. A failed write, or a run cleaned up before its write
+// started, releases the reservation and notifies them once so they retry; a
+// successful write notifies no one (no duplicate).
+const reservationReleaseListeners = new Set<(alertKey: string) => void>();
+
+function releaseAlertReservation(alertKey: string): void {
+  globalInFlightAlertKeys.delete(alertKey);
+  for (const notify of [...reservationReleaseListeners]) notify(alertKey);
+}
 
 function maybeClearGlobalSnapshotReservations(): void {
   if (mountedPersistHookCount <= 0 && activePersistWriteCount <= 0) {
     mountedPersistHookCount = 0;
     activePersistWriteCount = 0;
-    globalInFlightSnapshotKeys.clear();
+    globalInFlightAlertKeys.clear();
     globalCreatedEventLoggedKeys.clear();
   }
 }
@@ -172,6 +183,10 @@ export function usePersistEnvironmentAlerts(
   const [eligibilityWake, setEligibilityWake] = useState(0);
   // Bumped when a write this instance deferred to fails and frees its key.
   const [reservationWake, setReservationWake] = useState(0);
+  // Bumped by the bounded retry after an open alert's context refresh fails.
+  const [refreshRetryWake, setRefreshRetryWake] = useState(0);
+  // Consecutive failed context-refresh runs; reset by a successful refresh.
+  const refreshFailures = useRef(0);
 
   // Stable deps — recompute on snapshot ts / quality / targets identity.
   // Configured bounds are part of the targets key: persisted reasons quote
@@ -211,17 +226,18 @@ export function usePersistEnvironmentAlerts(
       return;
     }
 
-    const pendingSnapshotKeys = new Set<string>();
+    const pendingAlertKeys = new Set<string>();
     let cancelled = false;
     let wakeId: number | null = null;
+    let refreshRetryId: number | null = null;
     const activeKeys = inFlightKeys.current;
     // Reservations belong to this read until its request actually starts.
     // Release unstarted work on cleanup so a newer confirmed read can proceed.
     const pendingKeys = new Set<string>();
-    // Snapshot keys this run skipped because another write held them.
-    const blockedSnapshotKeys = new Set<string>();
-    const onReservationReleased = (snapKey: string) => {
-      if (!cancelled && blockedSnapshotKeys.has(snapKey)) setReservationWake((n) => n + 1);
+    // Alert keys this run skipped because another write held them.
+    const blockedAlertKeys = new Set<string>();
+    const onReservationReleased = (alertKey: string) => {
+      if (!cancelled && blockedAlertKeys.has(alertKey)) setReservationWake((n) => n + 1);
     };
     reservationReleaseListeners.add(onReservationReleased);
 
@@ -375,7 +391,6 @@ export function usePersistEnvironmentAlerts(
 
       const toInsert = persistable.filter((a) => {
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
-        const snapKey = `${key}::${tsKey}`;
         const dirKey = thresholdDirectionKey(
           growId,
           observedTentId,
@@ -402,18 +417,19 @@ export function usePersistEnvironmentAlerts(
         }
         if (existing.has(key) || (dirKey !== null && existingDirections.has(dirKey))) return false;
         if (activeKeys.has(key)) return false;
-        if (globalInFlightSnapshotKeys.has(snapKey)) {
-          blockedSnapshotKeys.add(snapKey);
+        if (globalInFlightAlertKeys.has(key)) {
+          blockedAlertKeys.add(key);
           return false;
         }
         activeKeys.add(key);
         pendingKeys.add(key);
-        globalInFlightSnapshotKeys.add(snapKey);
-        pendingSnapshotKeys.add(snapKey);
+        globalInFlightAlertKeys.add(key);
+        pendingAlertKeys.add(key);
         if (dirKey) existingDirections.add(dirKey);
         return true;
       });
 
+      let refreshError: string | null = null;
       for (const refresh of contextRefreshes) {
         if (cancelled) return;
         try {
@@ -422,15 +438,32 @@ export function usePersistEnvironmentAlerts(
             reason: refresh.reason,
             originating_timeline_events: refresh.refs,
           });
-        } catch {
-          // Best effort: the open alert stays as it was; the next run retries.
+        } catch (err) {
+          refreshError ??= `alert context refresh failed: ${(err as Error)?.message ?? "update failed"}`;
+        }
+      }
+      if (cancelled) return;
+      if (contextRefreshes.length > 0) {
+        // A failed refresh leaves the open alert quoting the old range, and no
+        // dependency of this effect moves to run it again. Surface the error
+        // and wake a bounded number of times to retry; success resets it.
+        if (refreshError) {
+          refreshFailures.current += 1;
+          const delay = alertContextRefreshRetryDelayMs(refreshFailures.current);
+          if (delay !== null) {
+            refreshRetryId = window.setTimeout(() => setRefreshRetryWake((n) => n + 1), delay);
+          }
+        } else {
+          refreshFailures.current = 0;
         }
       }
 
       if (toInsert.length === 0) {
-        if (!cancelled) {
-          setState({ status: "done", persistedCount: 0, lastError: null });
-        }
+        setState({
+          status: refreshError ? "error" : "done",
+          persistedCount: 0,
+          lastError: refreshError,
+        });
         return;
       }
 
@@ -439,14 +472,13 @@ export function usePersistEnvironmentAlerts(
       }
 
       let persistedCount = 0;
-      let lastError: string | null = null;
+      let lastError: string | null = refreshError;
 
       for (const a of toInsert) {
         if (cancelled) return;
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
-        const snapKey = `${key}::${tsKey}`;
         pendingKeys.delete(key);
-        pendingSnapshotKeys.delete(snapKey);
+        pendingAlertKeys.delete(key);
         activePersistWriteCount += 1;
         try {
           // Explicit refs only: metric_refs (sensor_readings) first, then
@@ -463,7 +495,7 @@ export function usePersistEnvironmentAlerts(
             source: SOURCE,
             originating_timeline_events: refs,
           });
-          const logDedupKey = `${saved?.id ?? ""}::${snapKey}`;
+          const logDedupKey = `${saved?.id ?? ""}::${key}`;
           if (!globalCreatedEventLoggedKeys.has(logDedupKey)) {
             globalCreatedEventLoggedKeys.add(logDedupKey);
             try {
@@ -482,8 +514,7 @@ export function usePersistEnvironmentAlerts(
         } catch (err) {
           // Release the in-flight guard so a later real attempt can retry.
           activeKeys.delete(key);
-          globalInFlightSnapshotKeys.delete(snapKey);
-          for (const notify of [...reservationReleaseListeners]) notify(snapKey);
+          releaseAlertReservation(key);
           lastError = (err as Error).message ?? "insert failed";
         } finally {
           activePersistWriteCount -= 1;
@@ -504,10 +535,13 @@ export function usePersistEnvironmentAlerts(
       cancelled = true;
       reservationReleaseListeners.delete(onReservationReleased);
       if (wakeId !== null) window.clearTimeout(wakeId);
+      if (refreshRetryId !== null) window.clearTimeout(refreshRetryId);
       for (const key of pendingKeys) activeKeys.delete(key);
       pendingKeys.clear();
-      for (const snapKey of pendingSnapshotKeys) globalInFlightSnapshotKeys.delete(snapKey);
-      pendingSnapshotKeys.clear();
+      // Unstarted reservations are released like a failed write, so an
+      // instance that deferred to this run retries instead of waiting forever.
+      for (const key of pendingAlertKeys) releaseAlertReservation(key);
+      pendingAlertKeys.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -525,6 +559,7 @@ export function usePersistEnvironmentAlerts(
     tentKey,
     eligibilityWake,
     reservationWake,
+    refreshRetryWake,
   ]);
 
   return state;

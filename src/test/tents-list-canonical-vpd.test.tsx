@@ -959,3 +959,43 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     },
   );
 });
+
+// Codex P2 on #2430 at fcd86356: a successful snapshot holding only rejection
+// evidence decides the card, as on the Dashboard, instead of "unavailable".
+describe("a rejected-only snapshot after a failed raw read", () => {
+  afterEach(() => cleanup());
+  const rejectedOnly = (source: string): SensorSnapshot =>
+    ({
+      ...EMPTY_SNAPSHOT,
+      tent_id: "tent-1",
+      rejected_quality_rows: [
+        { metric: "vpd_kpa", value: 9.9, captured_at: at(0.1), source, quality: "invalid" },
+      ],
+    }) as SensorSnapshot;
+  const renderWith = (sensorStatus: "error" | "success", snapshot: SensorSnapshot) =>
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={{ status: "ok", snapshot }}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus={sensorStatus}
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[]}
+        manualStatus="success"
+      />,
+    );
+
+  it.each(["error", "success"] as const)("reads VPD invalid with a %s raw read", (status) => {
+    renderWith(status, rejectedOnly("live"));
+    expect(screen.getByTestId("tents-list-vpd-rejected-tent-1")).toHaveTextContent("VPD invalid");
+    expect(screen.queryByTestId("tents-list-sensor-unavailable-tent-1")).toBeNull();
+  });
+
+  it("still reads unavailable when the snapshot carries no rejection", () => {
+    renderWith("error", { ...EMPTY_SNAPSHOT, tent_id: "tent-1" } as SensorSnapshot);
+    expect(screen.getByTestId("tents-list-sensor-unavailable-tent-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("tents-list-vpd-rejected-tent-1")).toBeNull();
+  });
+});

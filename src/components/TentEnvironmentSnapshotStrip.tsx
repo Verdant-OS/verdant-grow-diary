@@ -81,6 +81,28 @@ export default function TentEnvironmentSnapshotStrip({
     tentId,
     now,
   );
+  // A successful snapshot whose every row was rejected has no `ts`, so it
+  // yields no rows, but its rejection evidence still decides the VPD, as it
+  // does on the Dashboard (Codex P2 on #2430 at fcd86356).
+  const rejectedOnlyVpd =
+    diaryRows.length === 0 &&
+    (selection.kind === "sensor_unavailable" || selection.kind === "empty") &&
+    tonightSnapshot.status === "ok"
+      ? tentsListCanonicalVpd(
+          [],
+          tentId,
+          now,
+          { status: "ok", snapshot: tonightSnapshot.snapshot },
+          sensorStatus,
+        )
+      : null;
+  if (rejectedOnlyVpd?.rejected) {
+    return (
+      <p className="text-xs text-destructive" data-testid={`tents-list-vpd-rejected-${tentId}`}>
+        VPD invalid — the latest reading failed its quality check.
+      </p>
+    );
+  }
   if (selection.kind === "sensor_unavailable" && diaryRows.length === 0) {
     return sensorStatus === "refresh_error" ? (
       <p

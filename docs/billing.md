@@ -268,6 +268,14 @@ rollback, any visitor on the production hostname can open live checkout.
 
 ## Live checkout rollback
 
+Rollback is a deploy, not a toggle. `VITE_CHECKOUT_DISABLED` is read at build
+time, so turning live checkout off means publishing the pinned rollback SHA
+below: a full build and a production deploy. The expected time to roll back is
+one publish cycle of the configured publisher, from the promotion step until
+the live `/version.json` reports the rollback SHA. That duration is
+`NOT_MEASURED`. Record it when the rollback artifact is verified, and live
+checkout stays open until the rollback deploy is serving.
+
 The rollback artifact is a **pinned commit**, not a working-tree edit. The
 prebuild step (`restore-env-production-from-head.mjs`) resets
 `.env.production` to `HEAD` before every build, so an uncommitted switch is

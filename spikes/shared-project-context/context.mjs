@@ -38,7 +38,7 @@ function parse(json) {
       else if (char === '"') quoted = false;
     } else if (char === '"') quoted = true;
     else if (char === '{' || char === '[') { if (++depth > 12) fail('JSON nesting exceeds limit'); }
-    else if (char === '}' || char === ']') depth--;
+    else if (char === '}' || char === ']') { if (--depth < 0) fail('JSON nesting exceeds limit'); }
   }
   let value;
   try {
@@ -107,18 +107,23 @@ function freeze(value) {
   return value;
 }
 /** Synthetic data constructor, not a verification service. */
+function relationships(id, canonical) {
+  if (canonical.supersedes.includes(id) || canonical.conflictsWith.includes(id)) fail('Self reference');
+  if (canonical.supersedes.some((ref) => canonical.conflictsWith.includes(ref))) fail('Conflicting relationship types');
+}
 export function createRecord(inputJSON) {
   const input = object(parse(inputJSON), FIELDS);
   const canonical = fields(input);
-  return freeze({ id: recordId(canonical), ...canonical });
+  const id = recordId(canonical);
+  relationships(id, canonical);
+  return freeze({ id, ...canonical });
 }
 function record(value) {
   object(value, ['id', ...FIELDS]);
   string(value.id, 71, ID);
   const canonical = fields(value);
   if (value.id !== recordId(canonical)) fail('Record ID integrity mismatch');
-  if (canonical.supersedes.includes(value.id) || canonical.conflictsWith.includes(value.id)) fail('Self reference');
-  if (canonical.supersedes.some((id) => canonical.conflictsWith.includes(id))) fail('Conflicting relationship types');
+  relationships(value.id, canonical);
   return freeze({ id: value.id, ...canonical });
 }
 const envelope = (projectId, records) => ({ version: 1, synthetic: true, projectId, records });

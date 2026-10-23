@@ -1,0 +1,29 @@
+name: Shared project context spike
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "spikes/shared-project-context/**"
+      - ".github/workflows/shared-project-context-spike.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  spike-tests:
+    name: Node test spikes/shared-project-context
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run spike tests
+        run: node --test spikes/shared-project-context/context.test.mjs

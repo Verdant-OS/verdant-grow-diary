@@ -5,6 +5,8 @@
  * is out of scope for diary search; this locks the pre-change surface area.
  * It is a source-text tripwire, not a behaviour test: a comment naming
  * `globalSearchItems` in either file would trip it.
+ * @source-scan-justified: this fences the forbidden catalog module name in
+ * these consumers; resolved hook/dialog values cannot prove its absence.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

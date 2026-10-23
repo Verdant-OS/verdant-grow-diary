@@ -1183,6 +1183,10 @@ export async function connectMqtt(
     // DEBUG enables it, outside redactForLog. A no-op logger keeps dependency
     // diagnostics from bypassing redaction (Codex P1 on #2335 at d722d381).
     log: () => {},
+    // `ws` assembles a whole WebSocket message (100 MiB by default) before
+    // the stream guard sees a byte, so the frame bound is set on the socket
+    // itself for ws:// and wss:// (Codex P1 on #2423 at c50d2a61).
+    wsOptions: { maxPayload: MAX_INBOUND_PACKET_BYTES },
   });
   const buildStream = client.streamBuilder;
   if (typeof buildStream !== "function" || typeof client.connect !== "function") {
@@ -1219,6 +1223,10 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
   // A query value may be form-encoded (`+` for a space), so its form-decoded
   // spelling is registered too (Codex P1 on #2413 at 52a7ec20).
   const formDecoded = queryValues.map((value) => value.replace(/\+/g, " "));
+  // URLSearchParams decodes forgivingly: `a%20b%ZZ` becomes `a b%ZZ`, a
+  // spelling decodeURIComponent never produces because it throws on `%ZZ`
+  // (Copilot P1 on #2423 at c50d2a61).
+  for (const value of url?.searchParams.values() ?? []) values.push(value);
   for (const part of url ? [url.username, url.password, ...queryValues, ...formDecoded] : []) {
     values.push(part);
     try {
@@ -1249,6 +1257,37 @@ export function brokerUrlIsSupported(value: string): boolean {
 }
 
 const SUPPORTED_BROKER_SCHEMES = new Set(["mqtt:", "mqtts:", "ws:", "wss:"]);
+
+/**
+ * True when the broker URL's password contains `:`, literally or encoded.
+ * MQTT.js legacy-parses the URL and splits the decoded userinfo at the last
+ * `:`, so it would send a different password than the one registered for
+ * redaction (Copilot P1 on #2423 at c50d2a61).
+ */
+export function brokerPasswordAmbiguous(value: string): boolean {
+  if (!URL.canParse(value)) return false;
+  const { password } = new URL(value);
+  if (password.includes(":")) return true;
+  try {
+    return decodeURIComponent(password).includes(":");
+  } catch {
+    return /%3a/i.test(password);
+  }
+}
+
+/**
+ * The inherited settings that send credentials or payloads around the
+ * redactor or the TLS check: Bun's verbose fetch log prints the bearer token
+ * and the PASSKEY body, and a disabled certificate check lets a
+ * man-in-the-middle read the MQTT credentials and the bridge token (Codex P1s
+ * on #2423 at c50d2a61). Each is refused before connecting.
+ */
+export function unsafeInheritedSetting(env: NodeJS.ProcessEnv): string | null {
+  if ((env.BUN_CONFIG_VERBOSE_FETCH ?? "").trim() !== "") return "BUN_CONFIG_VERBOSE_FETCH";
+  const tls = env.NODE_TLS_REJECT_UNAUTHORIZED;
+  if (tls !== undefined && tls.trim() !== "1") return "NODE_TLS_REJECT_UNAUTHORIZED";
+  return null;
+}
 
 /**
  * True when `DEBUG` names any pattern at all. MQTT.js's transports (for
@@ -1311,6 +1350,23 @@ export async function main(
   if (!brokerUrlIsSupported(flags.mqttUrl)) {
     console.error(
       "[ecowitt-forwarder] refused: --mqtt-url is not a valid mqtt://, mqtts://, ws:// or wss:// URL.",
+    );
+    deps.exit(2);
+    return;
+  }
+
+  if (brokerPasswordAmbiguous(flags.mqttUrl)) {
+    console.error(
+      "[ecowitt-forwarder] refused: the --mqtt-url password contains ':'. MQTT.js would send only the part after the last ':'. Set ECOWITT_MQTT_PASSWORD instead.",
+    );
+    deps.exit(2);
+    return;
+  }
+
+  const unsafe = unsafeInheritedSetting(processEnv);
+  if (unsafe !== null) {
+    console.error(
+      `[ecowitt-forwarder] refused: ${unsafe} is set. It would expose credentials or skip TLS verification. Unset it.`,
     );
     deps.exit(2);
     return;

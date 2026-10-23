@@ -97,6 +97,13 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   refused before connecting.
 - A set `MQTTJS_SOCKS_PROXY` is refused before connecting: MQTT.js would route
   the broker connection through that proxy.
+- A `--mqtt-url` password containing `:` (literally or as `%3A`) is refused:
+  MQTT.js sends only the part after the last `:`. Use `ECOWITT_MQTT_PASSWORD`.
+- `BUN_CONFIG_VERBOSE_FETCH` (any value) and `NODE_TLS_REJECT_UNAUTHORIZED`
+  (anything but `1`) are refused before connecting: the first prints the bridge
+  token and PASSKEY body, the second disables certificate checks.
+- WebSocket brokers (`ws://`, `wss://`) are capped at the same inbound frame
+  bound through `wsOptions.maxPayload`.
 - Any non-empty `DEBUG` is refused before connecting. MQTT.js transports print
   the broker URL, query credentials included, and its packet parser prints
   gateway payloads, PASSKEY included, through their own loggers, outside

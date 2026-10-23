@@ -1030,6 +1030,75 @@ describe("broker transport is refused unless it is an explicit MQTT transport", 
   });
 });
 
+// Codex and Copilot P1s on #2423 at c50d2a61.
+describe("credential spellings MQTT.js would use, and settings that bypass redaction or TLS", () => {
+  afterEach(() => setConfiguredSecrets([]));
+  const privateValue = ["synthetic", "private", "value"].join("-");
+
+  async function run(url: string, env: NodeJS.ProcessEnv = {}) {
+    const out: string[] = [];
+    const capture = (...a: unknown[]) => out.push(a.map(String).join(" "));
+    const log = vi.spyOn(console, "log").mockImplementation(capture);
+    const err = vi.spyOn(console, "error").mockImplementation(capture);
+    const connect = vi.fn(async () => {
+      const client = { on: () => client, subscribe: () => {}, end: () => {} };
+      return client;
+    });
+    const exit = vi.fn();
+    try {
+      await main(["--mqtt-url", url, "--topic", `ecowitt/${privateValue}`], env, {
+        connect,
+        exit,
+      });
+    } finally {
+      log.mockRestore();
+      err.mockRestore();
+    }
+    return { out: out.join("\n"), connect, exit };
+  }
+
+  it("registers the forgiving form-decoded spelling of a query value with a bad escape", () => {
+    const values = configuredSecretValues(
+      flags({ mqttUrl: "wss://broker/mqtt?token=private%20secret%ZZ" }),
+      readEnv({}),
+    );
+    expect(values).toContain("private secret%ZZ");
+  });
+
+  it.each([
+    `mqtt://grower:prefix:${privateValue}@broker:1883`,
+    `mqtt://grower:prefix%3A${privateValue}@broker:1883`,
+    `mqtt://grower:prefix%3a${privateValue}%ZZ@broker:1883`,
+  ])("refuses a broker password containing ':' before logging: %s", async (url) => {
+    const { out, connect, exit } = await run(url);
+    expect(connect).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(out).toContain("password contains ':'");
+    expect(out).not.toContain(privateValue);
+  });
+
+  it.each([
+    ["BUN_CONFIG_VERBOSE_FETCH", "curl"],
+    ["BUN_CONFIG_VERBOSE_FETCH", "true"],
+    ["NODE_TLS_REJECT_UNAUTHORIZED", "0"],
+    ["NODE_TLS_REJECT_UNAUTHORIZED", "false"],
+  ])("refuses %s=%s before connecting", async (name, value) => {
+    const { out, connect, exit } = await run("mqtt://127.0.0.1:1883", { [name]: value });
+    expect(connect).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(out).toContain(name);
+    expect(out).not.toContain(privateValue);
+  });
+
+  it.each([{}, { NODE_TLS_REJECT_UNAUTHORIZED: "1" }, { BUN_CONFIG_VERBOSE_FETCH: "" }])(
+    "still connects with %j",
+    async (env) => {
+      const { connect } = await run("mqtt://user:plain@127.0.0.1:1883", env);
+      expect(connect).toHaveBeenCalled();
+    },
+  );
+});
+
 describe("a malformed escape in one URL credential keeps both redacted (Codex P1 on #2335 at d344f8e4)", () => {
   afterEach(() => setConfiguredSecrets([]));
   const URL_WITH_BAD_ESCAPE = "mqtt://mqtt-user:bad%ZZ@host:1883";
@@ -2244,6 +2313,9 @@ describe("inbound packet guard — production wiring", () => {
     const log = clients[0].opts.log as ((...a: unknown[]) => unknown) | undefined;
     expect(typeof log).toBe("function");
     expect(log?.("CONNECT", { password: "synthetic" })).toBeUndefined();
+    // ws:// and wss:// bound the WebSocket message itself, before the stream
+    // guard sees a byte (Codex P1 on #2423 at c50d2a61).
+    expect(clients[0].opts.wsOptions).toEqual({ maxPayload: MAX_INBOUND_PACKET_BYTES });
     expect(client.connectCalls).toBe(1);
     expect(sockets).toHaveLength(1);
     expect(client.stream).not.toBe(sockets[0]);

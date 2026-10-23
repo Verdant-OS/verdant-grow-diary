@@ -53,7 +53,7 @@ goal: Specification only (Matthew approved writing it 2026-10-23) for the additi
 branch: claude/vibrant-heisenberg-njd6r3
 base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED at this commit (draft PR opened immediately after; the PR body records it)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (draft)
 head_sha: read the PR's current full head before resuming
 state: spec pushed as a draft for Matthew's review. Recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key).
 next_action: Matthew reviews the option choice; then route an eligible independent review of the spec at its exact head.

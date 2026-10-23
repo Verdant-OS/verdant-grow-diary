@@ -129,6 +129,7 @@ import {
 } from "@/lib/timelineManualSensorMeasurementRules";
 import { mergeLinkedGrowEventVolume } from "@/lib/timelineLinkedGrowEventVolumeRules";
 import {
+  applyTimelineInitialSignedPhoto,
   collectTimelineDiaryPhotoIds,
   dedupeAlertEventsForTimeline,
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
@@ -139,7 +140,6 @@ import {
   timelineEntryCountsAsPhoto,
   timelineMeasurementChipCount,
   timelineResultsCountReceiptSuffix,
-  timelineSignedPhotoPathStillCurrent,
   timelineStageChipRows,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
@@ -978,14 +978,15 @@ export default function Timeline() {
               setEntries((current) =>
                 current.map((row) => {
                   const privatePath = privatePhotoPathById.get(row.id);
-                  // An edit saved meanwhile may have moved or removed the photo.
-                  if (
-                    !privatePath ||
-                    !timelineSignedPhotoPathStillCurrent(row, privatePath, user)
-                  ) {
-                    return row;
-                  }
-                  return { ...row, photo_url: signedMap.get(privatePath) ?? null };
+                  // An edit saved meanwhile may have moved, removed or re-signed the photo.
+                  return privatePath
+                    ? applyTimelineInitialSignedPhoto(
+                        row,
+                        privatePath,
+                        signedMap.get(privatePath),
+                        user,
+                      )
+                    : row;
                 }),
               );
             } catch {

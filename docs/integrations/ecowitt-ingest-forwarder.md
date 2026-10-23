@@ -31,7 +31,7 @@ repository dependency. Install it once per checkout without touching
 
 ```powershell
 cd "<repo>"
-bun add --no-save mqtt
+bun add --no-save mqtt@5.16.0
 ```
 
 ```powershell
@@ -100,9 +100,15 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - `--mqtt-url` credentials containing `:` (literally or as `%3A`, in the
   username or the password) are refused: MQTT.js splits them at the last `:`.
   So are credentials the URL parser rewrites (a space becomes `%20`), because
-  that spelling is not the one redacted. Use `ECOWITT_MQTT_USERNAME` and
-  `ECOWITT_MQTT_PASSWORD`.
-- `BUN_CONFIG_VERBOSE_FETCH` (any value) and `NODE_TLS_REJECT_UNAUTHORIZED`
+  that spelling is not the one redacted. So is a password with an empty
+  username (`mqtt://:secret@broker`), which MQTT.js would send as the
+  username `:secret`. Use `ECOWITT_MQTT_USERNAME` and `ECOWITT_MQTT_PASSWORD`.
+- Broker query values are registered for redaction as typed, as well as parsed
+  and decoded, so a topic that repeats one is redacted in its own spelling.
+- `--live` is refused while `HTTPS_PROXY`, `HTTP_PROXY` or `ALL_PROXY` (either
+  case) is set: Bun's fetch would send the bridge token and PASSKEY through
+  that proxy.
+- `BUN_CONFIG_VERBOSE_FETCH` (any non-empty value) and `NODE_TLS_REJECT_UNAUTHORIZED`
   (anything but `1`) are refused before connecting: the first prints the bridge
   token and PASSKEY body, the second disables certificate checks.
 - WebSocket brokers (`ws://`, `wss://`) are capped at the same inbound frame
@@ -156,9 +162,10 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
 - Arguments are read in order. An unknown argument, a repeated flag, or
   `--topic` / `--mqtt-url` without a non-empty value is refused before any
   connection. An unknown argument is reported by position only, so a mistyped
-  `--password=…` is never printed. A broker URL the MQTT client cannot open
-  (for example a malformed one) exits `2` with a fixed `mqtt_connect_failed`
-  line that carries neither the URL nor the error text.
+  `--password=…` is never printed. A malformed broker URL is refused by the
+  checks below. A URL that passes them but that the MQTT client still fails
+  to open exits `2` with a fixed `mqtt_connect_failed` line that carries
+  neither the URL nor the error text.
 - A refused subscription (error, no grant, or QoS 128), a subscription that is
   never acknowledged within 20 s, and a refused connection (bad credentials)
   each exit `2` in continuous mode as well, instead of staying connected while

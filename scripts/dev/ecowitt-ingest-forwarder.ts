@@ -1220,6 +1220,12 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
   const queryValues = (url?.search.slice(1) ?? "")
     .split("&")
     .map((pair) => pair.slice(pair.indexOf("=") + 1));
+  // The parser rewrites a raw space to %20, so the query as typed has its own
+  // spelling, which a topic can echo (Copilot P1 on #2431 at 463ab893).
+  const rawQuery = url ? flags.mqttUrl.split("#")[0].split("?").slice(1).join("?") : "";
+  if (rawQuery) {
+    for (const pair of rawQuery.split("&")) queryValues.push(pair.slice(pair.indexOf("=") + 1));
+  }
   // A query value may be form-encoded (`+` for a space), so its form-decoded
   // spelling is registered too (Codex P1 on #2413 at 52a7ec20).
   const formDecoded = queryValues.map((value) => value.replace(/\+/g, " "));
@@ -1275,6 +1281,9 @@ export function brokerUserinfoAmbiguous(value: string): boolean {
   const at = authority.lastIndexOf("@");
   const raw = at === -1 ? "" : authority.slice(0, at);
   if (raw !== (password === "" ? username : `${username}:${password}`)) return true;
+  // MQTT.js needs text on both sides of the ':', so `:secret@` would reach the
+  // broker as username `:secret` (Codex P1 on #2431 at 463ab893).
+  if (username === "" && password !== "") return true;
   return [username, password].some((part) => {
     try {
       return decodeURIComponent(part).includes(":");
@@ -1291,6 +1300,20 @@ export function brokerUserinfoAmbiguous(value: string): boolean {
  * man-in-the-middle read the MQTT credentials and the bridge token (Codex P1s
  * on #2423 at c50d2a61). Each is refused before connecting.
  */
+/**
+ * An inherited proxy variable for the live POST. Bun's fetch routes through
+ * it by default, so a TLS-inspecting proxy would see the bridge token and the
+ * PASSKEY body (Codex P1 on #2431 at 463ab893). Live mode is refused.
+ */
+export function liveProxySetting(env: NodeJS.ProcessEnv): string | null {
+  for (const name of ["HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY"]) {
+    for (const key of [name, name.toLowerCase()]) {
+      if ((env[key] ?? "").trim() !== "") return key;
+    }
+  }
+  return null;
+}
+
 export function unsafeInheritedSetting(env: NodeJS.ProcessEnv): string | null {
   if ((env.BUN_CONFIG_VERBOSE_FETCH ?? "").trim() !== "") return "BUN_CONFIG_VERBOSE_FETCH";
   const tls = env.NODE_TLS_REJECT_UNAUTHORIZED;
@@ -1366,7 +1389,7 @@ export async function main(
 
   if (brokerUserinfoAmbiguous(flags.mqttUrl)) {
     console.error(
-      "[ecowitt-forwarder] refused: the --mqtt-url credentials contain ':' or a character the URL parser rewrites. MQTT.js would send different credentials than the ones redacted. Set ECOWITT_MQTT_USERNAME and ECOWITT_MQTT_PASSWORD instead.",
+      "[ecowitt-forwarder] refused: the --mqtt-url credentials are ambiguous (a ':' inside one, a password with no username, or a character the URL parser rewrites). MQTT.js would send different credentials than the ones redacted. Set ECOWITT_MQTT_USERNAME and ECOWITT_MQTT_PASSWORD instead.",
     );
     deps.exit(2);
     return;
@@ -1402,6 +1425,14 @@ export async function main(
   }
 
   if (flags.live) {
+    const proxy = liveProxySetting(processEnv);
+    if (proxy !== null) {
+      console.error(
+        `[ecowitt-forwarder] --live refused: ${proxy} is set. The ingest POST would go through that proxy with the bridge token and PASSKEY. Unset it.`,
+      );
+      deps.exit(2);
+      return;
+    }
     const problems = liveConfigProblems(env);
     if (problems.length > 0) {
       console.error(

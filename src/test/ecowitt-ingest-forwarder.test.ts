@@ -1037,7 +1037,8 @@ describe("credential spellings MQTT.js would use, and settings that bypass redac
 
   async function run(url: string, env: NodeJS.ProcessEnv = {}) {
     const out: string[] = [];
-    const capture = (...a: unknown[]) => out.push(a.map(String).join(" "));
+    const capture = (...a: unknown[]) =>
+      out.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
     const log = vi.spyOn(console, "log").mockImplementation(capture);
     const err = vi.spyOn(console, "error").mockImplementation(capture);
     const connect = vi.fn(async () => {
@@ -1076,13 +1077,15 @@ describe("credential spellings MQTT.js would use, and settings that bypass redac
     // The URL parser rewrites the space to %20, a spelling nothing registered
     // (Copilot P1 on #2427 at f0f37f46).
     `mqtt://grower:private ${privateValue}%ZZ@broker:1883`,
+    // MQTT.js needs text on both sides of ':' (Codex P1 on #2431 at 463ab893).
+    `mqtt://:${privateValue}@broker:1883`,
   ])(
     "refuses broker credentials MQTT.js would send differently, before logging: %s",
     async (url) => {
       const { out, connect, exit } = await run(url);
       expect(connect).not.toHaveBeenCalled();
       expect(exit).toHaveBeenCalledWith(2);
-      expect(out).toContain("credentials contain ':' or a character the URL parser rewrites");
+      expect(out).toContain("--mqtt-url credentials are ambiguous");
       expect(out).not.toContain(privateValue);
     },
   );
@@ -1099,6 +1102,64 @@ describe("credential spellings MQTT.js would use, and settings that bypass redac
     expect(out).toContain(name);
     expect(out).not.toContain(privateValue);
   });
+
+  // Copilot P1 on #2431 at 463ab893: the query as typed has its own spelling.
+  it.each([`private ${privateValue}%2Ftail`, `private ${privateValue}+tail%ZZ`])(
+    "redacts a topic that repeats a raw broker query value: %s",
+    async (value) => {
+      const out: string[] = [];
+      const capture = (...a: unknown[]) =>
+        out.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+      const log = vi.spyOn(console, "log").mockImplementation(capture);
+      const err = vi.spyOn(console, "error").mockImplementation(capture);
+      const connect = vi.fn(async () => {
+        const client = { on: () => client, subscribe: () => {}, end: () => {} };
+        return client;
+      });
+      try {
+        await main(
+          ["--mqtt-url", `wss://broker/mqtt?token=${value}`, "--topic", value],
+          {},
+          {
+            connect,
+            exit: vi.fn(),
+          },
+        );
+      } finally {
+        log.mockRestore();
+        err.mockRestore();
+      }
+      expect(connect).toHaveBeenCalled();
+      expect(out.join("\n")).not.toContain(privateValue);
+    },
+  );
+
+  // Codex P1 on #2431 at 463ab893: Bun's fetch honours inherited proxies.
+  it.each(["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "ALL_PROXY", "all_proxy"])(
+    "refuses --live while %s is set",
+    async (name) => {
+      const out: string[] = [];
+      const capture = (...a: unknown[]) =>
+        out.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+      const log = vi.spyOn(console, "log").mockImplementation(capture);
+      const err = vi.spyOn(console, "error").mockImplementation(capture);
+      const connect = vi.fn();
+      const exit = vi.fn();
+      try {
+        await main(
+          ["--live", "--mqtt-url", "mqtt://127.0.0.1:1883", "--topic", "ecowitt/t"],
+          { [name]: "http://proxy.invalid:8080" },
+          { connect, exit },
+        );
+      } finally {
+        log.mockRestore();
+        err.mockRestore();
+      }
+      expect(connect).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(out.join("\n")).toContain(`${name} is set`);
+    },
+  );
 
   it.each([{}, { NODE_TLS_REJECT_UNAUTHORIZED: "1" }, { BUN_CONFIG_VERBOSE_FETCH: "" }])(
     "still connects with %j",

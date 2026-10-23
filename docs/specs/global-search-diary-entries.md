@@ -56,8 +56,11 @@ switch know only grow / tent / plant / cultivar.
    (`src/lib/timelineMergeRules.ts`):
    - linked by `details.linked_grow_event_id`, or by the legacy alias `details.grow_event_id`
      (`pickLogicalGrowEventLink`, lines 168–175);
-   - or, for an older unlinked manual companion, sharing the exact (plant, instant) pair with
-     a manual spine (lines 405–407).
+   - or, for an older unlinked manual companion, sharing the exact (grow, plant, instant)
+     triple with a manual spine, plants compared null-safely (`is not distinct from`). Timeline
+     pairs on (plant, instant) (lines 405–407) only because it filters both sources to one
+     `activeGrowId` first (`src/pages/Timeline.tsx:812,843`); this search spans every owned
+     grow, so it must add `grow_id` or two grows' null-plant rows at one instant would collapse.
 
    The result keeps the spine's id, since Timeline collapses the companion away. The placeholder
    `'(quick log)'` is not grower-authored text: exclude it only when
@@ -203,7 +206,10 @@ The function must:
   ordering, as in requirement 1, then
   `limit greatest(1, least(coalesce(max_results, 10), 10))`: a null or out-of-range
   `max_results` from the client still caps at 10, as `verdant_search` clamps its own
-  (`20260723000807_…sql:78`). A plain `least(max_results, 10)` would be unlimited for null.
+  (`20260723000807_…sql:78`). Postgres `least` ignores nulls, so `least(NULL, 10)` is already
+  10; the `coalesce` only makes that explicit. The `greatest(1, …)` is what matters: it gives
+  the lower bound, so a zero or negative `max_results` still returns at least one row instead
+  of an empty or failing `limit`.
 
 ## Acceptance tests (for the implementing slice)
 
@@ -227,7 +233,8 @@ The function must:
   current `quicklog_save_manual` save (spine plus its unconditional mirror) that matches is
   one result; a legacy pair linked only by `details.grow_event_id`, and a legacy unlinked
   manual companion at the same plant and instant as its spine, are each one result carrying
-  the spine id; an exact `'(quick log)'` placeholder does not match query `"quick"` or
+  the spine id; two grows each holding a null-plant unlinked companion and spine at the same
+  instant return two results, each with its own grow's spine id; an exact `'(quick log)'` placeholder does not match query `"quick"` or
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
   a deleted spine and a retracted entry are not returned, and neither is a non-retracted
   companion whose linked spine (`linked_grow_event_id` or legacy `grow_event_id`) is

@@ -132,6 +132,9 @@ export function tentsListCanonicalVpd(
       quality: row.quality ?? null,
       source: row.source ?? null,
       capture_ref: row.capture_ref ?? null,
+      // Kept until tentDetailCaptureClimate's diagnostic fence runs (Copilot
+      // P1 on #2412 at 8d8c4900).
+      raw_payload: row.raw_payload,
     })),
     snapshot.status === "ok" ? snapshot.snapshot : null,
   );
@@ -151,6 +154,10 @@ export function tentsListCanonicalVpd(
     // stored VPD when the rejected capture is its latest cohort
     // (Codex P1 on #2303 at 108e3eab).
     ...(rejected ? { rejected: true } : {}),
+    // A capture-gate rejection after a failed raw read stands whatever the
+    // cached cohort's age, as Tonight's own invalid does (Copilot P1 on #2412
+    // at 8d8c4900).
+    ...(rejected && rowsReadStatus !== "success" ? { rowsReadFailed: true } : {}),
   };
 }
 

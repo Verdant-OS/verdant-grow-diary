@@ -1,3 +1,4 @@
+import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
 import { isStale } from "@/lib/sensorSnapshot";
 import { classifyManualMetric, isHumidityStuckExtreme } from "@/lib/sensorTruthRules";
 import {
@@ -51,6 +52,8 @@ interface TentDetailClimateRow {
   quality?: string | null;
   source?: string | null;
   capture_ref?: string | null;
+  /** Classification only: lets the diagnostic fence run before capture refs are built. */
+  raw_payload?: unknown;
 }
 
 /** Same gate as the Dashboard's evidence rows: null, "" and "ok" are trusted. */
@@ -86,7 +89,10 @@ export function tentDetailCaptureClimate(
     | undefined,
 ): TentDetailCaptureClimate[] {
   const out: TentDetailCaptureClimate[] = [];
-  for (const row of rows ?? []) {
+  // Diagnostic (testbench) rows are not plant evidence: Tonight's selector and
+  // the header drop them, so they must not reject a physical capture here
+  // (Copilot P1 on #2412 at 8d8c4900).
+  for (const row of withoutDiagnosticSensorRows(rows)) {
     if (typeof row.value !== "number") continue;
     const at = row.captured_at ?? row.ts ?? null;
     const untrusted = !trustedIntakeQuality(row.quality);

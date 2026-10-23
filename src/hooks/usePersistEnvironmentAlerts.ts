@@ -98,7 +98,7 @@ const globalInFlightAlertKeys = new Set<string>();
 const globalCreatedEventLoggedKeys = new Set<string>();
 // A successful insert releases its reservation at once, so a later breach of
 // a closed alert can be persisted again. Until then-current list reads catch
-// up, it records a write sequence: a run whose open-alert list was requested
+// up, it records a write sequence: a run whose active-alert list was requested
 // before that insert committed skips the key instead of inserting a duplicate.
 let globalAlertWriteSeq = 0;
 const globalCommittedAlertSeq = new Map<string, number>();
@@ -273,7 +273,7 @@ export function usePersistEnvironmentAlerts(
       // sides), so the gate rejects a still-future observation while the
       // second read finds it current and arms nothing. The unchanged breach
       // would then never be persisted, because no effect dependency moves
-      // with wall time. The write path re-lists open rows and dedupes, so a
+      // with wall time. The write path re-lists active rows and dedupes, so a
       // sample a few milliseconds old cannot mint a stale row.
       const now = Date.now();
 
@@ -319,8 +319,9 @@ export function usePersistEnvironmentAlerts(
         setState((s) => ({ ...s, status: "checking", lastError: null }));
       }
 
-      // 3. Load currently-open alerts for this grow and dedupe by rule key,
-      //    scoped to the tent the breach was observed in.
+      // 3. Load this grow's active alerts (ACTIVE_ALERT_STATUSES: open or
+      //    acknowledged) and dedupe by rule key, scoped to the tent the
+      //    breach was observed in. Only open rows feed the context refresh.
       let openRows: {
         id: string;
         metric: string | null;
@@ -371,10 +372,10 @@ export function usePersistEnvironmentAlerts(
       // no tent (all historical rows, and any snapshot spanning tents) key on
       // "" and so keep their existing grow-wide dedupe behavior.
       // Grow is part of the key because `inFlightKeys` is a ref that survives
-      // grow switches and never drops successful keys. Without it, a
-      // tent-null rule persisted for one grow would suppress the same rule
-      // in the next grow the user selects, even with that grow's open-alert
-      // query empty. (The pre-existing key omitted grow too; it is included
+      // grow switches and holds a key while its write is pending (a successful
+      // insert drops it). Without it, a tent-null rule pending for one grow
+      // would suppress the same rule in the next grow the user selects, even
+      // with that grow's active-alert query empty. (The pre-existing key omitted grow too; it is included
       // here rather than left as a latent collision in code being rewritten.)
       const scopedKey = (tent: string | null, ruleKey: string) =>
         `${growId ?? ""}::${tent ?? ""}::${ruleKey}`;

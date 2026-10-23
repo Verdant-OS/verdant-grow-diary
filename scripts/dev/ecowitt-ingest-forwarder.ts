@@ -1242,27 +1242,16 @@ export function brokerUrlIsHierarchical(value: string): boolean {
 }
 
 /**
- * True when the `debug` package would enable any MQTT.js logger. MQTT.js's
- * transports (for example `mqttjs:ws`) log the broker URL, query credentials
- * included, through their own `debug` instances, which the client's `log`
- * option does not reach (Copilot P1 on #2413 at 52a7ec20). Patterns follow
- * `debug`: comma- or space-separated, `*` wildcards, `-` to exclude.
+ * True when `DEBUG` names any pattern at all. MQTT.js's transports (for
+ * example `mqttjs:ws`) log the broker URL, and its packet parser
+ * (`mqtt-packet:parser`) logs each payload, PASSKEY included, through their
+ * own `debug` instances, which the client's `log` option does not reach. A
+ * pattern matcher cannot be complete (`*:ws`, partial or differently cased
+ * exclusions, other dependencies' namespaces), so any non-empty value is
+ * refused (Codex and Copilot P1s on #2418 at 35b03bef).
  */
-export function mqttDebugEnabled(debug: string | undefined): boolean {
-  const patterns = (debug ?? "").split(/[\s,]+/).filter(Boolean);
-  // Any MQTT.js logger name: a wildcard that would match it enables it.
-  const coversAnyMqttName = (pattern: string) =>
-    new RegExp(
-      `^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*?")}$`,
-      "i",
-    ).test("mqttjs:any-logger");
-  const enabled = patterns.some(
-    (p) => !p.startsWith("-") && (/^mqttjs/i.test(p) || coversAnyMqttName(p)),
-  );
-  // Only an exclusion of every MQTT.js logger lifts it; excluding one name
-  // still leaves the others, so the guard stays conservative.
-  const excluded = patterns.some((p) => p.startsWith("-") && coversAnyMqttName(p.slice(1)));
-  return enabled && !excluded;
+export function debugEnvSet(debug: string | undefined): boolean {
+  return (debug ?? "").trim() !== "";
 }
 
 export interface MainDeps {
@@ -1316,9 +1305,9 @@ export async function main(
     return;
   }
 
-  if (mqttDebugEnabled(processEnv.DEBUG)) {
+  if (debugEnvSet(processEnv.DEBUG)) {
     console.error(
-      "[ecowitt-forwarder] refused: DEBUG enables MQTT.js diagnostics, which print the broker URL and credentials unredacted. Unset DEBUG or exclude mqttjs.",
+      "[ecowitt-forwarder] refused: DEBUG is set. Dependency diagnostics print the broker URL and gateway payloads unredacted. Unset DEBUG.",
     );
     deps.exit(2);
     return;

@@ -216,7 +216,8 @@ function eventMatchesMirrorValues(ev: TentManualEnvironmentEvent, details: unkno
   // correction RPC (20261014210000) writes VPD to the sibling but cannot
   // record it on the mirror (its jsonb_set path has no sensor_snapshot parent),
   // and nothing links a sibling to its parent, so a VPD-corrected save is not
-  // matched and shows twice. Fixing it needs a write-path change (#2500).
+  // matched and shows twice. Fixing it needs a write-path change; tracked in
+  // #2503, a precondition for applying that migration.
   if (ev.vpdKpa !== null) return false;
   let compared = 0;
   const tempF = snapshotNumber(details, "temp_f");

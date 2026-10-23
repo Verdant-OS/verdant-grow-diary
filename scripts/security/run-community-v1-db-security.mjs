@@ -74,6 +74,11 @@ try {
     console.log("Community V1 RED receipt: every case failed on a missing community object.");
     process.exitCode = 0;
   } else {
+    // Only Vitest's own pass (0) or fail (1) is a verdict; a timeout, signal,
+    // spawn error or infrastructure status is BLOCKED (Codex P2 on #2414).
+    if (child.error || child.signal || (child.status !== 0 && child.status !== 1)) {
+      throw new Error("abnormal exit");
+    }
     process.exitCode = failed === 0 && child.status === 0 ? 0 : 1;
   }
 } catch {

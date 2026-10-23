@@ -1,6 +1,8 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 // Parses the workflow and asserts on the resolved step list, so a commented-out or
@@ -24,14 +26,7 @@ describe("community-v1-db-proof workflow", () => {
     expect(runtime).toBeGreaterThan(catalog);
   });
 
-  it("expects all six catalog blocks on the green path", () => {
-    expect(step("Community V1 catalog proof").run).toContain(
-      "\"$(grep -c '✓ T-CAT-0' community-v1-catalog.log)\" -eq 6",
-    );
-  });
-
-  it("captures supabase start output to a file and never uploads it", () => {
-    expect(step("Start local Supabase").run).toContain("> supabase-start.log 2>&1");
+  it("uploads only the replay report and the two proof logs", () => {
     const uploaded = (step("Upload receipts").with?.path ?? "").split("\n").filter(Boolean);
     expect(uploaded).toEqual([
       "migration-replay-compatibility.json",
@@ -39,11 +34,123 @@ describe("community-v1-db-proof workflow", () => {
       "community-v1-catalog.log",
     ]);
   });
+});
 
-  it("masks local values before writing them to the job environment", () => {
-    const run = step("Export local Supabase env").run ?? "";
-    const mask = run.indexOf("::add-mask::");
-    expect(mask).toBeGreaterThanOrEqual(0);
-    expect(mask).toBeLessThan(run.indexOf('>> "$GITHUB_ENV"'));
+// The step scripts run for real under bash with stub `psql` and `supabase`
+// binaries, so the assertions are on behaviour, not on shell text: a check
+// that is commented out or moved behind an unreachable branch fails here
+// (Codex P2 on #2414 at 77d424b1).
+const dirs: string[] = [];
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+function runStep(name: string, stubs: Record<string, string>, env: Record<string, string> = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "verdant-community-step-"));
+  dirs.push(dir);
+  const bin = join(dir, "bin");
+  spawnSync("mkdir", [bin]);
+  for (const [command, body] of Object.entries(stubs)) {
+    writeFileSync(join(bin, command), `#!/usr/bin/env bash\n${body}\n`);
+    chmodSync(join(bin, command), 0o755);
+  }
+  const githubEnv = join(dir, "github-env");
+  const githubOutput = join(dir, "github-output");
+  writeFileSync(githubEnv, "");
+  writeFileSync(githubOutput, "");
+  const result = spawnSync("bash", ["-e", "-c", step(name).run ?? ""], {
+    cwd: dir,
+    encoding: "utf8",
+    env: {
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
+      GITHUB_ENV: githubEnv,
+      GITHUB_OUTPUT: githubOutput,
+      SUPABASE_REPLAY_WORKDIR: dir,
+      SUPABASE_DB_URL: "postgresql://postgres:local@127.0.0.1:54322/postgres",
+      ...env,
+    },
+  });
+  const file = (rel: string) =>
+    existsSync(join(dir, rel)) ? readFileSync(join(dir, rel), "utf8") : null;
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    env: readFileSync(githubEnv, "utf8"),
+    output: readFileSync(githubOutput, "utf8"),
+    file,
+  };
+}
+
+const catalogLog = (passed: number) =>
+  Array.from({ length: passed }, (_, i) => `NOTICE:  ✓ T-CAT-0${i + 1} ok`).join("\n");
+const psql = (log: string, code: number) => `cat <<'LOG'\n${log}\nLOG\nexit ${code}`;
+
+describe("community-v1-db-proof catalog step verdict", () => {
+  it("passes the green path only with exit 0 and all six catalog blocks", () => {
+    expect(runStep("Community V1 catalog proof", { psql: psql(catalogLog(6), 0) }).status).toBe(0);
+    expect(runStep("Community V1 catalog proof", { psql: psql(catalogLog(5), 0) }).status).not.toBe(
+      0,
+    );
+    expect(runStep("Community V1 catalog proof", { psql: psql(catalogLog(6), 3) }).status).not.toBe(
+      0,
+    );
+  });
+
+  it("passes the red path only when the first block stops on the missing relation", () => {
+    const missing = 'ERROR:  relation "public.community_profiles" does not exist';
+    const red = { EXPECT: "red" };
+    expect(runStep("Community V1 catalog proof", { psql: psql(missing, 3) }, red).status).toBe(0);
+    expect(runStep("Community V1 catalog proof", { psql: psql(missing, 0) }, red).status).not.toBe(
+      0,
+    );
+    expect(
+      runStep("Community V1 catalog proof", { psql: psql("ERROR: other", 3) }, red).status,
+    ).not.toBe(0);
+  });
+});
+
+describe("community-v1-db-proof start and export steps keep local values private", () => {
+  const key = ["eyJlocal", "start", "secret"].join("-");
+
+  it("writes supabase start output only to its log file", () => {
+    const ran = runStep("Start local Supabase", { supabase: `echo "service_role key: ${key}"` });
+    expect(ran.status).toBe(0);
+    expect(ran.stdout).not.toContain(key);
+    expect(ran.file("supabase-start.log")).toContain(key);
+    expect(ran.output).toContain("started=true");
+  });
+
+  it("prints only a redacted tail when supabase start fails", () => {
+    const ran = runStep("Start local Supabase", {
+      supabase: `echo "DB URL: postgresql://postgres:pw@127.0.0.1:54322/postgres"; echo "anon key: ${key}"; exit 4`,
+    });
+    expect(ran.status).toBe(4);
+    expect(ran.stdout).not.toContain(key);
+    expect(ran.stdout).not.toContain("postgres:pw@");
+  });
+
+  it("masks every local credential it writes to the job environment", () => {
+    const status = JSON.stringify({
+      API_URL: "http://127.0.0.1:54321",
+      ANON_KEY: "anon-local-value",
+      SERVICE_ROLE_KEY: "service-local-value",
+      DB_URL: "postgresql://postgres:local-db-pass@127.0.0.1:54322/postgres",
+    });
+    const ran = runStep("Export local Supabase env", { supabase: `echo '${status}'` });
+    expect(ran.status).toBe(0);
+    for (const secret of ["anon-local-value", "service-local-value", "local-db-pass"]) {
+      expect(ran.env).toContain(secret);
+      const masked = ran.stdout
+        .split("\n")
+        .filter((line) => line.startsWith("::add-mask::"))
+        .some((line) => line.includes(secret));
+      expect(masked, `${secret} is masked`).toBe(true);
+    }
+    expect(
+      ran.stdout
+        .split("\n")
+        .filter((l) => !l.startsWith("::add-mask::"))
+        .join("\n"),
+    ).not.toMatch(/anon-local-value|service-local-value|local-db-pass/);
   });
 });

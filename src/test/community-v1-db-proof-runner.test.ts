@@ -122,6 +122,14 @@ describe("community v1 proof runner refuses false receipts", () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toContain("Community V1 DB proof: 0 passed, 37 failed, 0 skipped");
   });
+  // A killed, timed-out or infrastructure-failed run is BLOCKED, not an
+  // ordinary failed proof, even after it wrote a complete report (Codex P2
+  // on #2414 at 77d424b1).
+  it.each([2, 3, 137])("blocks a green run whose test process exited %i", (code) => {
+    const result = run(fixture(report(), code));
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("BLOCKED");
+  });
   it("never exits 0 when a case failed, even if the test process exited 0", () => {
     const failing = report();
     failing.testResults[0].assertionResults[5].status = "failed";

@@ -439,7 +439,10 @@ async function race<T>(hold: LockHold, calls: Array<() => Promise<T>>): Promise<
     await sleep(100);
     waiting = Number(
       sql(
-        `SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND pid <> ${hold.pid};`,
+        // Only sessions blocked by the held row count, so unrelated lock waiters
+        // cannot release it early (Codex P2 on #2414 at 77d424b1).
+        `SELECT count(*) FROM pg_stat_activity
+          WHERE wait_event_type = 'Lock' AND ${hold.pid} = ANY (pg_blocking_pids(pid));`,
       ),
     );
   }
@@ -826,8 +829,13 @@ d("community v1 authority (local DB)", () => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { error: anonymousError } = await anonymous.auth.signInAnonymously();
+    // A disabled anonymous sign-in sends no RPC as an anonymous user, so it
+    // proves nothing: the case fails BLOCKED instead of passing (Codex P2 on
+    // #2414 at 77d424b1). Enabling it locally is a supabase/config.toml change.
     if (anonymousError) {
-      expect(anonymousError.message).toMatch(/anonymous/i);
+      throw new Error(
+        "BLOCKED: anonymous sign-in is disabled; the anonymous-caller probe did not run.",
+      );
     } else {
       expect(await notUnavailable(anonymous, everyClientCall(target))).toEqual([]);
     }
@@ -1125,6 +1133,13 @@ d("community v1 authority (local DB)", () => {
     const foreign = await preview(owner, collection, [draft(entry)]);
     await rejectedWith(other, otherCollection, foreign.previewToken);
 
+    // The same owner reusing a preview on another of their own collections is
+    // stale too: the token binds to its collection, not only its owner
+    // (Copilot P2 on #2414 at 77d424b1).
+    const ownerSecond = await newCollection(owner, "Second tent");
+    const rebound = await preview(owner, collection, [draft(entry)]);
+    await rejectedWith(owner, ownerSecond, rebound.previewToken);
+
     const staged = await preview(owner, collection, [draft(entry, { includeStage: true })]);
     sql(`UPDATE public.diary_entries SET stage = 'flower' WHERE id = ${lit(entry)};`);
     await rejectedWith(owner, collection, staged.previewToken);
@@ -1343,6 +1358,11 @@ d("community v1 authority (local DB)", () => {
     ]);
     expect(ok(await read(viewer, collection)).items).toHaveLength(2);
     sql(`UPDATE public.diary_entries SET retracted_at = now() WHERE id = ${lit(retracted)};`);
+    // Retraction alone removes only its own item; the still-valid source
+    // stays (Copilot P2 on #2414 at 77d424b1).
+    const notes = (items: Json[]) => items.map((item) => item.note as string);
+    expect(notes(ok(await read(viewer, collection)).items)).toEqual(["d"]);
+    expect((await digest(viewer)).items.map((item: Json) => item.publication.note)).toEqual(["d"]);
     sql(`DELETE FROM public.diary_entries WHERE id = ${lit(deleted)};`);
     const after = await read(viewer, collection);
     if (after.ok) expect(after.value.items).toEqual([]);
@@ -1365,6 +1385,11 @@ d("community v1 authority (local DB)", () => {
       }),
     );
     denied(await read(viewer, collection), "unavailable");
+    // The owner needs no reader grant, so this read shows whether the old
+    // publications came back (Copilot P2 on #2414 at 77d424b1).
+    const ownView = await read(owner, collection);
+    if (ownView.ok) expect(ownView.value.items).toEqual([]);
+    else denied(ownView, "unavailable");
     expect(accessState(accessHandle)).toBe("revoked");
     expect(
       sql(

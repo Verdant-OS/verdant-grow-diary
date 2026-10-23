@@ -338,7 +338,10 @@ export function resolveTentDetailVpd(input: {
     !existingFromRejectedCapture &&
     existingMs !== null &&
     tonightMs !== null &&
-    (existingMs > tonightMs || (existingMs === tonightMs && tonight?.calculated === true))
+    (existingMs > tonightMs ||
+      // Equal time only outranks Tonight's own calculated value; an invalid
+      // result stays terminal unless strictly older (Copilot P1 on #2410).
+      (existingMs === tonightMs && tonight?.state === "value" && tonight.calculated === true))
   ) {
     return { ...input.existing, calculated: false };
   }

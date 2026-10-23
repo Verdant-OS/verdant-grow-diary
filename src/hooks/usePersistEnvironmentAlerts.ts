@@ -324,11 +324,14 @@ export function usePersistEnvironmentAlerts(
         title: string;
         reason: string;
         tent: string | null;
+        acknowledged: boolean;
       }[] = [];
       // Inserts committed after this point may be missing from the list below.
       const listSeq = globalAlertWriteSeq;
       try {
-        const rows = await listAlerts({ growId, status: "open" });
+        // Acknowledged alerts are still active (the grower has seen them, the
+        // condition is not fixed), so they dedupe too; only open rows refresh.
+        const rows = await listAlerts({ growId, statuses: ["open", "acknowledged"] });
         openRows = rows.map((r) => ({
           id: typeof r.id === "string" ? r.id : "",
           metric: r.metric ?? null,
@@ -336,6 +339,7 @@ export function usePersistEnvironmentAlerts(
           title: r.title,
           reason: r.reason ?? "",
           tent: r.tent_id ?? null,
+          acknowledged: r.status === "acknowledged",
         }));
       } catch (err) {
         if (!cancelled) {
@@ -398,7 +402,7 @@ export function usePersistEnvironmentAlerts(
         const dirKey = thresholdDirectionKey(growId, r.tent, r.source ?? SOURCE, r.metric, r.title);
         if (dirKey) {
           existingDirections.add(dirKey);
-          if (!openRowByDirection.has(dirKey)) openRowByDirection.set(dirKey, r);
+          if (!r.acknowledged && !openRowByDirection.has(dirKey)) openRowByDirection.set(dirKey, r);
         }
       }
       // A configured-target candidate blocked by an open stage/default-range

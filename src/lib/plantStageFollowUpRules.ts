@@ -82,3 +82,23 @@ export function buildPlantStageFollowUp(input: PlantStageFollowUpInput): PlantSt
     actionLabel: tent && grow ? "Update tent and grow" : tent ? "Update tent" : "Update grow",
   };
 }
+
+/** Per-holder outcome of an accepted follow-up; null means not offered. */
+export interface PlantStageFollowUpOutcome {
+  tentUpdated: boolean | null;
+  growUpdated: boolean | null;
+}
+
+/** Error copy naming the holder(s) that did not move, or null when none failed. */
+export function plantStageFollowUpFailureMessage(
+  outcome: PlantStageFollowUpOutcome,
+): string | null {
+  const tentFailed = outcome.tentUpdated === false;
+  const growFailed = outcome.growUpdated === false;
+  if (tentFailed && growFailed) {
+    return "Couldn't update the stage. Edit the tent or grow to change it.";
+  }
+  if (tentFailed) return "Couldn't update the tent's stage. Edit the tent to change it.";
+  if (growFailed) return "Couldn't update the grow's stage. Edit the grow to change it.";
+  return null;
+}

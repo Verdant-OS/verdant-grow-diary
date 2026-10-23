@@ -13,6 +13,8 @@ const backend = vi.hoisted(() => ({
   updates: [] as Array<{ table: string; id: string; payload: Record<string, unknown> }>,
   /** Tables whose stage update matches zero rows (RLS or a deleted row). */
   zeroRowTables: [] as string[],
+  /** Stored stage per tent/grow id; a conditional write must match it. */
+  stages: { tents: {}, grows: {} } as Record<string, Record<string, string | null>>,
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), message: vi.fn() }));
 const store = vi.hoisted(() => ({
@@ -34,15 +36,34 @@ vi.mock("@/hooks/usePlantProfilePhotoPreview", () => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => ({
-      update: (payload: Record<string, unknown>) => ({
-        eq: (_column: string, id: string) => {
-          backend.updates.push({ table, id, payload: { ...payload } });
-          const rows = backend.zeroRowTables.includes(table) ? [] : [{ id }];
-          return Object.assign(Promise.resolve({ error: null }), {
-            select: async () => ({ data: rows, error: null }),
-          });
-        },
-      }),
+      update: (payload: Record<string, unknown>) => {
+        let id = "";
+        const filters: Record<string, unknown> = {};
+        const builder = {
+          eq: (column: string, value: string) => {
+            if (column === "id") {
+              id = value;
+              backend.updates.push({ table, id, payload: { ...payload } });
+            } else filters[column] = value;
+            return builder;
+          },
+          is: (column: string, value: null) => {
+            filters[column] = value;
+            return builder;
+          },
+          select: async () => {
+            if (backend.zeroRowTables.includes(table)) return { data: [], error: null };
+            const stored = backend.stages[table];
+            if (stored && "stage" in filters) {
+              if ((stored[id] ?? null) !== filters.stage) return { data: [], error: null };
+              stored[id] = payload.stage as string;
+            }
+            return { data: [{ id }], error: null };
+          },
+          then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }),
+        };
+        return builder;
+      },
     }),
   },
 }));
@@ -81,6 +102,7 @@ async function chooseStage(label: string) {
 beforeEach(() => {
   backend.updates.length = 0;
   backend.zeroRowTables.length = 0;
+  backend.stages = { tents: { "tent-a": "seedling" }, grows: { "grow-a": "seedling" } };
   vi.clearAllMocks();
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -125,7 +147,7 @@ describe("Edit Plant offers to move a lagging tent and grow", () => {
     options.action.onClick();
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "Couldn't update the stage. Edit the tent or grow to change it.",
+        "Couldn't update the tent's stage. Edit the tent to change it.",
       ),
     );
     expect(toast.success).not.toHaveBeenCalledWith("Stage updated.");
@@ -141,6 +163,53 @@ describe("Edit Plant offers to move a lagging tent and grow", () => {
     expect(toast.message.mock.calls[0][0]).toBe(
       "AF-01 is now Vegetative. Tent A and Grow A are still on an earlier stage. Move them to Vegetative too?",
     );
+  });
+
+  async function acceptPrompt() {
+    renderEditor("seedling");
+    await chooseStage("Vegetative");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() => expect(toast.message).toHaveBeenCalled());
+    return (toast.message.mock.calls[0] as [string, { action: { onClick: () => void } }])[1].action;
+  }
+
+  // Review of #2481 at a5fe0f4: partial success names the holder that failed.
+  it("moves the tent and names the grow when only the grow write fails", async () => {
+    backend.zeroRowTables.push("grows");
+    (await acceptPrompt()).onClick();
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Couldn't update the grow's stage. Edit the grow to change it.",
+      ),
+    );
+    expect(backend.stages.tents["tent-a"]).toBe("veg");
+    expect(toast.success).not.toHaveBeenCalledWith("Stage updated.");
+  });
+
+  // Codex P2 on #2481 at a5fe0f4: an older prompt never moves a holder that changed since.
+  it("does not overwrite a tent whose stage changed after the prompt appeared", async () => {
+    const action = await acceptPrompt();
+    backend.stages.tents["tent-a"] = "flower";
+    action.onClick();
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Couldn't update the tent's stage. Edit the tent to change it.",
+      ),
+    );
+    expect(backend.stages.tents["tent-a"]).toBe("flower");
+    expect(backend.stages.grows["grow-a"]).toBe("veg");
+  });
+
+  // Review of #2481 at a5fe0f4: the tent header and plant detail refetch the new stage.
+  it("invalidates tent detail and grow plant queries after the follow-up write", async () => {
+    const invalidate = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const action = await acceptPrompt();
+    invalidate.mockClear();
+    action.onClick();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Stage updated."));
+    const keys = invalidate.mock.calls.map(([filters]) => JSON.stringify(filters?.queryKey));
+    expect(keys).toEqual(expect.arrayContaining(['["tent-detail"]', '["grow","plant"]']));
+    invalidate.mockRestore();
   });
 
   it("does not prompt when the stage did not change", async () => {

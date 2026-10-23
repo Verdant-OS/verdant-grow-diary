@@ -11,7 +11,10 @@ import {
 } from "@/lib/plantStartDateRules";
 import { useTents } from "@/hooks/use-tents";
 import { useGrows } from "@/store/grows";
-import { buildPlantStageFollowUp } from "@/lib/plantStageFollowUpRules";
+import {
+  buildPlantStageFollowUp,
+  plantStageFollowUpFailureMessage,
+} from "@/lib/plantStageFollowUpRules";
 import { applyPlantStageFollowUp } from "@/lib/plantStageFollowUpService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -357,9 +360,12 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
               qc.invalidateQueries({ queryKey: ["tents"] });
               qc.invalidateQueries({ queryKey: ["grow", "tents"] });
               qc.invalidateQueries({ queryKey: ["grow", "tent"] });
+              qc.invalidateQueries({ queryKey: ["tent-detail"] });
+              qc.invalidateQueries({ queryKey: ["grow", "plant"] });
               void refreshGrows?.();
-              if (result.tentUpdated === false || result.growUpdated === false) {
-                toast.error("Couldn't update the stage. Edit the tent or grow to change it.");
+              const failure = plantStageFollowUpFailureMessage(result);
+              if (failure) {
+                toast.error(failure);
               } else {
                 toast.success("Stage updated.");
               }

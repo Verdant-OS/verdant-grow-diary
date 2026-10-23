@@ -64,11 +64,13 @@ function eventRow(occurredAt: string, id = "ev-1") {
 
 import {
   buildTentManualHistoryRead,
+  diarySnapshotsToChangeContextRows,
   dropEventsMirroredByDiaryRows,
   manualEnvironmentEventsToChangeContextRows,
   manualEnvironmentEventsToSnapshotRecords,
   parseTentManualEnvironmentEvents,
 } from "@/lib/tentManualEnvironmentEventRules";
+import { diaryRowsToManualSnapshotRecords } from "@/lib/manualSnapshotDiaryAdapter";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
@@ -592,6 +594,13 @@ describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves
     };
     const events = parseTentManualEnvironmentEvents([sibling]);
     expect(dropEventsMirroredByDiaryRows(events, [corrected])).toEqual([]);
+    // Codex 4364582866: the kept diary card and history row carry the
+    // corrected 1.2 kPa, not a VPD derived from 35 °C / 20 % (~4.5 kPa).
+    const [record] = diaryRowsToManualSnapshotRecords([corrected]);
+    expect(record.validation.metrics.find((m) => m.field === "vpd_kpa")?.value).toBe(1.2);
+    expect(
+      diarySnapshotsToChangeContextRows([corrected]).find((r) => r.metric === "vpd_kpa")?.value,
+    ).toBe(1.2);
     // A same-instant save whose VPD differs is still a different save.
     const other = parseTentManualEnvironmentEvents([
       {

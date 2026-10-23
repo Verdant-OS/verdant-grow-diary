@@ -356,7 +356,8 @@ export interface TentManualHistoryDiaryRow extends TentManualMirrorDiaryRow {
 
 /**
  * Project Quick Log diary snapshots into history rows. The persisted shape is
- * `temp_f`, `humidity_percent`, `ph`, `ec`; `ec` is reservoir EC in mS/cm
+ * `temp_f`, `humidity_percent`, `ph`, `ec`, plus a corrected VPD at
+ * `sensor_snapshot.metrics.vpd_kpa`; `ec` is reservoir EC in mS/cm
  * (manualSnapshotDiaryAdapter), never soil EC. Values stay as entered so the
  * history list's realism check can flag a bad one.
  */
@@ -375,6 +376,9 @@ export function diarySnapshotsToChangeContextRows(
       ["humidity_pct", snapshotNumber(row.details, "humidity_percent")],
       ["reservoir_ph", snapshotNumber(row.details, "ph")],
       ["reservoir_ec_ms_cm", snapshotNumber(row.details, "ec")],
+      // A corrected VPD lives beside the snapshot (mirrorVpdKpa); the dropped
+      // environment twin carried it, so the kept diary row must show it.
+      ["vpd_kpa", mirrorVpdKpa(row.details)],
     ];
     for (const [metric, value] of metrics) {
       if (value === null) continue;

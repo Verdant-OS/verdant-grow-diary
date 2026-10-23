@@ -83,8 +83,8 @@ switch know only grow / tent / plant / cultivar.
      revokes its EXECUTE from `authenticated` (lines 132–134), so this `security invoker` RPC
      would fail with a permission error;
    - or, for an older unlinked manual companion, sharing the exact (grow, plant, tent,
-     instant) key with a manual spine, plant and tent compared null-safely (`is not distinct
-from`). Timeline pairs on (plant, instant) (lines 405–407) only because it filters both
+     instant) key with a manual spine, plant and tent compared null-safely
+     (`is not distinct from`). Timeline pairs on (plant, instant) (lines 405–407) only because it filters both
      sources to one `activeGrowId` first (`src/pages/Timeline.tsx:812,843`); this search spans
      every owned grow, so it must add `grow_id` or two grows' null-plant rows at one instant
      would collapse. It adds `tent_id` because `quicklog_save_manual` writes tent-level logs
@@ -218,7 +218,7 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
    minimum too: for a trimmed query shorter than 3 characters `verdant_search_diary` returns no
    rows before any pattern is built, so a direct caller cannot run a one- or two-character
    leading-wildcard scan. Exactly 3 characters is searched. Maximum 120
-   characters, enforced by `verdant_search_diary` itself (the same cap as
+   characters, measured after the same trim as the minimum, enforced by `verdant_search_diary` itself (the same cap as
    `MAX_QUERY_LENGTH` in `src/lib/globalSearchSession.ts:21`, which today bounds only the
    persisted state). A longer query raises SQLSTATE `22023` with message
    `diary_query_too_long` before any pattern is built, so a direct authenticated caller cannot
@@ -368,7 +368,8 @@ The function must:
   with `grow_id` and `occurred_at`; `max_results` of `null` and `500` each return at most 10
   rows, and `0` and `-5` each return exactly 1 row, the newest matching fixture id; `100%` does not match `100 ml` server-side; `anon`
   cannot execute it; a 1- and a 2-character query (after trim) return no rows and a
-  3-character query returns its match; a 120-character query runs and a 121-character query raises
+  3-character query returns its match; a 120-character query runs, the same query padded with surrounding spaces still runs, and a
+  121-character query (after trim) raises
   `22023` / `diary_query_too_long`, which the hook shows as the invalid-query state, not as
   "Diary results unavailable"; run **as `authenticated`**, a legacy row with a valid link
   pairs with its spine and one whose link value is not a UUID does not fail the call and is
@@ -412,9 +413,10 @@ The function must:
   `"(quick log)"`, while a grower note `"topped in the quick log"` still matches `"quick"`;
   a deleted spine and a retracted entry are not returned, and neither is a non-retracted
   companion whose linked spine (`linked_grow_event_id` or legacy `grow_event_id`), in the
-  same owner and grow, is deleted; a companion whose note matches, with more than ten newer
-  matching spines in the same grow and a spine whose own note does not match, still returns
-  one result carrying its spine id (resolution happens before the limit). Option B: `verdant_search` is
+  same owner and grow, is deleted; the newest matching companion, whose spine's own note does not match the query, still
+  returns one result carrying its spine id while more than ten older matching spines exist
+  in the same grow (resolution does not depend on the spine being a matching or windowed
+  candidate; the result is newest, so the final 10-row limit keeps it). Option B: `verdant_search` is
   unchanged, so a plant found by its `strain` is still returned.
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to
@@ -480,4 +482,5 @@ The function must:
 ## Out of scope
 
 Searching photos, sensor readings, AI Doctor sessions, Action Queue items; fuzzy/semantic
-search; any schema change unless Option B is chosen.
+search; any schema change beyond the one additive `verdant_search_diary` migration (Option
+B).

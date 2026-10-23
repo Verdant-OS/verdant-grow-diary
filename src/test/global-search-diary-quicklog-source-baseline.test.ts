@@ -1,5 +1,5 @@
 /**
- * Global search diary spec — Quick Log source baseline (PR #2351 requirement 1).
+ * Global search diary spec — Quick Log source baseline (docs/specs/global-search-diary-entries.md requirement 1).
  *
  * Writers do not share one companion rule. Naive diary_entries-only search
  * misses legacy spine-only Quick Log rows (pre-dual-timestamp note-only

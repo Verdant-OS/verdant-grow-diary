@@ -1,7 +1,7 @@
 /**
  * Global search — spec baseline before diary-entry search.
  *
- * Spec: docs/specs/global-search-diary-entries.md (proposed, PR #2351).
+ * Spec: docs/specs/global-search-diary-entries.md (proposed).
  * Locks documented pre-implementation behaviour so the implementing slice cannot
  * regress navigation keywords, the private RPC-only path, or merge entity groups
  * without an explicit test update.

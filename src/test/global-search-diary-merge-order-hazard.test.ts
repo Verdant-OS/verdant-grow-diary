@@ -1,5 +1,5 @@
 /**
- * Global search diary spec — merge-order hazard (PR #2351 requirement 7).
+ * Global search diary spec — merge-order hazard (docs/specs/global-search-diary-entries.md requirement 7).
  *
  * `mergeGlobalSearchResults` sorts same-type equal-rank rows by label, then
  * arrival index. Diary excerpts that share rank/score would therefore render

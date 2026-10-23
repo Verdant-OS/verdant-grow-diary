@@ -1,5 +1,5 @@
 /**
- * Global search diary spec — synthetic attachment notes (PR #2351 requirement 1).
+ * Global search diary spec — synthetic attachment notes (docs/specs/global-search-diary-entries.md requirement 1).
  *
  * Photo/video Quick Log rows use fixed default notes when the grower leaves the
  * caption empty. They must not be searched as grower text; exclusion is separate

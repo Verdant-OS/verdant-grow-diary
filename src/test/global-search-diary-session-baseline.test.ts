@@ -1,5 +1,5 @@
 /**
- * Global search diary spec — session persistence baseline (PR #2451 requirement 8).
+ * Global search diary spec — session persistence baseline (docs/specs/global-search-diary-entries.md requirement 8).
  *
  * Filter normalization, history dedupe and last-selected restore list entity
  * types by hand. Until the implementing slice adds `diary`, a saved diary toggle

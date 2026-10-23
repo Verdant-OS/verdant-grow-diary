@@ -1,6 +1,6 @@
 # Spec — Global search over diary entries
 
-Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds nine spec-baseline Vitest files (20 tests).
+Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds nine spec-baseline Vitest files (21 tests).
 **Owner decision (Matthew, 2026-10-22): Option B** — a server-side RPC, so the search text
 travels in a POST body. The implementing slice adds it through a new additive migration,
 drafted on its own branch for the protected migration review. No agent applies it;
@@ -232,7 +232,12 @@ switch know only grow / tent / plant / cultivar.
    `yel`. The hook already trims (`src/hooks/useGlobalSearch.ts:57`); this binds the RPC
    for direct callers. The cap bounds the pattern, not the work: a leading-wildcard
    `ilike` still reads every eligible row the owner has, and `limit 10` does not bound that,
-   so scan cost at scale is `NOT_MEASURED`. An empty result set cannot carry a status,
+   so scan cost at scale is `NOT_MEASURED`. The owner filter is what bounds the scan to one
+   grower's rows: `grow_events` already has `idx_grow_events_active (user_id, occurred_at
+desc) where is_deleted = false`, but `diary_entries` has only `idx_diary_entries_grow_at
+(grow_id, entry_at desc)`, so the implementing migration adds an additive
+   `(user_id, entry_at desc)` index on `diary_entries`. A trigram GIN index on `note`
+   (`pg_trgm` is installed) is deferred until the scan cost is measured. An empty result set cannot carry a status,
    so the error is the channel: the hook maps exactly that code and message to an
    invalid-query state ("Diary search is limited to 120 characters") and every other error to
    "Diary results unavailable". The dialog input also gets `maxLength={120}`, so the UI never sends one. Same debounce and
@@ -344,7 +349,9 @@ The function must:
   `plant_id`, `tent_id`, `grow_name`, `plant_name`, `tent_name`. The client formats `occurred_at` with
   `formatSnapshotTimestamp` in the browser's zone; names come from owner-scoped joins, so no
   second lookup is needed;
-- match the raw `note` literally (`ilike '%' || escaped || '%' escape '\'`, escaping `\`,
+- match the raw `note` literally (`ilike '%' || escaped || '%' escape '\'`, where `'\'` is the one-character backslash
+  literal under the default `standard_conforming_strings = on` (`E'\\'` is equivalent),
+  escaping `\`,
   `%` and `_`), not through `verdant_normalize_search_text`: that normalizer replaces every
   non-alphanumeric run with a space (`20260723000807_…sql:12`), so `100%` or `a_b` could not
   match literally;

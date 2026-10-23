@@ -4,7 +4,7 @@
  * Entity/cultivar search keeps today's short-query behaviour ("OG"). The diary
  * read will enforce a separate 3-character minimum and must not disable this path.
  */
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -59,15 +59,14 @@ describe("global search diary short-query baseline", () => {
       wrapper: createWrapper(),
     });
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
+    await waitFor(() =>
+      expect(rpcSpy).toHaveBeenCalledWith(
+        "verdant_search",
+        expect.objectContaining({ q: "OG", max_results: 20 }),
+      ),
+    );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    expect(rpcSpy).toHaveBeenCalledWith(
-      "verdant_search",
-      expect.objectContaining({ q: "OG", max_results: 20 }),
-    );
     expect(rpcSpy.mock.calls.some(([name]) => name === "verdant_search_diary")).toBe(false);
   });
 });

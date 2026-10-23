@@ -16,7 +16,7 @@ function readSrc(relativePath: string): string {
 }
 
 describe("global search diary runtime wiring baseline", () => {
-  it("does not import GLOBAL_SEARCH_ITEMS from useGlobalSearch or GlobalSearchDialog", () => {
+  it("useGlobalSearch and GlobalSearchDialog do not name the globalSearchItems module", () => {
     const hookSource = readSrc("src/hooks/useGlobalSearch.ts");
     const dialogSource = readSrc("src/components/GlobalSearchDialog.tsx");
     expect(hookSource.includes("globalSearchItems")).toBe(false);

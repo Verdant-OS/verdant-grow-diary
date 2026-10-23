@@ -10,6 +10,18 @@ import { describe, expect, it } from "vitest";
 import { pickLogicalGrowEventLink } from "@/lib/timelineMergeRules";
 
 describe("global search diary pickLogicalGrowEventLink baseline", () => {
+  it("prefers the top-level linked_grow_event_id column over every details key", () => {
+    const link = pickLogicalGrowEventLink({
+      id: "d0",
+      linked_grow_event_id: "99999999-8888-7777-6666-555555555555",
+      details: {
+        linked_grow_event_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        grow_event_id: "11111111-2222-3333-4444-555555555555",
+      },
+    });
+    expect(link).toBe("99999999-8888-7777-6666-555555555555");
+  });
+
   it("prefers details.linked_grow_event_id over details.grow_event_id", () => {
     const link = pickLogicalGrowEventLink({
       id: "d1",

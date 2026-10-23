@@ -92,6 +92,11 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   a retryable status (408, 429, 5xx) is retried.
 - A `--mqtt-url` containing a control character (tab, CR, LF or another C0
   character) is refused before anything is logged.
+- `--mqtt-url` must use `mqtt://`, `mqtts://`, `ws://` or `wss://`. MQTT.js
+  sends any other scheme (for example `https://`) as plaintext MQTT, so it is
+  refused before connecting.
+- A set `MQTTJS_SOCKS_PROXY` is refused before connecting: MQTT.js would route
+  the broker connection through that proxy.
 - Any non-empty `DEBUG` is refused before connecting. MQTT.js transports print
   the broker URL, query credentials included, and its packet parser prints
   gateway payloads, PASSKEY included, through their own loggers, outside
@@ -129,9 +134,11 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   so a burst or a slow ingest never fans out into unbounded POSTs and retries.
   A broker close/offline is logged and left to the client's own reconnect;
   each reconnect subscribes again and waits for the broker's own acknowledgement.
-- Every log line passes through a redactor at every depth: `PASSKEY`, `MAC`,
-  tokens (also when embedded in another string or a URL), MAC addresses in any
-  common form, and the configured MQTT username and password (literally, in any
+- Every runtime log line (message handling, forwarding, retries) passes
+  through a redactor at every depth. Startup refusals are fixed, value-free
+  messages printed directly; they do not pass through the redactor. In runtime
+  lines `PASSKEY`, `MAC`, tokens (also when embedded in another string or a
+  URL), MAC addresses in any common form, and the configured MQTT username and password (literally, in any
   case, URI-encoded, at any length) never appear. Each upload is checked
   against its own PASSKEY, in any case; nothing carries over between messages.
   The Mosquitto watcher window still shows the raw topic, so crop it from

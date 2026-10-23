@@ -113,6 +113,9 @@ const flags = (over: Partial<ForwarderFlags> = {}): ForwarderFlags => ({
   ...over,
 });
 
+const URL_REFUSAL =
+  "[ecowitt-forwarder] refused: --mqtt-url is not a valid mqtt://, mqtts://, ws:// or wss:// URL.";
+
 describe("flags and env", () => {
   it.each([
     [["--mqtt-url", "--once"], "--mqtt-url"],
@@ -967,6 +970,66 @@ describe("MQTT.js debug output is refused before connecting (Copilot P1 on #2413
   });
 });
 
+// Codex P1s on #2421 at 36a67b9a: an unsupported scheme falls back to
+// plaintext MQTT, and an inherited SOCKS proxy reroutes the connection.
+describe("broker transport is refused unless it is an explicit MQTT transport", () => {
+  afterEach(() => setConfiguredSecrets([]));
+  const privateValue = ["synthetic", "private", "value"].join("-");
+
+  async function run(url: string, env: NodeJS.ProcessEnv = {}) {
+    const out: string[] = [];
+    const capture = (...a: unknown[]) => out.push(a.map(String).join(" "));
+    const log = vi.spyOn(console, "log").mockImplementation(capture);
+    const err = vi.spyOn(console, "error").mockImplementation(capture);
+    const connect = vi.fn(async () => {
+      const client = { on: () => client, subscribe: () => {}, end: () => {} };
+      return client;
+    });
+    const exit = vi.fn();
+    try {
+      await main(["--mqtt-url", url], env, { connect, exit });
+    } finally {
+      log.mockRestore();
+      err.mockRestore();
+    }
+    return { out: out.join("\n"), connect, exit };
+  }
+
+  it.each([
+    `https://u:${privateValue}@broker.example`,
+    `http://broker.example/?token=${privateValue}`,
+    `tcp://u:${privateValue}@broker.example:1883`,
+    `ssl://u:${privateValue}@broker.example:8883`,
+  ])("refuses %s without connecting or printing the credential", async (url) => {
+    const { out, connect, exit } = await run(url);
+    expect(connect).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(out).toBe(URL_REFUSAL);
+    expect(out).not.toContain(privateValue);
+  });
+
+  it.each([
+    "mqtt://127.0.0.1:1883",
+    "mqtts://broker:8883",
+    "ws://broker/mqtt",
+    "wss://broker/mqtt",
+  ])("still connects to %s", async (url) => {
+    const { connect } = await run(url);
+    expect(connect).toHaveBeenCalled();
+  });
+
+  it("refuses an inherited MQTTJS_SOCKS_PROXY without connecting or printing it", async () => {
+    const proxy = `socks5://${privateValue}@proxy.example:1080`;
+    const { out, connect, exit } = await run("mqtt://127.0.0.1:1883", {
+      MQTTJS_SOCKS_PROXY: proxy,
+    });
+    expect(connect).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(out).toContain("MQTTJS_SOCKS_PROXY");
+    expect(out).not.toContain(privateValue);
+  });
+});
+
 describe("a malformed escape in one URL credential keeps both redacted (Codex P1 on #2335 at d344f8e4)", () => {
   afterEach(() => setConfiguredSecrets([]));
   const URL_WITH_BAD_ESCAPE = "mqtt://mqtt-user:bad%ZZ@host:1883";
@@ -1047,7 +1110,7 @@ describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)"
     expect(mod.connect).not.toHaveBeenCalled();
     expect(exit).toHaveBeenCalledTimes(1);
     expect(exit).toHaveBeenCalledWith(2);
-    expect(lines).toEqual(["[ecowitt-forwarder] refused: --mqtt-url is not a valid URL."]);
+    expect(lines).toEqual([URL_REFUSAL]);
     for (const l of lines) {
       expect(l).not.toContain(USER);
       expect(l).not.toContain(PASS);
@@ -1072,7 +1135,7 @@ describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)"
     }
     expect(mod.connect).not.toHaveBeenCalled();
     expect(exit).toHaveBeenCalledWith(2);
-    expect(lines).toEqual(["[ecowitt-forwarder] refused: --mqtt-url is not a valid URL."]);
+    expect(lines).toEqual([URL_REFUSAL]);
   });
 
   it.each(["\t", "\r", "\n"])(
@@ -1093,7 +1156,7 @@ describe("a failed broker connect is value-free (Codex P1 on #2335 at ac8be57b)"
       }
       expect(mod.connect).not.toHaveBeenCalled();
       expect(exit).toHaveBeenCalledWith(2);
-      expect(lines).toEqual(["[ecowitt-forwarder] refused: --mqtt-url is not a valid URL."]);
+      expect(lines).toEqual([URL_REFUSAL]);
       for (const l of lines) expect(l).not.toContain(PASS);
     },
   );

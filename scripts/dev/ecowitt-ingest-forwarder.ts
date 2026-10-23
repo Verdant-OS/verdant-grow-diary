@@ -1230,16 +1230,25 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
   return [...new Set(values.filter((v): v is string => typeof v === "string" && v.length > 0))];
 }
 
-/** True for a broker URL with an authority (`scheme://host`), the only form whose credentials can be extracted. */
-export function brokerUrlIsHierarchical(value: string): boolean {
+/**
+ * True for a broker URL with an authority (`scheme://host`), the only form
+ * whose credentials can be extracted, and an MQTT transport scheme. MQTT.js
+ * treats any other scheme (`https:`, `tcp:`) as non-secure and falls back to
+ * plaintext `mqtt`, so an HTTPS-looking URL would send credentials and
+ * PASSKEY uploads without TLS (Codex P1 on #2421 at 36a67b9a).
+ */
+export function brokerUrlIsSupported(value: string): boolean {
   // URL parsing silently drops tab, CR and LF (and trims other C0 controls),
   // so a credential written with one would be extracted in a different form
   // than the text the startup line logs. Refuse any control character
   // (Copilot on #2335 at 5d10996a).
   if (/[\u0000-\u001f\u007f]/.test(value)) return false;
   if (!URL.canParse(value)) return false;
-  return new URL(value).host !== "";
+  const url = new URL(value);
+  return SUPPORTED_BROKER_SCHEMES.has(url.protocol) && url.host !== "";
 }
+
+const SUPPORTED_BROKER_SCHEMES = new Set(["mqtt:", "mqtts:", "ws:", "wss:"]);
 
 /**
  * True when `DEBUG` names any pattern at all. MQTT.js's transports (for
@@ -1299,8 +1308,22 @@ export async function main(
   // opaque one (`mqtt:user:pass@host`, no `//`) parses with an empty host and
   // no userinfo, yet MQTT.js's legacy parser reads `user:pass` as credentials,
   // so it is refused the same way (Codex P1 on #2335 at d722d381).
-  if (!brokerUrlIsHierarchical(flags.mqttUrl)) {
-    console.error("[ecowitt-forwarder] refused: --mqtt-url is not a valid URL.");
+  if (!brokerUrlIsSupported(flags.mqttUrl)) {
+    console.error(
+      "[ecowitt-forwarder] refused: --mqtt-url is not a valid mqtt://, mqtts://, ws:// or wss:// URL.",
+    );
+    deps.exit(2);
+    return;
+  }
+
+  // MQTT.js routes the connection through MQTTJS_SOCKS_PROXY when it is set
+  // and `socksProxy` is not, so an inherited value could silently send the
+  // broker credentials and PASSKEY uploads through another host (Codex P1 on
+  // #2421 at 36a67b9a).
+  if ((processEnv.MQTTJS_SOCKS_PROXY ?? "").trim() !== "") {
+    console.error(
+      "[ecowitt-forwarder] refused: MQTTJS_SOCKS_PROXY is set. The forwarder does not route the broker connection through a proxy. Unset it.",
+    );
     deps.exit(2);
     return;
   }

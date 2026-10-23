@@ -54,15 +54,21 @@ switch know only grow / tent / plant / cultivar.
    Searching `diary_entries` alone would miss those spine-only logs. A diary row and its spine
    are one result, not two, under the same rules Timeline uses
    (`src/lib/timelineMergeRules.ts`):
-   - linked by `details.linked_grow_event_id`, or by the legacy alias `details.grow_event_id`
-     (`pickLogicalGrowEventLink`, lines 168–175), where the linked spine has the diary row's
-     owner **and** `grow_id`. Timeline only ever resolves a link inside the selected grow
+   - linked by **one preferred link**: `details.linked_grow_event_id` when it is a non-empty
+     JSON string, otherwise the legacy alias `details.grow_event_id`. This is the
+     first-non-empty order of `pickLogicalGrowEventLink` (lines 168–179). Ownership, dedupe and
+     the deleted-spine exclusion below all use that one link, never the other key. A present
+     but unusable modern value (not a UUID, or no spine with the diary row's owner and
+     `grow_id`) does not fall back to the legacy key, because Timeline picks the modern value
+     without validating it; the row is then treated as unlinked. The linked spine must have
+     the diary row's owner **and** `grow_id`. Timeline only ever resolves a link inside the selected grow
      (`src/pages/Timeline.tsx:437–441`), and the dual-timestamp backfill joins on owner and
      grow (`20260725024026_quicklog_dual_timestamp_foundation.sql:205–209`); a stale or
      malformed link to the same owner's event in another grow must not replace or suppress
      this grow's result. Link values are historical JSON text, so they are compared as text:
-     `ge.id::text = lower(btrim(d.details->>'linked_grow_event_id'))` (likewise for
-     `grow_event_id`). That comparison never throws and needs no extra privilege. A direct
+     `ge.id::text = lower(btrim(<preferred link>))`, where the preferred link is
+     `d.details->>'linked_grow_event_id'` when `jsonb_typeof` of that key is `string` and its
+     text is non-empty, else the same test on `grow_event_id`. That comparison never throws and needs no extra privilege. A direct
      `::uuid` cast would let one malformed legacy row abort the whole RPC and show "Diary
      results unavailable", and `quicklog_try_parse_uuid` cannot be used: the same migration
      revokes its EXECUTE from `authenticated` (lines 132–134), so this `security invoker` RPC
@@ -100,11 +106,10 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      **10** results in total.
    - Excluded: `grow_events` rows with `is_deleted` or `deleted_at` set, `diary_entries` rows
      with `retracted_at` set, and entries in archived grows. A non-retracted diary companion
-     whose linked spine (by either link above) is deleted is excluded too: Timeline fetches a
-     referenced-but-missing parent, finds it gone, and drops the companion
-     (`src/pages/Timeline.tsx:907–915`, `resolveCompanion` in
-     `src/lib/timelineMergeRules.ts:368–382`), so neither the spine id nor the diary id would
-     open a visible entry. `useGrows().grows` holds active
+     whose preferred link names a deleted spine is excluded too. This is a rule of this
+     search, not a description of existing Timeline behaviour: the result's id would be the
+     deleted spine's, and no visible Timeline row is addressable by it, so the result would
+     open to nothing. `useGrows().grows` holds active
      grows only (archived ones are partitioned out in `src/store/grows.tsx`) and
      `useScopedGrow` resolves `?growId=` against that list, so an archived-grow result could
      not open its Timeline.
@@ -293,7 +298,10 @@ The function must:
   `22023` / `diary_query_too_long`, which the hook shows as the invalid-query state, not as
   "Diary results unavailable"; run **as `authenticated`**, a legacy row with a valid link
   pairs with its spine and one whose link value is not a UUID does not fail the call and is
-  matched as unlinked.
+  matched as unlinked; a row whose `linked_grow_event_id` and `grow_event_id` name two
+  different owned same-grow spines pairs only with the `linked_grow_event_id` spine (the
+  other spine stays its own result), and a row with a non-UUID `linked_grow_event_id` and a
+  valid `grow_event_id` is matched as unlinked, not paired through the legacy key.
 - Partial failure: a failing `verdant_search_diary` shows "Diary results unavailable" while
   `verdant_search` results still render; a failing `verdant_search` does not hide diary
   results.

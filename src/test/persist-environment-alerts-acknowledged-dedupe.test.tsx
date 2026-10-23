@@ -18,13 +18,14 @@ const alertsIo = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
   save: vi.fn(),
   list: vi.fn(),
+  update: vi.fn(),
 }));
 
 vi.mock("@/lib/alerts", () => ({
   listAlerts: (...args: unknown[]) => alertsIo.list(...args),
   saveAlert: (...args: unknown[]) => alertsIo.save(...args),
   logAlertEvent: async () => ({ id: "evt-1" }),
-  updateOpenAlertContext: async () => true,
+  updateOpenAlertContext: (...args: unknown[]) => alertsIo.update(...args),
 }));
 
 function stageOnlyInput(ts: string): PersistEnvironmentAlertsInput {
@@ -53,6 +54,7 @@ const tempSaves = () =>
 
 beforeEach(() => {
   alertsIo.rows = [];
+  alertsIo.update.mockReset().mockResolvedValue(true);
   // The list honours the status filter it is given, as the database does.
   alertsIo.list
     .mockReset()
@@ -96,6 +98,48 @@ describe("environment alert dedupe across statuses (Copilot on #2394)", () => {
     for (const r of alertsIo.rows) r.status = "resolved";
     hook.rerender(stageOnlyInput(new Date(now).toISOString()));
     await waitFor(() => expect(tempSaves()).toBe(2));
+    hook.unmount();
+  });
+
+  it("does not insert a configured-target alert or refresh wording beside an acknowledged stage-range alert in the same direction", async () => {
+    const ts = new Date().toISOString();
+    alertsIo.rows = [
+      {
+        id: "ack-stage-rh",
+        metric: "rh",
+        source: "environment_alerts",
+        title: "Humidity above stage range",
+        reason: "Observed 85%; seedling stage range 65%–75%.",
+        tent_id: "tent-1",
+        status: "acknowledged",
+      },
+    ];
+    const snapshot: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual",
+      ts,
+      temp: 24,
+      rh: 85,
+      vpd: 0.6,
+      tent_id: "tent-1",
+      metric_refs: { rh: { id: "rh-reading-1", captured_at: ts, source: "manual" } },
+    };
+    const hook = renderHook(() =>
+      usePersistEnvironmentAlerts({
+        growId: "grow-1",
+        tentId: "tent-1",
+        enabled: true,
+        stage: "seedling",
+        snapshot,
+        quality: evaluateSensorQuality(snapshot),
+        targets: compareSnapshotToTargets(snapshot, { rh: { min: 50, max: 70 } }),
+      }),
+    );
+    await waitFor(() => expect(hook.result.current.status).toBe("done"));
+    expect(alertsIo.save.mock.calls.filter(([payload]) => payload?.metric === "rh")).toHaveLength(
+      0,
+    );
+    expect(alertsIo.update).not.toHaveBeenCalled();
     hook.unmount();
   });
 });

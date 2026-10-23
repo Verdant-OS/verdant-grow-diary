@@ -9,10 +9,13 @@
  *   - Only writes when the snapshot is real and valid (see
  *     isSnapshotPersistable). Never writes from stale, unavailable, demo,
  *     fallback, or mock readings.
- *   - Idempotent: dedupes against currently-open alert rows for the grow
- *     by a deterministic rule key (source + metric + reason). A per-session
- *     in-memory guard avoids re-issuing the same insert across re-renders
- *     before the open-list query refreshes.
+ *   - Idempotent: dedupes against the grow's active alert rows (`open` or
+ *     `acknowledged`, ACTIVE_ALERT_STATUSES) by a deterministic rule key
+ *     (source + metric + reason) and by one alert per threshold direction.
+ *     Acknowledging does not let the same alert be re-created; only a
+ *     terminal row (`resolved` or `dismissed`) does. Context refresh updates
+ *     open rows only. A per-session in-memory guard avoids re-issuing the
+ *     same insert across re-renders before the list query refreshes.
  *   - Never sends user_id from the client. Ownership is anchored on
  *     auth.uid() via DB defaults + RLS.
  *   - No elevated keys. No AI calls. No Action Queue writes.
@@ -35,6 +38,7 @@ import {
   snapshotPersistenceBlockReason,
 } from "@/lib/environmentAlertPersistence";
 import { listAlerts, saveAlert, logAlertEvent, updateOpenAlertContext } from "@/lib/alerts";
+import { ACTIVE_ALERT_STATUSES } from "@/lib/alertActiveStatusRules";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 import { buildDiaryEntryEvidenceRefs } from "@/lib/diaryEntryEvidenceRefRules";
 import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEventRules";
@@ -331,7 +335,7 @@ export function usePersistEnvironmentAlerts(
       try {
         // Acknowledged alerts are still active (the grower has seen them, the
         // condition is not fixed), so they dedupe too; only open rows refresh.
-        const rows = await listAlerts({ growId, statuses: ["open", "acknowledged"] });
+        const rows = await listAlerts({ growId, statuses: ACTIVE_ALERT_STATUSES });
         openRows = rows.map((r) => ({
           id: typeof r.id === "string" ? r.id : "",
           metric: r.metric ?? null,

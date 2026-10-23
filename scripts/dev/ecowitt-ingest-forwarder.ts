@@ -1241,6 +1241,30 @@ export function brokerUrlIsHierarchical(value: string): boolean {
   return new URL(value).host !== "";
 }
 
+/**
+ * True when the `debug` package would enable any MQTT.js logger. MQTT.js's
+ * transports (for example `mqttjs:ws`) log the broker URL, query credentials
+ * included, through their own `debug` instances, which the client's `log`
+ * option does not reach (Copilot P1 on #2413 at 52a7ec20). Patterns follow
+ * `debug`: comma- or space-separated, `*` wildcards, `-` to exclude.
+ */
+export function mqttDebugEnabled(debug: string | undefined): boolean {
+  const patterns = (debug ?? "").split(/[\s,]+/).filter(Boolean);
+  // Any MQTT.js logger name: a wildcard that would match it enables it.
+  const coversAnyMqttName = (pattern: string) =>
+    new RegExp(
+      `^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*?")}$`,
+      "i",
+    ).test("mqttjs:any-logger");
+  const enabled = patterns.some(
+    (p) => !p.startsWith("-") && (/^mqttjs/i.test(p) || coversAnyMqttName(p)),
+  );
+  // Only an exclusion of every MQTT.js logger lifts it; excluding one name
+  // still leaves the others, so the guard stays conservative.
+  const excluded = patterns.some((p) => p.startsWith("-") && coversAnyMqttName(p.slice(1)));
+  return enabled && !excluded;
+}
+
 export interface MainDeps {
   /** Opens the broker connection. Production: the `mqtt` package. */
   connect: (flags: ForwarderFlags, env: ForwarderEnv) => Promise<MqttClientLike>;
@@ -1288,6 +1312,14 @@ export async function main(
   // so it is refused the same way (Codex P1 on #2335 at d722d381).
   if (!brokerUrlIsHierarchical(flags.mqttUrl)) {
     console.error("[ecowitt-forwarder] refused: --mqtt-url is not a valid URL.");
+    deps.exit(2);
+    return;
+  }
+
+  if (mqttDebugEnabled(processEnv.DEBUG)) {
+    console.error(
+      "[ecowitt-forwarder] refused: DEBUG enables MQTT.js diagnostics, which print the broker URL and credentials unredacted. Unset DEBUG or exclude mqttjs.",
+    );
     deps.exit(2);
     return;
   }

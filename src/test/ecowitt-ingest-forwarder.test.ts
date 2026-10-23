@@ -23,6 +23,7 @@ import {
   attachClientLifecycle,
   buildForwardRequest,
   configuredSecretValues,
+  mqttDebugEnabled,
   createBoundedRunner,
   MAX_BACKLOG,
   MAX_INFLIGHT,
@@ -892,6 +893,65 @@ describe("every broker query value is redacted, in the URL and echoed elsewhere 
     expect(out).not.toContain(privateValue);
     expect(out).not.toContain(encoded);
   });
+});
+
+describe("MQTT.js debug output is refused before connecting (Copilot P1 on #2413 at 52a7ec20)", () => {
+  afterEach(() => setConfiguredSecrets([]));
+  const privateValue = ["synthetic", "private", "value"].join("-");
+
+  async function run(debug: string) {
+    const out: string[] = [];
+    const capture = (...a: unknown[]) =>
+      out.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+    const log = vi.spyOn(console, "log").mockImplementation(capture);
+    const err = vi.spyOn(console, "error").mockImplementation(capture);
+    const connect = vi.fn(async () => {
+      const client = { on: () => client, subscribe: () => {}, end: () => {} };
+      return client;
+    });
+    const exit = vi.fn();
+    try {
+      await main(
+        ["--mqtt-url", `wss://broker/mqtt?access_token=${privateValue}`],
+        { DEBUG: debug },
+        { connect, exit },
+      );
+    } finally {
+      log.mockRestore();
+      err.mockRestore();
+    }
+    return { out: out.join("\n"), connect, exit };
+  }
+
+  it.each(["mqttjs:*", "mqttjs:ws", "*", "foo,mqttjs*", "  mqttjs:ws  "])(
+    "refuses DEBUG=%j without connecting or printing the credential",
+    async (debug) => {
+      const { out, connect, exit } = await run(debug);
+      expect(connect).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(out).not.toContain(privateValue);
+      expect(out).toContain("DEBUG");
+    },
+  );
+
+  it.each([
+    ["mqttjs:wx", true],
+    ["m*", true],
+    ["*,-mqttjs:ws", true],
+    ["*,-mqttjs:*", false],
+    ["-mqttjs:*", false],
+    [undefined, false],
+  ] as const)("mqttDebugEnabled(%j) is %s", (debug, expected) => {
+    expect(mqttDebugEnabled(debug)).toBe(expected);
+  });
+
+  it.each(["express:*", "-mqttjs:*,express:*", ""])(
+    "still connects with DEBUG=%j",
+    async (debug) => {
+      const { connect } = await run(debug);
+      expect(connect).toHaveBeenCalled();
+    },
+  );
 });
 
 describe("a malformed escape in one URL credential keeps both redacted (Codex P1 on #2335 at d344f8e4)", () => {

@@ -92,6 +92,9 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   a retryable status (408, 429, 5xx) is retried.
 - A `--mqtt-url` containing a control character (tab, CR, LF or another C0
   character) is refused before anything is logged.
+- A `DEBUG` value that would enable any MQTT.js logger (`mqttjs:*`, `*`, …) is
+  refused before connecting: MQTT.js transports print the broker URL, query
+  credentials included, through their own loggers, outside redaction.
 - A message whose `PASSKEY` or `dateutc` is not a string is rejected locally
   (`invalid_passkey` / `invalid_dateutc`); nothing is coerced.
   The HTTP bridge keeps `PASSKEY` as the exact string it received, so a

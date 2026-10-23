@@ -127,6 +127,7 @@ import {
   TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import { mergeLinkedGrowEventVolume } from "@/lib/timelineLinkedGrowEventVolumeRules";
 import {
   collectTimelineDiaryPhotoIds,
   dedupeAlertEventsForTimeline,
@@ -138,6 +139,7 @@ import {
   timelineEntryCountsAsPhoto,
   timelineMeasurementChipCount,
   timelineResultsCountReceiptSuffix,
+  timelineSignedPhotoPathStillCurrent,
   timelineStageChipRows,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
@@ -976,9 +978,14 @@ export default function Timeline() {
               setEntries((current) =>
                 current.map((row) => {
                   const privatePath = privatePhotoPathById.get(row.id);
-                  return privatePath
-                    ? { ...row, photo_url: signedMap.get(privatePath) ?? null }
-                    : row;
+                  // An edit saved meanwhile may have moved or removed the photo.
+                  if (
+                    !privatePath ||
+                    !timelineSignedPhotoPathStillCurrent(row, privatePath, user)
+                  ) {
+                    return row;
+                  }
+                  return { ...row, photo_url: signedMap.get(privatePath) ?? null };
                 }),
               );
             } catch {
@@ -1400,22 +1407,11 @@ export default function Timeline() {
               .trim()
               .toLowerCase()
           : "";
-      const hasVol =
-        nextDetails.watering != null ||
-        nextDetails.feeding != null ||
-        nextDetails.watering_amount_ml != null ||
-        nextDetails.wateringAmountMl != null ||
-        nextDetails.volume_ml != null;
-      const vol = mapped.details?.watering_amount_ml;
-      if (
-        !hasVol &&
-        (effectiveType === "watering" || effectiveType === "feeding") &&
-        typeof vol === "number" &&
-        Number.isFinite(vol)
-      ) {
-        const volumeEnvelope = effectiveType === "feeding" ? "feeding" : "watering";
-        nextDetails = { ...nextDetails, [volumeEnvelope]: { volume_ml: vol } };
-      }
+      nextDetails = mergeLinkedGrowEventVolume(
+        nextDetails,
+        effectiveType,
+        mapped.details?.watering_amount_ml,
+      );
       return nextDetails === details ? e : { ...e, details: nextDetails };
     });
   }, [entries, growEvents, supplementalLinkedGrowEvents]);

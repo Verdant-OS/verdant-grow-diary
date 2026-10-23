@@ -257,7 +257,13 @@ export function tentDetailHeaderRejection(
   snapshot: Parameters<typeof snapshotCaptureRef>[0] | null | undefined,
   opts: { existingIsSnapshotVpd: boolean },
 ): { rejectedMetrics: string[]; rejectedRefs?: (string | null)[]; existingRef?: string | null } {
-  const rejectedMetrics = [...(truth?.invalidFields ?? [])];
+  // A VPD dropped only because its temperature or RH was invalid is not its
+  // own rejection: the capture check below tests the actual contributors, so
+  // an independent VPD at the same instant stays (Copilot P2 on #2407 at e66265eb).
+  const dependencyOnly = truth?.reasonCodes.includes("vpd_dropped_temp_rh_invalid") ?? false;
+  const rejectedMetrics = (truth?.invalidFields ?? []).filter(
+    (key) => !(dependencyOnly && key === "vpd"),
+  );
   return {
     rejectedMetrics,
     ...tentDetailHeaderCaptureRefs(snapshot, rejectedMetrics, opts),

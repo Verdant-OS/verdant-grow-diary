@@ -17,7 +17,6 @@
  *      humidity_percent → humidityPct
  *      ph              → reservoirPh
  *      ec              → reservoirEc (mS/cm)
- *    and a corrected `details.sensor_snapshot.metrics.vpd_kpa` → vpdKpa.
  */
 
 import { validateManualSnapshot, type ManualSnapshotInput } from "@/lib/manualSensorSnapshotRules";
@@ -59,16 +58,8 @@ function finiteOrNull(v: unknown): number | null {
  * Build the validator input from the persisted snapshot. Missing values
  * stay missing.
  */
-function toValidatorInput(snap: PersistedManualSnapshot, details: unknown): ManualSnapshotInput {
+function toValidatorInput(snap: PersistedManualSnapshot): ManualSnapshotInput {
   const input: ManualSnapshotInput = {};
-  // The Quick Log correction (quicklog_correction_apply_measured_values)
-  // records a measured VPD at sensor_snapshot.metrics.vpd_kpa, not in the
-  // manual snapshot. Use it rather than deriving one from temperature + RH.
-  const vpd = finiteOrNull(
-    (details as { sensor_snapshot?: { metrics?: { vpd_kpa?: unknown } } }).sensor_snapshot?.metrics
-      ?.vpd_kpa,
-  );
-  if (vpd !== null) input.vpdKpa = vpd;
   const tempF = finiteOrNull(snap.temp_f);
   if (tempF !== null) {
     input.airTemp = tempF;
@@ -99,7 +90,7 @@ export function diaryRowToManualSnapshotRecord(
   if (Number.isNaN(Date.parse(row.entry_at))) return null;
   if (!row.tent_id || typeof row.tent_id !== "string") return null;
 
-  const input = toValidatorInput(snap, row.details);
+  const input = toValidatorInput(snap);
   const validation = validateManualSnapshot(input);
 
   // If nothing usable came across, skip — no point showing an empty card.

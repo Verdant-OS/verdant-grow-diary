@@ -199,23 +199,9 @@ function snapshotNumber(details: unknown, key: string): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-/** 0.01 °C storage rounding is 0.018 °F; humidity and VPD are stored as typed. */
+/** 0.01 °C storage rounding is 0.018 °F; humidity is stored as typed. */
 const MIRROR_TEMP_F_TOLERANCE = 0.15;
 const MIRROR_RH_TOLERANCE = 0.05;
-const MIRROR_VPD_TOLERANCE = 0.005;
-
-/**
- * VPD the mirror recorded. A save never sends one, but the Quick Log
- * correction (quicklog_correction_apply_measured_values) writes the same
- * value to the environment row and to the mirror's
- * `details.sensor_snapshot.metrics.vpd_kpa`, so the pair still agrees.
- */
-function mirrorVpdKpa(details: unknown): number | null {
-  const metrics = (details as { sensor_snapshot?: { metrics?: Record<string, unknown> } })
-    .sensor_snapshot?.metrics;
-  const v = metrics?.vpd_kpa;
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
 
 /**
  * True when the event carries exactly the readings the mirror recorded: the
@@ -226,13 +212,12 @@ function mirrorVpdKpa(details: unknown): number | null {
  */
 function eventMatchesMirrorValues(ev: TentManualEnvironmentEvent, details: unknown): boolean {
   // The Plant Quick Log adapter always sends an empty VPD and the RPC stores
-  // it as passed, so a sibling carries VPD only after a correction, which
-  // also records it on the mirror. VPD must be absent on both or agree.
-  const vpd = mirrorVpdKpa(details);
-  if ((vpd === null) !== (ev.vpdKpa === null)) return false;
-  if (vpd !== null && ev.vpdKpa !== null && Math.abs(ev.vpdKpa - vpd) > MIRROR_VPD_TOLERANCE) {
-    return false;
-  }
+  // it as passed, so a real sibling never carries VPD. Known gap: the VPD
+  // correction RPC (20261014210000) writes VPD to the sibling but cannot
+  // record it on the mirror (its jsonb_set path has no sensor_snapshot parent),
+  // and nothing links a sibling to its parent, so a VPD-corrected save is not
+  // matched and shows twice. Fixing it needs a write-path change (#2500).
+  if (ev.vpdKpa !== null) return false;
   let compared = 0;
   const tempF = snapshotNumber(details, "temp_f");
   if ((tempF === null) !== (ev.temperatureC === null)) return false;
@@ -356,8 +341,7 @@ export interface TentManualHistoryDiaryRow extends TentManualMirrorDiaryRow {
 
 /**
  * Project Quick Log diary snapshots into history rows. The persisted shape is
- * `temp_f`, `humidity_percent`, `ph`, `ec`, plus a corrected VPD at
- * `sensor_snapshot.metrics.vpd_kpa`; `ec` is reservoir EC in mS/cm
+ * `temp_f`, `humidity_percent`, `ph`, `ec`; `ec` is reservoir EC in mS/cm
  * (manualSnapshotDiaryAdapter), never soil EC. Values stay as entered so the
  * history list's realism check can flag a bad one.
  */
@@ -376,9 +360,6 @@ export function diarySnapshotsToChangeContextRows(
       ["humidity_pct", snapshotNumber(row.details, "humidity_percent")],
       ["reservoir_ph", snapshotNumber(row.details, "ph")],
       ["reservoir_ec_ms_cm", snapshotNumber(row.details, "ec")],
-      // A corrected VPD lives beside the snapshot (mirrorVpdKpa); the dropped
-      // environment twin carried it, so the kept diary row must show it.
-      ["vpd_kpa", mirrorVpdKpa(row.details)],
     ];
     for (const [metric, value] of metrics) {
       if (value === null) continue;

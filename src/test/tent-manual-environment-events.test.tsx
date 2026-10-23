@@ -64,13 +64,11 @@ function eventRow(occurredAt: string, id = "ev-1") {
 
 import {
   buildTentManualHistoryRead,
-  diarySnapshotsToChangeContextRows,
   dropEventsMirroredByDiaryRows,
   manualEnvironmentEventsToChangeContextRows,
   manualEnvironmentEventsToSnapshotRecords,
   parseTentManualEnvironmentEvents,
 } from "@/lib/tentManualEnvironmentEventRules";
-import { diaryRowsToManualSnapshotRecords } from "@/lib/manualSnapshotDiaryAdapter";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
@@ -575,41 +573,6 @@ describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves
     ]);
     const kept = dropEventsMirroredByDiaryRows(events, [plantQuickLogCompanion(at, "parent-1")]);
     expect(kept.map((e) => e.id)).toEqual(["env-a"]);
-  });
-
-  it("still claims its sibling after a correction adds the same VPD to both rows", () => {
-    // Codex 4364335238: quicklog_correction_apply_measured_values writes VPD to
-    // the environment row AND to the mirror's sensor_snapshot.metrics.vpd_kpa.
-    const corrected = {
-      ...plantQuickLogCompanion(at, "parent-1"),
-      details: {
-        linked_grow_event_id: "parent-1",
-        manual_sensor_snapshot: { source: "manual", temp_f: 95, humidity_percent: 20 },
-        sensor_snapshot: { metrics: { temperature_c: 35, humidity_pct: 20, vpd_kpa: 1.2 } },
-      },
-    };
-    const sibling = {
-      ...plantQuickLogSibling(at, "env-b"),
-      environment_events: { temperature_c: 35, humidity_pct: 20, vpd_kpa: 1.2 },
-    };
-    const events = parseTentManualEnvironmentEvents([sibling]);
-    expect(dropEventsMirroredByDiaryRows(events, [corrected])).toEqual([]);
-    // Codex 4364582866: the kept diary card and history row carry the
-    // corrected 1.2 kPa, not a VPD derived from 35 °C / 20 % (~4.5 kPa).
-    const [record] = diaryRowsToManualSnapshotRecords([corrected]);
-    expect(record.validation.metrics.find((m) => m.field === "vpd_kpa")?.value).toBe(1.2);
-    expect(
-      diarySnapshotsToChangeContextRows([corrected]).find((r) => r.metric === "vpd_kpa")?.value,
-    ).toBe(1.2);
-    // A same-instant save whose VPD differs is still a different save.
-    const other = parseTentManualEnvironmentEvents([
-      {
-        ...sibling,
-        id: "env-c",
-        environment_events: { ...sibling.environment_events, vpd_kpa: 1.6 },
-      },
-    ]);
-    expect(dropEventsMirroredByDiaryRows(other, [corrected]).map((e) => e.id)).toEqual(["env-c"]);
   });
 
   it("does not claim an event carrying a metric the mirror did not record", () => {

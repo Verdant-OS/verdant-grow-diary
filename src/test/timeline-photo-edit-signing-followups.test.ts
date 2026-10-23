@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyTimelineDiaryPhotoEdit,
+  applyTimelineInitialSignedPhoto,
   timelineEntryCountsAsPhoto,
   timelineSignedPhotoPathStillCurrent,
 } from "@/lib/timelineChipCountRules";
@@ -139,5 +140,30 @@ describe("the read's initial signed URL applies only to a still-current referenc
         VIEWER,
       ),
     ).toBe(false);
+  });
+});
+
+describe("a partial initial signing batch never erases a newer URL (Codex P2 at 705072e0)", () => {
+  // A note-only edit already re-signed path B before the read's batch resolved.
+  const row = {
+    id: "e1",
+    photo_url: "https://signed.example/b-from-edit",
+    details: { photo_url: pathB },
+    photoReferenceSource: "details" as const,
+  };
+
+  it("keeps the newer URL when the batch returned none for the path", () => {
+    for (const missing of [undefined, null, ""]) {
+      expect(applyTimelineInitialSignedPhoto(row, pathB, missing, VIEWER)).toBe(row);
+    }
+  });
+
+  it("applies a returned URL only while the row still references the path", () => {
+    expect(
+      applyTimelineInitialSignedPhoto(row, pathB, "https://signed.example/b", VIEWER).photo_url,
+    ).toBe("https://signed.example/b");
+    expect(applyTimelineInitialSignedPhoto(row, pathA, "https://signed.example/a", VIEWER)).toBe(
+      row,
+    );
   });
 });

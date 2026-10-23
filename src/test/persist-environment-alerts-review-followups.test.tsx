@@ -182,7 +182,24 @@ describe("usePersistEnvironmentAlerts review follow-ups (#2267 at 4dcba2be)", ()
   });
 
   it("reports the refresh error and stops after the bounded retries when every attempt fails (Codex P1)", async () => {
-    alertsIo.list.mockResolvedValue([OPEN_STAGE_RH]);
+    // The list reflects inserts, as the database does: once saved, the
+    // temperature alert is open and later runs dedupe against it.
+    alertsIo.list.mockImplementation(async () =>
+      alertsIo.save.mock.calls.some(([p]) => p?.metric === "temp")
+        ? [
+            OPEN_STAGE_RH,
+            {
+              id: "alert-1",
+              metric: "temp",
+              source: "environment_alerts",
+              title: "Temperature above target",
+              reason: "",
+              tent_id: "tent-1",
+              status: "open",
+            },
+          ]
+        : [OPEN_STAGE_RH],
+    );
     alertsIo.update.mockRejectedValue(new Error("network down"));
     const input = refreshAndInsertInput();
     const hook = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
@@ -223,5 +240,136 @@ describe("usePersistEnvironmentAlerts review follow-ups (#2267 at 4dcba2be)", ()
     expect(savesFor("rh")).toBe(0);
 
     blocked.unmount();
+  });
+
+  it("lets a still-mounted instance persist a breach again after the grower closed the alert another instance wrote (Codex P1 at 705072e0)", async () => {
+    const listGate = deferred<unknown[]>();
+    alertsIo.list.mockReturnValueOnce(listGate.promise).mockReturnValueOnce(listGate.promise);
+    const now = Date.now();
+    const writer = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: stageOnlyInput(new Date(now - 60_000).toISOString()),
+    });
+    const other = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: stageOnlyInput(new Date(now - 60_000).toISOString()),
+    });
+    await waitFor(() => expect(alertsIo.list).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      listGate.resolve([]);
+      await listGate.promise;
+    });
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    await waitFor(() => expect(other.result.current.status).toBe("done"));
+
+    // The grower closed the alert; a new reading shows the same breach. The
+    // list (default mock) now returns no open row.
+    other.rerender(stageOnlyInput(new Date(now).toISOString()));
+    await waitFor(() => expect(savesFor("temp")).toBe(2));
+    await settle();
+    expect(savesFor("temp")).toBe(2);
+
+    writer.unmount();
+    other.unmount();
+  });
+
+  it("does not insert a duplicate from an open-alert list requested before another instance's insert committed (Codex P1 at 705072e0)", async () => {
+    const firstSave = deferred<{ id: string }>();
+    const lateList = deferred<unknown[]>();
+    alertsIo.save.mockReturnValueOnce(firstSave.promise).mockResolvedValue({ id: "alert-2" });
+    alertsIo.list.mockResolvedValueOnce([]).mockReturnValueOnce(lateList.promise);
+    const input = stageOnlyInput(new Date().toISOString());
+
+    const writer = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    // This instance's list is requested while the insert is still in flight.
+    const late = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
+    await waitFor(() => expect(alertsIo.list).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      firstSave.resolve({ id: "alert-1" });
+      await firstSave.promise;
+    });
+    await waitFor(() => expect(alertsIo.log).toHaveBeenCalledTimes(1));
+    // Its list was read before the insert committed, so it cannot show the row.
+    await act(async () => {
+      lateList.resolve([]);
+      await lateList.promise;
+    });
+    await waitFor(() => expect(late.result.current.status).toBe("done"));
+    await settle();
+    expect(savesFor("temp")).toBe(1);
+
+    writer.unmount();
+    late.unmount();
+  });
+
+  it("gives a new refresh context its own retry budget after an earlier one was spent (Codex P2 at 705072e0)", async () => {
+    alertsIo.list.mockResolvedValue([OPEN_STAGE_RH]);
+    alertsIo.update.mockRejectedValue(new Error("network down"));
+    const input = refreshAndInsertInput();
+    const hook = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
+    await waitFor(() => expect(alertsIo.update).toHaveBeenCalledTimes(4));
+    await settle();
+
+    // The grower edits the RH target: a new context, a new budget.
+    const snapshot = input.snapshot as SensorSnapshot;
+    hook.rerender({
+      ...input,
+      targets: compareSnapshotToTargets(snapshot, {
+        rh: { min: 50, max: 72 },
+        temp: { min: 20, max: 28 },
+      }),
+    });
+    await waitFor(() => expect(alertsIo.update).toHaveBeenCalledTimes(8));
+    await settle();
+    expect(alertsIo.update).toHaveBeenCalledTimes(8);
+    expect(hook.result.current.status).toBe("error");
+
+    hook.unmount();
+  });
+
+  it("retries a pending insert that fails after the context refresh retry would have fired (Copilot at 705072e0)", async () => {
+    alertsIo.list.mockResolvedValue([OPEN_STAGE_RH]);
+    alertsIo.update.mockRejectedValueOnce(new Error("network down")).mockResolvedValue(true);
+    let rejectFirstSave!: (err: Error) => void;
+    alertsIo.save
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectFirstSave = reject;
+        }),
+      )
+      .mockResolvedValue({ id: "alert-temp" });
+    const hook = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: refreshAndInsertInput(),
+    });
+
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    // Hold the insert past the (5 ms in tests) refresh retry delay.
+    await settle();
+    await act(async () => {
+      rejectFirstSave(new Error("insert failed"));
+    });
+
+    await waitFor(() => expect(savesFor("temp")).toBe(2));
+    await waitFor(() => expect(hook.result.current.status).toBe("done"));
+    expect(alertsIo.update).toHaveBeenCalledTimes(2);
+
+    hook.unmount();
+  });
+
+  it("lets the instance that wrote an alert persist the breach again after the grower closed it elsewhere (Codex P1 at b4a8117f)", async () => {
+    const now = Date.now();
+    const writer = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: stageOnlyInput(new Date(now - 60_000).toISOString()),
+    });
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    await waitFor(() => expect(writer.result.current.status).toBe("done"));
+
+    // Closed from another tab or device; the next reading shows the same breach.
+    writer.rerender(stageOnlyInput(new Date(now).toISOString()));
+    await waitFor(() => expect(savesFor("temp")).toBe(2));
+    await settle();
+    expect(savesFor("temp")).toBe(2);
+
+    writer.unmount();
   });
 });

@@ -214,6 +214,25 @@ export function timelineSignedPhotoPathStillCurrent(
 }
 
 /**
+ * Apply a diary read's initial signed URL to a row. The row is returned
+ * unchanged when the read returned no URL for the path (a partial batch must
+ * not erase a newer URL an edit already signed) or when the row no longer
+ * references the path (an edit moved or removed the photo).
+ */
+export function applyTimelineInitialSignedPhoto<
+  T extends Pick<TimelineDiaryPhotoEditRow, "details" | "photoReferenceSource" | "photo_url">,
+>(
+  row: T,
+  signedPath: string,
+  signedUrl: string | null | undefined,
+  viewerUserId: string | null,
+): T {
+  if (typeof signedUrl !== "string" || signedUrl.length === 0) return row;
+  if (!timelineSignedPhotoPathStillCurrent(row, signedPath, viewerUserId)) return row;
+  return { ...row, photo_url: signedUrl };
+}
+
+/**
  * Ids whose saved photo reference is displayable. Call this on the rows
  * returned by the diary read, before storage paths are cleared for signing.
  */

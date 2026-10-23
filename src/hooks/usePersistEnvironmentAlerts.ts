@@ -9,10 +9,13 @@
  *   - Only writes when the snapshot is real and valid (see
  *     isSnapshotPersistable). Never writes from stale, unavailable, demo,
  *     fallback, or mock readings.
- *   - Idempotent: dedupes against currently-open alert rows for the grow
- *     by a deterministic rule key (source + metric + reason). A per-session
- *     in-memory guard avoids re-issuing the same insert across re-renders
- *     before the open-list query refreshes.
+ *   - Idempotent: dedupes against the grow's active alert rows (`open` or
+ *     `acknowledged`, ACTIVE_ALERT_STATUSES) by a deterministic rule key
+ *     (source + metric + reason) and by one alert per threshold direction.
+ *     Acknowledging does not let the same alert be re-created; only a
+ *     terminal row (`resolved` or `dismissed`) does. Context refresh updates
+ *     open rows only. A per-session in-memory guard avoids re-issuing the
+ *     same insert across re-renders before the list query refreshes.
  *   - Never sends user_id from the client. Ownership is anchored on
  *     auth.uid() via DB defaults + RLS.
  *   - No elevated keys. No AI calls. No Action Queue writes.
@@ -35,6 +38,7 @@ import {
   snapshotPersistenceBlockReason,
 } from "@/lib/environmentAlertPersistence";
 import { listAlerts, saveAlert, logAlertEvent, updateOpenAlertContext } from "@/lib/alerts";
+import { ACTIVE_ALERT_STATUSES } from "@/lib/alertActiveStatusRules";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 import { buildDiaryEntryEvidenceRefs } from "@/lib/diaryEntryEvidenceRefRules";
 import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEventRules";
@@ -92,6 +96,12 @@ let mountedPersistHookCount = 0;
 let activePersistWriteCount = 0;
 const globalInFlightAlertKeys = new Set<string>();
 const globalCreatedEventLoggedKeys = new Set<string>();
+// A successful insert releases its reservation at once, so a later breach of
+// a closed alert can be persisted again. Until then-current list reads catch
+// up, it records a write sequence: a run whose active-alert list was requested
+// before that insert committed skips the key instead of inserting a duplicate.
+let globalAlertWriteSeq = 0;
+const globalCommittedAlertSeq = new Map<string, number>();
 // Mounted instances that skipped a candidate because another write held its
 // alert reservation. A failed write, or a run cleaned up before its write
 // started, releases the reservation and notifies them once so they retry; a
@@ -109,6 +119,7 @@ function maybeClearGlobalSnapshotReservations(): void {
     activePersistWriteCount = 0;
     globalInFlightAlertKeys.clear();
     globalCreatedEventLoggedKeys.clear();
+    globalCommittedAlertSeq.clear();
   }
 }
 
@@ -175,8 +186,8 @@ export function usePersistEnvironmentAlerts(
     lastError: null,
   });
 
-  // Per-session guard to avoid re-issuing the same insert within the same
-  // render window (before the open-list refresh would naturally dedupe it).
+  // Per-session guard to avoid re-issuing the same insert while it is in
+  // flight. A successful insert drops its key (see the write sequence).
   const inFlightKeys = useRef<Set<string>>(new Set());
   // Bumped once when a future-dated observation reaches its eligibility
   // boundary, so the gate below is asked again with nothing else changed.
@@ -185,8 +196,10 @@ export function usePersistEnvironmentAlerts(
   const [reservationWake, setReservationWake] = useState(0);
   // Bumped by the bounded retry after an open alert's context refresh fails.
   const [refreshRetryWake, setRefreshRetryWake] = useState(0);
-  // Consecutive failed context-refresh runs; reset by a successful refresh.
+  // Consecutive failed context-refresh runs; reset by a successful refresh or
+  // when the grow, tent, targets, stage or enablement change.
   const refreshFailures = useRef(0);
+  const refreshContext = useRef<string | null>(null);
 
   // Stable deps — recompute on snapshot ts / quality / targets identity.
   // Configured bounds are part of the targets key: persisted reasons quote
@@ -221,6 +234,18 @@ export function usePersistEnvironmentAlerts(
   }, []);
 
   useEffect(() => {
+    const refreshContextKey = [
+      growId ?? "",
+      tentKey,
+      targetsKey,
+      stageKey,
+      enabled ? "on" : "off",
+      targetsPending ? "pending" : "ready",
+    ].join("|");
+    if (refreshContext.current !== refreshContextKey) {
+      refreshContext.current = refreshContextKey;
+      refreshFailures.current = 0;
+    }
     if (!enabled || targetsPending || !growId) {
       setState({ status: "skipped", persistedCount: 0, lastError: null });
       return;
@@ -248,7 +273,7 @@ export function usePersistEnvironmentAlerts(
       // sides), so the gate rejects a still-future observation while the
       // second read finds it current and arms nothing. The unchanged breach
       // would then never be persisted, because no effect dependency moves
-      // with wall time. The write path re-lists open rows and dedupes, so a
+      // with wall time. The write path re-lists active rows and dedupes, so a
       // sample a few milliseconds old cannot mint a stale row.
       const now = Date.now();
 
@@ -294,8 +319,9 @@ export function usePersistEnvironmentAlerts(
         setState((s) => ({ ...s, status: "checking", lastError: null }));
       }
 
-      // 3. Load currently-open alerts for this grow and dedupe by rule key,
-      //    scoped to the tent the breach was observed in.
+      // 3. Load this grow's active alerts (ACTIVE_ALERT_STATUSES: open or
+      //    acknowledged) and dedupe by rule key, scoped to the tent the
+      //    breach was observed in. Only open rows feed the context refresh.
       let openRows: {
         id: string;
         metric: string | null;
@@ -303,9 +329,14 @@ export function usePersistEnvironmentAlerts(
         title: string;
         reason: string;
         tent: string | null;
+        acknowledged: boolean;
       }[] = [];
+      // Inserts committed after this point may be missing from the list below.
+      const listSeq = globalAlertWriteSeq;
       try {
-        const rows = await listAlerts({ growId, status: "open" });
+        // Acknowledged alerts are still active (the grower has seen them, the
+        // condition is not fixed), so they dedupe too; only open rows refresh.
+        const rows = await listAlerts({ growId, statuses: ACTIVE_ALERT_STATUSES });
         openRows = rows.map((r) => ({
           id: typeof r.id === "string" ? r.id : "",
           metric: r.metric ?? null,
@@ -313,6 +344,7 @@ export function usePersistEnvironmentAlerts(
           title: r.title,
           reason: r.reason ?? "",
           tent: r.tent_id ?? null,
+          acknowledged: r.status === "acknowledged",
         }));
       } catch (err) {
         if (!cancelled) {
@@ -340,10 +372,10 @@ export function usePersistEnvironmentAlerts(
       // no tent (all historical rows, and any snapshot spanning tents) key on
       // "" and so keep their existing grow-wide dedupe behavior.
       // Grow is part of the key because `inFlightKeys` is a ref that survives
-      // grow switches and never drops successful keys. Without it, a
-      // tent-null rule persisted for one grow would suppress the same rule
-      // in the next grow the user selects, even with that grow's open-alert
-      // query empty. (The pre-existing key omitted grow too; it is included
+      // grow switches and holds a key while its write is pending (a successful
+      // insert drops it). Without it, a tent-null rule pending for one grow
+      // would suppress the same rule in the next grow the user selects, even
+      // with that grow's active-alert query empty. (The pre-existing key omitted grow too; it is included
       // here rather than left as a latent collision in code being rewritten.)
       const scopedKey = (tent: string | null, ruleKey: string) =>
         `${growId ?? ""}::${tent ?? ""}::${ruleKey}`;
@@ -375,7 +407,7 @@ export function usePersistEnvironmentAlerts(
         const dirKey = thresholdDirectionKey(growId, r.tent, r.source ?? SOURCE, r.metric, r.title);
         if (dirKey) {
           existingDirections.add(dirKey);
-          if (!openRowByDirection.has(dirKey)) openRowByDirection.set(dirKey, r);
+          if (!r.acknowledged && !openRowByDirection.has(dirKey)) openRowByDirection.set(dirKey, r);
         }
       }
       // A configured-target candidate blocked by an open stage/default-range
@@ -421,6 +453,9 @@ export function usePersistEnvironmentAlerts(
           blockedAlertKeys.add(key);
           return false;
         }
+        // Another instance inserted this alert after our list was requested;
+        // the row exists even though the list above cannot show it.
+        if ((globalCommittedAlertSeq.get(key) ?? -1) > listSeq) return false;
         activeKeys.add(key);
         pendingKeys.add(key);
         globalInFlightAlertKeys.add(key);
@@ -443,22 +478,31 @@ export function usePersistEnvironmentAlerts(
         }
       }
       if (cancelled) return;
+      // A failed refresh leaves the open alert quoting the old range, and no
+      // dependency of this effect moves to run it again. Surface the error
+      // and wake a bounded number of times to retry; success resets it. The
+      // wake re-runs this effect, so it is armed only once this run's inserts
+      // have settled: an earlier wake would cancel a pending insert whose
+      // failure could then reach no one.
+      let refreshRetryDelay: number | null = null;
       if (contextRefreshes.length > 0) {
-        // A failed refresh leaves the open alert quoting the old range, and no
-        // dependency of this effect moves to run it again. Surface the error
-        // and wake a bounded number of times to retry; success resets it.
         if (refreshError) {
           refreshFailures.current += 1;
-          const delay = alertContextRefreshRetryDelayMs(refreshFailures.current);
-          if (delay !== null) {
-            refreshRetryId = window.setTimeout(() => setRefreshRetryWake((n) => n + 1), delay);
-          }
+          refreshRetryDelay = alertContextRefreshRetryDelayMs(refreshFailures.current);
         } else {
           refreshFailures.current = 0;
         }
       }
+      const armRefreshRetry = () => {
+        if (cancelled || refreshRetryDelay === null) return;
+        refreshRetryId = window.setTimeout(
+          () => setRefreshRetryWake((n) => n + 1),
+          refreshRetryDelay,
+        );
+      };
 
       if (toInsert.length === 0) {
+        armRefreshRetry();
         setState({
           status: refreshError ? "error" : "done",
           persistedCount: 0,
@@ -495,6 +539,14 @@ export function usePersistEnvironmentAlerts(
             source: SOURCE,
             originating_timeline_events: refs,
           });
+          // The row is committed: release the reservation, here and in this
+          // instance's own guard, without waking blocked instances. Any run
+          // whose list predates this insert is fenced by the sequence, so a
+          // closed alert can be persisted again by any instance, this one too.
+          globalAlertWriteSeq += 1;
+          globalCommittedAlertSeq.set(key, globalAlertWriteSeq);
+          globalInFlightAlertKeys.delete(key);
+          activeKeys.delete(key);
           const logDedupKey = `${saved?.id ?? ""}::${key}`;
           if (!globalCreatedEventLoggedKeys.has(logDedupKey)) {
             globalCreatedEventLoggedKeys.add(logDedupKey);
@@ -523,6 +575,7 @@ export function usePersistEnvironmentAlerts(
       }
 
       if (!cancelled) {
+        armRefreshRetry();
         setState({
           status: lastError ? "error" : "done",
           persistedCount,

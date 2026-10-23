@@ -97,8 +97,11 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   refused before connecting.
 - A set `MQTTJS_SOCKS_PROXY` is refused before connecting: MQTT.js would route
   the broker connection through that proxy.
-- A `--mqtt-url` password containing `:` (literally or as `%3A`) is refused:
-  MQTT.js sends only the part after the last `:`. Use `ECOWITT_MQTT_PASSWORD`.
+- `--mqtt-url` credentials containing `:` (literally or as `%3A`, in the
+  username or the password) are refused: MQTT.js splits them at the last `:`.
+  So are credentials the URL parser rewrites (a space becomes `%20`), because
+  that spelling is not the one redacted. Use `ECOWITT_MQTT_USERNAME` and
+  `ECOWITT_MQTT_PASSWORD`.
 - `BUN_CONFIG_VERBOSE_FETCH` (any value) and `NODE_TLS_REJECT_UNAUTHORIZED`
   (anything but `1`) are refused before connecting: the first prints the bridge
   token and PASSKEY body, the second disables certificate checks.

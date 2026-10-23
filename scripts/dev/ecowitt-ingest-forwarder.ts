@@ -1259,20 +1259,29 @@ export function brokerUrlIsSupported(value: string): boolean {
 const SUPPORTED_BROKER_SCHEMES = new Set(["mqtt:", "mqtts:", "ws:", "wss:"]);
 
 /**
- * True when the broker URL's password contains `:`, literally or encoded.
- * MQTT.js legacy-parses the URL and splits the decoded userinfo at the last
- * `:`, so it would send a different password than the one registered for
- * redaction (Copilot P1 on #2423 at c50d2a61).
+ * True when the broker URL's userinfo would reach the broker as different
+ * credentials than the ones registered for redaction. MQTT.js legacy-parses
+ * the URL and splits the decoded userinfo at the last `:`, so a `:` in either
+ * credential, literal or `%3A`, moves the split (Copilot P1s on #2423 at
+ * c50d2a61 and on #2427 at f0f37f46). A userinfo the URL parser rewrites
+ * (`private secret` becomes `private%20secret`) has a raw spelling nothing
+ * registered, so it is refused too.
  */
-export function brokerPasswordAmbiguous(value: string): boolean {
+export function brokerUserinfoAmbiguous(value: string): boolean {
   if (!URL.canParse(value)) return false;
-  const { password } = new URL(value);
-  if (password.includes(":")) return true;
-  try {
-    return decodeURIComponent(password).includes(":");
-  } catch {
-    return /%3a/i.test(password);
-  }
+  const { username, password } = new URL(value);
+  const afterScheme = value.slice(value.indexOf("//") + 2);
+  const authority = afterScheme.slice(0, afterScheme.search(/[/?#]|$/));
+  const at = authority.lastIndexOf("@");
+  const raw = at === -1 ? "" : authority.slice(0, at);
+  if (raw !== (password === "" ? username : `${username}:${password}`)) return true;
+  return [username, password].some((part) => {
+    try {
+      return decodeURIComponent(part).includes(":");
+    } catch {
+      return /%3a/i.test(part);
+    }
+  });
 }
 
 /**
@@ -1355,9 +1364,9 @@ export async function main(
     return;
   }
 
-  if (brokerPasswordAmbiguous(flags.mqttUrl)) {
+  if (brokerUserinfoAmbiguous(flags.mqttUrl)) {
     console.error(
-      "[ecowitt-forwarder] refused: the --mqtt-url password contains ':'. MQTT.js would send only the part after the last ':'. Set ECOWITT_MQTT_PASSWORD instead.",
+      "[ecowitt-forwarder] refused: the --mqtt-url credentials contain ':' or a character the URL parser rewrites. MQTT.js would send different credentials than the ones redacted. Set ECOWITT_MQTT_USERNAME and ECOWITT_MQTT_PASSWORD instead.",
     );
     deps.exit(2);
     return;

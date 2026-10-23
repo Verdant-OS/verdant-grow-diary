@@ -1069,13 +1069,23 @@ describe("credential spellings MQTT.js would use, and settings that bypass redac
     `mqtt://grower:prefix:${privateValue}@broker:1883`,
     `mqtt://grower:prefix%3A${privateValue}@broker:1883`,
     `mqtt://grower:prefix%3a${privateValue}%ZZ@broker:1883`,
-  ])("refuses a broker password containing ':' before logging: %s", async (url) => {
-    const { out, connect, exit } = await run(url);
-    expect(connect).not.toHaveBeenCalled();
-    expect(exit).toHaveBeenCalledWith(2);
-    expect(out).toContain("password contains ':'");
-    expect(out).not.toContain(privateValue);
-  });
+    // A username-only userinfo with an encoded ':' becomes user and password
+    // in MQTT.js (Copilot P1 on #2427 at f0f37f46).
+    `mqtt://grower%3A${privateValue}@broker:1883`,
+    `mqtt://grower%3a${privateValue}:plain@broker:1883`,
+    // The URL parser rewrites the space to %20, a spelling nothing registered
+    // (Copilot P1 on #2427 at f0f37f46).
+    `mqtt://grower:private ${privateValue}%ZZ@broker:1883`,
+  ])(
+    "refuses broker credentials MQTT.js would send differently, before logging: %s",
+    async (url) => {
+      const { out, connect, exit } = await run(url);
+      expect(connect).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(out).toContain("credentials contain ':' or a character the URL parser rewrites");
+      expect(out).not.toContain(privateValue);
+    },
+  );
 
   it.each([
     ["BUN_CONFIG_VERBOSE_FETCH", "curl"],

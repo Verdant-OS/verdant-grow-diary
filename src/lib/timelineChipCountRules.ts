@@ -278,6 +278,6 @@ const QUICK_LOG_STORED_PLACEHOLDER = "(quick log)";
  */
 export function timelineEntryHasNoteText(note: unknown): boolean {
   return (
-    typeof note === "string" && note.trim().length > 0 && note !== QUICK_LOG_STORED_PLACEHOLDER
+    typeof note === "string" && note !== QUICK_LOG_STORED_PLACEHOLDER && note.trim().length > 0
   );
 }

@@ -3,7 +3,7 @@
  * diary entry, so Notes always equalled All and tapping it changed nothing.
  * Notes now means entries with note text; the chip exposes aria-pressed.
  */
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -199,8 +199,6 @@ const GROW_A = {
   started_at: "2026-07-01T00:00:00.000Z",
 };
 
-const TENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-const SENSOR_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 function diaryEntry(
   id: string,
@@ -219,35 +217,6 @@ function diaryEntry(
     plant_id: null,
     tent_id: null,
   };
-}
-
-function manualTempReading(id: string, capturedAt: string) {
-  return {
-    id,
-    user_id: SENSOR_USER_ID,
-    tent_id: TENT_ID,
-    metric: "temperature_c",
-    value: 24,
-    source: "manual",
-    quality: "ok",
-    ts: capturedAt,
-    captured_at: capturedAt,
-    created_at: capturedAt,
-    device_id: null,
-    raw_payload: null,
-    correction_valid: true,
-    corrected_at: null,
-  };
-}
-
-function receiptReadings(count: number) {
-  const base = Date.now() - 5 * 60_000;
-  return Array.from({ length: count }, (_, index) =>
-    manualTempReading(
-      `cccccccc-cccc-4ccc-8ccc-ccccccccccc${index}`,
-      new Date(base - index * 5 * 60_000).toISOString(),
-    ),
-  );
 }
 
 function defaultResult(spec: QuerySpec): QueryResult {
@@ -271,10 +240,6 @@ function chipCount(label: string): number {
   return value;
 }
 
-function listedEntries(): HTMLElement[] {
-  return screen.queryAllByTestId("timeline-entry");
-}
-
 function listedDiaryEntries(): HTMLElement[] {
   return screen
     .queryAllByTestId("timeline-entry")
@@ -287,14 +252,6 @@ function renderTimeline() {
       <Timeline />
     </MemoryRouter>,
   );
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
 }
 
 describe("Timeline Notes chip means note text (Pollen #1)", () => {

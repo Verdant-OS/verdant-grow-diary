@@ -199,9 +199,23 @@ function snapshotNumber(details: unknown, key: string): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-/** 0.01 °C storage rounding is 0.018 °F; humidity is stored as typed. */
+/** 0.01 °C storage rounding is 0.018 °F; humidity and VPD are stored as typed. */
 const MIRROR_TEMP_F_TOLERANCE = 0.15;
 const MIRROR_RH_TOLERANCE = 0.05;
+const MIRROR_VPD_TOLERANCE = 0.005;
+
+/**
+ * VPD the mirror recorded. A save never sends one, but the Quick Log
+ * correction (quicklog_correction_apply_measured_values) writes the same
+ * value to the environment row and to the mirror's
+ * `details.sensor_snapshot.metrics.vpd_kpa`, so the pair still agrees.
+ */
+function mirrorVpdKpa(details: unknown): number | null {
+  const metrics = (details as { sensor_snapshot?: { metrics?: Record<string, unknown> } })
+    .sensor_snapshot?.metrics;
+  const v = metrics?.vpd_kpa;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
 
 /**
  * True when the event carries exactly the readings the mirror recorded: the
@@ -212,8 +226,13 @@ const MIRROR_RH_TOLERANCE = 0.05;
  */
 function eventMatchesMirrorValues(ev: TentManualEnvironmentEvent, details: unknown): boolean {
   // The Plant Quick Log adapter always sends an empty VPD and the RPC stores
-  // it as passed, so a real sibling never carries VPD.
-  if (ev.vpdKpa !== null) return false;
+  // it as passed, so a sibling carries VPD only after a correction, which
+  // also records it on the mirror. VPD must be absent on both or agree.
+  const vpd = mirrorVpdKpa(details);
+  if ((vpd === null) !== (ev.vpdKpa === null)) return false;
+  if (vpd !== null && ev.vpdKpa !== null && Math.abs(ev.vpdKpa - vpd) > MIRROR_VPD_TOLERANCE) {
+    return false;
+  }
   let compared = 0;
   const tempF = snapshotNumber(details, "temp_f");
   if ((tempF === null) !== (ev.temperatureC === null)) return false;

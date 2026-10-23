@@ -575,6 +575,34 @@ describe("tent manual snapshots — Codex re-review on #2114 (same-instant saves
     expect(kept.map((e) => e.id)).toEqual(["env-a"]);
   });
 
+  it("still claims its sibling after a correction adds the same VPD to both rows", () => {
+    // Codex 4364335238: quicklog_correction_apply_measured_values writes VPD to
+    // the environment row AND to the mirror's sensor_snapshot.metrics.vpd_kpa.
+    const corrected = {
+      ...plantQuickLogCompanion(at, "parent-1"),
+      details: {
+        linked_grow_event_id: "parent-1",
+        manual_sensor_snapshot: { source: "manual", temp_f: 95, humidity_percent: 20 },
+        sensor_snapshot: { metrics: { temperature_c: 35, humidity_pct: 20, vpd_kpa: 1.2 } },
+      },
+    };
+    const sibling = {
+      ...plantQuickLogSibling(at, "env-b"),
+      environment_events: { temperature_c: 35, humidity_pct: 20, vpd_kpa: 1.2 },
+    };
+    const events = parseTentManualEnvironmentEvents([sibling]);
+    expect(dropEventsMirroredByDiaryRows(events, [corrected])).toEqual([]);
+    // A same-instant save whose VPD differs is still a different save.
+    const other = parseTentManualEnvironmentEvents([
+      {
+        ...sibling,
+        id: "env-c",
+        environment_events: { ...sibling.environment_events, vpd_kpa: 1.6 },
+      },
+    ]);
+    expect(dropEventsMirroredByDiaryRows(other, [corrected]).map((e) => e.id)).toEqual(["env-c"]);
+  });
+
   it("does not claim an event carrying a metric the mirror did not record", () => {
     const tempOnlyMirror = {
       ...plantQuickLogCompanion(at, "parent-1"),

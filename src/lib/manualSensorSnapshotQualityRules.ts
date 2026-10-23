@@ -207,7 +207,9 @@ export function evaluateManualSensorSnapshotQuality(
       invalidFields.push("reservoir_ec_mscm");
       reasons.push("Reservoir EC value looks like µS/cm reported as mS/cm.");
     } else if (!isSoilEcMscmRealistic(input.reservoir_ec_mscm)) {
-      // Same bounds as the history list and change-context deltas.
+      // Same bounds as the history list and change-context deltas. The soil
+      // EC range (0–8 mS/cm, sensorTruthRanges) deliberately also covers
+      // nutrient solutions (roughly 0.4–3.0 mS/cm), so no separate reservoir bound.
       invalidFields.push("reservoir_ec_mscm");
       reasons.push("Reservoir EC is outside the realistic range.");
     }

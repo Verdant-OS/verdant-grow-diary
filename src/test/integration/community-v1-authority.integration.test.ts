@@ -734,10 +734,12 @@ d("community v1 authority (local DB)", () => {
         codes.push(
           `${table}:select:${(await from().select("*")).error?.code}`,
           `${table}:insert:${(await from().insert({} as never)).error?.code}`,
+          // A non-empty payload, or PostgREST answers with a SELECT and the
+          // 42501 proves only read access (Copilot P2 on #2456 at 079d6aa7).
           `${table}:update:${
             (
               await from()
-                .update({} as never)
+                .update({ [column]: filterValue } as never)
                 .eq(column, filterValue as never)
             ).error?.code
           }`,
@@ -1546,13 +1548,26 @@ d("community v1 authority (local DB)", () => {
       draft(deleted, { sharedNote: "d" }),
     ]);
     expect(ok(await read(viewer, collection)).items).toHaveLength(2);
+    // Media on both sources, in a second collection approved only after its
+    // items exist, so they stay out of the digest (T-DIG-01) and the notes
+    // below (Copilot P2 on #2456 at 079d6aa7).
+    const media = await newCollection(owner, "Media");
+    await publish(owner, media, [draft(diaryEntry(owner))]);
+    const retractedMedia = seedDerivativeItem(owner, media, retracted);
+    const deletedMedia = seedDerivativeItem(owner, media, deleted);
+    await grant(owner, viewer, media);
+    ok(await mediaLookup(viewer, retractedMedia));
+    ok(await mediaLookup(viewer, deletedMedia));
     sql(`UPDATE public.diary_entries SET retracted_at = now() WHERE id = ${lit(retracted)};`);
+    denied(await mediaLookup(viewer, retractedMedia), "unavailable");
+    ok(await mediaLookup(viewer, deletedMedia));
     // Retraction alone removes only its own item; the still-valid source
     // stays (Copilot P2 on #2414 at 77d424b1).
     const notes = (items: Json[]) => items.map((item) => item.note as string);
     expect(notes(ok(await read(viewer, collection)).items)).toEqual(["d"]);
     expect((await digest(viewer)).items.map((item: Json) => item.publication.note)).toEqual(["d"]);
     sql(`DELETE FROM public.diary_entries WHERE id = ${lit(deleted)};`);
+    denied(await mediaLookup(viewer, deletedMedia), "unavailable");
     const after = await read(viewer, collection);
     if (after.ok) expect(after.value.items).toEqual([]);
     else denied(after, "unavailable");
@@ -1683,19 +1698,18 @@ d("community v1 authority (local DB)", () => {
     );
     const operator = await participant("mod2op");
     sql(`INSERT INTO public.user_roles (user_id, role) VALUES (${lit(operator.id)}, 'operator');`);
+    // Each denial must also leave the report and every other Community row
+    // unchanged (Copilot P2 on #2456 at 079d6aa7).
     for (const actor of [operator, reporter]) {
-      denied(
-        await rpc(actor.client, "community_moderation_list", { p_cursor: null, p_limit: 20 }),
-        "unavailable",
-      );
-      denied(
-        await rpc(actor.client, "community_moderation_decide", {
-          p_report_handle: report.reportHandle,
-          p_decision: "remove",
-          p_reason: "",
-        }),
-        "unavailable",
-      );
+      await deniedWithoutMutation(actor, "community_moderation_list", {
+        p_cursor: null,
+        p_limit: 20,
+      });
+      await deniedWithoutMutation(actor, "community_moderation_decide", {
+        p_report_handle: report.reportHandle,
+        p_decision: "remove",
+        p_reason: "",
+      });
     }
     expect(ok(await read(reporter, collection)).items).toHaveLength(1);
   }, 60_000);

@@ -26,6 +26,15 @@ describe("community-v1-db-proof workflow", () => {
     expect(runtime).toBeGreaterThan(catalog);
   });
 
+  it("enables proof-only auth after the replay copy exists and before Supabase starts", () => {
+    const prepare = indexOf("Prepare immutable migration replay workspace");
+    const auth = indexOf("Enable proof-only auth in the disposable config");
+    const start = indexOf("Start local Supabase");
+    expect(prepare).toBeGreaterThanOrEqual(0);
+    expect(auth).toBe(prepare + 1);
+    expect(start).toBe(auth + 1);
+  });
+
   it("uploads only the replay report and the two proof logs", () => {
     const uploaded = (step("Upload receipts").with?.path ?? "").split("\n").filter(Boolean);
     expect(uploaded).toEqual([
@@ -45,9 +54,18 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-function runStep(name: string, stubs: Record<string, string>, env: Record<string, string> = {}) {
+function runStep(
+  name: string,
+  stubs: Record<string, string>,
+  env: Record<string, string> = {},
+  files: Record<string, string> = {},
+) {
   const dir = mkdtempSync(join(tmpdir(), "verdant-community-step-"));
   dirs.push(dir);
+  for (const [rel, body] of Object.entries(files)) {
+    spawnSync("mkdir", ["-p", join(dir, rel, "..")]);
+    writeFileSync(join(dir, rel), body);
+  }
   const bin = join(dir, "bin");
   spawnSync("mkdir", [bin]);
   for (const [command, body] of Object.entries(stubs)) {
@@ -152,5 +170,35 @@ describe("community-v1-db-proof start and export steps keep local values private
         .filter((l) => !l.startsWith("::add-mask::"))
         .join("\n"),
     ).not.toMatch(/anon-local-value|service-local-value|local-db-pass/);
+  });
+});
+
+// Codex P1s on #2419 at 79e2256b: the runner's disposable config copy gets
+// anonymous sign-ins and a sign-in limit above the 37-case run; nothing else.
+describe("community-v1-db-proof proof-only auth step", () => {
+  const NAME = "Enable proof-only auth in the disposable config";
+  const BASE = 'project_id = "local"\n\n[functions]\n';
+
+  it("appends the anonymous sign-in and rate-limit settings to the replay copy", () => {
+    const run = runStep(NAME, {}, {}, { "supabase/config.toml": BASE });
+    expect(run.status).toBe(0);
+    expect(run.file("supabase/config.toml")).toBe(
+      `${BASE}\n[auth]\nenable_anonymous_sign_ins = true\n\n[auth.rate_limit]\nsign_in_sign_ups = 1000\n`,
+    );
+  });
+
+  it.each(["[auth]\nenabled = true\n", "  [auth.rate_limit]\nemail_sent = 2\n"])(
+    "refuses to append a second auth table to %j",
+    (existing) => {
+      const body = `${BASE}${existing}`;
+      const run = runStep(NAME, {}, {}, { "supabase/config.toml": body });
+      expect(run.status).not.toBe(0);
+      expect(run.stdout).toContain("already declares [auth]");
+      expect(run.file("supabase/config.toml")).toBe(body);
+    },
+  );
+
+  it("fails when the replay copy has no config", () => {
+    expect(runStep(NAME, {}).status).not.toBe(0);
   });
 });

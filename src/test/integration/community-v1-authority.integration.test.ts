@@ -25,6 +25,10 @@
  * - Every client RPC returns `{ ok: true, value }` or `{ ok: false, code }`.
  * - Values use the Task 1 camelCase shapes: CommunityProfileCard,
  *   PublicationPreview, SharedPublication (with `occurredDate`), DigestItem.
+ *   `occurredDate` (an owner-selected date or null, #2297) replaces Task 1's
+ *   `occurredAt`; Task 2B updates `SharedPublication` in
+ *   `src/lib/communityTypes.ts` and its rules in the same change (Codex P2 on
+ *   #2419 at 79e2256b).
  * - `p_entries` items: { sourceEntryId, sourceJournalLabel, occurredDate,
  *   sharedNote, includeStage, measurementKeys, includeMedia }.
  *   Measurement keys are `watering.<key>` / `feeding.<key>` from the approved
@@ -440,9 +444,18 @@ async function race<T>(hold: LockHold, calls: Array<() => Promise<T>>): Promise<
     waiting = Number(
       sql(
         // Only sessions blocked by the held row count, so unrelated lock waiters
-        // cannot release it early (Codex P2 on #2414 at 77d424b1).
-        `SELECT count(*) FROM pg_stat_activity
-          WHERE wait_event_type = 'Lock' AND ${hold.pid} = ANY (pg_blocking_pids(pid));`,
+        // cannot release it early (Codex P2 on #2414 at 77d424b1). The second
+        // FOR UPDATE caller waits on the first caller's tuple lock, not on the
+        // holder, so the blocking graph is walked from the holder rather than
+        // read one level deep (Copilot on #2419 at 79e2256b).
+        `WITH RECURSIVE blocked(pid) AS (
+           SELECT a.pid FROM pg_stat_activity a
+            WHERE a.wait_event_type = 'Lock' AND ${hold.pid} = ANY (pg_blocking_pids(a.pid))
+           UNION
+           SELECT a.pid FROM pg_stat_activity a JOIN blocked b ON b.pid = ANY (pg_blocking_pids(a.pid))
+            WHERE a.wait_event_type = 'Lock'
+         )
+         SELECT count(*) FROM blocked;`,
       ),
     );
   }
@@ -458,9 +471,15 @@ async function race<T>(hold: LockHold, calls: Array<() => Promise<T>>): Promise<
 /** Every client RPC, with real targets where the context supplies them. */
 function everyClientCall(context: {
   username?: string;
+  ownUsername?: string;
   profileId?: string;
   collection?: string;
+  requestCollection?: string;
+  leaveCollection?: string;
+  previewToken?: string;
   accessHandle?: string;
+  decideAccessHandle?: string;
+  withdrawAccessHandle?: string;
   publicationHandle?: string;
   reportHandle?: string;
 }): Array<[string, Record<string, unknown>]> {
@@ -468,7 +487,11 @@ function everyClientCall(context: {
   return [
     [
       "community_profile_upsert",
-      { p_username: context.username ?? uname(), p_display_name: "Again", p_bio: "" },
+      {
+        p_username: context.ownUsername ?? context.username ?? uname(),
+        p_display_name: "Again",
+        p_bio: "",
+      },
     ],
     ["community_profile_search", { p_username: context.username ?? uname() }],
     ["community_follow_set", { p_profile_id: context.profileId ?? id(), p_follow: true }],
@@ -488,23 +511,35 @@ function everyClientCall(context: {
     ],
     [
       "community_publish",
-      { p_collection_handle: context.collection ?? id(), p_preview_token: "x" },
+      {
+        p_collection_handle: context.collection ?? id(),
+        p_preview_token: context.previewToken ?? "x",
+      },
     ],
     ["community_unpublish", { p_collection_handle: context.collection ?? id() }],
-    ["community_access_request", { p_collection_handle: context.collection ?? id() }],
+    [
+      "community_access_request",
+      { p_collection_handle: context.requestCollection ?? context.collection ?? id() },
+    ],
     [
       "community_access_decide",
       {
-        p_access_handle: context.accessHandle ?? id(),
+        p_access_handle: context.decideAccessHandle ?? context.accessHandle ?? id(),
         p_decision: "approve",
         p_expected_revision: 0,
       },
     ],
     [
       "community_access_withdraw",
-      { p_access_handle: context.accessHandle ?? id(), p_expected_revision: 0 },
+      {
+        p_access_handle: context.withdrawAccessHandle ?? context.accessHandle ?? id(),
+        p_expected_revision: 0,
+      },
     ],
-    ["community_access_leave", { p_collection_handle: context.collection ?? id() }],
+    [
+      "community_access_leave",
+      { p_collection_handle: context.leaveCollection ?? context.collection ?? id() },
+    ],
     [
       "community_collection_read",
       { p_collection_handle: context.collection ?? id(), p_cursor: null, p_limit: 20 },
@@ -554,6 +589,64 @@ function collectionState(handle: string): string {
 }
 
 /** Returns every call whose result was not the generic `unavailable`. */
+/** Calls that change nothing, so an active actor can prove its targets are authorized. */
+const READ_ONLY_CALLS = new Set([
+  "community_profile_search",
+  "community_source_entries",
+  "community_collection_read",
+  "community_digest_read",
+  "community_moderation_list",
+]);
+
+/**
+ * Real targets the active `actor` is authorized for, one per client RPC: its
+ * own published collection and a fresh preview token, a pending request to
+ * decide, its own pending request to withdraw, an approved collection to
+ * leave, a readable publication to mark seen and report, and an open report
+ * to decide as a moderator. The read-only calls are shown to succeed before
+ * the caller returns, so after a lifecycle change only the lifecycle gate can
+ * make a call unavailable (Codex P2 on #2419 at 79e2256b).
+ */
+async function authorizedContext(actor: Actor, tag: string) {
+  const collection = await newCollection(actor);
+  await publish(actor, collection, [draft(diaryEntry(actor))]);
+  const { previewToken } = await preview(actor, collection, [draft(diaryEntry(actor))]);
+  const requester = await participant(`${tag}q`);
+  const decideAccessHandle = await requestAccess(requester, collection);
+  const reporter = await participant(`${tag}r`);
+  await grant(actor, reporter, collection);
+  const reportHandle = ok(
+    await rpc(reporter.client, "community_report_create", {
+      p_publication_handle: ok(await read(reporter, collection)).items[0].publicationHandle,
+      p_reason_code: "spam",
+      p_reason_text: "",
+    }),
+  ).reportHandle;
+  sql(`INSERT INTO public.community_moderators (user_id) VALUES (${lit(actor.id)});`);
+  const approved = await publishedOwner(`${tag}a`);
+  await grant(approved.owner, actor, approved.collection);
+  const pending = await publishedOwner(`${tag}p`);
+  const withdrawAccessHandle = await requestAccess(actor, pending.collection);
+  const asked = await publishedOwner(`${tag}k`);
+  const context = {
+    username: approved.owner.username,
+    ownUsername: actor.username,
+    profileId: approved.owner.communityId,
+    collection,
+    requestCollection: asked.collection,
+    leaveCollection: approved.collection,
+    previewToken,
+    decideAccessHandle,
+    withdrawAccessHandle,
+    publicationHandle: ok(await read(actor, approved.collection)).items[0].publicationHandle,
+    reportHandle,
+  };
+  for (const [fn, args] of everyClientCall(context)) {
+    if (READ_ONLY_CALLS.has(fn)) ok(await rpc(actor.client, fn, args));
+  }
+  return context;
+}
+
 async function notUnavailable(
   client: SupabaseClient,
   calls: Array<[string, Record<string, unknown>]>,
@@ -846,22 +939,20 @@ d("community v1 authority (local DB)", () => {
       sql(`SELECT count(*) FROM public.community_profiles WHERE user_id = ${lit(unverified.id)};`),
     ).toBe("0");
 
+    // An unverified user can hold no profile, so it has no authorized targets;
+    // the inactive and deleting callers below get real ones while active.
     const inactive = await participant("pro3i");
-    const inactiveCollection = await newCollection(inactive);
+    const inactiveContext = await authorizedContext(inactive, "pro3i");
     ok(await rpc(inactive.client, "community_profile_deactivate", {}));
-    const inactiveCalls = everyClientCall({ ...target, collection: inactiveCollection }).filter(
+    const inactiveCalls = everyClientCall(inactiveContext).filter(
       ([fn]) => fn !== "community_profile_upsert", // re-opt-in is the one allowed call (T-LIFE-01)
     );
     expect(await notUnavailable(inactive.client, inactiveCalls)).toEqual([]);
 
     const deleting = await participant("pro3d");
+    const deletingContext = await authorizedContext(deleting, "pro3d");
     ok(await rpc(admin, "community_account_deletion_begin", { p_user_id: deleting.id }));
-    expect(
-      await notUnavailable(
-        deleting.client,
-        everyClientCall({ ...target, username: deleting.username }),
-      ),
-    ).toEqual([]);
+    expect(await notUnavailable(deleting.client, everyClientCall(deletingContext))).toEqual([]);
   }, 180_000);
 
   it("T-PRO-04 confusable, reserved and out-of-bounds profile fields are invalid", async () => {
@@ -1092,17 +1183,26 @@ d("community v1 authority (local DB)", () => {
   }, 60_000);
 
   it("T-PUB-02 later private entries and note edits never appear in a publication", async () => {
-    const { owner, collection, entries } = await publishedOwner("pub2");
+    const { owner, collection } = await publishedOwner("pub2");
     const viewer = await participant("pub2v");
     await grant(owner, viewer, collection);
+    // A followed publication after approval, so the digest delivers it too and
+    // both payloads are compared (Codex P2 on #2419 at 79e2256b).
+    ok(await follow(viewer, owner));
+    const source = diaryEntry(owner, { note: "private pub2 source" });
+    await publish(owner, collection, [draft(source, { sharedNote: "shared pub2 after approval" })]);
     const before = ok(await read(viewer, collection)).items;
-    sql(
-      `UPDATE public.diary_entries SET note = 'EDITED PRIVATE NOTE' WHERE id = ${lit(entries[0])};`,
-    );
+    const digestBefore = (await digest(viewer)).items;
+    expect(digestBefore.length).toBeGreaterThan(0);
+    sql(`UPDATE public.diary_entries SET note = 'EDITED PRIVATE NOTE' WHERE id = ${lit(source)};`);
     diaryEntry(owner, { note: "NEW PRIVATE ENTRY" });
     const after = ok(await read(viewer, collection)).items;
+    const digestAfter = (await digest(viewer)).items;
     expect(after).toEqual(before);
-    expect(JSON.stringify(after)).not.toMatch(/EDITED PRIVATE NOTE|NEW PRIVATE ENTRY|private pub2/);
+    expect(digestAfter).toEqual(digestBefore);
+    expect(JSON.stringify([after, digestAfter])).not.toMatch(
+      /EDITED PRIVATE NOTE|NEW PRIVATE ENTRY|private pub2/,
+    );
   }, 60_000);
 
   it("T-PUB-03 expired, consumed, foreign, source-edited and audience-changed previews are stale", async () => {
@@ -1459,8 +1559,12 @@ d("community v1 authority (local DB)", () => {
         }),
       ),
     ]);
+    // Every reporter identifier stays moderator-only: handle, profile id, auth
+    // id and display name (Codex P2 on #2419 at 79e2256b).
     expect(ownerViews).not.toContain(reporter.username);
     expect(ownerViews).not.toContain(reporter.communityId);
+    expect(ownerViews).not.toContain(reporter.id);
+    expect(ownerViews).not.toContain("Grower mod1r");
   }, 60_000);
 
   it("T-MOD-02 operators and ordinary users cannot use moderation RPCs", async () => {
@@ -1498,6 +1602,13 @@ d("community v1 authority (local DB)", () => {
     const { owner, collection } = await publishedOwner("mod3");
     const reader = await participant("mod3r");
     await grant(owner, reader, collection);
+    // A followed publication after approval and a derivative, so removal is
+    // checked on digest and media too (Codex P2 on #2419 at 79e2256b).
+    ok(await follow(reader, owner));
+    await publish(owner, collection, [draft(diaryEntry(owner), { sharedNote: "after approval" })]);
+    const derivative = seedDerivativeItem(owner, collection, diaryEntry(owner));
+    expect((await digest(reader)).items.length).toBeGreaterThan(0);
+    ok(await mediaLookup(reader, derivative));
     const item = ok(await read(reader, collection)).items[0];
     const report = ok(
       await rpc(reader.client, "community_report_create", {
@@ -1520,6 +1631,8 @@ d("community v1 authority (local DB)", () => {
       ).status,
     ).toBe("removed");
     denied(await read(reader, collection), "unavailable");
+    expect((await digest(reader)).items).toEqual([]);
+    denied(await mediaLookup(reader, derivative), "unavailable");
     denied(
       await rpc(owner.client, "community_publish", {
         p_collection_handle: collection,

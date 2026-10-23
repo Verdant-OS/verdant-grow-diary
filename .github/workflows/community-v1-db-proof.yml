@@ -52,6 +52,22 @@ jobs:
             | tee migration-replay-compatibility.json
           echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
 
+      # Proof-only auth settings, written to the runner's disposable replay copy
+      # only; the committed supabase/config.toml is never edited. The anonymous
+      # caller case needs anonymous sign-ins, and the 37-case run signs in more
+      # fixture users than the local default of 30 per 5 minutes allows
+      # (Codex P1s on #2419 at 79e2256b; owner-approved).
+      - name: Enable proof-only auth in the disposable config
+        run: |
+          set -eo pipefail
+          CONFIG="${SUPABASE_REPLAY_WORKDIR}/supabase/config.toml"
+          test -f "$CONFIG"
+          if grep -Eq '^[[:space:]]*\[auth(\.rate_limit)?\]' "$CONFIG"; then
+            echo "::error::the replay config already declares [auth]; merge the proof settings instead of appending."
+            exit 1
+          fi
+          printf '\n[auth]\nenable_anonymous_sign_ins = true\n\n[auth.rate_limit]\nsign_in_sign_ups = 1000\n' >> "$CONFIG"
+
       - name: Start local Supabase
         id: supabase-start
         run: |

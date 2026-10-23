@@ -467,8 +467,23 @@ export function resolveTentDetailVpd(input: {
   // de8c1b27).
   const withheld = (observation: TentDetailVpdObservation): TentDetailVpdObservation =>
     observation.value === null ? { ...observation, rejected: true } : observation;
+  // A temperature- or RH-only rejection withholds a VPD only when one was in
+  // play: a rejected VPD row, an observed VPD, or a calculable temperature +
+  // RH pair at the rejected capture. Otherwise there is no VPD to call
+  // invalid (independent review on #2474 at 5e9cb604).
+  const vpdInPlay =
+    input.rejectedMetrics.includes("vpd") ||
+    input.existing.value !== null ||
+    tonight?.state === "value" ||
+    (input.rejectedMetrics.includes("temp") && input.rejectedMetrics.includes("rh")) ||
+    (rejectedMs !== null &&
+      input.captureClimate.some(
+        (climate) =>
+          instantMs(climate.at) === rejectedMs && climate.temp !== null && climate.rh !== null,
+      ));
   if (rejectionApplies && climateRejected && !tonightIndependent) {
-    return withheld(existingOrNothing());
+    const observation = existingOrNothing();
+    return vpdInPlay ? withheld(observation) : observation;
   }
   if (
     tonight?.state === "value" &&

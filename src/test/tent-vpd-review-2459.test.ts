@@ -127,6 +127,31 @@ describe("Tent Detail reports a withheld VPD as rejected", () => {
     expect(observation.rejected).toBe(true);
   });
 
+  it("does not call a VPD invalid when only the temperature was rejected and no VPD existed", () => {
+    // Independent review on #2474 at 5e9cb604: no VPD row, no RH, Tonight
+    // missing. A rejected temperature alone is not a rejected VPD.
+    const observation = resolveTentDetailVpd({
+      ...base,
+      tonight: null,
+      rejectedMetrics: ["temp"],
+      rejectedCapturedAt: T,
+    });
+    expect(observation.value).toBeNull();
+    expect(observation.rejected).toBeUndefined();
+  });
+
+  it("still withholds when the rejected capture had a temperature + RH pair", () => {
+    const observation = resolveTentDetailVpd({
+      ...base,
+      tonight: null,
+      captureClimate: [{ at: T, temp: 60, rh: 55 }],
+      rejectedMetrics: ["temp"],
+      rejectedCapturedAt: T,
+    });
+    expect(observation.value).toBeNull();
+    expect(observation.rejected).toBe(true);
+  });
+
   it("does not mark a VPD that was simply never observed", () => {
     const observation = resolveTentDetailVpd({
       ...base,

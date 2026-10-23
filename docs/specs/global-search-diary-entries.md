@@ -89,8 +89,10 @@ switch know only grow / tent / plant / cultivar.
    no plants/tents embed, so a relation select cannot supply them). When a name is unavailable the result shows "Plant" or "Tent",
    never a raw id. Selecting a result opens the Timeline for **that entry's grow**
    with the `timeline-entry-<id>` hash:
-   - Before anchoring, the handoff clears any active Timeline filter (plant, tent, type,
-     search, date) that would hide the entry.
+   - Before anchoring, the handoff clears every active Timeline filter that could hide the
+     entry: plant, tent, type, search and date, plus the sensor-source filter
+     (`src/pages/Timeline.tsx` `sensorSourceFilter`), the stage filter (`stageFilter`) and the
+     event chip. Each of these filters can hide a diary row on its own.
    - A diary companion that `collapseQuickLogSaveFanOut` (`src/lib/timelineMergeRules.ts:312`,
      called at `src/pages/Timeline.tsx:1814`) folds into its spine anchors to the spine's id,
      the row that is actually rendered.
@@ -117,11 +119,24 @@ switch know only grow / tent / plant / cultivar.
    entity results and are never arguments to `mergeGlobalSearchResults`. Encoding recency
    in `rank` is an allowed alternative only if the implementing slice still asserts the
    same final composed list order.
+   Appending diary rows must not push them past the dialog's first page.
+   `GlobalSearchDialog` slices the composed list to its first `INITIAL_VISIBLE` rows
+   (10, `filteredResults.slice(0, visibleCount)`), and the private and cultivar reads can
+   return up to 20 rows each. A query matching ten or more entity or cultivar rows would
+   therefore hide every diary match until "Show more" is pressed several times. The
+   implementing slice reserves first-page slots per group (at least the first diary match
+   when there is one), or applies the cutoff per group.
 8. The result reaches the grower: the implementing slice adds a `'diary'` entity type to
    `GlobalSearchDialog` (group order, default and restored filter state, icon, heading,
    preview and route switch), so a diary row is not filtered out by `enabledTypes`. The
    dormant `GLOBAL_SEARCH_ITEMS` catalog stays out of scope; wiring page links into search is
    a separate change.
+   The two persistence paths that list entity types by hand also change:
+   - `sameFilters` in `src/lib/globalSearchSession.ts` compares the history entries' filters
+     field by field. It must include `diary`, so two histories that differ only in the diary
+     toggle stay distinct.
+   - `readGlobalSearchLastSelected` checks `VALID_TYPES`. It must accept `diary`, so a
+     persisted diary selection restores its preview instead of being dropped.
 
 ## Options
 
@@ -140,12 +155,14 @@ limit, matching `orderNewestFirstStable` (`src/lib/timelineQueryOrderRules.ts:16
 authenticated session's id (never a value from the UI) and only narrows the operator case
 above. That select returns plant and tent ids only. Generated relationship metadata has no
 plants/tents embed (`diary_entries` → grows only; `grow_events` has none), so names cannot
-come from this query. Fill them with one batched owner-scoped lookup of the result ids,
+come from this query. Fill them with at most two batched owner-scoped lookups of the result ids, one per table,
 using session identity (the same `user_id` filter `useTimelineNameDirectory` uses, because
 operator RLS can otherwise return every grower's names):
-`.from("plants"|"tents").select("id,name").in("id", ids).eq("user_id", <session user id>)`.
+`.from("plants").select("id,name").in("id", plantIds).eq("user_id", <session user id>)` and the
+same against `tents` with the tent ids. A `.from()` query reads one table, so the two run in
+parallel, as `useTimelineNameDirectory` does.
 Missing names show "Plant" or "Tent", never a raw id. Cost: the diary/spine reads plus at
-most one batched name lookup; `%q%` scans are unindexed (acceptable at current
+most two batched name lookups; `%q%` scans are unindexed (acceptable at current
 diary sizes; `NOT_MEASURED` at scale). **Privacy:** PostgREST reads are GET requests, so the
 `ilike` filter, and with it the grower's search text, is in the request URL. Option A is
 acceptable only if the owner explicitly accepts that.
@@ -219,7 +236,10 @@ The function must:
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
-  companion), including for a grow other than the active one.
+  companion), including for a grow other than the active one. With eleven or more entity and
+  cultivar matches, the first diary match is still on the first page. A history entry that
+  differs only in the diary toggle is kept as its own entry. A persisted diary last-selection
+  restores its preview.
 - Ordering: assert the **final composed list** (hook `results` after entity+diary
   composition, or the dialog's rendered groups), not only the diary helper's return
   value. Entity ids stay in `mergeGlobalSearchResults` order; diary ids then follow
@@ -240,7 +260,8 @@ The function must:
   private-state epoch drops diary results.
 - Navigation (rendered Timeline): selecting a result older than the first loaded page loads it
   and scrolls to it; selecting a result from a different grow switches to that grow first; an
-  active filter that hides the entry is cleared first; a collapsed Quick Log companion scrolls
+  active filter that hides the entry is cleared first, for each of plant, tent, type, search,
+  date, sensor source, stage and event chip; a collapsed Quick Log companion scrolls
   to its visible row; an entry that cannot be found shows the calm notice instead of scrolling
   nowhere.
 - Names: a result shows its plant or tent name, and "Plant" / "Tent" when the name read fails.

@@ -1179,7 +1179,7 @@ export async function connectMqtt(
   const mqtt = await loadMqtt();
   if (!mqtt) {
     console.error(
-      "[ecowitt-forwarder] mqtt package not installed. Run `bun add --no-save mqtt@5.16.0`.",
+      "[ecowitt-forwarder] mqtt package not installed. Run `bun add --no-save mqtt@5.16.1`.",
     );
     process.exit(2);
   }
@@ -1278,6 +1278,18 @@ export function brokerUrlIsSupported(value: string): boolean {
   if (!URL.canParse(value)) return false;
   const url = new URL(value);
   return SUPPORTED_BROKER_SCHEMES.has(url.protocol) && url.host !== "";
+}
+
+/** True for a `ws:` or `wss:` URL whose host is a bracketed IPv6 address. */
+export function brokerWebSocketIpv6(value: string): boolean {
+  const url = new URL(value);
+  return (url.protocol === "ws:" || url.protocol === "wss:") && url.hostname.startsWith("[");
+}
+
+/** True when the URL carries userinfo and the environment sets a credential too. */
+export function brokerCredentialsInTwoPlaces(value: string, env: ForwarderEnv): boolean {
+  const url = new URL(value);
+  return (url.username !== "" || url.password !== "") && !!(env.mqttUsername || env.mqttPassword);
 }
 
 /**
@@ -1443,6 +1455,29 @@ export async function main(
   if (brokerUserinfoAmbiguous(flags.mqttUrl)) {
     console.error(
       "[ecowitt-forwarder] refused: the --mqtt-url credentials are ambiguous (a ':' inside one, a password with no username, or a character the URL parser rewrites). MQTT.js would send different credentials than the ones redacted. Set ECOWITT_MQTT_USERNAME and ECOWITT_MQTT_PASSWORD instead.",
+    );
+    deps.exit(2);
+    return;
+  }
+
+  // MQTT.js parses the URL with legacy url.parse, which drops the brackets
+  // from an IPv6 host, and its WebSocket transport then builds
+  // `ws://::1:<port>`, which no WebSocket accepts (Codex P2 on #2455 at
+  // d6c55adb). TCP (`mqtt://[::1]`) is unaffected.
+  if (brokerWebSocketIpv6(flags.mqttUrl)) {
+    console.error(
+      "[ecowitt-forwarder] refused: MQTT.js cannot open ws:// or wss:// to an IPv6 address. Use mqtt://[::1] or a hostname.",
+    );
+    deps.exit(2);
+    return;
+  }
+
+  // MQTT.js copies the URL's userinfo over the username and password options,
+  // so a URL credential would silently win over the environment ones (Codex
+  // P2 on #2455 at d6c55adb).
+  if (brokerCredentialsInTwoPlaces(flags.mqttUrl, env)) {
+    console.error(
+      "[ecowitt-forwarder] refused: credentials are set both in --mqtt-url and in ECOWITT_MQTT_USERNAME/ECOWITT_MQTT_PASSWORD. MQTT.js would use the URL ones. Set them in one place.",
     );
     deps.exit(2);
     return;

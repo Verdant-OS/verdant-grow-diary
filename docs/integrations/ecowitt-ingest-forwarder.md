@@ -31,7 +31,7 @@ repository dependency. Install it once per checkout without touching
 
 ```powershell
 cd "<repo>"
-bun add --no-save mqtt@5.16.0
+bun add --no-save mqtt@5.16.1
 ```
 
 ```powershell
@@ -100,6 +100,12 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   loopback broker (`localhost`, a canonical `127.x.x.x` with octets 0–255, `[::1]`); a remote broker needs
   `mqtts://` or `wss://`, because the credentials and PASSKEY uploads would
   otherwise travel unencrypted.
+- `ws://` and `wss://` to an IPv6 address (`ws://[::1]`) are refused: MQTT.js
+  drops the brackets and builds a WebSocket URL nothing accepts. Use
+  `mqtt://[::1]` or a hostname.
+- Credentials in both `--mqtt-url` and `ECOWITT_MQTT_USERNAME` /
+  `ECOWITT_MQTT_PASSWORD` are refused: MQTT.js would use the URL ones. Set them
+  in one place.
 - The startup line shows the broker as scheme, host and port only; the path,
   query and fragment are never logged.
 - A set `MQTTJS_SOCKS_PROXY` is refused before connecting: MQTT.js would route

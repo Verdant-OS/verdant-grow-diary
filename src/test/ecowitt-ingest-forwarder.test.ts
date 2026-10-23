@@ -1098,6 +1098,36 @@ describe("broker transport is refused unless it is an explicit MQTT transport", 
     expect(out).toContain("mqtts:// or wss://");
   });
 
+  // Codex P2s on #2455 at d6c55adb.
+  it.each(["ws://[::1]:8080/mqtt", "wss://[::1]/mqtt"])(
+    "refuses %s, which MQTT.js turns into an unusable WebSocket URL",
+    async (url) => {
+      const { out, connect, exit } = await run(url);
+      expect(connect).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(out).toContain("cannot open ws:// or wss:// to an IPv6 address");
+    },
+  );
+
+  it.each([[{ ECOWITT_MQTT_USERNAME: "grower" }], [{ ECOWITT_MQTT_PASSWORD: privateValue }]])(
+    "refuses URL credentials beside environment credentials %j",
+    async (env) => {
+      const { out, connect, exit } = await run(`mqtts://old:${privateValue}@broker:8883`, env);
+      expect(connect).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(out).toContain("credentials are set both in --mqtt-url");
+      expect(out).not.toContain(privateValue);
+    },
+  );
+
+  it("still connects with credentials in the environment only", async () => {
+    const { connect } = await run("mqtts://broker:8883", {
+      ECOWITT_MQTT_USERNAME: "grower",
+      ECOWITT_MQTT_PASSWORD: privateValue,
+    });
+    expect(connect).toHaveBeenCalled();
+  });
+
   it("logs only the broker scheme, host and port at startup (Codex on #2439 at 59bf4d7d)", async () => {
     // A path or fragment is not a registered secret, so only dropping it keeps it out.
     const { out, connect } = await run(

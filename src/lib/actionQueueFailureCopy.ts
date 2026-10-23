@@ -14,8 +14,8 @@ export type ActionQueueFailureOperation = "load" | "transition" | "audit" | "out
 
 const SAFE_COPY: Readonly<Record<ActionQueueFailureOperation, string>> = {
   load: "We couldn't load the Action Queue. Try again.",
-  transition: "Action status couldn't be saved. No new transition was recorded. Try again.",
-  audit: "The status was saved, but its audit entry could not be recorded.",
+  transition: "Action status couldn't be saved. Nothing was changed. Try again.",
+  audit: "The status was saved, but its history note couldn't be recorded.",
   outcome: "No outcome was saved. Try again.",
   followup: "The action remains completed; only the follow-up note is missing.",
 };
@@ -24,8 +24,8 @@ const TRANSITION_REASON_COPY = {
   status_conflict: "This action changed elsewhere. The latest status has been reloaded.",
   action_not_found: "This action is no longer available. The queue has been reloaded.",
   rpc_missing:
-    "That decision was not saved. Try again. If another button already succeeded, that status is kept. " +
-    "This queue never sends equipment control.",
+    "That decision was not saved. Try again. Any status you already saved is kept. " +
+    "Verdant never sends commands to your equipment from this queue.",
 } as const;
 
 /**

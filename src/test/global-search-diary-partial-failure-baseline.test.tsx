@@ -50,9 +50,7 @@ describe("global search diary partial failure baseline", () => {
       wrapper: createWrapper(),
     });
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
+    await waitFor(() => expect(supabaseMock.rpcSpy).toHaveBeenCalled());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.isError).toBe(true);

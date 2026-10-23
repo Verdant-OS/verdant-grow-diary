@@ -1,10 +1,13 @@
 /**
- * Global search diary spec — LIKE literal escape baseline (requirement 1).
+ * Global search diary spec — LIKE literal escape: executable spec example
+ * (requirement 1), not coverage.
  *
- * Diary search must match `%`, `_`, and `\` literally in grower text. The
- * implementing slice should share PostgREST escape semantics (see
- * escapePostgrestLikeLiteral in usePlantAssignedTentActions). This file
- * documents the contract without importing private hook helpers.
+ * Diary search must match `%`, `_`, and `\` literally in grower text. This file
+ * spells out the expected pattern for each case with a local copy of the rule;
+ * it cannot fail if the real helper drifts. The implementing slice owns the
+ * real test: the RPC fixtures in the spec's acceptance list (`100%` must not
+ * match `100 ml`). Shared semantics: escapePostgrestLikeLiteral in
+ * usePlantAssignedTentActions.
  */
 import { describe, expect, it } from "vitest";
 
@@ -17,15 +20,13 @@ function diaryPattern(query: string): string {
   return `%${escapeDiaryLikeLiteral(query)}%`;
 }
 
-describe("global search diary LIKE escape baseline", () => {
+describe("global search diary LIKE escape spec example", () => {
   it("escapes wildcards and backslash so 100% does not match 100 ml", () => {
     expect(diaryPattern("100%")).toBe("%100\\%%");
-    expect("100 ml".includes("100%")).toBe(false);
   });
 
   it("escapes underscore so a_b matches only the literal a_b", () => {
     expect(diaryPattern("a_b")).toBe("%a\\_b%");
-    expect("a bb".includes("a_b")).toBe(false);
   });
 
   it("escapes backslash in c:\\x style notes", () => {

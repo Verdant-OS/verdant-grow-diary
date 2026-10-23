@@ -10,7 +10,8 @@ import { describe, expect, it } from "vitest";
 import { pickLogicalGrowEventLink } from "@/lib/timelineMergeRules";
 
 describe("global search diary pickLogicalGrowEventLink baseline", () => {
-  it("prefers the top-level linked_grow_event_id column over every details key", () => {
+  // Client-input shape only: diary_entries rows have no top-level link columns.
+  it("prefers a top-level linked_grow_event_id field over every details key (picker input)", () => {
     const link = pickLogicalGrowEventLink({
       id: "d0",
       linked_grow_event_id: "99999999-8888-7777-6666-555555555555",

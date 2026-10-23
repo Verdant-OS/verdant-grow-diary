@@ -150,9 +150,7 @@ describe("global search diary spec baseline — useGlobalSearch private path", (
       wrapper: createWrapper(),
     });
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
+    await waitFor(() => expect(rpcSpy).toHaveBeenCalled());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(rpcSpy).toHaveBeenCalledWith(
@@ -184,9 +182,6 @@ describe("global search diary spec baseline — useGlobalSearch private path", (
       initialProps: { q: "flower" },
     });
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
     await waitFor(() => expect(result.current.results.some((r) => r.id === "t1")).toBe(true));
 
     // Keep the same query, so only the cleared epoch can drop the results; a
@@ -197,6 +192,8 @@ describe("global search diary spec baseline — useGlobalSearch private path", (
     });
     rerender({ q: "flower" });
 
+    // A sleep, not waitFor: this asserts nothing refills after the debounce,
+    // and waitFor cannot prove an absence.
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     });

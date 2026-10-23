@@ -3,6 +3,8 @@
  *
  * `GLOBAL_SEARCH_ITEMS` is not wired into the live search path today. Wiring it
  * is out of scope for diary search; this locks the pre-change surface area.
+ * It is a source-text tripwire, not a behaviour test: a comment naming
+ * `globalSearchItems` in either file would trip it.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

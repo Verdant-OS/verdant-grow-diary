@@ -61,7 +61,9 @@ switch know only grow / tent / plant / cultivar.
    (`src/lib/timelineMergeRules.ts`):
    - linked by **one preferred link**: `details.linked_grow_event_id` when it is a non-empty
      JSON string, otherwise the legacy alias `details.grow_event_id`. This is the
-     first-non-empty order of `pickLogicalGrowEventLink` (lines 168–179). Ownership, dedupe and
+     first-non-empty order of `pickLogicalGrowEventLink` (lines 170–181), which checks the
+     top-level `linked_grow_event_id` / `grow_event_id` columns first; `diary_entries` has no
+     such columns, so for real rows only the `details` keys apply. Ownership, dedupe and
      the deleted-spine exclusion below all use that one link, never the other key. A present
      but unusable modern value (not a UUID, or no spine with the diary row's owner and
      `grow_id`) does not fall back to the legacy key, because Timeline picks the modern value

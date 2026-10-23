@@ -518,15 +518,27 @@ function everyClientCall(context: {
   ];
 }
 /**
- * One digest of every Community table's rows except the switch itself, so a
- * call that writes and then reports `unavailable` is still caught.
+ * One digest of every Community table's rows, the switch included, so a call
+ * that writes (or re-enables the switch) and then reports `unavailable` is
+ * still caught. Callers take both digests while the switch is off (Copilot P2
+ * on #2408 at a5da2191).
  */
 function communityStateFingerprint(): string {
-  const parts = TABLES.filter(([table]) => table !== "community_feature_state").map(
+  const parts = TABLES.map(
     ([table]) =>
       `(SELECT coalesce(string_agg(x::text, '|' ORDER BY x::text), '') FROM public.${table} x)`,
   );
   return sql(`SELECT md5(concat_ws('#', ${parts.join(", ")}));`);
+}
+
+/** One digest of a collection row and all its publication rows. */
+function collectionState(handle: string): string {
+  return sql(`SELECT md5(concat_ws('#',
+      (SELECT c::text FROM public.community_collections c WHERE c.handle = ${lit(handle)}),
+      (SELECT coalesce(string_agg(i::text, '|' ORDER BY i::text), '')
+         FROM public.community_collection_items i
+         JOIN public.community_collections c ON c.id = i.collection_id
+        WHERE c.handle = ${lit(handle)})));`);
 }
 
 /** Returns every call whose result was not the generic `unavailable`. */
@@ -660,6 +672,10 @@ d("community v1 authority (local DB)", () => {
     const other = await participant("iso4x");
     const pending = await requestAccess(other, collection);
     const ownerPreview = await preview(owner, collection, [draft(diaryEntry(owner))]);
+    // Every denied call below leaves the collection and its publications as they
+    // are, not merely the item count (Copilot P2 on #2408 at a5da2191).
+    const stateBefore = collectionState(collection);
+    const unchanged = () => expect(collectionState(collection)).toBe(stateBefore);
 
     denied(
       await rpc(reader.client, "community_publish", {
@@ -668,6 +684,7 @@ d("community v1 authority (local DB)", () => {
       }),
       "unavailable",
     );
+    unchanged();
     denied(
       await rpc(reader.client, "community_access_decide", {
         p_access_handle: pending,
@@ -676,10 +693,12 @@ d("community v1 authority (local DB)", () => {
       }),
       "unavailable",
     );
+    unchanged();
     denied(
       await rpc(reader.client, "community_unpublish", { p_collection_handle: collection }),
       "unavailable",
     );
+    unchanged();
     denied(
       await rpc(reader.client, "community_collection_draft", {
         p_collection_handle: collection,
@@ -689,6 +708,7 @@ d("community v1 authority (local DB)", () => {
       }),
       "unavailable",
     );
+    unchanged();
     expect(accessState(pending)).toBe("pending");
     expect(ok(await read(reader, collection)).items).toHaveLength(1);
   }, 90_000);
@@ -1074,30 +1094,37 @@ d("community v1 authority (local DB)", () => {
     const entry = diaryEntry(owner);
     const publishWith = (who: Actor, handle: string, token: string) =>
       rpc(who.client, "community_publish", { p_collection_handle: handle, p_preview_token: token });
+    // A rejected publish leaves the token's collection and the requested one
+    // unchanged; the code alone could follow a write (Copilot P2 on #2408 at a5da2191).
+    const rejectedWith = async (who: Actor, handle: string, token: string) => {
+      const before = [collectionState(collection), collectionState(handle)];
+      denied(await publishWith(who, handle, token), "stale_preview");
+      expect([collectionState(collection), collectionState(handle)]).toEqual(before);
+    };
 
     const expired = await preview(owner, collection, [draft(entry)]);
     sql(`UPDATE public.community_preview_tokens SET expires_at = now() - interval '1 minute'
           WHERE collection_id = (SELECT id FROM public.community_collections WHERE handle = ${lit(collection)});`);
-    denied(await publishWith(owner, collection, expired.previewToken), "stale_preview");
+    await rejectedWith(owner, collection, expired.previewToken);
 
     const consumed = await preview(owner, collection, [draft(entry)]);
     ok(await publishWith(owner, collection, consumed.previewToken));
-    denied(await publishWith(owner, collection, consumed.previewToken), "stale_preview");
+    await rejectedWith(owner, collection, consumed.previewToken);
 
     const other = await participant("pub3x");
     const otherCollection = await newCollection(other);
     const foreign = await preview(owner, collection, [draft(entry)]);
-    denied(await publishWith(other, otherCollection, foreign.previewToken), "stale_preview");
+    await rejectedWith(other, otherCollection, foreign.previewToken);
 
     const staged = await preview(owner, collection, [draft(entry, { includeStage: true })]);
     sql(`UPDATE public.diary_entries SET stage = 'flower' WHERE id = ${lit(entry)};`);
-    denied(await publishWith(owner, collection, staged.previewToken), "stale_preview");
+    await rejectedWith(owner, collection, staged.previewToken);
 
     const viewer = await participant("pub3v");
     const accessHandle = await requestAccess(viewer, collection);
     const audience = await preview(owner, collection, [draft(entry)]);
     ok(await decide(owner, accessHandle, "approve"));
-    denied(await publishWith(owner, collection, audience.previewToken), "stale_preview");
+    await rejectedWith(owner, collection, audience.previewToken);
   }, 90_000);
 
   it("T-PUB-04 one idempotency key replays one revision; two keys racing one token publish once", async () => {
@@ -1189,6 +1216,10 @@ d("community v1 authority (local DB)", () => {
     const byNote = (items: Json[]) =>
       new Map(items.map((item) => [item.note as string, item.publicationHandle as string]));
     const first = byNote(ok(await read(viewer, collection)).items);
+    // Both slots exist before any handle is compared (Copilot P2 on #2408 at a5da2191).
+    expect([...first.keys()].sort()).toEqual(["same", "v1"]);
+    expect(first.get("same")).toEqual(expect.any(String));
+    expect(first.get("v1")).toEqual(expect.any(String));
     await publish(owner, collection, [
       draft(kept, { sharedNote: "same" }),
       draft(changed, { sharedNote: "v2" }),
@@ -1197,6 +1228,7 @@ d("community v1 authority (local DB)", () => {
     const second = handlesOf(secondItems);
     const renewed = byNote(secondItems);
     expect(second).toHaveLength(2);
+    expect([...renewed.keys()].sort()).toEqual(["same", "v2"]);
     // The unchanged slot keeps its handle; only the changed slot is renewed.
     expect(renewed.get("same")).toBe(first.get("same"));
     expect(renewed.get("v2")).toEqual(expect.any(String));
@@ -1520,6 +1552,11 @@ d("community v1 authority (local DB)", () => {
 
     const pages: string[] = [];
     let page = await digest(viewer, null, 2);
+    // A partial first page with a cursor, so the concurrent publish really lands
+    // between pages (Copilot P2 on #2408 at a5da2191).
+    expect(page.items).toHaveLength(2);
+    expect(page.nextCursor).toEqual(expect.any(String));
+    expect(page.nextCursor).not.toBe("");
     pages.push(...handlesOf(page.items));
     // A concurrent publish lands newer than every paged item and must not shift later pages.
     // Unchanged slots keep their current rows (D2), so only the new entry is new.

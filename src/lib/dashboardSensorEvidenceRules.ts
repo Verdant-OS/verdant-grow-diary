@@ -56,6 +56,8 @@ export interface DashboardSensorEvidenceRow extends SensorProvenanceRowLike {
   value: unknown;
   quality?: string | null;
   captured_at?: string | null;
+  id?: string | null;
+  device_id?: string | null;
 }
 
 export interface DashboardChartReading {
@@ -172,6 +174,9 @@ export function selectRejectedQualityRows(
       captured_at: row.captured_at ?? row.ts,
       source: row.source,
       quality: qualityRejected && typeof row.quality === "string" ? row.quality : source,
+      ...(typeof row.device_id === "string" && row.device_id.trim()
+        ? { device_id: row.device_id }
+        : {}),
     });
   }
   return out;
@@ -184,7 +189,15 @@ export function withRejectedQualityRows(
 ): CaptureEvidenceSnapshot | null {
   if (!snapshot) return snapshot;
   const rejected = selectRejectedQualityRows(rows);
-  return rejected.length > 0 ? { ...snapshot, rejected_quality_rows: rejected } : snapshot;
+  // The device behind each metric ref, so the ref's capture identity carries it.
+  const deviceIds: Record<string, string> = {};
+  for (const [key, ref] of Object.entries(snapshot.metric_refs ?? {})) {
+    const device = (rows ?? []).find((row) => row.id === ref?.id)?.device_id;
+    if (typeof device === "string" && device.trim()) deviceIds[key] = device;
+  }
+  const withDevices =
+    Object.keys(deviceIds).length > 0 ? { ...snapshot, metric_device_ids: deviceIds } : snapshot;
+  return rejected.length > 0 ? { ...withDevices, rejected_quality_rows: rejected } : withDevices;
 }
 
 /**

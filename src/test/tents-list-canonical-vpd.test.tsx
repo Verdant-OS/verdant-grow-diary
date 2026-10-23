@@ -310,8 +310,13 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     vpd = renderStrip([]);
     expect(vpd).not.toHaveAttribute("data-status", "ok");
     cleanup();
-    // The same values from a manual envelope stay healthy Manual evidence.
-    hook.state = { status: "ok", snapshot: blob("manual") };
+    // The same values from a manual envelope stay healthy Manual evidence. A
+    // real envelope carries its diary entry, which is what lets Tonight prove
+    // and calculate it.
+    hook.state = {
+      status: "ok",
+      snapshot: { ...blob("manual"), diary_evidence_ref: { id: "entry-1", entry_at: at(0.5) } },
+    };
     vpd = renderStrip([]);
     expect(vpd).toHaveAttribute("data-status", "ok");
   });
@@ -991,6 +996,49 @@ describe("a rejected-only snapshot after a failed raw read", () => {
     renderWith(status, rejectedOnly("live"));
     expect(screen.getByTestId("tents-list-vpd-rejected-tent-1")).toHaveTextContent("VPD invalid");
     expect(screen.queryByTestId("tents-list-sensor-unavailable-tent-1")).toBeNull();
+  });
+
+  // Copilot on #2442 at e50d6087: a failed manual scan or an air-less manual
+  // card does not hide the rejection either.
+  it.each([
+    ["a failed manual scan", { manualCards: [], manualStatus: "error" as const }],
+    [
+      "a pH-only manual card",
+      {
+        manualCards: [
+          {
+            id: "manual-ph",
+            title: "Manual sensor snapshot",
+            capturedAt: at(0.2),
+            sourceLabel: "Manual",
+            source: "manual",
+            tentId: "tent-1",
+            plantId: null,
+            isTentLevel: true,
+            notes: null,
+            readings: [{ field: "ph", value: 6.2, unit: "", derived: false }],
+            severity: "ok",
+            warnings: [],
+            errors: [],
+          },
+        ] as never,
+        manualStatus: "success" as const,
+      },
+    ],
+  ])("reads VPD invalid after a successful empty raw read with %s", (_label, manual) => {
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={{ status: "ok", snapshot: rejectedOnly("live") }}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="success"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        {...manual}
+      />,
+    );
+    expect(screen.getByTestId("tents-list-vpd-rejected-tent-1")).toHaveTextContent("VPD invalid");
   });
 
   it("still reads unavailable when the snapshot carries no rejection", () => {

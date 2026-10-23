@@ -14,7 +14,7 @@
  *
  * No I/O, no React, no automation, no device control.
  */
-import { captureRefsKnown, rowCaptureRef } from "@/lib/sensorCaptureRefRules";
+import { captureRefIn, captureRefsKnown, rowCaptureRef } from "@/lib/sensorCaptureRefRules";
 import { format } from "date-fns";
 import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
@@ -231,6 +231,12 @@ export interface CanonicalTentVpd {
    */
   unavailable?: boolean;
   /**
+   * True when Tonight has no VPD for this tent. The rows' own stored or
+   * fallback VPD is then withheld too, so a list card never shows a value the
+   * Dashboard does not (Copilot on #2442 at e50d6087).
+   */
+  missing?: boolean;
+  /**
    * The stored records behind the VPD (`sensorCaptureRefRules`); null entries
    * are unknown. Decides whether it is the cohort's own capture.
    */
@@ -327,7 +333,8 @@ export function buildTentSnapshotView(
     options.canonicalVpd != null &&
     (Number.isFinite(options.canonicalVpd.kpa) ||
       options.canonicalVpd.rejected === true ||
-      options.canonicalVpd.unavailable === true)
+      options.canonicalVpd.unavailable === true ||
+      options.canonicalVpd.missing === true)
       ? options.canonicalVpd
       : null;
   // Source resolution is strict across the whole latest timestamp. A mixed
@@ -346,14 +353,20 @@ export function buildTentSnapshotView(
     canonical !== null &&
     sameInstant(canonical.capturedAt, snap.ts) &&
     (captureRefsKnown(canonical.captureRefs) && captureRefsKnown(cohortRefs)
-      ? canonical.captureRefs.some((ref) => cohortRefs.includes(ref))
+      ? canonical.captureRefs.some((ref) => captureRefIn(ref, cohortRefs))
       : canonical.source !== null && canonical.source === provenance);
-  const useCanonicalVpd = sameCapture && !canonicalRejected;
+  // Cohort grading describes the VPD only when the cohort's provenance is the
+  // VPD's own: a live VPD beside a stale-flagged manual temperature, or a CSV
+  // VPD beside manual readings, keeps its own source and age instead (Codex
+  // and Copilot on #2437 at 9ddaa0ae). Rejection handling still keys on
+  // `sameCapture`.
+  const useCanonicalVpd =
+    sameCapture && !canonicalRejected && canonical !== null && canonical.source === provenance;
   // The capture gate rejected the cohort's own capture: its stored VPD is the
   // rejected reading and must not fall back to "ok" (Codex P1 at 108e3eab).
   const cohortVpdRejected = sameCapture && canonicalRejected;
   const vpdKpa =
-    canonical?.unavailable === true
+    canonical?.unavailable === true || canonical?.missing === true
       ? null
       : useCanonicalVpd && canonical
         ? canonical.kpa
@@ -511,9 +524,12 @@ export function buildTentSnapshotView(
     ),
   ];
 
-  // A canonical VPD from another capture keeps its own source and age.
+  // A canonical VPD from another capture, or from a mixed-source one, keeps
+  // its own source and age.
+  let vpdReplaced = false;
   if (canonical !== null && !canonicalRejected && !useCanonicalVpd && canonical.kpa !== null) {
     metrics[2] = ownCaptureVpdMetric({ ...canonical, kpa: canonical.kpa }, stage, now);
+    vpdReplaced = true;
   }
   // A rejected canonical VPD from a capture no older than the cohort is the
   // tent's latest VPD evidence: the cohort's older stored VPD must not stand
@@ -535,6 +551,7 @@ export function buildTentSnapshotView(
         .filter((part): part is string => !!part)
         .join(" · "),
     };
+    vpdReplaced = true;
   }
 
   return {
@@ -545,7 +562,9 @@ export function buildTentSnapshotView(
     stale,
     invalid,
     provenanceEligible,
-    canAssessStage,
+    // A VPD from another capture decides the stage prompt by its own grade:
+    // the cohort's health says nothing about it (Codex P2 on #2437 at 9ddaa0ae).
+    canAssessStage: canAssessStage && (!vpdReplaced || metrics[2].status === "ok"),
     metrics,
   };
 }

@@ -4,6 +4,8 @@ import { classifyManualMetric, isHumidityStuckExtreme } from "@/lib/sensorTruthR
 import {
   captureRefsKnown,
   rowCaptureRef,
+  captureRefIn,
+  captureRefsMatch,
   sensorCaptureRef,
   snapshotCaptureRef,
   type SensorCaptureRef,
@@ -78,11 +80,13 @@ export function tentDetailCaptureClimate(
         diary_evidence_ref?: { id: string } | null;
         diary_capture_id?: string | null;
         metric_refs?: Partial<Record<string, { captured_at: string; source: string }>>;
+        metric_device_ids?: Partial<Record<string, string>>;
         rejected_quality_rows?: readonly {
           metric: string;
           value: number | string | null;
           captured_at: string;
           source: string;
+          device_id?: string | null;
         }[];
       }
     | null
@@ -131,7 +135,7 @@ export function tentDetailCaptureClimate(
         temp: null,
         rh: null,
         untrusted: true,
-        ref: sensorCaptureRef(row.captured_at, row.source),
+        ref: sensorCaptureRef(row.captured_at, row.source, row.device_id),
       });
     }
   }
@@ -166,7 +170,9 @@ export function tentDetailVpdRowUntrusted(
       row.metric === "vpd_kpa" &&
       typeof row.value === "number" &&
       instantMs(row.captured_at ?? row.ts) === atMs &&
-      (selectedRef === null || rowCaptureRef(row) === null || rowCaptureRef(row) === selectedRef) &&
+      (selectedRef === null ||
+        rowCaptureRef(row) === null ||
+        captureRefsMatch(rowCaptureRef(row), selectedRef)) &&
       // An explicit stale/invalid source is a downgrade whatever the quality,
       // as selectRejectedQualityRows treats it (Codex P1 on #2412 at 8d8c4900).
       (!trustedIntakeQuality(row.quality) || downgradedSource(row.source)),
@@ -199,7 +205,7 @@ function sameCaptureClimate(
   selectedRefs: TonightMetricView["captureRefs"],
 ): boolean {
   if (climate.ref != null && captureRefsKnown(selectedRefs)) {
-    return selectedRefs.includes(climate.ref);
+    return captureRefIn(climate.ref, selectedRefs);
   }
   return instantMs(climate.at) === selectedMs;
 }
@@ -396,7 +402,7 @@ export function resolveTentDetailVpd(input: {
     (climateRejected &&
       input.existing.value !== null &&
       (identityKnown
-        ? rejectedClimateRefs.includes(input.existingRef as string)
+        ? captureRefIn(input.existingRef as string, rejectedClimateRefs)
         : existingMs === null || rejectedMs === null || existingMs === rejectedMs));
   const existingOrNothing = (): TentDetailVpdObservation =>
     existingFromRejectedCapture
@@ -423,7 +429,7 @@ export function resolveTentDetailVpd(input: {
     input.rejectedRefs !== undefined &&
     captureRefsKnown(rejectedClimateRefs) &&
     captureRefsKnown(tonightRefs) &&
-    !tonightRefs.some((ref) => rejectedClimateRefs.includes(ref));
+    !tonightRefs.some((ref) => captureRefIn(ref, rejectedClimateRefs));
   // Tonight's newest VPD evidence being invalid is terminal before any
   // header-rejection fallback: an older observation never stands beside it.
   // A genuinely newer `existing` already returned above (Copilot on #2303 at
@@ -466,7 +472,7 @@ export function resolveTentDetailVpd(input: {
   // only when either is unknown (Copilot on #2303 at b49c32ae).
   const existingIsTonightCapture =
     typeof input.existingRef === "string" && captureRefsKnown(tonightRefs)
-      ? tonightRefs.includes(input.existingRef)
+      ? captureRefIn(input.existingRef, tonightRefs)
       : existingMs !== null && tonightMs !== null && existingMs === tonightMs;
   if (tonight?.state === "value" && existingIsTonightCapture) {
     return { value: null, capturedAt: null, source: null, stale: false, calculated: false };

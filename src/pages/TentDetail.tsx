@@ -548,6 +548,16 @@ export default function TentDetail() {
             </p>
           );
         })()}
+      {(headerVpd === null || headerVpd === undefined) && storedVpdRowUntrusted && (
+        // A quality-rejected stored VPD is labelled, never silently dropped
+        // (Codex P1 on #2437 at 9ddaa0ae).
+        <p
+          className="text-[11px] text-destructive -mt-3 mb-4"
+          data-testid="tent-detail-vpd-rejected"
+        >
+          VPD invalid — the latest reading failed its quality check.
+        </p>
+      )}
       {vpdFromFallback && (
         <p
           className="text-[11px] text-muted-foreground -mt-3 mb-4 flex flex-wrap items-center gap-2"

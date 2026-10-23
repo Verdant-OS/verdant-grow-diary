@@ -14,6 +14,8 @@ export interface SensorSnapshotRejectedQualityRow {
   captured_at: string;
   source: string;
   quality: string;
+  /** The row's device, part of its capture identity (`sensorCaptureRefRules`). */
+  device_id?: string | null;
 }
 
 export interface SensorSnapshotCaptureEvidence {
@@ -31,6 +33,12 @@ export interface SensorSnapshotCaptureEvidence {
    * `diary_evidence_ref` (Codex P2 on #2303 at 0994ea2a).
    */
   diary_capture_id?: string;
+  /**
+   * The `device_id` of the exact row behind each `metric_refs` entry. Capture
+   * identity only; kept here because `metric_refs` is mirrored into the edge
+   * functions (owner decision on #2442).
+   */
+  metric_device_ids?: Partial<Record<string, string>>;
 }
 
 export type CaptureEvidenceSnapshot = SensorSnapshot & SensorSnapshotCaptureEvidence;

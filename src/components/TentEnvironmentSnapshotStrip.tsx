@@ -84,9 +84,14 @@ export default function TentEnvironmentSnapshotStrip({
   // A successful snapshot whose every row was rejected has no `ts`, so it
   // yields no rows, but its rejection evidence still decides the VPD, as it
   // does on the Dashboard (Codex P2 on #2430 at fcd86356).
+  // A failed or air-less manual card does not hide it either (Copilot on
+  // #2442 at e50d6087).
   const rejectedOnlyVpd =
     diaryRows.length === 0 &&
-    (selection.kind === "sensor_unavailable" || selection.kind === "empty") &&
+    (selection.kind === "sensor_unavailable" ||
+      selection.kind === "empty" ||
+      selection.kind === "manual_unavailable" ||
+      selection.kind === "manual_unusable") &&
     tonightSnapshot.status === "ok"
       ? tentsListCanonicalVpd(
           [],
@@ -228,8 +233,10 @@ export default function TentEnvironmentSnapshotStrip({
 
   const snapView = buildTentSnapshotView(rows, stage, now, {
     temperatureUnit,
+    // Tonight's own inputs, the raw rows and the snapshot, never the manual or
+    // diary fallback rows shown here (Codex P1 on #2437, Copilot on #2442).
     canonicalVpd: tentsListCanonicalVpd(
-      rows,
+      sensorRows,
       tentId,
       now,
       { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },

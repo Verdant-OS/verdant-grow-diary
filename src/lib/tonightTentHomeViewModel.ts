@@ -28,6 +28,9 @@ import type {
 import {
   rowCaptureRef,
   snapshotCaptureRef,
+  captureRefIn,
+  captureRefsKnown,
+  captureRefsMatch,
   sensorCaptureRef,
   type SensorCaptureRef,
 } from "@/lib/sensorCaptureRefRules";
@@ -208,7 +211,11 @@ interface Candidate {
   source: SensorSource;
   at: string;
   epochMs: number;
-  /** 0 = sensor row, 1 = diary-inclusive snapshot; deterministic tie-break. */
+  /**
+   * 0 = sensor row, 1 = diary-inclusive snapshot, 2 = a rejected VPD (a
+   * rejection placeholder, or a raw VPD whose capture has a rejected sibling);
+   * deterministic tie-break.
+   */
   origin: 0 | 1 | 2;
   /** Set only on a VPD candidate derived from temperature and RH. */
   calculated?: true;
@@ -304,6 +311,23 @@ function usableCandidate(candidate: Candidate, nowMs: number): Candidate | null 
     return { ...candidate, source: "stale" };
   }
   return candidate;
+}
+
+/**
+ * True when every VPD candidate at `derived`'s instant is a rejection with a
+ * known identity disjoint from the pair's own known records. A direct valid
+ * reading, or an unknown identity, keeps its precedence.
+ */
+function equalTimeRejectionsOnly(candidates: readonly Candidate[], derived: Candidate): boolean {
+  if (!captureRefsKnown(derived.refs)) return false;
+  return candidates
+    .filter((candidate) => candidate.epochMs === derived.epochMs)
+    .every(
+      (candidate) =>
+        candidate.origin === 2 &&
+        captureRefsKnown(candidate.refs) &&
+        !candidate.refs.some((ref) => captureRefIn(ref, derived.refs)),
+    );
 }
 
 function newestFirst(a: Candidate, b: Candidate): number {
@@ -457,8 +481,8 @@ function captureHasRejectedSibling(
     // degraded CO2 or soil reading says nothing about the air metrics (Copilot
     // on #2303 at b49c32ae).
     if (!isClimateMetric(row.metric)) return false;
-    const rowRef = sensorCaptureRef(row.captured_at, row.source);
-    if (ref && rowRef) return ref === rowRef;
+    const rowRef = sensorCaptureRef(row.captured_at, row.source, row.device_id);
+    if (ref && rowRef) return captureRefsMatch(ref, rowRef);
     return Number.isFinite(atMs) && Date.parse(row.captured_at) === atMs;
   });
 }
@@ -499,13 +523,15 @@ export function buildTonightTentMetrics(input: {
       const when = parseAt(row.captured_at ?? row.ts);
       if (!when) continue;
       const ref = rowCaptureRef(row);
+      const siblingRejected = captureHasRejectedSibling(rejectedSiblings, ref, when.epochMs);
       candidates.push({
         value: row.value,
-        source: captureHasRejectedSibling(rejectedSiblings, ref, when.epochMs)
-          ? "invalid"
-          : normalizeSensorSource(row.source),
+        source: siblingRejected ? "invalid" : normalizeSensorSource(row.source),
         ...when,
-        origin: 0,
+        // A raw VPD from a rejected capture ranks with the rejection
+        // placeholders, so an independent valid VPD at the same instant is
+        // not hidden behind it (Copilot on #2442 at e50d6087).
+        origin: key === "vpd" && siblingRejected ? 2 : 0,
         ownSource: true,
         refs: [ref],
         ...(isDiarySource(row.source) ? { historical: true as const } : {}),
@@ -555,7 +581,7 @@ export function buildTonightTentMetrics(input: {
           // still wins (Copilot P1 on #2430 at fcd86356).
           origin: 2,
           ownSource: false,
-          refs: [sensorCaptureRef(rejected.captured_at, rejected.source)],
+          refs: [sensorCaptureRef(rejected.captured_at, rejected.source, rejected.device_id)],
         });
       }
     }
@@ -578,6 +604,19 @@ export function buildTonightTentMetrics(input: {
     // #2268: when the temperature and RH the card shows are one capture newer
     // than every stored VPD, that pair's calculated VPD replaces the stored one.
     // An older pair is never used beside newer displayed inputs.
+    vpdCandidates.unshift(derived.candidate);
+  } else if (
+    derived.kind === "derived" &&
+    derived.paired &&
+    derived.candidate.source !== "invalid" &&
+    isDisplayedCandidate(derived.inputs.temp, byKey.get("temp")![0], nowMs) &&
+    isDisplayedCandidate(derived.inputs.rh, byKey.get("rh")![0], nowMs) &&
+    derived.candidate.epochMs === vpdCandidates[0].epochMs &&
+    equalTimeRejectionsOnly(vpdCandidates, derived.candidate)
+  ) {
+    // Only rejections share the pair's instant, and none is the pair's own
+    // capture: the independent calculation stands, as an independent stored
+    // VPD would (Copilot on #2437 and #2442 at e50d6087).
     vpdCandidates.unshift(derived.candidate);
   }
 

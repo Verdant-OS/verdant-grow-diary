@@ -116,6 +116,18 @@ export function tentsListCanonicalVpd(
       unavailable: true,
     };
   }
+  // Tonight has no VPD: say so explicitly, so the strip never derives one
+  // from rows Tonight does not read (Copilot on #2442 at e50d6087).
+  if (vpd?.state === "missing") {
+    return {
+      kpa: null,
+      capturedAt: null,
+      source: null,
+      sourceLabel: null,
+      ageText: null,
+      missing: true,
+    };
+  }
   if (vpd?.state !== "value" || typeof vpd.value !== "number") return null;
   // Tonight runs no realism check. The same capture gate the tent page applies
   // decides here too: the pair a calculated VPD came from, and every
@@ -229,7 +241,7 @@ export function tentsListDiarySnapshotRows(
   for (const rejected of snap.rejected_quality_rows ?? []) {
     if (!isClimateMetric(rejected.metric)) continue;
     if (Date.parse(rejected.captured_at) !== snapMs) continue;
-    const captureRef = sensorCaptureRef(rejected.captured_at, rejected.source);
+    const captureRef = sensorCaptureRef(rejected.captured_at, rejected.source, rejected.device_id);
     rows.push({
       metric: rejected.metric,
       value: rejected.value,

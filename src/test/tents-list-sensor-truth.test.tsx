@@ -699,8 +699,13 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
 
     expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("71.6");
     expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-rh`)).toHaveTextContent("55.0");
-    // #2268: VPD is the Dashboard's, calculated from this manual pair (22°C, 55% → 1.19 kPa).
-    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveTextContent("1.19");
+    // #2268: VPD is the Dashboard's. Tonight reads raw rows and its own snapshot,
+    // and has neither here, so the list derives none from the manual card
+    // (Codex P1 on #2437, Copilot on #2442).
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveAttribute(
+      "data-status",
+      "unknown",
+    );
     expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
     expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveAttribute(
       "data-captured-at",
@@ -770,10 +775,15 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
       "data-captured-at",
       capturedAt,
     );
-    const metrics = ["temp", "rh", "vpd"].map((key) =>
+    const metrics = ["temp", "rh"].map((key) =>
       screen.getByTestId(`tents-list-metric-${H.TENT_ID}-${key}`),
     );
     expect(metrics.every((item) => item.getAttribute("data-status") === "invalid")).toBe(true);
+    // Tonight has no VPD for this tent, so the card's own is withheld, not shown.
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveAttribute(
+      "data-status",
+      "unknown",
+    );
     expect(view.container.querySelectorAll('[data-status="ok"]')).toHaveLength(0);
     expect(screen.queryByTestId("tents-list-vpd-stage-missing-badge")).toBeNull();
   });

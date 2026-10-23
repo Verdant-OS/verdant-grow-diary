@@ -210,6 +210,8 @@ describe("Tent detail fallback VPD freshness", () => {
     expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
     expect(screen.queryByTestId("tent-detail-vpd-stage-hint")).toBeNull();
     expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
+    // Withheld, but labelled: never silently dropped (Codex P1 on #2437 at 9ddaa0ae).
+    expect(screen.getByTestId("tent-detail-vpd-rejected")).toHaveTextContent("VPD invalid");
   });
 
   it("checks a flagged live VPD against its own source, not the cohort's manual aggregate (Copilot P1 on #2430)", () => {

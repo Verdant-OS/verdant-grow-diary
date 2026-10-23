@@ -489,6 +489,47 @@ describe("handleMessage", () => {
     expect(sleep).toHaveBeenCalledWith(1500);
   });
 
+  // Codex on #2439 at 59bf4d7d: a failed upsert answers 200 with error insert_failed.
+  it("retries a 200 insert_failed and keeps timestamp_stale final", async () => {
+    const insertFailed = () =>
+      new Response(
+        JSON.stringify({ ok: false, accepted: false, inserted: 0, error: "insert_failed" }),
+        {
+          status: 200,
+        },
+      );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(insertFailed())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ accepted: true, inserted: 1 }), { status: 200 }),
+      );
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(out).toMatchObject({ kind: "forwarded", attempts: 2, response: { accepted: true } });
+
+    const stale = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, accepted: false, reason: "timestamp_stale" }), {
+          status: 200,
+        }),
+    );
+    const staleOut = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: stale as unknown as typeof fetch,
+      retry: NO_SLEEP,
+    });
+    expect(staleOut).toMatchObject({ kind: "forwarded", attempts: 1 });
+    expect(stale).toHaveBeenCalledTimes(1);
+  });
+
   it("never retries an auth or payload error", async () => {
     const fetchImpl = vi.fn(async () => new Response("no", { status: 401 }));
     const out = await handleMessage({
@@ -763,7 +804,7 @@ describe("configured MQTT credentials are redacted (Codex P1 at acab6b12, bae4ae
       await main(
         [
           "--mqtt-url",
-          "mqtt://mqtt-user:mqtt-user-password@h:1",
+          "mqtts://mqtt-user:mqtt-user-password@h:1",
           "--topic",
           "t/mqtt-user-password",
         ],
@@ -978,7 +1019,8 @@ describe("broker transport is refused unless it is an explicit MQTT transport", 
 
   async function run(url: string, env: NodeJS.ProcessEnv = {}) {
     const out: string[] = [];
-    const capture = (...a: unknown[]) => out.push(a.map(String).join(" "));
+    const capture = (...a: unknown[]) =>
+      out.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
     const log = vi.spyOn(console, "log").mockImplementation(capture);
     const err = vi.spyOn(console, "error").mockImplementation(capture);
     const connect = vi.fn(async () => {
@@ -1011,11 +1053,35 @@ describe("broker transport is refused unless it is an explicit MQTT transport", 
   it.each([
     "mqtt://127.0.0.1:1883",
     "mqtts://broker:8883",
-    "ws://broker/mqtt",
+    "ws://127.0.0.1/mqtt",
+    "ws://localhost:8080/mqtt",
+    "mqtt://[::1]:1883",
     "wss://broker/mqtt",
   ])("still connects to %s", async (url) => {
     const { connect } = await run(url);
     expect(connect).toHaveBeenCalled();
+  });
+
+  // Codex on #2439 at 59bf4d7d: only loopback may skip TLS.
+  it.each(["mqtt://broker.example:1883", "ws://10.0.0.5/mqtt", "mqtt://127.example.com"])(
+    "refuses plaintext %s for a remote broker",
+    async (url) => {
+      const { out, connect, exit } = await run(url);
+      expect(connect).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(out).toContain("mqtts:// or wss://");
+    },
+  );
+
+  it("logs only the broker scheme, host and port at startup (Codex on #2439 at 59bf4d7d)", async () => {
+    // A path or fragment is not a registered secret, so only dropping it keeps it out.
+    const { out, connect } = await run(
+      "wss://broker.example:8884/tenant-path-segment/mqtt#fragment-text",
+    );
+    expect(connect).toHaveBeenCalled();
+    expect(out).toContain('"broker":"wss://broker.example:8884"');
+    expect(out).not.toContain("tenant-path-segment");
+    expect(out).not.toContain("fragment-text");
   });
 
   it("refuses an inherited MQTTJS_SOCKS_PROXY without connecting or printing it", async () => {
@@ -1079,6 +1145,12 @@ describe("credential spellings MQTT.js would use, and settings that bypass redac
     `mqtt://grower:private ${privateValue}%ZZ@broker:1883`,
     // MQTT.js needs text on both sides of ':' (Codex P1 on #2431 at 463ab893).
     `mqtt://:${privateValue}@broker:1883`,
+    // A decoded line break would split the credential across log lines
+    // (Codex on #2439 at 59bf4d7d).
+    `mqtts://grower:prefix%0A${privateValue}@broker:8883`,
+    `mqtts://grower%0D${privateValue}:plain@broker:8883`,
+    `mqtts://grower:prefix%E2%80%A8${privateValue}@broker:8883`,
+    `mqtts://grower:prefix%0a${privateValue}%ZZ@broker:8883`,
   ])(
     "refuses broker credentials MQTT.js would send differently, before logging: %s",
     async (url) => {
@@ -1172,7 +1244,7 @@ describe("credential spellings MQTT.js would use, and settings that bypass redac
 
 describe("a malformed escape in one URL credential keeps both redacted (Codex P1 on #2335 at d344f8e4)", () => {
   afterEach(() => setConfiguredSecrets([]));
-  const URL_WITH_BAD_ESCAPE = "mqtt://mqtt-user:bad%ZZ@host:1883";
+  const URL_WITH_BAD_ESCAPE = "mqtts://mqtt-user:bad%ZZ@host:1883";
 
   it("keeps the valid username and the malformed password", () => {
     const values = configuredSecretValues(flags({ mqttUrl: URL_WITH_BAD_ESCAPE }), readEnv({}));
@@ -2142,7 +2214,7 @@ describe("main wiring (Codex P2 at acab6b12, bae4ae77)", () => {
     try {
       const { done } = run([
         "--mqtt-url",
-        "mqtt://broker-user-name:pw@h:1",
+        "mqtts://broker-user-name:pw@h:1",
         "--topic",
         "t/broker-user-name",
       ]);

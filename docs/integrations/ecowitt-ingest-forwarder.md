@@ -63,8 +63,10 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   gateway payload carries the PASSKEY, so it is never posted anywhere else.
 - The live POST times out after 15 s and retries only the transient cases in
   `docs/bridge-client-retry-guidance.md` (timeout, network failure, HTTP 408,
-  429, 5xx) with Full Jitter, at most 4 retries. 4xx auth and payload errors
-  are final.
+  429, 5xx) with Full Jitter, at most 4 retries. A `200` carrying
+  `error: "insert_failed"` is retried the same way (the write is an idempotent
+  upsert). 4xx auth and payload errors and the other `200` reasons, such as
+  `timestamp_stale`, are final.
 - `--once` exits `0` only for a dry run or a `2xx` response with
   `accepted: true`; a broker connect timeout (20 s), broker error or rejected
   subscription exits `2` instead of hanging.
@@ -94,7 +96,12 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   character) is refused before anything is logged.
 - `--mqtt-url` must use `mqtt://`, `mqtts://`, `ws://` or `wss://`. MQTT.js
   sends any other scheme (for example `https://`) as plaintext MQTT, so it is
-  refused before connecting.
+  refused before connecting. `mqtt://` and `ws://` are accepted only for a
+  loopback broker (`localhost`, `127.x.x.x`, `[::1]`); a remote broker needs
+  `mqtts://` or `wss://`, because the credentials and PASSKEY uploads would
+  otherwise travel unencrypted.
+- The startup line shows the broker as scheme, host and port only; the path,
+  query and fragment are never logged.
 - A set `MQTTJS_SOCKS_PROXY` is refused before connecting: MQTT.js would route
   the broker connection through that proxy.
 - `--mqtt-url` credentials containing `:` (literally or as `%3A`, in the
@@ -102,7 +109,8 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   So are credentials the URL parser rewrites (a space becomes `%20`), because
   that spelling is not the one redacted. So is a password with an empty
   username (`mqtt://:secret@broker`), which MQTT.js would send as the
-  username `:secret`. Use `ECOWITT_MQTT_USERNAME` and `ECOWITT_MQTT_PASSWORD`.
+  username `:secret`. So is a decoded line break (CR, LF, U+2028, U+2029) in
+  either credential. Use `ECOWITT_MQTT_USERNAME` and `ECOWITT_MQTT_PASSWORD`.
 - Broker query values are registered for redaction as typed, as well as parsed
   and decoded, so a topic that repeats one is redacted in its own spelling.
 - `--live` is refused while `HTTPS_PROXY`, `HTTP_PROXY` or `ALL_PROXY` (either

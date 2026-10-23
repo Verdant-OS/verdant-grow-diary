@@ -649,6 +649,16 @@ export function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || (status >= 500 && status <= 599);
 }
 
+/**
+ * ecowitt-ingest answers a failed database write with HTTP 200 and
+ * `error: "insert_failed"`. The write is an idempotent upsert, so it is
+ * retried like a 5xx; `timestamp_stale` and the other 200 reasons stay final
+ * (Codex on #2439 at 59bf4d7d).
+ */
+export function isRetryableResponse(response: ResponseSummary): boolean {
+  return isRetryableStatus(response.status) || response.reason === "insert_failed";
+}
+
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -718,7 +728,7 @@ export async function handleMessage(args: {
       const summarized = summarizeResponse(r.status, bodyText);
       const response = unreadable ? { ...summarized, reason: "response_unreadable" } : summarized;
       // A retryable status (408/429/5xx) with retries left falls through to the sleep below.
-      if (!isRetryableStatus(r.status) || attempt >= maxRetries) {
+      if (!isRetryableResponse(response) || attempt >= maxRetries) {
         return { kind: "forwarded", summary: prepared.summary, response, attempts: attempt + 1 };
       }
     } catch (e) {
@@ -1162,7 +1172,9 @@ export async function connectMqtt(
 ): Promise<MqttClientLike> {
   const mqtt = await loadMqtt();
   if (!mqtt) {
-    console.error("[ecowitt-forwarder] mqtt package not installed. Run `bun add --no-save mqtt`.");
+    console.error(
+      "[ecowitt-forwarder] mqtt package not installed. Run `bun add --no-save mqtt@5.16.0`.",
+    );
     process.exit(2);
   }
   const client = mqtt.connect(flags.mqttUrl, {
@@ -1262,6 +1274,25 @@ export function brokerUrlIsSupported(value: string): boolean {
   return SUPPORTED_BROKER_SCHEMES.has(url.protocol) && url.host !== "";
 }
 
+/**
+ * True for a plaintext scheme (`mqtt:`, `ws:`) aimed at a host other than
+ * this machine. The broker credentials and every PASSKEY upload would cross
+ * the network unencrypted, so only loopback may skip TLS (Codex on #2439 at
+ * 59bf4d7d).
+ */
+export function brokerPlaintextRemote(value: string): boolean {
+  const url = new URL(value);
+  if (url.protocol === "mqtts:" || url.protocol === "wss:") return false;
+  const host = url.hostname.toLowerCase();
+  return !(host === "localhost" || host === "[::1]" || /^127\.\d+\.\d+\.\d+$/.test(host));
+}
+
+/** The broker URL as the startup line shows it: scheme, host and port only. */
+export function brokerForLog(value: string): string {
+  const url = new URL(value);
+  return `${url.protocol}//${url.host}`;
+}
+
 const SUPPORTED_BROKER_SCHEMES = new Set(["mqtt:", "mqtts:", "ws:", "wss:"]);
 
 /**
@@ -1284,11 +1315,13 @@ export function brokerUserinfoAmbiguous(value: string): boolean {
   // MQTT.js needs text on both sides of the ':', so `:secret@` would reach the
   // broker as username `:secret` (Codex P1 on #2431 at 463ab893).
   if (username === "" && password !== "") return true;
+  // A decoded CR, LF, U+2028 or U+2029 would split the credential across log
+  // lines, so the redactor could miss either half (Codex on #2439 at 59bf4d7d).
   return [username, password].some((part) => {
     try {
-      return decodeURIComponent(part).includes(":");
+      return /[:\r\n\u2028\u2029]/.test(decodeURIComponent(part));
     } catch {
-      return /%3a/i.test(part);
+      return /%3a|%0d|%0a/i.test(part);
     }
   });
 }
@@ -1395,6 +1428,14 @@ export async function main(
     return;
   }
 
+  if (brokerPlaintextRemote(flags.mqttUrl)) {
+    console.error(
+      "[ecowitt-forwarder] refused: --mqtt-url uses mqtt:// or ws:// for a non-loopback broker. Credentials and PASSKEY uploads would travel unencrypted. Use mqtts:// or wss://.",
+    );
+    deps.exit(2);
+    return;
+  }
+
   const unsafe = unsafeInheritedSetting(processEnv);
   if (unsafe !== null) {
     console.error(
@@ -1449,7 +1490,7 @@ export async function main(
       ? "LIVE — forwarding to ecowitt-ingest"
       : "dry-run — no ingest POST; MQTT broker connection only",
     topic: flags.topic,
-    broker: flags.mqttUrl,
+    broker: brokerForLog(flags.mqttUrl),
     ingest_url: flags.live ? env.ingestUrl : "(none — dry-run)",
     once: flags.once,
   });

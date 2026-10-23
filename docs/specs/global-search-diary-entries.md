@@ -1,6 +1,6 @@
 # Spec — Global search over diary entries
 
-Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds five spec-baseline Vitest files (14 tests).
+Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds seven spec-baseline Vitest files (20 tests).
 **Owner decision (Matthew, 2026-10-22): Option B** — a server-side RPC, so the search text
 travels in a POST body. The implementing slice adds it through a new additive migration,
 drafted on its own branch for the protected migration review. No agent applies it;

@@ -162,6 +162,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["js-yaml", [4, 3, 2] as const],
     ["hono", [4, 13, 11] as const],
     ["qs", [6, 16, 0] as const],
+    ["body-parser", [2, 4, 0] as const],
     ["ajv", [6, 15, 0] as const],
     ["picomatch", [2, 3, 2] as const],
     ["vitest", [4, 1, 11] as const],
@@ -246,7 +247,8 @@ describe("dependency security Phase A resolution floors", () => {
       "js-yaml": "4.3.2",
       "launch-editor": "2.14.2",
       hono: "4.13.11",
-      qs: "6.16.0",
+      qs: "6.16.1",
+      "body-parser": "2.4.0",
       nanoid: "3.3.18",
       undici: "6.28.1",
     });

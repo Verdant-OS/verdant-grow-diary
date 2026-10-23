@@ -93,19 +93,19 @@ limits: Historical terminal-skipped events still return duplicate_skipped and do
 ```text
 TASK FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY  priority: P2  status: OPEN
 goal: A plant with no health assessment (null, missing or "unknown") reads "Not assessed yet" on /plants and on the plant page, never "unknown". Display only; no schema. Owns the unassessed-health display (owner decision, Matthew 2026-10-22). QA 2/2 on production ebaf1b6a. Fixes #2171 (display half).
-branch: claude/plant-health-not-assessed-label-p2 (fresh branch; ruleset GH013 refuses updates to the existing claude/* branch)
+branch: claude/plant-health-not-assessed-label-p3 (fresh branch; ruleset GH013 refuses updates to the existing claude/* branch)
 base: verdant-grow-diary
-checkout: git fetch origin claude/plant-health-not-assessed-label-p2 verdant-grow-diary && git switch claude/plant-health-not-assessed-label-p2 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: the PR opened from claude/plant-health-not-assessed-label-p2, superseding https://github.com/Verdant-OS/verdant-grow-diary/pull/2330 (closed when it opens)
+checkout: git fetch origin claude/plant-health-not-assessed-label-p3 verdant-grow-diary && git switch claude/plant-health-not-assessed-label-p3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: the PR opened from claude/plant-health-not-assessed-label-p2, https://github.com/Verdant-OS/verdant-grow-diary/pull/2490 (superseded #2330), itself superseded by the PR from claude/plant-health-not-assessed-label-p3
 head_sha: cc855a56a2f2f61cadf0b825fcafc977074b9792, #2330's last head (2026-10-22), the base of this round. This round's commit follows it; re-read the PR for the exact head before resuming.
 state: review. At cc855a56 a Cursor Agent added src/test/plant-health-not-assessed-display-contract.test.ts, a source-regex test. CodeRabbit (Major) and the independent review at cc855a5 flagged it under AGENTS.md's contract-test rule; this round removes it. The rendered tests already pin the wiring (14 failed / 4 passed with the page changes set aside). Application code unchanged since 1807c9a6.
-next_action: 35/35 required checks and an exact-head independent review (Blue Dream or Codex) of the superseding PR, then the merge queue.
+next_action: 35/35 required checks and an exact-head independent review of the superseding PR by an actually available, eligible session (Codex, Durban Poison, or a non-contributing Claude or Grok review session; AGENTS.md retires Blue Dream from future routing), then the merge queue.
 files: src/lib/plantHealthRules.ts; src/pages/Plants.tsx; src/pages/PlantDetail.tsx; src/test/plant-health-status-label.test.ts; src/test/plant-detail-health-display.test.tsx; src/test/plant-health-unknown-rendering.test.tsx; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change. #2140 was narrowed to its schema work at 373fd162 (plantHealthRules.ts, Plants.tsx and the label tests back to base; plants-page-unassessed-health-label.test.tsx deleted), so plantHealthStatusLabel exists in this PR only.
 artifacts: PR #2330 body (RED 27 failed / 4 passed with the fix set aside; neighbours 89 files / 1752 passed)
-reviewer_seat: Blue Dream or Codex (.tsx product files)
-claimed_by: Claude, 2026-10-23 20:20 UTC
-last_updated: 2026-10-23 20:20 UTC, by Claude
+reviewer_seat: Codex, Durban Poison, or a non-contributing Claude or Grok review session (.tsx product files); never the author
+claimed_by: Claude, 2026-10-23 20:11 UTC
+last_updated: 2026-10-23 20:18 UTC, by Claude
 ```
 
 ### FIX-2171-PLANT-CREATE-INSERT-ERROR

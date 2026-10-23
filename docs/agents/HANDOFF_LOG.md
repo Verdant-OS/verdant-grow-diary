@@ -45,6 +45,27 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### BRAND-IDENTITY-20261023
+
+```text
+TASK BRAND-IDENTITY-20261023  priority: other  status: OPEN
+goal: Link Verdant Grow Diary's application JSON-LD to its existing organization and describe the indoor Grow OS accurately; no claim that this fixes an unmeasured AI answer.
+branch: codex/brand-identity-20261023-app-publisher
+base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79, freshly verified 2026-10-23 UTC
+checkout: git fetch origin codex/brand-identity-20261023-app-publisher verdant-grow-diary && git switch codex/brand-identity-20261023-app-publisher && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED — ownership checkpoint will be pushed and a draft opened before implementation
+head_sha: NOT_MEASURED — this ownership checkpoint is based on 65d9964e49eb4b95910bedc59d288d747461da79; consult the draft for the resulting remote head
+state: ownership checkpoint only; no implementation or test result claimed
+next_action: Open the pushed checkpoint as a draft; add focused regression coverage and observe RED before changing the application metadata.
+files: src/lib/build/siteSoftwareApplicationJsonLd.ts (publisher reference and description only); src/test/site-application-identity.test.ts (new); docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Matthew explicitly assigned Codex the narrow correction despite the #2028/#2023 overlap in this chat on 2026-10-23. Existing Claude branches and broader work remain untouched. #2028 at 334a9f1b657da2a5b899782bc85ea6c8c415bb2b changes a comment in the application module; preserve that independent change when integrating. No shared live-session registry is available. GitHub comments still require separate approval, so no claim/renewal comment is posted.
+artifacts: Draft body will retain exact-head local/CI evidence and the owner assignment. Earlier investigation identified homegrown.guide from Helena's detailed email; actual AI substitution remains NOT_MEASURED.
+reviewer_seat: BLOCKED — eligible non-contributing Claude/Grok session not yet assigned; Codex contributors cannot independently accept this work
+claimed_by: Codex brand-identity session, Matthew's direct narrow assignment 2026-10-23; no takeover of Claude's tasks
+last_updated: 2026-10-23 UTC, by Codex brand-identity session
+limits: Stay draft. No merge, ready/enqueue, deployment, production write, GitHub comment, root-route/canonical/offer/pricing change, competitor identity claim, sameAs addition, locked-test edit or dependency/lockfile change.
+```
+
 ### REVIEWER-ROUTING-20261022
 
 ```text

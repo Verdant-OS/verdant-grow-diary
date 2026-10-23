@@ -182,8 +182,8 @@ export function usePersistEnvironmentAlerts(
     lastError: null,
   });
 
-  // Per-session guard to avoid re-issuing the same insert within the same
-  // render window (before the open-list refresh would naturally dedupe it).
+  // Per-session guard to avoid re-issuing the same insert while it is in
+  // flight. A successful insert drops its key (see the write sequence).
   const inFlightKeys = useRef<Set<string>>(new Set());
   // Bumped once when a future-dated observation reaches its eligibility
   // boundary, so the gate below is asked again with nothing else changed.
@@ -530,11 +530,14 @@ export function usePersistEnvironmentAlerts(
             source: SOURCE,
             originating_timeline_events: refs,
           });
-          // The row is committed: release the reservation without waking
-          // blocked instances (their stale lists are fenced by the sequence).
+          // The row is committed: release the reservation, here and in this
+          // instance's own guard, without waking blocked instances. Any run
+          // whose list predates this insert is fenced by the sequence, so a
+          // closed alert can be persisted again by any instance, this one too.
           globalAlertWriteSeq += 1;
           globalCommittedAlertSeq.set(key, globalAlertWriteSeq);
           globalInFlightAlertKeys.delete(key);
+          activeKeys.delete(key);
           const logDedupKey = `${saved?.id ?? ""}::${key}`;
           if (!globalCreatedEventLoggedKeys.has(logDedupKey)) {
             globalCreatedEventLoggedKeys.add(logDedupKey);

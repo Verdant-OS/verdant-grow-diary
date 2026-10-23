@@ -381,7 +381,8 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
         source: "quick_log",
         watering: { volume_ml: 750 },
       }),
-      diaryEntry("water-2", " (Quick Log) ", "2026-07-20T10:00:00.000Z", null, {
+      // A grower typed this themselves; the RPC stores it as written.
+      diaryEntry("water-2", "(Quick Log)", "2026-07-20T10:00:00.000Z", null, {
         event_type: "watering",
         source: "quick_log",
         watering: { volume_ml: 500 },
@@ -396,11 +397,14 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
     expect(await screen.findByText("topped in the quick log")).toBeInTheDocument();
 
     expect(chipCount("All")).toBe(3);
-    expect(chipCount("Notes")).toBe(1);
+    expect(chipCount("Notes")).toBe(2);
 
     fireEvent.click(chipButton("Notes"));
-    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(1));
-    expect(listedDiaryEntries()[0].id).toBe("timeline-entry-note-1");
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(2));
+    expect(listedDiaryEntries().map((e) => e.id)).toEqual([
+      "timeline-entry-note-1",
+      "timeline-entry-water-2",
+    ]);
   });
 });
 
@@ -412,7 +416,10 @@ describe("timelineEntryHasNoteText", () => {
     expect(timelineEntryHasNoteText(null)).toBe(false);
     expect(timelineEntryHasNoteText(undefined)).toBe(false);
     expect(timelineEntryHasNoteText("(quick log)")).toBe(false);
-    expect(timelineEntryHasNoteText(" (Quick Log) ")).toBe(false);
+    // Only the stored literal is a placeholder; a grower-typed variant is a note
+    // (Codex P2 on #2404 at f504938c).
+    expect(timelineEntryHasNoteText("(Quick Log)")).toBe(true);
+    expect(timelineEntryHasNoteText(" (quick log) ")).toBe(true);
     expect(timelineEntryHasNoteText("topped in the quick log")).toBe(true);
   });
 });

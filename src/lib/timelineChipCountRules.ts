@@ -14,7 +14,6 @@
  */
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import { isTimelineSensorDerivedDiaryId } from "@/lib/timelineManualSensorMeasurementRules";
-import { isQuickLogPlaceholderNote } from "@/lib/plantFeedingDisplayRules";
 
 export const EMPTY_TIMELINE_DIARY_PHOTO_IDS: ReadonlySet<string> = new Set();
 
@@ -266,9 +265,19 @@ export function timelineEntryCountsAsPhoto(
 }
 
 /**
+ * The exact placeholder the Quick Log save RPCs store for an empty note
+ * (`COALESCE(NULLIF(btrim(p_note), ''), '(quick log)')`). A grower can type
+ * "(Quick Log)" themselves, and that text is kept, so only this literal is a
+ * placeholder (Codex P2 on #2404 at f504938c).
+ */
+const QUICK_LOG_STORED_PLACEHOLDER = "(quick log)";
+
+/**
  * True when a diary entry carries grower-written note text: not blank, and not
  * the "(quick log)" placeholder Quick Log writers store when the note is left empty.
  */
 export function timelineEntryHasNoteText(note: unknown): boolean {
-  return typeof note === "string" && note.trim().length > 0 && !isQuickLogPlaceholderNote(note);
+  return (
+    typeof note === "string" && note.trim().length > 0 && note !== QUICK_LOG_STORED_PLACEHOLDER
+  );
 }

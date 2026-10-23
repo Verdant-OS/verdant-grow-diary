@@ -397,6 +397,17 @@ function calculatedVpdCandidate(
     }
   }
 
+  // The unpaired fallback must not combine two known, different captures at
+  // one instant either (Copilot on #2459 at de8c1b27).
+  if (
+    !paired &&
+    temp.epochMs === rh.epochMs &&
+    captureRefsKnown(temp.refs) &&
+    captureRefsKnown(rh.refs) &&
+    !temp.refs.some((ref) => captureRefIn(ref, rh.refs))
+  ) {
+    return { kind: "underivable" };
+  }
   const older = temp.epochMs <= rh.epochMs ? temp : rh;
   const source = compositeVpdSource(temp.source, rh.source);
   if (source == null) return { kind: "underivable" };

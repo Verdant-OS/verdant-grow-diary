@@ -389,6 +389,9 @@ export function buildTentSnapshotView(
       : useCanonicalVpd && canonical
         ? canonical.kpa
         : snap.vpd;
+  // A rejected capture's VPD keeps its Invalid label but never its number,
+  // matching Tonight and Tent Detail (Copilot on #2459 at de8c1b27).
+  const vpdShownKpa = cohortVpdRejected ? null : vpdKpa;
   const canonicalSource: SensorReadingSource | null =
     provenance === "live" || provenance === "manual" || provenance === "csv"
       ? provenance
@@ -534,9 +537,9 @@ export function buildTentSnapshotView(
     mkMetric(
       "vpd",
       "VPD",
-      vpdKpa,
+      vpdShownKpa,
       " kPa",
-      vpdMetricChipStatus(classifyVpdAgainstStage({ value: vpdKpa ?? null, stage })),
+      vpdMetricChipStatus(classifyVpdAgainstStage({ value: vpdShownKpa ?? null, stage })),
       "vpd",
       2,
     ),
@@ -586,7 +589,10 @@ export function buildTentSnapshotView(
     provenanceEligible,
     // A VPD from another capture decides the stage prompt by its own grade:
     // the cohort's health says nothing about it (Codex P2 on #2437 at 9ddaa0ae).
-    canAssessStage: canAssessStage && (!vpdReplaced || metrics[2].status === "ok"),
+    // A rejected cohort VPD never sits beside a stage prompt, even when the
+    // snapshot held no VPD number (Copilot on #2459 at de8c1b27).
+    canAssessStage:
+      canAssessStage && !cohortVpdRejected && (!vpdReplaced || metrics[2].status === "ok"),
     metrics,
   };
 }

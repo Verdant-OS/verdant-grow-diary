@@ -462,8 +462,13 @@ export function resolveTentDetailVpd(input: {
       rejected: true,
     };
   }
+  // With no valid stand-in, a rejection is reported as such, so the page
+  // labels it instead of dropping the VPD silently (Copilot on #2459 at
+  // de8c1b27).
+  const withheld = (observation: TentDetailVpdObservation): TentDetailVpdObservation =>
+    observation.value === null ? { ...observation, rejected: true } : observation;
   if (rejectionApplies && climateRejected && !tonightIndependent) {
-    return existingOrNothing();
+    return withheld(existingOrNothing());
   }
   if (
     tonight?.state === "value" &&
@@ -509,7 +514,9 @@ export function resolveTentDetailVpd(input: {
       rejected: true,
     };
   }
-  return existingOrNothing();
+  // Tonight's value failed sensor truth: with no other capture to stand in,
+  // it is a rejection, not an absence.
+  return tonight?.state === "value" ? withheld(existingOrNothing()) : existingOrNothing();
 }
 
 /**

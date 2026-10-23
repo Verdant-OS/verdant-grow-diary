@@ -118,6 +118,7 @@ import TentDetail from "@/pages/TentDetail";
 import { buildTonightTentMetrics } from "@/lib/tonightTentHomeViewModel";
 import { formatSensorValue } from "@/lib/sensorFormat";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
+import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
 const NOW = new Date("2026-10-15T12:00:00.000Z");
 const clients: QueryClient[] = [];
@@ -541,5 +542,107 @@ describe("Tent detail VPD agrees with the Dashboard Tonight card", () => {
       "5 minutes ago",
     );
     expect(within(provenance).queryByTestId("tent-detail-vpd-stale")).toBeNull();
+  });
+});
+
+// Copilot and the independent review of #2459 at de8c1b27: every withheld VPD
+// is labelled on the rendered page, and each header metric keeps its device.
+describe("Tent detail labels every withheld VPD", () => {
+  const recent = () => new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+
+  it("labels a snapshot-only VPD that fails sensor truth", () => {
+    const ts = recent();
+    state.snapshot = {
+      status: "ok",
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        source: "live",
+        ts,
+        vpd: 9.9,
+        metric_refs: { vpd: { id: "snap-vpd", captured_at: ts, source: "live" } },
+      },
+    };
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+    expect(screen.getByTestId("tent-detail-vpd-rejected")).toHaveTextContent("VPD invalid");
+  });
+
+  it("labels a quality-ok stored VPD the header rejects as unrealistic", () => {
+    const ts = recent();
+    state.rows = [
+      {
+        id: "r-vpd",
+        metric: "vpd_kpa",
+        value: 9.9,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+      } as never,
+    ];
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+    expect(screen.getByTestId("tent-detail-vpd-rejected")).toHaveTextContent("VPD invalid");
+  });
+
+  it("keeps one device's VPD beside another device's rejected RH at the same instant", () => {
+    const ts = recent();
+    state.rows = [
+      {
+        id: "r-rh",
+        metric: "humidity_pct",
+        value: 150,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+        device_id: "gw-b",
+      } as never,
+      {
+        id: "r-vpd",
+        metric: "vpd_kpa",
+        value: 1.1,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+        device_id: "gw-a",
+      } as never,
+    ];
+    mount();
+    expect(screen.queryByTestId("tent-detail-vpd-rejected")).toBeNull();
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("1.1");
+  });
+
+  it("does not withhold one device's VPD for another device's flagged VPD at the same instant", () => {
+    const ts = recent();
+    state.rows = [
+      {
+        id: "r-vpd-a",
+        metric: "vpd_kpa",
+        value: 1.1,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+        device_id: "gw-a",
+      } as never,
+      {
+        id: "r-vpd-b",
+        metric: "vpd_kpa",
+        value: 1.3,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "invalid",
+        device_id: "gw-b",
+      } as never,
+    ];
+    // Tonight has nothing to offer, so the stored row's own trust decides.
+    state.rowsError = true;
+    state.snapshot = { status: "unavailable", snapshot: null };
+    mount();
+    expect(screen.queryByTestId("tent-detail-vpd-rejected")).toBeNull();
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("1.1");
   });
 });

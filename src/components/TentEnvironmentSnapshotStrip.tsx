@@ -104,7 +104,7 @@ export default function TentEnvironmentSnapshotStrip({
   if (rejectedOnlyVpd?.rejected) {
     return (
       <p className="text-xs text-destructive" data-testid={`tents-list-vpd-rejected-${tentId}`}>
-        VPD invalid — the latest reading failed its quality check.
+        VPD invalid — the latest VPD reading did not pass a sensor check.
       </p>
     );
   }

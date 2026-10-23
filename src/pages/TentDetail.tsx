@@ -555,13 +555,14 @@ export default function TentDetail() {
         })()}
       {(headerVpd === null || headerVpd === undefined) &&
         (storedVpdRowUntrusted || headerVpdObservation.rejected) && (
-          // A quality-rejected stored VPD is labelled, never silently dropped
+          // A rejected VPD (quality flag, realism or capture gate) is labelled,
+          // never silently dropped
           // (Codex P1 on #2437 at 9ddaa0ae).
           <p
             className="text-[11px] text-destructive -mt-3 mb-4"
             data-testid="tent-detail-vpd-rejected"
           >
-            VPD invalid — the latest reading failed its quality check.
+            VPD invalid — the latest VPD reading did not pass a sensor check.
           </p>
         )}
       {vpdFromFallback && (

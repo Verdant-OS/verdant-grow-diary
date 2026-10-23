@@ -45,6 +45,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### REVIEWER-ROUTING-20261022
+
+```text
+TASK REVIEWER-ROUTING-20261022  priority: P2  status: OPEN
+goal: Matthew-approved bounded reviewer routing: retire Blue Dream/Critical Mass for future requests, allow available eligible independent sessions, preserve all acceptance and production gates.
+branch: codex/reviewer-routing-20261022
+base: verdant-grow-diary at ebaf1b6afa7fb8cfa7fb8090914c8633f7537a98, verified 2026-10-22 UTC
+checkout: git fetch origin codex/reviewer-routing-20261022 verdant-grow-diary && git switch codex/reviewer-routing-20261022 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2328 (draft; preserve draft; no existing branch or PR taken over)
+head_sha: e71049cec2214784a26b3a47c7075ab3a24d0ae9 (ownership checkpoint pushed and draft #2328 opened 2026-10-22 03:02 UTC); routing implementation commit follows. Read current full PR head before any review; this commit cannot record its own resulting SHA.
+state: bounded routing implemented after pushed ownership checkpoint/draft #2328. Local 31 governance regression tests and 71 focused Vitest cases pass; twelve-file version/parity, mirror, format, docs-safety and strict scorer report pass. This commit follows the ownership checkpoint; consult the PR for its resulting full head and hosted CI. Original checkout and #1971/#2086 branches untouched.
+next_action: Verify draft #2328 at its resulting full implementation head and hosted CI; assign one actually available independent Claude/Grok review session through permitted transport. Keep draft; no merge, ready/enqueue or production action.
+files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/{claude,codex,council-chair,gemini,grok,security}.md; docs/agents/OWNERSHIP.md; docs/agents/CURRENT_STATE.md (active header only); .agents/skills/verdant-exact-sha-review/SKILL.md; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Broad governance overlaps remain; Matthew approved this session as sole writer for only the narrow reviewer-routing correction on 2026-10-22 (parent question: designate this task sole writer while leaving #1971/#2086 unrelated work and branches untouched; Matthew: "Yeah"). This designation resolves the routing-slice collision, grants no takeover or review PASS, and changes no other assignments. Rechecked overlaps: #1971 canopy/constitution-clash-fixes at 82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e (51 files), #2086 claude/new-session-nms5b8 at 98b660ab13d2e3087364d1bc5faeb333b20590c8 (35 files). No fresh 24-hour claim or matching deploy HANDOFF_LOG block observed; staleness is not reassignment. #1971 issuecomment-6222081602 preserves the existing governance writer after last Canopy claim issuecomment-6102182294. The 12-file parity bump also overlaps #2028/#1879/#1876. Shared live-session registry unavailable. No claim/release comment posted; existing comment-approval gate remains.
+artifacts: draft #2328 body records current full head and actual local/hosted evidence; local supporting receipts in /workspace/reviewer-routing-deliverables/. Sentinel-Version 2026-10-22.1 across exactly 12 files; no parity expansion or checker/test/pin edits. Original proposal hash retained separately; it is not this implementation commit identity.
+reviewer_seat: BLOCKED — no independent available Claude/Grok session assigned; Codex is proposal author and cannot accept it; Graft governance lane excluded
+review_request: not sent; owner: Codex reviewer-routing session; permalink: NOT_MEASURED; state: blocked (no independent session/approved transport assigned); fallback transfers: 0
+claimed_by: Codex reviewer-routing session, 2026-10-22 03:01 UTC (Matthew direct bounded sole-writer designation; no claim on #1971/#2086; no GitHub claim comment posted because separate comment-approval gate remains)
+last_updated: 2026-10-22 03:04 UTC, by Codex reviewer-routing session
+limits: #2303/#2304 existing independent PASSes are preserved and are not review work here. #2312 moved to 588fe03c; the old 720e9b3 PASS cannot transfer. No merge, ready, auto-merge, enqueue, deploy, production dispatch, SQL, runtime automation, hooks, GitHub settings, security, billing, secret or protected-scorer changes.
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text

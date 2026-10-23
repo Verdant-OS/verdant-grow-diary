@@ -411,7 +411,14 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
       ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
-      resetScroll: options?.preventScrollReset !== true,
+      // A search-param update is in-page state (filter/status chips), so it
+      // keeps the scroll position unless the caller opts in with
+      // `preventScrollReset: false` (filming bug #16). A preserved anchor
+      // must not pull the viewport back to it either: TanStack's
+      // `hashScrollIntoView` defaults to true, so it is disabled whenever the
+      // position is kept (#2348 review).
+      resetScroll: options?.preventScrollReset === false,
+      ...(options?.preventScrollReset === false ? {} : { hashScrollIntoView: false }),
     } as never);
   };
 

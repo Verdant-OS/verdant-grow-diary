@@ -7,12 +7,14 @@ Read this section first. It doesn't replace the observation log below.
 - **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29. Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. Where OWNERSHIP.md and this section disagree on roles or merging, this section describes current practice until OWNERSHIP.md is updated (pending).
 - **Roles:**
   - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
-  - Blue Dream and Durban Poison: code reviewers (peers) for `.tsx`/UI, auth, RLS, DB and Edge.
-  - Critical Mass: reviewer for lib and logic, tests, docs-only, QA, accessibility, search and content (OWNERSHIP.md section 2).
+  - Blue Dream and Critical Mass: retired from future reviewer routing; historical receipts remain.
+  - Available eligible independent sessions: Codex on work Codex neither authored nor repaired; non-contributing Claude or Grok review sessions, including for Codex-authored work; Durban Poison when actually available. Apply OWNERSHIP.md §4.3 to the complete scope, including protected and supplemental evidence gates.
   - Codex: an accepted outside reviewer, except on a PR Codex authored or repaired (for example #1938). That exact-head review is the independent PASS when Codex is the chosen seat and did not author or repair the PR.
   - Graft: Graft's exact-head PASS counts as the outside review on a docs-only or other low-risk PR that Graft did not author or repair (OWNERSHIP.md section 2).
   - Claude, Codex and Grok 91: authors.
-  - Nobody reviews their own work.
+  - Nobody reviews their own work. Record reviewer session/role, contributor exclusions and verification, complete full-head scope, evidence and verdict; shared GitHub identity alone is not independence evidence.
+  - One active implementation writer; ownership is temporary accountability. Claims, releases, explicit assignments and named locks remain under AGENTS.md. Review routing transfers no implementation ownership.
+- **Review requests:** check the existing request and receipt before pinging. One current request per PR/full 40-character head SHA, with owner, permalink and requested/running/blocked/verdict/superseded state. Transfer an unavailable reviewer once to an actually available eligible fallback, otherwise BLOCKED. A new head invalidates the old verdict; preserve valid existing reviews. Pending requests, acknowledgments and silence are not PASS.
 - **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).
   - Every verdict is tied to one exact SHA, or it is BLOCKED.
   - PASS-with-P2 always goes back to the author for a full re-review at the new head. It is never merged as is.

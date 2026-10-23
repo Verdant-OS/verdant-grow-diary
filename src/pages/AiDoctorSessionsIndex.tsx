@@ -383,7 +383,7 @@ export default function AiDoctorSessionsIndex() {
   );
   const loopHandoffIds = useMemo(() => pickAiDoctorSessionLoopHandoffIds(rows), [rows]);
 
-  const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
+  const writeParams = (next: SessionsIndexFilters, nextPage: number, resetScroll = false) => {
     const params = new URLSearchParams();
     // Preserve any unrelated params already on the URL.
     const managed = new Set<string>([
@@ -404,7 +404,12 @@ export default function AiDoctorSessionsIndex() {
     for (const [k, v] of Object.entries(serializeFilters(next))) params.set(k, v);
     const pageStr = serializePageParam(nextPage);
     if (pageStr) params.set(FILTER_PARAM_KEYS.page, pageStr);
-    setSearchParams(params, { replace: true });
+    // Filter chips keep the scroll position; a page transition replaces the
+    // results, so it scrolls back to the top (#2348 review).
+    setSearchParams(params, {
+      replace: true,
+      ...(resetScroll ? { preventScrollReset: false } : {}),
+    });
   };
 
   const updateFilter = <K extends keyof SessionsIndexFilters>(
@@ -427,7 +432,7 @@ export default function AiDoctorSessionsIndex() {
   };
 
   const goToPage = (nextPage: number) => {
-    writeParams(filters, Math.max(0, nextPage));
+    writeParams(filters, Math.max(0, nextPage), true);
   };
 
   const [copyStatus, setCopyStatus] = useState<CopyLinkStatus>("idle");
@@ -491,7 +496,15 @@ export default function AiDoctorSessionsIndex() {
       : findSavedView(savedViews, id);
     if (!view) return;
     const next = savedViewToSearchParams(view, searchParams);
-    setSearchParams(next, { replace: true });
+    // A saved view that lands on another page replaces the results, so it
+    // scrolls back to the top like the pager; one on the same page keeps the
+    // scroll position (#2348 review).
+    const pageChanged =
+      next.get(FILTER_PARAM_KEYS.page) !== searchParams.get(FILTER_PARAM_KEYS.page);
+    setSearchParams(next, {
+      replace: true,
+      ...(pageChanged ? { preventScrollReset: false } : {}),
+    });
   };
 
   const handleSaveView = () => {

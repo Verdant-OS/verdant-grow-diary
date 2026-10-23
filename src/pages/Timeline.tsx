@@ -4,7 +4,7 @@ import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { orderNewestFirstStable } from "@/lib/timelineQueryOrderRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
-import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
+import { CriticalReadDeadlineError, withCriticalReadDeadline } from "@/lib/boundedReadRules";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
@@ -886,7 +886,15 @@ export default function Timeline() {
         sensorEventsQuery = sensorEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
       if (timelineDateRangeBounds.endIso)
         sensorEventsQuery = sensorEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
-      const sensorEventsResult = await sensorEventsQuery;
+      // Bounded like the core reads: this await sits before the core commit,
+      // so a hang here would hold the whole page on loading. A timeout is a
+      // failed sensor read, shown as partial manual sensor readings.
+      const sensorEventsResult = await withCriticalReadDeadline(sensorEventsQuery).catch(
+        (error: unknown) => {
+          if (error instanceof CriticalReadDeadlineError) return { data: null, error };
+          throw error;
+        },
+      );
       if (!isCurrentRequest()) return;
       const sensorReadFailed = hasTimelineRequiredReadError(sensorEventsResult);
       const nextSensorEvents = sensorReadFailed

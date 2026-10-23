@@ -270,6 +270,57 @@ describe("timeline manual sensor deadline", () => {
     expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
   });
 
+  it("commits the core read and marks sensors partial when the environment-event read hangs", async () => {
+    harness.executeQuery.mockImplementation(
+      (spec: {
+        table: string;
+        columns: string | null;
+        filters: Array<{ column: string; value: unknown }>;
+      }) => {
+        const isEnvironmentEvents =
+          spec.table === "grow_events" &&
+          spec.filters.some((f) => f.column === "event_type" && f.value === "environment");
+        if (isEnvironmentEvents) return new Promise(() => {});
+        if (spec.table === "diary_entries") {
+          return {
+            data: [
+              {
+                id: "entry-1",
+                note: "Core diary row",
+                photo_url: null,
+                stage: "vegetative",
+                details: null,
+                entry_at: "2026-07-10T12:00:00.000Z",
+                plant_id: null,
+                tent_id: null,
+              },
+            ],
+            error: null,
+            count: 1,
+          };
+        }
+        return { data: [], error: null, count: 0 };
+      },
+    );
+    vi.useFakeTimers();
+    render(
+      <MemoryRouter initialEntries={["/timeline?growId=grow-a"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.queryByText("Core diary row")).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+    });
+    expect(screen.getByText("Core diary row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
+  });
+
   it("clears linked context loading once the manual-sensor read settles", async () => {
     harness.executeQuery.mockImplementation((spec: { table: string; columns: string | null }) => {
       if (spec.table === "tents" && spec.columns === "id") {

@@ -429,7 +429,7 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
 
   // Codex P1 on #2453 at 1b2ea901: the text Quick Log stores when the grower
   // typed nothing is not a Note.
-  it("keeps Quick Log's generated photo and manual-readings text out of Notes", async () => {
+  it("keeps Quick Log's generated photo, video and manual-readings text out of Notes", async () => {
     const diaryRows = [
       diaryEntry("note-1", "Canopy check note", "2026-07-20T12:00:00.000Z"),
       diaryEntry(
@@ -449,16 +449,30 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
           source: "quick_log",
         },
       ),
+      // The persisted shape of buildQuickLogVideoDiaryEntryRow with no note
+      // (Copilot and the independent review of #2464 at 5be715ec).
+      diaryEntry("video-1", "Video attached from Quick Log.", "2026-07-20T09:00:00.000Z", null, {
+        event_type: "quicklog_video_attachment",
+        source: "manual",
+        attached_to_action: "note",
+        video: {
+          path: "grower/clip.mp4",
+          mime: "video/mp4",
+          size_bytes: 1024,
+          duration_s: 3,
+          poster_path: null,
+        },
+      }),
     ];
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
-      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 3 };
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 4 };
       return defaultResult(spec);
     });
 
     renderTimeline();
     expect(await screen.findByText("Canopy check note")).toBeInTheDocument();
 
-    expect(chipCount("All")).toBe(3);
+    expect(chipCount("All")).toBe(4);
     expect(chipCount("Notes")).toBe(1);
 
     fireEvent.click(chipButton("Notes"));

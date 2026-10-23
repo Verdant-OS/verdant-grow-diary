@@ -363,8 +363,9 @@ type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "acti
 
 function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
   const kinds: EventFilter[] = [];
-  // "Notes" means the grower wrote something; a watering-only Quick Log
-  // entry with an empty note is not a note (Pollen #1).
+  // "Notes" means the grower wrote something: an empty note, or text Verdant
+  // generated in its place (Quick Log fallbacks, outcome defaults), is not a
+  // note (Pollen #1).
   if (!isTimelineSensorDerivedDiaryId(e.id) && timelineEntryHasNoteText(e.note)) {
     kinds.push("note");
   }

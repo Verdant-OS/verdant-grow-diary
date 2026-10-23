@@ -5,6 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { QUICK_LOG_GENERATED_NOTES, timelineEntryHasNoteText } from "@/lib/timelineChipCountRules";
 import { QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE } from "@/lib/quickLogPhotoDiaryEntry";
+import { QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE } from "@/lib/quickLogVideoDiaryEntry";
+import { ACTION_OUTCOME_DEFAULT_NOTES } from "@/lib/actionOutcomeRules";
 
 describe("timelineEntryHasNoteText non-string inputs", () => {
   it("returns false for numbers and objects", () => {
@@ -20,7 +22,16 @@ describe("timelineEntryHasNoteText generated Quick Log text", () => {
     expect(timelineEntryHasNoteText("Manual readings captured from Quick Log.")).toBe(false);
   });
 
-  it("tracks the photo writer's default note", () => {
+  it("tracks the photo and video writers' default notes", () => {
     expect(QUICK_LOG_GENERATED_NOTES.has(QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE)).toBe(true);
+    expect(QUICK_LOG_GENERATED_NOTES.has(QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE)).toBe(true);
+    expect(timelineEntryHasNoteText(QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE)).toBe(false);
+  });
+
+  // Review of #2464 at 5be715ec: action-outcome default text is not a Note.
+  it("is false for every action-outcome default note", () => {
+    for (const note of Object.values(ACTION_OUTCOME_DEFAULT_NOTES)) {
+      expect(timelineEntryHasNoteText(note)).toBe(false);
+    }
   });
 });

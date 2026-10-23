@@ -14,6 +14,7 @@
  */
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import { isTimelineSensorDerivedDiaryId } from "@/lib/timelineManualSensorMeasurementRules";
+import { ACTION_OUTCOME_DEFAULT_NOTES } from "@/lib/actionOutcomeRules";
 
 export const EMPTY_TIMELINE_DIARY_PHOTO_IDS: ReadonlySet<string> = new Set();
 
@@ -319,15 +320,21 @@ export function timelineEntryCountsAsPhoto(
 const QUICK_LOG_STORED_PLACEHOLDER = "(quick log)";
 
 /**
- * Text Quick Log writers store when the grower typed nothing: the RPC
- * placeholder, and the photo and manual-readings fallbacks from
+ * Text Verdant writes when the grower typed nothing: the Quick Log RPC
+ * placeholder; the photo and manual-readings fallbacks from
  * `buildTimelineNote` in PlantQuickLog.tsx (the photo one is also
- * `QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE`). Codex P1 on #2453 at 1b2ea901.
+ * `QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE`); the video fallback
+ * `QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE`; and the action-outcome defaults.
+ * The writer modules import the Supabase client, so the strings are repeated
+ * here and pinned to the writers' exports by test. Codex P1 on #2453 at
+ * 1b2ea901; review of #2464 at 5be715ec.
  */
 export const QUICK_LOG_GENERATED_NOTES: ReadonlySet<string> = new Set([
   QUICK_LOG_STORED_PLACEHOLDER,
   "Photo attached from Quick Log.",
+  "Video attached from Quick Log.",
   "Manual readings captured from Quick Log.",
+  ...Object.values(ACTION_OUTCOME_DEFAULT_NOTES),
 ]);
 
 /**

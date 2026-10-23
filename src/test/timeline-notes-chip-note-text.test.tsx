@@ -218,6 +218,38 @@ function diaryEntry(
   };
 }
 
+const TENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const SENSOR_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+function manualTempReading(id: string, capturedAt: string) {
+  return {
+    id,
+    user_id: SENSOR_USER_ID,
+    tent_id: TENT_ID,
+    metric: "temperature_c",
+    value: 24,
+    source: "manual",
+    quality: "ok",
+    ts: capturedAt,
+    captured_at: capturedAt,
+    created_at: capturedAt,
+    device_id: null,
+    raw_payload: null,
+    correction_valid: true,
+    corrected_at: null,
+  };
+}
+
+function receiptReadings(count: number) {
+  const base = Date.now() - 5 * 60_000;
+  return Array.from({ length: count }, (_, index) =>
+    manualTempReading(
+      `cccccccc-cccc-4ccc-8ccc-ccccccccccc${index}`,
+      new Date(base - index * 5 * 60_000).toISOString(),
+    ),
+  );
+}
+
 function defaultResult(spec: QuerySpec): QueryResult {
   if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
   return { data: [], error: null };
@@ -361,6 +393,108 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
       "timeline-entry-note-1",
       "timeline-entry-water-2",
     ]);
+  });
+
+  // Moved from timeline-notes-chip-photo-sensor-regression.test.tsx so the
+  // harness lives once (Codex P2 on #2453 at 1b2ea901).
+  it("keeps photo-only rows out of Notes while Photos still counts them", async () => {
+    const diaryRows = [
+      diaryEntry("note-1", "Canopy check note", "2026-07-20T12:00:00.000Z"),
+      diaryEntry("photo-1", "", "2026-07-20T11:00:00.000Z", "https://cdn.example/leaf.jpg"),
+      diaryEntry("photo-2", "   ", "2026-07-20T10:00:00.000Z", "https://cdn.example/top.jpg"),
+    ];
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 3 };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("Canopy check note")).toBeInTheDocument();
+
+    expect(chipCount("All")).toBe(3);
+    expect(chipCount("Notes")).toBe(1);
+    expect(chipCount("Photos")).toBe(2);
+
+    fireEvent.click(chipButton("Notes"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(1));
+    expect(listedDiaryEntries()[0].id).toBe("timeline-entry-note-1");
+
+    fireEvent.click(chipButton("Photos"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(2));
+    expect(listedDiaryEntries().map((e) => e.id)).toEqual([
+      "timeline-entry-photo-1",
+      "timeline-entry-photo-2",
+    ]);
+  });
+
+  // Codex P1 on #2453 at 1b2ea901: the text Quick Log stores when the grower
+  // typed nothing is not a Note.
+  it("keeps Quick Log's generated photo and manual-readings text out of Notes", async () => {
+    const diaryRows = [
+      diaryEntry("note-1", "Canopy check note", "2026-07-20T12:00:00.000Z"),
+      diaryEntry(
+        "photo-1",
+        "Photo attached from Quick Log.",
+        "2026-07-20T11:00:00.000Z",
+        "https://cdn.example/leaf.jpg",
+        { event_type: "note", source: "quick_log" },
+      ),
+      diaryEntry(
+        "readings-1",
+        "Manual readings captured from Quick Log.",
+        "2026-07-20T10:00:00.000Z",
+        null,
+        {
+          event_type: "note",
+          source: "quick_log",
+        },
+      ),
+    ];
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 3 };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("Canopy check note")).toBeInTheDocument();
+
+    expect(chipCount("All")).toBe(3);
+    expect(chipCount("Notes")).toBe(1);
+
+    fireEvent.click(chipButton("Notes"));
+    await waitFor(() => expect(screen.queryAllByTestId("timeline-entry")).toHaveLength(1));
+    expect(screen.getAllByTestId("timeline-entry").map((e) => e.id)).toEqual([
+      "timeline-entry-note-1",
+    ]);
+  });
+
+  // Every rendered row is asserted, sensor receipts included, so a receipt
+  // classified as a Note would fail (Copilot P2 and CodeRabbit on #2453 at
+  // 1b2ea901).
+  it("does not treat manual sensor receipt note blocks as grower Notes", async () => {
+    const diaryRows = [diaryEntry("note-1", "Grower diary note", "2026-07-20T12:00:00.000Z")];
+    const readings = receiptReadings(2);
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 1 };
+      if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("Grower diary note")).toBeInTheDocument();
+
+    expect(chipCount("All")).toBe(1);
+    expect(chipCount("Notes")).toBe(1);
+    expect(chipCount("Measurements")).toBe(2);
+    const allRows = () => screen.queryAllByTestId("timeline-entry").map((e) => e.id);
+    await waitFor(() => expect(allRows()).toHaveLength(3));
+    expect(allRows().filter((id) => id.startsWith("timeline-entry-sensor-reading:"))).toHaveLength(
+      2,
+    );
+
+    fireEvent.click(chipButton("Notes"));
+    await waitFor(() => expect(allRows()).toEqual(["timeline-entry-note-1"]));
   });
 });
 

@@ -319,11 +319,21 @@ export function timelineEntryCountsAsPhoto(
 const QUICK_LOG_STORED_PLACEHOLDER = "(quick log)";
 
 /**
+ * Text Quick Log writers store when the grower typed nothing: the RPC
+ * placeholder, and the photo and manual-readings fallbacks from
+ * `buildTimelineNote` in PlantQuickLog.tsx (the photo one is also
+ * `QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE`). Codex P1 on #2453 at 1b2ea901.
+ */
+export const QUICK_LOG_GENERATED_NOTES: ReadonlySet<string> = new Set([
+  QUICK_LOG_STORED_PLACEHOLDER,
+  "Photo attached from Quick Log.",
+  "Manual readings captured from Quick Log.",
+]);
+
+/**
  * True when a diary entry carries grower-written note text: not blank, and not
- * the "(quick log)" placeholder Quick Log writers store when the note is left empty.
+ * text a Quick Log writer generated because the note was left empty.
  */
 export function timelineEntryHasNoteText(note: unknown): boolean {
-  return (
-    typeof note === "string" && note !== QUICK_LOG_STORED_PLACEHOLDER && note.trim().length > 0
-  );
+  return typeof note === "string" && !QUICK_LOG_GENERATED_NOTES.has(note) && note.trim().length > 0;
 }

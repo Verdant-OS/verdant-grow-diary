@@ -13,11 +13,14 @@ export interface PlantStageFollowUpResult {
 
 async function updateStage(table: "tents" | "grows", id: string, stage: string): Promise<boolean> {
   try {
-    const { error } = await supabase
+    // RLS or a deleted row matches zero rows without an error, so read back
+    // the updated id and count an empty result as a failed write.
+    const { data, error } = await supabase
       .from(table)
       .update({ stage } as never)
-      .eq("id", id);
-    return !error;
+      .eq("id", id)
+      .select("id");
+    return !error && Array.isArray(data) && data.length > 0;
   } catch {
     return false;
   }

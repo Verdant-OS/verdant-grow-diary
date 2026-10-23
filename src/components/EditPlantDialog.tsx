@@ -332,7 +332,9 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     const tentRow = (
       allTents as Array<{ id: string; name?: string | null; stage?: string | null }>
     ).find((t) => t.id === resolvedTentId);
-    const growRow = knownGrows?.find((g) => g.id === plant.growId);
+    // The same save may re-home the plant to the selected tent's grow.
+    const savedGrowId = growPatch?.grow_id ?? plant.growId;
+    const growRow = knownGrows?.find((g) => g.id === savedGrowId);
     const followUp = buildPlantStageFollowUp({
       plantName: form.name || plant.name,
       previousStage: plant.stage ?? null,

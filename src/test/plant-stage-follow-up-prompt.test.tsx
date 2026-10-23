@@ -11,6 +11,8 @@ import { buildPlantStageFollowUp } from "@/lib/plantStageFollowUpRules";
 
 const backend = vi.hoisted(() => ({
   updates: [] as Array<{ table: string; id: string; payload: Record<string, unknown> }>,
+  /** Tables whose stage update matches zero rows (RLS or a deleted row). */
+  zeroRowTables: [] as string[],
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), message: vi.fn() }));
 const store = vi.hoisted(() => ({
@@ -33,9 +35,12 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => ({
       update: (payload: Record<string, unknown>) => ({
-        eq: async (_column: string, id: string) => {
+        eq: (_column: string, id: string) => {
           backend.updates.push({ table, id, payload: { ...payload } });
-          return { error: null };
+          const rows = backend.zeroRowTables.includes(table) ? [] : [{ id }];
+          return Object.assign(Promise.resolve({ error: null }), {
+            select: async () => ({ data: rows, error: null }),
+          });
         },
       }),
     }),
@@ -44,7 +49,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import EditPlantDialog from "@/components/EditPlantDialog";
 
-function renderEditor(stage: string) {
+function renderEditor(stage: string, growId: string | null = "grow-a") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
@@ -56,7 +61,7 @@ function renderEditor(stage: string) {
           stage,
           health: "healthy",
           tentId: "tent-a",
-          growId: "grow-a",
+          growId,
           lastNote: "",
           plantType: "autoflower",
         }}
@@ -75,6 +80,7 @@ async function chooseStage(label: string) {
 
 beforeEach(() => {
   backend.updates.length = 0;
+  backend.zeroRowTables.length = 0;
   vi.clearAllMocks();
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -103,6 +109,38 @@ describe("Edit Plant offers to move a lagging tent and grow", () => {
       { table: "grows", id: "grow-a", payload: { stage: "veg" } },
     ]);
     expect(store.refresh).toHaveBeenCalled();
+  });
+
+  // Review of #2363 at b1289ce: a write RLS filters to zero rows is not a success.
+  it("reports a failure when the tent update matches no row", async () => {
+    backend.zeroRowTables.push("tents");
+    renderEditor("seedling");
+    await chooseStage("Vegetative");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() => expect(toast.message).toHaveBeenCalled());
+    const [, options] = toast.message.mock.calls[0] as [
+      string,
+      { action: { onClick: () => void } },
+    ];
+    options.action.onClick();
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Couldn't update the stage. Edit the tent or grow to change it.",
+      ),
+    );
+    expect(toast.success).not.toHaveBeenCalledWith("Stage updated.");
+  });
+
+  // Review of #2363 at b1289ce: the prompt names the grow this save moves the plant into.
+  it("pairs the tent with the grow the save assigns, not the plant's old grow", async () => {
+    renderEditor("seedling", null);
+    await chooseStage("Vegetative");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() => expect(toast.message).toHaveBeenCalled());
+    expect(backend.updates[0]).toMatchObject({ table: "plants", payload: { grow_id: "grow-a" } });
+    expect(toast.message.mock.calls[0][0]).toBe(
+      "AF-01 is now Vegetative. Tent A and Grow A are still on an earlier stage. Move them to Vegetative too?",
+    );
   });
 
   it("does not prompt when the stage did not change", async () => {

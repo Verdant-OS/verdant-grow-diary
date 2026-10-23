@@ -67,7 +67,19 @@ function isLocalSupabaseUrl(u: string): boolean {
     return false;
   }
 }
-const hasLocalSupabase = !!URL && !!ANON && !!SERVICE && !!DB_URL && isLocalSupabaseUrl(URL);
+// The same check beforeAll enforces, so an unsupported local shape skips
+// instead of failing setup (Copilot on #2448 at dab18959). The runner still
+// fails a skipped proof (requireExecutedCommunityProof).
+function localEnvironmentAccepted(): boolean {
+  try {
+    requireLocalCommunityEnvironment(process.env);
+    return true;
+  } catch {
+    return false;
+  }
+}
+const hasLocalSupabase =
+  !!URL && !!ANON && !!SERVICE && !!DB_URL && isLocalSupabaseUrl(URL) && localEnvironmentAccepted();
 const d = hasLocalSupabase ? describe : describe.skip;
 
 // Response bodies are untyped JSON from PostgREST.

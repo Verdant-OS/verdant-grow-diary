@@ -12,7 +12,7 @@ type Step = { name?: string; run?: string; with?: { path?: string } };
 const workflow = parse(
   readFileSync(resolve(__dirname, "../../.github/workflows/community-v1-db-proof.yml"), "utf8"),
 ) as { jobs: Record<string, { steps: Step[] }> };
-const steps = Object.values(workflow.jobs)[0].steps;
+const steps = workflow.jobs["community-v1-db-proof"].steps;
 const indexOf = (name: string) => steps.findIndex((s) => s.name === name);
 const step = (name: string) => steps[indexOf(name)];
 
@@ -187,16 +187,17 @@ describe("community-v1-db-proof proof-only auth step", () => {
     );
   });
 
-  it.each(["[auth]\nenabled = true\n", "  [auth.rate_limit]\nemail_sent = 2\n"])(
-    "refuses to append a second auth table to %j",
-    (existing) => {
-      const body = `${BASE}${existing}`;
-      const run = runStep(NAME, {}, {}, { "supabase/config.toml": body });
-      expect(run.status).not.toBe(0);
-      expect(run.stdout).toContain("already declares [auth]");
-      expect(run.file("supabase/config.toml")).toBe(body);
-    },
-  );
+  it.each([
+    "[auth]\nenabled = true\n",
+    "  [auth.rate_limit]\nemail_sent = 2\n",
+    "[auth.external.google]\nenabled = false\n",
+  ])("refuses to append a second auth table to %j", (existing) => {
+    const body = `${BASE}${existing}`;
+    const run = runStep(NAME, {}, {}, { "supabase/config.toml": body });
+    expect(run.status).not.toBe(0);
+    expect(run.stdout).toContain("already declares [auth]");
+    expect(run.file("supabase/config.toml")).toBe(body);
+  });
 
   it("fails when the replay copy has no config", () => {
     expect(runStep(NAME, {}).status).not.toBe(0);

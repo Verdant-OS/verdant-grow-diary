@@ -62,7 +62,9 @@ jobs:
           set -eo pipefail
           CONFIG="${SUPABASE_REPLAY_WORKDIR}/supabase/config.toml"
           test -f "$CONFIG"
-          if grep -Eq '^[[:space:]]*\[auth(\.rate_limit)?\]' "$CONFIG"; then
+          # Any auth table, dotted ones like [auth.external.google] included
+          # (Copilot on #2448 at dab18959).
+          if grep -Eq '^[[:space:]]*\[auth(\.[^]]*)?\]' "$CONFIG"; then
             echo "::error::the replay config already declares [auth]; merge the proof settings instead of appending."
             exit 1
           fi
@@ -129,7 +131,8 @@ jobs:
             # RED: the very first block must stop on the missing community relation.
             [ "$status" -ne 0 ] && grep -q 'relation "public.community_profiles" does not exist' community-v1-catalog.log
           else
-            [ "$status" -eq 0 ] && [ "$(grep -c '✓ T-CAT-0' community-v1-catalog.log)" -eq 6 ]
+            passed="$(grep -c '✓ T-CAT-0' community-v1-catalog.log || true)"
+            [ "$status" -eq 0 ] && [ "$passed" -eq 6 ]
           fi
 
       - name: Community V1 runtime proof

@@ -57,6 +57,7 @@
  *   ECOWITT_MQTT_USERNAME / ECOWITT_MQTT_PASSWORD   optional broker credentials
  */
 
+import { createRequire } from "node:module";
 import { Duplex } from "node:stream";
 
 export const DEFAULT_MQTT_URL = "mqtt://127.0.0.1:1883";
@@ -1156,9 +1157,41 @@ export function guardInboundStream(
 }
 
 /** Loads the optional `mqtt` package; null when it is not installed. */
-async function loadMqttModule(): Promise<any> {
+/**
+ * The MQTT.js release the runbook pins. 5.16.0 can stay in `disconnecting`
+ * after a short broker outage (MQTT.js #2068), silently ending continuous mode.
+ */
+export const REQUIRED_MQTT_VERSION = "5.16.1";
+
+function installedMqttVersion(): string | null {
   try {
-    return await (Function("m", "return import(m)") as any)("mqtt");
+    return String(createRequire(import.meta.url)("mqtt/package.json").version);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Loads MQTT.js, or null when it is not installed. An existing checkout can
+ * already hold another version (setup reuses node_modules), so any version
+ * but REQUIRED_MQTT_VERSION is refused before importing it (Codex P2 on #2461
+ * at affe932d). The readers are parameters for tests.
+ */
+export async function loadMqttModule(
+  readVersion: () => string | null = installedMqttVersion,
+  importMqtt: () => Promise<any> = () => (Function("m", "return import(m)") as any)("mqtt"),
+): Promise<any> {
+  const version = readVersion();
+  if (version === null) return null;
+  if (version !== REQUIRED_MQTT_VERSION) {
+    const shown = /^[0-9A-Za-z.+-]{1,40}$/.test(version) ? version : "an unsupported version";
+    console.error(
+      `[ecowitt-forwarder] mqtt ${shown} is installed; the forwarder needs ${REQUIRED_MQTT_VERSION}. Run \`bun add --no-save mqtt@${REQUIRED_MQTT_VERSION}\`.`,
+    );
+    throw new Error("unsupported mqtt version");
+  }
+  try {
+    return await importMqtt();
   } catch {
     return null;
   }

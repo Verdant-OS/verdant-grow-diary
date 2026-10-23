@@ -16,6 +16,8 @@ import {
   MAX_INBOUND_PACKET_BYTES,
   PRODUCTION_DEPS,
   connectMqtt,
+  loadMqttModule,
+  REQUIRED_MQTT_VERSION,
   createInboundPacketScanner,
   guardInboundStream,
   APPROVED_INGEST_URLS,
@@ -2722,5 +2724,40 @@ describe("the guard's readable buffer bound is what the docs state (Codex P2 on 
     expect(guarded.readableLength).toBe(100_000);
     expect(socket.isPaused()).toBe(true);
     guarded.destroy();
+  });
+});
+
+// Codex P2 on #2461 at affe932d: an already-installed MQTT.js other than the
+// pinned release is refused before it is imported.
+describe("loadMqttModule pins MQTT.js", () => {
+  it("refuses 5.16.0 without importing it", async () => {
+    const importMqtt = vi.fn(async () => ({ connect: () => null }));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(loadMqttModule(() => "5.16.0", importMqtt)).rejects.toThrow(
+        "unsupported mqtt version",
+      );
+      expect(err.mock.calls.flat().join(" ")).toContain("mqtt 5.16.0 is installed");
+    } finally {
+      err.mockRestore();
+    }
+    expect(importMqtt).not.toHaveBeenCalled();
+  });
+
+  it("imports the pinned version", async () => {
+    const mod = { connect: () => null };
+    expect(
+      await loadMqttModule(
+        () => REQUIRED_MQTT_VERSION,
+        async () => mod,
+      ),
+    ).toBe(mod);
+    expect(REQUIRED_MQTT_VERSION).toBe("5.16.1");
+  });
+
+  it("returns null when MQTT.js is not installed", async () => {
+    const importMqtt = vi.fn(async () => ({}));
+    expect(await loadMqttModule(() => null, importMqtt)).toBeNull();
+    expect(importMqtt).not.toHaveBeenCalled();
   });
 });

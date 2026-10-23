@@ -70,7 +70,9 @@ switch know only grow / tent / plant / cultivar.
      `activeGrowId` first (`src/pages/Timeline.tsx:812,843`); this search spans every owned
      grow, so it must add `grow_id` or two grows' null-plant rows at one instant would collapse.
 
-   The result keeps the spine's id, since Timeline collapses the companion away. The placeholder
+   The result keeps the spine's id, the canonical id for one save. (Timeline's collapse feeds
+   only the recent-activity lane; the main list still renders the diary card, so requirement 2
+   says how the spine id is made addressable there.) The placeholder
    `'(quick log)'` is not grower-authored text: exclude it only when
    `isQuickLogPlaceholderNote` (`src/lib/plantFeedingDisplayRules.ts:54`) is true (exact,
    trimmed, case-insensitive). A grower note that merely contains those words still matches.
@@ -107,21 +109,28 @@ switch know only grow / tent / plant / cultivar.
      entry: plant, tent, type, search and date, plus the sensor-source filter
      (`src/pages/Timeline.tsx` `sensorSourceFilter`), the stage filter (`stageFilter`) and the
      event chip. Each of these filters can hide a diary row on its own.
-   - A diary companion that `collapseQuickLogSaveFanOut` (`src/lib/timelineMergeRules.ts:312`,
-     called at `src/pages/Timeline.tsx:1814`) folds into its spine anchors to the spine's id,
-     the row that is actually rendered.
+   - The result's hash carries the spine id, but the main Timeline list does not render
+     spines. `collapseQuickLogSaveFanOut` (`src/lib/timelineMergeRules.ts:312`, called at
+     `src/pages/Timeline.tsx:1814`) builds only `recentLaneRawEntries`; the main list still
+     renders each diary card under its diary id (`src/pages/Timeline.tsx:2801–2826`). A card
+     gets a hidden spine-id alias only when its `details` carry an explicit
+     `linked_grow_event_id` or `grow_event_id` (`buildLinkedGrowEventTimelineAnchorId`,
+     `src/lib/timelineEntryAnchorRules.ts:23`). So a legacy **unlinked** manual companion,
+     paired by (grow, plant, instant), has only its diary-id anchor, and a hash with the spine
+     id scrolls nowhere. The implementing slice must give that card an alias for the spine id
+     it was paired with, using the same pairing rule as the search.
    - The existing hash handoff (`useTimelineHashAnchorHandoff.ts:50–63`) only scrolls to a row
      that is already mounted, and Timeline initially loads the selected grow's newest 100
      entries. The implementing slice adds a bounded "load until this entry or give up" step
      (for example one targeted read of the entry plus its page, capped) and a calm "This
      entry is no longer on the timeline" notice when it cannot be found.
-   - A spine-only result needs a mounted anchor too. Timeline assigns `timeline-entry-<id>`
-     only while rendering its primary diary-derived list (`src/pages/Timeline.tsx:2801–2823`);
-     standalone grow events appear only in `RecentQuickLogActivityPanel`, whose rows carry no
-     DOM id and are capped. Loading the spine alone therefore scrolls nowhere. The
-     implementing slice must render the target spine as an anchored row (or give the panel
-     row the anchor and load it past the cap), and the navigation acceptance test covers a
-     spine-only result.
+   - A spine-only result has no diary card at all. Its `QuickLogHistoryPanels` row
+     (`src/components/QuickLogHistoryPanels.tsx:250–255`) carries no DOM id, and that panel is
+     capped, so loading more records cannot create the destination. The implementing slice
+     must mount a row addressable by `timeline-entry-<spine-id>`: render the target spine as an
+     anchored row, or give the panel row that id and include it past the cap.
+   - Both cases are rendered navigation tests, not helper tests: each mounts Timeline with the
+     hash and asserts the element with that id exists and is scrolled to.
 3. A failed diary read is shown as "Diary results unavailable", never as "no results"
    (same rule the private RPC already follows).
 4. No new data exposure: rows come only through RLS-scoped reads; no service role. RLS is
@@ -279,8 +288,11 @@ The function must:
 - Dialog (rendered `GlobalSearchDialog`): a diary result is visible with fresh filter state and
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
-  companion), including for a grow other than the active one, and for a spine-only result,
-  whose anchored row is mounted and scrolled to. With eleven or more entity and
+  companion), including for a grow other than the active one. Rendered Timeline navigation
+  tests cover three hash targets by spine id, each asserting a mounted element with that id
+  is scrolled to: an explicitly linked companion (existing alias), a legacy unlinked manual
+  companion paired by (grow, plant, instant) (new alias), and a spine-only result (new
+  anchored row). With eleven or more entity and
   cultivar matches, the first diary match is still on the first page. A history entry that
   differs only in the diary toggle is kept as its own entry. A persisted diary last-selection
   restores its preview. Changing the query to another term in the same note updates the

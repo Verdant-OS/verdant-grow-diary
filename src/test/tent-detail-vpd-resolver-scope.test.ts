@@ -338,6 +338,19 @@ describe("tentDetailVpdRowUntrusted (Codex P1 at 307b10f4)", () => {
     expect(tentDetailVpdRowUntrusted([vpdRow(1, q)], at(1))).toBe(false);
   });
 
+  // An explicit stale/invalid source downgrades the row whatever its quality,
+  // as selectRejectedQualityRows treats it (Codex P1 on #2412 at 8d8c4900).
+  it.each(["stale", "invalid", " Invalid "])(
+    "flags an ok-quality vpd_kpa row whose source is %j",
+    (source) => {
+      expect(tentDetailVpdRowUntrusted([{ ...vpdRow(1, "ok"), source }], at(1))).toBe(true);
+    },
+  );
+
+  it.each(["live", "manual", "csv", null])("trusts an ok-quality row from source %j", (source) => {
+    expect(tentDetailVpdRowUntrusted([{ ...vpdRow(1, "ok"), source }], at(1))).toBe(false);
+  });
+
   it("ignores a flagged row at another capture, a non-VPD row and an unknown capture time", () => {
     expect(tentDetailVpdRowUntrusted([vpdRow(5, "invalid")], at(1))).toBe(false);
     expect(

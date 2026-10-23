@@ -148,9 +148,14 @@ export function tentDetailVpdRowUntrusted(
       row.metric === "vpd_kpa" &&
       typeof row.value === "number" &&
       instantMs(row.captured_at ?? row.ts) === atMs &&
-      !trustedIntakeQuality(row.quality),
+      // An explicit stale/invalid source is a downgrade whatever the quality,
+      // as selectRejectedQualityRows treats it (Codex P1 on #2412 at 8d8c4900).
+      (!trustedIntakeQuality(row.quality) ||
+        DOWNGRADED_SOURCES.has(row.source?.trim().toLowerCase() ?? "")),
   );
 }
+
+const DOWNGRADED_SOURCES = new Set(["stale", "invalid"]);
 
 function instantMs(at: string | null | undefined): number | null {
   if (!at) return null;

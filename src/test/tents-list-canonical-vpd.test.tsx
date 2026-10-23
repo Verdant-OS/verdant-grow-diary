@@ -556,6 +556,46 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(screen.getByTestId("tents-list-metric-tent-1-rh")).toHaveTextContent("55");
   });
 
+  it("keeps the snapshot fallback's climate capture beside a newer rejected VPD row (Codex P2 on #2412 at 8d8c4900)", () => {
+    const climate = at(0.1);
+    const later = at(0.05);
+    const snap: CaptureEvidenceSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "live",
+      ts: climate,
+      temp: 24,
+      rh: 55,
+      tent_id: "tent-1",
+      metric_refs: {
+        temp: { id: "row-temp", captured_at: climate, source: "live" },
+        rh: { id: "row-rh", captured_at: climate, source: "live" },
+      },
+      rejected_quality_rows: [
+        { metric: "vpd_kpa", value: 1.1, captured_at: later, source: "live", quality: "degraded" },
+      ],
+    };
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={{ status: "ok", snapshot: snap }}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="error"
+        now={NOW.getTime()}
+        temperatureUnit="celsius"
+        manualCards={[]}
+        manualStatus="success"
+      />,
+    );
+    expect(screen.getByTestId("tents-list-metric-tent-1-temp")).toHaveTextContent("24");
+    expect(screen.getByTestId("tents-list-metric-tent-1-rh")).toHaveTextContent("55");
+    // The rejected VPD itself never reads as healthy.
+    expect(screen.getByTestId("tents-list-metric-tent-1-vpd")).not.toHaveAttribute(
+      "data-status",
+      "ok",
+    );
+  });
+
   it("marks an older live VPD stale even beside a fresh live capture (Codex P1)", () => {
     const rows = [
       row("temperature_c", (80 - 32) / 1.8, at(2), "live"),

@@ -214,8 +214,14 @@ export function tentsListDiarySnapshotRows(
   // it does on the raw-row path (Codex P1 on #2303 at 0994ea2a).
   // Tonight ignores non-climate rejects, so a rejected CO2 row must not become
   // the fallback's latest cohort (Copilot P1 on #2407 at e66265eb).
+  // Only the displayed capture's own siblings ride along: a rejected row at
+  // another instant would become the fallback's latest cohort and blank the
+  // valid temperature and RH. Tonight still judges that capture from the
+  // snapshot itself (Codex P2 on #2412 at 8d8c4900).
+  const snapMs = Date.parse(snap.ts as string);
   for (const rejected of snap.rejected_quality_rows ?? []) {
     if (!isClimateMetric(rejected.metric)) continue;
+    if (Date.parse(rejected.captured_at) !== snapMs) continue;
     const captureRef = sensorCaptureRef(rejected.captured_at, rejected.source);
     rows.push({
       metric: rejected.metric,

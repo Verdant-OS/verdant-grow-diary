@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { dropBlankQuickLogPlaceholderRows } from "@/lib/timelineQuickLogPlaceholderDedupeRules";
+import { collapseQuickLogSaveFanOut } from "@/lib/timelineMergeRules";
 import { buildQuickLogPhotoDiaryEntryRow } from "@/lib/quickLogPhotoDiaryEntry";
 
 const harness = vi.hoisted(() => ({
@@ -250,6 +251,52 @@ describe("photo-row link derivation", () => {
     const kept = dropBlankQuickLogPlaceholderRows([unlinkedPhoto, unlinkedBlank]);
     expect(kept.map((row) => row.id).sort()).toEqual(["blank-unlinked", "photo-1"]);
   });
+
+  it("keeps an unlinked photo when the timeline collapse has its grow event", () => {
+    const built = buildQuickLogPhotoDiaryEntryRow({
+      ownerId: "owner-1",
+      growId: "grow-a",
+      tentId: "tent-1",
+      plantId: "plant-1",
+      photoPath: "user-1/grow-a/leaf.jpg",
+      noteRaw: "",
+      action: "water",
+      extraDetails: { linked_grow_event_id: "event-1", grow_event_id: "event-1" },
+      now: () => new Date("2026-10-14T14:47:00.000Z"),
+    });
+    const collapsed = collapseQuickLogSaveFanOut({
+      diaryEntries: [
+        {
+          id: "photo-real",
+          entry_at: built.entry_at,
+          plant_id: built.plant_id,
+          photo_url: built.photo_url,
+          note: built.note,
+          details: built.details,
+        },
+        {
+          id: "linked-companion",
+          entry_at: built.entry_at,
+          plant_id: "plant-1",
+          note: "(quick log)",
+          details: { linked_grow_event_id: "event-1" },
+        },
+      ],
+      growEvents: [
+        {
+          id: "event-1",
+          source: "manual",
+          is_deleted: false,
+          plant_id: "plant-1",
+          occurred_at: "2026-10-14T14:46:00.000Z",
+        },
+      ],
+    });
+    expect(collapsed.diaryEntries.map((row) => row.id)).toEqual(["photo-real"]);
+    expect(collapsed.droppedCompanionsBySpineId.get("event-1")?.map((row) => row.id)).toEqual([
+      "linked-companion",
+    ]);
+  });
 });
 
 describe("Timeline rendered blank quick-log deduplication", () => {
@@ -285,7 +332,6 @@ describe("Timeline rendered blank quick-log deduplication", () => {
       photoPath: "https://example.test/leaf.jpg",
       noteRaw: "",
       action: "water",
-      linkedGrowEventId: "event-1",
       now: () => new Date("2026-10-14T14:47:00.000Z"),
     });
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
@@ -314,6 +360,7 @@ describe("Timeline rendered blank quick-log deduplication", () => {
                 event_type: "observation",
                 source: "manual",
                 linked_grow_event_id: "event-1",
+                photo_url: built.photo_url,
               },
             },
           ],

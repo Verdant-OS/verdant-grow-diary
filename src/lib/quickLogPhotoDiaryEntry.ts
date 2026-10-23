@@ -37,12 +37,6 @@ export interface QuickLogPhotoDiaryEntryInput {
    */
   extraDetails?: Readonly<Record<string, string>> | null;
   /**
-   * Grow-event id from the manual save that this photo is attached to.
-   * Stored as details.linked_grow_event_id so Timeline can hide that save's
-   * blank "(quick log)" mirror. Omitted when the caller has no id.
-   */
-  linkedGrowEventId?: string | null;
-  /**
    * Diary event type. Defaults to the attachment marker
    * "quicklog_photo_attachment" (the V2-sheet contract plant-memory episodes
    * key on). The STANDALONE Photo activity passes "photo" so the read layers
@@ -77,6 +71,16 @@ export interface QuickLogPhotoDiaryEntryRow {
 export const QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE = "Photo attached from Quick Log." as const;
 
 /**
+ * Keys the linked-companion insert/delete policies reject on a client write
+ * (`20260927094000`). A photo row that carries either key is not insertable
+ * once that migration is applied, and a row that already has one cannot be
+ * deleted by the owner. Timeline also folds a linked diary row into its
+ * grow-event spine, so the photo disappears from the removable list.
+ * Blank "(quick log)" mirrors are matched by object path instead.
+ */
+const CLIENT_FORBIDDEN_LINK_KEYS = ["linked_grow_event_id", "grow_event_id"] as const;
+
+/**
  * Deterministic pure builder. Returns the exact row shape passed to
  * `diary_entries.insert(...)` — identical to the historical inline code.
  */
@@ -86,6 +90,8 @@ export function buildQuickLogPhotoDiaryEntryRow(
   const trimmed = (input.noteRaw ?? "").trim();
   const note = trimmed === "" ? QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE : trimmed;
   const now = input.now ? input.now() : new Date();
+  const extraDetails: Record<string, string> = { ...(input.extraDetails ?? {}) };
+  for (const key of CLIENT_FORBIDDEN_LINK_KEYS) delete extraDetails[key];
   return {
     grow_id: input.growId,
     tent_id: input.tentId,
@@ -95,15 +101,13 @@ export function buildQuickLogPhotoDiaryEntryRow(
     entry_at: now.toISOString(),
     details: {
       // Caller-supplied structured detail first; fixed identity keys win so
-      // no extraDetails key can spoof the attachment envelope. The save's
-      // grow-event id is applied last for the same reason.
-      ...(input.extraDetails ?? {}),
+      // no extraDetails key can spoof the attachment envelope. Grow-event
+      // link keys are stripped: this row is a removable photo, not a
+      // linked companion.
+      ...extraDetails,
       event_type: input.eventType ?? "quicklog_photo_attachment",
       source: "manual",
       attached_to_action: input.action,
-      ...(typeof input.linkedGrowEventId === "string" && input.linkedGrowEventId.trim() !== ""
-        ? { linked_grow_event_id: input.linkedGrowEventId.trim() }
-        : {}),
     },
   };
 }

@@ -85,6 +85,7 @@ import {
   TrainingHistoryPanel,
   MeasurementHistoryPanel,
 } from "@/components/QuickLogHistoryPanels";
+import { scopeTimelineQuickLogLaneRows } from "@/lib/timelineQuickLogLaneScopeRules";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import {
@@ -1852,6 +1853,26 @@ export default function Timeline() {
     }
     return out;
   }, [displayEntries, growEvents, supplementalLinkedGrowEvents]);
+  // The Quick Log history lanes follow the same plant/tent filter as the main
+  // list (filming bug #3); unscoped `recentLaneRawEntries` still feeds the
+  // grow-wide evidence counts.
+  const scopedRecentLaneRawEntries = useMemo(
+    () =>
+      scopeTimelineQuickLogLaneRows(recentLaneRawEntries, {
+        plantId: plantFilter,
+        tentId: tentFilter,
+      }),
+    [recentLaneRawEntries, plantFilter, tentFilter],
+  );
+  const scopedHistoryEntries = useMemo(
+    () => scopeTimelineQuickLogLaneRows(entries, { plantId: plantFilter, tentId: tentFilter }),
+    [entries, plantFilter, tentFilter],
+  );
+  const scopedMeasurementEntries = useMemo(
+    () =>
+      scopeTimelineQuickLogLaneRows(displayEntries, { plantId: plantFilter, tentId: tentFilter }),
+    [displayEntries, plantFilter, tentFilter],
+  );
 
   const symptomEvidenceByEntryId = useMemo(() => {
     const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
@@ -2684,7 +2705,7 @@ export default function Timeline() {
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
         <RecentQuickLogActivityPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           limit={10}
           growId={activeGrowId ?? null}
           onEntryChanged={() => {
@@ -2695,7 +2716,9 @@ export default function Timeline() {
 
       <div className="mt-4">
         <DiaryCalendarSection
-          rawEntries={recentLaneRawEntries}
+          // Remount on a scope change so the month snaps to the new scope's activity.
+          key={`${plantFilter ?? ""}|${tentFilter ?? ""}`}
+          rawEntries={scopedRecentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
           plantStartedAt={activeGrow?.started_at ?? null}
         />
@@ -2703,7 +2726,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <WateringHistoryPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
@@ -2714,7 +2737,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <FeedingHistoryPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
@@ -2725,7 +2748,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <PestDiseaseHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2735,7 +2758,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <TrainingHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2745,7 +2768,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <MeasurementHistoryPanel
-          rawEntries={displayEntries}
+          rawEntries={scopedMeasurementEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2755,7 +2778,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <PhotoHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={24}
           onEntryChanged={() => {
             void load();

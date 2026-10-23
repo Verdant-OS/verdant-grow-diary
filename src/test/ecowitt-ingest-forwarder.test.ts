@@ -21,6 +21,7 @@ import {
   APPROVED_INGEST_URLS,
   MAX_MESSAGE_BYTES,
   attachClientLifecycle,
+  brokerUrlIsHierarchical,
   buildForwardRequest,
   configuredSecretValues,
   createBoundedRunner,
@@ -159,6 +160,17 @@ describe("flags and env", () => {
     const env = readEnv({ ECOWITT_INGEST_URL: "  ", VERDANT_BRIDGE_TOKEN: "" });
     expect(env.ingestUrl).toBeNull();
     expect(env.token).toBeNull();
+  });
+});
+
+describe("brokerUrlIsHierarchical", () => {
+  it.each([
+    ["mqtt://127.0.0.1:1883", true],
+    ["mqtt://user:pass@broker.example:1883", true],
+    ["mqtt:user:pass@broker.invalid", false],
+    ["not-a-url", false],
+  ])("%s → %s", (url, expected) => {
+    expect(brokerUrlIsHierarchical(url)).toBe(expected);
   });
 });
 

@@ -8,6 +8,7 @@ import {
   parseEcowittBody,
   parseFlags,
   pathMatches,
+  redactBrokerUrl,
   type BridgeFlags,
   type MqttPublisher,
 } from "../../scripts/dev/ecowitt-http-local-bridge";
@@ -36,6 +37,23 @@ const fakePublisher = () => {
   };
   return { pub, calls };
 };
+
+describe("redactBrokerUrl", () => {
+  it("strips userinfo from a hierarchical broker URL", () => {
+    expect(redactBrokerUrl("mqtt://mqtt-user:mqtt-pass@127.0.0.1:1883")).toBe(
+      "mqtt://127.0.0.1:1883",
+    );
+  });
+
+  it("returns the URL unchanged when there is no userinfo", () => {
+    expect(redactBrokerUrl("mqtt://127.0.0.1:1883")).toBe("mqtt://127.0.0.1:1883");
+  });
+
+  it("returns the original string when the URL cannot be parsed", () => {
+    const bad = "mqtt://[not-a-host]:1883";
+    expect(redactBrokerUrl(bad)).toBe(bad);
+  });
+});
 
 describe("parseFlags", () => {
   it("defaults match spec", () => {

@@ -25,6 +25,11 @@ export interface TentDetailVpdObservation extends DisplayedVpdObservation {
    * (Codex P2 on #2303 at 4a304fe3).
    */
   sourceLabel?: string;
+  /**
+   * True when a VPD existed but was withheld as invalid, so the page labels it
+   * rather than dropping it (CodeRabbit on #2451 at 6d0fa53c).
+   */
+  rejected?: true;
 }
 
 /** Temperature and RH observed at one capture instant. */
@@ -54,6 +59,7 @@ interface TentDetailClimateRow {
   quality?: string | null;
   source?: string | null;
   capture_ref?: string | null;
+  device_id?: string | null;
   /** Classification only: lets the diagnostic fence run before capture refs are built. */
   raw_payload?: unknown;
 }
@@ -159,10 +165,15 @@ export function tentDetailVpdRowUntrusted(
    * bcdf2ea6). Unknown identity on either side falls back to the instant.
    */
   selectedSource?: string | null,
+  /**
+   * The selected VPD row's device, so another device's flagged VPD at the same
+   * instant is not taken for it (Codex on #2451 at 6d0fa53c).
+   */
+  selectedDevice?: string | null,
 ): boolean {
   const atMs = instantMs(at);
   if (atMs === null) return false;
-  const selectedRef = sensorCaptureRef(at, selectedSource);
+  const selectedRef = sensorCaptureRef(at, selectedSource, selectedDevice);
   // Diagnostic rows are fenced out here as in the capture climate, so a
   // testbench VPD cannot withhold a physical one (Copilot P1 on #2417).
   return withoutDiagnosticSensorRows(rows).some(
@@ -406,7 +417,14 @@ export function resolveTentDetailVpd(input: {
         : existingMs === null || rejectedMs === null || existingMs === rejectedMs));
   const existingOrNothing = (): TentDetailVpdObservation =>
     existingFromRejectedCapture
-      ? { value: null, capturedAt: null, source: null, stale: false, calculated: false }
+      ? {
+          value: null,
+          capturedAt: null,
+          source: null,
+          stale: false,
+          calculated: false,
+          rejected: true,
+        }
       : { ...input.existing, calculated: false };
   if (
     !existingFromRejectedCapture &&
@@ -435,7 +453,14 @@ export function resolveTentDetailVpd(input: {
   // A genuinely newer `existing` already returned above (Copilot on #2303 at
   // b49c32ae).
   if (tonight?.state === "invalid") {
-    return { value: null, capturedAt: null, source: null, stale: false, calculated: false };
+    return {
+      value: null,
+      capturedAt: null,
+      source: null,
+      stale: false,
+      calculated: false,
+      rejected: true,
+    };
   }
   if (rejectionApplies && climateRejected && !tonightIndependent) {
     return existingOrNothing();
@@ -475,7 +500,14 @@ export function resolveTentDetailVpd(input: {
       ? captureRefIn(input.existingRef, tonightRefs)
       : existingMs !== null && tonightMs !== null && existingMs === tonightMs;
   if (tonight?.state === "value" && existingIsTonightCapture) {
-    return { value: null, capturedAt: null, source: null, stale: false, calculated: false };
+    return {
+      value: null,
+      capturedAt: null,
+      source: null,
+      stale: false,
+      calculated: false,
+      rejected: true,
+    };
   }
   return existingOrNothing();
 }

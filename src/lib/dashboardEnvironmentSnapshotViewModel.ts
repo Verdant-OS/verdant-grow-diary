@@ -343,6 +343,12 @@ export function buildTentSnapshotView(
   // readings; diagnostics carrying that label are classified as demo first.
   const provenance = classifyLatestGroupProvenance(latestRows);
   const canonicalRejected = canonical?.rejected === true;
+  const latestVpdRowAt =
+    rows
+      .filter((r) => r.metric === "vpd_kpa" && typeof r.value === "number")
+      .map((r) => resolveSensorObservationTime(r))
+      .filter((at): at is string => !!at && Number.isFinite(Date.parse(at)))
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
   // The canonical VPD is the cohort's own capture only when it comes from one
   // of the cohort's own records (Codex P1 on #2303 at fa8edcff). With an
   // unknown identity on either side it must share both the instant and the
@@ -360,8 +366,20 @@ export function buildTentSnapshotView(
   // VPD beside manual readings, keeps its own source and age instead (Codex
   // and Copilot on #2437 at 9ddaa0ae). Rejection handling still keys on
   // `sameCapture`.
+  // With identities known on both sides, every cohort record must belong to the
+  // VPD's capture too: a live temperature from another device flagged stale
+  // must not grade this device's VPD (Copilot on #2451 at 6d0fa53c).
+  const cohortIsVpdCapture =
+    canonical !== null &&
+    (!captureRefsKnown(canonical.captureRefs) ||
+      !captureRefsKnown(cohortRefs) ||
+      cohortRefs.every((ref) => captureRefIn(ref, canonical.captureRefs ?? [])));
   const useCanonicalVpd =
-    sameCapture && !canonicalRejected && canonical !== null && canonical.source === provenance;
+    sameCapture &&
+    !canonicalRejected &&
+    canonical !== null &&
+    canonical.source === provenance &&
+    cohortIsVpdCapture;
   // The capture gate rejected the cohort's own capture: its stored VPD is the
   // rejected reading and must not fall back to "ok" (Codex P1 at 108e3eab).
   const cohortVpdRejected = sameCapture && canonicalRejected;
@@ -538,7 +556,11 @@ export function buildTentSnapshotView(
     canonical !== null &&
     canonicalRejected &&
     !sameCapture &&
-    (canonical.rowsReadFailed === true || !olderThan(canonical.capturedAt, snap.ts))
+    // Only a newer VPD supersedes the rejection; a newer CO2-only row is not VPD
+    // evidence (Copilot on #2451 at 6d0fa53c).
+    (canonical.rowsReadFailed === true ||
+      latestVpdRowAt === null ||
+      !olderThan(canonical.capturedAt, latestVpdRowAt))
   ) {
     metrics[2] = {
       key: "vpd",

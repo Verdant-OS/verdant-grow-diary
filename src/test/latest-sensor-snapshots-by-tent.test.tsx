@@ -10,8 +10,6 @@
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSnapshotBatcher,
@@ -33,6 +31,12 @@ const io = vi.hoisted(() => {
     diaryRows: [] as Row[],
     failSensor: false,
     failDiary: false,
+    // Each query's `.order` / `.limit` calls in order, so ordering is asserted
+    // on the resolved call chain (CodeRabbit on #2451 at 6d0fa53c).
+    queries: [] as {
+      table: string;
+      calls: { op: string; column?: string; ascending?: boolean }[];
+    }[],
     // A chainable, thenable PostgREST stand-in: fixtures are pre-sorted newest
     // first; `.in` filters by the named column and `.limit` slices.
     builder(table: string) {
@@ -43,9 +47,14 @@ const io = vi.hoisted(() => {
             ? state.diaryRows
             : [];
       let limit = Number.POSITIVE_INFINITY;
+      const log = { table, calls: [] as { op: string; column?: string; ascending?: boolean }[] };
+      state.queries.push(log);
       const b = {
         select: () => b,
-        order: () => b,
+        order: (column: string, opts?: { ascending?: boolean }) => {
+          log.calls.push({ op: "order", column, ascending: opts?.ascending });
+          return b;
+        },
         is: () => b,
         eq: () => b,
         or: () => b,
@@ -54,6 +63,7 @@ const io = vi.hoisted(() => {
           return b;
         },
         limit: (n: number) => {
+          log.calls.push({ op: "limit" });
           limit = n;
           return b;
         },
@@ -483,15 +493,17 @@ describe("useLatestSensorSnapshotsByTent (cold load, Codex P2 at d6ef3a20)", () 
     expect(bulk[b]).toEqual(await fetchLatestSensorSnapshot(GROW, [b]));
   });
 
-  it("orders both sensor reads by a unique final key before the limit (Codex P1 at 3d1e5800)", () => {
-    const source = readFileSync(resolve(__dirname, "../hooks/useLatestSensorSnapshot.ts"), "utf8");
-    const sensorQueries = source.split("effectiveSensorReadingsQuery()").slice(1);
-    expect(sensorQueries).toHaveLength(2);
-    for (const query of sensorQueries) {
-      const head = query.slice(0, query.indexOf(".limit("));
-      expect(head).toMatch(
-        /\.order\("created_at"[^)]*\)\s*(?:\/\/[^\n]*\n\s*)*\.order\("id", \{ ascending: false \}\)/,
-      );
+  it("orders both sensor reads by a unique final key before the limit (Codex P1 at 3d1e5800)", async () => {
+    io.queries.length = 0;
+    await fetchLatestSensorSnapshot(GROW, [TENT_A]);
+    await fetchLatestSensorSnapshotsByTent(GROW, [TENT_A, TENT_B]);
+    const sensorReads = io.queries.filter((q) => q.table === "sensor_readings_effective");
+    expect(sensorReads.length).toBeGreaterThanOrEqual(2);
+    for (const read of sensorReads) {
+      const limitAt = read.calls.findIndex((c) => c.op === "limit");
+      const orders = read.calls.slice(0, limitAt).filter((c) => c.op === "order");
+      expect(limitAt).toBeGreaterThan(0);
+      expect(orders.at(-1)).toEqual({ op: "order", column: "id", ascending: false });
     }
   });
 });

@@ -382,7 +382,12 @@ function calculatedVpdCandidate(
     const matchingRh = provenRhs.find(
       (candidateRh) =>
         candidateRh.epochMs === candidateTemp.epochMs &&
-        compositeVpdSource(candidateTemp.source, candidateRh.source) != null,
+        compositeVpdSource(candidateTemp.source, candidateRh.source) != null &&
+        // Known, disjoint captures (two devices at one instant) are not a pair
+        // (Copilot on #2451 at 6d0fa53c).
+        (!captureRefsKnown(candidateTemp.refs) ||
+          !captureRefsKnown(candidateRh.refs) ||
+          candidateTemp.refs.some((ref) => captureRefIn(ref, candidateRh.refs))),
     );
     if (matchingRh) {
       temp = candidateTemp;
@@ -557,7 +562,9 @@ export function buildTonightTentMetrics(input: {
         value: snapValue,
         source: metricSource,
         ...snapWhen,
-        origin: 1,
+        // An invalid snapshot VPD ranks with the other rejections, so it never
+        // blocks an independent equal-time calculation (Copilot on #2451).
+        origin: key === "vpd" && metricSource === "invalid" ? 2 : 1,
         ownSource: snapshotMetricSourceProven(snap, key, metricSource),
         refs: [snapRef],
         ...(isDiarySource(snap.source) ? { historical: true as const } : {}),

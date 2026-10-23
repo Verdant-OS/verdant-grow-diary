@@ -182,6 +182,24 @@ export function selectRejectedQualityRows(
   return out;
 }
 
+/**
+ * The snapshot with the `device_id` of the exact row behind each `metric_refs`
+ * entry, so its capture refs carry the device (owner decision on #2442).
+ */
+export function withMetricDeviceIds<T extends SensorSnapshot>(
+  snapshot: T,
+  rows: readonly { id?: string | null; device_id?: string | null }[] | null | undefined,
+): T & Pick<CaptureEvidenceSnapshot, "metric_device_ids"> {
+  const deviceIds: Record<string, string> = {};
+  for (const [key, ref] of Object.entries(snapshot.metric_refs ?? {})) {
+    const device = (rows ?? []).find((row) => row.id === ref?.id)?.device_id;
+    if (typeof device === "string" && device.trim()) deviceIds[key] = device;
+  }
+  return Object.keys(deviceIds).length > 0
+    ? { ...snapshot, metric_device_ids: deviceIds }
+    : snapshot;
+}
+
 /** The snapshot with `rows`' quality-rejected siblings attached, when there are any. */
 export function withRejectedQualityRows(
   snapshot: SensorSnapshot | null,
@@ -189,14 +207,7 @@ export function withRejectedQualityRows(
 ): CaptureEvidenceSnapshot | null {
   if (!snapshot) return snapshot;
   const rejected = selectRejectedQualityRows(rows);
-  // The device behind each metric ref, so the ref's capture identity carries it.
-  const deviceIds: Record<string, string> = {};
-  for (const [key, ref] of Object.entries(snapshot.metric_refs ?? {})) {
-    const device = (rows ?? []).find((row) => row.id === ref?.id)?.device_id;
-    if (typeof device === "string" && device.trim()) deviceIds[key] = device;
-  }
-  const withDevices =
-    Object.keys(deviceIds).length > 0 ? { ...snapshot, metric_device_ids: deviceIds } : snapshot;
+  const withDevices = withMetricDeviceIds(snapshot, rows);
   return rejected.length > 0 ? { ...withDevices, rejected_quality_rows: rejected } : withDevices;
 }
 

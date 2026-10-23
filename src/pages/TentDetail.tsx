@@ -121,6 +121,7 @@ import {
   tentDetailCaptureClimate,
   tentDetailVpdNeedsOwnProvenance,
 } from "@/lib/tentDetailVpdRules";
+import { withMetricDeviceIds } from "@/lib/dashboardSensorEvidenceRules";
 
 const EMPTY_TENT_PLANTS: never[] = [];
 
@@ -210,10 +211,14 @@ export default function TentDetail() {
   // rejection: no snapshot value, rejection noted (Codex P1 on #2303 at 307b10f4).
   // The VPD's own source, not the snapshot's aggregate: one manual metric in
   // the cohort makes `snap.source` manual (Copilot P1 on #2430 at fcd86356).
+  // Each header metric's device, so its capture refs never match another
+  // device at the same instant (Copilot and Codex on #2451 at 6d0fa53c).
+  const snapWithDevices = snap ? withMetricDeviceIds(snap, readings) : snap;
   const storedVpdRowUntrusted = tentDetailVpdRowUntrusted(
     readings,
     header.capturedAt,
     snap?.metric_refs?.vpd?.source ?? null,
+    snapWithDevices?.metric_device_ids?.vpd ?? null,
   );
   const storedVpdObservation = resolveDisplayedVpdObservation({
     snapshotVpd: storedVpdRowUntrusted ? null : snap?.vpd,
@@ -242,7 +247,7 @@ export default function TentDetail() {
     existing: storedVpdObservation,
     rejectedCapturedAt: header.capturedAt,
     // The stored VPD is the snapshot's own exactly when that value was passed in.
-    ...tentDetailHeaderRejection(header.truth, snap, {
+    ...tentDetailHeaderRejection(header.truth, snapWithDevices, {
       existingIsSnapshotVpd: !storedVpdRowUntrusted && Number.isFinite(snap?.vpd ?? NaN),
     }),
     // The pair a calculated VPD came from, not the displayed temperature and
@@ -548,16 +553,17 @@ export default function TentDetail() {
             </p>
           );
         })()}
-      {(headerVpd === null || headerVpd === undefined) && storedVpdRowUntrusted && (
-        // A quality-rejected stored VPD is labelled, never silently dropped
-        // (Codex P1 on #2437 at 9ddaa0ae).
-        <p
-          className="text-[11px] text-destructive -mt-3 mb-4"
-          data-testid="tent-detail-vpd-rejected"
-        >
-          VPD invalid — the latest reading failed its quality check.
-        </p>
-      )}
+      {(headerVpd === null || headerVpd === undefined) &&
+        (storedVpdRowUntrusted || headerVpdObservation.rejected) && (
+          // A quality-rejected stored VPD is labelled, never silently dropped
+          // (Codex P1 on #2437 at 9ddaa0ae).
+          <p
+            className="text-[11px] text-destructive -mt-3 mb-4"
+            data-testid="tent-detail-vpd-rejected"
+          >
+            VPD invalid — the latest reading failed its quality check.
+          </p>
+        )}
       {vpdFromFallback && (
         <p
           className="text-[11px] text-muted-foreground -mt-3 mb-4 flex flex-wrap items-center gap-2"

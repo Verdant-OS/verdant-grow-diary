@@ -118,7 +118,9 @@ export function tentsListCanonicalVpd(
   }
   // Tonight has no VPD: say so explicitly, so the strip never derives one
   // from rows Tonight does not read (Copilot on #2442 at e50d6087).
-  if (vpd?.state === "missing") {
+  // Missing, or not yet read: either way the list shows no VPD of its own until
+  // Tonight's evidence settles (Codex on #2451 at 6d0fa53c).
+  if (vpd?.state === "missing" || vpd?.state === "loading") {
     return {
       kpa: null,
       capturedAt: null,
@@ -144,6 +146,9 @@ export function tentsListCanonicalVpd(
       quality: row.quality ?? null,
       source: row.source ?? null,
       capture_ref: row.capture_ref ?? null,
+      // The device keeps another device's rejection off this capture (Copilot
+      // on #2451 at 6d0fa53c).
+      device_id: row.device_id ?? null,
       // Kept until tentDetailCaptureClimate's diagnostic fence runs (Copilot
       // P1 on #2412 at 8d8c4900).
       raw_payload: row.raw_payload,

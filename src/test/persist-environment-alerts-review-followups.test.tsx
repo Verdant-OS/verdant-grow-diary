@@ -182,7 +182,24 @@ describe("usePersistEnvironmentAlerts review follow-ups (#2267 at 4dcba2be)", ()
   });
 
   it("reports the refresh error and stops after the bounded retries when every attempt fails (Codex P1)", async () => {
-    alertsIo.list.mockResolvedValue([OPEN_STAGE_RH]);
+    // The list reflects inserts, as the database does: once saved, the
+    // temperature alert is open and later runs dedupe against it.
+    alertsIo.list.mockImplementation(async () =>
+      alertsIo.save.mock.calls.some(([p]) => p?.metric === "temp")
+        ? [
+            OPEN_STAGE_RH,
+            {
+              id: "alert-1",
+              metric: "temp",
+              source: "environment_alerts",
+              title: "Temperature above target",
+              reason: "",
+              tent_id: "tent-1",
+              status: "open",
+            },
+          ]
+        : [OPEN_STAGE_RH],
+    );
     alertsIo.update.mockRejectedValue(new Error("network down"));
     const input = refreshAndInsertInput();
     const hook = renderHook((p) => usePersistEnvironmentAlerts(p), { initialProps: input });
@@ -337,5 +354,22 @@ describe("usePersistEnvironmentAlerts review follow-ups (#2267 at 4dcba2be)", ()
     expect(alertsIo.update).toHaveBeenCalledTimes(2);
 
     hook.unmount();
+  });
+
+  it("lets the instance that wrote an alert persist the breach again after the grower closed it elsewhere (Codex P1 at b4a8117f)", async () => {
+    const now = Date.now();
+    const writer = renderHook((p) => usePersistEnvironmentAlerts(p), {
+      initialProps: stageOnlyInput(new Date(now - 60_000).toISOString()),
+    });
+    await waitFor(() => expect(savesFor("temp")).toBe(1));
+    await waitFor(() => expect(writer.result.current.status).toBe("done"));
+
+    // Closed from another tab or device; the next reading shows the same breach.
+    writer.rerender(stageOnlyInput(new Date(now).toISOString()));
+    await waitFor(() => expect(savesFor("temp")).toBe(2));
+    await settle();
+    expect(savesFor("temp")).toBe(2);
+
+    writer.unmount();
   });
 });

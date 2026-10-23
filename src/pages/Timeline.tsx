@@ -836,16 +836,6 @@ export default function Timeline() {
           entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
         return entriesQuery;
       });
-      if (!isCurrentRequest()) return;
-      if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
-
-      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
-      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
-      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
-        rows,
-        user,
-      );
-      const paths = [...new Set(privatePhotoPathById.values())];
 
       // Filtered by is_deleted here so the visible-event page (its 100-row
       // budget, and growEvents.length UI-copy gates below) never shows or
@@ -874,6 +864,7 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
 
       const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
       const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rows,
         user,

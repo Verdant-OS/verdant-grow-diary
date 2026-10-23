@@ -30,7 +30,12 @@ switch know only grow / tent / plant / cultivar.
 ## Requirements
 
 1. Match the grower's **own** logged notes on `note` text in **both** places a log lives:
-   `grow_events` (every confirmed Quick Log save writes this spine row) and `diary_entries`.
+   `grow_events` (every confirmed `quicklog_save_event` and `quicklog_save_manual` save writes
+   this spine row) and `diary_entries`. Not every Quick Log save has a spine: the standalone
+   Photo activity (`createQuickLogPhotoDiaryEntry`, called at
+   `src/components/QuickLogAllActivitiesSection.tsx:1294`) and the video attachment helper
+   (`src/lib/quickLogVideoDiaryEntry.ts:86`) insert only a `diary_entries` row. Such a row is
+   matched on its own and returned as a `'diary_entry'` result; it never needs a spine.
    Companion presence depends on the writer, not on "structured details" as a single rule:
    - `quicklog_save_manual` always inserts a linked `diary_entries` mirror, even without
      details (`20260927160000_quicklog_manual_plant_tent_lineage.sql:211–229`). Empty notes
@@ -60,7 +65,11 @@ switch know only grow / tent / plant / cultivar.
      the deleted-spine exclusion below all use that one link, never the other key. A present
      but unusable modern value (not a UUID, or no spine with the diary row's owner and
      `grow_id`) does not fall back to the legacy key, because Timeline picks the modern value
-     without validating it; the row is then treated as unlinked. The linked spine must have
+     without validating it. A row with **any** preferred link whose link does not resolve
+     stays a standalone `'diary_entry'` result: it is never paired by the legacy tuple rule
+     below, as `collapseQuickLogSaveFanOut` takes its link branch and continues without tuple
+     fallback (`src/lib/timelineMergeRules.ts:393–407`). Only a row with no preferred link at
+     all is "unlinked". The linked spine must have
      the diary row's owner **and** `grow_id`. Timeline only ever resolves a link inside the selected grow
      (`src/pages/Timeline.tsx:437–441`), and the dual-timestamp backfill joins on owner and
      grow (`20260725024026_quicklog_dual_timestamp_foundation.sql:205–209`); a stale or
@@ -82,9 +91,24 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      with a null plant and a caller-supplied time
      (`20260927160000_quicklog_manual_plant_tent_lineage.sql`), so two tents of one grow can
      share (grow, null plant, instant).
+     - Environment siblings collapse first. A legacy manual save with sensor values wrote a
+       watering/observation parent and a same-instant manual `environment` sibling with the same
+       tuple (`20260611021144_…sql:300–343`). Before pairing, the search drops each environment
+       sibling that shares its tuple with a non-environment manual spine, keeping the parent, as
+       Timeline's `dedupeMergedManualGrowActivityRows`
+       (`src/lib/connectedOneTentActivationRules.ts:567`, called by `collapseQuickLogSaveFanOut`)
+       does. A standalone environment event with no such parent stays its own result.
+     - One spine per tuple. If several surviving manual spines still share a tuple, the
+       companion pairs only with the first in the result order (`occurred_at desc, id desc`,
+       so the highest id), matching Timeline's first-input-wins pair key. The others stay
+       their own results.
 
    When a spine and its companion collapse into one result, the returned `note` is the note
-   that matched: the diary companion's when it matches, otherwise the spine's. Historical
+   that matched: the diary companion's when it matches, otherwise the spine's. Several
+   non-retracted mirrors can resolve to one spine (the dual-timestamp backfill ranks such
+   duplicates, `20260725024026_quicklog_dual_timestamp_foundation.sql:184–204`). Among the
+   matching companions the note comes from the first by `entry_at desc, id desc`, so every
+   call returns the same excerpt. Historical
    pairs can carry different notes, so projecting the spine's note alone could return an
    excerpt without the match.
 
@@ -120,9 +144,11 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      every grower's diary entries (`20260517010926_65004f70-….sql:67–74`), so RLS alone is not
      owner scoping.
 
-2. Each result shows a note excerpt containing the whole match: 80 characters by default,
-   widened to the match's own length when the match is longer (so at most 120, the query
-   cap), with an ellipsis on each clipped side, the plant or tent name
+2. Each result shows a note excerpt containing the whole match: 80 characters of note text by
+   default, widened to the match's own length when the match is longer (so at most 120, the
+   query cap), with an ellipsis (`…`, one character) on each clipped side. The ellipses sit
+   **outside** that bound: the note text is at most 120 characters and the rendered excerpt at
+   most 122. The excerpt also shows the plant or tent name
    when known, and the local date (`formatSnapshotTimestamp`). Under the chosen Option B the
    RPC returns the plant, tent **and grow** names from owner-scoped joins; Option A would need one batched
    owner-scoped lookup (generated `diary_entries` / `grow_events` relationship metadata has
@@ -146,6 +172,10 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      paired by (grow, plant, instant), has only its diary-id anchor, and a hash with the spine
      id scrolls nowhere. The implementing slice must give that card an alias for the spine id
      it was paired with, using the same pairing rule as the search.
+     Exactly one card owns each spine alias: when several mirrors resolve to one spine, the
+     alias goes to the card whose note supplied the excerpt (the first matching companion by
+     `entry_at desc, id desc`, requirement 1), or to the first by that order when none
+     matched. Duplicate DOM ids would let `getElementById` pick the wrong card.
      The existing alias also keeps the link's spelling, and `getElementById` is case-sensitive,
      while the search returns the spine's canonical lowercase id. So every alias, explicit or
      paired, uses the resolved canonical spine id (lowercased, as the search compares it), not
@@ -157,6 +187,11 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      longer on the timeline" is shown only when that read **succeeds** and returns no eligible
      row. A read that errors or times out has not established absence: it shows a separate,
      retryable "Couldn't load this entry" state instead.
+   - Selecting the same result again from a Timeline already at that grow and hash must still
+     scroll. The URL does not change, and `useTimelineHashAnchorHandoff` keeps the fragment in
+     `handledAnchorRef` and skips it (`src/hooks/useTimelineHashAnchorHandoff.ts:57`). The
+     selection flow re-arms an identical fragment (for example by clearing that ref on
+     selection) before navigating.
    - A spine-only result has no diary card at all. Its `QuickLogHistoryPanels` row
      (`src/components/QuickLogHistoryPanels.tsx:250–255`) carries no DOM id, and that panel is
      capped, so loading more records cannot create the destination. The implementing slice
@@ -170,7 +205,10 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
    the authorization boundary; the owner filter in requirement 1 only narrows an operator's
    personal search and must never be relied on as authorization.
 5. Minimum query length 3 characters **for the diary read only**; grows, tents, plants and
-   cultivars keep their current short-query behaviour (for example "OG"). Maximum 120
+   cultivars keep their current short-query behaviour (for example "OG"). The RPC enforces the
+   minimum too: for a trimmed query shorter than 3 characters `verdant_search_diary` returns no
+   rows before any pattern is built, so a direct caller cannot run a one- or two-character
+   leading-wildcard scan. Exactly 3 characters is searched. Maximum 120
    characters, enforced by `verdant_search_diary` itself (the same cap as
    `MAX_QUERY_LENGTH` in `src/lib/globalSearchSession.ts:21`, which today bounds only the
    persisted state). A longer query raises SQLSTATE `22023` with message
@@ -187,8 +225,11 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
    RPC is revoked from `anon`, so a signed-out search makes no diary request and shows no diary
    state at all, neither results nor "Diary results unavailable".
 6. Diary search text never appears in a request URL. A note search term is private grower
-   content; URLs reach access logs, proxies and observability tools that request bodies do
-   not. The existing `verdant_search` RPC already sends `q` in a POST body.
+   content, and URLs land in access logs and proxy logs by default. A POST body removes that
+   default URL exposure, as the existing `verdant_search` RPC already does with `q`, but it
+   does not hide the term from tools that capture bodies (request tracing, debug logging).
+   So the client and the RPC never log the diary query or the request body, and neither is
+   added to analytics, telemetry or error reports.
 7. Diary results keep their own newest-first order. `mergeGlobalSearchResults` sorts by
    rank, then score, then label (`src/lib/globalSearchResults.ts:158–162`), which would
    reorder equal-rank excerpts alphabetically (`"alpha…"` before `"zeta…"` even when zeta
@@ -209,6 +250,10 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
    dormant `GLOBAL_SEARCH_ITEMS` catalog stays out of scope; wiring page links into search is
    a separate change.
    The two persistence paths that list entity types by hand also change:
+   - `normalizeFilters` in `src/lib/globalSearchSession.ts:41–51` copies a hard-coded
+     grow/tent/plant/cultivar key list. It must include `diary`, or a saved `diary: false` is
+     dropped and diary results silently come back on reopen or history replay. Its all-off
+     guard counts the diary toggle too.
    - `sameFilters` in `src/lib/globalSearchSession.ts` compares the history entries' filters
      field by field. It must include `diary`, so two histories that differ only in the diary
      toggle stay distinct.
@@ -297,23 +342,36 @@ The function must:
 
 ## Acceptance tests (for the implementing slice)
 
-- Pure rules: excerpt centres the match and never exceeds the bound, and a 120-character
-  match is shown whole in a 120-character excerpt; ordering is newest-first
-  with `id` tie-break; whitespace-only and <3-char queries return nothing; `100%`, `a_b` and
+- Pure rules: excerpt centres the match and its note text never exceeds the bound; a
+  120-character match with text on both sides is shown whole as 120 characters of note text
+  plus one ellipsis on each side (122 rendered); ordering is newest-first
+  with `id` tie-break; whitespace-only and <3-char queries return nothing, and an exactly 3-character query is
+  searched; `100%`, `a_b` and
   `c:\x` are escaped so they match only literally (`100%` must not match `100 ml`).
 - Query shape, Option B (chosen; RPC-side, against a local database): with more than 10
   matches sharing one timestamp, two calls return the same 10 ids, ordered by
   `occurred_at desc, id desc` before the limit; the search text is sent only in the RPC body; `verdant_search_diary` returns at most 10 rows
   with `grow_id` and `occurred_at`; `max_results` of `null` and `500` each return at most 10
   rows, and `0` and `-5` each return exactly 1 row, the newest matching fixture id; `100%` does not match `100 ml` server-side; `anon`
-  cannot execute it; a 120-character query runs and a 121-character query raises
+  cannot execute it; a 1- and a 2-character query (after trim) return no rows and a
+  3-character query returns its match; a 120-character query runs and a 121-character query raises
   `22023` / `diary_query_too_long`, which the hook shows as the invalid-query state, not as
   "Diary results unavailable"; run **as `authenticated`**, a legacy row with a valid link
   pairs with its spine and one whose link value is not a UUID does not fail the call and is
-  matched as unlinked; a row whose `linked_grow_event_id` and `grow_event_id` name two
+  returned standalone, never tuple-paired; a row whose `linked_grow_event_id` and `grow_event_id` name two
   different owned same-grow spines pairs only with the `linked_grow_event_id` spine (the
   other spine stays its own result), and a row with a non-UUID `linked_grow_event_id` and a
-  valid `grow_event_id` is matched as unlinked, not paired through the legacy key.
+  valid `grow_event_id` is returned standalone, not paired through the legacy key or the
+  tuple rule.
+- Pairing edges (local database): a legacy sensor-carrying manual save (watering parent,
+  same-instant `environment` sibling, unlinked diary companion; all at one tuple) returns one
+  result with the parent's id, never the sibling's; a standalone environment event still
+  matches on its own; two non-environment manual spines at one tuple pair the companion
+  only with the higher id; a row whose preferred link is malformed or names another grow,
+  and which shares its tuple with an unrelated manual spine, stays its own `'diary_entry'`
+  result; two matching mirrors of one spine return one row whose note is the first by
+  `entry_at desc, id desc`, on repeated calls; a standalone Photo-activity diary row with a
+  grower caption is found as a `'diary_entry'` result.
 - Collapsed projection: a linked pair whose companion note matches, whose spine note does
   not, and whose `entry_at` differs from the spine's `occurred_at` returns one row with
   `source = 'grow_event'`, the spine's id and `occurred_at`, and the companion's note.
@@ -347,15 +405,19 @@ The function must:
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
   companion), including for a grow other than the active one. Rendered Timeline navigation
   tests cover four hash targets by spine id, each asserting a mounted element with that id
-  is scrolled to: an explicitly linked companion (existing alias), a legacy unlinked manual
+  is scrolled to: an explicitly linked companion (existing alias), two mirrors of one spine (only the
+  excerpt's card carries the alias), a legacy unlinked manual
   companion paired by (grow, plant, tent, instant) (new alias), a companion whose explicit
   link is written in uppercase (alias uses the canonical lowercase id), and a spine-only result
   (new anchored row). The spine-only fixture is older than both the initial grow-event page
-  and the history-panel cap, so a capped panel cannot pass it. With eleven or more entity and
-  cultivar matches, the first diary match is still on the first page. A history entry that
+  and the history-panel cap, so a capped panel cannot pass it. With exactly ten entity and
+  cultivar matches (the `INITIAL_VISIBLE` boundary), the first diary match is among the
+  first ten rendered rows. A history entry that
   differs only in the diary toggle is kept as its own entry. A restored session or history
   filter object saved before this change, holding only the four pre-diary fields, normalizes
-  the missing diary toggle to enabled, and the diary result is visible with it. A persisted diary last-selection
+  the missing diary toggle to enabled, and the diary result is visible with it. A session
+  saved with the diary toggle off restores with it still off (round trip through
+  `normalizeFilters`). A persisted diary last-selection
   restores its preview. Changing the query to another term in the same note updates the
   preview to the new excerpt, and the input accepts at most 120 characters.
 - Ordering: assert the **final composed list** (hook `results` after entity+diary
@@ -387,6 +449,10 @@ The function must:
 - Names: a result shows its plant or tent name, and "Plant" / "Tent" when the name read fails;
   a grow-level result (null plant and tent) shows its grow name, and "Grow" when the grow
   name is unavailable.
+- Re-selection: selecting the same diary result twice from a Timeline already at its hash
+  scrolls both times.
+- Privacy: with a spy on `console` and the analytics sink, a diary search logs neither the
+  query nor the request body.
 - Signed out (the public `/cultivars` palette): a 3+ character search makes no
   `verdant_search_diary` call and shows no diary unavailable notice, while cultivar results
   still render.

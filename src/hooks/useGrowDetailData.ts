@@ -53,6 +53,8 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { formatActionReasonForDisplay } from "@/lib/actionQueueRowView";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
 import { pickSoleLoadedId } from "@/lib/oneTentLoopHandoffIds";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
@@ -498,7 +500,8 @@ export function useGrowDetailData(): UseGrowDetailData {
           kind: "diary",
           ts: d.entry_at ?? "",
           title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
-          detail: d.note,
+          // Action Queue trace notes copy "Reading at <ISO>." from the alert reason.
+          detail: d.note ? localizeReadingAtTimestamps(d.note) : d.note,
         }));
 
         const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
@@ -537,7 +540,7 @@ export function useGrowDetailData(): UseGrowDetailData {
             kind: "action_event",
             ts: e.created_at,
             title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
-            detail: e.note ?? parent?.reason ?? null,
+            detail: e.note ?? formatActionReasonForDisplay(parent?.reason),
             href: `/actions/${e.action_queue_id}`,
           };
         });

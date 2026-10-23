@@ -106,6 +106,7 @@ function Row({
             currentNote={currentNote ?? null}
             currentOccurredAt={row.occurredAt}
             currentPlantId={row.plantId}
+            correctionValues={{ kind: "watering", volumeMl: row.volumeMl }}
             plantId={row.plantId}
             tentId={row.tentId}
             onChanged={onEntryChanged}

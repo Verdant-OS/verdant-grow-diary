@@ -3,7 +3,9 @@
  *
  * Photo/video Quick Log rows use fixed default notes when the grower leaves the
  * caption empty. They must not be searched as grower text; exclusion is separate
- * from `isQuickLogPlaceholderNote`, which only handles `(quick log)`.
+ * from `isQuickLogPlaceholderNote`, which only handles `(quick log)`. Both default
+ * captions contain "photo" / "video", so a naive substring search for those words would
+ * return them; the implementing slice must exclude them by exact note and event type.
  */
 import { describe, expect, it } from "vitest";
 
@@ -15,11 +17,6 @@ describe("global search diary synthetic attachment note baseline", () => {
   it("does not treat photo or video default captions as Quick Log placeholders", () => {
     expect(isQuickLogPlaceholderNote(QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE)).toBe(false);
     expect(isQuickLogPlaceholderNote(QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE)).toBe(false);
-  });
-
-  it("would match naive substring search for 'photo' or 'video' on default captions (implementing slice must exclude)", () => {
-    expect(QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE.toLowerCase().includes("photo")).toBe(true);
-    expect(QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE.toLowerCase().includes("video")).toBe(true);
   });
 
   it("keeps grower-written captions distinct from the synthetic defaults", () => {

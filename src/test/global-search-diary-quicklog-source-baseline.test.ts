@@ -16,6 +16,5 @@ describe("global search diary Quick Log source baseline", () => {
     expect(isQuickLogPlaceholderNote("(quick log)")).toBe(true);
     expect(isQuickLogPlaceholderNote("  (Quick Log)  ")).toBe(true);
     expect(isQuickLogPlaceholderNote("topped in the quick log")).toBe(false);
-    expect("(quick log)".toLowerCase().includes("quick")).toBe(true);
   });
 });

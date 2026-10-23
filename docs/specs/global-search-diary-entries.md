@@ -132,7 +132,12 @@ switch know only grow / tent / plant / cultivar.
    - Order is newest first (`occurred_at` / `entry_at`) with an `id` tie-break, bounded to
      **10** results in total.
    - Excluded: `grow_events` rows with `is_deleted` or `deleted_at` set, `diary_entries` rows
-     with `retracted_at` set, and entries in archived grows. A non-retracted diary companion
+     with `retracted_at` set, and entries in archived grows. Entries for an archived plant or
+     tent in an active grow are kept: Timeline still lists that history under the plant's or
+     tent's real name (`src/hooks/useTimelineNameDirectory.ts:9–23` loads names including
+     archived rows), so the result is labelled with that same name and opens the same Timeline
+     row. This differs from `verdant_search`, which drops archived plants as entity results;
+     archiving a plant does not remove its diary. A non-retracted diary companion
      is excluded too when its preferred link resolves to a deleted spine owned by the diary
      row's owner and in the diary row's `grow_id`. A link to another grow is unresolved for
      this search and leaves the diary row standalone, even when that spine is deleted. This is a rule of this
@@ -222,7 +227,10 @@ switch know only grow / tent / plant / cultivar.
    `MAX_QUERY_LENGTH` in `src/lib/globalSearchSession.ts:21`, which today bounds only the
    persisted state). A longer query raises SQLSTATE `22023` with message
    `diary_query_too_long` before any pattern is built, so a direct authenticated caller cannot
-   send an oversized pattern. The cap bounds the pattern, not the work: a leading-wildcard
+   send an oversized pattern. The `ilike` pattern is built from the trimmed query, then
+   escaped: surrounding spaces are never part of the pattern, so `"  yel  "` searches for
+   `yel`. The hook already trims (`src/hooks/useGlobalSearch.ts:57`); this binds the RPC
+   for direct callers. The cap bounds the pattern, not the work: a leading-wildcard
    `ilike` still reads every eligible row the owner has, and `limit 10` does not bound that,
    so scan cost at scale is `NOT_MEASURED`. An empty result set cannot carry a status,
    so the error is the channel: the hook maps exactly that code and message to an
@@ -368,7 +376,9 @@ The function must:
   with `grow_id` and `occurred_at`; `max_results` of `null` and `500` each return at most 10
   rows, and `0` and `-5` each return exactly 1 row, the newest matching fixture id; `100%` does not match `100 ml` server-side; `anon`
   cannot execute it; a 1- and a 2-character query (after trim) return no rows and a
-  3-character query returns its match; a 120-character query runs, the same query padded with surrounding spaces still runs, and a
+  3-character query returns its match; a 120-character query runs, the same query padded with surrounding spaces runs and returns
+  exactly the ids the unpadded query returns (and `"  yel  "` returns the same ids as
+  `"yel"`), and a
   121-character query (after trim) raises
   `22023` / `diary_query_too_long`, which the hook shows as the invalid-query state, not as
   "Diary results unavailable"; run **as `authenticated`**, a legacy row with a valid link
@@ -450,6 +460,8 @@ The function must:
   `[...entityIds, "newer-zeta", "older-alpha"]` after composition. Passing those two
   rows through `mergeGlobalSearchResults` today puts `"older-alpha"` first.
 - Archived grows: a matching entry in an archived grow is not returned.
+- Archived plant or tent: a matching entry for an archived plant in an active grow is
+  returned, labelled with that plant's name, and opens its Timeline row.
 - Operator regression: a session with the operator role and diary rows from several owners
   returns only its own rows.
 - Cross-owner negative: an ordinary user A searching for text that only user B's note

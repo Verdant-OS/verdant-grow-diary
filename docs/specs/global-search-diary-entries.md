@@ -136,6 +136,10 @@ from`). Timeline pairs on (plant, instant) (lines 405–407) only because it fil
      paired by (grow, plant, instant), has only its diary-id anchor, and a hash with the spine
      id scrolls nowhere. The implementing slice must give that card an alias for the spine id
      it was paired with, using the same pairing rule as the search.
+     The existing alias also keeps the link's spelling, and `getElementById` is case-sensitive,
+     while the search returns the spine's canonical lowercase id. So every alias, explicit or
+     paired, uses the resolved canonical spine id (lowercased, as the search compares it), not
+     the raw `details` text.
    - The existing hash handoff (`useTimelineHashAnchorHandoff.ts:50–63`) only scrolls to a row
      that is already mounted, and Timeline initially loads the selected grow's newest 100
      entries. The implementing slice adds a bounded "load until this entry or give up" step
@@ -249,7 +253,9 @@ call. Keeping it separate, rather than adding a branch to `verdant_search`:
 
 The function must:
 
-- be `language sql`, `security invoker` (as `verdant_search` is), `stable`, with
+- be `language plpgsql` (a `language sql` body cannot `raise` the required `22023` /
+  `diary_query_too_long` error), with the length guard before `return query`, and
+  `security invoker` (as `verdant_search` is), `stable`, with
   `set search_path = public, pg_temp`; after `create function`, run
   `revoke all … from public`, `revoke all … from anon` and
   `grant execute … to authenticated`, mirroring `verdant_search`
@@ -317,9 +323,10 @@ The function must:
   with restored session filter state; selecting it navigates to
   `/timeline?growId=<the entry's grow>#timeline-entry-<id>` (the spine id for a collapsed
   companion), including for a grow other than the active one. Rendered Timeline navigation
-  tests cover three hash targets by spine id, each asserting a mounted element with that id
+  tests cover four hash targets by spine id, each asserting a mounted element with that id
   is scrolled to: an explicitly linked companion (existing alias), a legacy unlinked manual
-  companion paired by (grow, plant, tent, instant) (new alias), and a spine-only result
+  companion paired by (grow, plant, tent, instant) (new alias), a companion whose explicit
+  link is written in uppercase (alias uses the canonical lowercase id), and a spine-only result
   (new anchored row). The spine-only fixture is older than both the initial grow-event page
   and the history-panel cap, so a capped panel cannot pass it. With eleven or more entity and
   cultivar matches, the first diary match is still on the first page. A history entry that

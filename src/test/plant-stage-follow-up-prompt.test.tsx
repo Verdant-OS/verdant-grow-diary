@@ -150,6 +150,46 @@ describe("Edit Plant offers to move a lagging tent and grow", () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Plant updated"));
     expect(toast.message).not.toHaveBeenCalled();
   });
+
+  it("offers grow-only when the tent already matches the new stage", async () => {
+    tents[0] = { ...tents[0], stage: "veg" };
+    renderEditor("seedling");
+    await chooseStage("Vegetative");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() => expect(toast.message).toHaveBeenCalled());
+    const [message, options] = toast.message.mock.calls[0] as [
+      string,
+      { action: { label: string; onClick: () => void } },
+    ];
+    expect(message).toBe(
+      "AF-01 is now Vegetative. Grow A is still on an earlier stage. Move it to Vegetative too?",
+    );
+    expect(options.action.label).toBe("Update grow");
+    options.action.onClick();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Stage updated."));
+    expect(backend.updates.slice(1)).toEqual([
+      { table: "grows", id: "grow-a", payload: { stage: "veg" } },
+    ]);
+    tents[0] = { id: "tent-a", name: "Tent A", grow_id: "grow-a", stage: "seedling" };
+  });
+
+  it("reports failure when the grow update matches no row", async () => {
+    backend.zeroRowTables.push("grows");
+    renderEditor("seedling");
+    await chooseStage("Vegetative");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() => expect(toast.message).toHaveBeenCalled());
+    const [, options] = toast.message.mock.calls[0] as [
+      string,
+      { action: { onClick: () => void } },
+    ];
+    options.action.onClick();
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Couldn't update the stage. Edit the tent or grow to change it.",
+      ),
+    );
+  });
 });
 
 describe("buildPlantStageFollowUp", () => {

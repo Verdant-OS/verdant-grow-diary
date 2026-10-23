@@ -647,16 +647,34 @@ async function authorizedContext(actor: Actor, tag: string) {
   return context;
 }
 
+/**
+ * Every call that did not return the generic `unavailable`, and every call
+ * that changed Community state while returning it: a function that writes and
+ * then reports a denial would otherwise pass (Codex P2 on #2425 at 9eb550b1).
+ */
 async function notUnavailable(
   client: SupabaseClient,
   calls: Array<[string, Record<string, unknown>]>,
 ): Promise<string[]> {
   const leaks: string[] = [];
   for (const [fn, args] of calls) {
+    const before = communityStateFingerprint();
     const result = await rpc(client, fn, args);
     if (!(result.ok === false && result.code === "unavailable")) leaks.push(fn);
+    else if (communityStateFingerprint() !== before) leaks.push(`${fn} (mutated)`);
   }
   return leaks;
+}
+
+/** One denied owner call that must leave every Community table unchanged. */
+async function deniedWithoutMutation(
+  actor: Actor,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<void> {
+  const before = communityStateFingerprint();
+  denied(await rpc(actor.client, fn, args), "unavailable");
+  expect(communityStateFingerprint(), `${fn} changed Community state`).toBe(before);
 }
 
 d("community v1 authority (local DB)", () => {
@@ -735,13 +753,21 @@ d("community v1 authority (local DB)", () => {
     await publish(owner, b, [draft(entryB, { sharedNote: "b" })]);
     await grant(owner, viewer, a);
     ok(await follow(viewer, owner));
+    // Items published before approval are excluded from the digest (T-DIG-01),
+    // so both collections get a fresh item after approval and follow; then A's
+    // presence proves the digest is non-empty and B's absence is meaningful
+    // (Codex P2 on #2425 at 9eb550b1).
+    await publish(owner, a, [draft(diaryEntry(owner), { sharedNote: "a after approval" })]);
+    await publish(owner, b, [draft(diaryEntry(owner), { sharedNote: "b after approval" })]);
     const derivativeA = seedDerivativeItem(owner, a, diaryEntry(owner));
     const derivativeB = seedDerivativeItem(owner, b, diaryEntry(owner));
+    const aItems = ok(await read(owner, a)).items;
     const bItems = ok(await read(owner, b)).items;
 
     ok(await read(viewer, a));
     denied(await read(viewer, b), "unavailable");
     const digestHandles = handlesOf((await digest(viewer)).items);
+    expect(handlesOf(aItems).some((h) => digestHandles.includes(h))).toBe(true);
     expect(digestHandles.some((h) => handlesOf(bItems).includes(h))).toBe(false);
     expect(ok(await mediaLookup(viewer, derivativeA)).objectKey).toEqual(expect.any(String));
     denied(await mediaLookup(viewer, derivativeB), "unavailable");
@@ -953,6 +979,43 @@ d("community v1 authority (local DB)", () => {
     const deletingContext = await authorizedContext(deleting, "pro3d");
     ok(await rpc(admin, "community_account_deletion_begin", { p_user_id: deleting.id }));
     expect(await notUnavailable(deleting.client, everyClientCall(deletingContext))).toEqual([]);
+
+    // The calls above read the caller's own collection, whose owner is the
+    // caller, so an owner-only lifecycle check would pass them. Here only the
+    // reader's lifecycle changes, written directly in the disposable fixture;
+    // the other owner, its publication and the approved grant are untouched
+    // (Copilot P2 on #2425 at 9eb550b1). The inactive value is the one
+    // community_profile_deactivate wrote above, not a guessed literal.
+    const inactiveLifecycle = sql(
+      `SELECT lifecycle FROM public.community_profiles WHERE user_id = ${lit(inactive.id)};`,
+    );
+    for (const [tag, lifecycle] of [
+      ["pro3x", inactiveLifecycle],
+      ["pro3y", "deleting"],
+    ]) {
+      const other = await publishedOwner(`${tag}o`);
+      const reader = await participant(tag);
+      const accessHandle = await grant(other.owner, reader, other.collection);
+      ok(await read(reader, other.collection));
+      const ownerLifecycle = () =>
+        sql(
+          `SELECT lifecycle FROM public.community_profiles WHERE user_id = ${lit(other.owner.id)};`,
+        );
+      const before = [
+        ownerLifecycle(),
+        collectionState(other.collection),
+        accessState(accessHandle),
+      ];
+      sql(
+        `UPDATE public.community_profiles SET lifecycle = ${lit(lifecycle)} WHERE user_id = ${lit(reader.id)};`,
+      );
+      denied(await read(reader, other.collection), "unavailable");
+      expect([
+        ownerLifecycle(),
+        collectionState(other.collection),
+        accessState(accessHandle),
+      ]).toEqual(before);
+    }
   }, 180_000);
 
   it("T-PRO-04 confusable, reserved and out-of-bounds profile fields are invalid", async () => {
@@ -1132,6 +1195,20 @@ d("community v1 authority (local DB)", () => {
       );
     const delivered = ok(await read(viewer, collection)).items;
     expect(delivered.map(display)).toEqual(shown.entries.map(display));
+    // An oracle independent of the preview: the seeded source. The second
+    // entry's stage was not selected, so it must be absent even though its
+    // source row has one (Copilot and Codex P2s on #2425 at 9eb550b1).
+    for (const entries of [shown.entries, delivered]) {
+      expect(entries.map((item: Json) => item.stage)).toEqual(["flower", null]);
+      expect(entries.map((item: Json) => item.note)).toEqual([
+        "Watered to runoff",
+        "Checked the canopy",
+      ]);
+      expect(entries.map((item: Json) => item.sourceJournalLabel)).toEqual([
+        "Main tent",
+        "Main tent",
+      ]);
+    }
     // The three selected measurements, each against the seeded watering row
     // (500 ml, pH 6.2, EC 1.4), all manual: never invented, zeroed or swapped.
     const measured: Json[] = delivered[0].measurements;
@@ -1472,9 +1549,15 @@ d("community v1 authority (local DB)", () => {
 
   it("T-LIFE-01 opt-out then re-opt-in restores no grants, follows or publications", async () => {
     const { owner, collection } = await publishedOwner("life1");
-    const viewer = await participant("life1v");
+    // Relationships in both directions: the viewer reads and follows the owner,
+    // and the owner reads and follows the viewer, so a deactivation that drops
+    // only inbound rows cannot pass (Codex P2 on #2425 at 9eb550b1).
+    const { owner: viewer, collection: viewerCollection } = await publishedOwner("life1v");
     const accessHandle = await grant(owner, viewer, collection);
     ok(await follow(viewer, owner));
+    const outboundHandle = await grant(viewer, owner, viewerCollection);
+    ok(await follow(owner, viewer));
+    ok(await read(owner, viewerCollection));
     ok(await rpc(owner.client, "community_profile_deactivate", {}));
     denied(await read(viewer, collection), "unavailable");
     ok(
@@ -1494,6 +1577,13 @@ d("community v1 authority (local DB)", () => {
     expect(
       sql(
         `SELECT count(*) FROM public.community_follows WHERE followed_id = ${lit(owner.communityId)};`,
+      ),
+    ).toBe("0");
+    expect(accessState(outboundHandle)).toBe("revoked");
+    denied(await read(owner, viewerCollection), "unavailable");
+    expect(
+      sql(
+        `SELECT count(*) FROM public.community_follows WHERE follower_id = ${lit(owner.communityId)};`,
       ),
     ).toBe("0");
   }, 60_000);
@@ -1633,30 +1723,25 @@ d("community v1 authority (local DB)", () => {
     denied(await read(reader, collection), "unavailable");
     expect((await digest(reader)).items).toEqual([]);
     denied(await mediaLookup(reader, derivative), "unavailable");
-    denied(
-      await rpc(owner.client, "community_publish", {
-        p_collection_handle: collection,
-        p_preview_token: pending.previewToken,
-      }),
-      "unavailable",
-    );
+    // Each denied owner call must leave the collection, its publications and
+    // the preview token as they were, not merely stay hidden behind the
+    // removal (Codex P2 on #2425 at 9eb550b1).
+    await deniedWithoutMutation(owner, "community_publish", {
+      p_collection_handle: collection,
+      p_preview_token: pending.previewToken,
+    });
     denied(await read(reader, collection), "unavailable");
-    denied(
-      await rpc(owner.client, "community_preview_create", {
-        p_collection_handle: collection,
-        p_entries: [draft(diaryEntry(owner))],
-      }),
-      "unavailable",
-    );
-    denied(
-      await rpc(owner.client, "community_collection_draft", {
-        p_collection_handle: collection,
-        p_title: "Restored",
-        p_source_label: "x",
-        p_description: "",
-      }),
-      "unavailable",
-    );
+    const freshEntry = draft(diaryEntry(owner));
+    await deniedWithoutMutation(owner, "community_preview_create", {
+      p_collection_handle: collection,
+      p_entries: [freshEntry],
+    });
+    await deniedWithoutMutation(owner, "community_collection_draft", {
+      p_collection_handle: collection,
+      p_title: "Restored",
+      p_source_label: "x",
+      p_description: "",
+    });
   }, 60_000);
 
   // ── Digest ───────────────────────────────────────────────────────────────
@@ -1770,11 +1855,32 @@ d("community v1 authority (local DB)", () => {
     );
     const moderator = await participant("fmt1m");
     sql(`INSERT INTO public.community_moderators (user_id) VALUES (${lit(moderator.id)});`);
+    const readBody = ok(await read(viewer, collection));
+    const digestBody = await digest(viewer);
+    // The timestamps each shape must carry (src/lib/communityTypes.ts), asserted
+    // present before any value is parsed, so a shape that omits one cannot pass
+    // on another shape's stamps (Codex P2 on #2425 at 9eb550b1).
+    const required: Array<[string, unknown]> = [
+      ["PublicationPreview.expiresAt", shown.expiresAt],
+      ...readBody.items.map((item: Json): [string, unknown] => [
+        "collection item publishedAt",
+        item.publishedAt,
+      ]),
+      ...digestBody.items.map((item: Json): [string, unknown] => [
+        "DigestItem.publication.publishedAt",
+        item.publication?.publishedAt,
+      ]),
+    ];
+    expect(readBody.items.length).toBeGreaterThan(0);
+    expect(digestBody.items.length).toBeGreaterThan(0);
+    expect(required.filter(([, value]) => typeof value !== "string").map(([name]) => name)).toEqual(
+      [],
+    );
     const bodies = [
       shown,
       published,
-      ok(await read(viewer, collection)),
-      await digest(viewer),
+      readBody,
+      digestBody,
       ok(await rpc(owner.client, "community_source_entries", { p_cursor: null, p_limit: 20 })),
       accessRequested,
       reported,

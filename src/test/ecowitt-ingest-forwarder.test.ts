@@ -870,6 +870,17 @@ describe("every broker query value is redacted, in the URL and echoed elsewhere 
     expect(out).not.toContain(privateValue);
   });
 
+  it("redacts a form-encoded query token echoed with spaces in the topic (Codex P1 on #2413 at 52a7ec20)", async () => {
+    const out = await startupLog([
+      "--mqtt-url",
+      `wss://broker/mqtt?token=${privateValue}+tail`,
+      "--topic",
+      `${privateValue} tail`,
+    ]);
+    expect(out).not.toContain(`${privateValue} tail`);
+    expect(out).not.toContain(privateValue);
+  });
+
   it("redacts an encoded query token echoed decoded in the topic", async () => {
     const encoded = encodeURIComponent(`${privateValue}/x y`);
     const out = await startupLog([

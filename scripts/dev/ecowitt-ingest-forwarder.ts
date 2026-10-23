@@ -1216,7 +1216,10 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
   const queryValues = (url?.search.slice(1) ?? "")
     .split("&")
     .map((pair) => pair.slice(pair.indexOf("=") + 1));
-  for (const part of url ? [url.username, url.password, ...queryValues] : []) {
+  // A query value may be form-encoded (`+` for a space), so its form-decoded
+  // spelling is registered too (Codex P1 on #2413 at 52a7ec20).
+  const formDecoded = queryValues.map((value) => value.replace(/\+/g, " "));
+  for (const part of url ? [url.username, url.password, ...queryValues, ...formDecoded] : []) {
     values.push(part);
     try {
       values.push(decodeURIComponent(part));

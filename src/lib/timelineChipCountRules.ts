@@ -171,11 +171,15 @@ export function applyTimelineDiaryPhotoEdit(
           )
         : null;
     const samePath = prior?.kind === "storage" && prior.path === ref.path;
+    // An unchanged path keeps its signed URL only when it has one. One still
+    // unsigned (an earlier edit's signing in flight, or a load whose signing
+    // is superseded by this edit) must be signed again, or it stays blank.
+    const keepSignedUrl = samePath && !!before.photo_url;
     return {
-      photo_url: samePath ? before.photo_url : null,
+      photo_url: keepSignedUrl ? before.photo_url : null,
       photoReferenceSource: "details",
       photoIds: withId(true),
-      signStoragePath: samePath ? null : ref.path,
+      signStoragePath: keepSignedUrl ? null : ref.path,
     };
   }
   return {
@@ -184,6 +188,48 @@ export function applyTimelineDiaryPhotoEdit(
     photoIds: withId(false),
     signStoragePath: null,
   };
+}
+
+/**
+ * Whether a row still references `signedPath`, the private path a diary read
+ * asked to sign. An edit saved while that signing was in flight may have
+ * moved the details photo to another path, replaced it with an external URL
+ * or removed it; the late signed URL must then not overwrite the row (nor
+ * put a removed photo back in Photos). A top-level reference is untouched by
+ * a details edit and stays current.
+ */
+export function timelineSignedPhotoPathStillCurrent(
+  row: Pick<TimelineDiaryPhotoEditRow, "details" | "photoReferenceSource">,
+  signedPath: string,
+  viewerUserId: string | null,
+): boolean {
+  const source = row.photoReferenceSource ?? null;
+  if (source === "top") return true;
+  if (source !== "details") return false;
+  const ref = parseDiaryPhotoDisplayReferenceFromRow(
+    { photo_url: null, details: row.details },
+    { viewerUserId },
+  );
+  return ref.kind === "storage" && ref.path === signedPath;
+}
+
+/**
+ * Apply a diary read's initial signed URL to a row. The row is returned
+ * unchanged when the read returned no URL for the path (a partial batch must
+ * not erase a newer URL an edit already signed) or when the row no longer
+ * references the path (an edit moved or removed the photo).
+ */
+export function applyTimelineInitialSignedPhoto<
+  T extends Pick<TimelineDiaryPhotoEditRow, "details" | "photoReferenceSource" | "photo_url">,
+>(
+  row: T,
+  signedPath: string,
+  signedUrl: string | null | undefined,
+  viewerUserId: string | null,
+): T {
+  if (typeof signedUrl !== "string" || signedUrl.length === 0) return row;
+  if (!timelineSignedPhotoPathStillCurrent(row, signedPath, viewerUserId)) return row;
+  return { ...row, photo_url: signedUrl };
 }
 
 /**

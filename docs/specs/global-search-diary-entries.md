@@ -1,6 +1,6 @@
 # Spec — Global search over diary entries
 
-Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds twelve spec-baseline Vitest files (28 tests).
+Status: **proposed spec only** (filming bug #17, 2026-10-22). No application or production code in this slice; it adds eleven spec-baseline Vitest files (25 tests).
 **Owner decision (Matthew, 2026-10-22): Option B** — a server-side RPC, so the search text
 travels in a POST body. The implementing slice adds it through a new additive migration,
 drafted on its own branch for the protected migration review. No agent applies it;
@@ -236,9 +236,13 @@ switch know only grow / tent / plant / cultivar.
    `ilike` still reads every eligible row the owner has, and `limit 10` does not bound that,
    so scan cost at scale is `NOT_MEASURED`. The owner filter is what bounds the scan to one
    grower's rows: `grow_events` already has `idx_grow_events_active (user_id, occurred_at
-desc) where is_deleted = false`, but `diary_entries` has only `idx_diary_entries_grow_at
-(grow_id, entry_at desc)`, so the implementing migration adds an additive
-   `(user_id, entry_at desc)` index on `diary_entries`. A trigram GIN index on `note`
+desc) where is_deleted = false`. For `diary_entries`, committed migrations define only
+   `idx_diary_entries_grow_at (grow_id, entry_at desc)`, but production also holds
+   `diary_entries_user_id_idx (user_id)` and a partial `diary_entries_retracted` index, created
+   outside committed migrations (`source claim`: independent review of #2482, read-only, 2026-10-23).
+   The `user_id` index already bounds the scan to one owner. The implementing migration may add
+   `(user_id, entry_at desc)` only to serve the newest-first ordering, with `if not exists`, after
+   re-reading the live index set; it must not be justified as the owner bound. A trigram GIN index on `note`
    (`pg_trgm` is installed) is deferred until the scan cost is measured. An empty result set cannot carry a status,
    so the error is the channel: the hook maps exactly that code and message to an
    invalid-query state ("Diary search is limited to 120 characters") and every other error to

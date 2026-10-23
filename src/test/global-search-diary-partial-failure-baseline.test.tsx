@@ -4,7 +4,7 @@
  * Today only `verdant_search` runs privately; cultivar matches stay available
  * when it fails. The diary RPC must follow the same isolation when added.
  */
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";

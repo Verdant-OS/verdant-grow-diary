@@ -17,6 +17,9 @@ describe("global search diary synthetic attachment note baseline", () => {
   it("does not treat photo or video default captions as Quick Log placeholders", () => {
     expect(isQuickLogPlaceholderNote(QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE)).toBe(false);
     expect(isQuickLogPlaceholderNote(QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE)).toBe(false);
+    // The trap the header names: a naive substring search would return these.
+    expect(QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE).toMatch(/photo/i);
+    expect(QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE).toMatch(/video/i);
   });
 
   it("keeps grower-written captions distinct from the synthetic defaults", () => {

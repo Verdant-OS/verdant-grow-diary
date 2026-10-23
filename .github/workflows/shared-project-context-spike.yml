@@ -18,9 +18,9 @@ concurrency:
 
 jobs:
   spike-tests:
-    name: Shared context node:test
+    name: Node test spikes/shared-project-context
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Spike tests
+      - name: Run spike tests
         run: node --test spikes/shared-project-context/context.test.mjs
 
       - name: Restricted demo

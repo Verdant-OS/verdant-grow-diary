@@ -58,6 +58,7 @@ import { tentDetailCaptureClimate, tonightCaptureRejected } from "@/lib/tentDeta
 import {
   buildTonightTentMetrics,
   DIARY_SOURCE_LABEL,
+  isClimateMetric,
   TONIGHT_FUTURE_SKEW_MS,
   type TonightRowsReadStatus,
   type TonightSensorRow,
@@ -99,6 +100,7 @@ export function tentsListCanonicalVpd(
       captureRefs: vpd.captureRefs,
       ageText: vpd.ageText,
       rejected: true,
+      ...(rowsReadStatus === "success" ? {} : { rowsReadFailed: true }),
     };
   }
   // Tonight could not read the VPD at all: say so, so the list never restores
@@ -210,7 +212,10 @@ export function tentsListDiarySnapshotRows(
   // Siblings the snapshot read dropped for intake quality ride along with
   // their quality, so the capture gate rejects their capture here exactly as
   // it does on the raw-row path (Codex P1 on #2303 at 0994ea2a).
+  // Tonight ignores non-climate rejects, so a rejected CO2 row must not become
+  // the fallback's latest cohort (Copilot P1 on #2407 at e66265eb).
   for (const rejected of snap.rejected_quality_rows ?? []) {
+    if (!isClimateMetric(rejected.metric)) continue;
     const captureRef = sensorCaptureRef(rejected.captured_at, rejected.source);
     rows.push({
       metric: rejected.metric,

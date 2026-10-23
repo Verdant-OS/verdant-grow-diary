@@ -219,6 +219,12 @@ export interface CanonicalTentVpd {
    */
   rejected?: boolean;
   /**
+   * True when the raw rows behind the cohort failed to refresh. Tonight then
+   * ignores them, so its rejection stands whatever the cached cohort's age
+   * (Copilot P1 on #2407 at e66265eb).
+   */
+  rowsReadFailed?: boolean;
+  /**
    * True when Tonight could not read this tent's VPD at all (raw refresh and
    * snapshot read both failed). The stored VPD is then withheld rather than
    * restored as a healthy value (Copilot on #2303 at b49c32ae).
@@ -507,7 +513,7 @@ export function buildTentSnapshotView(
     canonical !== null &&
     canonicalRejected &&
     !sameCapture &&
-    !olderThan(canonical.capturedAt, snap.ts)
+    (canonical.rowsReadFailed === true || !olderThan(canonical.capturedAt, snap.ts))
   ) {
     metrics[2] = {
       key: "vpd",

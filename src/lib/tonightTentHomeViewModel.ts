@@ -434,7 +434,7 @@ function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | nu
 
 const CLIMATE_METRIC_PATTERN = /^(temp|temperature|humidity|rh|vpd)(_|$)/i;
 
-function isClimateMetric(metric: unknown): boolean {
+export function isClimateMetric(metric: unknown): boolean {
   return typeof metric === "string" && CLIMATE_METRIC_PATTERN.test(metric.trim());
 }
 

@@ -401,7 +401,7 @@
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^3.24.2"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@actions/artifact": "^6.2.1",
@@ -475,6 +475,7 @@
     "seroval": "1.6.8",
     "shell-quote": "1.12.0",
     "source-map-js": "1.2.2",
-    "undici": "6.28.1"
+    "undici": "6.28.1",
+    "zod": "4.6.7"
   }
 }

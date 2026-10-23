@@ -825,6 +825,64 @@ describe("overlapping configured values and credential shapes are redacted toget
   });
 });
 
+describe("every broker query value is redacted, in the URL and echoed elsewhere (Copilot P1s on #2409 at e1aac033)", () => {
+  afterEach(() => setConfiguredSecrets([]));
+  const privateValue = ["synthetic", "private", "value"].join("-");
+
+  async function startupLog(args: string[]): Promise<string> {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+    });
+    try {
+      const client = { on: () => client, subscribe: () => {}, end: () => {} };
+      await main(args, {}, { connect: async () => client, exit: vi.fn() });
+      expect(lines.length).toBeGreaterThan(0);
+      return lines.join("\n");
+    } finally {
+      log.mockRestore();
+    }
+  }
+
+  it("redacts a query value whose name is percent-encoded", async () => {
+    const out = await startupLog(["--mqtt-url", `wss://broker/mqtt?%6bey=${privateValue}`]);
+    expect(out).not.toContain(privateValue);
+  });
+
+  it("redacts an access_token query value", async () => {
+    const out = await startupLog(["--mqtt-url", `wss://broker/mqtt?access_token=${privateValue}`]);
+    expect(out).not.toContain(privateValue);
+  });
+
+  it("redacts a query value through a space to the next &", () => {
+    const out = redactString(`wss://broker/mqtt?password=private secret-suffix&qos=1`);
+    expect(out).not.toContain("private");
+    expect(out).not.toContain("secret-suffix");
+  });
+
+  it("redacts a query token echoed in the topic", async () => {
+    const out = await startupLog([
+      "--mqtt-url",
+      `wss://broker/mqtt?token=${privateValue}`,
+      "--topic",
+      privateValue,
+    ]);
+    expect(out).not.toContain(privateValue);
+  });
+
+  it("redacts an encoded query token echoed decoded in the topic", async () => {
+    const encoded = encodeURIComponent(`${privateValue}/x y`);
+    const out = await startupLog([
+      "--mqtt-url",
+      `wss://broker/mqtt?token=${encoded}`,
+      "--topic",
+      `${privateValue}/x y`,
+    ]);
+    expect(out).not.toContain(privateValue);
+    expect(out).not.toContain(encoded);
+  });
+});
+
 describe("a malformed escape in one URL credential keeps both redacted (Codex P1 on #2335 at d344f8e4)", () => {
   afterEach(() => setConfiguredSecrets([]));
   const URL_WITH_BAD_ESCAPE = "mqtt://mqtt-user:bad%ZZ@host:1883";

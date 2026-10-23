@@ -512,8 +512,13 @@ const MAC12_RE = /[0-9a-f]{12}/gi;
  * whole (Codex P1 on #2335 at 5a7accaf).
  */
 const URL_USERINFO_RE = /(\/\/)[^/\s]*@/g;
-/** `?token=…`, `&password=…` and similar query credentials. */
-const URL_SECRET_QUERY_RE = /([?&](?:token|key|api_key|password|passkey|secret)=)[^&\s]*/gi;
+/**
+ * Every query value (`?name=…`, `&name=…`) through the next `&`, spaces
+ * included, whatever the name: an allowlist missed `%6bey=` and
+ * `access_token=`, and stopping at a space left a suffix (Copilot P1 on #2409
+ * at e1aac033). Over-redacting a harmless query value in a log is fine.
+ */
+const URL_SECRET_QUERY_RE = /([?&][^=&?#\s]*=)[^&]*/g;
 
 /**
  * The MQTT username and password this run was configured with (environment
@@ -1205,7 +1210,13 @@ export function configuredSecretValues(flags: ForwarderFlags, env: ForwarderEnv)
   // Each URL credential is kept as written and, separately, decoded: one
   // malformed escape (`bad%ZZ`) must not drop the other credential or itself
   // from redaction (Codex P1 on #2335 at d344f8e4).
-  for (const part of url ? [url.username, url.password] : []) {
+  // Every broker query value too, raw and decoded, so a topic or error that
+  // echoes one without its name is redacted literally (Copilot P1 on #2409 at
+  // e1aac033).
+  const queryValues = (url?.search.slice(1) ?? "")
+    .split("&")
+    .map((pair) => pair.slice(pair.indexOf("=") + 1));
+  for (const part of url ? [url.username, url.password, ...queryValues] : []) {
     values.push(part);
     try {
       values.push(decodeURIComponent(part));

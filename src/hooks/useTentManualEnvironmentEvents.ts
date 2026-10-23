@@ -40,7 +40,8 @@ export const TENT_MANUAL_ENVIRONMENT_EVENTS_QUERY_KEY_PREFIX = [
  * Quick Log manual readings for this tent. They live only in grow_events +
  * environment_events, never in sensor_readings, so the tent page reads them
  * separately and merges them into its manual snapshot history. A failed
- * read leaves the sensor rows exactly as before.
+ * read is not hidden: `buildTentManualHistoryRead` marks the whole merged
+ * history as an error, so a partial history never reads as complete.
  */
 export function useTentManualEnvironmentEvents(
   tentId: string | null | undefined,

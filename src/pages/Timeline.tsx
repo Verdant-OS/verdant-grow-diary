@@ -138,7 +138,7 @@ import {
   type TimelineDiaryPhotoReferenceSource,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
-  timelineEntryHasNoteText,
+  timelineDiaryEntryCountsAsNote,
   timelineMeasurementChipCount,
   timelineResultsCountReceiptSuffix,
   timelineStageChipRows,
@@ -365,7 +365,7 @@ function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[]
   const kinds: EventFilter[] = [];
   // "Notes" means the grower wrote something; a watering-only Quick Log
   // entry with an empty note is not a note (Pollen #1).
-  if (!isTimelineSensorDerivedDiaryId(e.id) && timelineEntryHasNoteText(e.note)) {
+  if (timelineDiaryEntryCountsAsNote(e)) {
     kinds.push("note");
   }
   if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");

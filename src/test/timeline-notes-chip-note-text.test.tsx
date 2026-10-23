@@ -315,6 +315,35 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
     });
   });
 
+  it("shows Notes count 0 and an empty filtered list when no entry has note text", async () => {
+    const diaryRows = [
+      diaryEntry("water-1", "", "2026-07-20T12:00:00.000Z", null, {
+        event_type: "watering",
+        source: "quick_log",
+        watering: { volume_ml: 750 },
+      }),
+      diaryEntry("water-2", "(quick log)", "2026-07-20T11:00:00.000Z", null, {
+        event_type: "watering",
+        source: "quick_log",
+        watering: { volume_ml: 500 },
+      }),
+    ];
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 2 };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("All")).toBeInTheDocument();
+
+    expect(chipCount("All")).toBe(2);
+    expect(chipCount("Notes")).toBe(0);
+
+    fireEvent.click(chipButton("Notes"));
+    await waitFor(() => expect(listedDiaryEntries()).toHaveLength(0));
+    expect(chipButton("Notes")).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("counts and lists only entries with note text, and hides a watering-only entry", async () => {
     const diaryRows = [
       diaryEntry("note-1", "QA seed note", "2026-07-20T12:00:00.000Z"),

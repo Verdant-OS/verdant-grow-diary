@@ -3,7 +3,12 @@
  * must not count as grower Notes (Pollen #1 / #2453).
  */
 import { describe, expect, it } from "vitest";
-import { QUICK_LOG_GENERATED_NOTES, timelineEntryHasNoteText } from "@/lib/timelineChipCountRules";
+import {
+  QUICK_LOG_GENERATED_NOTES,
+  timelineDiaryEntryCountsAsNote,
+  timelineEntryHasNoteText,
+} from "@/lib/timelineChipCountRules";
+import { TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX } from "@/lib/timelineManualSensorMeasurementRules";
 import { QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE } from "@/lib/quickLogPhotoDiaryEntry";
 
 describe("timelineEntryHasNoteText non-string inputs", () => {
@@ -22,5 +27,25 @@ describe("timelineEntryHasNoteText generated Quick Log text", () => {
 
   it("tracks the photo writer's default note", () => {
     expect(QUICK_LOG_GENERATED_NOTES.has(QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE)).toBe(true);
+  });
+});
+
+describe("timelineDiaryEntryCountsAsNote", () => {
+  it("is false for synthetic sensor receipt ids even when note text is present", () => {
+    expect(
+      timelineDiaryEntryCountsAsNote({
+        id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}abc`,
+        note: "Manual temp 24°C",
+      }),
+    ).toBe(false);
+  });
+
+  it("is true for a diary row with grower note text", () => {
+    expect(
+      timelineDiaryEntryCountsAsNote({
+        id: "diary-note-1",
+        note: "Topped lower nodes",
+      }),
+    ).toBe(true);
   });
 });

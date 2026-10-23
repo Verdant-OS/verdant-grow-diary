@@ -337,3 +337,8 @@ export const QUICK_LOG_GENERATED_NOTES: ReadonlySet<string> = new Set([
 export function timelineEntryHasNoteText(note: unknown): boolean {
   return typeof note === "string" && !QUICK_LOG_GENERATED_NOTES.has(note) && note.trim().length > 0;
 }
+
+/** Grow Timeline "Notes" chip: grower note text on a real diary row, not a sensor receipt. */
+export function timelineDiaryEntryCountsAsNote(entry: { id: string; note?: unknown }): boolean {
+  return !isTimelineSensorDerivedDiaryId(entry.id) && timelineEntryHasNoteText(entry.note);
+}

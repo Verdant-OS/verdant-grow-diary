@@ -3,10 +3,12 @@
  *
  * `acknowledged` is active: acknowledging records that the grower has seen the
  * alert, not that the condition is fixed. `resolved` and `dismissed` are
- * terminal. Every reader that decides whether an alert is still active uses
- * this one list; naming the statuses independently once made the acknowledged
- * path unreachable and once let persistence insert a duplicate beside an
- * acknowledged alert.
+ * terminal. Environment-alert persistence and the Plant Detail assigned-tent
+ * panel read this list; naming the statuses independently once made the
+ * acknowledged path unreachable and once let persistence insert a duplicate
+ * beside an acknowledged alert. Other readers still name the statuses inline
+ * (growWalkContextReadModels.ts, growWalkTargetReadModels.ts,
+ * growWalkEvidenceRules.ts) and are not covered here.
  *
  * Pure. No I/O.
  */

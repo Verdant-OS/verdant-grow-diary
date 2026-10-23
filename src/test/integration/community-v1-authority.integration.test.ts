@@ -231,9 +231,18 @@ interface EntryOptions {
 /** Inserts an owner-owned diary entry (and its typed watering event when asked). */
 function diaryEntry(owner: { id: string }, options: EntryOptions = {}): string {
   const uid = lit(owner.id);
-  const grow = sql(
-    `INSERT INTO public.grows (user_id, name) VALUES (${uid}, '[fixture] community v1') RETURNING id;`,
-  );
+  // One active grow per owner: the free-tier cap trigger rejects a second
+  // active grow, which would abort every multi-entry case before its
+  // assertions (Copilot P1 on #2414 at 77d424b1).
+  const grow = sql(`WITH existing AS (
+      SELECT id FROM public.grows WHERE user_id = ${uid} AND is_archived = false
+       ORDER BY created_at, id LIMIT 1
+    ), created AS (
+      INSERT INTO public.grows (user_id, name)
+      SELECT ${uid}, '[fixture] community v1' WHERE NOT EXISTS (SELECT 1 FROM existing)
+      RETURNING id
+    )
+    SELECT id FROM existing UNION ALL SELECT id FROM created LIMIT 1;`);
   let details = "'{}'::jsonb";
   if (options.watering) {
     const event = sql(

@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SPEC-2503-VPD-CORRECTION-TENT-HISTORY-DEDUPE
+
+```text
+TASK SPEC-2503-VPD-CORRECTION-TENT-HISTORY-DEDUPE  priority: P2  status: OPEN
+goal: Specification only (Matthew approved writing it 2026-10-23) for the additive fix behind #2503: a VPD correction must not double a Plant Quick Log save in tent history. No migration written or applied.
+branch: claude/vibrant-heisenberg-njd6r3
+base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79
+checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED at this commit (draft PR opened immediately after; the PR body records it)
+head_sha: read the PR's current full head before resuming
+state: spec pushed as a draft for Matthew's review. Recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key).
+next_action: Matthew reviews the option choice; then route an eligible independent review of the spec at its exact head.
+files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Implementation slice 2 depends on open #2504 (adds src/lib/tentManualEnvironmentEventRules.ts). The migration is Matthew's per-PR decision; applying 20261014210000 stays blocked by #2503.
+artifacts: the spec file above
+reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3; this author is excluded
+claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-23 UTC (Matthew's direct assignment)
+last_updated: 2026-10-23, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+```
+
 ### REVIEWER-ROUTING-20261022
 
 ```text

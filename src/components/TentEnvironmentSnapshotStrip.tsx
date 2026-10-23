@@ -127,7 +127,9 @@ export default function TentEnvironmentSnapshotStrip({
       </p>
     );
   }
-  if (selection.kind === "manual_unusable") {
+  // A manual card with no air readings does not hide a diary capture the
+  // Dashboard shows for this tent (Codex P2 on #2407 at e66265eb).
+  if (selection.kind === "manual_unusable" && diaryRows.length === 0) {
     return (
       <div className="space-y-1">
         {selection.refreshing ? (
@@ -187,7 +189,8 @@ export default function TentEnvironmentSnapshotStrip({
   const rows =
     selection.kind === "empty" ||
     selection.kind === "sensor_unavailable" ||
-    selection.kind === "manual_unavailable"
+    selection.kind === "manual_unavailable" ||
+    selection.kind === "manual_unusable"
       ? diaryRows
       : selection.rows;
   if (rows.length === 0) {

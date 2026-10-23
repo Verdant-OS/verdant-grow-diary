@@ -593,6 +593,83 @@ describe("Tents list VPD matches the Dashboard (#2268)", () => {
     expect(renderStrip(rows).textContent ?? "").not.toContain("1.2");
   });
 
+  it("shows the Dashboard's diary VPD when the only manual card has no air readings (Codex P2 on #2407 at e66265eb)", () => {
+    const diary: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual",
+      diary_evidence_ref: { id: "env-check-entry-1", entry_at: "2026-10-22T02:00:00.000Z" },
+      ts: at(0.5),
+      temp: (80 - 32) / 1.8,
+      rh: 50,
+      tent_id: "tent-1",
+    };
+    hook.state = { status: "ok", snapshot: diary };
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={hook.state}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="success"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[
+          {
+            id: "manual-ph-only",
+            title: "Manual sensor snapshot",
+            capturedAt: at(0.2),
+            sourceLabel: "Manual",
+            source: "manual",
+            tentId: "tent-1",
+            plantId: null,
+            isTentLevel: true,
+            notes: null,
+            readings: [{ field: "reservoir_ph", value: 6.1, unit: "pH", derived: false }],
+            severity: "ok",
+            warnings: [],
+            errors: [],
+          },
+        ]}
+        manualStatus="success"
+      />,
+    );
+    expect(screen.queryByTestId("tents-list-manual-unusable-tent-1")).toBeNull();
+    expect(screen.getByTestId("tents-list-metric-tent-1-vpd")).toHaveTextContent("1.75");
+  });
+
+  it("still says the manual card has no air readings when no diary capture backs it", () => {
+    render(
+      <TentEnvironmentSnapshotStrip
+        tentId="tent-1"
+        tonightSnapshot={hook.state}
+        stage="flower"
+        sensorRows={[]}
+        sensorStatus="success"
+        now={NOW.getTime()}
+        temperatureUnit="fahrenheit"
+        manualCards={[
+          {
+            id: "manual-ph-only",
+            title: "Manual sensor snapshot",
+            capturedAt: at(0.2),
+            sourceLabel: "Manual",
+            source: "manual",
+            tentId: "tent-1",
+            plantId: null,
+            isTentLevel: true,
+            notes: null,
+            readings: [{ field: "reservoir_ph", value: 6.1, unit: "pH", derived: false }],
+            severity: "ok",
+            warnings: [],
+            errors: [],
+          },
+        ]}
+        manualStatus="success"
+      />,
+    );
+    expect(screen.getByTestId("tents-list-manual-unusable-tent-1")).toBeInTheDocument();
+  });
+
   it("shows the Dashboard's diary-only VPD when the tent has no stored rows (Codex P2 at 69de43db)", () => {
     const diary: SensorSnapshot = {
       ...EMPTY_SNAPSHOT,

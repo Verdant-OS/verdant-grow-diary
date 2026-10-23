@@ -1161,10 +1161,11 @@ describe("Tents list sensor truth — static wiring", () => {
     // The rows are the fallback selection's, or the Dashboard's diary-only
     // capture when the selection is empty (Codex P2 on #2303 at 69de43db) or
     // the raw read failed (Codex P2 on #2303 at fa8edcff), or the manual
-    // fallback read failed (Codex P2 on #2303 at 6a242e1f).
+    // fallback read failed (Codex P2 on #2303 at 6a242e1f), or the manual card has
+    // no air readings (Codex P2 on #2407 at e66265eb).
     expect(SNAPSHOT_STRIP_SRC).toMatch(/const diaryRows = tentsListDiarySnapshotRows\(/);
     expect(SNAPSHOT_STRIP_SRC).toMatch(
-      /const rows =\s*selection\.kind === "empty" \|\|\s*selection\.kind === "sensor_unavailable" \|\|\s*selection\.kind === "manual_unavailable"\s*\? diaryRows\s*: selection\.rows;/,
+      /const rows =\s*selection\.kind === "empty" \|\|\s*selection\.kind === "sensor_unavailable" \|\|\s*selection\.kind === "manual_unavailable" \|\|\s*selection\.kind === "manual_unusable"\s*\? diaryRows\s*: selection\.rows;/,
     );
     expect(SNAPSHOT_STRIP_SRC).not.toMatch(
       /useManualSnapshotTimelineCards|useTentManualSnapshotBatch/,

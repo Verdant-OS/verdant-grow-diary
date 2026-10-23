@@ -128,6 +128,19 @@ describe("Sensors VPD card with only a calculated VPD", () => {
     expect(screen.getByTestId("chart-temp")).toBeInTheDocument();
   });
 
+  // Review of #2346 at 452834e: a stale calculated VPD keeps its stale copy.
+  it("keeps the stale message for a calculated VPD from an old reading", () => {
+    const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    state.sensors = [
+      { ...manual(), ts: old, capturedAt: old, vpd: 0, observedMetrics: ["temp", "rh"] },
+    ];
+    state.manuals.data = [];
+    mount();
+    const empty = screen.getByTestId("sensors-empty-vpd");
+    expect(empty).toHaveTextContent(/older than the freshness window/i);
+    expect(empty).not.toHaveTextContent(/no recorded vpd history/i);
+  });
+
   it("still charts directly recorded VPD rows", () => {
     state.sensors = [manual()];
     state.manuals.data = [];

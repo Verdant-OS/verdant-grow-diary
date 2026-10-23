@@ -171,16 +171,32 @@ describe("paddle-portal-session through the actual isolated Edge handler", () =>
     expect(h.portalCalls).toEqual([]);
   });
 
-  it.each(["absent", "wrong environment", "wrong customer", "query error"])(
-    "refuses a canonical customer mirror that is %s",
-    async (scenario) => {
+  it.each([
+    ["absent", 200, 1],
+    ["wrong environment", 503, 0],
+    ["wrong customer", 200, 1],
+    ["query error", 503, 0],
+  ] as const)(
+    "handles a customer mirror that is %s without changing subscription ownership",
+    async (scenario, status, portalCount) => {
       const h = portalSessionHarness();
       if (scenario === "absent") h.customers.length = 0;
       if (scenario === "wrong environment") h.customers[0].environment = "sandbox";
       if (scenario === "wrong customer") h.customers[0].paddle_customer_id = "ctm_other";
       if (scenario === "query error") h.state.faults.customer = { message: SENSITIVE_FAILURE };
-      expect(await h.deliver()).toMatchObject({ status: 503, body: { error: "unavailable" } });
-      expect(h.portalCalls).toEqual([]);
+      const result = await h.deliver();
+      expect(result.status).toBe(status);
+      expect(result.body).toEqual(
+        status === 200 ? { url: expect.any(String) } : { error: "unavailable" },
+      );
+      expect(h.portalCalls).toHaveLength(portalCount);
+      if (portalCount) {
+        expect(h.portalCalls[0]).toEqual({
+          environment: "live",
+          customerId: "ctm_live_fixture",
+          subscriptionIds: ["sub_live_fixture"],
+        });
+      }
     },
   );
 
@@ -210,12 +226,10 @@ describe("paddle-portal-session through the actual isolated Edge handler", () =>
   it("checks the exact canonical customer ID and environment before minting", async () => {
     const h = portalSessionHarness();
     expect((await h.deliver()).status).toBe(200);
-    expect(h.queries.find((query) => query.table === "paddle_customers")?.filters).toEqual(
-      expect.arrayContaining([
-        { key: "paddle_customer_id", operator: "eq", value: "ctm_live_fixture" },
-        { key: "environment", operator: "eq", value: "live" },
-      ]),
-    );
+    // Query by ID alone so a conflicting mirror environment remains visible.
+    expect(h.queries.find((query) => query.table === "paddle_customers")?.filters).toEqual([
+      { key: "paddle_customer_id", operator: "eq", value: "ctm_live_fixture" },
+    ]);
     expect(h.operations.indexOf("query:paddle_customers")).toBeLessThan(
       h.operations.indexOf("create-portal"),
     );

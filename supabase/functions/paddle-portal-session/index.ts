@@ -9,8 +9,8 @@
  *    cannot mint a portal for anyone else's subscription.
  *  - Selects the caller's most recent recurring subscription (skips
  *    lifetime_ rows — Paddle has no portal surface for one-off purchases).
- *  - Env is resolved from explicit server configuration; both subscription
- *    and canonical customer mirror must match it. Client input is ignored.
+ *  - Env is resolved from explicit server configuration; the subscription
+ *    and any present customer mirror must match it. Client input is ignored.
  *  - Returns { url } only; never the customer id, subscription id, or
  *    portal session id itself.
  */
@@ -112,22 +112,29 @@ Deno.serve(async (req) => {
       return json(503, { error: "unavailable" });
     }
 
-    // paddle_customers has no app user_id. Ownership comes from the caller's
-    // subscription above, and the provider mirror must agree on id and env.
+    // Customer events arrive independently of subscription events, so a valid
+    // owned subscription can predate its customer mirror. The mirror has no
+    // app user_id: ownership comes from the subscription above. Look up by
+    // customer ID alone so an existing conflicting environment is not hidden
+    // as an absent row. A lookup failure is not evidence of absence.
     const { data: customer, error: customerError } = await admin
       .from("paddle_customers")
       .select("paddle_customer_id, environment")
       .eq("paddle_customer_id", sub.paddle_customer_id)
-      .eq("environment", environment)
       .maybeSingle();
-    if (
-      customerError ||
-      !customer ||
-      customer.paddle_customer_id !== sub.paddle_customer_id ||
-      customer.environment !== environment
-    ) {
+    if (customerError) {
+      console.error("portal_customer_mirror_lookup_failed");
       return json(503, { error: "unavailable" });
     }
+    if (
+      customer &&
+      (customer.paddle_customer_id !== sub.paddle_customer_id ||
+        customer.environment !== environment)
+    ) {
+      console.error("portal_customer_mirror_mismatch");
+      return json(503, { error: "unavailable" });
+    }
+    if (!customer) console.warn("portal_customer_mirror_missing");
 
     const paddle = getPaddleClient(environment);
     let portal: { urls?: { general?: { overview?: string } } };

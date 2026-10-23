@@ -248,6 +248,23 @@ export function tentDetailHeaderCaptureRefs(
 }
 
 /**
+ * The header's rejection inputs for `resolveTentDetailVpd`: the rejected
+ * metrics, aligned with each one's capture record, and the snapshot VPD's own
+ * record.
+ */
+export function tentDetailHeaderRejection(
+  truth: { invalidFields: readonly string[]; reasonCodes: readonly string[] } | null | undefined,
+  snapshot: Parameters<typeof snapshotCaptureRef>[0] | null | undefined,
+  opts: { existingIsSnapshotVpd: boolean },
+): { rejectedMetrics: string[]; rejectedRefs?: (string | null)[]; existingRef?: string | null } {
+  const rejectedMetrics = [...(truth?.invalidFields ?? [])];
+  return {
+    rejectedMetrics,
+    ...tentDetailHeaderCaptureRefs(snapshot, rejectedMetrics, opts),
+  };
+}
+
+/**
  * The tent page's current VPD (VER-189, #2268): the same value the Dashboard
  * Tonight card shows for this tent, chosen by `buildTonightTentMetrics` over the
  * same stored rows and diary-inclusive snapshot. A temperature and RH pair from

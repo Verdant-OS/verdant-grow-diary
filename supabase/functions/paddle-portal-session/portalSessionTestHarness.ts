@@ -253,6 +253,19 @@ export function portalSessionHarness() {
     },
     configurePrivilegedKey(present: boolean) {
       if (!present) environment.delete("SUPABASE_SERVICE_ROLE_KEY");
+      else environment.set("SUPABASE_SERVICE_ROLE_KEY", "synthetic-privileged-key");
+    },
+    configureDeploymentCredential(
+      key: "SUPABASE_URL" | "SUPABASE_ANON_KEY" | "SUPABASE_SERVICE_ROLE_KEY",
+      present: boolean,
+    ) {
+      const defaults: Record<typeof key, string> = {
+        SUPABASE_URL: "https://database.fixture.invalid",
+        SUPABASE_ANON_KEY: "synthetic-caller-key",
+        SUPABASE_SERVICE_ROLE_KEY: "synthetic-privileged-key",
+      };
+      if (present) environment.set(key, defaults[key]);
+      else environment.delete(key);
     },
     async deliver(
       options: {

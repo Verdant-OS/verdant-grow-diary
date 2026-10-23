@@ -33,6 +33,48 @@ describe("paddle-portal-session through the actual isolated Edge handler", () =>
     expect(h.networkAttempts).toBe(0);
   });
 
+  it.each(["SUPABASE_URL", "SUPABASE_ANON_KEY"] as const)(
+    "refuses unavailable when %s is missing before authentication or IO",
+    async (key) => {
+      const h = portalSessionHarness();
+      h.configureDeploymentCredential(key, false);
+      expect(await h.deliver()).toMatchObject({ status: 503, body: { error: "unavailable" } });
+      expect(h.operations).toEqual([]);
+      expect(h.queries).toEqual([]);
+      expect(h.portalCalls).toEqual([]);
+    },
+  );
+
+  it("refuses unavailable when the privileged key is missing after authentication", async () => {
+    const h = portalSessionHarness();
+    h.configurePrivilegedKey(false);
+    expect(await h.deliver()).toMatchObject({ status: 503, body: { error: "unavailable" } });
+    expect(h.operations).toEqual(["caller-client", "authenticate"]);
+    expect(h.queries).toEqual([]);
+    expect(h.portalCalls).toEqual([]);
+  });
+
+  it("scopes the recurring subscription lookup to non-lifetime rows in the configured environment", async () => {
+    const h = portalSessionHarness();
+    h.subscriptions.push(
+      recurringRow({
+        paddle_subscription_id: "lifetime_live_fixture",
+        created_at: "2026-10-25T00:00:00Z",
+      }),
+    );
+    expect((await h.deliver()).status).toBe(200);
+    expect(h.queries[0]).toMatchObject({
+      table: "subscriptions",
+      filters: expect.arrayContaining([
+        { key: "user_id", operator: "eq", value: PORTAL_USER },
+        { key: "environment", operator: "eq", value: "live" },
+        { key: "paddle_subscription_id", operator: "notLike", value: "lifetime_%" },
+      ]),
+      orders: ["created_at", "paddle_subscription_id"],
+    });
+    expect(h.portalCalls[0].subscriptionIds).toEqual(["sub_live_fixture"]);
+  });
+
   it.each([undefined, "", "production", "LIVE", " live "])(
     "refuses unavailable server environment %s after authentication and before mirror/provider work",
     async (environment) => {

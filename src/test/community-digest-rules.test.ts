@@ -12,7 +12,7 @@ const item = (publicationHandle: string, publishedAt: string): DigestItem => ({
     revision: 1,
     publishedAt,
     sourceJournalLabel: "Tent A journal",
-    occurredAt: "2026-10-01T12:00:00Z",
+    occurredDate: "2026-10-01",
     action: "note",
     note: "",
     stage: null,

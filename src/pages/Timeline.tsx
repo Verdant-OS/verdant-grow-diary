@@ -31,6 +31,7 @@ import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { STAGES } from "@/lib/grow";
 import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
+import { QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS } from "@/lib/quickLogFabClearanceRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
@@ -2303,7 +2304,10 @@ export default function Timeline() {
         data-testid="timeline-evidence-filters"
         aria-label="Search and filter timeline entries"
       >
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          className={`flex flex-wrap items-center gap-2 ${QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS}`}
+          data-testid="timeline-plant-filter-row"
+        >
           <input
             type="search"
             value={searchQuery}

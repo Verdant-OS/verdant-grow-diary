@@ -12,23 +12,47 @@ An unpushed candidate is not a remote head and must never be treated as hosted C
 
 ## Template
 
+A cold agent (Claude Code, Codex, Cursor, or Grok) must be able to take the next step
+from this entry, the PR, and the repo, with no chat history. Use plain repo paths, full
+SHAs, and URLs. Do not write "as discussed" or "per my earlier message".
+
 ```text
 TASK <id>  priority: publish-gate | P1 | P2 | other  status: OPEN | CLOSED
 goal:
+why:
 branch: codex/<task-id>-<slug> for new Codex tasks; preserve existing names
 base: verdant-grow-diary or the recorded parent branch
-checkout: git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
+checkout: git fetch origin <branch> <base> && git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
 pr: URL or NOT_MEASURED
 head_sha: full exact remote SHA, with observation time
 state: implemented / local only / pushed draft / CI / review / merged / live measured
-next_action: the single smallest next step
-files:
+current_step:
+next_action: the single smallest next step a cold agent can run
+post_merge_check: the check that reopens this work with the same owner if it fails after merge; or NOT_APPLICABLE
+active_writer: the branch holder; only that holder pushes; nobody edits another holder's branch
+decisions: what was decided, and the reason for each
+tried_and_rejected: what was tried, and why it was rejected
+commands: exact commands to reproduce the current state and run the relevant tests
+files_touched: repo paths
+files_remaining: repo paths still to touch
 blockers: blocker and who can clear it
+open_questions:
+gotchas:
+links: review, issue, and run URLs
 artifacts: repository paths or PR/check URLs; local receipts may supplement them
 reviewer_seat:
+reviewer_sha: full SHA the current review or human go-ahead covers; never an older SHA
+session_state: cloud agent ids, routines, paused workflows, pending human decisions
 claimed_by: agent and date/time/zone, or empty
+owner: current owner; on retirement, transfer the CURRENT_STATE row (default inheritor: OG Kush)
 last_updated: YYYY-MM-DD HH:MM CT, by agent
 ```
+
+Before stopping, run the cold start test: a fresh agent reading only the PR, this
+entry, and the repo can take `next_action`. The matching PR comment starts with
+`resume here` and repeats goal, why, decisions, rejected attempts, commands, files
+touched and remaining, open questions, gotchas, links, and the exact head SHA.
+Retirement adds a `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC` comment on the PR.
 
 Before the checkout command, run `git fetch origin <branch> <base>`, then compare the
 freshly fetched `git rev-parse origin/<branch>` with head_sha as AGENTS.md (Agent Handoff /
@@ -53,8 +77,8 @@ goal: Specification only (Matthew approved writing it 2026-10-23) for the additi
 branch: claude/vibrant-heisenberg-njd6r3
 base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (returned to draft 2026-10-24 per AGENTS.md drafts-until-merge)
-head_sha: ab9c90a8385651deab1f0063b4bc5a52ab18ad7d (remote head adopted by the Claude claim, observed 2026-10-24 14:13 UTC). The base-merge and review-fix commits that follow it are listed on the PR; compare against the PR's current head before resuming.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (marked ready for review by its owner after 17:05 UTC 2026-10-24; this session left that owner decision in place)
+head_sha: 253361bec8dee3764c13b4d19180f3debaca8369 (observed 2026-10-24 22:52 UTC; ab9c90a8 was adopted by the Claude claim at 14:13 UTC, and every later commit is a review fix or base merge listed on the PR). The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
 state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
 next_action: Route an eligible independent review of the spec at its exact head. Matthew's option choice and the migration's per-PR decision remain his.
 files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
@@ -62,7 +86,41 @@ blockers: Slice 2 is blocked on its real-write-path fixture, which only the slic
 artifacts: the spec file above
 reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3. Excluded: author Claude session 01QxMpAHgnpV65y3Yykv8CvE, and the Grok cloud review-fix session (commits 6a30b7ae, e29a451f, ab9c90a8, authored as Cursor Agent) as repairer
 claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-24 14:13 UTC (Matthew reassigned it; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6385243811)
-last_updated: 2026-10-24 14:20 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+last_updated: 2026-10-24 22:55 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+```
+
+### HANDOFF-CONTINUITY-20261024
+
+```text
+TASK HANDOFF-CONTINUITY-20261024  priority: other  status: OPEN
+goal: Docs-only constitution amendment so a retired or out-of-token agent can be resumed immediately, including Cheeko's seven further gates (one writer, one-pass review, stale expiry, ship/money, repo-wide breakages, protected instruction files, post-merge loop).
+why: Unpushed session state and SHA-unbound passes leave the next agent unable to continue. Cheeko approved the continuity rules and the seven gates for this same draft.
+branch: cursor/handoff-continuity-a798
+base: verdant-grow-diary
+checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
+head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
+state: pushed draft once this commit is on the remote
+current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry
+next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain a fresh independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
+decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
+tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
+commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.6 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
+files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/*.md; docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
+files_remaining: none in this slice. .github/pull_request_template.md stays unchanged.
+blockers: independent exact-head review not yet requested; GitHub comment approval gate still applies to a resume-here comment unless Cheeko or Matthew allows it
+open_questions: none for the wording Cheeko approved
+gotchas: A new commit invalidates any review of an older SHA. CURRENT_STATE.md is exempt from Sentinel-Version. Do not force-push. Keep the PR draft.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523 ; PASS at d46e2a3c only: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523#pullrequestreview-5638407206
+artifacts: this block
+reviewer_seat: an eligible independent session that did not author this PR (not this Cursor Grok session)
+reviewer_sha: none yet
+session_state: Cursor cloud agent on cursor/handoff-continuity-a798; no paused workflow; no pending human decision beyond draft review
+post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.6 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
+active_writer: Cursor Grok cloud agent (this session)
+claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-24 13:50 UTC, by Cursor Grok cloud agent
 ```
 
 ### REVIEWER-ROUTING-20261022

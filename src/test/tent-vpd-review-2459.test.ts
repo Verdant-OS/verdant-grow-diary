@@ -157,6 +157,54 @@ describe("Tent Detail reports a withheld VPD as rejected", () => {
     expect(observation.rejected).toBe(true);
   });
 
+  it("does not call a VPD invalid when only the RH was rejected and no VPD existed", () => {
+    // Independent review on #2501 at 57ff9f45: the RH mirror of the
+    // temperature-only case above.
+    const observation = resolveTentDetailVpd({
+      ...base,
+      tonight: null,
+      rejectedMetrics: ["rh"],
+      rejectedCapturedAt: T,
+    });
+    expect(observation.value).toBeNull();
+    expect(observation.rejected).toBeUndefined();
+  });
+
+  it("does not pair a rejected gw-a temperature with an RH from gw-b at the same instant", () => {
+    // Independent review on #2501 at 57ff9f45: with the rejected capture's
+    // ref known, the pair check matches by capture identity, so another
+    // device's RH at the same instant is not a calculable VPD.
+    const observation = resolveTentDetailVpd({
+      ...base,
+      tonight: null,
+      captureClimate: tentDetailCaptureClimate(
+        [row("temperature_c", 60, "gw-a"), row("humidity_pct", 55, "gw-b")] as never,
+        null,
+      ),
+      rejectedMetrics: ["temp"],
+      rejectedRefs: [sensorCaptureRef(T, "live", "gw-a")],
+      rejectedCapturedAt: T,
+    });
+    expect(observation.value).toBeNull();
+    expect(observation.rejected).toBeUndefined();
+  });
+
+  it("withholds when the ref-matched rejected capture carries both temperature and RH", () => {
+    const observation = resolveTentDetailVpd({
+      ...base,
+      tonight: null,
+      captureClimate: tentDetailCaptureClimate(
+        [row("temperature_c", 60, "gw-a"), row("humidity_pct", 55, "gw-a")] as never,
+        null,
+      ),
+      rejectedMetrics: ["temp"],
+      rejectedRefs: [sensorCaptureRef(T, "live", "gw-a")],
+      rejectedCapturedAt: T,
+    });
+    expect(observation.value).toBeNull();
+    expect(observation.rejected).toBe(true);
+  });
+
   it("does not mark a VPD that was simply never observed", () => {
     const observation = resolveTentDetailVpd({
       ...base,

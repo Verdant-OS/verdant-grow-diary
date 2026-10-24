@@ -487,7 +487,10 @@ export function resolveTentDetailVpd(input: {
   // A temperature- or RH-only rejection withholds a VPD only when one was in
   // play: a rejected VPD row, an observed VPD, or a calculable temperature +
   // RH pair at the rejected capture. Otherwise there is no VPD to call
-  // invalid (independent review on #2474 at 5e9cb604).
+  // invalid (independent review on #2474 at 5e9cb604). Temperature and RH
+  // both rejected also counts, without checking they share a capture: that
+  // errs toward labelling the VPD invalid rather than showing it
+  // (independent review on #2501 at 57ff9f45).
   const vpdInPlay =
     input.rejectedMetrics.includes("vpd") ||
     input.existing.value !== null ||

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { QUICK_LOG_START_ROOM_TIMEOUT_MS } from "@/lib/quickLogStartScreenTargetRules";
 import { setStartScreenChoice } from "@/lib/startScreenPreferences";
 import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
@@ -21,11 +21,11 @@ vi.mock("@/store/auth", () => ({
 }));
 
 vi.mock("@/hooks/use-plants", () => ({
-  fetchPlants: () => h.plants(),
+  fetchPlants: (...args: unknown[]) => h.plants(...args),
 }));
 
 vi.mock("@/hooks/use-tents", () => ({
-  fetchTents: () => h.tents(),
+  fetchTents: (...args: unknown[]) => h.tents(...args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -60,9 +60,19 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function AuthHarness({ entry }: { entry: string }) {
+function ReturnToAuth() {
+  const nav = useNavigate();
+  return (
+    <button type="button" onClick={() => nav("/auth")}>
+      Return to auth
+    </button>
+  );
+}
+
+function AuthHarness({ entry, persistAuth = false }: { entry: string; persistAuth?: boolean }) {
   const [userId, setUserId] = useState<string | null>(h.user?.id ?? null);
   h.user = userId ? { id: userId } : null;
+  const auth = <Auth />;
   return (
     <MemoryRouter initialEntries={[entry]}>
       <button type="button" onClick={() => setUserId("user-1")}>
@@ -71,8 +81,10 @@ function AuthHarness({ entry }: { entry: string }) {
       <button type="button" onClick={() => setUserId("user-2")}>
         Switch user
       </button>
+      <ReturnToAuth />
+      {persistAuth ? auth : null}
       <Routes>
-        <Route path="/auth" element={<Auth />} />
+        <Route path="/auth" element={persistAuth ? <div>Auth route</div> : auth} />
         <Route path="/grows" element={<div>Grows</div>} />
         <Route path="/dashboard" element={<div>Dashboard</div>} />
         <Route path="/onboarding" element={<div>Onboarding</div>} />
@@ -83,8 +95,8 @@ function AuthHarness({ entry }: { entry: string }) {
   );
 }
 
-function renderAuth(entry: string) {
-  return render(<AuthHarness entry={entry} />);
+function renderAuth(entry: string, persistAuth = false) {
+  return render(<AuthHarness entry={entry} persistAuth={persistAuth} />);
 }
 
 beforeEach(() => {
@@ -187,31 +199,34 @@ describe("Auth start-screen routing", () => {
 
   it("does not keep the previous user's plant when the signed-in user changes", async () => {
     setStartScreenChoice("user-1", "quickLog");
-    let resolvePlants: (plants: unknown[]) => void = () => {};
-    h.plants.mockReturnValue(
-      new Promise((resolve) => {
-        resolvePlants = resolve;
-      }),
-    );
-    h.tents.mockResolvedValue([{ id: "tent-a", grow_id: "grow-a", is_archived: false }]);
-    h.grows.mockResolvedValue({ data: [{ id: "grow-a", is_archived: false }], error: null });
-    h.user = { id: "user-1" };
-    renderAuth("/auth");
-    expect(screen.getByTestId("location")).toHaveTextContent("/auth");
-    fireEvent.click(screen.getByRole("button", { name: /switch user/i }));
-    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/onboarding"));
-    resolvePlants([
+    setStartScreenChoice("user-2", "quickLog");
+    const plantA = [
       {
         id: "plant-a",
         tent_id: "tent-a",
         grow_id: "grow-a",
         updated_at: "2026-04-01T00:00:00.000Z",
       },
-    ]);
+    ];
+    let calls = 0;
+    h.plants.mockImplementation(() => {
+      calls += 1;
+      if (calls === 1) return Promise.resolve(plantA);
+      return new Promise(() => {});
+    });
+    h.tents.mockResolvedValue([{ id: "tent-a", grow_id: "grow-a", is_archived: false }]);
+    h.grows.mockResolvedValue({ data: [{ id: "grow-a", is_archived: false }], error: null });
+    h.user = { id: "user-1" };
+    renderAuth("/auth", true);
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a?open=quick-log"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /switch user/i }));
+    fireEvent.click(screen.getByRole("button", { name: /return to auth/i }));
     await act(async () => {
       await Promise.resolve();
     });
-    expect(screen.getByTestId("location")).toHaveTextContent("/onboarding");
+    expect(screen.getByTestId("location")).toHaveTextContent("/auth");
     expect(screen.getByTestId("location").textContent).not.toContain("plant-a");
   });
 
@@ -229,5 +244,27 @@ describe("Auth start-screen routing", () => {
     });
     expect(screen.getByTestId("location")).toHaveTextContent("/dashboard");
     expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
+  });
+
+  it("aborts the plant and tent reads when the fallback timer fires", async () => {
+    vi.useFakeTimers();
+    setStartScreenChoice("user-1", "quickLog");
+    h.user = { id: "user-1" };
+    const signals: AbortSignal[] = [];
+    const capture = (signal?: AbortSignal) => {
+      if (signal) signals.push(signal);
+      return new Promise(() => {});
+    };
+    h.plants.mockImplementation(capture);
+    h.tents.mockImplementation(capture);
+    h.grows.mockReturnValue(new Promise(() => {}));
+    renderAuth("/auth");
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal.aborted)).toBe(false);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(QUICK_LOG_START_ROOM_TIMEOUT_MS);
+    });
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(screen.getByTestId("location")).toHaveTextContent("/dashboard");
   });
 });

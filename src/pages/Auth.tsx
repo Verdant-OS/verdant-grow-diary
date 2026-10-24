@@ -229,12 +229,13 @@ export default function Auth() {
       tents: [],
       grows: [] as QuickLogStartGrow[],
     };
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
       if (settled) return;
       settled = true;
+      controller.abort();
       setQuickLogRoom(emptyRoom);
     }, QUICK_LOG_START_ROOM_TIMEOUT_MS);
-    const controller = new AbortController();
     const growsQuery = applyPostgrestAbortSignal(
       supabase.from("grows").select("id,is_archived"),
       controller.signal,

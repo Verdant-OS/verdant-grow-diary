@@ -85,9 +85,11 @@ export function eligibleQuickLogStartPlants(
 
 function pickMostRecent(plants: readonly QuickLogStartPlant[]): QuickLogStartPlant {
   return [...plants].sort((a, b) => {
-    const byTime = recencyMs(b) - recencyMs(a);
-    if (byTime !== 0) return byTime;
-    return a.id.localeCompare(b.id);
+    const earlier = recencyMs(a);
+    const later = recencyMs(b);
+    // Subtracting two missing timestamps is NaN, which skips the id tie-break.
+    if (earlier !== later) return later > earlier ? 1 : -1;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   })[0];
 }
 

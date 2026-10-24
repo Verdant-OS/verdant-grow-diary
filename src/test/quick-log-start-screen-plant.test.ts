@@ -85,6 +85,22 @@ describe("returning Quick Log start screen", () => {
     expect(target.opensQuickLog).toBe(true);
   });
 
+  it("breaks an undated tie by plant id, independent of input order", () => {
+    const undated = { updated_at: null, created_at: null };
+    const plantsHighFirst = [
+      plant({ id: PLANT_B, tent_id: TENT_B, grow_id: GROW_B, ...undated }),
+      plant({ id: PLANT_A, tent_id: TENT_A, grow_id: GROW_A, ...undated }),
+    ];
+    const plantsLowFirst = [...plantsHighFirst].reverse();
+
+    expect(resolveReturningQuickLogStartTarget({ plants: plantsHighFirst, ...room }).plantId).toBe(
+      PLANT_A,
+    );
+    expect(resolveReturningQuickLogStartTarget({ plants: plantsLowFirst, ...room }).plantId).toBe(
+      PLANT_A,
+    );
+  });
+
   it("lands on the Dashboard without opening Quick Log when no plant can be resolved", () => {
     const cases: QuickLogStartPlant[][] = [
       [],

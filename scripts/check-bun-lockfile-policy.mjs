@@ -64,6 +64,8 @@ export const BUN_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
     4: null,
     5: "5.0.12",
   }),
+  // GHSA-xjj6-f33q-929c: >=6.23.0 <6.29.1, >=7.18.0 <7.30.1, >=8.0.0 <8.12.2.
+  undici: Object.freeze({ 6: "6.29.1", 7: "7.30.1", 8: "8.12.2" }),
 });
 // Patched minimatch within the two majors that carried the advisory. Other
 // majors present in the graph (for example 5.x and 10.x) are outside it.

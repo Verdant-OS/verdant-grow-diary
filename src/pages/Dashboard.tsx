@@ -76,6 +76,7 @@ import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useEnvironmentTrends } from "@/hooks/useEnvironmentTrends";
+import { isDashboardSupplementalLoading } from "@/lib/dashboardSupplementalLoadingRules";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
 import {
   compareSnapshotToTargets,
@@ -1501,8 +1502,12 @@ export default function Dashboard() {
                 Open Timeline →
               </Link>
             </div>
-            {trendsState.status === "loading" || trendsState.status === "idle" ? (
+            {isDashboardSupplementalLoading(trendsState.status) ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : trendsState.status === "idle" ? (
+              <p className="text-sm text-muted-foreground">
+                Environment trends have not started for this view.
+              </p>
             ) : trendsState.status === "unavailable" ? (
               <p className="text-sm text-muted-foreground">Trend data unavailable.</p>
             ) : trendsState.trends.status === "empty" ? (
@@ -1902,13 +1907,17 @@ export default function Dashboard() {
                   testId="dashboard-no-recent-check-in-recovery"
                 />
               )}
-              {recent.status === "loading" || recent.status === "idle" ? (
+              {isDashboardSupplementalLoading(recent.status) ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : recent.status === "idle" ? (
+                <p className="text-sm text-muted-foreground">
+                  Recent activity has not started for this view.
+                </p>
               ) : recent.status === "unavailable" ? (
                 <p className="text-sm text-muted-foreground">Recent activity unavailable.</p>
-              ) : recent.items.length === 0 ? (
+              ) : recent.status === "ok" && recent.items.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No recent activity yet.</p>
-              ) : (
+              ) : recent.status === "ok" ? (
                 <ul className="space-y-2">
                   {recent.items.map((item) => (
                     <li
@@ -1937,7 +1946,7 @@ export default function Dashboard() {
                     </li>
                   ))}
                 </ul>
-              )}
+              ) : null}
             </section>
 
             <section
@@ -1967,11 +1976,15 @@ export default function Dashboard() {
                 className="mb-3"
                 testId="dashboard-approval-queue-safe-by-design"
               />
-              {pending.status === "loading" || pending.status === "idle" ? (
+              {isDashboardSupplementalLoading(pending.status) ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : pending.status === "idle" ? (
+                <p className="text-sm text-muted-foreground">
+                  Pending actions have not started for this view.
+                </p>
               ) : pending.status === "unavailable" ? (
                 <p className="text-sm text-muted-foreground">Pending actions unavailable.</p>
-              ) : pending.items.length === 0 ? (
+              ) : pending.status === "ok" && pending.items.length === 0 ? (
                 <div
                   data-testid="dashboard-approval-queue-empty"
                   className="rounded-lg border border-dashed border-border/60 bg-secondary/10 p-3 text-sm"
@@ -1982,7 +1995,7 @@ export default function Dashboard() {
                     {APPROVAL_QUEUE_EMPTY_COPY.hint}
                   </p>
                 </div>
-              ) : (
+              ) : pending.status === "ok" ? (
                 <ul className="space-y-2">
                   {pending.items.map((a) => {
                     const severity = mapRiskToSeverity(a.risk_level);
@@ -2079,7 +2092,7 @@ export default function Dashboard() {
                     );
                   })}
                 </ul>
-              )}
+              ) : null}
             </section>
           </div>
         </>

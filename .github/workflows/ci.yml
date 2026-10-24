@@ -801,3 +801,42 @@ jobs:
             echo "Running sub-shard ${n}/256 for gate shard ${{ matrix.shard }}/32"
             bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
           done
+
+  quicklog-correction-measured-values:
+    name: Quick Log correction measured values
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: verdant-runtime-only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Prove measured corrections and the owner fence
+        run: |
+          node scripts/prove-quicklog-correction-measured-values.mjs
+          node scripts/prove-quicklog-correction-owner-fence.mjs

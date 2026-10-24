@@ -9,6 +9,8 @@
  *  - Demo / stale / invalid sources render as caution / untrusted
  *    and are never labeled healthy.
  */
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { useHydrated } from "@/hooks/useHydrated";
 import { cn } from "@/lib/utils";
 import {
   type ContextualPhenoComparisonPlant,
@@ -207,6 +209,8 @@ function isPlantInsufficient(plant: ContextualPhenoComparisonPlant): boolean {
 
 function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
   const env = plant.environmentSummary;
+  // Local time differs between the SSR host and the browser; format only after hydration.
+  const hydrated = useHydrated();
   const sourceEntries = SENSOR_SOURCE_ORDER.filter((s) => plant.sourceCounts[s] > 0);
 
   return (
@@ -276,7 +280,10 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
           <li>Avg PPFD: {fmtNum(env.avgPpfd, 0)}</li>
         </ul>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Last sensor: <span data-testid="plant-last-sensor-at">{env.lastSensorAt ?? "—"}</span>
+          Last sensor:{" "}
+          <span data-testid="plant-last-sensor-at">
+            {env.lastSensorAt ? (hydrated ? formatSnapshotTimestamp(env.lastSensorAt) : "…") : "—"}
+          </span>
           {" · "}
           Trusted context:{" "}
           <span data-testid="plant-trusted-context">

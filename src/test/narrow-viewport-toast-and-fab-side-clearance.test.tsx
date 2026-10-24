@@ -212,8 +212,13 @@ describe("narrow viewport toast offset and Timeline filter clearance", () => {
     expect(mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_REM)).toBe(4.75);
     expect(mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_SM_REM)).toBe(4.25);
     expect(QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS).toBe(
-      `pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_REM)}rem] sm:pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_SM_REM)}rem] md:pr-0`,
+      "pr-[4.75rem] sm:pr-[4.25rem] md:pr-0",
     );
+    expect(QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS.split(" ")).toEqual([
+      `pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_REM)}rem]`,
+      `sm:pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_SM_REM)}rem]`,
+      "md:pr-0",
+    ]);
   });
 
   it("at 375px the All plants row ends a gap left of the FAB", () => {

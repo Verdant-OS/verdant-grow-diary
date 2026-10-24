@@ -82,12 +82,12 @@ export function mobileQuickLogSideClearanceRem(mainPaddingRem: number): number {
   );
 }
 
-/** Timeline filter row only. Not used on the shell page body. */
-export const QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS = [
-  `pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_REM)}rem]`,
-  `sm:pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_SM_REM)}rem]`,
-  "md:pr-0",
-].join(" ");
+/**
+ * Timeline filter row only. Not used on the shell page body.
+ * Literal Tailwind classes — do not build these with a template. Tailwind v4
+ * scans source text (`@source "../src"`) and skips dynamically constructed names.
+ */
+export const QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS = "pr-[4.75rem] sm:pr-[4.25rem] md:pr-0";
 
 /**
  * Bottom edge of a toast while the signed-in shell's bottom nav and FAB are
@@ -95,8 +95,14 @@ export const QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS = [
  * (FAB bottom + height + gap) plus the safe-area inset. Above the FAB, so a
  * toast does not cover Quick Log.
  */
+/**
+ * Raw CSS length, written into a `<style>` tag by `AppShell`. This is not a
+ * Tailwind class, so the scanner does not need to see it.
+ */
+export const MOBILE_SHELL_TOAST_BOTTOM_OFFSET = "calc(9.5rem + env(safe-area-inset-bottom))";
+
 export function mobileShellToastBottomOffset(): string {
-  return `calc(${mobileQuickLogContentClearanceRem()}rem + env(safe-area-inset-bottom))`;
+  return MOBILE_SHELL_TOAST_BOTTOM_OFFSET;
 }
 
 /**
@@ -105,7 +111,7 @@ export function mobileShellToastBottomOffset(): string {
  * the library default toast position.
  */
 export function mobileShellToastOffsetCss(): string {
-  const offset = mobileShellToastBottomOffset();
+  const offset = MOBILE_SHELL_TOAST_BOTTOM_OFFSET;
   return [
     "@media (max-width: 767px) {",
     "  [data-sonner-toaster] {",

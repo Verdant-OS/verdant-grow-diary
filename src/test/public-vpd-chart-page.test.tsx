@@ -83,18 +83,17 @@ describe("public VPD chart page", () => {
     expect(screen.queryByText("1.06 kPa")).not.toBeInTheDocument();
   });
 
-  it("clears an open temperature draft when the unit changes", async () => {
+  it("commits an open Fahrenheit draft when °C is clicked, then converts it", async () => {
     const user = userEvent.setup();
     renderPage();
     const air = () => screen.getByLabelText(/Air temperature/);
 
     await user.clear(air());
-    await user.type(air(), "8");
-    expect(air()).toHaveValue(8);
+    await user.type(air(), "85");
+    expect(air()).toHaveValue(85);
 
     await user.click(screen.getByRole("button", { name: "°C" }));
-    expect(air()).toHaveValue(25);
-    expect(screen.getByText("1.06 kPa")).toBeInTheDocument();
+    expect(air()).toHaveValue(29.4);
   });
 
   it("restores the last valid humidity and leaf offset when the field is emptied", async () => {
@@ -106,8 +105,24 @@ describe("public VPD chart page", () => {
     await user.clear(humidity());
     await user.tab();
     expect(humidity()).toHaveValue(60);
+    await user.click(humidity());
+    await user.type(humidity(), "-");
+    await user.tab();
+    expect(humidity()).toHaveValue(60);
+    await user.click(humidity());
+    await user.type(humidity(), ".");
+    await user.tab();
+    expect(humidity()).toHaveValue(60);
 
     await user.clear(offset());
+    await user.tab();
+    expect(offset()).toHaveValue(-2);
+    await user.click(offset());
+    await user.type(offset(), "-");
+    await user.tab();
+    expect(offset()).toHaveValue(-2);
+    await user.click(offset());
+    await user.type(offset(), ".");
     await user.tab();
     expect(offset()).toHaveValue(-2);
     expect(screen.getByText("1.06 kPa")).toBeInTheDocument();

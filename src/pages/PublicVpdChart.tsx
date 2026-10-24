@@ -181,7 +181,6 @@ export default function PublicVpdChart() {
                 type="button"
                 className="px-3 py-2 text-sm"
                 aria-pressed={isFahrenheit}
-                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => setUnit("F")}
               >
                 °F
@@ -190,7 +189,6 @@ export default function PublicVpdChart() {
                 type="button"
                 className="px-3 py-2 text-sm"
                 aria-pressed={!isFahrenheit}
-                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => setUnit("C")}
               >
                 °C
@@ -207,7 +205,6 @@ export default function PublicVpdChart() {
                 {isFahrenheit ? "Range: 50–100 °F" : "Range: 10–38 °C"}
               </p>
               <DraftNumberInput
-                key={unit}
                 id="air-temp-number"
                 describedBy="air-temp-range-hint"
                 committed={displayedAir}
@@ -252,7 +249,6 @@ export default function PublicVpdChart() {
                 {isFahrenheit ? "Range: −10 to +5 °F" : "Range: −5.6 to +2.8 °C"}
               </p>
               <DraftNumberInput
-                key={unit}
                 id="leaf-offset-number"
                 describedBy="leaf-offset-range-hint"
                 committed={displayedOffset}

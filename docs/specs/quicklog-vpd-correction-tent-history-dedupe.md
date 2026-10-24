@@ -116,8 +116,9 @@ any other file.
    guard would set the whole `details` column to NULL. A JSON null, a missing key, or any
    non-number takes the ELSE branch: temperature and humidity still update, and no `vpd_kpa`
    key is written. A null temperature or humidity has the same STRICT `jsonb_set` exposure in
-   this mirror UPDATE (`20261014210000:287-294`) and in the unchanged `sensor_snapshot` VPD
-   write (`:278`). `quicklog_correct_entry` rejects a non-number sensor value
+   this mirror UPDATE (`20261014210000:287-294`) and in the unchanged `sensor_snapshot`
+   temperature and humidity writes (`:270` and `:274`). `:278` is that UPDATE's VPD write, not
+   temperature or humidity. `quicklog_correct_entry` rejects a non-number sensor value
    (`:451`), so a normal save cannot reach those paths. Leave those existing `?` guards as
    they are. This function is the one being replaced, so the new VPD branch is guarded here.
 
@@ -129,15 +130,25 @@ any other file.
 4. Repeat `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role` (idempotent; grants
    unchanged).
 5. **Postflight, fail closed.** Privileges are as in step 2. `quicklog_correct_entry` is
-   unchanged (md5 equals the `20261014210000` body). Check the mirror UPDATE only. Take the
-   `prosrc` slice that starts at `'{manual_sensor_snapshot,temp_f}'` and ends at the next
-   `jsonb_typeof(d.details -> 'manual_sensor_snapshot')` (that UPDATE's `WHERE`). That slice
-   must contain `'{manual_sensor_snapshot,vpd_kpa}'` and
-   `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'`, and it must not contain
-   `p_sensor ? 'vpd_kpa'`. Do not search all of `prosrc` for `p_sensor ? 'vpd_kpa'`: that
-   string stays in the unchanged `environment_events` UPDATE (`20261014210000:262`) and the
-   unchanged `sensor_snapshot` UPDATE (`:278`). A whole-body substring check fails closed on
-   every run. The full-body md5 in step 2 already identifies a re-run; this slice check does
+   unchanged (md5 equals the `20261014210000` body). Check the mirror UPDATE only. Find
+   `'{manual_sensor_snapshot,temp_f}'`, then start the `prosrc` slice at the nearest preceding
+   `UPDATE public.diary_entries d` (the statement in step 3, not the earlier `sensor_snapshot`
+   UPDATE at `20261014210000:264`). End the slice at the next
+   `jsonb_typeof(d.details -> 'manual_sensor_snapshot')` (that UPDATE's `WHERE`).
+
+   Checked against the step-3 SQL: that slice contains
+   `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'` and `'{manual_sensor_snapshot,vpd_kpa}'`,
+   and it does not contain `p_sensor ? 'vpd_kpa'`. The guard sits before
+   `'{manual_sensor_snapshot,temp_f}'`, so a slice that starts at the temp_f literal misses
+   the guard and fails closed on every apply. The real temperature and humidity expression
+   inside the placeholder uses `p_sensor ? 'temperature_c'` and `p_sensor ? 'humidity_pct'`
+   (`:287-294`), not `p_sensor ? 'vpd_kpa'`.
+
+   Do not search all of `prosrc` for `p_sensor ? 'vpd_kpa'`: that string stays in the
+   unchanged `environment_events` UPDATE (`:262`) and the unchanged `sensor_snapshot` UPDATE
+   (`:278`). A whole-body substring check fails closed on every run. Starting at the first
+   `UPDATE public.diary_entries d` (`:264`) also fails, because that statement still contains
+   `:278`. The full-body md5 in step 2 already identifies a re-run; this slice check does
    not replace it.
 6. `COMMIT; NOTIFY pgrst, 'reload schema';`
 
@@ -277,6 +288,7 @@ as an `authenticated` owner.
 | P7 (RED)         | With only `20261014210000` applied, P2 fails on the missing `vpd_kpa`. Record the failing count in the PR body.                                                                                                                                          |
 | P8               | The revision ledger's `previous_state` still holds the original `environment_events` values (F10).                                                                                                                                                       |
 | P9 (null vpd)    | Call `quicklog_correction_apply_measured_values` directly, as a role that may execute it, with `p_sensor` containing `"vpd_kpa": null` and a real temperature change. `quicklog_correct_entry` rejects a null sensor value, so the authenticated path cannot reach this. `details` stays non-null; `temp_f` updates; no `vpd_kpa` key is written. |
+| P10 (postflight) | On the replaced function body, the step-5 slice contains `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'` and does not contain `p_sensor ? 'vpd_kpa'`. The same check started at `'{manual_sensor_snapshot,temp_f}'` fails, because the guard is before that literal. |
 
 The harness also **generates the client fixture** (6.2) and has a `--check` mode that fails when
 the committed fixture differs from a fresh run.
@@ -377,9 +389,9 @@ still met by C).
 
 ## 10. Acceptance
 
-- [ ] P1–P9 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
+- [ ] P1–P10 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
       P9 calls `quicklog_correction_apply_measured_values` with a null `vpd_kpa` and leaves
-      `details` non-null.
+      `details` non-null. P10 runs the step-5 postflight slice against the new body.
 - [ ] T1–T9 pass; all three negative gates shown failing, then restored.
 - [ ] `config/local-supabase-replay-compatibility.json` unchanged; the `Published migration
 integrity` gate green; no merged migration edited.

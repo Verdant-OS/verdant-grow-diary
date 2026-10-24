@@ -291,6 +291,27 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+async function completeDelayedSensorReadings(
+  release: () => void,
+  note: string,
+  expectedMeasurementCount: number,
+) {
+  await waitFor(() => {
+    expect(
+      harness.executeQuery.mock.calls.filter(
+        ([spec]) => (spec as QuerySpec).table === "sensor_readings_effective",
+      ),
+    ).toHaveLength(2);
+  });
+  // Both captured and legacy sensor reads are pending while core diary rows are usable.
+  expect(screen.getByText(note)).toBeInTheDocument();
+  expect(chipCount("Measurements")).toBe(1);
+  await act(async () => {
+    release();
+  });
+  await waitFor(() => expect(chipCount("Measurements")).toBe(expectedMeasurementCount));
+}
+
 describe("Timeline chip counts match listed entries (#2163)", () => {
   beforeEach(() => {
     harness.executeQuery.mockReset();
@@ -348,19 +369,20 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
       }),
     ];
     const readings = receiptReadings(4);
+    const sensorReadGate = deferred<void>();
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 6 };
       if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
-      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      if (spec.table === "sensor_readings_effective") {
+        return sensorReadGate.promise.then(() => ({ data: readings, error: null }));
+      }
       return defaultResult(spec);
     });
 
     renderTimeline();
 
-    expect(await screen.findByText("Plain diary note")).toBeInTheDocument();
-    // Manual sensor receipts load after the core read commits (the detached
-    // directory read), so wait for them before comparing chips to the list.
-    await waitFor(() => expect(chipCount("Measurements")).toBe(5));
+    await completeDelayedSensorReadings(() => sensorReadGate.resolve(), "Plain diary note", 5);
+    expect(screen.getByText("Plain diary note")).toBeInTheDocument();
 
     expect(chipCount("All")).toBe(6);
     expect(chipCount("All stages")).toBe(6);
@@ -431,15 +453,19 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
       }),
     ];
     const readings = receiptReadings(2);
+    const sensorReadGate = deferred<void>();
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 3 };
       if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
-      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      if (spec.table === "sensor_readings_effective") {
+        return sensorReadGate.promise.then(() => ({ data: readings, error: null }));
+      }
       return defaultResult(spec);
     });
 
     renderTimeline();
 
+    await completeDelayedSensorReadings(() => sensorReadGate.resolve(), "QA Test watering note", 3);
     expect(await screen.findByText("QA Test watering note")).toBeInTheDocument();
     expect(chipCount("All")).toBe(3);
 

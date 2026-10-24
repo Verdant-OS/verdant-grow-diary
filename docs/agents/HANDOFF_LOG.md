@@ -53,16 +53,16 @@ goal: Specification only (Matthew approved writing it 2026-10-23) for the additi
 branch: claude/vibrant-heisenberg-njd6r3
 base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (open, not draft)
-head_sha: read the PR's current full head before resuming
-state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (returned to draft 2026-10-24 per AGENTS.md drafts-until-merge)
+head_sha: ab9c90a8385651deab1f0063b4bc5a52ab18ad7d (remote head adopted by the Claude claim, observed 2026-10-24 14:13 UTC). The base-merge and review-fix commits that follow it are listed on the PR; compare against the PR's current head before resuming.
+state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
 next_action: Route an eligible independent review of the spec at its exact head. Matthew's option choice and the migration's per-PR decision remain his.
 files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
-blockers: None for slice 2: #2504 merged as 3ef43ee49, so src/lib/tentManualEnvironmentEventRules.ts is on the deploy branch. The migration is Matthew's per-PR decision; applying 20261014210000 stays blocked by #2503.
+blockers: Slice 2 is blocked on its real-write-path fixture, which only the slice 1 harness can produce, and slice 1 (migration + harness) waits on Matthew's per-PR migration decision. #2504's code dependency is cleared (merged as 3ef43ee49). The migration is Matthew's per-PR decision; applying 20261014210000 stays blocked by #2503.
 artifacts: the spec file above
-reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3; this author is excluded
-claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-23 UTC (Matthew's direct assignment)
-last_updated: 2026-10-24 07:26 CT, by Grok (cloud review-fix on #2508)
+reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3. Excluded: author Claude session 01QxMpAHgnpV65y3Yykv8CvE, and the Grok cloud review-fix session (commits 6a30b7ae, e29a451f, ab9c90a8, authored as Cursor Agent) as repairer
+claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-24 14:13 UTC (Matthew reassigned it; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6385243811)
+last_updated: 2026-10-24 14:20 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
 ```
 
 ### REVIEWER-ROUTING-20261022

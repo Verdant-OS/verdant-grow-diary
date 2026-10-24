@@ -115,7 +115,12 @@ any other file.
    `(p_sensor ->> 'vpd_kpa')::numeric` NULL, and `to_jsonb(NULL::numeric)` is NULL, so the `?`
    guard would set the whole `details` column to NULL. A JSON null, a missing key, or any
    non-number takes the ELSE branch: temperature and humidity still update, and no `vpd_kpa`
-   key is written. A null temperature or humidity has the same STRICT `jsonb_set` exposure in
+   key is written. That holds for this UPDATE only. The function still runs the unchanged
+   `sensor_snapshot` UPDATE first (`20261014210000:264-281`), and its VPD write at `:278` is
+   guarded by `p_sensor ? 'vpd_kpa'`. For a present-but-null `vpd_kpa` that write sets every
+   targeted row's `details` to NULL, `sensor_snapshot` or not, so this UPDATE's `WHERE` then
+   skips the row. The whole function is therefore not null-safe for VPD. What keeps a null out
+   is `quicklog_correct_entry` (`:451`, tested by P11). A null temperature or humidity has the same STRICT `jsonb_set` exposure in
    this mirror UPDATE (`20261014210000:287-294`) and in the unchanged `sensor_snapshot`
    temperature and humidity writes (`:270` and `:274`). `:278` is that UPDATE's VPD write, not
    temperature or humidity. `quicklog_correct_entry` rejects a non-number sensor value
@@ -150,6 +155,7 @@ any other file.
    `UPDATE public.diary_entries d` (`:264`) also fails, because that statement still contains
    `:278`. The full-body md5 in step 2 already identifies a re-run; this slice check does
    not replace it.
+
 6. `COMMIT; NOTIFY pgrst, 'reload schema';`
 
 **Key name.** `vpd_kpa` names its unit, as `temp_f` and `humidity_percent` do. It is the name the
@@ -277,18 +283,19 @@ delegate files through `scripts/lib/quicklogManualDeliveryOrder.mjs`) and
 F11's proof does.** Every write goes through `quicklog_save_manual` and `quicklog_correct_entry`
 as an `authenticated` owner.
 
-| Case             | Setup → expectation                                                                                                                                                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1 (C invariant) | A plant save with temperature and RH and `p_vpd_kpa = null` → the parent, sibling `grow_events` row and mirror `diary_entries` row have byte-equal `created_at` text under `to_jsonb`. `quicklog_revision_sibling_env_ids` returns exactly that sibling. |
-| P2               | Correct `sensor_values: { vpd_kpa: 1.2 }` → `environment_events.vpd_kpa = 1.2`; the mirror's `manual_sensor_snapshot.vpd_kpa` is the JSON number `1.2`; `temp_f` and `humidity_percent` unchanged; **no** `sensor_snapshot` key created.                 |
-| P3               | Correct temperature only → `temp_f` updated; **no** `vpd_kpa` key added.                                                                                                                                                                                 |
-| P4 (regression)  | A row that does carry `sensor_snapshot`, written by its real writer (identify that writer during implementation; this spec did not trace it) → after the same correction, `details` equals what `20261014210000` alone produces, byte for byte.          |
-| P5               | Privileges: owner `postgres`, SECURITY DEFINER, pinned search path; `has_function_privilege` is false for `anon`, `authenticated` and `service_role`. `quicklog_correct_entry` md5 is unchanged.                                                         |
-| P6               | Preflight fails with `quicklog_correction_manual_vpd_preflight_unrecognized` when `20261014210000` is absent or its body differs. Re-running the migration succeeds and changes nothing.                                                                 |
-| P7 (RED)         | With only `20261014210000` applied, P2 fails on the missing `vpd_kpa`. Record the failing count in the PR body.                                                                                                                                          |
-| P8               | The revision ledger's `previous_state` still holds the original `environment_events` values (F10).                                                                                                                                                       |
-| P9 (null vpd)    | Call `quicklog_correction_apply_measured_values` directly, as a role that may execute it, with `p_sensor` containing `"vpd_kpa": null` and a real temperature change. `quicklog_correct_entry` rejects a null sensor value, so the authenticated path cannot reach this. `details` stays non-null; `temp_f` updates; no `vpd_kpa` key is written. |
-| P10 (postflight) | On the replaced function body, the step-5 slice contains `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'` and does not contain `p_sensor ? 'vpd_kpa'`. The same check started at `'{manual_sensor_snapshot,temp_f}'` fails, because the guard is before that literal. |
+| Case                | Setup → expectation                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1 (C invariant)    | A plant save with temperature and RH and `p_vpd_kpa = null` → the parent, sibling `grow_events` row and mirror `diary_entries` row have byte-equal `created_at` text under `to_jsonb`. `quicklog_revision_sibling_env_ids` returns exactly that sibling.                                                                                                                                                                                                   |
+| P2                  | Correct `sensor_values: { vpd_kpa: 1.2 }` → `environment_events.vpd_kpa = 1.2`; the mirror's `manual_sensor_snapshot.vpd_kpa` is the JSON number `1.2`; `temp_f` and `humidity_percent` unchanged; **no** `sensor_snapshot` key created.                                                                                                                                                                                                                   |
+| P3                  | Correct temperature only → `temp_f` updated; **no** `vpd_kpa` key added.                                                                                                                                                                                                                                                                                                                                                                                   |
+| P4 (regression)     | A row that does carry `sensor_snapshot`, written by its real writer (identify that writer during implementation; this spec did not trace it) → after the same correction, `details` equals what `20261014210000` alone produces, byte for byte.                                                                                                                                                                                                            |
+| P5                  | Privileges: owner `postgres`, SECURITY DEFINER, pinned search path; `has_function_privilege` is false for `anon`, `authenticated` and `service_role`. `quicklog_correct_entry` md5 is unchanged.                                                                                                                                                                                                                                                           |
+| P6                  | Preflight fails with `quicklog_correction_manual_vpd_preflight_unrecognized` when `20261014210000` is absent or its body differs. Re-running the migration succeeds and changes nothing.                                                                                                                                                                                                                                                                   |
+| P7 (RED)            | With only `20261014210000` applied, P2 fails on the missing `vpd_kpa`. Record the failing count in the PR body.                                                                                                                                                                                                                                                                                                                                            |
+| P8                  | The revision ledger's `previous_state` still holds the original `environment_events` values (F10).                                                                                                                                                                                                                                                                                                                                                         |
+| P9 (null vpd)       | Test the new mirror UPDATE's `SET` expression in isolation, not the whole function: evaluate it in a `SELECT` over a real Plant Quick Log mirror row with `p_sensor` = `{"temperature_c": 25, "vpd_kpa": null}`. The result is non-null, `temp_f` is updated, and no `vpd_kpa` key is written. A whole-function call with that input would hit the unchanged `:278` write first and set `details` to NULL (step 3 note), so P9 must not be written as one. |
+| P11 (null rejected) | As an `authenticated` owner, `quicklog_correct_entry` with `sensor_values: {"vpd_kpa": null}` returns `invalid_changes` (`20261014210000:451`), and the mirror row's `details` is unchanged. This is the guard that keeps a null away from `:278`.                                                                                                                                                                                                         |
+| P10 (postflight)    | On the replaced function body, the step-5 slice contains `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'` and does not contain `p_sensor ? 'vpd_kpa'`. The same check started at `'{manual_sensor_snapshot,temp_f}'` fails, because the guard is before that literal.                                                                                                                                                                                      |
 
 The harness also **generates the client fixture** (6.2) and has a `--check` mode that fails when
 the committed fixture differs from a fresh run.
@@ -325,7 +332,7 @@ New `src/test/tent-history-vpd-correction-write-path.test.ts`:
 | T4 (S4) | One card; no VPD is invented.                                                                                                                                                                              |
 | T5 (S5) | The value-rule fallback still collapses a legacy mirror with matching readings, and still refuses a VPD-bearing event.                                                                                     |
 | T6      | Null or malformed `created_at` on either side → no transaction-key claim; the fallback applies.                                                                                                            |
-| T7      | Determinism: every permutation of the input rows gives the same output.                                                                                                                                    |
+| T7      | Determinism: every permutation of the input rows claims and keeps the same set of ids; each output keeps the order of its own input (step 5), so outputs differ only in order.                             |     |
 | T8      | Two `created_at` values that differ only in microseconds do not match (pins string comparison).                                                                                                            |
 
 **Negative gates:** set aside the C branch (diffed against the base) → T2 and T9 show two
@@ -389,7 +396,7 @@ still met by C).
 
 ## 10. Acceptance
 
-- [ ] P1–P10 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
+- [ ] P1–P11 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
       P9 calls `quicklog_correction_apply_measured_values` with a null `vpd_kpa` and leaves
       `details` non-null. P10 runs the step-5 postflight slice against the new body.
 - [ ] T1–T9 pass; all three negative gates shown failing, then restored.
@@ -422,5 +429,10 @@ absent. The source label stays `manual`. The migration narrows a truth gap. It w
 
 Implementation holder: unassigned. Slice 2 overlaps #2504's files, so the #2504 holder is the
 natural owner. Independent reviewer: an available eligible session under `OWNERSHIP.md` §4.3 that
-did not write this spec or either slice. This spec's author (Claude, session
-`01QxMpAHgnpV65y3Yykv8CvE`) is excluded from accepting it and from accepting both slices.
+did not write or repair this spec or either slice. Excluded from accepting the spec:
+
+- its author, Claude session `01QxMpAHgnpV65y3Yykv8CvE`;
+- the Grok cloud review-fix session that pushed `6a30b7ae`, `e29a451f` and `ab9c90a8` (authored
+  as Cursor Agent), as a repairer.
+
+A non-contributing Grok or Claude session stays eligible.

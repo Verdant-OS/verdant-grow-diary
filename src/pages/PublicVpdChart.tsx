@@ -47,6 +47,54 @@ function parseFinite(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function DraftNumberInput({
+  id,
+  describedBy,
+  committed,
+  min,
+  max,
+  step,
+  inputMode,
+  onCommit,
+}: {
+  id: string;
+  describedBy: string;
+  committed: number;
+  min: number;
+  max: number;
+  step: number;
+  inputMode: "decimal" | "numeric";
+  onCommit: (raw: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  function commit(raw: string) {
+    onCommit(raw);
+    setDraft(null);
+  }
+
+  return (
+    <input
+      id={id}
+      className="mt-1 w-full rounded-md border px-3 py-2"
+      type="number"
+      inputMode={inputMode}
+      min={min}
+      max={max}
+      step={step}
+      value={draft ?? String(committed)}
+      aria-describedby={describedBy}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={(event) => commit(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        commit(event.currentTarget.value);
+      }}
+    />
+  );
+}
+
 export default function PublicVpdChart() {
   const [unit, setUnit] = useState<PublicVpdChartUnit>(PUBLIC_VPD_CHART_DEFAULTS.unit);
   const [airTempF, setAirTempF] = useState<number>(PUBLIC_VPD_CHART_DEFAULTS.airTempF);
@@ -156,18 +204,17 @@ export default function PublicVpdChart() {
               <p id="air-temp-range-hint" className="text-sm text-[#526656]">
                 {isFahrenheit ? "Range: 50–100 °F" : "Range: 10–38 °C"}
               </p>
-              <input
+              <DraftNumberInput
+                key={unit}
                 id="air-temp-number"
-                className="mt-1 w-full rounded-md border px-3 py-2"
-                type="number"
-                inputMode="decimal"
+                describedBy="air-temp-range-hint"
+                committed={displayedAir}
                 min={isFahrenheit ? 50 : 10}
                 max={isFahrenheit ? 100 : 38}
                 step={0.1}
-                value={displayedAir}
-                aria-describedby="air-temp-range-hint"
-                onChange={(event) => {
-                  const parsed = parseFinite(event.target.value);
+                inputMode="decimal"
+                onCommit={(raw) => {
+                  const parsed = parseFinite(raw);
                   if (parsed === null) return;
                   setAirTempF(publicVpdChartAirTemperatureFromDisplay(parsed, unit));
                 }}
@@ -180,18 +227,16 @@ export default function PublicVpdChart() {
               <p id="rh-range-hint" className="text-sm text-[#526656]">
                 Range: 0–100%
               </p>
-              <input
+              <DraftNumberInput
                 id="rh-number"
-                className="mt-1 w-full rounded-md border px-3 py-2"
-                type="number"
-                inputMode="numeric"
+                describedBy="rh-range-hint"
+                committed={rh}
                 min={0}
                 max={100}
                 step={1}
-                value={rh}
-                aria-describedby="rh-range-hint"
-                onChange={(event) => {
-                  const parsed = parseFinite(event.target.value);
+                inputMode="numeric"
+                onCommit={(raw) => {
+                  const parsed = parseFinite(raw);
                   if (parsed === null) return;
                   setRh(publicVpdChartClamp(Math.round(parsed), 0, 100));
                 }}
@@ -204,18 +249,17 @@ export default function PublicVpdChart() {
               <p id="leaf-offset-range-hint" className="text-sm text-[#526656]">
                 {isFahrenheit ? "Range: −10 to +5 °F" : "Range: −5.6 to +2.8 °C"}
               </p>
-              <input
+              <DraftNumberInput
+                key={unit}
                 id="leaf-offset-number"
-                className="mt-1 w-full rounded-md border px-3 py-2"
-                type="number"
-                inputMode="decimal"
+                describedBy="leaf-offset-range-hint"
+                committed={displayedOffset}
                 min={isFahrenheit ? -10 : -5.6}
                 max={isFahrenheit ? 5 : 2.8}
                 step={0.1}
-                value={displayedOffset}
-                aria-describedby="leaf-offset-range-hint"
-                onChange={(event) => {
-                  const parsed = parseFinite(event.target.value);
+                inputMode="decimal"
+                onCommit={(raw) => {
+                  const parsed = parseFinite(raw);
                   if (parsed === null) return;
                   setOffsetF(publicVpdChartOffsetFromDisplay(parsed, unit));
                 }}

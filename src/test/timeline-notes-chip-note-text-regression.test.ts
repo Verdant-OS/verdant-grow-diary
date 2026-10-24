@@ -46,6 +46,13 @@ describe("Timeline Notes chip — generated text contract", () => {
       /!isTimelineSensorDerivedDiaryId\(e\.id\) && timelineEntryHasNoteText\(e\.note\)/,
     );
     expect(TIMELINE_PAGE).toMatch(/kinds\.push\("note"\)/);
-    expect(TIMELINE_PAGE).toMatch(/aria-pressed=\{active\}/);
+  });
+
+  // @source-scan-justified: FilterChip is private to Timeline.tsx; restrict this
+  // check to its declaration so the sensor-source toggle cannot satisfy it.
+  it("FilterChip exposes its active state via aria-pressed", () => {
+    const filterChip = TIMELINE_PAGE.match(/^function FilterChip\([\s\S]*?^\}$/m)?.[0];
+    expect(filterChip).toBeDefined();
+    expect(filterChip).toMatch(/aria-pressed=\{active\}/);
   });
 });

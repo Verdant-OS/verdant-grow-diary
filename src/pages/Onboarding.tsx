@@ -56,7 +56,12 @@ import {
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
-  const { grows = [], loading: growsLoading, refresh: refreshGrows } = useGrows();
+  const {
+    grows = [],
+    loading: growsLoading = false,
+    error: growsError = null,
+    refresh: refreshGrows,
+  } = useGrows();
   const {
     loading: entitlementLoading,
     lookupFailed: entitlementLookupFailed,
@@ -95,6 +100,27 @@ export default function Onboarding() {
     );
   }
   if (!user) return <Navigate to="/auth" replace />;
+  if (growsError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div
+          role="alert"
+          data-testid="onboarding-grows-error"
+          className="max-w-md space-y-3 text-sm"
+        >
+          <p>We couldn&apos;t load your grows. This is not an empty account.</p>
+          <Button
+            type="button"
+            onClick={() => {
+              void refreshGrows?.();
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
   if (grows.length >= 1) return <Navigate to={routeForStartScreen("dashboard")} replace />;
 
   function go(c: StartScreenChoice, save: boolean) {

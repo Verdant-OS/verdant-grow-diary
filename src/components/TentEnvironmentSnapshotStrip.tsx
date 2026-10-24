@@ -14,9 +14,18 @@ import {
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
+import { tentsListCanonicalVpd, tentsListDiarySnapshotRows } from "@/lib/tentsListVpdRules";
+import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
+import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
 export interface TentEnvironmentSnapshotStripProps {
   tentId: string;
+  /**
+   * The tent's Dashboard diary-inclusive snapshot (`useLatestSensorSnapshotsByTent`),
+   * read once at page level and passed down, never fetched per card (#2268;
+   * Codex P2 on #2303 at 0c19a9e0). Idle when the page has none for this tent.
+   */
+  tonightSnapshot?: SnapshotState;
   stage: string | null | undefined;
   sensorRows: readonly BuildTentSnapshotInput[];
   sensorStatus: TentSensorReadStatus;
@@ -27,8 +36,11 @@ export interface TentEnvironmentSnapshotStripProps {
   manualUnavailableReason?: TentManualSnapshotUnavailableReason | null;
 }
 
+const IDLE_SNAPSHOT: SnapshotState = { status: "idle", snapshot: EMPTY_SNAPSHOT };
+
 export default function TentEnvironmentSnapshotStrip({
   tentId,
+  tonightSnapshot = IDLE_SNAPSHOT,
   stage,
   sensorRows,
   sensorStatus,
@@ -46,7 +58,12 @@ export default function TentEnvironmentSnapshotStrip({
     now,
   });
 
-  if (selection.kind === "sensor_loading") {
+  // A failed raw read is not "unavailable" while the Dashboard's own snapshot
+  // read, which may still back it, is in flight (Codex P2 on #2303 at 0994ea2a).
+  if (
+    selection.kind === "sensor_loading" ||
+    (selection.kind === "sensor_unavailable" && tonightSnapshot.status === "loading")
+  ) {
     return (
       <p
         className="text-xs text-muted-foreground animate-pulse"
@@ -56,7 +73,42 @@ export default function TentEnvironmentSnapshotStrip({
       </p>
     );
   }
-  if (selection.kind === "sensor_unavailable") {
+  // The raw read failed but the Dashboard's own snapshot read resolved a
+  // capture: show that capture, as the Dashboard and Tent Detail do, rather
+  // than claim nothing could be loaded (Codex P2 on #2303 at fa8edcff).
+  const diaryRows = tentsListDiarySnapshotRows(
+    { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+    tentId,
+    now,
+  );
+  // A successful snapshot whose every row was rejected has no `ts`, so it
+  // yields no rows, but its rejection evidence still decides the VPD, as it
+  // does on the Dashboard (Codex P2 on #2430 at fcd86356).
+  // A failed or air-less manual card does not hide it either (Copilot on
+  // #2442 at e50d6087).
+  const rejectedOnlyVpd =
+    diaryRows.length === 0 &&
+    (selection.kind === "sensor_unavailable" ||
+      selection.kind === "empty" ||
+      selection.kind === "manual_unavailable" ||
+      selection.kind === "manual_unusable") &&
+    tonightSnapshot.status === "ok"
+      ? tentsListCanonicalVpd(
+          [],
+          tentId,
+          now,
+          { status: "ok", snapshot: tonightSnapshot.snapshot },
+          sensorStatus,
+        )
+      : null;
+  if (rejectedOnlyVpd?.rejected) {
+    return (
+      <p className="text-xs text-destructive" data-testid={`tents-list-vpd-rejected-${tentId}`}>
+        VPD invalid — the latest VPD reading did not pass a sensor check.
+      </p>
+    );
+  }
+  if (selection.kind === "sensor_unavailable" && diaryRows.length === 0) {
     return sensorStatus === "refresh_error" ? (
       <p
         className="text-xs text-muted-foreground"
@@ -83,7 +135,9 @@ export default function TentEnvironmentSnapshotStrip({
       </p>
     );
   }
-  if (selection.kind === "manual_unavailable") {
+  // A failed manual read does not hide a successful Dashboard snapshot; that
+  // snapshot backs the card instead (Codex P2 on #2303 at 6a242e1f).
+  if (selection.kind === "manual_unavailable" && diaryRows.length === 0) {
     const unavailableCopy =
       manualUnavailableReason === "cap_exhausted"
         ? "Manual snapshot unavailable — the saved-reading scan reached its safe limit."
@@ -100,7 +154,9 @@ export default function TentEnvironmentSnapshotStrip({
       </p>
     );
   }
-  if (selection.kind === "manual_unusable") {
+  // A manual card with no air readings does not hide a diary capture the
+  // Dashboard shows for this tent (Codex P2 on #2407 at e66265eb).
+  if (selection.kind === "manual_unusable" && diaryRows.length === 0) {
     return (
       <div className="space-y-1">
         {selection.refreshing ? (
@@ -132,7 +188,39 @@ export default function TentEnvironmentSnapshotStrip({
       </div>
     );
   }
-  if (selection.kind === "empty") {
+  // No stored rows and no manual card: the Dashboard's diary-inclusive
+  // snapshot may still hold a Quick Log or Environment Check capture for this
+  // tent, which is what the Dashboard shows (Codex P2 on #2303 at 69de43db).
+  // Until that read resolves, say so rather than claiming absence; a failed
+  // read is unavailable, not empty (Codex P2 on #2303 at 85ec1e78).
+  if (selection.kind === "empty" && tonightSnapshot.status === "loading") {
+    return (
+      <p
+        className="text-xs text-muted-foreground animate-pulse"
+        data-testid={`tents-list-sensor-loading-${tentId}`}
+      >
+        Loading sensor data…
+      </p>
+    );
+  }
+  if (selection.kind === "empty" && tonightSnapshot.status === "unavailable") {
+    return (
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid={`tents-list-sensor-unavailable-${tentId}`}
+      >
+        Sensor data unavailable — readings couldn't be loaded.
+      </p>
+    );
+  }
+  const rows =
+    selection.kind === "empty" ||
+    selection.kind === "sensor_unavailable" ||
+    selection.kind === "manual_unavailable" ||
+    selection.kind === "manual_unusable"
+      ? diaryRows
+      : selection.rows;
+  if (rows.length === 0) {
     return (
       <p
         className="text-xs text-muted-foreground"
@@ -143,7 +231,18 @@ export default function TentEnvironmentSnapshotStrip({
     );
   }
 
-  const snapView = buildTentSnapshotView(selection.rows, stage, now, { temperatureUnit });
+  const snapView = buildTentSnapshotView(rows, stage, now, {
+    temperatureUnit,
+    // Tonight's own inputs, the raw rows and the snapshot, never the manual or
+    // diary fallback rows shown here (Codex P1 on #2437, Copilot on #2442).
+    canonicalVpd: tentsListCanonicalVpd(
+      sensorRows,
+      tentId,
+      now,
+      { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+      sensorStatus,
+    ),
+  });
   const vpdMetric = snapView.metrics.find((metric) => metric.key === "vpd");
   const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";
 
@@ -168,7 +267,7 @@ export default function TentEnvironmentSnapshotStrip({
           Refreshing saved manual snapshot…
         </p>
       ) : null}
-      {selection.refreshWarning ? (
+      {(selection.kind === "sensor" || selection.kind === "manual") && selection.refreshWarning ? (
         <p
           className="text-xs text-amber-600"
           data-testid={

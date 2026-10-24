@@ -45,6 +45,27 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### FIX2488-ZERO-ROW-PLANT-SAVE
+
+```text
+TASK FIX2488-ZERO-ROW-PLANT-SAVE  priority: P2  status: OPEN
+goal: Require a confirmed plant update before success or parent-stage prompts; add a rendered zero-row regression after checking #2489.
+branch: codex/fix2488-zero-row-plant-save
+base: verdant-grow-diary at 158f2726ca6a9d6452be04e06d834a6954dba43d
+checkout: git switch codex/fix2488-zero-row-plant-save
+pr: Draft ownership checkpoint follows this commit; read current branch PR before resuming.
+head_sha: Source checkpoint is 158f2726ca6a9d6452be04e06d834a6954dba43d; this handoff commit follows it. Read the PR for the resulting full head.
+state: Explicitly assigned by Matthew in Codex chat on 2026-10-24; isolated checkout prepared; implementation not started.
+next_action: Push this ownership checkpoint and open a draft before implementation; prove the new regression RED, apply the receipt guard, and verify focused suites.
+files: src/components/EditPlantDialog.tsx; new src/test/plant-edit-zero-row-save.test.tsx; existing rendered-test backend fixtures only as required by returned-row confirmation; this block.
+blockers: Independent acceptance requires an available non-contributing Claude/Grok session; Codex is the author and cannot accept its own repair.
+artifacts: Private #2488 review in the assigning chat; #2489 head 73b0f942b51c4f55a68155f455ce6ad7f388f67b inspected first. Its own changes are two new rules/service test files and do not handle zero-row plants saves. All 138 open PR file lists checked; #2041 modifies other EditPlantDialog hunks, with no competing zero-row implementation.
+reviewer_seat: Available eligible non-contributing Claude/Grok session required; independent acceptance NOT_MEASURED.
+claimed_by: Codex, Matthew's direct assignment in this chat, 2026-10-24
+last_updated: 2026-10-24 13:20 CT, by Codex
+limits: Stay draft. No merge, ready/enqueue, deploy, production writes, schema/RLS/auth/Edge/lockfile changes or edits to #2489/#2041 branches. Preserve original checkouts.
+```
+
 ### REVIEWER-ROUTING-20261022
 
 ```text

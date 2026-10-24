@@ -9,7 +9,7 @@ import {
 
 describe("grows read retry budget and non-retryable codes", () => {
   it("fails fast on permission, missing-table, and client errors", async () => {
-    for (const code of ["42501", "42P01", "PGRST116", "403", "PGRST301"]) {
+    for (const code of ["42501", "42P01", "PGRST116", "403"]) {
       const failure = classifyGrowReadFailure({ code, message: "grower@example.com" });
       expect(isRetryableGrowReadFailure(failure)).toBe(false);
       const read = vi.fn(async () => ({ ok: false as const, failure }));
@@ -18,6 +18,22 @@ describe("grows read retry budget and non-retryable codes", () => {
       expect(outcome.ok).toBe(false);
       expect(read).toHaveBeenCalledTimes(1);
       expect(sleep).not.toHaveBeenCalled();
+    }
+  });
+
+  it("retries an expired JWT, request timeout, and rate limit", async () => {
+    for (const code of ["PGRST301", "408", "429"]) {
+      const failure = classifyGrowReadFailure({ code, message: "jwt for grower@example.com" });
+      expect(isRetryableGrowReadFailure(failure)).toBe(true);
+      const read = vi
+        .fn<() => Promise<{ ok: false; failure: typeof failure } | { ok: true; value: string[] }>>()
+        .mockResolvedValueOnce({ ok: false, failure })
+        .mockResolvedValueOnce({ ok: true, value: ["grow-1"] });
+      const sleep = vi.fn(async (_ms: number) => {});
+      const outcome = await readWithGrowRetry(read, sleep, [10, 20]);
+      expect(outcome).toEqual({ ok: true, value: ["grow-1"] });
+      expect(read).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(read.mock.calls)).not.toContain("grower@example.com");
     }
   });
 

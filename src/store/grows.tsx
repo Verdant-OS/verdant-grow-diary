@@ -23,10 +23,10 @@ import {
 import { reportErrorWhenReady } from "@/lib/errorReporter";
 import {
   AUTH_SETTLE_WAIT_MS,
-  GROW_READ_ATTEMPT_DEADLINE_MS,
   GROW_READ_BUDGET_MS,
   GrowReadCancelledError,
   classifyGrowReadFailure,
+  growReadAttemptDeadlineMs,
   readWithGrowRetry,
   withTrackedDeadline,
   type GrowReadFailure,
@@ -107,7 +107,9 @@ function GrowsProviderForOwner({
   const [error, setError] = useState<string | null>(null);
   const [authWaitExpired, setAuthWaitExpired] = useState(false);
   const growReadGenerationRef = useRef(0);
-  const retryCancelsRef = useRef<Array<() => void>>([]);
+  /** The one active backoff or deadline cancel. Replaced, not appended. */
+  const retryCancelRef = useRef<(() => void) | null>(null);
+  const initialReadStartedRef = useRef(false);
 
   const setActiveGrowId = (id: string | null) => {
     _setActive(id);
@@ -122,6 +124,8 @@ function GrowsProviderForOwner({
    */
   const readAndPublishGrows = useCallback(
     async (canPublish: () => boolean = () => true): Promise<PublishedGrowRead> => {
+      retryCancelRef.current?.();
+      retryCancelRef.current = null;
       const requestGeneration = ++growReadGenerationRef.current;
       if (!user) {
         setGrows([]);
@@ -136,24 +140,45 @@ function GrowsProviderForOwner({
       const stillCurrent = () =>
         canPublish() && requestGeneration === growReadGenerationRef.current;
       const startedAt = Date.now();
+      let attempt = 0;
       try {
         const outcome = await readWithGrowRetry(
           async () => {
             if (!stillCurrent()) return { ok: true, value: null };
             const remaining = GROW_READ_BUDGET_MS - (Date.now() - startedAt);
-            if (remaining <= 0) {
+            const deadline = growReadAttemptDeadlineMs(attempt, remaining);
+            attempt += 1;
+            if (deadline <= 0) {
               return {
                 ok: false,
                 failure: { kind: "timeout", code: "critical_read_deadline" } as const,
               };
             }
+            // PostgREST's builder accepts abortSignal and aborts its fetch.
+            // Stubs without that method cannot be aborted; the deadline still ends the wait.
+            const controller = new AbortController();
+            const query = supabase
+              .from("grows")
+              .select("*")
+              .order("created_at", { ascending: false });
+            const abortable = query as typeof query & {
+              abortSignal?: (signal: AbortSignal) => typeof query;
+            };
+            const raced =
+              typeof abortable.abortSignal === "function"
+                ? abortable.abortSignal(controller.signal)
+                : query;
             try {
               const { data, error: qErr } = await withTrackedDeadline(
-                supabase.from("grows").select("*").order("created_at", { ascending: false }),
-                Math.min(GROW_READ_ATTEMPT_DEADLINE_MS, remaining),
+                raced,
+                deadline,
                 (cancel) => {
-                  retryCancelsRef.current.push(cancel);
+                  retryCancelRef.current = () => {
+                    controller.abort();
+                    cancel();
+                  };
                 },
+                () => controller.abort(),
               );
               if (qErr) return { ok: false, failure: classifyGrowReadFailure(qErr) };
               return { ok: true, value: (data as Grow[] | null) ?? [] };
@@ -167,7 +192,7 @@ function GrowsProviderForOwner({
           {
             shouldStop: () => !stillCurrent(),
             onDelay: (cancel) => {
-              retryCancelsRef.current.push(cancel);
+              retryCancelRef.current = cancel;
             },
           },
         );
@@ -216,23 +241,25 @@ function GrowsProviderForOwner({
   );
 
   useEffect(() => {
-    if (!authLoading) {
-      setAuthWaitExpired(false);
-      return;
-    }
+    if (!authLoading) return;
     const timer = setTimeout(() => setAuthWaitExpired(true), AUTH_SETTLE_WAIT_MS);
     return () => clearTimeout(timer);
   }, [authLoading]);
 
   useEffect(() => {
     if (authLoading && !authWaitExpired) return;
+    if (initialReadStartedRef.current) return;
+    initialReadStartedRef.current = true;
     void refresh();
+  }, [authLoading, authWaitExpired, refresh]);
+
+  useEffect(() => {
     return () => {
       growReadGenerationRef.current += 1;
-      for (const cancel of retryCancelsRef.current) cancel();
-      retryCancelsRef.current = [];
+      retryCancelRef.current?.();
+      retryCancelRef.current = null;
     };
-  }, [authLoading, authWaitExpired, refresh]);
+  }, [ownerId]);
 
   // Auto-select first grow if none selected; clear after a successful read with no active grows
   useEffect(() => {

@@ -1,16 +1,16 @@
-import { CriticalReadDeadlineError } from "@/lib/boundedReadRules";
+import { CRITICAL_READ_DEADLINE_MS, CriticalReadDeadlineError } from "@/lib/boundedReadRules";
 
 /**
- * Two short waits after the first attempt. Combined with the per-attempt
- * deadline, a failing read leaves the loading state inside GROW_READ_BUDGET_MS.
+ * Two short waits after the first attempt. The first attempt keeps the full
+ * page deadline; later attempts use only the time left in GROW_READ_BUDGET_MS.
  */
 export const GROW_READ_RETRY_DELAYS_MS = [200, 400] as const;
 
-/** Whole retry sequence, including backoff. About 10s, under the 12s review cap. */
-export const GROW_READ_BUDGET_MS = 10_000;
-
-/** Each attempt is shorter than the 8s page deadline so three attempts fit the budget. */
-export const GROW_READ_ATTEMPT_DEADLINE_MS = 3_000;
+/**
+ * Whole retry sequence, including the 8s first attempt and backoff.
+ * A healthy read that finishes inside CRITICAL_READ_DEADLINE_MS still succeeds.
+ */
+export const GROW_READ_BUDGET_MS = 12_000;
 
 /** How long the first grows read waits for the post-sign-in session check. */
 export const AUTH_SETTLE_WAIT_MS = 2_000;
@@ -65,11 +65,22 @@ function isNetworkFailure(error: unknown): boolean {
 
 function isClientOrPermissionCode(code: string): boolean {
   if (NON_RETRYABLE_CODES.has(code)) return true;
+  // Expired or invalid JWT. This is the post-sign-in race, so it is retried.
+  if (code === "PGRST301") return false;
+  // Request timeout and rate limit can clear on a short retry.
+  if (code === "408" || code === "429") return false;
   if (/^4\d\d$/.test(code)) return true;
   if (code.startsWith("42")) return true;
   if (/^PGRST[123]\d*/.test(code)) return true;
   if (code.startsWith("28")) return true;
   return false;
+}
+
+/** First attempt keeps the 8s page deadline. Retries get only the budget that remains. */
+export function growReadAttemptDeadlineMs(attempt: number, remainingMs: number): number {
+  if (remainingMs <= 0) return 0;
+  if (attempt === 0) return Math.min(CRITICAL_READ_DEADLINE_MS, remainingMs);
+  return remainingMs;
 }
 
 /**
@@ -120,12 +131,16 @@ export function withTrackedDeadline<T>(
   work: PromiseLike<T>,
   timeoutMs: number,
   track: (cancel: () => void) => void,
+  onTimeout?: () => void,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let rejectTimeout: (error: Error) => void = () => {};
   const timeout = new Promise<never>((_, reject) => {
     rejectTimeout = reject;
-    timer = setTimeout(() => reject(new CriticalReadDeadlineError()), timeoutMs);
+    timer = setTimeout(() => {
+      onTimeout?.();
+      reject(new CriticalReadDeadlineError());
+    }, timeoutMs);
   });
   track(() => {
     if (timer !== undefined) clearTimeout(timer);
@@ -139,10 +154,7 @@ export function withTrackedDeadline<T>(
 
 function defaultSleep(ms: number, onDelay?: (cancel: () => void) => void): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      onDelay?.(() => {});
-      resolve();
-    }, ms);
+    const timer = setTimeout(resolve, ms);
     onDelay?.(() => {
       clearTimeout(timer);
       resolve();

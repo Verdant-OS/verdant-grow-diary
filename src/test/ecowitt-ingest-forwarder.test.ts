@@ -1544,6 +1544,62 @@ describe("redaction", () => {
     expect(out).toMatchObject({ kind: "forwarded", response: { status: 200, accepted: true } });
   });
 
+  it("retries a 2xx whose body cannot be read (Codex P2 on #2472 at f54d222e)", async () => {
+    // The 200 may carry a retryable insert_failed or tent_lookup_failed that
+    // was never read, and the write is an idempotent upsert, so an unreadable
+    // 2xx is a transport failure, not a final answer.
+    const unreadable200 = () =>
+      new Response(
+        new ReadableStream({
+          pull(c) {
+            c.error(new Error("body timed out"));
+          },
+        }),
+        { status: 200 },
+      );
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      return calls === 1 ? unreadable200() : new Response('{"accepted":true}', { status: 200 });
+    });
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: { ...NO_SLEEP, maxRetries: 1 },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(out).toMatchObject({ kind: "forwarded", attempts: 2, response: { status: 200, accepted: true } });
+  });
+
+  it("stops after the retry budget when every 2xx body is unreadable", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          new ReadableStream({
+            pull(c) {
+              c.error(new Error("reset"));
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: { ...NO_SLEEP, maxRetries: 1 },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(out).toMatchObject({
+      kind: "forwarded",
+      attempts: 2,
+      response: { status: 200, reason: "response_unreadable" },
+    });
+  });
+
   it("cancels a refused redirect's unread body (Codex P2 at d236df20)", async () => {
     let cancelled = false;
     const body = new ReadableStream({

@@ -734,8 +734,13 @@ export async function handleMessage(args: {
       }
       const summarized = summarizeResponse(r.status, bodyText);
       const response = unreadable ? { ...summarized, reason: "response_unreadable" } : summarized;
-      // A retryable status (408/429/5xx) with retries left falls through to the sleep below.
-      if (!isRetryableResponse(response) || attempt >= maxRetries) {
+      // An unreadable 2xx may hide a retryable insert_failed or
+      // tent_lookup_failed, and the write is an idempotent upsert, so it is
+      // retried as a transport failure (Codex P2 on #2472 at f54d222e).
+      const retryable =
+        isRetryableResponse(response) || (unreadable && r.status >= 200 && r.status < 300);
+      // A retryable response with retries left falls through to the sleep below.
+      if (!retryable || attempt >= maxRetries) {
         return { kind: "forwarded", summary: prepared.summary, response, attempts: attempt + 1 };
       }
     } catch (e) {

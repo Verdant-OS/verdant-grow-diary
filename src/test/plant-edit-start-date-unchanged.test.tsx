@@ -24,11 +24,13 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table !== "plants") throw new Error(`Unexpected table: ${table}`);
       return {
         update: (payload: Record<string, unknown>) => ({
-          eq: async (column: string, id: string) => {
-            if (column !== "id") throw new Error(`Unexpected selector: ${column}`);
-            backend.updates.push({ id, payload: { ...payload } });
-            return { error: backend.error };
-          },
+          eq: (column: string, id: string) => ({
+            select: async () => {
+              if (column !== "id") throw new Error(`Unexpected selector: ${column}`);
+              backend.updates.push({ id, payload: { ...payload } });
+              return { data: [{ id }], error: backend.error };
+            },
+          }),
         }),
       };
     },

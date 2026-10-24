@@ -25,9 +25,10 @@ No schema, RLS, grant or save-path change.
 - **C (client, no migration).** The tent dedupe identifies the environment sibling with the
   key the server already uses for the same job: the sibling's `grow_events.created_at` equals
   the mirror's `diary_entries.created_at`, because the save writes the parent, sibling and
-  mirror in one transaction. That key is deterministic. An independent same-instant save runs
-  in a different transaction and has a different `created_at`, so the two can be told apart.
-  The value rule stays as a fallback for rows the key does not match.
+  mirror in one transaction. An independent same-instant save runs in a different transaction,
+  so it normally has a different `created_at` and the two can be told apart. The residual
+  risk is two transactions sharing a microsecond (§9 K5). The value rule stays as a fallback
+  for rows the key does not match.
 
 Rejected: building a `sensor_snapshot` object on plant mirrors (A2), and a
 `grow_events.parent_event_id` column (B1). Deferred: a save-time link key in the mirror's
@@ -40,7 +41,8 @@ details (B2). Reasons are in §4.
 - R2. That card shows the corrected, measured VPD. It never shows a temperature/RH-derived VPD
   that contradicts the corrected value.
 - R3. An independent manual save at the same tent, plant and instant still shows as its own
-  card, with or without VPD.
+  card, with or without VPD. The one known exception is two transactions with
+  microsecond-equal `created_at` (§9 K5); C does not guarantee R3 in that case.
 - R4. Uncorrected saves and every pre-existing row render exactly as they do today.
 - R5. Additive only. No merged migration is edited. No table, column, policy, grant or RLS
   change. The save delegate (`quicklog_save_manual_pre_logged_at`) is not replaced.
@@ -183,22 +185,35 @@ grow_events(id)`, an index, a same-owner trigger, a replacement of the save dele
 **Client change (`tentManualEnvironmentEventRules.ts`, added by #2504):**
 
 1. Add `created_at` to `TENT_MANUAL_ENV_EVENT_SELECT`, and carry it as `createdAt: string | null`
-   on `TentManualEnvironmentEvent`. Add `created_at` to the diary snapshot read and to
-   `TentManualMirrorDiaryRow`.
+   on `TentManualEnvironmentEvent`. Add `created_at` to `TentManualMirrorDiaryRow` and to
+   **both** diary reads that feed `dropEventsMirroredByDiaryRows`:
+   - the tent timeline's `fetchTentManualSnapshotRows`
+     (`src/hooks/useManualSnapshotTimelineCards.ts:61-76`, consumed at `:118`), and its
+     `ManualSnapshotDiaryRow` shape;
+   - the history list's read in `src/hooks/useTentManualDiarySnapshots.ts`.
+
+   A surface whose read lacks `created_at` silently falls back to the value rule and still
+   shows two cards.
+
 2. In `dropEventsMirroredByDiaryRows`, between the direct-id branch and the value branch, add a
    **transaction-key branch**. A linked mirror with a manual snapshot claims the unclaimed event
-   whose `createdAt` is string-equal to the mirror's `created_at` **and** whose `siblingKey(tent,
-plant, instant)` equals the mirror's. That branch ignores VPD and readings. Equal `created_at`
-   is the same proof the correction RPC uses to choose which rows it edits.
+   whose `createdAt` is string-equal to the mirror's `created_at` and whose sibling key
+   (tent, plant, instant) equals the mirror's. That branch ignores VPD and readings. Equal
+   `created_at` is the same proof the correction RPC uses to choose which rows it edits.
 3. Keep the value branch unchanged, including `ev.vpdKpa !== null → false`, as the fallback for a
    row whose `created_at` is missing, malformed or unequal.
 4. Compare `created_at` as exact strings. Never compare parsed `Date`s: JavaScript drops
    microseconds, and two transactions in the same millisecond would then collide.
 5. Each mirror still claims at most one event. Break ties by lowest id (current behaviour).
    Input order is preserved.
+6. `diarySnapshotsToChangeContextRows` (`tentManualEnvironmentEventRules.ts:350-364`) feeds the
+   tent history list and today emits only temperature, RH, pH and EC. Add a `vpd_kpa` row from
+   a finite `manual_sensor_snapshot.vpd_kpa` (the metric union already includes `vpd_kpa`).
+   Otherwise, once the sibling is dropped, the history list loses the corrected VPD and R2
+   fails on that surface.
 
-**What C fixes and what it doesn't:** C fixes R1 and R3 for every row, past and future, with no
-backfill. It does not fix R2 by itself: without A1 the kept mirror card still shows the derived
+**What C fixes and what it doesn't:** C fixes R1, and R3 subject to K5, for every row, past and
+future, with no backfill. It does not fix R2 by itself: without A1 the kept mirror card still shows the derived
 VPD. Hence A1 + C.
 
 **Existing rows:** the current delegate inserts the parent, sibling and mirror within one function
@@ -266,36 +281,38 @@ shapes itself.**
 
 New `src/test/tent-history-vpd-correction-write-path.test.ts`:
 
-| Case    | Expectation                                                                                                            |
-| ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| T1 (S1) | One card (regression of today's behaviour).                                                                            |
-| T2 (S2) | One card; its VPD is 1.2 from `manual_sensor_snapshot.vpd_kpa`, labelled measured, not the derived value.              |
-| T3 (S3) | Two cards: the corrected save and the independent save. The independent one keeps its own VPD.                         |
-| T4 (S4) | One card; no VPD is invented.                                                                                          |
-| T5 (S5) | The value-rule fallback still collapses a legacy mirror with matching readings, and still refuses a VPD-bearing event. |
-| T6      | Null or malformed `created_at` on either side → no transaction-key claim; the fallback applies.                        |
-| T7      | Determinism: every permutation of the input rows gives the same output.                                                |
-| T8      | Two `created_at` values that differ only in microseconds do not match (pins string comparison).                        |
+| Case    | Expectation                                                                                                                                                                                                |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1 (S1) | One card (regression of today's behaviour).                                                                                                                                                                |
+| T2 (S2) | Timeline surface: one card; its VPD is 1.2 from `manual_sensor_snapshot.vpd_kpa`, labelled measured, not the derived value. Rows go through the projection `fetchTentManualSnapshotRows` actually selects. |
+| T9 (S2) | History-list surface (`buildTentManualHistoryRead`): one snapshot, including a `vpd_kpa` row of 1.2 from the mirror; no duplicate from the sibling.                                                        |
+| T3 (S3) | Two cards: the corrected save and the independent save. The independent one keeps its own VPD.                                                                                                             |
+| T4 (S4) | One card; no VPD is invented.                                                                                                                                                                              |
+| T5 (S5) | The value-rule fallback still collapses a legacy mirror with matching readings, and still refuses a VPD-bearing event.                                                                                     |
+| T6      | Null or malformed `created_at` on either side → no transaction-key claim; the fallback applies.                                                                                                            |
+| T7      | Determinism: every permutation of the input rows gives the same output.                                                                                                                                    |
+| T8      | Two `created_at` values that differ only in microseconds do not match (pins string comparison).                                                                                                            |
 
-**Negative gates:** set aside the C branch (diffed against the base) → T2 shows two cards. Set
-aside the adapter change → T2 shows the derived VPD. Restore both, then re-run.
+**Negative gates:** set aside the C branch (diffed against the base) → T2 and T9 show two
+cards. Set aside the adapter change → T2 shows the derived VPD. Set aside step 6 → T9 has no
+VPD row. Restore all three, then re-run.
 
 Existing tests to keep green: #2504's `tent-manual-environment-events.test.tsx` and
 `tent-manual-history-diary-snapshots.test.ts`, plus the `quicklog-correction-*` suites.
 
 ## 7. File-level plan
 
-| Slice                                    | File                                                                                                                   | Change                                                                                                                                                                                                         |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 (migration, Matthew's per-PR decision) | `supabase/migrations/<ts>_quicklog_correction_manual_snapshot_vpd.sql`                                                 | New; §4 A1                                                                                                                                                                                                     |
-| 1                                        | `scripts/run-quicklog-correction-manual-vpd-pg15-harness.mjs`                                                          | New; §6.1                                                                                                                                                                                                      |
-| 1                                        | `.github/workflows/ci.yml`                                                                                             | One step in the existing job (protected scope)                                                                                                                                                                 |
-| 1                                        | `scripts/assert-required-core-migrations-applied.mjs`                                                                  | Add a fingerprint for the new `quicklog_correction_apply_measured_values` body, next to the `quicklog_correct_entry` one (`:97-109`), so a production verify catches `20261014210000` applied without this fix |
-| 2 (client)                               | `src/lib/tentManualEnvironmentEventRules.ts`                                                                           | §4 C steps 1–5                                                                                                                                                                                                 |
-| 2                                        | `src/hooks/useTentManualEnvironmentEvents.ts`, `src/hooks/useTentManualDiarySnapshots.ts`                              | Select `created_at`                                                                                                                                                                                            |
-| 2                                        | `src/lib/manualSnapshotDiaryAdapter.ts`                                                                                | Measured `vpd_kpa` (§4 A1)                                                                                                                                                                                     |
-| 2                                        | `src/test/fixtures/quicklog-vpd-correction-write-path.json`, `src/test/tent-history-vpd-correction-write-path.test.ts` | New; §6.2                                                                                                                                                                                                      |
-| 2                                        | `src/lib/tentManualEnvironmentEventRules.ts` comment in `eventMatchesMirrorValues`                                     | Replace the "known gap" note with a pointer to the transaction-key branch                                                                                                                                      |
+| Slice                                    | File                                                                                                                                                                     | Change                                                                                                                                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 (migration, Matthew's per-PR decision) | `supabase/migrations/<ts>_quicklog_correction_manual_snapshot_vpd.sql`                                                                                                   | New; §4 A1                                                                                                                                                                                                     |
+| 1                                        | `scripts/run-quicklog-correction-manual-vpd-pg15-harness.mjs`                                                                                                            | New; §6.1                                                                                                                                                                                                      |
+| 1                                        | `.github/workflows/ci.yml`                                                                                                                                               | One step in the existing job (protected scope)                                                                                                                                                                 |
+| 1                                        | `scripts/assert-required-core-migrations-applied.mjs`                                                                                                                    | Add a fingerprint for the new `quicklog_correction_apply_measured_values` body, next to the `quicklog_correct_entry` one (`:97-109`), so a production verify catches `20261014210000` applied without this fix |
+| 2 (client)                               | `src/lib/tentManualEnvironmentEventRules.ts`                                                                                                                             | §4 C steps 1–6                                                                                                                                                                                                 |
+| 2                                        | `src/hooks/useTentManualEnvironmentEvents.ts`, `src/hooks/useTentManualDiarySnapshots.ts`, `src/hooks/useManualSnapshotTimelineCards.ts` (`fetchTentManualSnapshotRows`) | Select `created_at`                                                                                                                                                                                            |     |
+| 2                                        | `src/lib/manualSnapshotDiaryAdapter.ts`                                                                                                                                  | Measured `vpd_kpa` (§4 A1)                                                                                                                                                                                     |
+| 2                                        | `src/test/fixtures/quicklog-vpd-correction-write-path.json`, `src/test/tent-history-vpd-correction-write-path.test.ts`                                                   | New; §6.2                                                                                                                                                                                                      |
+| 2                                        | `src/lib/tentManualEnvironmentEventRules.ts` comment in `eventMatchesMirrorValues`                                                                                       | Replace the "known gap" note with a pointer to the transaction-key branch                                                                                                                                      |
 
 Slice 2 depends on slice 1's harness for its fixture. Slice 2's rule change is safe to merge
 before the migration is applied. A sibling with matching readings is claimed under either rule
@@ -332,7 +349,7 @@ still met by C).
 ## 10. Acceptance
 
 - [ ] P1–P8 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
-- [ ] T1–T8 pass; both negative gates shown failing, then restored.
+- [ ] T1–T9 pass; all three negative gates shown failing, then restored.
 - [ ] `config/local-supabase-replay-compatibility.json` unchanged; the `Published migration
 integrity` gate green; no merged migration edited.
 - [ ] No table, column, policy, grant or RLS change (diff check).

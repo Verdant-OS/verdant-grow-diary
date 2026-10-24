@@ -20,6 +20,7 @@ import {
   HierarchyCreateOutcomeRecoveryCoordinator,
   type HierarchyCreateVisibleListReceipt,
 } from "@/hooks/useHierarchyCreateOutcomeRecoveryCoordinator";
+import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
 
 export type Grow = GrowRow;
 
@@ -103,10 +104,9 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
 
       setLoading(true);
       try {
-        const { data, error: qErr } = await supabase
-          .from("grows")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const { data, error: qErr } = await withCriticalReadDeadline(
+          supabase.from("grows").select("*").order("created_at", { ascending: false }),
+        );
         if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
           return { status: "stale" };
         }
@@ -165,12 +165,13 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
     refresh();
   }, [refresh]);
 
-  // Auto-select first grow if none selected
+  // Auto-select first grow if none selected; clear after a successful read with no active grows
   useEffect(() => {
     if (!activeGrowId && grows.length > 0) setActiveGrowId(grows[0].id);
     if (activeGrowId && grows.length > 0 && !grows.find((g) => g.id === activeGrowId))
       setActiveGrowId(grows[0].id);
-  }, [grows, activeGrowId]);
+    if (activeGrowId && !loading && !error && grows.length === 0) setActiveGrowId(null);
+  }, [grows, activeGrowId, loading, error]);
 
   const activeGrow = grows.find((g) => g.id === activeGrowId) ?? null;
 

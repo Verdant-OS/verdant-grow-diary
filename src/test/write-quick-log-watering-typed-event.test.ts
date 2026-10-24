@@ -168,7 +168,8 @@ describe("writeQuickLogWateringTypedEvent — validation", () => {
     [{ grow_id: "  " }, "grow_id:missing"],
     [{ volume_ml: 0 }, "volume_ml:invalid"],
     [{ volume_ml: -1 }, "volume_ml:invalid"],
-    [{ volume_ml: 1_000_001 }, "volume_ml:invalid"],
+    [{ volume_ml: 50_001 }, "volume_ml:invalid"],
+    [{ volume_ml: 1_000_000 }, "volume_ml:invalid"],
     [{ volume_ml: Number.NaN }, "volume_ml:invalid"],
     [{ occurred_at: "not-a-date" }, "occurred_at:invalid"],
     [{ note: "x".repeat(501) }, "note:invalid"],
@@ -216,7 +217,7 @@ describe("writeQuickLogWateringTypedEvent — validation", () => {
     const { client, rpc } = makeClient();
     const result = await writeQuickLogWateringTypedEvent(
       baseInput({
-        volume_ml: 1_000_000,
+        volume_ml: 50_000,
         ph: 0,
         ec_ms_cm: 10,
         runoff_ml: 0,

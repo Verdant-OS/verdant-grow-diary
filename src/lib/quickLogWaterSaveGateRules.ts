@@ -80,6 +80,7 @@ export function assessQuickLogWaterSaveGate(input: {
   if (
     volumeReason === "volume_ml:missing" ||
     volumeReason === "volume_ml:invalid" ||
+    volumeReason === "volume_ml:too_large" ||
     volumeReason === "numeric:invalid"
   ) {
     fields.volume = messageFor(volumeReason, "volume", input.temperatureUnit);

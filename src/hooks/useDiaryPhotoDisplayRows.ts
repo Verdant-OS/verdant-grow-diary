@@ -38,9 +38,20 @@ export interface UseDiaryPhotoDisplayRowsResult {
   refetchPrivatePhotos: () => Promise<void>;
 }
 
+export interface UseDiaryPhotoDisplayRowsOptions {
+  /**
+   * Keep the paths that signed when others did not, instead of failing the
+   * whole batch. For batches spanning several plants (the /plants cards), where
+   * one deleted photo must not hide every other plant's photo.
+   */
+  allowPartial?: boolean;
+}
+
 export function useDiaryPhotoDisplayRows(
   rawRows: ReadonlyArray<DiaryPhotoDisplayRow> | null | undefined,
+  options: UseDiaryPhotoDisplayRowsOptions = {},
 ): UseDiaryPhotoDisplayRowsResult {
+  const allowPartial = options.allowPartial === true;
   const { user } = useAuth();
   const viewerUserId = user?.id ?? null;
   const rows = useMemo(() => rawRows ?? [], [rawRows]);
@@ -66,7 +77,13 @@ export function useDiaryPhotoDisplayRows(
 
   const signedQuery = useQuery({
     enabled: storagePaths.length > 0,
-    queryKey: ["diary-photo-display-url", DIARY_PHOTO_BUCKET, viewerUserId, storagePaths],
+    queryKey: [
+      "diary-photo-display-url",
+      DIARY_PHOTO_BUCKET,
+      viewerUserId,
+      storagePaths,
+      allowPartial ? "partial" : "all",
+    ],
     staleTime: SIGNED_URL_TTL_SECONDS * 1000 - REFRESH_BEFORE_EXPIRY_MS,
     gcTime: SIGNED_URL_TTL_SECONDS * 1000,
     retry: 1,
@@ -86,7 +103,7 @@ export function useDiaryPhotoDisplayRows(
           signedByPath.set(signed.path, signed.signedUrl);
         }
       }
-      if (storagePaths.some((path) => !signedByPath.has(path))) {
+      if (!allowPartial && storagePaths.some((path) => !signedByPath.has(path))) {
         throw new Error("diary-photo-display-url-failed");
       }
       return signedByPath;

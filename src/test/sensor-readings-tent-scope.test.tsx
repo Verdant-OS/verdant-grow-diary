@@ -207,6 +207,16 @@ describe("useSensorReadings({ tentIds })", () => {
     expect(io.requests[0].orders).toEqual(["captured_at", "ts", "created_at", "id"]);
   });
 
+  it("orders the single-tent read by the same unique id before the limit (Copilot on #2459)", async () => {
+    // Tent Detail reads one tent through this path; with the Dashboard's tent
+    // window ordered by id, equal-time rows from two devices must tie-break the
+    // same way on both surfaces.
+    const { result } = renderHook(() => useSensorReadings(TENT_A, 200), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(io.requests).toHaveLength(1);
+    expect(io.requests[0].orders).toEqual(["captured_at", "ts", "created_at", "id"]);
+  });
+
   it("a failed scope refetch is an error even while cached tent ids remain", async () => {
     // React Query keeps `data` when a tents refetch fails and sets `isError`,
     // so callers pass cached ids together with `scopeError: true`. The old

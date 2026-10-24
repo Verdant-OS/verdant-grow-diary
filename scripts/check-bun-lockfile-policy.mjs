@@ -42,7 +42,7 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@vitest/mocker": "4.1.11",
   esbuild: "0.28.1",
   "brace-expansion": "1.1.21",
-  undici: "6.28.1",
+  undici: "6.29.1",
   "proxy-addr": "2.0.8",
   seroval: "1.6.3",
   "shell-quote": "1.11.0",

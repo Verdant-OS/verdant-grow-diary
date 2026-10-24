@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 
 // @ts-nocheck
 
@@ -41,6 +41,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
+import { Route as VpdChartRouteImport } from './routes/vpd-chart'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as AppOperatorRouteImport } from './routes/_app/_operator'
 import { Route as AppActionQueueRouteImport } from './routes/_app/action-queue'
@@ -314,6 +315,11 @@ const UnsubscribeRoute = UnsubscribeRouteImport.update({
 const UpgradeRoute = UpgradeRouteImport.update({
   id: '/upgrade',
   path: '/upgrade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VpdChartRoute = VpdChartRouteImport.update({
+  id: '/vpd-chart',
+  path: '/vpd-chart',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WelcomeRoute = WelcomeRouteImport.update({
@@ -967,6 +973,7 @@ export interface FileRoutesByFullPath {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/upgrade': typeof UpgradeRoute
+  '/vpd-chart': typeof VpdChartRoute
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
   '/actions': typeof AppActionsRoute
@@ -1114,6 +1121,7 @@ export interface FileRoutesByTo {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/upgrade': typeof UpgradeRoute
+  '/vpd-chart': typeof VpdChartRoute
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
   '/actions': typeof AppActionsRoute
@@ -1262,6 +1270,7 @@ export interface FileRoutesById {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/upgrade': typeof UpgradeRoute
+  '/vpd-chart': typeof VpdChartRoute
   '/welcome': typeof WelcomeRoute
   '/_app/_operator': typeof AppOperatorRouteWithChildren
   '/_app/action-queue': typeof AppActionQueueRoute
@@ -1412,6 +1421,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/unsubscribe'
     | '/upgrade'
+    | '/vpd-chart'
     | '/welcome'
     | '/action-queue'
     | '/actions'
@@ -1559,6 +1569,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/unsubscribe'
     | '/upgrade'
+    | '/vpd-chart'
     | '/welcome'
     | '/action-queue'
     | '/actions'
@@ -1706,6 +1717,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/unsubscribe'
     | '/upgrade'
+    | '/vpd-chart'
     | '/welcome'
     | '/_app/_operator'
     | '/_app/action-queue'
@@ -1856,6 +1868,7 @@ export interface RootRouteChildren {
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   UpgradeRoute: typeof UpgradeRoute
+  VpdChartRoute: typeof VpdChartRoute
   WelcomeRoute: typeof WelcomeRoute
   BillingPlanRoute: typeof BillingPlanRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
@@ -2106,6 +2119,13 @@ declare module '@tanstack/react-router' {
       path: '/upgrade'
       fullPath: '/upgrade'
       preLoaderRoute: typeof UpgradeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vpd-chart': {
+      id: '/vpd-chart'
+      path: '/vpd-chart'
+      fullPath: '/vpd-chart'
+      preLoaderRoute: typeof VpdChartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/welcome': {
@@ -3181,6 +3201,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsOfServiceRoute: TermsOfServiceRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   UpgradeRoute: UpgradeRoute,
+  VpdChartRoute: VpdChartRoute,
   WelcomeRoute: WelcomeRoute,
   BillingPlanRoute: BillingPlanRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,

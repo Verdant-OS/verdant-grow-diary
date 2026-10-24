@@ -540,6 +540,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "redirect",
     description: "→ /pricing with allowlisted plan, acquisition, and return intent.",
   },
+  {
+    path: "/vpd-chart",
+    access: "public",
+    description: "Public VPD chart by growth stage with a leaf-offset calculator.",
+  },
   { path: "/welcome", access: "public" },
 ];
 

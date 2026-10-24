@@ -280,6 +280,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         links: [
           { label: "Understand sensor truth", to: "/guides/sensor-truth-grow-room" },
           { label: "Open the stage-aware VPD calculator", to: "/tools/vpd-calculator" },
+          { label: "VPD chart by growth stage", to: "/vpd-chart" },
         ],
       },
       {

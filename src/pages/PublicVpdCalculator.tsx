@@ -691,7 +691,11 @@ export default function PublicVpdCalculator() {
             <Link to={PUBLIC_VPD_GUIDE_PATH} className="underline hover:text-foreground">
               grow-room VPD tracking guide
             </Link>
-            .
+            , or open the{" "}
+            <Link to="/vpd-chart" className="underline hover:text-foreground">
+              VPD chart
+            </Link>{" "}
+            for stage ranges in one table.
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
             Planning nutrients, canopy light, and cycle costs too? Open the{" "}

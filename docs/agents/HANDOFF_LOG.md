@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VPD-CHART-PAGE
+
+```text
+TASK VPD-CHART-PAGE  priority: other  status: OPEN
+goal: Add public /vpd-chart (chart, heatmap, leaf-offset calculator) beside the existing /tools/vpd-calculator. Keep both pages. Chart math and stage ranges match the SEO desk HTML exactly.
+branch: cursor/vpd-chart-page-3b09
+base: verdant-grow-diary
+checkout: git fetch origin cursor/vpd-chart-page-3b09 verdant-grow-diary && git switch cursor/vpd-chart-page-3b09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED
+head_sha: NOT_MEASURED
+state: local implementation in progress
+next_action: Finish validation, push, and open the PR against verdant-grow-diary.
+files: src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md
+blockers: none for repository work. No publish, SQL, or production write.
+artifacts: uploaded HTML and brief are not in the repo
+reviewer_seat: independent Claude or Grok session that did not author this slice; this Grok session cannot accept it
+claimed_by: Grok cloud session, 2026-10-24 20:10 UTC
+last_updated: 2026-10-24 20:10 UTC, by Grok
+```
+
 ### REVIEWER-ROUTING-20261022
 
 ```text

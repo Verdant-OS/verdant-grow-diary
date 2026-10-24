@@ -364,13 +364,31 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                   />
                 )}
                 <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{row.plantName}</div>
+                  <Link
+                    to={row.plantHref}
+                    data-testid="dashboard-daily-grow-check-panel-plant-link"
+                    aria-label={`Open ${row.plantName}`}
+                    className="text-sm font-medium truncate underline underline-offset-2 rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {row.plantName}
+                  </Link>
                   <div
                     className="text-xs text-muted-foreground truncate"
                     data-testid="dashboard-daily-grow-check-panel-row-method"
                   >
                     {row.tentName ? `${row.tentName} · ` : ""}
-                    {row.shortGuidance}
+                    {row.latestActivityHref ? (
+                      <Link
+                        to={row.latestActivityHref}
+                        data-testid="dashboard-daily-grow-check-panel-activity-link"
+                        aria-label={`Latest log for ${row.plantName}`}
+                        className="underline underline-offset-2 rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {row.shortGuidance}
+                      </Link>
+                    ) : (
+                      row.shortGuidance
+                    )}
                   </div>
                 </div>
               </div>

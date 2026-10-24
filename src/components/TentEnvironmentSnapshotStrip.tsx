@@ -1,3 +1,6 @@
+import type { SensorReading } from "@/mock";
+import type { ManualHistoryReadState } from "@/lib/vpdStabilityInputRules";
+import { selectTentEnvironmentManualDisplay } from "@/lib/tentEnvironmentDisplayRules";
 import MetricChip from "@/components/MetricChip";
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import type { TentManualSnapshotUnavailableReason } from "@/lib/tentManualSnapshotBatchRules";
@@ -20,6 +23,8 @@ import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
 export interface TentEnvironmentSnapshotStripProps {
   tentId: string;
+  quickLogManualReadings?: readonly SensorReading[];
+  quickLogManualReadState?: ManualHistoryReadState;
   /**
    * The tent's Dashboard diary-inclusive snapshot (`useLatestSensorSnapshotsByTent`),
    * read once at page level and passed down, never fetched per card (#2268;
@@ -40,6 +45,8 @@ const IDLE_SNAPSHOT: SnapshotState = { status: "idle", snapshot: EMPTY_SNAPSHOT 
 
 export default function TentEnvironmentSnapshotStrip({
   tentId,
+  quickLogManualReadings,
+  quickLogManualReadState = "ready",
   tonightSnapshot = IDLE_SNAPSHOT,
   stage,
   sensorRows,
@@ -50,13 +57,39 @@ export default function TentEnvironmentSnapshotStrip({
   manualStatus,
   manualUnavailableReason,
 }: TentEnvironmentSnapshotStripProps) {
-  const selection = selectTentEnvironmentSnapshotFallback({
+  const manualDisplay =
+    sensorStatus === "loading" || sensorStatus === "error"
+      ? null
+      : selectTentEnvironmentManualDisplay({
+          tentId,
+          sensorRows,
+          manualReadings: quickLogManualReadings,
+          now,
+          sensorStatus,
+          snapshot: { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+        });
+  const manualHistoryNotice =
+    quickLogManualReadState === "ready" ? null : (
+      <p className="text-xs text-muted-foreground" role="status">
+        {quickLogManualReadState === "unavailable"
+          ? "Quick Log manual history unavailable — only last loaded readings can be shown."
+          : "Checking Quick Log manual history — saved readings are still loading."}
+      </p>
+    );
+  const storedSelection = selectTentEnvironmentSnapshotFallback({
     sensorRows,
     sensorStatus,
     manualCards,
     manualStatus,
     now,
   });
+  const selection = manualDisplay
+    ? {
+        kind: "sensor" as const,
+        rows: manualDisplay.rows,
+        refreshWarning: sensorStatus === "refresh_error",
+      }
+    : storedSelection;
 
   // A failed raw read is not "unavailable" while the Dashboard's own snapshot
   // read, which may still back it, is in flight (Codex P2 on #2303 at 0994ea2a).
@@ -221,6 +254,7 @@ export default function TentEnvironmentSnapshotStrip({
       ? diaryRows
       : selection.rows;
   if (rows.length === 0) {
+    if (manualHistoryNotice) return manualHistoryNotice;
     return (
       <p
         className="text-xs text-muted-foreground"
@@ -233,15 +267,18 @@ export default function TentEnvironmentSnapshotStrip({
 
   const snapView = buildTentSnapshotView(rows, stage, now, {
     temperatureUnit,
-    // Tonight's own inputs, the raw rows and the snapshot, never the manual or
-    // diary fallback rows shown here (Codex P1 on #2437, Copilot on #2442).
-    canonicalVpd: tentsListCanonicalVpd(
-      sensorRows,
-      tentId,
-      now,
-      { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
-      sensorStatus,
-    ),
+    // An admitted Quick Log observation keeps Detail's value and provenance.
+    // Otherwise use Tonight's raw/snapshot inputs, never the display fallback
+    // rows (Codex P1 on #2437, Copilot on #2442).
+    canonicalVpd:
+      manualDisplay?.canonicalVpd ??
+      tentsListCanonicalVpd(
+        sensorRows,
+        tentId,
+        now,
+        { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+        sensorStatus,
+      ),
   });
   const vpdMetric = snapView.metrics.find((metric) => metric.key === "vpd");
   const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";
@@ -259,6 +296,7 @@ export default function TentEnvironmentSnapshotStrip({
 
   return (
     <>
+      {manualHistoryNotice}
       {selection.kind === "manual" && selection.refreshing ? (
         <p
           className="text-xs text-muted-foreground animate-pulse"
@@ -315,10 +353,10 @@ export default function TentEnvironmentSnapshotStrip({
       <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
         <span
           data-testid={`tents-list-sensor-source-${tentId}`}
-          data-source-label={snapView.sourceLabel}
+          data-source-label={manualDisplay ? "Manual" : snapView.sourceLabel}
           className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide border-border/50 bg-secondary/40"
         >
-          {snapView.sourceLabel}
+          {manualDisplay ? "Manual" : snapView.sourceLabel}
         </span>
         <span
           data-testid={`tents-list-sensor-last-updated-${tentId}`}

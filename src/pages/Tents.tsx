@@ -1,3 +1,9 @@
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import type { SensorReading } from "@/mock";
+import {
+  type ManualHistoryReadState,
+  resolveManualHistoryReadState,
+} from "@/lib/vpdStabilityInputRules";
 import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { AlertTriangle, Box, Lightbulb, LoaderCircle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -63,20 +69,32 @@ const LOADING_MANUAL_SNAPSHOT: TentManualSnapshotBatchDisplay = {
 interface TentManualSnapshotBatchBoundaryProps {
   ownerId: string | null;
   tentIds: readonly string[];
-  children: (byTent: Record<string, TentManualSnapshotBatchDisplay>) => ReactNode;
+  quickLogTentIds: readonly string[];
+  children: (
+    byTent: Record<string, TentManualSnapshotBatchDisplay>,
+    manuals: readonly SensorReading[],
+    manualReadState: ManualHistoryReadState,
+  ) => ReactNode;
 }
 
 function TentManualSnapshotBatchBoundary({
   ownerId,
   tentIds,
+  quickLogTentIds,
   children,
 }: TentManualSnapshotBatchBoundaryProps) {
-  return tentIds.length === 0 ? (
-    <>{children(EMPTY_MANUAL_SNAPSHOT_BATCH)}</>
-  ) : (
-    <ActiveTentManualSnapshotBatch ownerId={ownerId} tentIds={tentIds}>
-      {children}
-    </ActiveTentManualSnapshotBatch>
+  return (
+    <TentQuickLogManualBoundary ownerId={ownerId} tentIds={quickLogTentIds}>
+      {(manuals, readState) =>
+        tentIds.length === 0 ? (
+          <>{children(EMPTY_MANUAL_SNAPSHOT_BATCH, manuals, readState)}</>
+        ) : (
+          <ActiveTentManualSnapshotBatch ownerId={ownerId} tentIds={tentIds}>
+            {(byTent) => children(byTent, manuals, readState)}
+          </ActiveTentManualSnapshotBatch>
+        )
+      }
+    </TentQuickLogManualBoundary>
   );
 }
 
@@ -84,9 +102,34 @@ function ActiveTentManualSnapshotBatch({
   ownerId,
   tentIds,
   children,
-}: TentManualSnapshotBatchBoundaryProps) {
+}: {
+  ownerId: string | null;
+  tentIds: readonly string[];
+  children: (byTent: Record<string, TentManualSnapshotBatchDisplay>) => ReactNode;
+}) {
   const { byTent } = useTentManualSnapshotBatch(ownerId, tentIds);
   return <>{children(byTent)}</>;
+}
+
+interface TentQuickLogManualBoundaryProps {
+  ownerId: string | null;
+  tentIds: readonly string[];
+  children: (readings: readonly SensorReading[], state: ManualHistoryReadState) => ReactNode;
+}
+
+// Mount the owner-scoped history read only for an authenticated, loaded tent
+// set. It is one page-level batch, never a separate request hook per card.
+function TentQuickLogManualBoundary(props: TentQuickLogManualBoundaryProps) {
+  return props.ownerId && props.tentIds.length > 0 ? (
+    <ActiveTentQuickLogManualRead {...props} />
+  ) : (
+    <>{props.children([], "ready")}</>
+  );
+}
+
+function ActiveTentQuickLogManualRead({ tentIds, children }: TentQuickLogManualBoundaryProps) {
+  const manuals = useSensorsQuickLogManualReadings(tentIds);
+  return <>{children(manuals.data ?? [], resolveManualHistoryReadState(manuals))}</>;
 }
 
 function formatPlantCount(count: number): string {
@@ -565,8 +608,12 @@ export default function Tents() {
           description="Set up your first tent to start tracking."
         />
       ) : (
-        <TentManualSnapshotBatchBoundary ownerId={user?.id ?? null} tentIds={manualFallbackTentIds}>
-          {(manualSnapshotsByTent) => (
+        <TentManualSnapshotBatchBoundary
+          ownerId={user?.id ?? null}
+          tentIds={manualFallbackTentIds}
+          quickLogTentIds={sensorTentIds}
+        >
+          {(manualSnapshotsByTent, quickLogManualReadings, quickLogManualReadState) => (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {tents.map((t) => {
                 // Pending/failed reads must not masquerade as established
@@ -643,6 +690,8 @@ export default function Tents() {
                       </div>
 
                       <TentEnvironmentSnapshotStrip
+                        quickLogManualReadings={quickLogManualReadings}
+                        quickLogManualReadState={isUuid(t.id) ? quickLogManualReadState : "ready"}
                         tentId={t.id}
                         tonightSnapshot={tonightSnapshotsByTent[t.id]}
                         stage={envStage}
@@ -663,7 +712,10 @@ export default function Tents() {
                           <Lightbulb
                             className={`h-3 w-3 shrink-0 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`}
                           />
-                          {formatTentLightStatus({ on: t.light.on, schedule: t.light.schedule })}
+                          {formatTentLightStatus({
+                            on: t.light.on,
+                            schedule: t.light.schedule,
+                          })}
                         </span>
                         <span
                           className="basis-full min-w-0"

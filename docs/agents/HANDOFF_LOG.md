@@ -196,6 +196,26 @@ claimed_by: Codex, 2026-10-14 22:00 UTC (issuecomment-6179419049); Matthew direc
 last_updated: 2026-10-14 19:38 CT, by Codex
 ```
 
+### ISSUE-1997-EDIT-PLANT-BLANK-NAME
+
+```text
+TASK ISSUE-1997-EDIT-PLANT-BLANK-NAME  priority: P1  status: OPEN
+goal: Finish the Edit Plant side of #1997: whitespace Name, earliest start date, name length and wrapping, linked labels, and Cancel. Edit Tent stays on #2032.
+branch: cursor/edit-plant-blank-name-3bf6
+base: verdant-grow-diary at 5459c3a18a402d2bf5b00c96b0688c4475dcf93d (merged for this repair)
+checkout: git fetch origin cursor/edit-plant-blank-name-3bf6 verdant-grow-diary && git switch cursor/edit-plant-blank-name-3bf6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2041 (observed non-draft at 2026-10-14 22:00 UTC; no readiness change by this repair)
+head_sha: parent 334e584c25fbd23246ed0e4de6ee36c17bd80dde before the photo-preview pin renegotiation. This commit cannot contain its own SHA. Fetch origin and the PR head after push. Prior CI/review evidence applies only to its named SHA.
+state: Blank-name Save disable kept. The plant-profile photo preview source pin was renegotiated: it required disabled={busy} exclusively, which shard 17/32 failed at EditPlantDialog.tsx. Preview still must not disable Save.
+next_action: required checks at the new remote head, then independent Blue Dream review (.tsx product, P1). No ready-state change, merge, or deploy from this writer.
+files: src/components/EditPlantDialog.tsx; src/lib/formIdentityFailClosedRules.ts; src/lib/plantStartDateRules.ts; src/test/edit-plant-identity-fail-closed.test.tsx; src/test/edit-plant-issue-1997-remainder.test.tsx; src/test/plant-profile-photo-preview.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: final-head CI and independent review. No production write.
+artifacts: Renegotiated pin src/test/plant-profile-photo-preview.test.tsx (Save disable). Local vitest 3 files / 21 passed / 0 failed after the pin update.
+reviewer_seat: Blue Dream
+claimed_by: cursor cloud agent, 2026-10-23, sole writer assigned in chat for the shard-17 pin repair; no GitHub comment
+last_updated: 2026-10-23 15:35 CT, by Grok
+```
+
 ### TIMELINE-GROW-DAY-2005
 
 ```text

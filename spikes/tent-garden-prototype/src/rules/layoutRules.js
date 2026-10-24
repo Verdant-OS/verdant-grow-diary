@@ -230,6 +230,23 @@ export function validateLayout(layout, tent = TENT) {
   return { ok: problems.length === 0, problems };
 }
 
+/**
+ * Warning for the pot size that is selected now.
+ * Returns null when that size does not make two pots overlap.
+ * The text names the first overlapping pair in plant-id order.
+ * @returns {{ show:true, plantIds:[string, string], text:string } | null}
+ */
+export function selectedPotOverlapWarning(layout, tent) {
+  if (!layout || !tent || !Number.isFinite(tent.potGal)) return null;
+  const hit = validateLayout(layout, tent).problems.find((p) => p.problem === "overlaps");
+  if (!hit) return null;
+  return {
+    show: true,
+    plantIds: [hit.plantId, hit.withId],
+    text: `${tent.potGal} gal pots would overlap (${hit.plantId} and ${hit.withId})`,
+  };
+}
+
 /** Human-readable grid cell, e.g. "x 24 in, z 36 in". Pure formatting. */
 export function describePosition(pos) {
   if (!pos) return "no recorded position";

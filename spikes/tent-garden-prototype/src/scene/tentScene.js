@@ -8,6 +8,7 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { TENT, clampToTent } from "../rules/layoutRules.js";
 import { visualForStage, labelFor } from "../rules/plantVisualRules.js";
 import { layoutLabels } from "../rules/labelLayoutRules.js";
+import { pointerCue } from "../rules/pointerCueRules.js";
 import { hardwareOpacity, HARDWARE_KEYS } from "../rules/hardwareVisibilityRules.js";
 import { decideFrame, fadeStep } from "../rules/renderScheduleRules.js";
 import {
@@ -126,6 +127,9 @@ export function createTentScene(host, handlers, opts = {}) {
   let editable = false;
   let animations = true;
   let selectedId = null;
+  let hoverId = null;
+  let hoverKind = null; // "pot" | "label" | null
+  let finePointer = false;
   let drag = null; // { id, offset:{x,z}, moved:boolean }
   let currentView = null;
   let lastRenderedTick = 0;
@@ -289,13 +293,27 @@ export function createTentScene(host, handlers, opts = {}) {
     ev.preventDefault();
   });
   renderer.domElement.addEventListener("pointermove", (ev) => {
-    if (!drag) return;
-    const fp = floorPoint(ev);
-    if (!fp) return;
-    const raw = { x: fp.x + drag.offset.x, z: fp.z + drag.offset.z };
-    const pos = clampToTent(raw, tent);
-    drag.moved = true;
-    handlers.onDragMove(drag.id, pos);
+    if (drag) {
+      const fp = floorPoint(ev);
+      if (!fp) return;
+      const raw = { x: fp.x + drag.offset.x, z: fp.z + drag.offset.z };
+      const pos = clampToTent(raw, tent);
+      drag.moved = true;
+      handlers.onDragMove(drag.id, pos);
+      return;
+    }
+    if (!finePointer) return;
+    const id = pickPlant(ev);
+    if (id === hoverId && hoverKind === (id ? "pot" : null)) return;
+    hoverId = id;
+    hoverKind = id ? "pot" : null;
+    applySelection();
+  });
+  renderer.domElement.addEventListener("pointerleave", () => {
+    if (hoverKind !== "pot") return;
+    hoverId = null;
+    hoverKind = null;
+    applySelection();
   });
   function endDrag(ev) {
     if (!drag) return;
@@ -415,8 +433,24 @@ export function createTentScene(host, handlers, opts = {}) {
     chipEl.setAttribute("aria-label", `Select ${plantRecord?.shortName ?? id} (${id})`);
     chipEl.textContent = id;
     chipEl.style.display = "none";
+    const hoverLabel = () => {
+      if (!finePointer) return;
+      hoverId = id;
+      hoverKind = "label";
+      applySelection();
+    };
+    const leaveLabel = () => {
+      if (hoverId !== id || hoverKind !== "label") return;
+      hoverId = null;
+      hoverKind = null;
+      applySelection();
+    };
+    labelEl.addEventListener("pointerenter", hoverLabel);
+    labelEl.addEventListener("pointerleave", leaveLabel);
     chipEl.addEventListener("pointerdown", press);
     chipEl.addEventListener("click", clickPick);
+    chipEl.addEventListener("pointerenter", hoverLabel);
+    chipEl.addEventListener("pointerleave", leaveLabel);
     chipEl.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") pick(ev);
     });
@@ -540,13 +574,30 @@ export function createTentScene(host, handlers, opts = {}) {
     requestRender();
   }
   function applySelection() {
+    const cue = pointerCue({ finePointer, overTarget: hoverId != null });
+    host.classList.toggle("is-over-pot", cue.highlight && hoverKind === "pot");
+    renderer.domElement.style.cursor = cue.highlight && hoverKind === "pot" ? cue.cursor : "";
     for (const [id, p] of plants) {
       const sel = id === selectedId && p.group.visible;
-      p.ring.visible = sel;
+      const on = cue.highlight && id === hoverId && p.group.visible;
+      p.ring.visible = sel || on;
+      p.ring.material.opacity = sel ? 0.95 : 0.4;
       p.labelEl.classList.toggle("is-selected", sel);
       p.chipEl.classList.toggle("is-selected", sel);
+      p.labelEl.classList.toggle("is-hover", on && hoverKind === "label");
+      p.chipEl.classList.toggle("is-hover", on && hoverKind === "label");
     }
   }
+  const fineMedia = window.matchMedia?.("(hover: hover) and (pointer: fine)");
+  finePointer = !!fineMedia?.matches;
+  fineMedia?.addEventListener?.("change", (ev) => {
+    finePointer = ev.matches;
+    if (!finePointer) {
+      hoverId = null;
+      hoverKind = null;
+    }
+    applySelection();
+  });
   function setSelected(id) {
     selectedId = id;
     applySelection();
@@ -642,6 +693,7 @@ export function createTentScene(host, handlers, opts = {}) {
         p.chipEl.style.display = "";
         p.chipSize = { w: p.chipEl.offsetWidth, h: p.chipEl.offsetHeight };
       }
+      const edge = project(g.x + tent.potRadiusIn, POT_H + 0.2, g.z);
       items.push({
         id,
         ax: a.x,
@@ -650,6 +702,7 @@ export function createTentScene(host, handlers, opts = {}) {
         by: b.y,
         tx: t.x,
         ty: t.y,
+        pr: Math.hypot(edge.x - b.x, edge.y - b.y),
         w: p.labelSize.w,
         h: p.labelSize.h,
         cw: p.chipSize.w,

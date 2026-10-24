@@ -9,6 +9,7 @@ import {
   TENT_PROFILES,
   tentFor,
   potSizeOptions,
+  selectedPotOverlapWarning,
 } from "../rules/layoutRules.js";
 import { GARDEN_IDS, resolveGardenId } from "../rules/gardenRules.js";
 import {
@@ -25,7 +26,14 @@ import {
   canSave,
 } from "../rules/saveRules.js";
 import { timelinePoints, pointAt, evidenceFor } from "../rules/historyRules.js";
-import { resolveModeChange, cameraLocked, escapeClearsSelection } from "../rules/modeRules.js";
+import {
+  resolveModeChange,
+  cameraLocked,
+  escapeClearsSelection,
+  editLeaveControls,
+} from "../rules/modeRules.js";
+import { EMPTY_DETAILS_HINT } from "../rules/pointerCueRules.js";
+import { viewOptionsAfterKey } from "../rules/viewOptionsRules.js";
 import { visualForStage, sexLabel } from "../rules/plantVisualRules.js";
 // Which fictional garden to load. The query value only ever selects from a fixed map, so no
 // user-supplied text reaches an import path.
@@ -83,6 +91,7 @@ const state = {
   animations: readAnimPref(),
   potGal: GARDEN.DEFAULT_POT_GAL, // drawn footprint for every pot in this tent (prototype setting)
   listVisible: false,
+  viewOptionsOpen: false,
 };
 let scene = null;
 let toastTimer = 0;
@@ -213,7 +222,7 @@ function plantsByIdForView(layout) {
 
 function render({ transition = false } = {}) {
   const view = currentView();
-  renderTentControls();
+  renderTentControls(view.layout);
   if (scene) {
     scene.setView({
       layout: view.layout,
@@ -269,8 +278,19 @@ function renderSaveBar() {
   const changes = dirtyChanges();
   const notes = dirtyNotes();
   const total = changes.length + notes.length;
+  const saveFailed = state.saveStatus === "failed" && !!state.pendingBatch;
+  const leave = editLeaveControls({
+    changeCount: changes.length,
+    noteChangeCount: notes.length,
+    saveFailed,
+  });
+  const clean = leave.kind === "clean";
+  $("doneEdit").hidden = !clean;
+  $("undoDraft").hidden = clean;
+  $("cancelEdit").hidden = clean;
+  $("saveBtn").hidden = clean;
   const summary = $("draftSummary");
-  if (state.saveStatus === "failed" && state.pendingBatch) {
+  if (saveFailed) {
     summary.innerHTML = `<span class="is-failed">Save failed (simulated). Draft kept locally — unsaved.</span>`;
     $("saveBtn").textContent = "Retry save";
     $("saveBtn").disabled = false;
@@ -288,7 +308,7 @@ function renderSaveBar() {
   $("undoDraft").disabled = state.draftHistory.length <= 1;
 }
 
-function renderTentControls() {
+function renderTentControls(layout) {
   const garden = $("gardenSelect");
   if (!garden.options.length) {
     for (const id of GARDEN_IDS) garden.add(new Option(`${TENT_PROFILES[id].label} (sample)`, id));
@@ -314,11 +334,8 @@ function renderTentControls() {
     state.mode === "edit"
       ? "Finish or cancel the layout edit before changing pot size."
       : "Drawn pot footprint for this tent. Sizes that would make a recorded layout overlap or cross a wall are disabled. Prototype setting — nothing is recorded.";
-  $("potSizeNote").textContent = opts
-    .filter((o) => !o.ok)
-    .map((o) => o.reason)
-    .slice(0, 1)
-    .join("");
+  const warning = selectedPotOverlapWarning(layout, activeTent());
+  $("potSizeNote").textContent = warning?.text ?? "";
 }
 
 function renderList(view) {
@@ -345,7 +362,7 @@ function renderDetails(view) {
     host.innerHTML = `<p class="muted">${
       id && !view.layout[id]
         ? `${esc(plantById(id)?.shortName ?? id)} (${esc(id)}) has no recorded position in this view.`
-        : "Tap or click a plant to see its recorded details."
+        : EMPTY_DETAILS_HINT
     }</p>`;
     return;
   }
@@ -767,7 +784,13 @@ function wireControls() {
     render();
   };
   $("cancelEdit").onclick = () => setMode("view");
+  $("doneEdit").onclick = () => setMode("view");
   $("saveBtn").onclick = openSave;
+  $("viewOptionsBtn").onclick = () => {
+    state.viewOptionsOpen = !state.viewOptionsOpen;
+    syncViewOptions();
+  };
+  syncViewOptions();
   $("undoSaved").onclick = undoSaved;
   $("returnToday").onclick = () => goToIndex(TODAY_INDEX);
   $("histRange").oninput = (e) => goToIndex(Number(e.target.value));
@@ -816,14 +839,22 @@ function wireControls() {
     else if (e.key === "r" || e.key === "R") scene?.resetView();
   });
   // Escape clears the selection from anywhere on the page, not only with focus in the 3D view.
+  // Escape closes View options first, and then it does not also clear the selection.
   document.addEventListener("keydown", (e) => {
+    const dialogOpen = !!document.querySelector("dialog[open]");
+    if (!dialogOpen && state.viewOptionsOpen && !viewOptionsAfterKey(true, e.key)) {
+      state.viewOptionsOpen = false;
+      syncViewOptions();
+      $("viewOptionsBtn").focus();
+      e.preventDefault();
+      return;
+    }
     const t = e.target;
     const editableTarget =
       !!t &&
       ((t.tagName === "INPUT" && !/^(checkbox|radio|range|button|submit|reset)$/.test(t.type)) ||
         /^(TEXTAREA|SELECT)$/.test(t.tagName || "") ||
         t.isContentEditable === true);
-    const dialogOpen = !!document.querySelector("dialog[open]");
     if (
       escapeClearsSelection({
         key: e.key,
@@ -835,6 +866,12 @@ function wireControls() {
     )
       select(null);
   });
+}
+
+function syncViewOptions() {
+  const open = !!state.viewOptionsOpen;
+  $("viewOptionsBtn").setAttribute("aria-expanded", String(open));
+  $("viewOptionsPanel").classList.toggle("is-open", open);
 }
 
 function esc(s) {

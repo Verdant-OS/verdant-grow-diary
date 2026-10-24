@@ -22,6 +22,20 @@ export function resolveModeChange(current, requested) {
   return { action: "switch", mode: "view" };
 }
 
+/**
+ * Which leave controls Edit Layout shows.
+ * No draft changes: Done, and Done returns to View.
+ * Draft changes, or a failed save that still holds the draft: Undo, Cancel and Save.
+ * @param {{ changeCount?:number, noteChangeCount?:number, saveFailed?:boolean } | null} input
+ * @returns {{ kind:"clean"|"draft", buttons:string[] }}
+ */
+export function editLeaveControls(input) {
+  const changes = Number(input?.changeCount) || 0;
+  const notes = Number(input?.noteChangeCount) || 0;
+  if (changes + notes > 0 || input?.saveFailed) return { kind: "draft", buttons: ["undo", "cancel", "save"] };
+  return { kind: "clean", buttons: ["done"] };
+}
+
 /** Camera interaction is locked whenever layout editing is on. */
 export function cameraLocked(mode) {
   return mode === "edit";

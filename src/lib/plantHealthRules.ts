@@ -57,6 +57,17 @@ export function buildPlantHealthUpdate(
 /** Placeholder for a health select with nothing chosen (QA 2026-09-24, BUG-009). */
 export const PLANT_HEALTH_NOT_ASSESSED_LABEL = "Not assessed yet";
 
+/**
+ * Visible health status for the plant page and the /plants card. Null,
+ * missing, "unknown" and unrecognized values were never assessed by the
+ * grower, so they read "Not assessed yet" (#2171), never "unknown" or
+ * "healthy". A recorded assessment shows as stored.
+ */
+export function plantHealthStatusLabel(value: unknown): string {
+  const health = normalizePlantHealth(value);
+  return health === "unknown" ? PLANT_HEALTH_NOT_ASSESSED_LABEL : health;
+}
+
 /** Select item value for "Not assessed yet" (Radix items cannot use ""). */
 export const PLANT_HEALTH_NOT_ASSESSED_OPTION = "not_assessed";
 

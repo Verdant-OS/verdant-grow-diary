@@ -169,6 +169,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["@vitest/mocker", [4, 1, 11] as const],
     ["nanoid", [3, 3, 18] as const],
     ["undici", [6, 29, 1] as const],
+    ["zod", [4, 6, 7] as const],
   ])("resolves every %s instance at or above %s in bun.lock", (packageName, minimum) => {
     const versions = resolvedVersions(packageName);
     expect(versions.length, `${packageName} must be present in bun.lock`).toBeGreaterThan(0);

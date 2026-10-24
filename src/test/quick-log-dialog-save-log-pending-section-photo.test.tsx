@@ -224,6 +224,26 @@ describe("Quick Log dialog: Save log with a selected Photo-section image", () =>
     expect(saveMock).not.toHaveBeenCalled();
   });
 
+  it("does not hold Save log on a photo once another activity is selected", async () => {
+    const dialog = openDialog();
+    // Type the main note first: Symptom Check adds its own note box ahead of it.
+    typeMainNote(dialog, "short note");
+    selectPhotoActivity();
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId(`${PREFIX}-photo-file`), { target: { files: [file] } });
+    expect(screen.getByText(/Selected: bud\.jpg/)).toBeInTheDocument();
+
+    // Symptom Check switches the activity without clearing the chosen photo,
+    // and the Photo editor is no longer shown.
+    fireEvent.click(screen.getByTestId(`${PREFIX}-start-symptom-check`));
+    expect(screen.queryByTestId(`${PREFIX}-photo-file`)).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY)).toBeNull();
+    expect(uploadMock).not.toHaveBeenCalled();
+  });
+
   it("keeps note-only Save log working when no photo is selected", async () => {
     const dialog = openDialog();
     typeMainNote(dialog, "short note");

@@ -331,7 +331,10 @@ export default function QuickLogAllActivitiesSection({
   // A chosen PNG is still pending while its signature is read; photoFile stays
   // null until that check passes, so track the read separately.
   const [photoValidating, setPhotoValidating] = useState(false);
-  const hasPendingPhoto = photoFile !== null || photoValidating;
+  // Only the Photo activity can save a chosen photo. Switching to another
+  // activity hides the Photo editor without clearing it, so a photo left there
+  // must not hold the dialog's Save log behind a section the grower can't see.
+  const hasPendingPhoto = selected?.id === "photo" && (photoFile !== null || photoValidating);
   useEffect(() => {
     if (!onPendingPhotoChange) return;
     onPendingPhotoChange(hasPendingPhoto);

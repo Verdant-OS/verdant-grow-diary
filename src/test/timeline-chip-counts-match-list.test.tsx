@@ -358,6 +358,9 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
     renderTimeline();
 
     expect(await screen.findByText("Plain diary note")).toBeInTheDocument();
+    // Manual sensor receipts load after the core read commits (the detached
+    // directory read), so wait for them before comparing chips to the list.
+    await waitFor(() => expect(chipCount("Measurements")).toBe(5));
 
     expect(chipCount("All")).toBe(6);
     expect(chipCount("All stages")).toBe(6);
@@ -401,6 +404,19 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
           `Detailed diary: showing ${count} of 6 entries`,
         );
       }
+      // QA follow-up to #2163: the header names exactly the manual sensor
+      // receipts the list shows, so diary rows + readings = the rendered rows
+      // (and, under Measurements, the chip).
+      const receiptsListed = listedEntries().length - listedDiaryEntries().length;
+      const header = screen.getByTestId("timeline-results-count");
+      if (receiptsListed === 0) {
+        expect(header, `chip ${label} lists no receipt`).not.toHaveTextContent("manual sensor");
+      } else {
+        expect(header, `chip ${label} names its listed receipts`).toHaveTextContent(
+          `· plus ${receiptsListed} manual sensor ${receiptsListed === 1 ? "reading" : "readings"}`,
+        );
+      }
+      if (label === "Measurements") expect(receiptsListed).toBe(4);
     }
   }, 20_000);
 

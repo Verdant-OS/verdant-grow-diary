@@ -4,6 +4,7 @@ import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { orderNewestFirstStable } from "@/lib/timelineQueryOrderRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import { CriticalReadDeadlineError, withCriticalReadDeadline } from "@/lib/boundedReadRules";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
@@ -127,7 +128,9 @@ import {
   TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import { mergeLinkedGrowEventVolume } from "@/lib/timelineLinkedGrowEventVolumeRules";
 import {
+  applyTimelineInitialSignedPhoto,
   collectTimelineDiaryPhotoIds,
   dedupeAlertEventsForTimeline,
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
@@ -137,6 +140,7 @@ import {
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
   timelineMeasurementChipCount,
+  timelineResultsCountReceiptSuffix,
   timelineStageChipRows,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
@@ -263,6 +267,7 @@ import {
   buildTimelinePageReadView,
   hasTimelineRequiredReadError,
   mergeTimelinePartialSources,
+  resolveTimelineFetchScope,
   type TimelineCoreReadState,
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
@@ -514,7 +519,7 @@ export default function Timeline() {
   const user = authUser?.id ?? null;
   const {
     activeGrow: storeActiveGrow,
-    activeGrowId: storeGrowId,
+    activeGrowId: rawStoreGrowId,
     grows,
     loading: growsLoading,
     error: growsError,
@@ -538,9 +543,19 @@ export default function Timeline() {
   // active grow instead of creating a scope/read-key disagreement that can
   // leave the page waiting forever.
   const urlGrowId = rawUrlGrowId?.trim() || null;
-  const hasInvalidScope = Boolean(urlGrowId) && !isValidScopedGrow;
-  const preferredGrowId = urlGrowId ?? storeGrowId;
-  const activeGrowId = hasInvalidScope ? null : preferredGrowId;
+  // The stored id is restored from local storage verbatim; trim it like the
+  // URL id so the query and the read key always name the same grow.
+  const storeGrowId = rawStoreGrowId?.trim() || null;
+  const { hasInvalidScope } = resolveTimelineFetchScope({
+    urlGrowId,
+    storeGrowId,
+    growsLoading,
+    growsError,
+    isValidScopedGrow,
+  });
+  // URL scope wins over the store's active grow. Same precedence as
+  // resolveTimelineFetchScope; kept here so the page states it directly.
+  const activeGrowId = hasInvalidScope ? null : (urlGrowId ?? storeGrowId);
   const activeGrow = urlGrowId ? (isValidScopedGrow ? scopedGrow : null) : storeActiveGrow;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
@@ -585,13 +600,18 @@ export default function Timeline() {
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [directorySensorEpoch, setDirectorySensorEpoch] = useState(0);
   const [coreRead, setCoreRead] = useState<TimelineCoreReadState>({ status: "idle" });
   const [partialReadSources, setPartialReadSources] = useState<TimelineSupplementalReadSource[]>(
     [],
   );
   const [supplementalLoading, setSupplementalLoading] = useState(false);
+  // The detached directory sensor read is linked context too: until it
+  // settles, the page must not read as complete.
+  const [directorySensorsLoading, setDirectorySensorsLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
   const readRequestIdRef = useRef(0);
+  const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -797,11 +817,11 @@ export default function Timeline() {
 
     try {
       // `diary_entries` and `grow_events` are the two authoritative core
-      // Timeline sources. Stage both locally and commit them atomically only
+      // Timeline sources. Start both together and commit them atomically only
       // after both reads succeed for the same owner/grow/range key.
       // Page-critical read: falls back to unfiltered pre-migration (the
       // retracted_at column ships in 20260811090000) instead of failing.
-      const entriesResult = await selectWithRetractionCompat((withRetractionFilter) => {
+      const entriesPromise = selectWithRetractionCompat((withRetractionFilter) => {
         let entriesQuery = orderNewestFirstStable(
           supabase
             .from("diary_entries")
@@ -818,16 +838,6 @@ export default function Timeline() {
           entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
         return entriesQuery;
       });
-      if (!isCurrentRequest()) return;
-      if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
-
-      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
-      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
-      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
-        rows,
-        user,
-      );
-      const paths = [...new Set(privatePhotoPathById.values())];
 
       // Filtered by is_deleted here so the visible-event page (its 100-row
       // budget, and growEvents.length UI-copy gates below) never shows or
@@ -847,9 +857,21 @@ export default function Timeline() {
         growEventsQuery = growEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
       if (timelineDateRangeBounds.endIso)
         growEventsQuery = growEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
-      const growEventsResult = await growEventsQuery;
+
+      const [entriesResult, growEventsResult] = await withCriticalReadDeadline(
+        Promise.all([entriesPromise, growEventsQuery]),
+      );
       if (!isCurrentRequest()) return;
+      if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
+
+      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
+      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
+        rows,
+        user,
+      );
+      const paths = [...new Set(privatePhotoPathById.values())];
       const nextGrowEvents = growEventsResult.data as unknown as GrowEventRowForRecent[];
       let sensorEventsQuery = orderNewestFirstStable(
         supabase
@@ -864,7 +886,15 @@ export default function Timeline() {
         sensorEventsQuery = sensorEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
       if (timelineDateRangeBounds.endIso)
         sensorEventsQuery = sensorEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
-      const sensorEventsResult = await sensorEventsQuery;
+      // Bounded like the core reads: this await sits before the core commit,
+      // so a hang here would hold the whole page on loading. A timeout is a
+      // failed sensor read, shown as partial manual sensor readings.
+      const sensorEventsResult = await withCriticalReadDeadline(sensorEventsQuery).catch(
+        (error: unknown) => {
+          if (error instanceof CriticalReadDeadlineError) return { data: null, error };
+          throw error;
+        },
+      );
       if (!isCurrentRequest()) return;
       const sensorReadFailed = hasTimelineRequiredReadError(sensorEventsResult);
       const nextSensorEvents = sensorReadFailed
@@ -896,6 +926,10 @@ export default function Timeline() {
       setPartialReadSources(sensorReadFailed ? ["manual_sensor_readings"] : []);
       setCoreRead({ status: "success", readKey: requestedReadKey });
       setLoading(false);
+      // Manual sensor receipts are cleared with this commit. The directory
+      // loader runs from the epoch effect, including after an event refresh,
+      // without putting directoryGrowId on this callback.
+      if (isCurrentRequest()) setDirectorySensorEpoch((epoch) => epoch + 1);
 
       const markPartial = (source: TimelineSupplementalReadSource) => {
         if (!isCurrentRequest()) return;
@@ -975,8 +1009,14 @@ export default function Timeline() {
               setEntries((current) =>
                 current.map((row) => {
                   const privatePath = privatePhotoPathById.get(row.id);
+                  // An edit saved meanwhile may have moved, removed or re-signed the photo.
                   return privatePath
-                    ? { ...row, photo_url: signedMap.get(privatePath) ?? null }
+                    ? applyTimelineInitialSignedPhoto(
+                        row,
+                        privatePath,
+                        signedMap.get(privatePath),
+                        user,
+                      )
                     : row;
                 }),
               );
@@ -1035,99 +1075,6 @@ export default function Timeline() {
         })(),
       );
 
-      if (directoryGrowId) {
-        supplementalTasks.push(
-          (async () => {
-            try {
-              const tentsResult = await supabase
-                .from("tents")
-                .select("id")
-                .eq("grow_id", directoryGrowId);
-              if (!isCurrentRequest()) return;
-              if (tentsResult.error || !Array.isArray(tentsResult.data)) {
-                markPartial("manual_sensor_readings");
-                setManualSensorMeasurementEntries([]);
-                setManualSensorHistoryLimited(false);
-                return;
-              }
-              const tentIds = tentsResult.data
-                .map((row) => (typeof row.id === "string" ? row.id : null))
-                .filter((id): id is string => Boolean(id));
-              if (tentIds.length === 0) {
-                setManualSensorMeasurementEntries([]);
-                setManualSensorHistoryLimited(false);
-                return;
-              }
-              // Captured rows and legacy rows need separate bounded reads:
-              // filtering or ordering everything by ts would hide a backdated
-              // capture in the correct observation-date window, while sorting
-              // null captured_at last can hide a newer legacy reading.
-              let capturedQuery = effectiveSensorReadingsQuery()
-                .select("*")
-                .in("tent_id", tentIds)
-                .eq("source", "manual")
-                .not("captured_at", "is", null)
-                .order("captured_at", { ascending: false, nullsFirst: false })
-                .order("ts", { ascending: false })
-                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
-              let legacyQuery = effectiveSensorReadingsQuery()
-                .select("*")
-                .in("tent_id", tentIds)
-                .eq("source", "manual")
-                .is("captured_at", null)
-                .order("ts", { ascending: false })
-                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
-              if (timelineDateRangeBounds.startIso) {
-                capturedQuery = capturedQuery.gte("captured_at", timelineDateRangeBounds.startIso);
-                legacyQuery = legacyQuery.gte("ts", timelineDateRangeBounds.startIso);
-              }
-              if (timelineDateRangeBounds.endIso) {
-                capturedQuery = capturedQuery.lte("captured_at", timelineDateRangeBounds.endIso);
-                legacyQuery = legacyQuery.lte("ts", timelineDateRangeBounds.endIso);
-              }
-              const [capturedResult, legacyResult] = await Promise.all([
-                capturedQuery,
-                legacyQuery,
-              ]);
-              if (!isCurrentRequest()) return;
-              if (
-                capturedResult.error ||
-                !Array.isArray(capturedResult.data) ||
-                legacyResult.error ||
-                !Array.isArray(legacyResult.data)
-              ) {
-                markPartial("manual_sensor_readings");
-                setManualSensorMeasurementEntries([]);
-                setManualSensorHistoryLimited(false);
-                return;
-              }
-              const manualPage = completeManualSensorTimelineRows([
-                ...requireEffectiveSensorReadings(capturedResult.data),
-                ...requireEffectiveSensorReadings(legacyResult.data),
-              ]);
-              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
-              if (timelineDateRangeBounds.startIso) {
-                receipts = receipts.filter(
-                  (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
-                );
-              }
-              if (timelineDateRangeBounds.endIso) {
-                receipts = receipts.filter(
-                  (row) => row.entry_at <= timelineDateRangeBounds.endIso!,
-                );
-              }
-              setManualSensorMeasurementEntries(receipts as Entry[]);
-              setManualSensorHistoryLimited(manualPage.hasOlderRows);
-            } catch {
-              if (!isCurrentRequest()) return;
-              markPartial("manual_sensor_readings");
-              setManualSensorMeasurementEntries([]);
-              setManualSensorHistoryLimited(false);
-            }
-          })(),
-        );
-      }
-
       await Promise.all(supplementalTasks);
       if (isCurrentRequest()) setSupplementalLoading(false);
     } catch {
@@ -1136,6 +1083,116 @@ export default function Timeline() {
       setSupplementalLoading(false);
       setCoreRead({ status: "error", readKey: requestedReadKey });
       setLoading(false);
+    }
+  }, [activeGrowId, activeReadKey, timelineDateRangeBounds, user]);
+
+  // Directory scope only unlocks tents and manual sensor receipts. It must not
+  // rebuild `load`: that would cancel the early core read and start another
+  // 8s deadline when the grow list settles.
+  const loadDirectorySensors = useCallback(async () => {
+    if (directoryGrowId) {
+      if (!activeGrowId || !user) return;
+      const requestId = readRequestIdRef.current;
+      const sensorGeneration = ++directorySensorGenerationRef.current;
+      const requestedReadKey = activeReadKey;
+      const isCurrentRequest = () =>
+        requestId === readRequestIdRef.current &&
+        sensorGeneration === directorySensorGenerationRef.current &&
+        activeReadKeyRef.current === requestedReadKey;
+      const markPartial = (source: TimelineSupplementalReadSource) => {
+        if (!isCurrentRequest()) return;
+        setPartialReadSources((current) => mergeTimelinePartialSources(current, [source]));
+      };
+      setDirectorySensorsLoading(true);
+      try {
+        // The tent lookup is bounded too: a hung lookup would otherwise never
+        // reach the reading deadline below or mark the source partial.
+        const tentsResult = await withCriticalReadDeadline(
+          supabase.from("tents").select("id").eq("grow_id", directoryGrowId),
+        );
+        if (!isCurrentRequest()) return;
+        if (tentsResult.error || !Array.isArray(tentsResult.data)) {
+          markPartial("manual_sensor_readings");
+          setManualSensorMeasurementEntries([]);
+          setManualSensorHistoryLimited(false);
+          return;
+        }
+        const tentIds = tentsResult.data
+          .map((row) => (typeof row.id === "string" ? row.id : null))
+          .filter((id): id is string => Boolean(id));
+        if (tentIds.length === 0) {
+          setManualSensorMeasurementEntries([]);
+          setManualSensorHistoryLimited(false);
+          return;
+        }
+        // Captured rows and legacy rows need separate bounded reads:
+        // filtering or ordering everything by ts would hide a backdated
+        // capture in the correct observation-date window, while sorting
+        // null captured_at last can hide a newer legacy reading.
+        let capturedQuery = effectiveSensorReadingsQuery()
+          .select("*")
+          .in("tent_id", tentIds)
+          .eq("source", "manual")
+          .not("captured_at", "is", null)
+          .order("captured_at", { ascending: false, nullsFirst: false })
+          .order("ts", { ascending: false })
+          .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
+        let legacyQuery = effectiveSensorReadingsQuery()
+          .select("*")
+          .in("tent_id", tentIds)
+          .eq("source", "manual")
+          .is("captured_at", null)
+          .order("ts", { ascending: false })
+          .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
+        if (timelineDateRangeBounds.startIso) {
+          capturedQuery = capturedQuery.gte("captured_at", timelineDateRangeBounds.startIso);
+          legacyQuery = legacyQuery.gte("ts", timelineDateRangeBounds.startIso);
+        }
+        if (timelineDateRangeBounds.endIso) {
+          capturedQuery = capturedQuery.lte("captured_at", timelineDateRangeBounds.endIso);
+          legacyQuery = legacyQuery.lte("ts", timelineDateRangeBounds.endIso);
+        }
+        const [capturedResult, legacyResult] = await withCriticalReadDeadline(
+          Promise.all([capturedQuery, legacyQuery]),
+        );
+        if (!isCurrentRequest()) return;
+        if (
+          capturedResult.error ||
+          !Array.isArray(capturedResult.data) ||
+          legacyResult.error ||
+          !Array.isArray(legacyResult.data)
+        ) {
+          markPartial("manual_sensor_readings");
+          setManualSensorMeasurementEntries([]);
+          setManualSensorHistoryLimited(false);
+          return;
+        }
+        const manualPage = completeManualSensorTimelineRows([
+          ...requireEffectiveSensorReadings(capturedResult.data),
+          ...requireEffectiveSensorReadings(legacyResult.data),
+        ]);
+        let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
+        if (timelineDateRangeBounds.startIso) {
+          receipts = receipts.filter((row) => row.entry_at >= timelineDateRangeBounds.startIso!);
+        }
+        if (timelineDateRangeBounds.endIso) {
+          receipts = receipts.filter((row) => row.entry_at <= timelineDateRangeBounds.endIso!);
+        }
+        setManualSensorMeasurementEntries(receipts as Entry[]);
+        setManualSensorHistoryLimited(manualPage.hasOlderRows);
+      } catch {
+        if (!isCurrentRequest()) return;
+        markPartial("manual_sensor_readings");
+        setManualSensorMeasurementEntries([]);
+        setManualSensorHistoryLimited(false);
+      } finally {
+        // Only the newest directory read owns the pending flag. A read made
+        // obsolete by a newer core request still settles under its deadline
+        // and clears it if nothing newer started.
+        if (sensorGeneration === directorySensorGenerationRef.current) {
+          setDirectorySensorsLoading(false);
+        }
+      }
     }
   }, [activeGrowId, activeReadKey, directoryGrowId, timelineDateRangeBounds, user]);
 
@@ -1326,6 +1383,14 @@ export default function Timeline() {
   useEffect(() => {
     load();
   }, [load]);
+  // A scope change rebuilds loadDirectorySensors before its core read commits.
+  // Wait for that commit's epoch bump instead of reading the directory twice.
+  const coreCommittedForActiveScope =
+    coreRead.status === "success" && coreRead.readKey === activeReadKey;
+  useEffect(() => {
+    if (directorySensorEpoch === 0 || !coreCommittedForActiveScope) return;
+    void loadDirectorySensors();
+  }, [coreCommittedForActiveScope, directorySensorEpoch, loadDirectorySensors]);
   useEffect(
     () =>
       subscribeManualSensorCorrections(ownerId, () => {
@@ -1399,22 +1464,11 @@ export default function Timeline() {
               .trim()
               .toLowerCase()
           : "";
-      const hasVol =
-        nextDetails.watering != null ||
-        nextDetails.feeding != null ||
-        nextDetails.watering_amount_ml != null ||
-        nextDetails.wateringAmountMl != null ||
-        nextDetails.volume_ml != null;
-      const vol = mapped.details?.watering_amount_ml;
-      if (
-        !hasVol &&
-        (effectiveType === "watering" || effectiveType === "feeding") &&
-        typeof vol === "number" &&
-        Number.isFinite(vol)
-      ) {
-        const volumeEnvelope = effectiveType === "feeding" ? "feeding" : "watering";
-        nextDetails = { ...nextDetails, [volumeEnvelope]: { volume_ml: vol } };
-      }
+      nextDetails = mergeLinkedGrowEventVolume(
+        nextDetails,
+        effectiveType,
+        mapped.details?.watering_amount_ml,
+      );
       return nextDetails === details ? e : { ...e, details: nextDetails };
     });
   }, [entries, growEvents, supplementalLinkedGrowEvents]);
@@ -1968,7 +2022,7 @@ export default function Timeline() {
     coreRead,
     evidenceCount: recentLaneRawEntries.length + manualSensorMeasurementEntries.length,
     hasAppliedDateBounds: Boolean(effectiveStartDate || effectiveEndDate),
-    supplementalLoading,
+    supplementalLoading: supplementalLoading || directorySensorsLoading,
     partialSources: partialReadSources,
   });
   const isDateWindowEmpty = pageReadView.kind === "ready_empty_date_window";
@@ -2455,6 +2509,7 @@ export default function Timeline() {
           {entriesTotal !== null && entriesTotal > entries.length
             ? ` (${entries.length} loaded)`
             : ""}
+          {timelineResultsCountReceiptSuffix(filtered)}
           {growEvents.length > 0
             ? " · Quick Log activity appears in the history panels below."
             : ""}
@@ -3044,6 +3099,7 @@ export default function Timeline() {
                                       ...supplementalLinkedGrowEvents,
                                       ...timelineSensorEvents,
                                     ])}
+                                    environmentCheckDetails={e.details}
                                     onChanged={() => void load()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (

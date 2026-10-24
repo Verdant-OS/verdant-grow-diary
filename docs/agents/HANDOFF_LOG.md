@@ -45,6 +45,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### REVIEWER-ROUTING-20261022
+
+```text
+TASK REVIEWER-ROUTING-20261022  priority: P2  status: OPEN
+goal: Matthew-approved bounded reviewer routing: retire Blue Dream/Critical Mass for future requests, allow available eligible independent sessions, preserve all acceptance and production gates.
+branch: codex/reviewer-routing-20261022
+base: verdant-grow-diary at ebaf1b6afa7fb8cfa7fb8090914c8633f7537a98, verified 2026-10-22 UTC
+checkout: git fetch origin codex/reviewer-routing-20261022 verdant-grow-diary && git switch codex/reviewer-routing-20261022 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2328 (draft; preserve draft; no existing branch or PR taken over)
+head_sha: e71049cec2214784a26b3a47c7075ab3a24d0ae9 (ownership checkpoint pushed and draft #2328 opened 2026-10-22 03:02 UTC); routing implementation commit follows. Read current full PR head before any review; this commit cannot record its own resulting SHA.
+state: bounded routing implemented after pushed ownership checkpoint/draft #2328. Local 31 governance regression tests and 71 focused Vitest cases pass; twelve-file version/parity, mirror, format, docs-safety and strict scorer report pass. This commit follows the ownership checkpoint; consult the PR for its resulting full head and hosted CI. Original checkout and #1971/#2086 branches untouched.
+next_action: Verify draft #2328 at its resulting full implementation head and hosted CI; assign one actually available independent Claude/Grok review session through permitted transport. Keep draft; no merge, ready/enqueue or production action.
+files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/{claude,codex,council-chair,gemini,grok,security}.md; docs/agents/OWNERSHIP.md; docs/agents/CURRENT_STATE.md (active header only); .agents/skills/verdant-exact-sha-review/SKILL.md; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Broad governance overlaps remain; Matthew approved this session as sole writer for only the narrow reviewer-routing correction on 2026-10-22 (parent question: designate this task sole writer while leaving #1971/#2086 unrelated work and branches untouched; Matthew: "Yeah"). This designation resolves the routing-slice collision, grants no takeover or review PASS, and changes no other assignments. Rechecked overlaps: #1971 canopy/constitution-clash-fixes at 82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e (51 files), #2086 claude/new-session-nms5b8 at 98b660ab13d2e3087364d1bc5faeb333b20590c8 (35 files). No fresh 24-hour claim or matching deploy HANDOFF_LOG block observed; staleness is not reassignment. #1971 issuecomment-6222081602 preserves the existing governance writer after last Canopy claim issuecomment-6102182294. The 12-file parity bump also overlaps #2028/#1879/#1876. Shared live-session registry unavailable. No claim/release comment posted; existing comment-approval gate remains.
+artifacts: draft #2328 body records current full head and actual local/hosted evidence; local supporting receipts in /workspace/reviewer-routing-deliverables/. Sentinel-Version 2026-10-22.1 across exactly 12 files; no parity expansion or checker/test/pin edits. Original proposal hash retained separately; it is not this implementation commit identity.
+reviewer_seat: BLOCKED — no independent available Claude/Grok session assigned; Codex is proposal author and cannot accept it; Graft governance lane excluded
+review_request: not sent; owner: Codex reviewer-routing session; permalink: NOT_MEASURED; state: blocked (no independent session/approved transport assigned); fallback transfers: 0
+claimed_by: Codex reviewer-routing session, 2026-10-22 03:01 UTC (Matthew direct bounded sole-writer designation; no claim on #1971/#2086; no GitHub claim comment posted because separate comment-approval gate remains)
+last_updated: 2026-10-22 03:04 UTC, by Codex reviewer-routing session
+limits: #2303/#2304 existing independent PASSes are preserved and are not review work here. #2312 moved to 588fe03c; the old 720e9b3 PASS cannot transfer. No merge, ready, auto-merge, enqueue, deploy, production dispatch, SQL, runtime automation, hooks, GitHub settings, security, billing, secret or protected-scorer changes.
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text
@@ -66,11 +88,31 @@ last_updated: 2026-10-16 18:19 UTC, by Codex
 limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Deferred ordering risk: cancellation updates acknowledge zero matched rows; stale subscription upserts have no occurred_at guard. No ordering/replay changes, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
 ```
 
+### FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY
+
+```text
+TASK FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY  priority: P2  status: OPEN
+goal: A plant with no health assessment (null, missing or "unknown") reads "Not assessed yet" on /plants and on the plant page, never "unknown". Display only; no schema. Owns the unassessed-health display (owner decision, Matthew 2026-10-22). QA 2/2 on production ebaf1b6a. Fixes #2171 (display half).
+branch: claude/plant-health-not-assessed-label-p4 (fresh branch; ruleset GH013 refuses updates to an existing claude/* branch)
+base: verdant-grow-diary
+checkout: git fetch origin claude/plant-health-not-assessed-label-p4 verdant-grow-diary && git switch claude/plant-health-not-assessed-label-p4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: the PR opened from claude/plant-health-not-assessed-label-p4, superseding https://github.com/Verdant-OS/verdant-grow-diary/pull/2492 (chain: #2330 -> #2490 -> #2492)
+head_sha: 9e0931a9b23b0022d9f7199ac43b0faa25b9d6f2, #2492's head (2026-10-23 20:20 UTC) and the parent of the commit that records this line (a commit cannot contain its own SHA). Re-read the PR for the exact head before resuming.
+state: review. Round 2 (#2490, c1192044) removed a Cursor-added source-regex test; round 3 (#2492, eaff21b9) pinned the capitalize class and dropped Blue Dream routing; Cursor Agent commit 9e0931a9 added a rendered integration test (independently reviewed at 9e0931a9, no blocking findings). Round 4 updates this block only. Application code unchanged since 1807c9a6.
+next_action: 35/35 required checks and an exact-head independent review of the superseding PR by an actually available, eligible session (Codex, Durban Poison, or a non-contributing Claude or Grok review session; AGENTS.md retires Blue Dream from future routing), then the merge queue.
+files: src/lib/plantHealthRules.ts; src/pages/Plants.tsx; src/pages/PlantDetail.tsx; src/test/plant-health-status-label.test.ts; src/test/plant-detail-health-display.test.tsx; src/test/plant-health-unknown-rendering.test.tsx; src/test/plant-health-not-assessed-ui-integration.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. #2140 was narrowed to its schema work at 373fd162 (plantHealthRules.ts, Plants.tsx and the label tests back to base; plants-page-unassessed-health-label.test.tsx deleted), so plantHealthStatusLabel exists in this PR only.
+artifacts: PR #2330 body (RED 27 failed / 4 passed with the fix set aside; neighbours 89 files / 1752 passed)
+reviewer_seat: Codex, Durban Poison, or a non-contributing Claude or Grok review session (.tsx product files); never the author
+claimed_by: Claude, 2026-10-23 20:11 UTC
+last_updated: 2026-10-23 20:25 UTC, by Claude
+```
+
 ### FIX-2171-PLANT-CREATE-INSERT-ERROR
 
 ```text
 TASK FIX-2171-PLANT-CREATE-INSERT-ERROR  priority: P2  status: OPEN
-goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the "not assessed" plants-list label; that is open PR #2140. Fixes #2171.
+goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the unassessed-health label; that display belongs to the #2330 -> #2490 -> #2492 superseding chain (owner decision, Matthew 2026-10-22, superseding the earlier #2140 assignment). Fixes #2171.
 branch: cursor/plant-create-insert-error-99b8
 base: verdant-grow-diary
 checkout: git fetch origin cursor/plant-create-insert-error-99b8 verdant-grow-diary && git switch cursor/plant-create-insert-error-99b8 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
@@ -79,7 +121,7 @@ head_sha: 71be93f03ec13e4ad9d8378a2c10f076f719dd52, remote observed 2026-10-19 1
 state: review. Not merged, so this block stays OPEN; move it to Closed with the landing SHA when #2192 merges.
 next_action: Exact-head Codex review of PR #2192 at its current head, then independent review. No merge from this block.
 files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-failure-notice.test.ts; src/test/plant-create-insert-failure-notice.test.tsx; src/test/plant-create-retry-recovery-notice.test.tsx; docs/agents/HANDOFF_LOG.md
-blockers: none for the repository change. The plants-list health label stays with #2140. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
+blockers: none for the repository change. The unassessed-health label on /plants and the plant page belongs to the #2330 -> #2490 -> #2492 chain (owner decision 2026-10-22); #2140 keeps only its schema work. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
 artifacts: PR #2192 body (RED/GREEN counts for the retry-clear fix); earlier toast-target fail-first 1 failed / 3 skipped before the notifications-region lookup, 10 passed / 0 failed after
 reviewer_seat: Blue Dream (CreatePlantDialog.tsx)
 claimed_by: Claude (close-out session), 2026-10-19 16:14 UTC (VER-216, Matthew 2026-10-19)

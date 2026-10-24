@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-24.5**
+**Sentinel-Version: 2026-10-24.6**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -508,16 +508,17 @@ snapshots can differ.
   **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
   and is not one of the twelve: it is the changing shift report, revised several times a
   day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
-  Editing it alone requires no bump. Single-file edits of this file have merged
-  with no version change. The pull-request numbers for those precedents are in §17.
+  Editing `docs/agents/CURRENT_STATE.md` alone requires no bump. Single-file edits
+  of `docs/agents/CURRENT_STATE.md` have merged with no version change
+  (`1ae167764`, `a0c30e565`).
   An earlier wording of this bullet said `docs/agents/**`, which over-stated the rule
   against the gate that supposedly enforced it.
 
 ## 17. Changelog
 
-- **2026-10-24.5** — Operating state does not override `OWNERSHIP.md` on ownership and review routing; the start-here note in `docs/agents/CURRENT_STATE.md` now says the same thing. Extending the repair-all-defects rule and the do-not-integrate-your-own-work rule from the Codex seat to every branch holder is an intended change, recorded here; the Codex wording stays in the roster. Before editing a migration file, confirm it is new. Everything else runs without waiting on the founder. The integration branch is `main`. The deploy branch is `verdant-grow-diary`. Historical single-file `CURRENT_STATE.md` edits that needed no version bump include #729 (`1ae167764`) and #746 (`a0c30e565`).
+- **2026-10-24.6** — The environment note names `docs/agents/CURRENT_STATE.md` as the file whose single-file edits need no version bump. Those precedents are commits `1ae167764` and `a0c30e565`.
+- **2026-10-24.5** — Operating state does not override `OWNERSHIP.md` on ownership and review routing; the start-here note in `docs/agents/CURRENT_STATE.md` now says the same thing. Extending the repair-all-defects rule and the do-not-integrate-your-own-work rule from the Codex seat to every branch holder is an intended change, recorded here; the Codex wording stays in the roster. Before editing a migration file, confirm it is new. Everything else runs without waiting on the founder. The integration branch is `main`. The deploy branch is `verdant-grow-diary`.
 - **2026-10-24.4** — Restored the render-body rule in its original words: keep transforms/selectors out of render bodies when possible.
-
 - **2026-10-24.3** — Restored rules weakened in 2026-10-24.2: only the branch
   holder pushes, and nobody edits another holder's branch; a public estimate is
   not authenticated analytics; measure the publisher and its deployment checks

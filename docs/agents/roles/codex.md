@@ -1,6 +1,6 @@
 # Role — Codex: Implementation and Integration Lead
 
-**Sentinel-Version: 2026-10-24.5**
+**Sentinel-Version: 2026-10-24.6**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

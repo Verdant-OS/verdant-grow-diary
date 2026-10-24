@@ -250,6 +250,33 @@ describe("evaluatePolicy", () => {
     );
   });
 
+  it("fails when a direct dependency override is neither $name nor its spec", () => {
+    const manifest = packageJson("0.24.0", { [MCP]: "0.24.1" });
+    expect(evaluate(policyFiles({ manifest })).errors.join("\n")).toContain(
+      `Override for ${MCP}@0.24.0 conflicts with its direct dependency`,
+    );
+  });
+
+  it("accepts a $name reference and an override equal to the direct spec", () => {
+    const reference = packageJson("0.24.0", { [MCP]: `$${MCP}` });
+    const identical = packageJson("0.24.0", { [MCP]: "0.24.0" });
+    expect(evaluate(policyFiles({ manifest: reference })).errors.join("\n")).not.toContain(
+      "EOVERRIDE",
+    );
+    expect(evaluate(policyFiles({ manifest: identical })).errors.join("\n")).not.toContain(
+      "EOVERRIDE",
+    );
+  });
+
+  it("treats a bun.lock copy of the direct spec as synchronized with a $name override", () => {
+    const manifest = packageJson("0.24.0", { [MCP]: `$${MCP}` });
+    const lock = JSON.parse(bunLock(manifest));
+    lock.overrides[MCP] = "0.24.0";
+    expect(evaluate(policyFiles({ manifest, bunLockText: JSON.stringify(lock) })).errors).toEqual(
+      [],
+    );
+  });
+
   it("fails when bun.lock overrides drift from package.json", () => {
     const manifest = packageJson("0.24.0", { "fast-uri": "3.1.8" });
     const files = policyFiles({ manifest, bunLockText: bunLock(packageJson()) });

@@ -326,7 +326,13 @@ async function clickNextMissingAction(): Promise<string> {
 }
 
 describe("Timeline next missing action follows the plant filter", () => {
+  let scrollIntoView: ReturnType<typeof vi.fn<() => void>>;
+
   beforeEach(() => {
+    // jsdom does not implement scrollIntoView; the jump calls it on a found gap.
+    scrollIntoView = vi.fn<() => void>();
+    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView =
+      scrollIntoView;
     harness.executeQuery.mockReset();
     harness.createSignedUrls.mockReset();
     harness.createSignedUrls.mockImplementation((paths: string[]) =>
@@ -357,17 +363,20 @@ describe("Timeline next missing action follows the plant filter", () => {
     const banner = await clickNextMissingAction();
     expect(banner).not.toMatch(/feeding/i);
     expect(banner).toContain(MISSING_ACTION_NOTHING_MISSING_COPY);
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it("still finds plant B's gap when filtered to plant B", async () => {
     mockTwoPlantRhythms();
     renderTimeline(`/timeline?plantId=${PLANT_B}`);
     expect(await clickNextMissingAction()).toMatch(/feeding/i);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
   it("reads every plant when no plant is filtered", async () => {
     mockTwoPlantRhythms();
     renderTimeline("/timeline");
     expect(await clickNextMissingAction()).toMatch(/feeding/i);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 });

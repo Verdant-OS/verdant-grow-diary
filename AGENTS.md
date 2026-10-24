@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-24.3**
+**Sentinel-Version: 2026-10-24.4**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -145,7 +145,7 @@ Preferred layering:
 
 - UI stays a presenter. Do not copy rule tables into markup.
 - New logic is typed, deterministic, and null-safe. Inject time when tests need it.
-- Keep transforms and selectors out of render bodies when possible.
+- Keep transforms/selectors out of render bodies when possible.
 - Stable sorts with explicit tie-breakers. No randomness in rules.
 - Preserve old rows that omit fields.
 - Do not change schema, row-level security, auth, or edge functions outside the task.

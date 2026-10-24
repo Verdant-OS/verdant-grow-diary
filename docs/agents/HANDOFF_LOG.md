@@ -29,7 +29,7 @@ state: implemented / local only / pushed draft / CI / review / merged / live mea
 current_step:
 next_action: the single smallest next step a cold agent can run
 post_merge_check: the check that reopens this work with the same owner if it fails after merge; or NOT_APPLICABLE
-active_writer: the only agent who may push; others ask this owner first
+active_writer: the branch holder; only that holder pushes; nobody edits another holder's branch
 decisions: what was decided, and the reason for each
 tried_and_rejected: what was tried, and why it was rejected
 commands: exact commands to reproduce the current state and run the relevant tests

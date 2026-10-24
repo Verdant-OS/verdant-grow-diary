@@ -5,7 +5,7 @@ Numbered rules in the constitution do not name tools, vendors, or people.
 
 | Seat | What the constitution means | Current holder |
 | --- | --- | --- |
-| Founder | Explicit current instructions outrank the constitution. Keeps production database changes, the spend ceiling, anything that gates a publish, and the publish decision. | Matthew Cheek |
+| Founder | Explicit current instructions outrank the constitution. Production database changes, spend, publish gates, and the publish decision remain with this seat. Repository work does not authorize those operations. | Matthew Cheek |
 | Engineering lead | Default inheritor when a workstream's holder retires and names no successor. | OG Kush |
 | Merge seat | Merges only after every required check is green and an independent exact-head review passes. Does not bypass the queue. | Chemdawg (also called Grok 91 in operating notes) |
 | Peers | No peer outranks another. Assignment, named lock, and the coverage claim decide who writes. | Codex, Claude, Grok |
@@ -28,8 +28,9 @@ Preserved from the constitution as it stood before names moved here:
 - The preferred cross-role sequence is research, architecture, build, security review, QA audit, council, founder approval. It is a path, not rank.
 - New branches for the Codex seat use `codex/<task-id>-<slug>`. Other seats preserve the branch they were given.
 - The Codex seat opens pull requests as drafts when it is the holder. A holder without that right asks the seat that can open one.
-- Repair intake for the Codex seat arrives as comments that name that seat. A coverage record does not delegate implementation.
-- One class of pushes is limited to ordinary branch pushes: no force-push, merge, publish, SQL apply, or production database writes. Drafts stay draft until the merge rule says otherwise.
+- Codex fixes every discovered defect in its assigned repository scope itself. New work arrives as `@codex` comments. A coverage record does not delegate implementation or grant new authority.
+- Codex does not integrate its own work.
+- Codex pushes are ordinary branch pushes only: no force-push, merge, publish, SQL apply, or production database writes. Drafts stay draft.
 
 ## Off limits until the founder approves
 

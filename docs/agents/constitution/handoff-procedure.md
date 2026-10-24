@@ -24,7 +24,7 @@ Retirement is explicit. Every open PR has a current entry. Routines are reassign
 
 ## Claim, release, and takeover
 
-Last activity is the newer of `last_updated` on the deploy branch and the effective claim. A `last_updated` that exists only on the task branch does not count. A block with a pushed branch and a PR is open when it has no effective claim or its last activity is older than 24 hours.
+Last activity is the newer of `last_updated` on the deploy branch and the effective claim, including the holder's renewal comments. A `last_updated` that exists only on the task branch does not count. A block with a pushed branch and a PR is open when it has no effective claim or its last activity is older than 24 hours.
 
 The effective claim is the newest valid `claimed_by` in the log or on the PR, unless that holder later posted `released_by:`. A claim posted while another valid claim is under 24 hours old is not valid. The first claim posted wins a race. A release may name a successor; only that successor's claim is valid for the next 24 hours.
 

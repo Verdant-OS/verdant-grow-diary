@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-24.2**
+**Sentinel-Version: 2026-10-24.3**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-24.2**
+**Sentinel-Version: 2026-10-24.3**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -49,13 +49,14 @@ Procedures (normative detail): `docs/agents/constitution/handoff-procedure.md`,
 
 When two instructions conflict, higher wins. Report the conflict. Do not pick in silence.
 
-1. The founder's explicit current instruction.
-2. This constitution.
-3. Role files, then `docs/agents/OWNERSHIP.md` for who fills a seat.
-4. Task instructions, the handoff block, and the handoff protocol.
+1. The founder's explicit current instruction. It controls any conflicting permission.
+2. On ownership and review routing, `docs/agents/OWNERSHIP.md` wins.
+3. This constitution.
+4. Role files.
+5. Task instructions, the handoff block, and the handoff protocol.
 
 Operating state records facts, owners, and locks. It does not override a numbered
-rule. A seat map that disagrees with a numbered rule is updated to match the rule.
+rule or OWNERSHIP.md on ownership and review routing.
 
 ### 0.2 Amendment
 
@@ -83,7 +84,7 @@ illustrative and labeled as such.
 | --- | --- |
 | Head SHA | The full commit the pull request currently points at. |
 | Exact-head review | An independent verdict on that one head SHA. It dies when the head moves. |
-| Writer | The one agent who may push the branch. Others ask the owner first. |
+| Writer | The holder of the branch. Only that holder pushes. Nobody edits another holder's branch. There is no shared working branch. |
 | Owner | The accountable holder of a workstream. Ownership is temporary. |
 | Handoff | The written block a cold agent uses to resume. Chat is not a handoff. |
 | Gate | A condition that must be true at one head SHA before merge, publish, or spend. |
@@ -93,8 +94,9 @@ illustrative and labeled as such.
 ## 2. Principles
 
 - Diary first, sensors second, AI third, automation last.
-- A merge is not a deployment. Green CI is not proof of indexing. An unverified
-  sensor value is not healthy. If you cannot measure it, say so.
+- A merge is not a deployment. Green CI is not proof of indexing. A public
+  estimate is not authenticated analytics. An unverified sensor value is not
+  healthy live data. If you cannot measure it, say so.
 - Small, scoped changes. Preserve behavior a task did not ask to change.
 - One writer, one branch, one workstream. Work belongs to the task.
 - The grower decides. The product may suggest. It does not act on hardware by itself.
@@ -131,18 +133,27 @@ Build, then audit, then fix, then CI, then publish, then measure on live, then f
 - Bad or unknown telemetry is never shown as healthy.
 - The doctor is cautious and does not sound certain from one photo or one reading.
 - Do not recommend aggressive nutrient, irrigation, or equipment changes from weak evidence.
-- Do not expose service-role keys, bridge tokens, API keys, webhook secrets, or private env values.
+- Do not expose service role keys, bridge tokens, API keys, webhook secrets, private env values, or internal secrets.
 - Treat user data, sensor data, exports, bridge payloads, and model output as untrusted.
 
 ## 5. Data, schema, and migrations
 
-Layering: constants, pure rules, services for I/O, view models, pages and
-components, hooks, server functions, migrations. Paths are the usual `src/lib`,
-`src/pages`, `src/components`, `src/hooks`, `supabase/functions`, and
-`supabase/migrations` trees.
+Preferred layering:
+
+| Layer | Path |
+| --- | --- |
+| Constants / config | `src/constants/*` |
+| Pure logic / rules | `src/lib/*Rules.ts` |
+| Services / IO | `src/lib/*Service.ts` |
+| View models | `src/lib/*ViewModel.ts` |
+| React rendering | `src/pages/*.tsx`, `src/components/*.tsx` |
+| Hooks | `src/hooks/*` |
+| Supabase functions | `supabase/functions/*` |
+| Migrations | `supabase/migrations/*` |
 
 - UI stays a presenter. Do not copy rule tables into markup.
 - New logic is typed, deterministic, and null-safe. Inject time when tests need it.
+- Keep transforms and selectors out of render bodies when possible.
 - Stable sorts with explicit tie-breakers. No randomness in rules.
 - Preserve old rows that omit fields.
 - Do not change schema, row-level security, auth, or edge functions outside the task.
@@ -207,7 +218,7 @@ It is not guessed.
 - Do not add a required-tier route unless the task asks.
 - Do not reuse profile tier for billing, and do not put the service role in client code.
 
-Meter the doctor review and the coach before the model call. Free: 3 credits
+Meter `ai-doctor-review` and `ai-coach` before the model call. Free: 3 credits
 per grow. Paid monthly, paid annual, and founder lifetime: 100 credits per UTC
 calendar month, capped. The client cannot set user id, weight, model tier, or
 plan. The edge function decides tier and weight. Refund a failed call with an
@@ -259,14 +270,16 @@ ran and what you skipped.
 ## 11. Release and gates
 
 - Production only. No sandbox, staging, preview, or other smoke environment.
-  Verify and smoke on the production host. A task that asks for a non-production
-  target is out of date; report it. Local and CI fixtures validate code, not
-  production. Identity, tagging, and receipts: `docs/production-only-verification-runbook.md`.
+  Verify and smoke on the production host. Verify the fixture identity and
+  ownership before any write. A task that asks for a non-production target is
+  out of date; report it. Local and CI fixtures validate code, not production.
+  Identity, tagging, and receipts: `docs/production-only-verification-runbook.md`.
 - CI probes production or it probes nothing. No push-triggered job probes a
   non-production database. The production schema verifier runs only by manual
   dispatch from the deploy branch, in its protected environment. A red check
   that probes a retired environment is a CI defect, not a schema verdict.
-- Agents never publish, promote, or roll back. They prepare a packet: live SHA,
+- Measure the configured publisher and its actual deployment checks before
+  asserting delivery. Agents never publish, promote, or roll back. They prepare a packet: live SHA,
   target SHA, commits, checks at the target, deployment URL, rollback target,
   and one promotion step. A merge is not a release until the live version
   endpoint reports the SHA.
@@ -281,13 +294,21 @@ ran and what you skipped.
   Protected and mixed scopes still need an eligible outside reviewer and their
   supplemental evidence.
 - Payment, migration, and production pull requests stay out of the queue until
-  a human approves that exact head SHA. The founder keeps production database
-  changes, the spend ceiling, publish gates, and the publish decision.
+  a human approves that exact head SHA. Production database changes, spend,
+  publish gates, and the publish decision remain with the founder. Repository
+  work does not authorize those operations.
 - Off-limits paths and named holds need an explicit reassignment. The current
   list is in operating state and the roster.
-- One writer per pull request. Operating state records the writer and the owner.
-  Anyone else asks that owner before pushing. The task goes with the branch.
-  Preserve branch names. Stacked work is one block per branch.
+- There is no shared working branch. Only the agent currently holding a branch,
+  per the effective claim in `docs/agents/HANDOFF_LOG.md` or on the task's pull
+  request, pushes it, and no agent edits files on another holder's branch.
+  Operating state records that holder. The task goes with the branch. Preserve
+  branch names. Stacked work is one block per branch.
+- The holder fixes every discovered defect in its assigned repository scope.
+  New work for that scope arrives as comments that name the seat. A coverage
+  record preserves resumable evidence. It does not delegate implementation or
+  grant new authority. The holder does not integrate its own work. The roster
+  names the seat.
 - A check that is red across pull requests is top-priority work. A paused
   workflow records an owner and a re-enable date in operating state.
 - A pull request untouched for 14 or more days, or more than 500 commits behind
@@ -320,10 +341,12 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
   exact-head review if the head moved.
 - One active writer. A reviewer assignment is not write access. Claims,
   releases, assignments, and named locks prevent a second writer.
-- A block with a pushed branch and a pull request is open to resume when it has
-  no effective claim, or its last activity on the deploy branch is older than
-  24 hours, and no assignment or lock conflicts. Priority: publish gate, P1, P2,
-  then the rest. Oldest update wins a tie.
+- A block's last activity is the newer of its `last_updated` on the deploy
+  branch and its effective claim, including the holder's renewal comments. A
+  `last_updated` that exists only on a task branch does not count. A block with
+  both a pushed branch and a pull request is open when it has no effective
+  claim or that last activity is older than 24 hours, and no assignment or lock
+  conflicts. Priority: publish gate, P1, P2, then the rest. Oldest update wins a tie.
 - Closing a merged, superseded, or dropped task moves the block to Closed the
   same day with the reason and the final SHA.
 
@@ -344,15 +367,21 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
   cannot pass it.
 - Who may sit the review is the roster, applied to the whole scope, including
   protected files and supplemental evidence.
-- Role files say each seat's default strength. Strength is not rank. Read your
-  role file before work beyond the startup read.
+- Role files say each seat's default strength. Strength is not rank. Before
+  work beyond the startup read, the seat reads its role file:
+  `docs/agents/roles/codex.md`, `docs/agents/roles/grok.md`,
+  `docs/agents/roles/claude.md`, `docs/agents/roles/gemini.md`,
+  `docs/agents/roles/security.md`, `docs/agents/roles/council-chair.md`.
 
 ## 14. Startup gate
 
 Before tools beyond read-only context, or any edit, read this file,
 `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned
-role file. Listing files only to find those four is allowed. No application
-inspection, network mutation, recommendation, or write happens before the
+role file. The only action permitted before the gate is read-only acquisition
+of those four files so the acknowledgment can be truthful. Listing files solely
+to locate those four documents, or using a platform context-discovery command
+such as `grok inspect`, is also permitted. No application-code inspection,
+network mutation, recommendation, or repository write is permitted before the
 acknowledgment.
 
 MANDATORY STARTUP GATE
@@ -400,7 +429,8 @@ Use these words. A blocked or unmeasured check is never a pass.
 
 Never invent search volume, traffic, keyword difficulty, CPC, domain rating,
 backlink counts, conversion rates, audience sizes, sensor health, or
-deployment outcomes. Record the source for every material measurement.
+deployment/indexing outcomes. Record the authorized source and provenance
+for every material measurement.
 
 ## 16. Environment notes
 
@@ -410,11 +440,27 @@ check asserts this section's package-manager wording. The runbook is
 
 ## 17. Changelog
 
-- **2026-10-24.2** — Restructured into numbered sections, a glossary, §0
-  precedence, an amendment rule, and a quarterly prune. Named seats moved to
-  the roster. Long handoff and testing procedures moved under
-  `docs/agents/constitution/`. No prior rule removed; each has a section in §11's
-  companion map on the pull request.
+- **2026-10-24.3** — Restored rules weakened in 2026-10-24.2: only the branch
+  holder pushes, and nobody edits another holder's branch; a public estimate is
+  not authenticated analytics; measure the publisher and its deployment checks
+  before asserting delivery; layer paths `src/constants/*`, `src/lib/*Rules.ts`,
+  `src/lib/*Service.ts`, `src/lib/*ViewModel.ts`, and no transforms in render
+  bodies; verify fixture identity and ownership before a write; the holder
+  fixes every defect in its scope and does not integrate its own work (Codex
+  specifics stay in the roster); do not invent deployment/indexing outcomes;
+  record the authorized source and provenance; internal secrets stay unexposed.
+  OWNERSHIP.md again wins on ownership and review routing. The stale-open test
+  uses last activity, which includes the effective claim. The pre-gate
+  allowance again includes locating the four context files and a platform
+  context-discovery command. Metered ids are `ai-doctor-review` and `ai-coach`.
+  Repository work does not authorize production database changes, spend,
+  publish gates, or the publish decision.
+- **2026-10-24.2** — Numbered sections, glossary, amendment rule, and quarterly
+  prune. Seat names moved to `docs/agents/constitution/roster.md`. Handoff
+  steps moved to `docs/agents/constitution/handoff-procedure.md`. Testing
+  detail moved to `docs/agents/constitution/testing-standard.md`. That revision
+  ranked this file above OWNERSHIP.md for every conflict and shortened several
+  rules listed in 2026-10-24.3. Those shortenings are reversed.
 - **2026-10-24.1** — Cold-start handoff, exact-SHA approvals, one writer,
   one-pass review, stale expiry, ship and money hold, repo-wide breakage
   priority, protected instruction files, post-merge reopen.

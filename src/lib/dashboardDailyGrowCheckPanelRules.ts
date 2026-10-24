@@ -117,17 +117,28 @@ function latestTodayDiaryEntryId(
   plantId: string,
   now: Date,
 ): string | null {
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  let best: { at: number; id: string } | null = null;
+  // Same local-day bucket as buildDailyGrowCheckHistory: [start, next local day).
+  // A timestamp on a later calendar day is not today's check.
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const start = dayStart.getTime();
+  const end = dayEnd.getTime();
+  let best: { at: number; created: number; id: string } | null = null;
   for (const entry of entries) {
     if (entry.plant_id !== plantId) continue;
-    const id = typeof entry.id === "string" ? entry.id : "";
-    if (!id) continue;
     const at = Date.parse(entry.entry_at ?? "");
-    if (!Number.isFinite(at) || at < dayStart) continue;
-    if (!best || at > best.at || (at === best.at && id > best.id)) best = { at, id };
+    if (!Number.isFinite(at) || at < start || at >= end) continue;
+    const id = typeof entry.id === "string" ? entry.id : "";
+    const created = Date.parse(entry.created_at ?? "") || at;
+    const newer =
+      !best ||
+      at > best.at ||
+      (at === best.at && created > best.created) ||
+      (at === best.at && created === best.created && id > best.id);
+    if (newer) best = { at, created, id };
   }
-  return best?.id ?? null;
+  return best && best.id.length > 0 ? best.id : null;
 }
 
 function latestActivityHrefForRow(args: {
@@ -244,10 +255,7 @@ export function buildDashboardDailyGrowCheckPanel(
         plantHref: plantDetailPath(plant.id),
         latestActivityHref: latestActivityHrefForRow({
           plantId: plant.id,
-          growId:
-            input.scopedGrowId && plantGrowId(plant) === input.scopedGrowId
-              ? input.scopedGrowId
-              : plantGrowId(plant),
+          growId: plantGrowId(plant),
           checkedToday,
           diaryEntryId: latestTodayDiaryEntryId(input.diaryEntries, plant.id, input.now),
         }),

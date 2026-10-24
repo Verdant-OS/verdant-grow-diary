@@ -17,13 +17,10 @@ import { usePlants } from "@/hooks/use-plants";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { deriveDailyGrowCheckStatus, type DailyCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
-import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import { DASHBOARD_SAVED_WORK_LINK_CLASS } from "@/lib/dashboardSavedWorkLinkClass";
 import { plantDetailPath, timelinePath, withGrowId } from "@/lib/routes";
 import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
 import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
-
-const SAVED_WORK_LINK_CLASS =
-  "underline underline-offset-2 rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
 interface Props {
   /** Compact strip variant (used inside the legacy operator view). */
@@ -44,10 +41,12 @@ function savedWorkHrefs(
   growId: string | null,
 ): { plantHref: string | null; activityHref: string | null } {
   const plantHref = status.plantId ? plantDetailPath(status.plantId) : null;
-  const diaryHref = plantHref ? `${plantHref}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}` : null;
   const anchor = buildTimelineEntryAnchorId(status.lastDiaryEntryId);
-  const entryHref = anchor ? `${timelinePath(growId)}#${anchor}` : null;
-  return { plantHref, activityHref: entryHref ?? diaryHref };
+  const diaryMs = status.lastQuickLogAt ? Date.parse(status.lastQuickLogAt) : NaN;
+  const activityMs = status.lastActivityAt ? Date.parse(status.lastActivityAt) : NaN;
+  const diaryIsNewest = Number.isFinite(diaryMs) && diaryMs === activityMs;
+  const entryHref = anchor && diaryIsNewest ? `${timelinePath(growId)}#${anchor}` : null;
+  return { plantHref, activityHref: entryHref };
 }
 
 function relTime(iso: string | null): string {
@@ -223,10 +222,10 @@ export default function DailyGrowCheckStatusCard({
                 <Link
                   to={savedWork.activityHref}
                   data-testid="daily-grow-check-last-activity"
-                  aria-label={
-                    plantName ? `Latest log for ${plantName}` : "Latest log for this check"
-                  }
-                  className={SAVED_WORK_LINK_CLASS}
+                  aria-label={`Last check activity ${relTime(status.lastActivityAt)}${
+                    plantName ? `, latest log for ${plantName}` : ""
+                  }`}
+                  className={DASHBOARD_SAVED_WORK_LINK_CLASS}
                 >
                   Last check activity {relTime(status.lastActivityAt)}
                 </Link>
@@ -244,7 +243,7 @@ export default function DailyGrowCheckStatusCard({
                   to={savedWork.plantHref}
                   data-testid="daily-grow-check-plant-name"
                   aria-label={`Open ${plantName}`}
-                  className={SAVED_WORK_LINK_CLASS}
+                  className={DASHBOARD_SAVED_WORK_LINK_CLASS}
                 >
                   {plantName}
                 </Link>

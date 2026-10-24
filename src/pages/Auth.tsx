@@ -552,7 +552,7 @@ export default function Auth() {
       <div className="w-full max-w-sm">
         <div className="mb-4">
           <Link
-            to="/welcome"
+            to="/"
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home

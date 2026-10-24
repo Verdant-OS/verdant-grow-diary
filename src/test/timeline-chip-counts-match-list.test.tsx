@@ -440,7 +440,10 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
 
     renderTimeline();
 
-    expect(await screen.findByText("QA Test watering note")).toBeInTheDocument();
+    // The first async render can pass findByText's 1s default on a loaded CI runner (#2521).
+    expect(
+      await screen.findByText("QA Test watering note", undefined, { timeout: 5_000 }),
+    ).toBeInTheDocument();
     expect(chipCount("All")).toBe(3);
 
     fireEvent.change(screen.getByTestId("timeline-search-input"), {

@@ -1,3 +1,5 @@
 {
-  "install": "bun install --frozen-lockfile\nnpx --yes playwright install chromium"
+  "name": "Verdant Grow Diary",
+  "install": "bash .cursor/cloud-agent-install.sh",
+  "start": "bash .cursor/cloud-agent-start.sh"
 }

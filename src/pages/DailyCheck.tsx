@@ -16,7 +16,8 @@
  * Manual readings remain source = "manual". Handheld pH/EC/PPFD readings
  * remain QuickLog note text only. CO2 is context-only.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@/lib/react-router-compat";
 import {
   AlertTriangle,
@@ -57,6 +58,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
+import {
+  checkDailyCheckPlantArchiveBeforeSave,
+  readDailyCheckPlantArchive,
+} from "@/lib/dailyCheckPlantArchiveReadService";
+import { registerDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import {
@@ -77,10 +83,16 @@ import {
   type StepOutcome,
 } from "@/lib/dailyGrowCheckRules";
 import {
+  DAILY_CHECK_PLANTS_LIST_QUERY_KEY,
   DAILY_CHECK_WHAT_COUNTS_HINT,
+  dailyCheckArchiveCheckIsStale,
+  dailyCheckSavePlantId,
+  dailyCheckSubmitBlockForPlantArchive,
   defaultDailyCheckPlantId,
+  isDailyCheckSubmitSaveTestId,
   resolveDailyCheckPlantSelection,
   resolveDailyCheckPostSubmitPlantId,
+  type DailyCheckPlantArchiveRead,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
@@ -155,8 +167,17 @@ function resolveCompatibleAssignedTentId(
   return assignedTent.id;
 }
 
+function submitSaveButton(target: EventTarget | null): HTMLButtonElement | null {
+  if (!(target instanceof Element)) return null;
+  const button = target.closest("button");
+  if (!(button instanceof HTMLButtonElement) || button.disabled) return null;
+  if (!isDailyCheckSubmitSaveTestId(button.getAttribute("data-testid"))) return null;
+  return button;
+}
+
 export default function DailyCheck() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
@@ -180,6 +201,10 @@ export default function DailyCheck() {
     null,
   );
   const [emptyManualWarning, setEmptyManualWarning] = useState(false);
+  const [archivedPlantSubmitMessage, setArchivedPlantSubmitMessage] = useState<string | null>(null);
+  const selectedPlantIdRef = useRef("");
+  const archiveReplayRef = useRef(false);
+  const archivePreflightRef = useRef(false);
 
   const selectablePlants = useMemo(
     () => (urlGrowId ? plants.filter((plant) => plant.grow_id === urlGrowId) : plants),
@@ -258,6 +283,76 @@ export default function DailyCheck() {
     () => selectablePlants.find((plant) => plant.id === renderedPlantId) ?? null,
     [renderedPlantId, selectablePlants],
   );
+  selectedPlantIdRef.current = selectedPlant?.id ?? "";
+
+  // Every Quick Log writer Daily Check opens re-reads the plant it is about
+  // to save, including the AppShell Water/Feed sheet.
+  useEffect(
+    () => registerDailyCheckPlantArchiveSaveGuard(checkDailyCheckPlantArchiveBeforeSave),
+    [],
+  );
+
+  useEffect(() => {
+    const onClickCapture = (event: MouseEvent) => {
+      if (archiveReplayRef.current) return;
+      const button = submitSaveButton(event.target);
+      if (!button) return;
+      const checkedPlantId = dailyCheckSavePlantId({
+        hintedPlantId: button.getAttribute("data-daily-check-save-plant"),
+        selectedPlantId: selectedPlantIdRef.current,
+      });
+      if (!checkedPlantId) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      // A second click while the read is in flight must not start another
+      // preflight. Replaying both would hit manual-reading-save again after
+      // review is open and save without the confirm button.
+      if (archivePreflightRef.current) return;
+      archivePreflightRef.current = true;
+      void (async () => {
+        try {
+          let read: DailyCheckPlantArchiveRead;
+          try {
+            read = await readDailyCheckPlantArchive(checkedPlantId);
+          } catch {
+            read = { status: "unreadable" };
+          }
+          const currentPlantId = dailyCheckSavePlantId({
+            hintedPlantId: button.isConnected
+              ? button.getAttribute("data-daily-check-save-plant")
+              : "",
+            selectedPlantId: selectedPlantIdRef.current,
+          });
+          if (dailyCheckArchiveCheckIsStale(checkedPlantId, currentPlantId)) return;
+          const decision = dailyCheckSubmitBlockForPlantArchive(read);
+          if (decision.block) {
+            // Leave the open editor mounted. Clearing the page plant, or
+            // refreshing the active-only list, unmounts Quick Log and the
+            // snapshot review and drops the typed draft. A different dialog
+            // target must not clear the page selection either.
+            setArchivedPlantSubmitMessage(decision.message);
+            return;
+          }
+          // This click re-read the plant it will save. A pass makes the
+          // earlier archive banner stale, including when the same plant was
+          // restored or only the dialog target changed.
+          setArchivedPlantSubmitMessage(null);
+          if (!button.isConnected) return;
+          archiveReplayRef.current = true;
+          try {
+            button.click();
+          } finally {
+            archiveReplayRef.current = false;
+          }
+        } finally {
+          archivePreflightRef.current = false;
+        }
+      })();
+    };
+    document.addEventListener("click", onClickCapture, true);
+    return () => document.removeEventListener("click", onClickCapture, true);
+  }, []);
+
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
   const activityTarget = resolveDailyCheckActivityTarget({
@@ -379,6 +474,9 @@ export default function DailyCheck() {
   // real save time, not the moment the React listener happened to run.
   useEffect(() => {
     function onEntry(e: Event) {
+      // Fires only after a confirmed save, plant- or tent-scoped.
+      setArchivedPlantSubmitMessage(null);
+      void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
       const detail = (
         e as CustomEvent<{ createdAt?: string | number | Date; activityId?: string | null }>
       ).detail;
@@ -397,6 +495,7 @@ export default function DailyCheck() {
       // Manual sensor snapshot success — counts as today's check and
       // shows the same source-aware confirmation card. Drives the
       // `manual` step outcome when the grower is on that step.
+      setArchivedPlantSubmitMessage(null);
       const detail = (e as CustomEvent<{ createdAt?: string | number | Date }>).detail;
       const raw = detail?.createdAt;
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
@@ -413,7 +512,7 @@ export default function DailyCheck() {
       window.removeEventListener("verdant:entry-created", onEntry);
       window.removeEventListener("verdant:sensor-reading-created", onSensor);
     };
-  }, [renderedStep]);
+  }, [queryClient, renderedStep]);
 
   // Sole-plant preselect fills the form when the URL names no plant. Post-submit
   // follows an explicit selector choice, including a cleared picker. An
@@ -478,6 +577,8 @@ export default function DailyCheck() {
   );
 
   function handleSubmitSuccess(method: "note" | "sensor") {
+    setArchivedPlantSubmitMessage(null);
+    void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
     toast.success(
       method === "note" ? DAILY_CHECK_NOTE_SAVED_TOAST : DAILY_CHECK_SENSOR_SAVED_TOAST,
     );
@@ -575,6 +676,17 @@ export default function DailyCheck() {
         <span className="min-w-0 break-words">{DAILY_CHECK_WHAT_COUNTS_HINT}</span>
       </p>
 
+      {archivedPlantSubmitMessage ? (
+        <div
+          role="status"
+          data-testid="daily-check-archived-plant-submit"
+          className="mb-4 flex items-start gap-2 rounded-lg border border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10 p-3 text-sm"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{archivedPlantSubmitMessage}</span>
+        </div>
+      ) : null}
+
       {/* Visible rejection banner when ?plantId= cannot be honored. */}
       {plantResolution.message && (
         <div
@@ -603,6 +715,7 @@ export default function DailyCheck() {
                   onValueChange={(value) => {
                     setPlantChoice("explicit");
                     setPlantId(value === "__none" ? "" : value);
+                    setArchivedPlantSubmitMessage(null);
                   }}
                 >
                   <SelectTrigger
@@ -705,6 +818,10 @@ export default function DailyCheck() {
               },
               user?.id ?? null,
             );
+            // Only a confirmed save clears the archive banner and refreshes
+            // plants; a blocked save leaves the target and draft in place.
+            setArchivedPlantSubmitMessage(null);
+            void queryClient.invalidateQueries({ queryKey: DAILY_CHECK_PLANTS_LIST_QUERY_KEY });
           }}
         />
       </div>

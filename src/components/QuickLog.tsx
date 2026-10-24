@@ -32,6 +32,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { activeDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
@@ -1500,6 +1501,15 @@ export default function QuickLog({
       return;
     }
     const saveTarget = Object.freeze({ ...saveTargetResolution.target });
+    const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+    if (archiveGuard && saveTarget.plantId) {
+      const archiveDecision = await archiveGuard(saveTarget.plantId);
+      if (archiveDecision.block) {
+        setSaveError(archiveDecision.message);
+        toast.error(archiveDecision.message);
+        return;
+      }
+    }
     const saveDraftHandoffKey = draftHandoffKey;
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
@@ -3916,6 +3926,7 @@ export default function QuickLog({
                 !!savedTarget
               }
               data-testid="quick-log-save"
+              data-daily-check-save-plant={resolvedTarget?.plantId ?? ""}
               className="gradient-leaf text-primary-foreground"
             >
               {busy || childSaveBusy ? (

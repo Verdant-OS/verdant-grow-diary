@@ -1,0 +1,175 @@
+import { useState } from "react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
+import { QUICK_LOG_START_ROOM_TIMEOUT_MS } from "@/lib/quickLogStartScreenTargetRules";
+import { setStartScreenChoice } from "@/lib/startScreenPreferences";
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
+
+const h = vi.hoisted(() => ({
+  user: null as { id: string } | null,
+  signIn: vi.fn(),
+  signUp: vi.fn(),
+  oauth: vi.fn(),
+  plants: vi.fn(),
+  tents: vi.fn(),
+  grows: vi.fn(),
+}));
+
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: h.user, session: null, loading: false, signOut: vi.fn() }),
+}));
+
+vi.mock("@/hooks/use-plants", () => ({
+  fetchPlants: () => h.plants(),
+}));
+
+vi.mock("@/hooks/use-tents", () => ({
+  fetchTents: () => h.tents(),
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: {
+      signInWithPassword: (...args: unknown[]) => h.signIn(...args),
+      signUp: (...args: unknown[]) => h.signUp(...args),
+      resetPasswordForEmail: vi.fn(),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
+    from: () => ({
+      select: () => h.grows(),
+    }),
+  },
+}));
+
+vi.mock("@/integrations/lovable/index", () => ({
+  lovable: {
+    auth: {
+      signInWithOAuth: (...args: unknown[]) => h.oauth(...args),
+    },
+  },
+}));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+import Auth from "@/pages/Auth";
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function AuthHarness({ entry }: { entry: string }) {
+  const [signedIn, setSignedIn] = useState(h.user != null);
+  h.user = signedIn ? { id: "user-1" } : null;
+  return (
+    <MemoryRouter initialEntries={[entry]}>
+      <button type="button" onClick={() => setSignedIn(true)}>
+        Commit session
+      </button>
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/grows" element={<div>Grows</div>} />
+        <Route path="/dashboard" element={<div>Dashboard</div>} />
+        <Route path="/onboarding" element={<div>Onboarding</div>} />
+        <Route path="/plants/:plantId" element={<div>Plant</div>} />
+      </Routes>
+      <LocationProbe />
+    </MemoryRouter>
+  );
+}
+
+function renderAuth(entry: string) {
+  return render(<AuthHarness entry={entry} />);
+}
+
+beforeEach(() => {
+  h.user = null;
+  h.signIn.mockReset();
+  h.signUp.mockReset();
+  h.oauth.mockReset();
+  h.plants.mockReset();
+  h.tents.mockReset();
+  h.grows.mockReset();
+  h.signIn.mockResolvedValue({ data: { session: { user: { id: "user-1" } } }, error: null });
+  h.signUp.mockResolvedValue({
+    data: { user: { id: "user-1" }, session: { user: { id: "user-1" } } },
+    error: null,
+  });
+  h.oauth.mockResolvedValue({ error: null, redirected: false });
+  h.plants.mockResolvedValue([]);
+  h.tents.mockResolvedValue([]);
+  h.grows.mockResolvedValue({ data: [], error: null });
+  clearLocalStorageForTest();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("Auth start-screen routing", () => {
+  it("keeps redirectTo after a password sign-in once the user is set", async () => {
+    renderAuth("/auth?redirectTo=%2Fgrows");
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "grower@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "longenough1" } });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    await waitFor(() => expect(h.signIn).toHaveBeenCalled());
+    expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows");
+    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows"));
+  });
+
+  it("keeps redirectTo after sign-up once the user is set", async () => {
+    renderAuth("/auth?mode=signup&redirectTo=%2Fgrows");
+    fireEvent.pointerDown(screen.getByRole("tab", { name: /create account/i }), { button: 0 });
+    fireEvent.click(screen.getByRole("tab", { name: /create account/i }));
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "grower@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "longenough1" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /terms of service/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^create account$/i }));
+    await waitFor(() => expect(h.signUp).toHaveBeenCalled());
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/auth?mode=signup&redirectTo=%2Fgrows",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows"));
+  });
+
+  it("keeps redirectTo after Google sign-in once the user is set", async () => {
+    renderAuth("/auth?redirectTo=%2Fgrows");
+    fireEvent.click(screen.getAllByRole("button", { name: /continue with google/i })[0]);
+    await waitFor(() => expect(h.oauth).toHaveBeenCalled());
+    expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows");
+    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows"));
+  });
+
+  it("lands on the Dashboard without Quick Log when no plant can be resolved", async () => {
+    setStartScreenChoice("user-1", "quickLog");
+    renderAuth("/auth");
+    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/dashboard"));
+    expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
+  });
+
+  it("falls back to the Dashboard when the plant read hangs", async () => {
+    vi.useFakeTimers();
+    setStartScreenChoice("user-1", "quickLog");
+    h.user = { id: "user-1" };
+    h.plants.mockReturnValue(new Promise(() => {}));
+    h.tents.mockReturnValue(new Promise(() => {}));
+    h.grows.mockReturnValue(new Promise(() => {}));
+    renderAuth("/auth");
+    expect(screen.getByTestId("location")).toHaveTextContent("/auth");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(QUICK_LOG_START_ROOM_TIMEOUT_MS);
+    });
+    expect(screen.getByTestId("location")).toHaveTextContent("/dashboard");
+    expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
+  });
+});

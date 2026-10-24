@@ -27,22 +27,28 @@ function plant(
   };
 }
 
+const room = {
+  tents: [
+    { id: TENT_A, grow_id: GROW_A, is_archived: false },
+    { id: TENT_B, grow_id: GROW_B, is_archived: false },
+  ],
+  grows: [
+    { id: GROW_A, is_archived: false },
+    { id: GROW_B, is_archived: false },
+  ],
+};
+
 describe("returning Quick Log start screen", () => {
   it("opens Quick Log on the only active plant, with its tent and grow", () => {
-    const target = resolveReturningQuickLogStartTarget([
+    const plants = [
       plant({ id: PLANT_A, tent_id: TENT_A, grow_id: GROW_A }),
       plant({ id: PLANT_B, is_archived: true, tent_id: TENT_B, grow_id: GROW_B }),
-    ]);
+    ];
+    const target = resolveReturningQuickLogStartTarget({ plants, ...room });
 
-    expect(
-      resolveReturningSignInRoute({
-        savedChoice: "quickLog",
-        plants: [
-          plant({ id: PLANT_A, tent_id: TENT_A, grow_id: GROW_A }),
-          plant({ id: PLANT_B, is_archived: true }),
-        ],
-      }),
-    ).toBe(`/plants/${PLANT_A}?open=quick-log`);
+    expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants, ...room })).toBe(
+      `/plants/${PLANT_A}?open=quick-log`,
+    );
     expect(target).toEqual({
       route: `/plants/${PLANT_A}?open=quick-log`,
       plantId: PLANT_A,
@@ -68,9 +74,9 @@ describe("returning Quick Log start screen", () => {
         updated_at: "2026-10-20T12:00:00.000Z",
       }),
     ];
-    const target = resolveReturningQuickLogStartTarget(plants);
+    const target = resolveReturningQuickLogStartTarget({ plants, ...room });
 
-    expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants })).toBe(
+    expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants, ...room })).toBe(
       `/plants/${PLANT_B}?open=quick-log`,
     );
     expect(target.plantId).toBe(PLANT_B);
@@ -88,14 +94,29 @@ describe("returning Quick Log start screen", () => {
     ];
 
     for (const plants of cases) {
-      const target = resolveReturningQuickLogStartTarget(plants);
+      const target = resolveReturningQuickLogStartTarget({ plants, ...room });
       expect(target.opensQuickLog).toBe(false);
       expect(target.plantId).toBeNull();
-      expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants })).toBe("/dashboard");
-      expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants })).not.toContain(
-        "open=quick-log",
+      expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants, ...room })).toBe(
+        "/dashboard",
       );
     }
+
+    const namedPlant = [plant({ id: PLANT_A, tent_id: TENT_A, grow_id: GROW_A })];
+    expect(
+      resolveReturningQuickLogStartTarget({
+        plants: namedPlant,
+        tents: [],
+        grows: room.grows,
+      }).opensQuickLog,
+    ).toBe(false);
+    expect(
+      resolveReturningQuickLogStartTarget({
+        plants: namedPlant,
+        tents: room.tents,
+        grows: [{ id: GROW_A, is_archived: true }],
+      }).opensQuickLog,
+    ).toBe(false);
   });
 
   it("keeps the post-setup plant Quick Log path", () => {

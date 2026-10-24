@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { fetchPlants } from "@/hooks/use-plants";
+import { fetchTents } from "@/hooks/use-tents";
 import { Navigate, useNavigate, useSearchParams, Link } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,7 +43,11 @@ import {
 } from "@/lib/signupAcquisitionRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
-import { resolveReturningSignInRoute } from "@/lib/quickLogStartScreenTargetRules";
+import {
+  QUICK_LOG_START_ROOM_TIMEOUT_MS,
+  resolveReturningSignInRoute,
+  type QuickLogStartGrow,
+} from "@/lib/quickLogStartScreenTargetRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import {
   acceptancePayloadsForCurrentAgreements,
@@ -175,10 +180,9 @@ export default function Auth() {
         return;
       }
       if (result.redirected) return; // browser redirects to Google
-      // Tokens returned and session set — route to intended destination.
+      // The session effect routes once `user` is set, so a stale null user
+      // cannot replace an explicit redirect or skip plant resolution.
       clearPendingOAuthPostAuthRedirect();
-      const googleTarget = postSignInTarget();
-      if (googleTarget) nav(googleTarget, { replace: true });
     } catch {
       if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
       clearPendingOAuthPostAuthRedirect();
@@ -207,42 +211,66 @@ export default function Auth() {
 
   const savedStartScreen = user ? getStartScreenChoice(user.id) : null;
   const needsQuickLogPlant = !explicitRedirect && savedStartScreen === "quickLog";
-  const [quickLogPlants, setQuickLogPlants] = useState<Awaited<
-    ReturnType<typeof fetchPlants>
-  > | null>(null);
-  const [quickLogPlantsReady, setQuickLogPlantsReady] = useState(false);
+  const [quickLogRoom, setQuickLogRoom] = useState<{
+    userId: string;
+    plants: Awaited<ReturnType<typeof fetchPlants>>;
+    tents: Awaited<ReturnType<typeof fetchTents>>;
+    grows: QuickLogStartGrow[];
+  } | null>(null);
 
   useEffect(() => {
-    if (!needsQuickLogPlant) {
-      setQuickLogPlants(null);
-      setQuickLogPlantsReady(false);
-      return;
-    }
-    let cancelled = false;
-    setQuickLogPlantsReady(false);
-    fetchPlants()
-      .then((rows) => {
-        if (!cancelled) setQuickLogPlants(rows);
+    const userId = user?.id;
+    if (!needsQuickLogPlant || !userId) return;
+    let settled = false;
+    const emptyRoom = {
+      userId,
+      plants: [],
+      tents: [],
+      grows: [] as QuickLogStartGrow[],
+    };
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      setQuickLogRoom(emptyRoom);
+    }, QUICK_LOG_START_ROOM_TIMEOUT_MS);
+    const growsQuery = supabase.from("grows").select("id,is_archived");
+    void Promise.all([fetchPlants(), fetchTents(), growsQuery])
+      .then(([plants, tents, growsResult]) => {
+        if (settled) return;
+        if (growsResult.error) throw growsResult.error;
+        settled = true;
+        window.clearTimeout(timer);
+        setQuickLogRoom({
+          userId,
+          plants,
+          tents,
+          grows: growsResult.data ?? [],
+        });
       })
       .catch(() => {
-        if (!cancelled) setQuickLogPlants([]);
-      })
-      .finally(() => {
-        if (!cancelled) setQuickLogPlantsReady(true);
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        setQuickLogRoom(emptyRoom);
       });
     return () => {
-      cancelled = true;
+      settled = true;
+      window.clearTimeout(timer);
     };
   }, [needsQuickLogPlant, user?.id]);
 
+  const quickLogRoomForUser = quickLogRoom?.userId === user?.id ? quickLogRoom : null;
+
   function postSignInTarget(): string | null {
-    if (!user) return "/onboarding";
-    if (needsQuickLogPlant && !quickLogPlantsReady) return null;
     if (explicitRedirect) return explicitRedirect;
+    if (!user) return null;
+    if (needsQuickLogPlant && !quickLogRoomForUser) return null;
     if (savedStartScreen === "quickLog") {
       return resolveReturningSignInRoute({
         savedChoice: "quickLog",
-        plants: quickLogPlants ?? [],
+        plants: quickLogRoomForUser?.plants ?? [],
+        tents: quickLogRoomForUser?.tents ?? [],
+        grows: quickLogRoomForUser?.grows ?? [],
       });
     }
     return savedStartScreen ? routeForStartScreen(savedStartScreen) : "/onboarding";
@@ -390,8 +418,6 @@ export default function Auth() {
       signInEmailRef.current?.focus();
       return;
     }
-    const signedInTarget = postSignInTarget();
-    if (signedInTarget) nav(signedInTarget, { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
@@ -494,8 +520,6 @@ export default function Auth() {
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Your account is ready.");
-    const signedUpTarget = postSignInTarget();
-    if (signedUpTarget) nav(signedUpTarget, { replace: true });
   }
 
   async function sendMagicLink() {

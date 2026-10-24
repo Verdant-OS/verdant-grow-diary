@@ -625,7 +625,14 @@ export function redactForLog(fields: Record<string, unknown>): Record<string, un
 
 export type ForwardOutcome =
   | { kind: "dry_run"; summary: PayloadSummary }
-  | { kind: "forwarded"; summary: PayloadSummary; response: ResponseSummary; attempts: number }
+  | {
+      kind: "forwarded";
+      summary: PayloadSummary;
+      response: ResponseSummary;
+      attempts: number;
+      /** Set when a retry after an unreadable 2xx found the write already landed. */
+      deliveredAs?: "duplicate_on_retry";
+    }
   | { kind: "rejected_locally"; reason: PrepareReason }
   | { kind: "network_error"; summary: PayloadSummary; error: string; attempts: number };
 
@@ -634,6 +641,12 @@ export interface LiveRetryOptions {
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
+}
+
+/** Pure. A numeric `Retry-After` (whole seconds) in ms, capped at `maxDelayMs`; otherwise null. */
+export function retryAfterDelayMs(header: string | null, maxDelayMs: number): number | null {
+  if (header === null || !/^\d+$/.test(header.trim())) return null;
+  return Math.min(Number(header.trim()) * 1000, maxDelayMs);
 }
 
 /** Pure. `random(0, min(maxDelay, base * 2^attempt))`, as the bridge-client guidance states. */
@@ -701,7 +714,10 @@ export async function handleMessage(args: {
   const timeoutMs = args.retry?.timeoutMs ?? LIVE_REQUEST_TIMEOUT_MS;
   const sleep = args.retry?.sleep ?? realSleep;
   const random = args.retry?.random ?? Math.random;
+  // An earlier 2xx whose body could not be read may already have written.
+  let priorUnreadable2xx = false;
   for (let attempt = 0; ; attempt++) {
+    let retryAfterMs: number | null = null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -741,7 +757,30 @@ export async function handleMessage(args: {
         isRetryableResponse(response) || (unreadable && r.status >= 200 && r.status < 300);
       // A retryable response with retries left falls through to the sleep below.
       if (!retryable || attempt >= maxRetries) {
-        return { kind: "forwarded", summary: prepared.summary, response, attempts: attempt + 1 };
+        // The idempotent upsert answers a re-sent write with accepted:false,
+        // inserted:0, skipped_duplicate:n; after an unreadable 2xx that means
+        // the first attempt landed (#2514 review at 5d62d69c).
+        const duplicateOnRetry =
+          priorUnreadable2xx &&
+          !retryable &&
+          r.status >= 200 &&
+          r.status < 300 &&
+          response.inserted === 0 &&
+          (response.skipped_duplicate ?? 0) > 0;
+        return {
+          kind: "forwarded",
+          summary: prepared.summary,
+          response,
+          attempts: attempt + 1,
+          ...(duplicateOnRetry ? { deliveredAs: "duplicate_on_retry" as const } : {}),
+        };
+      }
+      if (unreadable && r.status >= 200 && r.status < 300) priorUnreadable2xx = true;
+      if (r.status === 429) {
+        retryAfterMs = retryAfterDelayMs(
+          r.headers.get("retry-after"),
+          LIVE_RETRY_POLICY.maxDelayMs,
+        );
       }
     } catch (e) {
       if (attempt >= maxRetries) {
@@ -755,7 +794,7 @@ export async function handleMessage(args: {
     } finally {
       clearTimeout(timer);
     }
-    await sleep(fullJitterDelayMs(attempt, random));
+    await sleep(retryAfterMs ?? fullJitterDelayMs(attempt, random));
   }
 }
 
@@ -764,7 +803,8 @@ export function onceExitCode(outcome: ForwardOutcome): number {
   if (outcome.kind === "dry_run") return 0;
   if (outcome.kind === "forwarded") {
     const { status, accepted } = outcome.response;
-    return accepted === true && status >= 200 && status < 300 ? 0 : 1;
+    const delivered = accepted === true || outcome.deliveredAs === "duplicate_on_retry";
+    return delivered && status >= 200 && status < 300 ? 0 : 1;
   }
   return 1;
 }
@@ -1219,7 +1259,8 @@ export async function connectMqtt(
     console.error(
       "[ecowitt-forwarder] mqtt package not installed. Run `bun add --no-save mqtt@5.16.1`.",
     );
-    process.exit(2);
+    // main() catches this, logs mqtt_connect_failed and exits 2 through deps.exit.
+    throw new Error("mqtt package not installed");
   }
   const client = mqtt.connect(flags.mqttUrl, {
     username: env.mqttUsername ?? undefined,

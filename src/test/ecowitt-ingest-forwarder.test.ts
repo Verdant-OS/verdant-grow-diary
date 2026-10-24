@@ -470,6 +470,55 @@ describe("handleMessage", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(5);
   });
 
+  it.each([
+    ["7", 7_000],
+    ["999", 45_000],
+  ])(
+    "waits a numeric Retry-After of %s on a 429, capped at the max delay",
+    async (header, wait) => {
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response("slow down", { status: 429, headers: { "retry-after": header } }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ accepted: true, inserted: 1 }), { status: 200 }),
+        );
+      const sleep = vi.fn(async () => {});
+      await handleMessage({
+        text: GATEWAY_MESSAGE,
+        flags: flags({ live: true }),
+        env: LIVE_ENV,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        retry: { sleep, random: () => 0.5 },
+      });
+      expect(sleep).toHaveBeenCalledWith(wait);
+    },
+  );
+
+  it("falls back to Full Jitter when a 429 Retry-After is not a number of seconds", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("slow down", {
+          status: 429,
+          headers: { "retry-after": "Wed, 21 Oct 2026 07:28:00 GMT" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ accepted: true, inserted: 1 }), { status: 200 }),
+      );
+    const sleep = vi.fn(async () => {});
+    await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: { sleep, random: () => 0.5 },
+    });
+    expect(sleep).toHaveBeenCalledWith(1500);
+  });
+
   // Codex P2 at 79ce2801: docs/bridge-client-retry-guidance.md §4.
   it("retries a transient 503 with Full Jitter and then forwards", async () => {
     const fetchImpl = vi
@@ -1570,7 +1619,64 @@ describe("redaction", () => {
       retry: { ...NO_SLEEP, maxRetries: 1 },
     });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(out).toMatchObject({ kind: "forwarded", attempts: 2, response: { status: 200, accepted: true } });
+    expect(out).toMatchObject({
+      kind: "forwarded",
+      attempts: 2,
+      response: { status: 200, accepted: true },
+    });
+  });
+
+  it("counts a duplicate on the retry after an unreadable 2xx as delivered (#2514 review)", async () => {
+    // The first 200 may already have written; the idempotent upsert then
+    // answers the retry with accepted:false, inserted:0, skipped_duplicate:n.
+    const unreadable200 = () =>
+      new Response(
+        new ReadableStream({
+          pull(c) {
+            c.error(new Error("body timed out"));
+          },
+        }),
+        { status: 200 },
+      );
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      return calls === 1
+        ? unreadable200()
+        : new Response('{"accepted":false,"inserted":0,"skipped_duplicate":1}', { status: 200 });
+    });
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: { ...NO_SLEEP, maxRetries: 1 },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(out).toMatchObject({
+      kind: "forwarded",
+      attempts: 2,
+      deliveredAs: "duplicate_on_retry",
+      response: { status: 200, inserted: 0, skipped_duplicate: 1 },
+    });
+    expect(onceExitCode(out)).toBe(0);
+  });
+
+  it("keeps a first-attempt duplicate as not accepted", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response('{"accepted":false,"inserted":0,"skipped_duplicate":1}', { status: 200 }),
+    );
+    const out = await handleMessage({
+      text: GATEWAY_MESSAGE,
+      flags: flags({ live: true }),
+      env: LIVE_ENV,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      retry: { ...NO_SLEEP, maxRetries: 1 },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(out).not.toHaveProperty("deliveredAs");
+    expect(onceExitCode(out)).toBe(1);
   });
 
   it("stops after the retry budget when every 2xx body is unreadable", async () => {
@@ -2815,5 +2921,28 @@ describe("loadMqttModule pins MQTT.js", () => {
     const importMqtt = vi.fn(async () => ({}));
     expect(await loadMqttModule(() => null, importMqtt)).toBeNull();
     expect(importMqtt).not.toHaveBeenCalled();
+  });
+});
+
+describe("missing mqtt package (#2514 review)", () => {
+  it("exits through the injected exit, not process.exit", async () => {
+    const exit = vi.fn();
+    const processExit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await main(
+        ["--mqtt-url", "mqtt://127.0.0.1:1883", "--topic", "ecowitt/test"],
+        {},
+        { connect: (f, e) => connectMqtt(f, e, async () => null), exit },
+      );
+      expect(processExit).not.toHaveBeenCalled();
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(errorSpy.mock.calls.flat().join(" ")).toContain("mqtt package not installed");
+    } finally {
+      processExit.mockRestore();
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });

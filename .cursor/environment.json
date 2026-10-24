@@ -1,3 +1,4 @@
 {
-  "install": "bun install --frozen-lockfile\nnpx --yes playwright install chromium"
+  "install": "set -euo pipefail\nexport PATH=\"/usr/local/bin:${HOME}/.bun/bin:${PATH}\"\nif ! /usr/local/bin/node -e 'const [M,m,p]=process.versions.node.split(\".\").map(Number); if (M<22||(M===22&&(m<22||(m===22&&p<1)))) process.exit(1)' >/dev/null 2>&1; then\n  curl -fsSL \"https://nodejs.org/dist/v22.22.2/node-v22.22.2-linux-x64.tar.xz\" | sudo tar -xJ -C /usr/local --strip-components=1\nfi\nif ! command -v bun >/dev/null 2>&1; then\n  curl -fsSL https://bun.sh/install | bash\nfi\nif [ ! -x /usr/local/bin/bun ]; then\n  sudo ln -sf \"${HOME}/.bun/bin/bun\" /usr/local/bin/bun\nfi\nhash -r\nprintf '%s\\n' 'registry=https://registry.npmjs.org/' > .npmrc.tmp\nnpm_config_userconfig=\"${PWD}/.npmrc.tmp\" npm ci --no-audit --no-fund\nrm -f .npmrc.tmp\nnpx playwright install chromium\n",
+  "start": "set -euo pipefail\nexport PATH=\"/usr/local/bin:${HOME}/.bun/bin:${PATH}\"\nif curl -sf -o /dev/null --max-time 2 http://127.0.0.1:8080/; then\n  exit 0\nfi\nexec bun run dev -- --host 127.0.0.1 --port 8080\n"
 }

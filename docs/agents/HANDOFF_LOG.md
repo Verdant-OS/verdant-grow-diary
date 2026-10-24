@@ -45,6 +45,27 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### BRAND-IDENTITY-20261023
+
+```text
+TASK BRAND-IDENTITY-20261023  priority: other  status: OPEN
+goal: Link Verdant Grow Diary's application JSON-LD to its existing organization and describe the indoor Grow OS accurately; no claim that this fixes an unmeasured AI answer.
+branch: codex/brand-identity-20261023-app-publisher
+base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79, freshly verified 2026-10-23 UTC
+checkout: git fetch origin codex/brand-identity-20261023-app-publisher verdant-grow-diary && git switch codex/brand-identity-20261023-app-publisher && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2507 (draft; opened before implementation)
+head_sha: fb471c4531b5f3175e23a35f2c7880fe82a5e3be (remote ownership checkpoint); this implementation commit follows it. Read the PR for the resulting full implementation head; this commit cannot record its own SHA.
+state: Application publisher/description correction implemented. New root-head JSON-LD regression: RED 2 failed / 1 passed before the fix; GREEN plus related SEO suites 31 passed / 14 legacy tests skipped / 0 failed across 5 files. Scoped lint/format, docs safety and strict scorer report PASS. Full-project tsc --noEmit PASS with a 6 GB heap after the default 2 GB heap exhausted; no config/dependency/lockfile change. Codex peer review has zero P1/P2 and is not independent acceptance. GitHub transport publishes the locally hooked tree because shell Git cannot authenticate; verify tree equality rather than equating the local and API-created commit IDs.
+next_action: Read the resulting full PR head and current CI, then obtain eligible outside exact-head acceptance. Stay draft; no integration or production action.
+files: src/lib/build/siteSoftwareApplicationJsonLd.ts (publisher reference and description only); src/test/site-application-identity.test.ts (new); docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Matthew explicitly assigned Codex the narrow correction despite the #2028/#2023 overlap in this chat on 2026-10-23. Existing Claude branches and broader work remain untouched. #2028 at 334a9f1b657da2a5b899782bc85ea6c8c415bb2b changes a comment in the application module; preserve that independent change when integrating. No shared live-session registry is available. GitHub comments still require separate approval, so no claim/renewal comment is posted.
+artifacts: Draft #2507 records the owner assignment and exact-head evidence. Local identity-red.log / identity-green.log / identity-typecheck*.log are under /workspace/scratch/62688fa4f4c6/. Earlier investigation identified homegrown.guide from Helena's detailed email; actual AI substitution remains NOT_MEASURED.
+reviewer_seat: BLOCKED — eligible non-contributing Claude/Grok session not yet assigned; Codex contributors cannot independently accept this work
+claimed_by: Codex brand-identity session, Matthew's direct narrow assignment 2026-10-23; no takeover of Claude's tasks
+last_updated: 2026-10-23 23:15 UTC, by Codex brand-identity session
+limits: Stay draft. No merge, ready/enqueue, deployment, production write, GitHub comment, root-route/canonical/offer/pricing change, competitor identity claim, sameAs addition, locked-test edit or dependency/lockfile change.
+```
+
 ### REVIEWER-ROUTING-20261022
 
 ```text

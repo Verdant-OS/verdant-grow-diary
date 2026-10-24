@@ -49,7 +49,8 @@ $env:VERDANT_BRIDGE_TOKEN="vbt_..."   # paste only into this window, never into 
 bun run dev:ecowitt-forwarder:live -- --once
 ```
 
-`--once` exits `0` for a dry run or an `accepted: true` forward, `1` otherwise.
+`--once` exits `0` for a dry run, an `accepted: true` forward, or a duplicate on the
+retry after an unreadable `2xx` (see below), and `1` otherwise.
 The outcome is printed to the console, redacted. The forwarder writes no files;
 an earlier version's `--write-report` option is gone and is now refused as an
 unknown argument. A report file an earlier run left in `tmp/` is not touched.
@@ -67,9 +68,16 @@ unknown argument. A report file an earlier run left in `tmp/` is not touched.
   `error: "insert_failed"` (the write is an idempotent upsert) or
   `reason: "tent_lookup_failed"` (nothing was written yet) is retried the same way. 4xx auth and payload errors and the other `200` reasons, such as
   `timestamp_stale`, are final.
+- A `429` with a whole-seconds `Retry-After` waits that long (capped at 45 s)
+  instead of the jittered delay; any other `Retry-After` value falls back to Full Jitter.
 - `--once` exits `0` only for a dry run or a `2xx` response with
-  `accepted: true`; a broker connect timeout (20 s), broker error or rejected
-  subscription exits `2` instead of hanging.
+  `accepted: true`. One exception: when an earlier attempt got a `2xx` whose body
+  could not be read, a retry answered with `accepted: false`, `inserted: 0` and
+  `skipped_duplicate` above 0 means the first attempt's write landed. It is
+  logged as `deliveredAs: "duplicate_on_retry"` and exits `0`. A duplicate on
+  the first attempt still exits `1`. A broker connect timeout (20 s), broker
+  error, rejected subscription or missing `mqtt` package exits `2` instead of
+  hanging.
 - The summary echoes only checked fields. `dateutc` must be the EcoWitt
   `YYYY-MM-DD HH:MM:SS` form `ecowitt-ingest` accepts, or the message is
   rejected (`invalid_dateutc`). Free-form upload strings such as `stationtype`

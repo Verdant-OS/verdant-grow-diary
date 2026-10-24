@@ -267,6 +267,8 @@
     "dev:ecowitt-mqtt:publish-sample": "bun run scripts/dev/ecowitt-mqtt-runner.ts --sample --once",
     "dev:ecowitt-http-bridge": "bun run scripts/dev/ecowitt-http-local-bridge.ts",
     "dev:ecowitt-http-bridge:dry-run": "bun run scripts/dev/ecowitt-http-local-bridge.ts --dry-run",
+    "dev:ecowitt-forwarder": "bun run scripts/dev/ecowitt-ingest-forwarder.ts",
+    "dev:ecowitt-forwarder:live": "bun run scripts/dev/ecowitt-ingest-forwarder.ts --live",
     "dev:ecowitt-doctor": "bun run scripts/dev/ecowitt-windows-doctor.ts",
     "dev:ecowitt-bridge-smoke": "bun run scripts/dev/ecowitt-local-bridge-smoke.ts",
     "dev:ecowitt-fast-path": "bun run scripts/dev/ecowitt-windows-fast-path.ts",

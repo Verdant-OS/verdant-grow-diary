@@ -17,6 +17,10 @@ import {
   type SensorQualityResult,
 } from "@/lib/sensorQuality";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import type {
+  CaptureEvidenceSnapshot,
+  SensorSnapshotRejectedQualityRow,
+} from "@/lib/sensorSnapshotCaptureEvidence";
 import {
   resolveSensorObservationTime,
   type SensorObservationTimeLike,
@@ -52,6 +56,8 @@ export interface DashboardSensorEvidenceRow extends SensorProvenanceRowLike {
   value: unknown;
   quality?: string | null;
   captured_at?: string | null;
+  id?: string | null;
+  device_id?: string | null;
 }
 
 export interface DashboardChartReading {
@@ -99,6 +105,9 @@ function canonicalDashboardSource(source: string): DashboardChartReading["source
   }
 }
 
+/** Raw sources that are themselves a downgrade of the row they label. */
+const REJECTED_SOURCES = new Set(["stale", "invalid"]);
+
 /** Explicit quality flags other than `ok` cannot feed unlabeled telemetry. */
 function hasUsableDashboardQuality(quality: unknown): boolean {
   if (quality == null) return true; // Preserve legacy rows created before quality was exposed.
@@ -131,6 +140,75 @@ export function selectDashboardSensorEvidenceRows<T extends DashboardSensorEvide
 ): T[] {
   if (!Array.isArray(rows)) return [];
   return rows.filter((row) => isDashboardSensorEvidenceRow(row));
+}
+
+/**
+ * Telemetry rows the evidence filter drops for their intake quality (a known
+ * telemetry source, quality not ok) or their explicit stale/invalid source,
+ * never for diagnostic provenance. A
+ * snapshot built from the surviving rows carries these so a fallback
+ * projection can reject their capture the way the raw-row path does (Codex
+ * P1 on #2303 at 0994ea2a).
+ */
+export function selectRejectedQualityRows(
+  rows: readonly DashboardSensorEvidenceRow[] | null | undefined,
+): SensorSnapshotRejectedQualityRow[] {
+  if (!Array.isArray(rows)) return [];
+  const out: SensorSnapshotRejectedQualityRow[] = [];
+  for (const row of rows) {
+    if (!row || typeof row.source !== "string") continue;
+    const source = row.source.trim().toLowerCase();
+    // An explicit stale/invalid source is an authoritative downgrade on the
+    // raw-row path, like a quality flag, so it is carried too (Codex P1 on
+    // #2303 at b2606eca). Its quality names the downgrade when the row's own
+    // quality does not.
+    const explicitSource = REJECTED_SOURCES.has(source);
+    if (!explicitSource && !DASHBOARD_TELEMETRY_SOURCES.has(source)) continue;
+    const qualityRejected = !hasUsableDashboardQuality(row.quality);
+    if (!explicitSource && (typeof row.quality !== "string" || !qualityRejected)) continue;
+    if (withoutDiagnosticSensorRows([row]).length !== 1) continue;
+    const value = row.value;
+    out.push({
+      metric: row.metric,
+      value: typeof value === "number" || typeof value === "string" ? value : null,
+      captured_at: row.captured_at ?? row.ts,
+      source: row.source,
+      quality: qualityRejected && typeof row.quality === "string" ? row.quality : source,
+      ...(typeof row.device_id === "string" && row.device_id.trim()
+        ? { device_id: row.device_id }
+        : {}),
+    });
+  }
+  return out;
+}
+
+/**
+ * The snapshot with the `device_id` of the exact row behind each `metric_refs`
+ * entry, so its capture refs carry the device (owner decision on #2442).
+ */
+export function withMetricDeviceIds<T extends SensorSnapshot>(
+  snapshot: T,
+  rows: readonly { id?: string | null; device_id?: string | null }[] | null | undefined,
+): T & Pick<CaptureEvidenceSnapshot, "metric_device_ids"> {
+  const deviceIds: Record<string, string> = {};
+  for (const [key, ref] of Object.entries(snapshot.metric_refs ?? {})) {
+    const device = (rows ?? []).find((row) => row.id === ref?.id)?.device_id;
+    if (typeof device === "string" && device.trim()) deviceIds[key] = device;
+  }
+  return Object.keys(deviceIds).length > 0
+    ? { ...snapshot, metric_device_ids: deviceIds }
+    : snapshot;
+}
+
+/** The snapshot with `rows`' quality-rejected siblings attached, when there are any. */
+export function withRejectedQualityRows(
+  snapshot: SensorSnapshot | null,
+  rows: readonly DashboardSensorEvidenceRow[] | null | undefined,
+): CaptureEvidenceSnapshot | null {
+  if (!snapshot) return snapshot;
+  const rejected = selectRejectedQualityRows(rows);
+  const withDevices = withMetricDeviceIds(snapshot, rows);
+  return rejected.length > 0 ? { ...withDevices, rejected_quality_rows: rejected } : withDevices;
 }
 
 /**

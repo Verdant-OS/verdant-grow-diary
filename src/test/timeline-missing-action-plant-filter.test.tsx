@@ -393,6 +393,18 @@ describe("Timeline next missing action follows the plant filter", () => {
     expect((scrollIntoView.mock.contexts[0] as HTMLElement).id).toBe("timeline-entry-a-feed-3");
   });
 
+  it("hides plant B's suggestion once the filter moves to plant A", async () => {
+    mockTwoPlantRhythms();
+    renderTimeline(`/timeline?plantId=${PLANT_B}`);
+    expect(await clickNextMissingAction()).toMatch(/feeding/i);
+    fireEvent.change(screen.getByTestId("timeline-plant-filter"), {
+      target: { value: PLANT_A },
+    });
+    await waitFor(() =>
+      expect(screen.queryByTestId("timeline-missing-action-banner")).not.toBeInTheDocument(),
+    );
+  });
+
   it("reads every plant when no plant is filtered", async () => {
     mockTwoPlantRhythms();
     renderTimeline("/timeline");

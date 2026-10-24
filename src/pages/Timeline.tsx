@@ -696,7 +696,16 @@ export default function Timeline() {
     const v = searchParams.get(TIMELINE_END_DATE_PARAM);
     return isTimelineDateFilterValue(v) ? v : "";
   });
-  const [missingAction, setMissingAction] = useState<MissingActionResult | null>(null);
+  // The suggestion is tagged with the plant/tent scope it was computed for and
+  // only shown while that scope is active, so switching the filter never
+  // leaves one plant's gap above another plant's history.
+  const [missingAction, setMissingAction] = useState<{
+    scope: string;
+    result: MissingActionResult;
+  } | null>(null);
+  const missingActionScope = `${plantFilter}|${tentFilter}`;
+  const visibleMissingAction =
+    missingAction?.scope === missingActionScope ? missingAction.result : null;
 
   // Push date-range state → URL whenever it diverges (mirrors the
   // sensorSources param sync above).
@@ -1765,7 +1774,7 @@ export default function Timeline() {
   // decides; Verdant only points at the grower's own history.
   function handleFindMissingAction() {
     const result = findNextMissingAction(scopedRecentLaneRawEntries, new Date());
-    setMissingAction(result);
+    setMissingAction({ scope: missingActionScope, result });
     if (result.status === "found") {
       const targetId = findNewestEntryIdForCategory(
         scopedHistoryEntries,
@@ -2467,16 +2476,16 @@ export default function Timeline() {
             </Link>
           </p>
         )}
-        {missingAction && (
+        {visibleMissingAction && (
           <div
             role="status"
             data-testid="timeline-missing-action-banner"
             className="rounded-xl border border-border/50 bg-secondary/30 p-3 space-y-1"
           >
             <p className="text-sm">
-              {missingAction.status === "found"
-                ? buildMissingActionCopy(missingAction.suggestion)
-                : missingAction.status === "nothing_missing"
+              {visibleMissingAction.status === "found"
+                ? buildMissingActionCopy(visibleMissingAction.suggestion)
+                : visibleMissingAction.status === "nothing_missing"
                   ? MISSING_ACTION_NOTHING_MISSING_COPY
                   : MISSING_ACTION_NOT_ENOUGH_HISTORY_COPY}
             </p>

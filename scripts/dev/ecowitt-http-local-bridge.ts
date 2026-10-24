@@ -179,7 +179,7 @@ const defaultPublisherFactory: PublisherFactory = async (flags) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
-    throw new Error("mqtt package not installed. Run `bun add mqtt` or use --dry-run.");
+    throw new Error("mqtt package not installed. Run `bun add --no-save mqtt` or use --dry-run.");
   }
   const client = mqtt.connect(flags.mqttUrl, {
     username: flags.mqttUsername ?? undefined,

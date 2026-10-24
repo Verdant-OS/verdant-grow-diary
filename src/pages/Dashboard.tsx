@@ -1018,7 +1018,7 @@ export default function Dashboard() {
                               <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-medium text-sm">{tent.name}</span>
-                                  <StageBadge stage={tent.stage as Stage} />
+                                  {envStage ? <StageBadge stage={envStage as Stage} /> : null}
                                   {snapView.hasReading && (
                                     <span
                                       data-testid={`dashboard-env-snapshot-source-${tent.id}`}

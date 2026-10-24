@@ -163,8 +163,9 @@ export default function TentDetail() {
   // Stage for the environment chips, VPD hint, stage-missing badge and
   // stability card. Resolved like the Sensors page and the scoped Dashboard's
   // single-tent view: the tent's grow row, the tent, and the active plants in
-  // it (QA 2026-09-24, BUG-006 follow-up). The stage badge and tent menu still
-  // show the tent's own. Until the tent's grow row and the plant rows are
+  // it (QA 2026-09-24, BUG-006 follow-up). The stage badge shows this
+  // resolved stage and stays hidden while it is unresolved. The tent menu
+  // still shows the tent's own stage. Until the tent's grow row and the plant rows are
   // known, stage grading is withheld (Codex review on #1683).
   const { grows, loading: growsLoading, error: growsError } = useGrows();
   const envStage = resolveTentEnvironmentStage({
@@ -386,7 +387,7 @@ export default function TentDetail() {
         title={tent.name}
         description={formatTentHeaderDescription(tent.brand, tent.size)}
         icon={<Box className="h-5 w-5" />}
-        actions={<StageBadge stage={tent.stage} />}
+        actions={envStage ? <StageBadge stage={envStage} /> : null}
       />
 
       <GrowDataSourceDisclosure

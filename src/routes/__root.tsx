@@ -45,7 +45,7 @@ const SITE_DESCRIPTION =
   "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
 const SITE_IMAGE = `${SITE_URL}/brand/verdant-logo-512.png`;
 const FONT_HREF =
-  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap";
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap";
 
 /**
  * Sitewide Organization + WebSite JSON-LD, carried over verbatim from the

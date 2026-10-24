@@ -38,6 +38,7 @@ import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import {
   QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
   QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
+  QUICK_LOG_FAB_SIDE_CLEARANCE_CLASS,
 } from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -443,7 +444,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             ) : (
               <div
                 data-testid="app-shell-page-content"
-                className={QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS}
+                className={`${QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS} ${QUICK_LOG_FAB_SIDE_CLEARANCE_CLASS}`}
               >
                 <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
                   {pageContent}

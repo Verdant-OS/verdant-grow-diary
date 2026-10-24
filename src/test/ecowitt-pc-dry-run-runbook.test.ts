@@ -35,10 +35,18 @@ describe("docs/integrations/ecowitt-pc-dry-run-runbook.md", () => {
     expect(section).toMatch(/Get-Service mosquitto/);
     expect(section).toMatch(/netstat -ano \| findstr :1883/);
     expect(section).toMatch(/systemctl is-active mosquitto/);
-    expect(section).toMatch(/ss -ltn \| grep 1883/);
+    expect(section).toMatch(/ss -ltn 'sport = :1883'/);
     expect(section).toMatch(/lsof -iTCP:1883 -sTCP:LISTEN/);
     expect(section).toMatch(/listener 1883 127\.0\.0\.1/);
+    expect(section).toMatch(/\$env:TEMP\\verdant-mosquitto\.conf/);
+    expect(section).toMatch(/mosquitto\.exe" -v -c "\$env:TEMP\\verdant-mosquitto\.conf"/);
     expect(section).toMatch(/mosquitto -v -c \/tmp\/verdant-mosquitto-local\.conf/);
+    const winget = section.indexOf("winget install EclipseFoundation.Mosquitto");
+    const windowsManual = section.indexOf("$env:TEMP\\verdant-mosquitto.conf");
+    expect(winget).toBeGreaterThan(-1);
+    expect(windowsManual).toBeGreaterThan(winget);
+    expect(section.slice(winget, windowsManual)).toMatch(/```/);
+    expect(section.slice(0, windowsManual)).not.toMatch(/mosquitto\.exe" -v -c/);
     expect(section.indexOf("sudo apt-get update")).toBeLessThan(
       section.indexOf("brew install mosquitto"),
     );
@@ -74,7 +82,8 @@ describe("docs/integrations/ecowitt-pc-dry-run-runbook.md", () => {
     expect(RUNBOOK).toMatch(/NOT[\s\S]{0,80}require `VERDANT_BRIDGE_TOKEN`/);
   });
 
-  it("stops a Debian mosquitto service the install started", () => {
+  it("stops a Debian mosquitto service only when this dry run installed it", () => {
+    expect(RUNBOOK).toMatch(/only if you installed Mosquitto for this/);
     expect(RUNBOOK).toMatch(/sudo systemctl disable --now mosquitto/);
   });
 });

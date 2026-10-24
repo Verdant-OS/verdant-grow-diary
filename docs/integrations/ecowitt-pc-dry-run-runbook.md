@@ -46,21 +46,13 @@ consumer. Those clients connect to `127.0.0.1:1883`. If nothing is
 listening there, the bridge exits with `ECONNREFUSED`.
 
 Windows — install the broker, then check whether it is already
-listening before starting another copy. The installer often registers a
-service. Run `mosquitto.exe` only when `Get-Service` is not `Running`
-and `findstr` prints nothing:
+listening. The installer often registers a service. Do not start
+`mosquitto.exe` in this step:
 
 ```powershell
 winget install EclipseFoundation.Mosquitto
 Get-Service mosquitto
 netstat -ano | findstr :1883
-# only when 1883 is free:
-cd "C:\Program Files\mosquitto"
-@"
-listener 1883 127.0.0.1
-allow_anonymous true
-"@ | Set-Content -Encoding ascii .\verdant-mosquitto-local.conf
-.\mosquitto.exe -v -c .\verdant-mosquitto-local.conf
 ```
 
 Debian/Ubuntu — `apt-get install` starts the `mosquitto` service and
@@ -69,7 +61,7 @@ binds port 1883. Check that before any manual start:
 ```bash
 sudo apt-get update && sudo apt-get install -y mosquitto mosquitto-clients
 systemctl is-active mosquitto
-ss -ltn | grep 1883
+ss -ltn 'sport = :1883'
 ```
 
 macOS (Homebrew) — check for a listener before starting another broker:
@@ -77,6 +69,18 @@ macOS (Homebrew) — check for a listener before starting another broker:
 ```bash
 brew install mosquitto
 lsof -iTCP:1883 -sTCP:LISTEN
+```
+
+Windows manual start, only when `Get-Service mosquitto` is not `Running`
+and `findstr` printed nothing. Write the config under `$env:TEMP`, not
+under `C:\Program Files\mosquitto`:
+
+```powershell
+@"
+listener 1883 127.0.0.1
+allow_anonymous true
+"@ | Set-Content -Encoding ascii "$env:TEMP\verdant-mosquitto.conf"
+& "C:\Program Files\mosquitto\mosquitto.exe" -v -c "$env:TEMP\verdant-mosquitto.conf"
 ```
 
 Manual start, Linux or macOS, only when those checks show nothing
@@ -225,8 +229,9 @@ Press Ctrl+C in each terminal you opened: the dry-run consumer (it also
 exits on its own after one message), the HTTP bridge, the Mosquitto
 subscriber, and `mosquitto -v -c` if you started the broker yourself.
 
-On Debian/Ubuntu the install starts a `mosquitto` service. Stop and
-disable it when you are done with this dry run:
+On Debian/Ubuntu, run this only if you installed Mosquitto for this
+dry run and do not already use that service. Leave an existing broker
+alone:
 
 ```bash
 sudo systemctl disable --now mosquitto
@@ -326,7 +331,7 @@ reachable on mqtt://127.0.0.1:1883`. Mosquitto is not running or
    ```bash
    # Debian/Ubuntu
    systemctl is-active mosquitto
-   ss -ltn | grep 1883
+   ss -ltn 'sport = :1883'
    # macOS
    lsof -iTCP:1883 -sTCP:LISTEN
    ```

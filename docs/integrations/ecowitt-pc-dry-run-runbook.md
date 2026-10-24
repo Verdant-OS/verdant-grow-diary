@@ -45,29 +45,56 @@ Start the broker before any subscriber, the HTTP bridge, or the dry-run
 consumer. Those clients connect to `127.0.0.1:1883`. If nothing is
 listening there, the bridge exits with `ECONNREFUSED`.
 
-Windows — install the broker, then start it only if port 1883 is not
-already taken (the installer often registers a service):
+Windows — install the broker, then check whether it is already
+listening before starting another copy. The installer often registers a
+service. Run `mosquitto.exe` only when `Get-Service` is not `Running`
+and `findstr` prints nothing:
 
 ```powershell
 winget install EclipseFoundation.Mosquitto
+Get-Service mosquitto
+netstat -ano | findstr :1883
+# only when 1883 is free:
 cd "C:\Program Files\mosquitto"
-.\mosquitto.exe -v -p 1883
+@"
+listener 1883 127.0.0.1
+allow_anonymous true
+"@ | Set-Content -Encoding ascii .\verdant-mosquitto-local.conf
+.\mosquitto.exe -v -c .\verdant-mosquitto-local.conf
 ```
 
-Linux (Debian/Ubuntu) and macOS (Homebrew). The manual start listens on
-port 1883 for clients on this machine, including `127.0.0.1`:
+Debian/Ubuntu — `apt-get install` starts the `mosquitto` service and
+binds port 1883. Check that before any manual start:
 
 ```bash
-# Debian/Ubuntu. Skip the manual start if a service is already listening on 1883.
 sudo apt-get update && sudo apt-get install -y mosquitto mosquitto-clients
-# macOS
+systemctl is-active mosquitto
+ss -ltn | grep 1883
+```
+
+macOS (Homebrew) — check for a listener before starting another broker:
+
+```bash
 brew install mosquitto
-mosquitto -v -p 1883
+lsof -iTCP:1883 -sTCP:LISTEN
+```
+
+Manual start, Linux or macOS, only when those checks show nothing
+listening on 1883. The config binds the broker to localhost:
+
+```bash
+cat > /tmp/verdant-mosquitto-local.conf <<'EOF'
+listener 1883 127.0.0.1
+allow_anonymous true
+EOF
+mosquitto -v -c /tmp/verdant-mosquitto-local.conf
 ```
 
 Leave that terminal open. Verbose logs should include
-`Opening ipv4 listen socket on port 1883`. Do not point this broker at a
-production host.
+`Opening ipv4 listen socket on port 1883`. `ss` (or `lsof`) should show
+`127.0.0.1:1883`, not `0.0.0.0:1883`. Do not point this broker at a
+production host. `allow_anonymous true` is only for this localhost
+listener with no password; it is not a remote broker.
 
 ### Before you start — install the MQTT client without touching tracked files
 
@@ -196,8 +223,14 @@ fail-closed results, not a broken dry run.
 
 Press Ctrl+C in each terminal you opened: the dry-run consumer (it also
 exits on its own after one message), the HTTP bridge, the Mosquitto
-subscriber, and `mosquitto -v` if you started the broker yourself. Leave
-an already-running Mosquitto service alone.
+subscriber, and `mosquitto -v -c` if you started the broker yourself.
+
+On Debian/Ubuntu the install starts a `mosquitto` service. Stop and
+disable it when you are done with this dry run:
+
+```bash
+sudo systemctl disable --now mosquitto
+```
 
 `tmp/` is ignored. The redacted report at
 `tmp/ecowitt-last-ingest-report.json` stays on disk until you delete it
@@ -288,6 +321,14 @@ reachable on mqtt://127.0.0.1:1883`. Mosquitto is not running or
    ```powershell
    netstat -ano | findstr :1883
    netstat -ano | findstr :8080
+   ```
+
+   ```bash
+   # Debian/Ubuntu
+   systemctl is-active mosquitto
+   ss -ltn | grep 1883
+   # macOS
+   lsof -iTCP:1883 -sTCP:LISTEN
    ```
 
 4. **Re-run the doctor** — confirm recommended LAN IPv4 and Mosquitto

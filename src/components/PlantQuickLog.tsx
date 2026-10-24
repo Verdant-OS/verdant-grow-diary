@@ -38,6 +38,10 @@ import {
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
 import {
+  PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER,
+  plantQuickLogEcError,
+} from "@/lib/plantQuickLogSensorInputRules";
+import {
   computeChronologyDelta,
   type ChronologyDelta,
 } from "@/lib/manualSensorChronologyDeltaRules";
@@ -56,9 +60,30 @@ import {
   applyQuickLogActionChip,
   applyResponseCheck,
   hasResponseCheck,
+  isPhotoOnlyQuickLogNote,
   type QuickLogActionChip,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
+import {
+  createQuickLogPhotoDiaryEntry,
+  hasConfirmedQuickLogPhotoDiaryEntryForOwner,
+} from "@/lib/quickLogPhotoDiaryEntry";
+import {
+  fileClaimsPng,
+  inspectQuickLogPngClaimNow,
+  validateQuickLogPngClaim,
+} from "@/lib/quickLogPhotoContentRules";
+import {
+  QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT,
+  claimQuickLogPhotoAttachmentRecoveryLock,
+  completeQuickLogPhotoAttachmentAttempt,
+  getQuickLogPhotoAttachmentRecoveryRecord,
+  hasQuickLogPhotoAttachmentRecoveryLock,
+  recordQuickLogPhotoAttachmentRecoveryLock,
+  releaseQuickLogPhotoAttachmentRecoveryLockForEntry,
+} from "@/lib/quickLogPhotoAttachmentRecovery";
+import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
@@ -91,7 +116,24 @@ interface Props {
 }
 
 const EMPTY_SENSORS: QuickLogSensorInput = { temp: "", humidity: "", ph: "", ec: "" };
+
+/** One Photo only submission, captured when Save is pressed. */
+interface PhotoOnlyAttempt {
+  scope: { ownerId: string; growId: string; tentId: string | null; plantId: string };
+  entryId: string;
+  path: string;
+  file: File;
+  note: string;
+  /** True when `path` was uploaded by this attempt and no insert references it yet. */
+  freshUpload: boolean;
+}
 const SAVE_DETAIL_HELPER = "You can add more detail later from the timeline.";
+const PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE =
+  "Could not confirm the photo attachment; it may still appear in history.";
+// Photo only needs the browser-session fence before anything is uploaded or
+// inserted. Without it, an unmount and remount could save the photo twice.
+const PHOTO_FENCE_UNAVAILABLE_MESSAGE =
+  "Verdant could not reserve this photo save in this browser, so nothing was saved. Allow site storage and try again, or add a note to save the photo with your log.";
 
 function buildTimelineNote(rawNote: string, hasPhoto: boolean, hasManualReadings: boolean): string {
   const note = rawNote.trim();
@@ -149,6 +191,13 @@ export default function PlantQuickLog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photoAttachmentUnconfirmed, setPhotoAttachmentUnconfirmed] = useState(false);
+  const [photoChecking, setPhotoChecking] = useState(false);
+  const photoValidationGenerationRef = useRef(0);
+  const photoOnlyAttemptRef = useRef<{ entryId: string; path: string; file: File } | null>(null);
+  // True while this sheet is locked only because the session fence for its
+  // target is held (by an earlier or other attempt). Other locks, such as a
+  // confirmed save whose photo patch failed, never clear from fence changes.
+  const sessionFenceLockedRef = useRef(false);
 
   useEffect(() => {
     // A draft and its asynchronous save belong to one owner, target and open
@@ -157,17 +206,100 @@ export default function PlantQuickLog({
     saveInFlightRef.current = false;
     saveKeyRef.current = null;
     pendingPhotoSaveRef.current = null;
+    photoOnlyAttemptRef.current = null;
+    photoValidationGenerationRef.current += 1;
     setPhotoFile(null);
     setPhotoPreview(null);
     setNote("");
     setSensors(EMPTY_SENSORS);
     setError(null);
     setBusy(false);
-    setPhotoAttachmentUnconfirmed(false);
+    setPhotoChecking(false);
+    const recoveryLocked = hasQuickLogPhotoAttachmentRecoveryLock({
+      ownerId: user?.id ?? null,
+      growId,
+      tentId: tentId ?? null,
+      plantId,
+    });
+    sessionFenceLockedRef.current = recoveryLocked;
+    setPhotoAttachmentUnconfirmed(recoveryLocked);
+    if (recoveryLocked) {
+      setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
+    }
     if (fileRef.current) fileRef.current.value = "";
     if (libraryFileRef.current) libraryFileRef.current.value = "";
     return () => {
       saveContextRevisionRef.current += 1;
+    };
+  }, [open, user?.id, plantId, growId, tentId]);
+
+  // When the exact owner-scoped diary row is readable, clear the session
+  // photo lock and release Save for this plant.
+  useEffect(() => {
+    if (!open) return;
+    const scope = {
+      ownerId: user?.id ?? null,
+      growId,
+      tentId: tentId ?? null,
+      plantId,
+    };
+    const recovery = getQuickLogPhotoAttachmentRecoveryRecord(scope);
+    const ownerId = scope.ownerId;
+    if (!recovery?.diaryEntryId || typeof ownerId !== "string" || ownerId.trim() === "") return;
+
+    let active = true;
+    const entryId = recovery.diaryEntryId;
+    void hasConfirmedQuickLogPhotoDiaryEntryForOwner(ownerId, entryId).then((confirmed) => {
+      if (!active || !confirmed) return;
+      // Settle only this exact attempt, and never clear a different attempt's
+      // claim. The save's own response settles through the same gate, so
+      // whichever path is first announces the row and the other does not.
+      const announce = completeQuickLogPhotoAttachmentAttempt(scope, entryId);
+      const stillLocked = hasQuickLogPhotoAttachmentRecoveryLock(scope);
+      sessionFenceLockedRef.current = stillLocked;
+      setPhotoAttachmentUnconfirmed(stillLocked);
+      if (!stillLocked) {
+        setError((current) => (current === PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE ? null : current));
+      }
+      if (!announce) return;
+      dispatchQuickLogV2EntryCreated({
+        createdAt: new Date().toISOString(),
+        growEventId: null,
+        source: "quick_log_v2",
+        activityId: "photo",
+      });
+      trackQuickLogSuccess("photo", { reused: false });
+    });
+    return () => {
+      active = false;
+    };
+  }, [open, user?.id, plantId, growId, tentId]);
+
+  // A sheet locked by the session fence re-checks it whenever a fence is
+  // released in this page. When the original save settles after this sheet's
+  // one-shot lookup missed (the insert was still pending), Save is restored
+  // without a close/reopen. The original save's own path announces the row.
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    const scope = {
+      ownerId: user?.id ?? null,
+      growId,
+      tentId: tentId ?? null,
+      plantId,
+    };
+    const onRecoveryChanged = () => {
+      if (!sessionFenceLockedRef.current) return;
+      if (hasQuickLogPhotoAttachmentRecoveryLock(scope)) return;
+      sessionFenceLockedRef.current = false;
+      setPhotoAttachmentUnconfirmed(false);
+      setError((current) => (current === PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE ? null : current));
+    };
+    window.addEventListener(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT, onRecoveryChanged);
+    return () => {
+      window.removeEventListener(
+        QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_CHANGED_EVENT,
+        onRecoveryChanged,
+      );
     };
   }, [open, user?.id, plantId, growId, tentId]);
 
@@ -209,11 +341,13 @@ export default function PlantQuickLog({
     [sensors, tempUnit],
   );
   const hasManualReadings = !!buildManualSensorSnapshot(sensorsForPayload);
+  const ecError = plantQuickLogEcError(sensors.ec);
   const hasPhoto = !!photoFile;
   const hasPlantResponseCheck = hasResponseCheck(note);
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
   const hasAnyContent = timelineNote.trim().length > 0;
-  const canSave = hasAnyContent && !busy && !photoAttachmentUnconfirmed && !!growId;
+  const canSave =
+    hasAnyContent && !ecError && !busy && !photoAttachmentUnconfirmed && !photoChecking && !!growId;
 
   const saveHelper = !growId
     ? "Missing grow context. This plant needs a grow before saving."
@@ -223,13 +357,15 @@ export default function PlantQuickLog({
         ? "Saving this log to the timeline…"
         : !hasAnyContent
           ? "Tap what changed, add a photo, or add a manual reading."
-          : hasPlantResponseCheck
-            ? "Ready to save this plant response follow-up."
-            : hasPhoto
-              ? "Ready to save this photo and log to the timeline."
-              : hasManualReadings
-                ? "Ready to save these manual readings to the timeline."
-                : "Ready to save what changed to the timeline.";
+          : ecError
+            ? PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER
+            : hasPlantResponseCheck
+              ? "Ready to save this plant response follow-up."
+              : hasPhoto
+                ? "Ready to save this photo and log to the timeline."
+                : hasManualReadings
+                  ? "Ready to save these manual readings to the timeline."
+                  : "Ready to save what changed to the timeline.";
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
@@ -243,6 +379,7 @@ export default function PlantQuickLog({
     // close, which is the only other thing that clears the key.
     saveKeyRef.current = null;
     pendingPhotoSaveRef.current = null;
+    photoOnlyAttemptRef.current = null;
     setPhotoFile(null);
     setPhotoPreview(null);
     setNote("");
@@ -264,6 +401,9 @@ export default function PlantQuickLog({
       // An uncertain prior upload may already be referenced; never delete it.
       saveKeyRef.current = null;
       pendingPhotoSaveRef.current = null;
+      if (photoOnlyAttemptRef.current && photoOnlyAttemptRef.current.file !== file) {
+        photoOnlyAttemptRef.current = null;
+      }
     }
     setPhotoFile(file);
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
@@ -272,9 +412,49 @@ export default function PlantQuickLog({
 
   function handlePhotoInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0] ?? null;
-    if (!file) return;
-    handleFileSelected(file);
     e.currentTarget.value = "";
+    if (!file) return;
+    if (!fileClaimsPng(file)) {
+      photoValidationGenerationRef.current += 1;
+      setPhotoChecking(false);
+      handleFileSelected(file);
+      return;
+    }
+    const immediate = inspectQuickLogPngClaimNow(file);
+    if (immediate) {
+      photoValidationGenerationRef.current += 1;
+      setPhotoChecking(false);
+      if (!immediate.ok) {
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setError(immediate.message);
+        return;
+      }
+      handleFileSelected(file);
+      return;
+    }
+    const generation = photoValidationGenerationRef.current + 1;
+    photoValidationGenerationRef.current = generation;
+    setPhotoChecking(true);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setError(null);
+    void validateQuickLogPngClaim(file).then(
+      (claim) => {
+        if (generation !== photoValidationGenerationRef.current) return;
+        setPhotoChecking(false);
+        if (!claim.ok) {
+          setError(claim.message);
+          return;
+        }
+        handleFileSelected(file);
+      },
+      () => {
+        if (generation !== photoValidationGenerationRef.current) return;
+        setPhotoChecking(false);
+        setError("That photo could not be read. Try a different file.");
+      },
+    );
   }
 
   function clearPhoto() {
@@ -298,7 +478,19 @@ export default function PlantQuickLog({
   }
 
   async function handleSave() {
-    if (busy || saveInFlightRef.current || photoAttachmentUnconfirmed) return;
+    if (
+      busy ||
+      saveInFlightRef.current ||
+      photoAttachmentUnconfirmed ||
+      hasQuickLogPhotoAttachmentRecoveryLock({
+        ownerId: user?.id ?? null,
+        growId,
+        tentId: tentId ?? null,
+        plantId,
+      })
+    ) {
+      return;
+    }
     blurActiveElement();
     setError(null);
 
@@ -311,6 +503,9 @@ export default function PlantQuickLog({
       setError("Add what changed, a photo, or a reading before saving.");
       return;
     }
+
+    // #2159: the inline EC error names the field; never save a negative EC.
+    if (ecError) return;
 
     if (photoFile && !user) {
       setError("Sign in to attach photos.");
@@ -338,12 +533,64 @@ export default function PlantQuickLog({
     const pending = pendingPhotoSaveRef.current;
     const retry =
       pending?.key === resolvedSaveKey.state.key && pending.file === photoFile ? pending : null;
-    let uploadedPath: string | null = retry?.path ?? null;
+    const photoOnly =
+      !!photoFile && !!user && !hasManualReadings && isPhotoOnlyQuickLogNote(timelineNote);
+    const retainedPhotoOnly =
+      photoOnly && photoOnlyAttemptRef.current?.file === photoFile
+        ? photoOnlyAttemptRef.current
+        : null;
+    let photoOnlyEntryId = retainedPhotoOnly?.entryId ?? null;
+    if (photoOnly && !photoOnlyEntryId) {
+      const minted = globalThis.crypto?.randomUUID?.();
+      photoOnlyEntryId = typeof minted === "string" && minted.trim() !== "" ? minted : null;
+    }
+    let uploadedPath: string | null = retry?.path ?? retainedPhotoOnly?.path ?? null;
     // A later rejection cannot disprove an earlier uncertain commit.
-    let cleanupAllowed = !retry;
+    let cleanupAllowed = !retry && !retainedPhotoOnly;
     let saveConfirmed = false;
+    const photoOnlyScope =
+      photoOnly && user ? { ownerId: user.id, growId, tentId: tentId ?? null, plantId } : null;
+    // Set once this attempt holds the session fence before its upload. Until
+    // the insert starts, no diary row can exist for this id, so a stop before
+    // then releases the claim (persistPhotoOnlyEntry owns it after that).
+    let photoOnlyEarlyClaim = false;
+    let photoOnlyInsertStarted = false;
+    const releaseEarlyPhotoOnlyClaim = () => {
+      if (!photoOnlyEarlyClaim || photoOnlyInsertStarted || !photoOnlyScope || !photoOnlyEntryId) {
+        return;
+      }
+      photoOnlyEarlyClaim = false;
+      releaseQuickLogPhotoAttachmentRecoveryLockForEntry(photoOnlyScope, photoOnlyEntryId);
+    };
     try {
-      if (photoFile && user && !retry) {
+      if (photoOnly && !photoOnlyEntryId) {
+        setError("Verdant could not prepare a safe photo attachment. Refresh and try again.");
+        return;
+      }
+      if (photoOnlyScope && photoOnlyEntryId && !retry && !retainedPhotoOnly) {
+        // Claim the exact scope and id BEFORE uploading, so a sheet remounted
+        // for the same plant mid-upload finds the fence and cannot start a
+        // second upload or insert, however the two attempts interleave.
+        const claim = claimQuickLogPhotoAttachmentRecoveryLock(
+          photoOnlyScope,
+          photoOnlyEntryId,
+          "upload",
+        );
+        if (claim === "held_by_other") {
+          if (!canContinue()) return;
+          sessionFenceLockedRef.current = true;
+          setPhotoAttachmentUnconfirmed(true);
+          setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
+          return;
+        }
+        if (claim !== "claimed") {
+          if (!canContinue()) return;
+          setError(PHOTO_FENCE_UNAVAILABLE_MESSAGE);
+          return;
+        }
+        photoOnlyEarlyClaim = true;
+      }
+      if (photoFile && user && !retry && !retainedPhotoOnly) {
         const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
         const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage
@@ -352,15 +599,36 @@ export default function PlantQuickLog({
             contentType: photoFile.type,
             upsert: false,
           });
-        if (!canContinue()) return;
         if (upErr) {
-          console.error("PlantQuickLog photo upload failed", upErr);
-          setError(
-            "Could not upload the photo, so nothing was saved. Check your connection and try again, or remove the photo and save the log without it.",
-          );
+          releaseEarlyPhotoOnlyClaim();
+          if (canContinue()) {
+            console.error("PlantQuickLog photo upload failed", upErr);
+            setError(
+              "Could not upload the photo, so nothing was saved. Check your connection and try again, or remove the photo and save the log without it.",
+            );
+          }
           return;
         }
         uploadedPath = path;
+        if (!canContinue() && !photoOnly) return;
+      }
+
+      if (uploadedPath && user && photoFile && photoOnly && photoOnlyEntryId) {
+        const freshUpload = cleanupAllowed;
+        cleanupAllowed = false;
+        photoOnlyInsertStarted = true;
+        await persistPhotoOnlyEntry(
+          {
+            scope: { ownerId: user.id, growId, tentId: tentId ?? null, plantId },
+            entryId: photoOnlyEntryId,
+            path: uploadedPath,
+            file: photoFile,
+            note: timelineNote,
+            freshUpload,
+          },
+          canContinue,
+        );
+        return;
       }
 
       // Reuse the first upload and payload together. A reused RPC key returns
@@ -485,7 +753,7 @@ export default function PlantQuickLog({
         );
         return;
       }
-      toast.success("Log saved to timeline.");
+      announceSavedPlantQuickLog();
       resetForm();
       onOpenChange(false);
       onSaved?.();
@@ -510,11 +778,133 @@ export default function PlantQuickLog({
           : `${failure.message} ${failure.recovery}`,
       );
     } finally {
+      // Any stop before the insert (an upload that throws included) leaves no
+      // diary row for this id. A no-op once persistPhotoOnlyEntry owns the claim.
+      releaseEarlyPhotoOnlyClaim();
       if (canContinue()) {
         saveInFlightRef.current = false;
         setBusy(false);
       }
     }
+  }
+
+  // Photo only writes one exact, preallocated diary row (the standalone Photo
+  // activity's path). Every outcome uses the scope captured when Save was
+  // pressed, because the sheet may unmount or switch plants mid-insert.
+  async function persistPhotoOnlyEntry(attempt: PhotoOnlyAttempt, canContinue: () => boolean) {
+    const { scope, entryId, path, file } = attempt;
+    const retainUnconfirmed = (message: string) => {
+      // The session fence survives unmount, close and reload, so a reopened
+      // sheet can neither re-upload nor mint a second diary id.
+      recordQuickLogPhotoAttachmentRecoveryLock(scope, entryId);
+      if (!canContinue()) return;
+      photoOnlyAttemptRef.current = { entryId, path, file };
+      setPhotoAttachmentUnconfirmed(true);
+      setError(message);
+    };
+    // Claim the exact scope and id BEFORE awaiting the insert. A sheet that
+    // unmounts and remounts for the same plant while this insert is pending
+    // then finds the fence and cannot upload or insert a second id.
+    // Normally this attempt already holds the claim from before its upload; the
+    // call then confirms it. Insert only under a durable claim: `unavailable`
+    // (storage could not persist the fence) must not fall through.
+    const claim = claimQuickLogPhotoAttachmentRecoveryLock(scope, entryId, "insert");
+    if (claim !== "claimed") {
+      // Never insert without the fence. No insert has started for this id, so
+      // its own upload reservation (if any) is released; a claim held by
+      // another attempt is left alone. An object this attempt just uploaded
+      // is referenced by nothing, so it alone may be removed.
+      if (claim === "unavailable")
+        releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
+      if (attempt.freshUpload) {
+        await supabase.storage
+          .from("diary-photos")
+          .remove([path])
+          .catch(() => {});
+      }
+      if (!canContinue()) return;
+      if (claim === "held_by_other") {
+        // Another attempt for this exact target is pending or unconfirmed.
+        sessionFenceLockedRef.current = true;
+        setPhotoAttachmentUnconfirmed(true);
+        setError(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
+      } else {
+        setError(PHOTO_FENCE_UNAVAILABLE_MESSAGE);
+      }
+      return;
+    }
+    let entryResult: Awaited<ReturnType<typeof createQuickLogPhotoDiaryEntry>>;
+    try {
+      entryResult = await createQuickLogPhotoDiaryEntry({
+        ownerId: scope.ownerId,
+        growId: scope.growId,
+        tentId: scope.tentId,
+        plantId: scope.plantId,
+        photoPath: path,
+        noteRaw: attempt.note,
+        action: "photo",
+        eventType: "photo",
+        entryId,
+      });
+    } catch {
+      retainUnconfirmed(PHOTO_ATTACHMENT_UNCONFIRMED_MESSAGE);
+      return;
+    }
+    if (!entryResult.ok) {
+      const failure = entryResult as { message: string; ambiguous?: boolean };
+      if (failure.ambiguous) {
+        retainUnconfirmed(failure.message);
+        return;
+      }
+      // Definitive non-commit: no row exists for this id, so release its claim.
+      releaseQuickLogPhotoAttachmentRecoveryLockForEntry(scope, entryId);
+      await supabase.storage
+        .from("diary-photos")
+        .remove([path])
+        .catch(() => {});
+      if (!canContinue()) return;
+      setError(failure.message);
+      return;
+    }
+    // Confirmed: the row is durable whether or not this sheet still shows its
+    // plant. Telemetry, the recent target, the Timeline refresh and the single
+    // entry-created signal therefore run for the captured plant even after an
+    // unmount or target switch; only the sheet's own UI completion is gated.
+    // If a remounted sheet's exact reconciliation already settled this row, it
+    // already sent the success telemetry and entry-created signal; do not send
+    // them a second time, even if the browser refused to remove the fence.
+    const alreadyAnnounced = !completeQuickLogPhotoAttachmentAttempt(scope, entryId);
+    try {
+      if (!alreadyAnnounced) trackQuickLogSuccess("photo", { reused: false });
+      rememberRecentQuickLogTarget(
+        {
+          plantId: scope.plantId,
+          growId: scope.growId,
+          tentId: scope.tentId,
+          savedAt: new Date().toISOString(),
+        },
+        scope.ownerId,
+      );
+      applyQuickLogV2Refresh(queryClient, {
+        targetType: "plant",
+        targetId: scope.plantId,
+        tentId: scope.tentId,
+      });
+      if (!alreadyAnnounced) {
+        window.dispatchEvent(
+          new CustomEvent("verdant:entry-created", {
+            detail: { plantId: scope.plantId, createdAt: new Date().toISOString() },
+          }),
+        );
+      }
+    } catch (err) {
+      console.warn("PlantQuickLog post-save refresh failed", err);
+    }
+    if (!canContinue()) return;
+    announceSavedPlantQuickLog();
+    resetForm();
+    onOpenChange(false);
+    onSaved?.();
   }
 
   return (
@@ -801,6 +1191,7 @@ export default function PlantQuickLog({
                 inputMode="decimal"
                 step="0.01"
                 delta={deltaFor("ec", sensors.ec)}
+                error={ecError}
               />
             </fieldset>
           </section>
@@ -862,9 +1253,20 @@ interface SensorFieldProps {
   inputMode: "decimal" | "numeric";
   step: string;
   delta: ChronologyDelta | null;
+  error?: string | null;
 }
 
-function SensorField({ id, label, value, onChange, inputMode, step, delta }: SensorFieldProps) {
+function SensorField({
+  id,
+  label,
+  value,
+  onChange,
+  inputMode,
+  step,
+  delta,
+  error,
+}: SensorFieldProps) {
+  const errorId = `${id}-error`;
   const deltaTone =
     delta?.direction === "up"
       ? "text-primary"
@@ -886,7 +1288,14 @@ function SensorField({ id, label, value, onChange, inputMode, step, delta }: Sen
         onChange={(e) => onChange(e.target.value)}
         placeholder="—"
         className="text-base"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
       />
+      {error && (
+        <span id={errorId} role="alert" className="text-xs text-destructive">
+          {error}
+        </span>
+      )}
       {delta && (
         <span
           data-testid={`${id}-delta`}
@@ -898,4 +1307,8 @@ function SensorField({ id, label, value, onChange, inputMode, step, delta }: Sen
       )}
     </div>
   );
+}
+
+function announceSavedPlantQuickLog() {
+  toast.success("Log saved to timeline.");
 }

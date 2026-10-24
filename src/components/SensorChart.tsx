@@ -32,6 +32,14 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 
 interface Props {
   data: SensorReading[];
+  /** Optional full dataset for CSV export when the chart plots a subset. Defaults to `data`. */
+  exportData?: SensorReading[];
+  /** Optional map of `tentId` → tent name so multi-tent exports attribute each row to its tent. */
+  tentNamesById?: Readonly<Record<string, string>>;
+  /** Disable CSV export while a contributing reading source is still loading or errored. */
+  exportDisabled?: boolean;
+  /** Tooltip / accessible reason when `exportDisabled` is true. */
+  exportDisabledReason?: string | null;
   metric: "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
   height?: number;
   variant?: "area" | "line";
@@ -49,6 +57,10 @@ interface Props {
 
 export default function SensorChart({
   data,
+  exportData,
+  tentNamesById,
+  exportDisabled = false,
+  exportDisabledReason = null,
   metric,
   height = 220,
   variant = "area",
@@ -71,7 +83,14 @@ export default function SensorChart({
     () => filterTimeSeriesByRange(data, range, (r) => r.ts),
     [data, range],
   );
+  const filteredExportData = useMemo(
+    () => (exportData ? filterTimeSeriesByRange(exportData, range, (r) => r.ts) : filteredData),
+    [exportData, filteredData, range],
+  );
 
+  // A timestamp without a finite value for this metric stays in the data as a
+  // null point, so the line breaks there instead of bridging a period with
+  // no measurement. The legend counts only the finite plotted points.
   const chartData = useMemo(() => {
     return filteredData.map((r) => {
       const raw = r[metric as keyof SensorReading] as number | null | undefined;
@@ -79,12 +98,24 @@ export default function SensorChart({
         metric === "temp" && typeof raw === "number"
           ? convertCelsiusForDisplay(raw, temperatureUnit)
           : raw;
-      return { ts: r.ts, value: v };
+      return { ts: r.ts, value: typeof v === "number" && Number.isFinite(v) ? v : null };
     });
   }, [filteredData, metric, temperatureUnit]);
+  const plottedPointCount = useMemo(
+    () => chartData.filter((point) => point.value !== null).length,
+    [chartData],
+  );
 
   const handleExport = () => {
-    const csv = buildSensorReadingsCsv(filteredData, Date.now());
+    if (exportDisabled) return;
+    const csv = buildSensorReadingsCsv(
+      filteredExportData,
+      Date.now(),
+      temperatureUnit,
+      tentNamesById !== undefined || exportData !== undefined
+        ? { tentNamesById, includeTentColumn: true }
+        : undefined,
+    );
     const filename = `sensor-readings-${metric}-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadTextFile(csv, filename);
   };
@@ -97,9 +128,9 @@ export default function SensorChart({
   >;
   const id = `grad-${metric}`;
   return (
-    <div className="w-full">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <div className="w-full min-w-0 overflow-hidden">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span
             data-testid="sensor-chart-legend"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -109,14 +140,20 @@ export default function SensorChart({
               className="inline-block h-2 w-2 rounded-full"
               style={{ background: axisMeta.color }}
             />
-            {legendLabel}
+            {legendLabel} · {plottedPointCount} {plottedPointCount === 1 ? "point" : "points"}
           </span>
           {!hideExportButton && (
             <button
               type="button"
               onClick={handleExport}
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-              title="Download CSV for current range"
+              disabled={exportDisabled}
+              aria-disabled={exportDisabled || undefined}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              title={
+                exportDisabled && exportDisabledReason
+                  ? exportDisabledReason
+                  : "Download CSV for current range"
+              }
               data-testid="sensor-chart-export-btn"
             >
               <Download className="h-3.5 w-3.5" />
@@ -129,7 +166,7 @@ export default function SensorChart({
             role="radiogroup"
             aria-label="Chart time range"
             data-testid="sensor-chart-range-selector"
-            className="flex gap-1"
+            className="flex flex-wrap gap-1"
           >
             {SENSOR_CHART_TIME_RANGES.map((r) => {
               const selected = r.value === range;

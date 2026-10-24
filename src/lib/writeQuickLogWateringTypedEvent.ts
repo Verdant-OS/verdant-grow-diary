@@ -12,6 +12,7 @@
  */
 
 import { isUuid } from "@/lib/isUuid";
+import { QUICK_LOG_WATER_VOLUME_MAX_ML } from "@/lib/quickLogWateringFormViewModel";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import {
   resolveTypedReceiptReaders,
@@ -207,7 +208,7 @@ export function mapWateringInputToRpcArgs(
     typeof input.volume_ml !== "number" ||
     !Number.isFinite(input.volume_ml) ||
     input.volume_ml <= 0 ||
-    input.volume_ml > 1_000_000
+    input.volume_ml > QUICK_LOG_WATER_VOLUME_MAX_ML
   ) {
     return { ok: false, reason: "volume_ml:invalid" };
   }

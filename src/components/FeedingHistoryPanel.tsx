@@ -89,8 +89,8 @@ function Row({
       id={row.timelineAnchorId ?? undefined}
       className="rounded-xl border border-border/40 bg-card/40 p-3 animate-fade-in scroll-mt-24"
     >
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div className="inline-flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <Leaf className="h-3.5 w-3.5 text-primary" />
           <span className="text-foreground/90 font-medium">
             {fmtDate(row.occurredAt, row.occurredAtLabel)}
@@ -111,6 +111,11 @@ function Row({
             currentNote={currentNote ?? null}
             currentOccurredAt={row.occurredAt}
             currentPlantId={row.plantId}
+            correctionValues={{
+              kind: "feeding",
+              doseAmount: row.nutrients[0]?.amount ?? null,
+              volumeMl: row.volumeMl,
+            }}
             plantId={row.plantId}
             tentId={row.tentId}
             onChanged={onEntryChanged}

@@ -73,8 +73,8 @@ const undiciErrors = (result: { errors: string[] }) =>
   result.errors.filter((error) => /security floor for undici\b/.test(error));
 
 describe("undici major-aware security floors (GHSA-xjj6-f33q-929c)", () => {
-  it.each(["6.29.0", "7.18.0", "7.30.0", "8.0.0", "8.12.1"])(
-    "rejects affected %s even when the override pins it",
+  it.each(["5.28.4", "6.29.0", "7.18.0", "7.30.0", "8.0.0", "8.12.1"])(
+    "rejects %s (below its major's patched floor) even when the override pins it",
     (version) => {
       expect(undiciErrors(evaluateWithUndici(version))).toContain(
         `bun.lock major-aware security floor for undici rejected ${version}.`,
@@ -82,7 +82,7 @@ describe("undici major-aware security floors (GHSA-xjj6-f33q-929c)", () => {
     },
   );
 
-  it.each(["6.29.1", "7.30.1", "8.12.2", "9.0.0"])("accepts %s", (version) => {
+  it.each(["6.29.1", "7.30.1", "8.12.2", "9.0.0", "9.0.0-rc.1"])("accepts %s", (version) => {
     expect(undiciErrors(evaluateWithUndici(version))).toEqual([]);
   });
 });

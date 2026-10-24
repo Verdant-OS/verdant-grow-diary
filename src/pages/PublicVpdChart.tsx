@@ -69,6 +69,7 @@ function DraftNumberInput({
   const [draft, setDraft] = useState<string | null>(null);
 
   function commit(raw: string) {
+    if (draft === null) return;
     onCommit(raw);
     setDraft(null);
   }

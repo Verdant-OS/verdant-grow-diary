@@ -96,6 +96,32 @@ describe("public VPD chart page", () => {
     expect(air()).toHaveValue(29.4);
   });
 
+  it("keeps Celsius values unchanged when tabbing through every field without typing", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const air = () => screen.getByLabelText(/Air temperature/);
+    const humidity = () => screen.getByLabelText(/Relative humidity/);
+    const offset = () => screen.getByLabelText(/Leaf temperature offset/);
+    const stage = () => screen.getByLabelText(/Growth stage target/);
+
+    await user.click(screen.getByRole("button", { name: "°C" }));
+    expect(air()).toHaveValue(25);
+    expect(humidity()).toHaveValue(60);
+    expect(offset()).toHaveValue(-1.1);
+    expect(stage()).toHaveValue("veg");
+
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    await user.tab();
+
+    expect(air()).toHaveValue(25);
+    expect(humidity()).toHaveValue(60);
+    expect(offset()).toHaveValue(-1.1);
+    expect(stage()).toHaveValue("veg");
+    expect(screen.getByText("1.06 kPa")).toBeInTheDocument();
+  });
+
   it("restores the last valid humidity and leaf offset when the field is emptied", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -105,11 +131,11 @@ describe("public VPD chart page", () => {
     await user.clear(humidity());
     await user.tab();
     expect(humidity()).toHaveValue(60);
-    await user.click(humidity());
+    await user.clear(humidity());
     await user.type(humidity(), "-");
     await user.tab();
     expect(humidity()).toHaveValue(60);
-    await user.click(humidity());
+    await user.clear(humidity());
     await user.type(humidity(), ".");
     await user.tab();
     expect(humidity()).toHaveValue(60);
@@ -117,11 +143,11 @@ describe("public VPD chart page", () => {
     await user.clear(offset());
     await user.tab();
     expect(offset()).toHaveValue(-2);
-    await user.click(offset());
+    await user.clear(offset());
     await user.type(offset(), "-");
     await user.tab();
     expect(offset()).toHaveValue(-2);
-    await user.click(offset());
+    await user.clear(offset());
     await user.type(offset(), ".");
     await user.tab();
     expect(offset()).toHaveValue(-2);

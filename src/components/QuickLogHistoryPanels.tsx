@@ -41,6 +41,7 @@ import QuickLogEntryIntegrityControls, {
   QuickLogEditedBadge,
 } from "@/components/QuickLogEntryIntegrityControls";
 import RetractedQuickLogPanel from "@/components/RetractedQuickLogPanel";
+import { quickLogRecentEmptyCopy } from "@/lib/quickLogRecentEmptyStateRules";
 import { cn } from "@/lib/utils";
 import { resolveEffectiveQuickLogCareType } from "@/lib/environmentCheckTimelineViewModel";
 
@@ -444,14 +445,18 @@ export function RecentQuickLogActivityPanel({
   rawEntries,
   limit = 10,
   growId = null,
+  dateFiltered = false,
   onEntryChanged,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
   /** Enables the retracted-entries audit disclosure below the lane. */
   growId?: string | null;
+  /** True when the page's date filter limited `rawEntries` to a range. */
+  dateFiltered?: boolean;
   onEntryChanged?: () => void;
 }) {
+  const emptyCopy = quickLogRecentEmptyCopy(dateFiltered);
   const handleExport = () => {
     const result = exportGrowDiaryReportAsPdf(buildRecentDiaryPdfInput(rawEntries, limit));
     if (result === "unavailable") {
@@ -470,8 +475,8 @@ export function RecentQuickLogActivityPanel({
         onEntryChanged={onEntryChanged}
         icon={<Activity className="h-3.5 w-3.5 text-primary" />}
         builder={(entries) => buildRecentQuickLogActivity(entries, limit)}
-        emptyTitle="No Quick Log entries yet"
-        emptyHelp="Open Quick Log to capture a note, watering, photo, or manual reading."
+        emptyTitle={emptyCopy.title}
+        emptyHelp={emptyCopy.help}
         limit={limit}
         headerAction={
           <Button

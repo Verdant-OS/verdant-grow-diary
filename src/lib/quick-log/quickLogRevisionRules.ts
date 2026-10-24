@@ -1,3 +1,17 @@
+import { LARGE_WATER_AMOUNT_HARD_MAX_ML } from "@/lib/quickLogWaterVolumeWarningRules";
+import { ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS } from "@/lib/environmentCheckQuickLogRules";
+import {
+  environmentCheckEnvelopeHasRecordedReading,
+  environmentCheckEnvelopeReadings,
+  isEnvironmentCheckTimelineEntry,
+} from "@/lib/environmentCheckTimelineViewModel";
+import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
+import {
+  isHumidityValid,
+  isTemperatureValid,
+  isVpdValid,
+} from "@/lib/sensorReadingNormalizationRules";
+
 /**
  * Quick Log Corrections & Retractions v1 — pure rules (issue #786).
  *
@@ -207,11 +221,38 @@ export function isRetractedDiaryRow(row: RetractableDiaryRowLike | null | undefi
   return typeof row?.retracted_at === "string" && row.retracted_at.length > 0;
 }
 
+/** Merged writer bound, still used for feeding volume (Quick Log Feed allows 1,000,000 ml). */
+export const QUICKLOG_CORRECTION_VOLUME_MAX_ML = 1_000_000;
+/** A watering correction uses the Quick Log single-watering ceiling (#2110). */
+export const QUICKLOG_CORRECTION_WATERING_VOLUME_MAX_ML = LARGE_WATER_AMOUNT_HARD_MAX_ML;
+/** Merged feeding product amount bound in root-zone observation rules. */
+export const QUICKLOG_CORRECTION_DOSE_MAX = 1_000_000;
+
+export interface QuickLogCorrectionSensorValues {
+  temperature_c?: number;
+  humidity_pct?: number;
+  vpd_kpa?: number;
+}
+
+export type QuickLogCorrectionValueKind = "watering" | "feeding" | "sensor";
+
+export interface QuickLogCorrectionValueContext {
+  kind: QuickLogCorrectionValueKind;
+  volumeMl?: number | null;
+  doseAmount?: number | null;
+  sensor?: QuickLogCorrectionSensorValues | null;
+}
+
 export interface QuickLogCorrectionChanges {
   note?: string | null;
   occurredAt?: string;
   targetType?: "plant" | "tent";
   targetId?: string;
+  volumeMl?: number;
+  /** Which entry the volume belongs to; a watering volume is capped lower. Not sent. */
+  volumeKind?: "watering" | "feeding";
+  doseAmount?: number;
+  sensorValues?: QuickLogCorrectionSensorValues;
 }
 
 export type QuickLogCorrectionValidation =
@@ -259,10 +300,341 @@ export function validateQuickLogCorrection(
     changes.target_type = input.targetType;
     changes.target_id = input.targetId;
   }
+  if (input.volumeMl !== undefined) {
+    if (!isCorrectionVolumeMl(input.volumeMl, input.volumeKind)) {
+      return { ok: false, reason: "invalid_changes" };
+    }
+    changes.volume_ml = input.volumeMl;
+  }
+  if (input.doseAmount !== undefined) {
+    if (!isCorrectionDoseAmount(input.doseAmount)) return { ok: false, reason: "invalid_changes" };
+    changes.dose_amount = input.doseAmount;
+  }
+  if (input.sensorValues !== undefined) {
+    const sensor = normalizeCorrectionSensorValues(input.sensorValues);
+    if (!sensor) return { ok: false, reason: "invalid_changes" };
+    changes.sensor_values = sensor;
+  }
   if (Object.keys(changes).length === 0) {
     return { ok: false, reason: "no_changes" };
   }
   return { ok: true, changes };
+}
+
+function isCorrectionVolumeMl(
+  value: unknown,
+  kind: QuickLogCorrectionChanges["volumeKind"],
+): value is number {
+  const max =
+    kind === "watering"
+      ? QUICKLOG_CORRECTION_WATERING_VOLUME_MAX_ML
+      : QUICKLOG_CORRECTION_VOLUME_MAX_ML;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= max;
+}
+
+function isCorrectionDoseAmount(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= QUICKLOG_CORRECTION_DOSE_MAX
+  );
+}
+
+function normalizeCorrectionSensorValues(
+  input: QuickLogCorrectionSensorValues | null,
+): QuickLogCorrectionSensorValues | null {
+  if (!input || typeof input !== "object") return null;
+  const next: QuickLogCorrectionSensorValues = {};
+  if (input.temperature_c !== undefined) {
+    if (!isTemperatureValid(input.temperature_c) || input.temperature_c === null) return null;
+    next.temperature_c = input.temperature_c;
+  }
+  if (input.humidity_pct !== undefined) {
+    if (!isHumidityValid(input.humidity_pct) || input.humidity_pct === null) return null;
+    next.humidity_pct = input.humidity_pct;
+  }
+  if (input.vpd_kpa !== undefined) {
+    if (!isVpdValid(input.vpd_kpa) || input.vpd_kpa === null) return null;
+    next.vpd_kpa = input.vpd_kpa;
+  }
+  return Object.keys(next).length > 0 ? next : null;
+}
+
+function finiteOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function doseFromDetails(details: Record<string, unknown>): number | null {
+  const feeding = isPlainObject(details.feeding) ? details.feeding : null;
+  const products = feeding && Array.isArray(feeding.products) ? feeding.products : null;
+  const firstProduct = products && isPlainObject(products[0]) ? products[0] : null;
+  if (firstProduct) {
+    const amount = finiteOrNull(firstProduct.amount);
+    if (amount !== null) return amount;
+  }
+  const nutrients = Array.isArray(details.nutrients) ? details.nutrients : null;
+  const firstNutrient = nutrients && isPlainObject(nutrients[0]) ? nutrients[0] : null;
+  return firstNutrient ? finiteOrNull(firstNutrient.amount) : null;
+}
+
+function sensorFromDetails(
+  details: Record<string, unknown>,
+): QuickLogCorrectionSensorValues | null {
+  const snapshot = isPlainObject(details.sensor_snapshot)
+    ? details.sensor_snapshot
+    : isPlainObject(details.manual_sensor_snapshot)
+      ? details.manual_sensor_snapshot
+      : null;
+  const metrics = snapshot && isPlainObject(snapshot.metrics) ? snapshot.metrics : snapshot;
+  if (!metrics) return null;
+  const sensor: QuickLogCorrectionSensorValues = {};
+  // PlantQuickLog V2 persists manual_sensor_snapshot as temp_f / humidity_percent.
+  const tempF = finiteOrNull(metrics.temp_f);
+  const temperature =
+    finiteOrNull(metrics.temperature_c) ??
+    (tempF === null ? null : Math.round(fahrenheitToCelsius(tempF) * 10) / 10);
+  const humidity = finiteOrNull(metrics.humidity_pct) ?? finiteOrNull(metrics.humidity_percent);
+  const vpd = finiteOrNull(metrics.vpd_kpa);
+  if (temperature !== null) sensor.temperature_c = temperature;
+  if (humidity !== null) sensor.humidity_pct = humidity;
+  if (vpd !== null) sensor.vpd_kpa = vpd;
+  return Object.keys(sensor).length > 0 ? sensor : null;
+}
+
+export const QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE =
+  "Recorded readings on this Environment check that have no field here can't be corrected. You can still correct the note, time, or plant.";
+
+/** Envelope readings the dialog's sensor fields (temperature, humidity, VPD) cover. */
+const DIALOG_AIR_READING_KEYS: ReadonlySet<string> = new Set([
+  "room_temp_f",
+  "temp_c",
+  "humidity_pct",
+  "vpd_kpa",
+]);
+
+/**
+ * Explains, inside the correction dialog, that an Environment Check recorded
+ * readings the dialog has no field for. The dialog passes whether it offers
+ * its air-reading fields: without them every recorded reading is uncovered;
+ * with them only the rest are (water temperature, EC, CO₂, and any reading
+ * the writer adds later). The copy states only what the dialog offers, not
+ * why, so it holds whatever the page loaded: envelope-only readings are
+ * rejected by the correction RPC (20261014210000, "unsupported_change"), and
+ * a linked reading this page did not load is equally not offered here. Null
+ * for every other entry, including typed care events (Watering, …) that only
+ * carry an environment envelope as context.
+ */
+export function quickLogCorrectionEnvironmentCheckReadingsNote(
+  details: unknown,
+  dialog: { offersAirReadingFields: boolean },
+): string | null {
+  if (!isPlainObject(details)) return null;
+  if (!isEnvironmentCheckTimelineEntry({ details })) return null;
+  const check = details.environment_check;
+  if (!dialog.offersAirReadingFields) {
+    return environmentCheckEnvelopeHasRecordedReading(check)
+      ? QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE
+      : null;
+  }
+  if (!isPlainObject(check)) return null;
+  const uncovered =
+    environmentCheckEnvelopeReadings(check).co2Ppm !== null ||
+    ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS.some(
+      (key) =>
+        !DIALOG_AIR_READING_KEYS.has(key) &&
+        environmentCheckEnvelopeHasRecordedReading({ [key]: check[key] }),
+    );
+  return uncovered ? QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE : null;
+}
+
+/**
+ * Which value the correction dialog can edit for one saved Quick Log entry.
+ * Returns null for notes, photos, and any other entry type.
+ */
+export function correctionValuesForTimelineAction(
+  action: {
+    kind: string;
+    volumeMl?: number | null;
+    aiDoctorPhase1Evidence?: { details?: unknown } | null;
+  },
+  readings?: ReadonlyArray<{ field: string; value: number }>,
+): QuickLogCorrectionValueContext | null {
+  const sensor = sensorFromReadings(readings);
+  if (action.kind === "water") {
+    const volumeMl =
+      typeof action.volumeMl === "number" && Number.isFinite(action.volumeMl)
+        ? action.volumeMl
+        : null;
+    // A watering log saved with readings has an environment sibling; the
+    // dialog corrects the volume and those readings together.
+    return sensor ? { kind: "watering", volumeMl, sensor } : { kind: "watering", volumeMl };
+  }
+  const fromEvidence = correctionValuePropsFromDiaryDetails(action.aiDoctorPhase1Evidence?.details);
+  if (fromEvidence?.kind === "feeding") return fromEvidence;
+  return sensor ? { kind: "sensor", sensor } : null;
+}
+
+function sensorFromReadings(
+  readings: ReadonlyArray<{ field: string; value: number }> | undefined,
+): QuickLogCorrectionSensorValues | null {
+  const sensor: QuickLogCorrectionSensorValues = {};
+  for (const reading of readings ?? []) {
+    if (reading.field === "air_temp_c") sensor.temperature_c = reading.value;
+    if (reading.field === "humidity_pct") sensor.humidity_pct = reading.value;
+    if (reading.field === "vpd_kpa") sensor.vpd_kpa = reading.value;
+  }
+  return Object.keys(sensor).length > 0 ? sensor : null;
+}
+
+export function correctionValuePropsFromDiaryDetails(
+  details: unknown,
+): QuickLogCorrectionValueContext | null {
+  if (!isPlainObject(details)) return null;
+  const eventType = typeof details.event_type === "string" ? details.event_type : "";
+  if (eventType === "watering") {
+    const watering = isPlainObject(details.watering) ? details.watering : null;
+    const structured = finiteOrNull(watering?.volume_ml);
+    const flat = finiteOrNull(details.watering_amount_ml) ?? finiteOrNull(details.wateringAmountMl);
+    return { kind: "watering", volumeMl: structured ?? flat };
+  }
+  if (eventType === "feeding") {
+    const feeding = isPlainObject(details.feeding) ? details.feeding : null;
+    const structured = finiteOrNull(feeding?.volume_ml);
+    const flat = finiteOrNull(details.watering_amount_ml) ?? finiteOrNull(details.wateringAmountMl);
+    const volumeMl = structured ?? flat;
+    const doseAmount = doseFromDetails(details);
+    return volumeMl == null
+      ? { kind: "feeding", doseAmount }
+      : { kind: "feeding", doseAmount, volumeMl };
+  }
+  if (
+    eventType === "environment" ||
+    eventType === "environment_check" ||
+    eventType === "manual_sensor_snapshot"
+  ) {
+    // The correction RPC writes sensor values into sensor_snapshot.metrics.
+    // An Environment Check keeps its readings only in details.environment_check,
+    // so blank fields here would save a revision that changes nothing.
+    const sensor = sensorFromDetails(details);
+    return sensor ? { kind: "sensor", sensor } : null;
+  }
+  // V2 Fast Check stores the action as an observation and the measurements
+  // on the environment companion. Timeline merge keeps those metrics on the
+  // same details object while the spine event_type stays observation.
+  if (eventType === "observation") {
+    const sensor = sensorFromDetails(details);
+    if (sensor) return { kind: "sensor", sensor };
+  }
+  return null;
+}
+
+interface TimelineEnvironmentChild {
+  temperature_c?: unknown;
+  humidity_pct?: unknown;
+  vpd_kpa?: unknown;
+}
+
+interface TimelineEnvironmentSibling {
+  id?: string;
+  event_type?: unknown;
+  source?: unknown;
+  plant_id?: string | null;
+  occurred_at?: unknown;
+  created_at?: unknown;
+  environment_events?: TimelineEnvironmentChild | readonly TimelineEnvironmentChild[] | null;
+}
+
+function sensorFromEnvironmentChild(
+  child: TimelineEnvironmentChild | null | undefined,
+): QuickLogCorrectionSensorValues | null {
+  if (!child) return null;
+  const sensor: QuickLogCorrectionSensorValues = {};
+  const temperature = finiteOrNull(child.temperature_c);
+  const humidity = finiteOrNull(child.humidity_pct);
+  const vpd = finiteOrNull(child.vpd_kpa);
+  if (temperature !== null) sensor.temperature_c = temperature;
+  if (humidity !== null) sensor.humidity_pct = humidity;
+  if (vpd !== null) sensor.vpd_kpa = vpd;
+  return Object.keys(sensor).length > 0 ? sensor : null;
+}
+
+/** Readings on the manual environment row saved in the same request as `root`. */
+function sensorFromExactEnvironmentSibling(
+  root: TimelineEnvironmentSibling,
+  rows: readonly TimelineEnvironmentSibling[],
+): QuickLogCorrectionSensorValues | null {
+  if (typeof root.created_at !== "string") return null;
+  const companion = rows.find(
+    (row) =>
+      row.id !== root.id &&
+      row.event_type === "environment" &&
+      row.source === "manual" &&
+      row.created_at === root.created_at,
+  );
+  if (!companion) return null;
+  const child = Array.isArray(companion.environment_events)
+    ? companion.environment_events[0]
+    : companion.environment_events;
+  return sensorFromEnvironmentChild(child);
+}
+
+/**
+ * Timeline diary cards for a V2 Fast Check keep the note on the observation
+ * row. The temperature, humidity, and VPD live on the same-instant manual
+ * environment sibling, not in diary details.
+ */
+export function correctionValuesForTimelineDiaryEntry(
+  entry: { details?: unknown; plant_id?: string | null; entry_at?: string | null },
+  growEvents?: readonly TimelineEnvironmentSibling[],
+): QuickLogCorrectionValueContext | null {
+  const fromDetails = correctionValuePropsFromDiaryDetails(entry?.details);
+  const details = isPlainObject(entry?.details) ? entry.details : null;
+  const linkedId = details ? nonEmpty(details.linked_grow_event_id) : null;
+  if (fromDetails?.kind === "watering" && linkedId) {
+    // A watering log saved with readings has an exact manual environment
+    // sibling (same created_at as its root). Tied backdated waterings share an
+    // occurred_at, so only that exact sibling may supply the readings.
+    const root = (growEvents ?? []).find((row) => row.id === linkedId);
+    const sensor = root ? sensorFromExactEnvironmentSibling(root, growEvents ?? []) : null;
+    return sensor ? { ...fromDetails, sensor } : fromDetails;
+  }
+  if (fromDetails) return fromDetails;
+  if (!details) return null;
+  // Quick Log V2 diary companions link to their spine root: PlantQuickLog
+  // stamps event_type "quick_log", the Fast Check sheet stamps none. Resolve
+  // any linked companion through that root, like an observation row.
+  const isLinkedEnvelope = details.event_type !== "observation" && linkedId !== null;
+  if (details.event_type !== "observation" && !isLinkedEnvelope) return null;
+  const entryAt = entry?.entry_at;
+  if (typeof entryAt !== "string") return null;
+  const entryMs = Date.parse(entryAt);
+  if (!Number.isFinite(entryMs)) return null;
+  const plantId = entry?.plant_id ?? null;
+  const rows = growEvents ?? [];
+  if (linkedId) {
+    const root = rows.find((row) => row.id === linkedId);
+    // Only an observation root accepts sensor corrections server-side.
+    if (isLinkedEnvelope && root?.event_type !== "observation") return null;
+    if (root && typeof root.created_at === "string") {
+      const sensor = sensorFromExactEnvironmentSibling(root, rows);
+      return sensor ? { kind: "sensor", sensor } : null;
+    }
+    // A persisted link whose root is not loaded yet (or failed to load) must
+    // not borrow a same-time sibling; only unlinked legacy rows use the matcher.
+    return null;
+  }
+  for (const row of rows) {
+    if (row.event_type !== "environment" || row.source !== "manual") continue;
+    if ((row.plant_id ?? null) !== plantId) continue;
+    if (typeof row.occurred_at !== "string" || Date.parse(row.occurred_at) !== entryMs) continue;
+    const child = Array.isArray(row.environment_events)
+      ? row.environment_events[0]
+      : row.environment_events;
+    const sensor = sensorFromEnvironmentChild(child);
+    if (sensor) return { kind: "sensor", sensor };
+  }
+  return null;
 }
 
 export interface QuickLogEntryHandleRef {
@@ -348,9 +720,10 @@ export const QUICKLOG_REVISION_FAILURE_COPY: Record<string, string> = {
   grow_not_owned: "That grow is not yours.",
   // PGRST202/42883: the RPC does not exist on the server, so nothing ran.
   // Production served a client ahead of its migration (QA 2026-09-24,
-  // BUG-021); the grower must know the entry is unchanged.
+  // BUG-021; again 2026-10-21). The grower must know the entry is unchanged
+  // and that retrying cannot help until the server is updated.
   rpc_unavailable:
-    "Correcting or retracting entries isn't available right now. Nothing was changed. Try again later.",
+    "Correcting or retracting entries isn't set up on the server yet. Nothing was changed. Trying again won't help until the server is updated.",
   forbidden: "You do not have permission to change this entry.",
   invalid_idempotency_key: "This change could not be identified. Close and reopen the entry.",
   idempotency_conflict: "This change could not be confirmed. Close and reopen the entry.",

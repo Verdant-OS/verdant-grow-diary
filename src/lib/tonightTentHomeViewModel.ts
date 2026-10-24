@@ -18,6 +18,8 @@ import {
 } from "@/lib/dashboardSensorEvidenceRules";
 import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
+import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 
 export const TONIGHT_TENT_HOME_COPY = {
   missing: "Missing",
@@ -31,6 +33,8 @@ export const TONIGHT_TENT_HOME_COPY = {
   lastLogLoading: "Checking last log…",
   log: "Log",
   demo: "Demo",
+  /** Shown under a VPD value derived from temperature and RH, never under a stored reading. */
+  calculatedVpd: "Calculated from temperature and RH",
   chooseHeading: "Choose a tent",
   chooseBody: "Several tents could be tonight's tent. Open the one you want to check.",
 } as const;
@@ -129,6 +133,10 @@ export interface TonightSnapshotInput {
     temp: number | null;
     rh: number | null;
     vpd: number | null;
+    /** Per-metric raw source of the exact sensor row behind each value, when known. */
+    metric_refs?: SensorSnapshot["metric_refs"];
+    /** Present when the whole snapshot came from one diary row. */
+    diary_evidence_ref?: SensorSnapshot["diary_evidence_ref"];
   } | null;
 }
 
@@ -144,6 +152,8 @@ export interface TonightMetricView {
   sourceLabel: string | null;
   capturedAt: string | null;
   ageText: string | null;
+  /** True only for VPD derived from temperature and RH (no stored vpd_kpa). */
+  calculated: boolean;
 }
 
 /** Allowed clock skew before a capture time counts as "in the future". */
@@ -156,6 +166,16 @@ interface Candidate {
   epochMs: number;
   /** 0 = sensor row, 1 = diary-inclusive snapshot; deterministic tie-break. */
   origin: 0 | 1;
+  /** Set only on a VPD candidate derived from temperature and RH. */
+  calculated?: true;
+  /**
+   * True when `source` is proven to describe this metric's own record. A
+   * readings snapshot labels every metric with one aggregate source (same-time
+   * live + manual rows collapse to "manual"), so its metrics are proven only
+   * through per-metric refs or a single diary record. Unproven candidates are
+   * still shown on their own but never feed a calculated VPD.
+   */
+  ownSource: boolean;
 }
 
 /** Snapshot sources map onto the canonical vocabulary; "unavailable" carries no reading. */
@@ -177,6 +197,19 @@ function snapshotSource(raw: string): SensorSource | null {
   }
 }
 
+type TonightSnapshot = NonNullable<TonightSnapshotInput["snapshot"]>;
+
+function snapshotMetricSourceProven(
+  snap: TonightSnapshot,
+  key: TonightMetricKey,
+  source: SensorSource,
+): boolean {
+  // One diary blob or one diary row: every metric shares that record's source.
+  if (snap.source === "diary" || snap.diary_evidence_ref) return true;
+  const ref = snap.metric_refs?.[key];
+  return ref != null && normalizeSensorSource(ref.source) === source;
+}
+
 function parseAt(value: string | null | undefined): { at: string; epochMs: number } | null {
   if (typeof value !== "string" || value.length === 0) return null;
   const epochMs = Date.parse(value);
@@ -191,9 +224,145 @@ function rowsFailed(status: TonightRowsReadStatus): boolean {
   return status === "error" || status === "refresh_error";
 }
 
+/** Drop future and unknown-source readings. Live past the canon window is stale, still usable. */
+function usableCandidate(candidate: Candidate, nowMs: number): Candidate | null {
+  if (candidate.source === "invalid") return null;
+  const ageMs = nowMs - candidate.epochMs;
+  if (ageMs < -FUTURE_SKEW_MS) return null;
+  if (candidate.source === "live" && ageMs > LIVE_CURRENT_STATE_STALE_MS) {
+    return { ...candidate, source: "stale" };
+  }
+  return candidate;
+}
+
+function newestFirst(a: Candidate, b: Candidate): number {
+  return b.epochMs - a.epochMs || a.origin - b.origin;
+}
+
+type CalculatedVpd =
+  | { kind: "no_inputs" }
+  | { kind: "underivable" }
+  /** `paired`: temperature and RH share one capture time; `inputs`: the pair used. */
+  | {
+      kind: "derived";
+      candidate: Candidate;
+      paired: boolean;
+      inputs: { temp: Candidate; rh: Candidate };
+    };
+
+function usableSorted(candidates: readonly Candidate[], nowMs: number): Candidate[] {
+  return candidates
+    .map((c) => usableCandidate(c, nowMs))
+    .filter((c): c is Candidate => c != null)
+    .sort(newestFirst);
+}
+
+/**
+ * VPD from temperature and RH, used when no stored vpd_kpa exists or when a
+ * same-capture pair is newer than every stored one.
+ * Only inputs whose own source is proven are used. The newest same-time pair
+ * with compatible sources wins over a newer unpaired reading. Otherwise the
+ * latest proven temperature and RH are used, and the result is dated to the
+ * older of the two so it is not newer than either input. Out-of-range inputs
+ * stay invalid and carry no number. Inputs that exist but cannot honestly be
+ * combined (mixed or unproven sources) are "underivable", never a value.
+ */
+function calculatedVpdCandidate(
+  temps: readonly Candidate[],
+  rhs: readonly Candidate[],
+  nowMs: number,
+): CalculatedVpd {
+  const usableTemps = usableSorted(temps, nowMs);
+  const usableRhs = usableSorted(rhs, nowMs);
+  if (usableTemps.length === 0 || usableRhs.length === 0) return { kind: "no_inputs" };
+
+  const provenTemps = usableTemps.filter((c) => c.ownSource);
+  const provenRhs = usableRhs.filter((c) => c.ownSource);
+  if (provenTemps.length === 0 || provenRhs.length === 0) return { kind: "underivable" };
+
+  let temp = provenTemps[0];
+  let rh = provenRhs[0];
+  let paired = false;
+  for (const candidateTemp of provenTemps) {
+    const matchingRh = provenRhs.find(
+      (candidateRh) =>
+        candidateRh.epochMs === candidateTemp.epochMs &&
+        compositeVpdSource(candidateTemp.source, candidateRh.source) != null,
+    );
+    if (matchingRh) {
+      temp = candidateTemp;
+      rh = matchingRh;
+      paired = true;
+      break;
+    }
+  }
+
+  const older = temp.epochMs <= rh.epochMs ? temp : rh;
+  const source = compositeVpdSource(temp.source, rh.source);
+  if (source == null) return { kind: "underivable" };
+  const when = {
+    at: older.at,
+    epochMs: older.epochMs,
+    origin: 0 as const,
+    calculated: true as const,
+    ownSource: true,
+  };
+  // RH pinned at 0% or 100% is a stuck sensor, not a reading (same guard as the Environment ribbon).
+  const vpd = rhIsPinned(rh.value)
+    ? null
+    : calculateVpdKpa({ tempC: temp.value, rhPercent: rh.value });
+  if (vpd == null) {
+    return {
+      kind: "derived",
+      candidate: { value: 0, source: "invalid", ...when },
+      paired,
+      inputs: { temp, rh },
+    };
+  }
+  return {
+    kind: "derived",
+    candidate: { value: vpd, source, ...when },
+    paired,
+    inputs: { temp, rh },
+  };
+}
+
+/** Compares after the same freshness normalization the pair went through (live past the window → stale). */
+function isDisplayedCandidate(
+  used: Candidate,
+  displayed: Candidate | undefined,
+  nowMs: number,
+): boolean {
+  const shown = displayed ? usableCandidate(displayed, nowMs) : null;
+  return (
+    shown != null &&
+    used.epochMs === shown.epochMs &&
+    used.value === shown.value &&
+    used.source === shown.source
+  );
+}
+
+function rhIsPinned(rh: number): boolean {
+  return rh <= 0 || rh >= 100;
+}
+
+/**
+ * Provenance of a value derived from two inputs. Same source → that source.
+ * A live sensor pair where one input aged out → stale. Any other mix (live with
+ * manual, CSV with demo, …) has no honest single label, so no value is derived.
+ */
+function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | null {
+  if (a === b) return a;
+  const pair = new Set([a, b]);
+  if (pair.has("live") && pair.has("stale")) return "stale";
+  return null;
+}
+
 /**
  * Newest finite candidate per metric, each keeping its own source and capture
- * time. A newer RH-only record never renews temperature or VPD.
+ * time. A newer RH-only record never renews temperature. VPD with no stored
+ * reading is calculated from temperature and RH (same capture time first); a
+ * same-capture pair newer than every stored VPD also replaces it (#2268).
  */
 export function buildTonightTentMetrics(input: {
   rows: readonly TonightSensorRow[] | null | undefined;
@@ -206,9 +375,11 @@ export function buildTonightTentMetrics(input: {
     ? []
     : selectDashboardSensorEvidenceRows(input.rows ?? []);
 
-  return METRICS.map(({ key, label, readingMetric }) => {
-    const candidates: Candidate[] = [];
+  const byKey = new Map<TonightMetricKey, Candidate[]>();
+  for (const metric of METRICS) byKey.set(metric.key, []);
 
+  for (const { key, readingMetric } of METRICS) {
+    const candidates = byKey.get(key)!;
     for (const row of evidenceRows) {
       if (row.metric !== readingMetric) continue;
       if (typeof row.value !== "number" || !Number.isFinite(row.value)) continue;
@@ -219,6 +390,7 @@ export function buildTonightTentMetrics(input: {
         source: normalizeSensorSource(row.source),
         ...when,
         origin: 0,
+        ownSource: true,
       });
     }
 
@@ -233,16 +405,50 @@ export function buildTonightTentMetrics(input: {
       typeof snapValue === "number" &&
       Number.isFinite(snapValue)
     ) {
-      candidates.push({ value: snapValue, source: snapSource, ...snapWhen, origin: 1 });
+      candidates.push({
+        value: snapValue,
+        source: snapSource,
+        ...snapWhen,
+        origin: 1,
+        ownSource: snapshotMetricSourceProven(snap, key, snapSource),
+      });
     }
+    candidates.sort(newestFirst);
+  }
 
-    candidates.sort((a, b) => b.epochMs - a.epochMs || a.origin - b.origin);
+  const vpdCandidates = byKey.get("vpd")!;
+  let vpdUnderivable = false;
+  const derived = calculatedVpdCandidate(byKey.get("temp")!, byKey.get("rh")!, nowMs);
+  if (vpdCandidates.length === 0) {
+    if (derived.kind === "derived") vpdCandidates.push(derived.candidate);
+    vpdUnderivable = derived.kind === "underivable";
+  } else if (
+    derived.kind === "derived" &&
+    derived.paired &&
+    isDisplayedCandidate(derived.inputs.temp, byKey.get("temp")![0], nowMs) &&
+    isDisplayedCandidate(derived.inputs.rh, byKey.get("rh")![0], nowMs) &&
+    derived.candidate.epochMs > vpdCandidates[0].epochMs
+  ) {
+    // #2268: when the temperature and RH the card shows are one capture newer
+    // than every stored VPD, that pair's calculated VPD replaces the stored one.
+    // An older pair is never used beside newer displayed inputs.
+    vpdCandidates.unshift(derived.candidate);
+  }
+
+  return METRICS.map(({ key, label }) => {
+    const candidates = byKey.get(key)!;
     const best = candidates[0];
 
     if (!best) {
       const loading = rowsAreLoading(input.rowsRead.status) || input.snapshot.status === "loading";
       const failed = rowsFailed(input.rowsRead.status) || input.snapshot.status === "unavailable";
-      const state: TonightMetricState = loading ? "loading" : failed ? "unavailable" : "missing";
+      // Temperature and RH exist but cannot honestly be combined: unavailable, not missing.
+      const underivable = key === "vpd" && vpdUnderivable;
+      const state: TonightMetricState = loading
+        ? "loading"
+        : failed || underivable
+          ? "unavailable"
+          : "missing";
       return {
         key,
         label,
@@ -252,6 +458,7 @@ export function buildTonightTentMetrics(input: {
         sourceLabel: null,
         capturedAt: null,
         ageText: null,
+        calculated: false,
       };
     }
 
@@ -270,6 +477,7 @@ export function buildTonightTentMetrics(input: {
       sourceLabel: sensorSourceLabel(source),
       capturedAt: best.at,
       ageText: formatAgeLabel(Math.max(0, ageMs)),
+      calculated: best.calculated === true,
     };
   });
 }

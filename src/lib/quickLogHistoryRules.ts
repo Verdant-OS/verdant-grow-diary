@@ -11,6 +11,7 @@
  */
 import { EVENT_TYPES } from "@/lib/diary";
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
+import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 
 export type HistoryLane =
@@ -211,26 +212,110 @@ export interface QuickLogHistoryRow {
    * (issue #786 review).
    */
   rawNote: string;
+  /** Structured summary (e.g. "500 ml", "pH 6.2") when available. */
+  summarySuffix?: string;
   manualHandheld: ManualHandheldReadings | null;
   photoUrl: string | null;
   warnings: string[];
 }
 
+function asObjectRecord(v: unknown): Record<string, unknown> | null {
+  return v != null && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
+function coercePositiveMl(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1_000_000) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n) && n >= 0 && n <= 1_000_000) return n;
+  }
+  return undefined;
+}
+
+function coerceValidPh(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 14) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n) && n >= 0 && n <= 14) return n;
+  }
+  return undefined;
+}
+
+function coerceValidEc(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 10) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n) && n >= 0 && n <= 10) return n;
+  }
+  return undefined;
+}
+
+function enrichEntryWithNestedActivity(entry: NormalizedDiaryEntry): NormalizedDiaryEntry {
+  const extras = entry.details.extras;
+  if (!extras) return entry;
+  const wObj = asObjectRecord(extras.watering);
+  const fObj = asObjectRecord(extras.feeding);
+  if (!wObj && !fObj && extras.volume_ml == null) return entry;
+  const nextDetails = { ...entry.details };
+  let changed = false;
+  if (nextDetails.wateringAmountMl === undefined) {
+    const vol = coercePositiveMl(wObj?.volume_ml ?? fObj?.volume_ml ?? extras.volume_ml);
+    if (vol !== undefined) {
+      nextDetails.wateringAmountMl = vol;
+      changed = true;
+    }
+  }
+  if (nextDetails.ph === undefined) {
+    const ph = coerceValidPh(wObj?.ph ?? fObj?.ph);
+    if (ph !== undefined) {
+      nextDetails.ph = ph;
+      changed = true;
+    }
+  }
+  if (nextDetails.ec === undefined) {
+    const ec = coerceValidEc(wObj?.ec_ms_cm ?? fObj?.ec_in ?? fObj?.ec_ms_cm);
+    if (ec !== undefined) {
+      nextDetails.ec = ec;
+      changed = true;
+    }
+  }
+  if (nextDetails.runoffPh === undefined) {
+    const rph = coerceValidPh(wObj?.runoff_ph ?? fObj?.runoff_ph);
+    if (rph !== undefined) {
+      nextDetails.runoffPh = rph;
+      changed = true;
+    }
+  }
+  if (nextDetails.runoffEc === undefined) {
+    const rec = coerceValidEc(wObj?.runoff_ec ?? fObj?.runoff_ec);
+    if (rec !== undefined) {
+      nextDetails.runoffEc = rec;
+      changed = true;
+    }
+  }
+  return changed ? { ...entry, details: nextDetails } : entry;
+}
+
 function toRow(entry: NormalizedDiaryEntry): QuickLogHistoryRow {
-  const split = splitHardwareReadingsFromNote(entry.note);
+  const enriched = enrichEntryWithNestedActivity(entry);
+  const split = splitHardwareReadingsFromNote(enriched.note);
+  const identity = resolveQuickLogEventIdentity(enriched);
   return {
-    id: entry.id,
-    occurredAt: entry.createdAt,
-    occurredAtLabel: entry.createdAtLabel,
-    plantId: entry.plantId,
-    tentId: entry.tentId,
-    stage: entry.stage,
-    eventType: entry.eventType,
+    id: enriched.id,
+    occurredAt: enriched.createdAt,
+    occurredAtLabel: enriched.createdAtLabel,
+    plantId: enriched.plantId,
+    tentId: enriched.tentId,
+    stage: enriched.stage,
+    eventType: enriched.eventType,
     noteBody: split.body,
-    rawNote: entry.note ?? "",
-    manualHandheld: parseManualHandheldReadings(entry.note),
-    photoUrl: entry.photoUrl,
-    warnings: entry.warnings.slice(),
+    rawNote: enriched.note ?? "",
+    ...(identity.summarySuffix ? { summarySuffix: identity.summarySuffix } : {}),
+    manualHandheld: parseManualHandheldReadings(enriched.note),
+    photoUrl: enriched.photoUrl,
+    warnings: enriched.warnings.slice(),
   };
 }
 

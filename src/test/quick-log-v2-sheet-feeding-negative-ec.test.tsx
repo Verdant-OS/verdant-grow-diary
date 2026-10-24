@@ -215,3 +215,68 @@ describe("QuickLogV2Sheet — feeding EC cannot be negative (#2159)", () => {
     expect(writeFeedingMock.mock.calls[0][0].ec_in).toBe(saved);
   });
 });
+
+describe("QuickLogV2Sheet — feeding PPM cannot be negative (#2304 review should-fix)", () => {
+  // Typing a negative PPM clears the paired EC (updateEcPpm500Pair keeps the
+  // typed text only), so an EC-only live check saw a blank EC and left Save on.
+  it.each([
+    ["PPM in (500 scale)", "qlv2-feed-ppm-in-error", "PPM can't be negative."],
+    ["PPM out (500 scale)", "qlv2-feed-ppm-out-error", "Output PPM can't be negative."],
+    ["Runoff PPM (500 scale)", "qlv2-feed-runoff-ppm-error", "Runoff PPM can't be negative."],
+  ])("names a negative %s under the field and blocks Save", (label, testId, message) => {
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    openOptionalMetrics();
+    expect(saveButton()).toBeEnabled();
+    const input = typeAndTab(label, "-500");
+    expect(screen.getByTestId(testId)).toHaveTextContent(message);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input.getAttribute("aria-describedby")).toContain(testId);
+    expect(saveButton()).toBeDisabled();
+    expect(saveHelper()).toHaveTextContent(message);
+    expect(saveHelper()).not.toHaveTextContent(READY);
+    clickSave();
+    expect(writeFeedingMock).not.toHaveBeenCalled();
+  });
+
+  it("guards a negative PPM typed in exponent form", () => {
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    typeAndTab("PPM in (500 scale)", "-5e2");
+    expect(screen.getByTestId("qlv2-feed-ppm-in-error")).toHaveTextContent(
+      "PPM can't be negative.",
+    );
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it("clears the message and re-enables Save once the PPM is corrected", () => {
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    typeAndTab("PPM in (500 scale)", "-500");
+    expect(saveButton()).toBeDisabled();
+    const input = typeAndTab("PPM in (500 scale)", "600");
+    expect(screen.queryByTestId("qlv2-feed-ppm-in-error")).toBeNull();
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(saveButton()).toBeEnabled();
+    expect(saveHelper()).toHaveTextContent(READY);
+  });
+
+  it.each([
+    ["0", 0],
+    ["600", 1.2],
+  ])("still saves PPM in %j as its EC", async (typed, savedEc) => {
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-ppm", reused: false });
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    typeAndTab("PPM in (500 scale)", typed);
+    expect(screen.queryByTestId("qlv2-feed-ppm-in-error")).toBeNull();
+    expect(saveButton()).toBeEnabled();
+    clickSave();
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    expect(writeFeedingMock.mock.calls[0][0].ec_in).toBe(savedEc);
+  });
+});

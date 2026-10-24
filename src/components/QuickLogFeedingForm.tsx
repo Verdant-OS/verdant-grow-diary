@@ -277,9 +277,24 @@ export default function QuickLogFeedingForm({
               inputMode="decimal"
               value={value.ppmIn}
               disabled={disabled}
-              aria-describedby="qlv2-feed-ec-ppm-help"
+              aria-invalid={Boolean(ecFieldErrors.ppmIn) || undefined}
+              aria-describedby={
+                ecFieldErrors.ppmIn
+                  ? "qlv2-feed-ec-ppm-help qlv2-feed-ppm-in-error"
+                  : "qlv2-feed-ec-ppm-help"
+              }
               onChange={(e) => setEcPpmPair("ecIn", "ppmIn", "ppm", e.target.value)}
             />
+            {ecFieldErrors.ppmIn && (
+              <p
+                id="qlv2-feed-ppm-in-error"
+                data-testid="qlv2-feed-ppm-in-error"
+                className="mt-1 text-sm text-destructive"
+                role="alert"
+              >
+                {ecFieldErrors.ppmIn}
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="qlv2-feed-ec-out">EC out</Label>
@@ -314,9 +329,24 @@ export default function QuickLogFeedingForm({
               inputMode="decimal"
               value={value.ppmOut}
               disabled={disabled}
-              aria-describedby="qlv2-feed-ec-ppm-help"
+              aria-invalid={Boolean(ecFieldErrors.ppmOut) || undefined}
+              aria-describedby={
+                ecFieldErrors.ppmOut
+                  ? "qlv2-feed-ec-ppm-help qlv2-feed-ppm-out-error"
+                  : "qlv2-feed-ec-ppm-help"
+              }
               onChange={(e) => setEcPpmPair("ecOut", "ppmOut", "ppm", e.target.value)}
             />
+            {ecFieldErrors.ppmOut && (
+              <p
+                id="qlv2-feed-ppm-out-error"
+                data-testid="qlv2-feed-ppm-out-error"
+                className="mt-1 text-sm text-destructive"
+                role="alert"
+              >
+                {ecFieldErrors.ppmOut}
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="qlv2-feed-runoff-ml">Runoff (ml)</Label>
@@ -371,9 +401,24 @@ export default function QuickLogFeedingForm({
               inputMode="decimal"
               value={value.runoffPpm}
               disabled={disabled}
-              aria-describedby="qlv2-feed-ec-ppm-help"
+              aria-invalid={Boolean(ecFieldErrors.runoffPpm) || undefined}
+              aria-describedby={
+                ecFieldErrors.runoffPpm
+                  ? "qlv2-feed-ec-ppm-help qlv2-feed-runoff-ppm-error"
+                  : "qlv2-feed-ec-ppm-help"
+              }
               onChange={(e) => setEcPpmPair("runoffEc", "runoffPpm", "ppm", e.target.value)}
             />
+            {ecFieldErrors.runoffPpm && (
+              <p
+                id="qlv2-feed-runoff-ppm-error"
+                data-testid="qlv2-feed-runoff-ppm-error"
+                className="mt-1 text-sm text-destructive"
+                role="alert"
+              >
+                {ecFieldErrors.runoffPpm}
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="qlv2-feed-water-temp">Water ({entryTemperatureUnitSymbol})</Label>

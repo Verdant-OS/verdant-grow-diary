@@ -439,13 +439,24 @@ export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | str
   }
 }
 
-export type FeedingEcFieldKey = "ecIn" | "ecOut" | "runoffEc";
+/** The three feeding EC fields and their PPM-500 companions. */
+export type FeedingEcFieldKey = "ecIn" | "ecOut" | "runoffEc" | "ppmIn" | "ppmOut" | "runoffPpm";
 
-const FEEDING_EC_NEGATIVE_CHECKS = [
-  ["ecIn", "ec_in:negative"],
-  ["ecOut", "ec_out:negative"],
-  ["runoffEc", "runoff_ec:negative"],
-] as const;
+/** Live-check copy for a negative PPM-500 value, field by field. */
+export const FEEDING_PPM_NEGATIVE_COPY = {
+  ppmIn: "PPM can't be negative.",
+  ppmOut: "Output PPM can't be negative.",
+  runoffPpm: "Runoff PPM can't be negative.",
+} as const;
+
+const FEEDING_EC_NEGATIVE_CHECKS: ReadonlyArray<readonly [FeedingEcFieldKey, string]> = [
+  ["ecIn", feedingFormReasonToHelper("ec_in:negative")],
+  ["ppmIn", FEEDING_PPM_NEGATIVE_COPY.ppmIn],
+  ["ecOut", feedingFormReasonToHelper("ec_out:negative")],
+  ["ppmOut", FEEDING_PPM_NEGATIVE_COPY.ppmOut],
+  ["runoffEc", feedingFormReasonToHelper("runoff_ec:negative")],
+  ["runoffPpm", FEEDING_PPM_NEGATIVE_COPY.runoffPpm],
+];
 
 /** Any typed text that parses to a finite number below zero, exponent forms included. */
 function isTypedNegativeNumber(raw: string | null | undefined): boolean {
@@ -456,10 +467,11 @@ function isTypedNegativeNumber(raw: string | null | undefined): boolean {
 }
 
 /**
- * Live check of the feeding EC fields (#2159). A negative EC, in plain or
- * exponent form, is named under its own field and blocks Save as soon as it
- * is typed, with the same copy the save-time validation uses. Blank, zero and
- * positive values pass here.
+ * Live check of the feeding EC fields and their PPM-500 companions (#2159).
+ * A negative value, in plain or exponent form, is named under its own field
+ * and blocks Save as soon as it is typed; EC uses the same copy as the
+ * save-time validation. A negative PPM is checked on its own field because
+ * typing it clears the paired EC. Blank, zero and positive values pass here.
  */
 export function assessFeedingEcFields(form: Pick<QuickLogFeedingFormState, FeedingEcFieldKey>): {
   fields: Partial<Record<FeedingEcFieldKey, string>>;
@@ -467,10 +479,10 @@ export function assessFeedingEcFields(form: Pick<QuickLogFeedingFormState, Feedi
 } {
   const fields: Partial<Record<FeedingEcFieldKey, string>> = {};
   let footerMessage: string | null = null;
-  for (const [key, reason] of FEEDING_EC_NEGATIVE_CHECKS) {
+  for (const [key, message] of FEEDING_EC_NEGATIVE_CHECKS) {
     if (!isTypedNegativeNumber(form[key])) continue;
-    fields[key] = feedingFormReasonToHelper(reason);
-    footerMessage ??= fields[key];
+    fields[key] = message;
+    footerMessage ??= message;
   }
   return { fields, footerMessage };
 }

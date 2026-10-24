@@ -275,12 +275,15 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       payload.started_at = startedAtIso;
     }
 
-    const { error } = await supabase
+    const { data: updatedPlants, error } = await supabase
       .from("plants")
       .update(payload as never)
-      .eq("id", plant.id);
+      .eq("id", plant.id)
+      .select("id");
 
-    if (error) {
+    // A deleted or RLS-filtered plant can match no row without an error.
+    // Confirm the save before success, old-photo cleanup or parent-stage offers.
+    if (error || !updatedPlants?.some((row) => row.id === plant.id)) {
       // Clean up orphan upload; keep old plant photo untouched.
       if (uploadedPath) {
         await removeUploadedPlantProfilePhoto(uploadedPath);

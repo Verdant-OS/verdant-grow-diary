@@ -29,10 +29,12 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       update: (payload: Record<string, unknown>) => ({
-        eq: async (_column: string, id: string) => {
-          backend.updates.push({ id, payload: { ...payload } });
-          return { error: null };
-        },
+        eq: (_column: string, id: string) => ({
+          select: async () => {
+            backend.updates.push({ id, payload: { ...payload } });
+            return { data: [{ id }], error: null };
+          },
+        }),
       }),
     }),
   },

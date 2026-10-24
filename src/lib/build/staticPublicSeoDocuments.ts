@@ -115,10 +115,18 @@ function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]
             `<li><a href="${escapeStaticHtml(link.to)}">${escapeStaticHtml(link.label)}</a></li>`,
         )
         .join("");
+      const downloads = (section.downloads ?? [])
+        .filter((file) => file.href.startsWith("/downloads/") && isSafeStaticInternalPath(file.href))
+        .map(
+          (file) =>
+            `<li><a href="${escapeStaticHtml(file.href)}" download="${escapeStaticHtml(file.fileName)}">${escapeStaticHtml(file.label)}</a> ${escapeStaticHtml(file.description)}</li>`,
+        )
+        .join("");
       return [
         `<section><h2>${escapeStaticHtml(section.heading)}</h2>`,
         `<p>${escapeStaticHtml(section.body)}</p>`,
         links ? `<ul>${links}</ul>` : "",
+        downloads ? `<ul aria-label="Blank record downloads">${downloads}</ul>` : "",
         "</section>",
       ].join("");
     })

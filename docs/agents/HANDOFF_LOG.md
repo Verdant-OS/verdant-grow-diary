@@ -53,10 +53,10 @@ goal: Add public /vpd-chart (chart, heatmap, leaf-offset calculator) beside the 
 branch: cursor/vpd-chart-page-3b09
 base: verdant-grow-diary
 checkout: git fetch origin cursor/vpd-chart-page-3b09 verdant-grow-diary && git switch cursor/vpd-chart-page-3b09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the pull request is opened
-head_sha: d1b84f85fd3b64361d0adcfc29616eba64201163 (local commit 2026-10-24; confirm origin after push)
-state: implemented locally; typecheck, targeted tests, sitemap-robots parity, and production build passed
-next_action: Push the branch and open the PR against verdant-grow-diary. Watch required CI.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2533
+head_sha: e545fdd4b4724f53ae5474b4ee55991d90405dd5 (pushed 2026-10-24; this docs update follows that head and cannot name its own SHA)
+state: pushed; PR #2533 open against verdant-grow-diary
+next_action: Watch required CI on #2533 and fix failures this PR causes. Independent review is still unassigned.
 files: src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md
 blockers: none for repository work. No publish, SQL, or production write.
 artifacts: uploaded HTML and brief are not in the repo

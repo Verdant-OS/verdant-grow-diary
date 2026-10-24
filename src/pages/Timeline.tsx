@@ -1711,7 +1711,10 @@ export default function Timeline() {
     const result = findNextMissingAction(scopedRecentLaneRawEntries, new Date());
     setMissingAction(result);
     if (result.status === "found") {
-      const targetId = findNewestEntryIdForCategory(entries, result.suggestion.category);
+      const targetId = findNewestEntryIdForCategory(
+        scopedHistoryEntries,
+        result.suggestion.category,
+      );
       if (targetId && typeof document !== "undefined") {
         const node = document.getElementById(`timeline-entry-${targetId}`);
         const prefersReduced =

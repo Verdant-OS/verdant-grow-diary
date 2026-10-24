@@ -373,6 +373,26 @@ describe("Timeline next missing action follows the plant filter", () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
+  it("jumps to the filtered plant's entry when another plant logged the same care more recently", async () => {
+    // Plant A fed daily and stopped 10 days ago; plant B is feeding on rhythm.
+    const rows = [
+      careEntry("a-feed-1", PLANT_A, "feeding", 12),
+      careEntry("a-feed-2", PLANT_A, "feeding", 11),
+      careEntry("a-feed-3", PLANT_A, "feeding", 10),
+      careEntry("b-feed-1", PLANT_B, "feeding", 3),
+      careEntry("b-feed-2", PLANT_B, "feeding", 2),
+      careEntry("b-feed-3", PLANT_B, "feeding", 1),
+    ];
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: rows, error: null, count: rows.length };
+      return { data: [], error: null };
+    });
+    renderTimeline(`/timeline?plantId=${PLANT_A}`);
+    expect(await clickNextMissingAction()).toMatch(/feeding/i);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect((scrollIntoView.mock.contexts[0] as HTMLElement).id).toBe("timeline-entry-a-feed-3");
+  });
+
   it("reads every plant when no plant is filtered", async () => {
     mockTwoPlantRhythms();
     renderTimeline("/timeline");

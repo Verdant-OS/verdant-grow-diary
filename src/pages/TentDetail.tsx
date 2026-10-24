@@ -28,7 +28,12 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
-import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
+import TentManualSnapshotHistoryList, {
+  type ManualSnapshotHistoryReading,
+} from "@/components/TentManualSnapshotHistoryList";
+import { useTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+import { useTentManualDiarySnapshots } from "@/hooks/useTentManualDiarySnapshots";
+import { buildTentManualHistoryRead } from "@/lib/tentManualEnvironmentEventRules";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
@@ -180,6 +185,17 @@ export default function TentDetail() {
   const allPlants = plantListRead.plants;
   const sensorReadings = useSensorReadings(id);
   const { data: readings = [] } = sensorReadings;
+  // Quick Log V2 manual snapshots are grow_events and diary snapshots, never
+  // sensor_readings. Read only for the owner-verified tent, not the route id.
+  const manualEvents = useTentManualEnvironmentEvents(tent?.id ?? null);
+  const manualDiarySnapshots = useTentManualDiarySnapshots(tent?.id ?? null);
+  // Every read gates the history: a pending or failed read must not let the
+  // list declare an empty or complete history.
+  const manualHistoryRead = buildTentManualHistoryRead<ManualSnapshotHistoryReading>({
+    sensor: sensorReadings,
+    manual: manualEvents,
+    diary: manualDiarySnapshots,
+  });
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
   // Manual history is read only for a tent the owner-scoped tent read
@@ -612,12 +628,10 @@ export default function TentDetail() {
 
       <TentManualSnapshotHistoryList
         tentId={id ?? null}
-        readings={readings}
-        readStatus={sensorReadings.status}
-        isFetching={sensorReadings.isFetching}
-        onRetry={() => {
-          void sensorReadings.refetch();
-        }}
+        readings={manualHistoryRead.readings}
+        readStatus={manualHistoryRead.readStatus}
+        isFetching={manualHistoryRead.isFetching}
+        onRetry={manualHistoryRead.onRetry}
       />
 
       <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />

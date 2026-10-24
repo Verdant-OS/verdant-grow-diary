@@ -5,9 +5,8 @@
 **Does not replace or delay:** `POSTGRES_RESTRICTED_ROLE_SPIKE`
 
 Nested `package.json` overrides the `@connectrpc/connect-node` transitive
-`undici` to `6.28.0` so `bun audit` is clean. That override is spike-local
+`undici` to `6.29.1` so `bun audit` is clean. That override is spike-local
 and must not be copied into the root application.
-
 
 ## 1. Goal
 

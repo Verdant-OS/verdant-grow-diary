@@ -110,13 +110,16 @@ any other file.
       AND jsonb_typeof(d.details -> 'manual_sensor_snapshot') = 'object';
    ```
 
-   Guard on `jsonb_typeof(...) = 'number'`, not on `p_sensor ? 'vpd_kpa'`. `jsonb_set` is
-   STRICT. A present-but-null `vpd_kpa` makes `(p_sensor ->> 'vpd_kpa')::numeric` NULL, and
-   `to_jsonb(NULL::numeric)` is NULL, so the `?` guard would set the whole `details` column to
-   NULL. A JSON null, a missing key, or any non-number takes the ELSE branch: temperature and
-   humidity still update, and no `vpd_kpa` key is written. `quicklog_correct_entry` already
-   rejects a null sensor value (`20261014210000:442-468`), but this function is the one being
-   replaced, so the guard lives here.
+   Guard the new VPD branch on `jsonb_typeof(...) = 'number'`, not on `p_sensor ? 'vpd_kpa'`.
+   `jsonb_set` is STRICT. A present-but-null `vpd_kpa` makes
+   `(p_sensor ->> 'vpd_kpa')::numeric` NULL, and `to_jsonb(NULL::numeric)` is NULL, so the `?`
+   guard would set the whole `details` column to NULL. A JSON null, a missing key, or any
+   non-number takes the ELSE branch: temperature and humidity still update, and no `vpd_kpa`
+   key is written. A null temperature or humidity has the same STRICT `jsonb_set` exposure in
+   this mirror UPDATE (`20261014210000:287-294`) and in the unchanged `sensor_snapshot` VPD
+   write (`:278`). `quicklog_correct_entry` rejects a non-number sensor value
+   (`:451`), so a normal save cannot reach those paths. Leave those existing `?` guards as
+   they are. This function is the one being replaced, so the new VPD branch is guarded here.
 
    `create = true` works here because the `WHERE` guarantees the parent object exists. The key
    is written **only** when the correction carries a numeric VPD, so a temperature-only
@@ -125,10 +128,17 @@ any other file.
 
 4. Repeat `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role` (idempotent; grants
    unchanged).
-5. **Postflight, fail closed.** `prosrc` contains `'{manual_sensor_snapshot,vpd_kpa}'` and
-   `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'`, and it does not contain
-   `p_sensor ? 'vpd_kpa'` as the mirror-VPD branch guard; the privileges are as in step 2;
-   `quicklog_correct_entry` is unchanged (md5 equals the `20261014210000` body).
+5. **Postflight, fail closed.** Privileges are as in step 2. `quicklog_correct_entry` is
+   unchanged (md5 equals the `20261014210000` body). Check the mirror UPDATE only. Take the
+   `prosrc` slice that starts at `'{manual_sensor_snapshot,temp_f}'` and ends at the next
+   `jsonb_typeof(d.details -> 'manual_sensor_snapshot')` (that UPDATE's `WHERE`). That slice
+   must contain `'{manual_sensor_snapshot,vpd_kpa}'` and
+   `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'`, and it must not contain
+   `p_sensor ? 'vpd_kpa'`. Do not search all of `prosrc` for `p_sensor ? 'vpd_kpa'`: that
+   string stays in the unchanged `environment_events` UPDATE (`20261014210000:262`) and the
+   unchanged `sensor_snapshot` UPDATE (`:278`). A whole-body substring check fails closed on
+   every run. The full-body md5 in step 2 already identifies a re-run; this slice check does
+   not replace it.
 6. `COMMIT; NOTIFY pgrst, 'reload schema';`
 
 **Key name.** `vpd_kpa` names its unit, as `temp_f` and `humidity_percent` do. It is the name the

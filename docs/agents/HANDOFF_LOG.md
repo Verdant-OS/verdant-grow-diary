@@ -55,14 +55,14 @@ base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (open, not draft)
 head_sha: read the PR's current full head before resuming
-state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
+state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9). Postflight searches only the manual_sensor_snapshot UPDATE slice for p_sensor ? 'vpd_kpa'; the environment_events and sensor_snapshot copies of that string stay. Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
 next_action: Route an eligible independent review of the spec at its exact head. Matthew's option choice and the migration's per-PR decision remain his.
 files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
 blockers: None for slice 2: #2504 merged as 3ef43ee49, so src/lib/tentManualEnvironmentEventRules.ts is on the deploy branch. The migration is Matthew's per-PR decision; applying 20261014210000 stays blocked by #2503.
 artifacts: the spec file above
 reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3; this author is excluded
 claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-23 UTC (Matthew's direct assignment)
-last_updated: 2026-10-24 06:44 CT, by Grok (cloud review-fix on #2508)
+last_updated: 2026-10-24 06:48 CT, by Grok (cloud review-fix on #2508)
 ```
 
 ### REVIEWER-ROUTING-20261022

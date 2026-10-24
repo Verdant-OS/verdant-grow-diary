@@ -382,15 +382,19 @@ export function scrubEvent<T>(event: T): T {
   return next as T;
 }
 
+const FAILURE_CODE = /^[A-Za-z0-9_]{1,40}$/;
+
 function scrubTags(tags: unknown): Record<string, string> | undefined {
   if (!tags || typeof tags !== "object" || Array.isArray(tags)) return undefined;
   const record = tags as Record<string, unknown>;
+  const failureCode = record.failure_code;
   const rebuilt = manualReportTags({
     source: typeof record.source === "string" ? record.source : undefined,
     route: typeof record.route === "string" ? record.route : undefined,
     handled: eventHandled(record.handled),
     failureKind: failureKindTag(record.failure_kind),
-    failureCode: typeof record.failure_code === "string" ? record.failure_code : undefined,
+    failureCode:
+      typeof failureCode === "string" && FAILURE_CODE.test(failureCode) ? failureCode : undefined,
   });
   return Object.keys(rebuilt).length > 0 ? rebuilt : undefined;
 }
@@ -401,7 +405,6 @@ export function normalizeCaughtError(error: unknown): Error {
 }
 
 const FAILURE_KINDS = new Set(["timeout", "network", "db"]);
-const FAILURE_CODE = /^[A-Za-z0-9_]{1,40}$/;
 
 function failureKindTag(value: unknown): ManualReportContext["failureKind"] {
   return typeof value === "string" && FAILURE_KINDS.has(value)

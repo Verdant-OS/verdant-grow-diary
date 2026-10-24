@@ -255,6 +255,7 @@ function GrowsProviderForOwner({
 
   useEffect(() => {
     return () => {
+      initialReadStartedRef.current = false;
       growReadGenerationRef.current += 1;
       retryCancelRef.current?.();
       retryCancelRef.current = null;

@@ -12,6 +12,9 @@ export const GROW_READ_RETRY_DELAYS_MS = [200, 400] as const;
  */
 export const GROW_READ_BUDGET_MS = 12_000;
 
+/** Do not start another attempt when less than this much budget remains. */
+export const GROW_READ_MIN_RETRY_MS = 1_000;
+
 /** How long the first grows read waits for the post-sign-in session check. */
 export const AUTH_SETTLE_WAIT_MS = 2_000;
 
@@ -188,6 +191,7 @@ export async function readWithGrowRetry<T>(
     const delay = delays[attempt];
     if (delay === undefined) break;
     const elapsed = now() - startedAt;
+    if (budgetMs - elapsed < GROW_READ_MIN_RETRY_MS) break;
     if (elapsed + delay >= budgetMs) break;
     if (controls.sleep) await controls.sleep(delay);
     else await defaultSleep(delay, controls.onDelay);

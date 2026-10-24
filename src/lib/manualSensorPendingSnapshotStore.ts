@@ -3,6 +3,11 @@ import { validateManualEntry, type ManualEntryInput } from "./sensorReadingManua
 import { isCanonicalManualSensorPayload } from "./manualSensorProvenanceRules";
 import { normalizeManualSourceNote } from "./manualSensorSourceLabel";
 import {
+  convertTemperatureInputString,
+  parseTemperatureInput,
+  type TemperatureInputUnit,
+} from "./sensorInputUnitConversion";
+import {
   createManualDraftValues,
   type ManualDraftValues,
   type ManualSnapshotPayloads,
@@ -12,6 +17,8 @@ export interface PendingManualSnapshot {
   version: 1;
   ownerId: string;
   payloads: ManualSnapshotPayloads;
+  /** The unit the grower typed the air temperature in; display only, never sent. */
+  airTempUnit?: TemperatureInputUnit;
 }
 
 export const MANUAL_RECOVERY_STORAGE_ERROR =
@@ -61,8 +68,9 @@ function valid(value: unknown, ownerId: string): value is PendingManualSnapshot 
   if (
     !owner(ownerId) ||
     !object(value) ||
-    !exactKeys(value, ["version", "ownerId", "payloads"]) ||
+    !exactKeys(value, ["version", "ownerId", "payloads", "airTempUnit"]) ||
     value.version !== 1 ||
+    (value.airTempUnit !== undefined && value.airTempUnit !== "C" && value.airTempUnit !== "F") ||
     value.ownerId !== ownerId ||
     !Array.isArray(value.payloads) ||
     !value.payloads.length ||
@@ -129,10 +137,43 @@ function valid(value: unknown, ownerId: string): value is PendingManualSnapshot 
   return payloads.every((row) => isCanonicalManualSensorPayload(row.raw_payload));
 }
 
-export function restoreManualSnapshotValues(record: PendingManualSnapshot): ManualDraftValues {
+/**
+ * Stored °C (two decimals) re-expressed in `unit`: one decimal when that saves
+ * back to the same °C (200 °F → 93.33 °C → 200 °F), otherwise two decimals,
+ * which always does (77.02 °F → 25.01 °C → 77.02 °F, not 77 → 25 °C).
+ */
+function restoredTemperature(storedC: string, unit: TemperatureInputUnit): string {
+  const oneDecimal = convertTemperatureInputString(storedC, "C", unit, 1);
+  const back = parseTemperatureInput(oneDecimal, unit);
+  const savesBack =
+    back.kind === "ok" &&
+    back.celsius !== null &&
+    Math.round(back.celsius * 100) / 100 === Number(storedC);
+  return savesBack ? oneDecimal : convertTemperatureInputString(storedC, "C", unit, 2);
+}
+
+/**
+ * Rebuild an unconfirmed snapshot's draft in the unit the form should show.
+ * Payloads hold canonical °C at two decimals; the shown value saves back to
+ * exactly that °C even if another field is edited first.
+ * The draft keeps an explicit unit so the shown number and unit always agree.
+ */
+export function restoreManualSnapshotValues(
+  record: PendingManualSnapshot,
+  displayUnit: TemperatureInputUnit = "C",
+): ManualDraftValues {
   const device = record.payloads[0].device_id;
+  const form = formFor(record.payloads);
+  const shown =
+    displayUnit === "C"
+      ? form
+      : {
+          ...form,
+          airTemp: restoredTemperature(String(form.airTemp ?? ""), displayUnit),
+          airTempUnit: displayUnit,
+        };
   return {
-    ...createManualDraftValues(formFor(record.payloads), "C"),
+    ...createManualDraftValues(shown, displayUnit),
     hasEditedReading: true,
     devicePreset: device ? "custom" : "none",
     deviceCustom: device?.slice(7) ?? "",
@@ -161,7 +202,8 @@ export function claimPendingManualSnapshot(
     const current = readPendingManualSnapshot(record.ownerId);
     if (current.status === "blocked") return current;
     if (current.status === "pending")
-      return JSON.stringify(current.record) === JSON.stringify(record)
+      // The snapshot's identity is its payloads; the entry unit is display only.
+      return JSON.stringify(current.record.payloads) === JSON.stringify(record.payloads)
         ? { status: "claimed", record: current.record }
         : current;
     const raw = JSON.stringify(record);
@@ -177,7 +219,10 @@ export function clearPendingManualSnapshot(record: PendingManualSnapshot): boole
   try {
     if (!valid(record, record.ownerId)) return false;
     const current = readPendingManualSnapshot(record.ownerId);
-    if (current.status !== "pending" || JSON.stringify(current.record) !== JSON.stringify(record))
+    if (
+      current.status !== "pending" ||
+      JSON.stringify(current.record.payloads) !== JSON.stringify(record.payloads)
+    )
       return false;
     window.sessionStorage.removeItem(key(record.ownerId));
     return window.sessionStorage.getItem(key(record.ownerId)) === null;

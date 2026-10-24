@@ -181,9 +181,11 @@ export default function Auth() {
         return;
       }
       if (result.redirected) return; // browser redirects to Google
-      // The session effect routes once `user` is set, so a stale null user
-      // cannot replace an explicit redirect or skip plant resolution.
+      // A session is already here, so the one-shot handoff is consumed now.
+      // An explicit safe return leaves immediately. The plant route waits
+      // until `user` is set and only applies when there is no explicit target.
       clearPendingOAuthPostAuthRedirect();
+      if (explicitRedirect) nav(explicitRedirect, { replace: true });
     } catch {
       if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
       clearPendingOAuthPostAuthRedirect();
@@ -425,6 +427,7 @@ export default function Auth() {
       signInEmailRef.current?.focus();
       return;
     }
+    if (explicitRedirect) nav(explicitRedirect, { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
@@ -524,6 +527,10 @@ export default function Auth() {
       setSignUpSuccess(
         "Account created. Check your inbox and open the verification link to continue.",
       );
+      return;
+    }
+    if (explicitRedirect) {
+      nav(explicitRedirect, { replace: true });
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Your account is ready.");

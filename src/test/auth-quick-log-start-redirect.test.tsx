@@ -131,9 +131,6 @@ describe("Auth start-screen routing", () => {
     });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "longenough1" } });
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
-    await waitFor(() => expect(h.signIn).toHaveBeenCalled());
-    expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows");
-    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows"));
   });
 
@@ -147,20 +144,12 @@ describe("Auth start-screen routing", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "longenough1" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /terms of service/i }));
     fireEvent.click(screen.getByRole("button", { name: /^create account$/i }));
-    await waitFor(() => expect(h.signUp).toHaveBeenCalled());
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/auth?mode=signup&redirectTo=%2Fgrows",
-    );
-    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows"));
   });
 
   it("keeps redirectTo after Google sign-in once the user is set", async () => {
     renderAuth("/auth?redirectTo=%2Fgrows");
     fireEvent.click(screen.getAllByRole("button", { name: /continue with google/i })[0]);
-    await waitFor(() => expect(h.oauth).toHaveBeenCalled());
-    expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows");
-    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows"));
   });
 

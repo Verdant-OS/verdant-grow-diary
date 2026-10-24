@@ -55,9 +55,13 @@ const PRO_UNLOCKED_FEATURES = [
   "Date-range diary & post-grow reports",
 ];
 
+// Craft and existing Founder Lifetime holders both have the `blueprint`
+// capability (planCatalog); Pro does not.
+const BLUEPRINT_FEATURE = "Pro Blueprint: live per-stage SOP scoring";
+
 const CRAFT_UNLOCKED_FEATURES = [
   ...PRO_UNLOCKED_FEATURES,
-  "Pro Blueprint: live per-stage SOP scoring",
+  BLUEPRINT_FEATURE,
   "300 AI Doctor credits / month",
 ];
 
@@ -127,6 +131,7 @@ export const PRICING_TIERS: PricingTier[] = [
     cap: { total: FOUNDER_LIFETIME_LIMIT, claimed: 0 },
     features: [
       ...PRO_UNLOCKED_FEATURES,
+      BLUEPRINT_FEATURE,
       "Ongoing Pro-level access",
       "Founder badge & early-supporter perks",
     ],

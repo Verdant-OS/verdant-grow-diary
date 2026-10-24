@@ -340,6 +340,7 @@ describe("evaluatePolicy", () => {
     ["@vitest/mocker", "4.1.10"],
     ["esbuild", "0.28.0"],
     ["undici", "6.28.0"],
+    ["zod", "4.6.6"],
     // Floors carried over from the retired package-lock.json check.
     ["vite", "6.4.2"],
     ["postcss", "8.5.6"],

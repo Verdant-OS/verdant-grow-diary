@@ -49,20 +49,20 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK PR-2345-BASE-INTEGRATION  priority: P2  status: OPEN
-goal: Integrate the latest deploy base into #2345, preserve the temperature fixes, push and refresh CI; report queue readiness without merging the PR or deploying.
+goal: Integrate the latest deploy base into #2345, preserve the temperature tests, push and refresh CI, obtain eligible outside acceptance, and report queue readiness without merging the PR or deploying.
 branch: claude/settings-temperature-reset-label
-base: verdant-grow-diary at 158f2726ca6a9d6452be04e06d834a6954dba43d
+base: verdant-grow-diary at 0451952b355076500fb1d04797d84b96ed9accd8
 checkout: git switch claude/settings-temperature-reset-label && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345
-head_sha: 24938fc0853a26514d41c3de86d57d4738ab303d (verified remote source checkpoint before this integration commit; read the PR for its resulting full head before resuming or reviewing)
-state: This integration merges base 158f2726. Merged #2405 already supplies both production fixes, so Settings.tsx and both existing reset suites are preserved byte-for-byte from that base. The remaining feature delta is six supplemental preference-event cases in a new test file. Focused validation: 8 files, 87 passed, 0 failed. Hosted CI and independent acceptance of the resulting head are NOT_MEASURED here.
-next_action: Verify the pushed full head, observe its required CI and applicable safeguards, and obtain a fresh eligible independent review before queue readiness. No PR merge or deploy is authorized.
+head_sha: a8e2a28951f5ac838d596e1ba78bf35380f1ef8a (verified remote source checkpoint before this integration commit; read the PR for its resulting full head before resuming or reviewing)
+state: This integration merges base 0451952b. Settings.tsx and all three temperature reset test files are preserved byte-for-byte from source head a8e2a289. The feature delta remains the six supplemental preference-event cases and this handoff. Focused validation: 8 files, 87 passed, 0 failed; local typecheck retains two known diagnostics in the unchanged not-found route test. New-head hosted CI and eligible independent acceptance are NOT_MEASURED here; the prior Codex technical review is not release acceptance.
+next_action: Verify the pushed full head and its CI, then obtain a fresh non-contributing Claude/Grok review through an authenticated session. No PR merge, queue entry or deploy is authorized.
 files: src/test/temperature-unit-reset-events.test.tsx; docs/agents/HANDOFF_LOG.md
-blockers: New-head hosted CI and independent review remain unverified. Four prior threads were unresolved/outdated at the source checkpoint; no thread resolution was requested. Open #2434 overlaps one same-document test case; its branch and work remain untouched.
+blockers: Claude Code availability check reported loggedIn=false. Grok CLI requires reauthentication. No eligible outside request has been sent, and no Codex self-acceptance is substituted. All nine threads were resolved at source head a8e2a289; recheck after the new push. Open #2434 overlaps one same-document test case; its branch and work remain untouched.
 artifacts: This branch, config/required-status-checks.json, and the PR's new-head checks. Local typecheck result is reported in the chat rather than inherited from another head.
-reviewer_seat: Pending fresh eligible outside session; the private review of 24938fc0 does not transfer to a base-merge commit.
+reviewer_seat: BLOCKED pending an authenticated fresh Claude/Grok session; availability probes only, no review request sent, fallback transfers=0. Earlier-head reviews do not transfer.
 claimed_by: Codex PR #2345 repair session, Matthew's direct assignment on 2026-10-24; no external claim comment posted.
-last_updated: 2026-10-24 18:11 UTC, by Codex PR #2345 repair session
+last_updated: 2026-10-24 20:02 UTC, by Codex PR #2345 repair session
 ```
 
 ### REVIEWER-ROUTING-20261022

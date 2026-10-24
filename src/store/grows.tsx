@@ -21,6 +21,12 @@ import {
   type HierarchyCreateVisibleListReceipt,
 } from "@/hooks/useHierarchyCreateOutcomeRecoveryCoordinator";
 import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
+import { reportErrorWhenReady } from "@/lib/errorReporter";
+import {
+  classifyGrowReadFailure,
+  readWithGrowRetry,
+  type GrowReadFailure,
+} from "@/lib/growsReadRetryRules";
 
 export type Grow = GrowRow;
 
@@ -39,6 +45,16 @@ const GrowsCtx = createContext<Ctx>({} as Ctx);
 
 type PublishedGrowRead =
   { status: "published"; rows: Grow[] } | { status: "stale" | "unavailable" };
+
+function publishGrowReadFailure(failure: GrowReadFailure): void {
+  console.error("GrowsProvider.refresh error:", failure.kind, failure.code);
+  void reportErrorWhenReady(new Error("grows_read_failed"), {
+    source: "grows_provider",
+    handled: true,
+    failureKind: failure.kind,
+    failureCode: failure.code,
+  });
+}
 
 /**
  * Active-grow selection is private per authenticated account. The legacy
@@ -61,15 +77,23 @@ function readActiveGrowId(ownerId: string | null): string | null {
  * refresh is still in flight.
  */
 export function GrowsProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   return (
-    <GrowsProviderForOwner key={user?.id ?? "signed-out"} user={user}>
+    <GrowsProviderForOwner key={user?.id ?? "signed-out"} user={user} authLoading={loading}>
       {children}
     </GrowsProviderForOwner>
   );
 }
 
-function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: User | null }) {
+function GrowsProviderForOwner({
+  children,
+  user,
+  authLoading,
+}: {
+  children: ReactNode;
+  user: User | null;
+  authLoading: boolean;
+}) {
   const ownerId = user?.id ?? null;
   const storageKey = activeGrowStorageKey(ownerId);
   const [grows, setGrows] = useState<Grow[]>([]);
@@ -103,39 +127,39 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
       if (!canPublish()) return { status: "stale" };
 
       setLoading(true);
+      const stillCurrent = () =>
+        canPublish() && requestGeneration === growReadGenerationRef.current;
       try {
-        const { data, error: qErr } = await withCriticalReadDeadline(
-          supabase.from("grows").select("*").order("created_at", { ascending: false }),
-        );
-        if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
-          return { status: "stale" };
-        }
-
-        if (qErr) {
-          console.error("GrowsProvider.refresh error:", qErr.message);
+        const outcome = await readWithGrowRetry(async () => {
+          if (!stillCurrent()) return { ok: true, value: null };
+          try {
+            const { data, error: qErr } = await withCriticalReadDeadline(
+              supabase.from("grows").select("*").order("created_at", { ascending: false }),
+            );
+            if (qErr) return { ok: false, failure: classifyGrowReadFailure(qErr) };
+            return { ok: true, value: (data as Grow[] | null) ?? [] };
+          } catch (caught) {
+            return { ok: false, failure: classifyGrowReadFailure(caught) };
+          }
+        });
+        if (!stillCurrent()) return { status: "stale" };
+        if (!outcome.ok) {
+          publishGrowReadFailure(outcome.failure);
           setGrows([]);
           setArchivedGrows([]);
-          setError(qErr.message);
+          setError(
+            outcome.failure.kind === "timeout" ? "critical_read_deadline" : "Unable to load grows",
+          );
           return { status: "unavailable" };
         }
-
-        const partitioned = partitionGrowsByArchive((data as Grow[] | null) ?? []);
+        if (outcome.value === null) return { status: "stale" };
+        const partitioned = partitionGrowsByArchive(outcome.value);
         setGrows(partitioned.active);
         setArchivedGrows(partitioned.archived);
         setError(null);
         return { status: "published", rows: partitioned.active };
-      } catch (caught) {
-        if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
-          return { status: "stale" };
-        }
-        const message = caught instanceof Error ? caught.message : "Unable to load grows";
-        console.error("GrowsProvider.refresh error:", message);
-        setGrows([]);
-        setArchivedGrows([]);
-        setError(message);
-        return { status: "unavailable" };
       } finally {
-        if (canPublish() && requestGeneration === growReadGenerationRef.current) setLoading(false);
+        if (stillCurrent()) setLoading(false);
       }
     },
     [user],
@@ -162,8 +186,12 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
   );
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (authLoading) return;
+    void refresh();
+    return () => {
+      growReadGenerationRef.current += 1;
+    };
+  }, [authLoading, refresh]);
 
   // Auto-select first grow if none selected; clear after a successful read with no active grows
   useEffect(() => {

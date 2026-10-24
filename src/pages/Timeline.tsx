@@ -324,7 +324,14 @@ function buildTimelineDiaryPhotoDisplayRows(
     }
     if (reference.kind === "storage") {
       privatePhotoPathById.set(row.id, reference.path);
-      return { ...row, photo_url: null, photo_object_path: reference.path };
+      // Keep the private path for blank-mirror dedupe after signing, and the
+      // reference source the initial signer requires before it will apply a URL.
+      return {
+        ...row,
+        photo_url: null,
+        photo_object_path: reference.path,
+        photoReferenceSource,
+      };
     }
 
     return { ...row, photo_url: null, photoReferenceSource };

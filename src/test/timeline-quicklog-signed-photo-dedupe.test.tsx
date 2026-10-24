@@ -298,8 +298,10 @@ describe("signed photo quick-log dedupe", () => {
     expect(await screen.findByText("Photo attached from Quick Log.")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByText("(quick log)")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("timeline-entry")).toHaveLength(1);
+      // The base signer applies the signed URL after the first paint, and only
+      // while the row still references the private path it asked to sign.
+      expect(screen.getByRole("img").getAttribute("src")).toBe(SIGNED_URL);
     });
-    expect(screen.getAllByTestId("timeline-entry")).toHaveLength(1);
-    expect(screen.getByRole("img").getAttribute("src")).toBe(SIGNED_URL);
   });
 });

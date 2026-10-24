@@ -799,8 +799,31 @@ jobs:
           for i in 1 2 3 4 5 6 7 8; do
             n=$(( base + i ))
             echo "Running sub-shard ${n}/256 for gate shard ${{ matrix.shard }}/32"
-            bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
+            # Coverage is collected only for gate shard 1/32: instrumenting all
+            # 256 sub-shard processes would add real memory/time overhead to a
+            # job already tuned against repeated OOM (#697). Shard 1 is a
+            # genuine, non-synthetic sample of the real suite — its raw
+            # Istanbul maps are merged into one Cobertura report below.
+            if [[ "${{ matrix.shard }}" == "1" ]]; then
+              bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests --coverage --coverage.reporter=json --coverage.reportsDirectory=coverage-raw/${n}
+            else
+              bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
+            fi
           done
+
+      # Raw per-sub-shard Istanbul coverage maps for gate shard 1/32 only (see
+      # the coverage comment above). .github/workflows/coverage.yml merges and
+      # uploads them after CI completes, so ci.yml keeps exactly the 35
+      # unconditional jobs the deploy ruleset requires. Skipped for fork PRs:
+      # the upload needs code-quality: write, which forked PRs cannot be granted.
+      - name: Upload raw coverage sample (gate shard 1/32)
+        if: matrix.shard == 1 && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-raw-typescript
+          path: coverage-raw/
+          if-no-files-found: error
+          retention-days: 7
 
   quicklog-correction-measured-values:
     name: Quick Log correction measured values

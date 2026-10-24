@@ -135,6 +135,7 @@ import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
   FEEDING_SAVE_SUCCESS_MESSAGE,
+  assessFeedingEcFields,
   buildFeedingFormPayload,
   feedingFormReasonToHelper,
   findFeedingPayloadRangeViolation,
@@ -987,6 +988,11 @@ function QuickLogV2SheetForOwner({
   const waterFieldMessage = retryPending
     ? null
     : (waterSaveGate?.footerMessage ?? snapshotGate?.footerMessage ?? null);
+  // #2159: a negative feeding EC is named under its field and blocks Save
+  // while typed, not only when the save is attempted.
+  const feedingEcGate =
+    form.action === "feed" && !retryPending ? assessFeedingEcFields(feedingForm) : null;
+  const feedingFieldMessage = feedingEcGate?.footerMessage ?? null;
   const largeWaterAssessment =
     form.action === "water" && !retryPending
       ? assessLargeWaterAmount({
@@ -1063,6 +1069,7 @@ function QuickLogV2SheetForOwner({
           selectedTargetMissing,
           volumeMissing,
           waterFieldMessage,
+          feedingFieldMessage,
           largeWaterMessage: largeWaterAssessment?.needsConfirmation
             ? largeWaterAssessment.message
             : null,
@@ -3337,6 +3344,7 @@ function QuickLogV2SheetForOwner({
                 disabled={feedingSaving || wateringSaving || saving || submissionLocked}
                 defaultsApplied={feedingDefaultsApplied}
                 entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
+                ecFieldErrors={feedingEcGate?.fields}
               />
             </div>
           )}
@@ -3985,6 +3993,7 @@ function QuickLogV2SheetForOwner({
                       (selectedTargetStale && !retryPending) ||
                       (criticalContentMissing && !retryPending) ||
                       (Boolean(waterFieldMessage) && !retryPending) ||
+                      Boolean(feedingFieldMessage) ||
                       Boolean(largeWaterAssessment?.needsConfirmation) ||
                       Boolean(archivedGrowActionBlock)
                     }
@@ -4015,6 +4024,7 @@ function getSaveHelperMessage(input: {
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
   waterFieldMessage: string | null;
+  feedingFieldMessage?: string | null;
   largeWaterMessage?: string | null;
   criticalContentMissing: boolean;
   saving: boolean;
@@ -4025,6 +4035,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.waterFieldMessage) return input.waterFieldMessage;
+  if (input.feedingFieldMessage) return input.feedingFieldMessage;
   if (input.largeWaterMessage) return input.largeWaterMessage;
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;

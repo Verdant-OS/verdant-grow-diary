@@ -139,6 +139,7 @@ import {
   type TimelineDiaryPhotoReferenceSource,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
+  timelineEntryHasNoteText,
   timelineMeasurementChipCount,
   timelineResultsCountReceiptSuffix,
   timelineStageChipRows,
@@ -364,7 +365,12 @@ type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "acti
 
 function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
   const kinds: EventFilter[] = [];
-  if (!isTimelineSensorDerivedDiaryId(e.id)) kinds.push("note");
+  // "Notes" means the grower wrote something: an empty note, or text Verdant
+  // generated in its place (Quick Log fallbacks, outcome defaults), is not a
+  // note (Pollen #1).
+  if (!isTimelineSensorDerivedDiaryId(e.id) && timelineEntryHasNoteText(e.note)) {
+    kinds.push("note");
+  }
   if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
   // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
@@ -3602,6 +3608,7 @@ function FilterChip({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={active}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition",
         active

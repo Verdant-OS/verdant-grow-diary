@@ -54,15 +54,15 @@ branch: cursor/vpd-chart-page-3b09
 base: verdant-grow-diary
 checkout: git fetch origin cursor/vpd-chart-page-3b09 verdant-grow-diary && git switch cursor/vpd-chart-page-3b09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2533
-head_sha: e545fdd4b4724f53ae5474b4ee55991d90405dd5 (pushed 2026-10-24; this docs update follows that head and cannot name its own SHA)
-state: pushed; PR #2533 open. Sour Diesel blocked 8e550e70 on keystroke clamping. Repair commits draft text for air, RH, and leaf offset (clamp on blur or Enter), regenerates the route tree header, and adds a page test.
-next_action: Confirm the repair head on #2533 and required CI. Independent review is still unassigned.
-files: src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md
+head_sha: 7276f288357bc4cbc8fe03039f0f07e2b5a8f275 (Sour Diesel PASS). This cleanup follows that head and cannot name its own SHA.
+state: pushed; PR #2533 open. Sour Diesel passed 7276f288. Cleanup removes lint-staged.config.mjs, ignores the generated route tree in ESLint, and extends the page tests.
+next_action: Confirm the cleanup head on #2533 and required CI. Independent review of the cleanup head is still unassigned.
+files: eslint.config.js; src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; src/test/public-vpd-chart-page.test.tsx; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md
 blockers: none for repository work. No publish, SQL, or production write.
 artifacts: uploaded HTML and brief are not in the repo
 reviewer_seat: independent Claude or Grok session that did not author this slice; this Grok session cannot accept it
 claimed_by: Grok cloud session, 2026-10-24 20:10 UTC
-last_updated: 2026-10-24 20:10 UTC, by Grok
+last_updated: 2026-10-24 20:42 UTC, by Grok
 ```
 
 ### REVIEWER-ROUTING-20261022

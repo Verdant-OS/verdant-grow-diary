@@ -181,6 +181,7 @@ export default function PublicVpdChart() {
                 type="button"
                 className="px-3 py-2 text-sm"
                 aria-pressed={isFahrenheit}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => setUnit("F")}
               >
                 °F
@@ -189,6 +190,7 @@ export default function PublicVpdChart() {
                 type="button"
                 className="px-3 py-2 text-sm"
                 aria-pressed={!isFahrenheit}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => setUnit("C")}
               >
                 °C

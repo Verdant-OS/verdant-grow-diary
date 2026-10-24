@@ -17,6 +17,21 @@ function characterCount(text: string): number {
   return Array.from(text).length;
 }
 
+/** YYYY-MM-DD only: a shared date never carries a time of day. */
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** True for a real calendar date; an impossible day (Feb 30, month 13) rolls over and fails. */
+function isCalendarDate(text: unknown): boolean {
+  if (typeof text !== "string") return false;
+  const match = DATE_PATTERN.exec(text);
+  if (match === null) return false;
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
+}
+
 function isPresent(text: string): boolean {
   return typeof text === "string" && text.trim().length > 0;
 }
@@ -42,7 +57,7 @@ function isValidDraft(entry: PublicationDraft): boolean {
     isPresent(entry.action) &&
     isPresent(entry.sourceJournalLabel) &&
     characterCount(entry.sourceJournalLabel) <= SOURCE_LABEL_MAX &&
-    readCommunityInstant(entry.occurredAt) !== null &&
+    (entry.occurredDate === null || isCalendarDate(entry.occurredDate)) &&
     typeof entry.note === "string" &&
     characterCount(entry.note) <= NOTE_MAX &&
     (entry.stage === null || isPresent(entry.stage)) &&

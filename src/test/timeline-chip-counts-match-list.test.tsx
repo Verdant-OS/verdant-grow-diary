@@ -440,7 +440,8 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
 
     renderTimeline();
 
-    // The first async render can pass findByText's 1s default on a loaded CI runner (#2521).
+    // On a loaded CI runner the first async render can exceed findByText's 1s default (#2521);
+    // the case's 15s timeout below leaves room for this 5s wait.
     expect(
       await screen.findByText("QA Test watering note", undefined, { timeout: 5_000 }),
     ).toBeInTheDocument();
@@ -456,7 +457,7 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
     expect(chipCount("Notes")).toBe(2);
     expect(chipCount("Measurements")).toBe(1);
     expect(chipCount("Vegetative")).toBe(2);
-  });
+  }, 15_000);
 
   it("counts storage photos before signed URLs resolve and keeps Photos list equal to Photos count", async () => {
     const pending = deferred<void>();

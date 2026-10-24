@@ -79,7 +79,7 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (draft)
 head_sha: read the PR head after push; base 0673fe6f merged by Claude on 2026-10-24 (governance re-bumped to 2026-10-24.7); this handoff commit cannot name itself
-state: draft PR open; base merged; Blueprint existing-holder copy added in src/config/pricing.ts and AI_CREDIT_EXPLAINER with a new fail-first test; waiting on required checks and a fresh exact-head review
+state: draft PR open; base 0673fe6f merged; Blueprint added to the retained Founder account-display list in src/config/pricing.ts with new fail-first test founder-blueprint-retained-copy (RED 2/5, GREEN 5/5). AI_CREDIT_EXPLAINER existing-holder sentence is BLOCKED: locked src/test/pricing.test.ts "AI credit copy does not sell Founder Lifetime" forbids any Founder word in the explainer, so it needs Matthew's decision. Waiting on required checks and a fresh exact-head review
 next_action: keep the PR draft; fix in-scope required-check failures; existing Codex findings (including credit-pack copy r4320065636) stay open and are not waived by the Blueprint copy
 files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md, src/test/founder-blueprint-retained-copy.test.tsx
 blockers: none for the draft; entitlement removal is a later PR plus migration

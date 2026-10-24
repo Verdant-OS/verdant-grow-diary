@@ -33,6 +33,42 @@ EcoWitt gateway
 
 ## Windows workaround: Verdant HTTP bridge
 
+Commands below are shown twice. PowerShell blocks are for Windows.
+`bash` blocks are for Linux and macOS. `cd` into the checkout you cloned.
+A path such as `/path/to/verdant-grow-diary` or
+`C:\src\verdant-grow-diary` is only a placeholder. Do not use a personal
+OneDrive path: `bun install` fails under OneDrive paths on Windows.
+
+### Before you start — install and start the Mosquitto broker
+
+Start the broker before any subscriber, the HTTP bridge, or the dry-run
+consumer. Those clients connect to `127.0.0.1:1883`. If nothing is
+listening there, the bridge exits with `ECONNREFUSED`.
+
+Windows — install the broker, then start it only if port 1883 is not
+already taken (the installer often registers a service):
+
+```powershell
+winget install EclipseFoundation.Mosquitto
+cd "C:\Program Files\mosquitto"
+.\mosquitto.exe -v -p 1883
+```
+
+Linux (Debian/Ubuntu) and macOS (Homebrew). The manual start listens on
+port 1883 for clients on this machine, including `127.0.0.1`:
+
+```bash
+# Debian/Ubuntu. Skip the manual start if a service is already listening on 1883.
+sudo apt-get update && sudo apt-get install -y mosquitto mosquitto-clients
+# macOS
+brew install mosquitto
+mosquitto -v -p 1883
+```
+
+Leave that terminal open. Verbose logs should include
+`Opening ipv4 listen socket on port 1883`. Do not point this broker at a
+production host.
+
 ### Before you start — install the MQTT client without touching tracked files
 
 The HTTP bridge and the dry-run consumer both load the `mqtt` package at
@@ -40,25 +76,44 @@ runtime. It is not a dependency of the repository, so install it with
 `--no-save`, which leaves `package.json` and `bun.lock` unchanged:
 
 ```powershell
-cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
+cd \path\to\verdant-grow-diary
 bun add --no-save mqtt
 ```
 
-Do not run plain `bun add mqtt` in the checkout: it rewrites the tracked
-`package.json` and `bun.lock`. `git status` should show nothing new after
-this step. Re-run it if `node_modules` is deleted.
+```bash
+cd /path/to/verdant-grow-diary
+bun add --no-save mqtt
+```
+
+This install step installs all repository packages, not only `mqtt`. Its
+prepare script creates the ignored `.husky/_/` folder (that folder ignores
+its own contents). `node_modules/` is ignored too. Do not run plain `bun add mqtt`
+in the checkout: it rewrites the tracked `package.json` and `bun.lock`.
+`git status` should show nothing new after this step. Re-run it if
+`node_modules` is deleted.
 
 ### Terminal 1 — Mosquitto subscriber (sanity check)
+
+The broker from the previous step must already be running.
 
 ```powershell
 cd "C:\Program Files\mosquitto"
 .\mosquitto_sub.exe -h 127.0.0.1 -p 1883 -t "ecowitt/#" -v
 ```
 
+```bash
+mosquitto_sub -h 127.0.0.1 -p 1883 -t "ecowitt/#" -v
+```
+
 ### Terminal 2 — start the Verdant HTTP bridge
 
 ```powershell
-cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
+cd \path\to\verdant-grow-diary
+bun run dev:ecowitt-http-bridge
+```
+
+```bash
+cd /path/to/verdant-grow-diary
 bun run dev:ecowitt-http-bridge
 ```
 
@@ -84,11 +139,20 @@ message to arrive, and the HTTP bridge does not publish retained
 messages, so anything posted before the consumer subscribes is missed.
 
 ```powershell
-cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
+cd \path\to\verdant-grow-diary
 # The runner refuses to start without UPSTREAM_MODE; ecowitt_raw is the mode for this HTTP bridge.
 $env:UPSTREAM_MODE="ecowitt_raw"
 $env:ECOWITT_MQTT_URL="mqtt://127.0.0.1:1883"
 $env:ECOWITT_MQTT_TOPIC="ecowitt/grow"
+bun run dev:ecowitt-mqtt:dry-run -- --once --write-report
+```
+
+```bash
+cd /path/to/verdant-grow-diary
+# The runner refuses to start without UPSTREAM_MODE; ecowitt_raw is the mode for this HTTP bridge.
+export UPSTREAM_MODE=ecowitt_raw
+export ECOWITT_MQTT_URL=mqtt://127.0.0.1:1883
+export ECOWITT_MQTT_TOPIC=ecowitt/grow
 bun run dev:ecowitt-mqtt:dry-run -- --once --write-report
 ```
 
@@ -107,6 +171,11 @@ curl.exe -X POST "http://127.0.0.1:8080/data/report" `
   -d "temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"
 ```
 
+```bash
+curl -X POST "http://127.0.0.1:8080/data/report" \
+  -d "temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"
+```
+
 Expected: HTTP `200`, and Mosquitto subscriber prints a JSON message on
 `ecowitt/grow` containing the metrics plus `received_at`, `transport`
 (`ecowitt_http_local_bridge`), and `topic`. If Terminal 3 was not yet
@@ -122,6 +191,17 @@ gateway upload carries `dateutc`; its report should show
 `stale_timestamp`, and an out-of-range value reports an `invalid_*` reason
 such as `invalid_humidity` or `invalid_temperature`. Those are correct
 fail-closed results, not a broken dry run.
+
+### Stop and clean up
+
+Press Ctrl+C in each terminal you opened: the dry-run consumer (it also
+exits on its own after one message), the HTTP bridge, the Mosquitto
+subscriber, and `mosquitto -v` if you started the broker yourself. Leave
+an already-running Mosquitto service alone.
+
+`tmp/` is ignored. The redacted report at
+`tmp/ecowitt-last-ingest-report.json` stays on disk until you delete it
+and does not show up in `git status`.
 
 ---
 

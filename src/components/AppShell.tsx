@@ -338,6 +338,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         />
         <a
           href="#main-content"
+          onClick={(event) => {
+            // A hash change alone leaves focus on BODY under the router, so
+            // the next Tab restarts at this link. Move focus into main.
+            const main = document.getElementById("main-content");
+            if (!main) return;
+            event.preventDefault();
+            main.focus();
+          }}
           className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Skip to main content

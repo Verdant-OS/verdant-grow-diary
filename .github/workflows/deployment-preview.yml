@@ -136,10 +136,13 @@ jobs:
 
   # Stage 3 — publish the preview status back to the PR. Runs even when
   # earlier stages fail so the PR always shows current preview health.
+  # A run cancelled by a newer push (cancel-in-progress) skips it: the newer
+  # run reports, and a stale "cancelled" comment no longer overwrites it or
+  # posts a red check. A build that fails or times out still reports.
   publish-preview-status:
     name: Publish preview status to PR
     needs: [preflight, build]
-    if: always() && github.event_name == 'pull_request'
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:

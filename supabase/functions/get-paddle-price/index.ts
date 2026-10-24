@@ -175,6 +175,16 @@ Deno.serve(async (req) => {
       return json(400, { error: "unknown_plan" });
     }
 
+    // 2.0 Founder Lifetime is no longer sold (#2028). Refuse it here, before
+    //     the slot lookup or any Paddle call, so a direct call to this
+    //     function cannot open a Founder checkout. Existing Founder rows are
+    //     still honoured by the webhook and entitlement resolution.
+    if (requested === "founder_lifetime") {
+      // Telemetry keeps the sanitized reason enum: no longer a sellable plan.
+      logCatalogUnavailable({ plan: requested, reason: "unknown_plan", stage: "allowlist" });
+      return json(410, { error: "plan_retired" });
+    }
+
     // 2a. Credit packs are merchandised as paid-plan top-ups. Already-owned
     //     grant balance remains portable in the authoritative spend function,
     //     but starting a NEW checkout still requires a verified paid plan.

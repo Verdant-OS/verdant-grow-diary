@@ -40,7 +40,8 @@ export interface PublicationDraft {
   sourceEntryHandle: string;
   sourceRevision: string;
   sourceJournalLabel: string;
-  occurredAt: string;
+  /** Owner-selected calendar date (YYYY-MM-DD) in the owner's timezone; null when not shared. */
+  occurredDate: string | null;
   action: string;
   note: string;
   stage: string | null;
@@ -54,7 +55,8 @@ export interface SharedPublication {
   revision: number;
   publishedAt: string;
   sourceJournalLabel: string;
-  occurredAt: string;
+  /** Date only (YYYY-MM-DD); no time of day is shared. Null when the owner did not select it. */
+  occurredDate: string | null;
   action: string;
   note: string;
   stage: string | null;

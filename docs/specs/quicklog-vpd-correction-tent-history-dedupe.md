@@ -212,8 +212,11 @@ grow_events(id)`, an index, a same-owner trigger, a replacement of the save dele
    Otherwise, once the sibling is dropped, the history list loses the corrected VPD and R2
    fails on that surface.
 
-**What C fixes and what it doesn't:** C fixes R1, and R3 subject to K5, for every row, past and
-future, with no backfill. It does not fix R2 by itself: without A1 the kept mirror card still shows the derived
+**What C fixes and what it doesn't:** C fixes R1, and R3 subject to K5, for rows whose parent,
+sibling and mirror `created_at` values are equal; that covers every save the current delegate
+writes (F1). Rows with a missing, malformed or unequal `created_at` fall back to the value rule
+and stay outside that guarantee. A VPD-corrected one of those can still show two cards. No
+backfill is provided. C does not fix R2 by itself: without A1 the kept mirror card still shows the derived
 VPD. Hence A1 + C.
 
 **Existing rows:** the current delegate inserts the parent, sibling and mirror within one function

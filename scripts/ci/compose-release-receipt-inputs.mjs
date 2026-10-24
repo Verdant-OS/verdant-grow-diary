@@ -116,10 +116,11 @@ const workflowName = env("WORKFLOW") || null;
 const generatedAt = env("GENERATED_AT") || new Date().toISOString();
 
 const totalFailed = commandResults.reduce((a, c) => a + c.failed, 0);
-const overallSummary =
-  totalFailed === 0
-    ? `Verdant CI full suite green (${commandResults.length} commands).`
-    : `Verdant CI full suite has ${totalFailed} failing command(s).`;
+const totalSkipped = commandResults.filter((c) => c.status === "skipped").length;
+const totalUnknown = commandResults.filter((c) => c.status === "unknown").length;
+const overallSummary = commandResults.every((c) => c.status === "pass")
+  ? `Verdant CI receipt validation commands all passed (${commandResults.length} commands).`
+  : `Verdant CI receipt validation commands: ${totalFailed} failing, ${totalSkipped} skipped, ${totalUnknown} unknown/incomplete (${commandResults.length} commands).`;
 
 const emitterInput = {
   artifactId: `ci-full-suite-${runId ?? "local"}-${Date.now()}`,

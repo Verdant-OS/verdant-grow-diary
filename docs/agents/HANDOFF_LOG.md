@@ -53,10 +53,10 @@ goal: Add public /vpd-chart (chart, heatmap, leaf-offset calculator) beside the 
 branch: cursor/vpd-chart-page-3b09
 base: verdant-grow-diary
 checkout: git fetch origin cursor/vpd-chart-page-3b09 verdant-grow-diary && git switch cursor/vpd-chart-page-3b09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED
-head_sha: NOT_MEASURED
-state: local implementation in progress
-next_action: Finish validation, push, and open the PR against verdant-grow-diary.
+pr: NOT_MEASURED until the pull request is opened
+head_sha: d1b84f85fd3b64361d0adcfc29616eba64201163 (local commit 2026-10-24; confirm origin after push)
+state: implemented locally; typecheck, targeted tests, sitemap-robots parity, and production build passed
+next_action: Push the branch and open the PR against verdant-grow-diary. Watch required CI.
 files: src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md
 blockers: none for repository work. No publish, SQL, or production write.
 artifacts: uploaded HTML and brief are not in the repo

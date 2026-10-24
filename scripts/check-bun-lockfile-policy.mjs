@@ -35,19 +35,21 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "form-data": "4.0.6",
   "follow-redirects": "1.16.1",
   "js-yaml": "4.3.2",
-  qs: "6.16.0",
+  qs: "6.16.1",
+  "body-parser": "2.4.0",
   ajv: "6.15.0",
   picomatch: "2.3.2",
   vitest: "4.1.11",
   "@vitest/mocker": "4.1.11",
   esbuild: "0.28.1",
   "brace-expansion": "1.1.21",
-  undici: "6.28.1",
+  undici: "6.29.1",
   "proxy-addr": "2.0.8",
   seroval: "1.6.3",
   "shell-quote": "1.11.0",
   "source-map-js": "1.2.2",
   "postcss-selector-parser": "7.1.6",
+  zod: "4.6.7",
 });
 // Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
 // Absence is safe; every copy must still be patched if it returns transitively.

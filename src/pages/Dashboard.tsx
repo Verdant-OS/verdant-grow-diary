@@ -1,3 +1,4 @@
+import { selectTentEnvironmentManualDisplay } from "@/lib/tentEnvironmentDisplayRules";
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
@@ -965,12 +966,27 @@ export default function Dashboard() {
                       <div className="space-y-2.5">
                         {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
-                          const snapView = buildTentSnapshotView(
-                            tentRows as BuildTentSnapshotInput[],
-                            envStage,
-                            nowTick,
-                            { temperatureUnit },
-                          );
+                          const manualDisplay = selectTentEnvironmentManualDisplay({
+                            tentId: tent.id,
+                            sensorRows: readingsByTent[tent.id] ?? [],
+                            manualReadings: stripManuals.data,
+                            now: nowTick,
+                            sensorStatus: sensorStatusByTent[tent.id] ?? "success",
+                          });
+                          const snapView = manualDisplay
+                            ? {
+                                ...buildTentSnapshotView(manualDisplay.rows, envStage, nowTick, {
+                                  temperatureUnit,
+                                  canonicalVpd: manualDisplay.canonicalVpd,
+                                }),
+                                sourceLabel: "Manual",
+                              }
+                            : buildTentSnapshotView(
+                                tentRows as BuildTentSnapshotInput[],
+                                envStage,
+                                nowTick,
+                                { temperatureUnit },
+                              );
                           // Pending/failed reads must not masquerade as established
                           // absence or as data. Non-UUID ids (mock-fallback tents)
                           // are never queried — a uuid column cannot hold them, so
@@ -1104,6 +1120,12 @@ export default function Dashboard() {
                                     ))}
                                   </div>
                                 </div>
+                              ) : isUuid(tent.id) && stripManualsReadState !== "ready" ? (
+                                <p className="text-xs text-muted-foreground" role="status">
+                                  {stripManualsReadState === "unavailable"
+                                    ? "Quick Log manual history unavailable."
+                                    : "Checking Quick Log manual history…"}
+                                </p>
                               ) : (
                                 <p
                                   className="text-xs text-muted-foreground"

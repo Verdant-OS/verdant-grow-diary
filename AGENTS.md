@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-22.1**
+**Sentinel-Version: 2026-10-24.1**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
@@ -104,9 +104,26 @@ Use small, scoped changes. Avoid broad rewrites.
   Off-limits paths and named holds still require explicit reassignment before editing.
   Production database changes, spend, publish gates and the publish decision remain
   with Matthew; repository work does not authorize those operations.
+  Payment, migration, and production PRs stay out of the merge queue until a human
+  approves that exact SHA. The PR body includes a "Release steps measured" checkbox
+  (wording is recorded in `docs/agents/CURRENT_STATE.md` because
+  `.github/pull_request_template.md` is left unchanged in the amendment that added it).
+- **Repo-wide breakages first.** A check that is red across PRs (for example a
+  dependency audit) is top-priority work, ahead of feature slices. Any paused
+  workflow gets an owner and a re-enable date in `docs/agents/CURRENT_STATE.md`.
+- **Agent instruction files are protected.** `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
+  `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`,
+  `docs/agents/HANDOFF_PROTOCOL.md`, and `docs/agents/roles/*.md` are protected.
+  Hooks and agents must not edit them outside a reviewed pull request.
+- **Stale work.** A PR untouched for 14 or more days, or more than 500 commits
+  behind its base, is closed with a superseded/stale note and its branch is kept,
+  unless an owner claims it.
+- **Close the post-merge loop.** Every feature PR names its post-merge check. A
+  failure of that check reopens the work with the same owner.
 - **One task, one branch, one holder.** New Codex branches use
   `codex/<task-id>-<slug>` in lowercase. There is no shared working branch.
-  Only the agent currently holding a
+  One active writer per PR. `docs/agents/CURRENT_STATE.md` records that writer.
+  Anyone else asks that owner before pushing. Only the agent currently holding a
   branch, per the effective claim (see Agent Handoff / Coverage) in `docs/agents/HANDOFF_LOG.md` or on the task's PR, pushes to it, and no agent edits files on
   another holder's branch. The task goes with the branch: whoever holds the branch holds
   the task. Preserve the original names of existing branches when resuming them.
@@ -146,18 +163,28 @@ Work belongs to the task, not to the agent doing it. Ownership is temporary
 accountability, not permanent dibs. Keep one active implementation writer; a reviewer
 assignment never grants implementation ownership. Claims, releases, explicit
 assignments and named locks below prevent competing writers. Any agent can be cut off at any time
-(token limit, outage, session end), so every open task must be resumable by a different
-agent from one written block.
+(token limit, outage, session end, or retirement), so every open task must be
+resumable immediately by a different agent from one written block. The block is
+tool-agnostic and self-sufficient: Claude Code, Codex, Cursor, and Grok resume cold
+from the PR, the handoff entry, and the repo. No chat history is required. Plain repo
+paths, full SHAs, and URLs only. Never write "as discussed", "per my earlier message",
+or any other session-only pointer.
 
 - **One place to look.** Every in-flight task has a handoff block in
   `docs/agents/HANDOFF_LOG.md`. The log is not a versioned governance file; editing it
-  needs no `Sentinel-Version` bump.
-- **What a block holds.** Task id and priority, goal, branch, base, the exact checkout
-  command, PR and exact head SHA, current state, next action, files touched, blockers,
-  where artifacts live, the independent reviewer seat, `claimed_by`, and `last_updated`
-  (date, time, zone). Use the template at the top of the log.
+  needs no `Sentinel-Version` bump. Write the block before the first push, then update
+  it at every stop.
+- **What a block holds.** Use the template at the top of the log. It records task id and
+  priority, the goal and why, branch, base, the exact checkout command, PR URL, exact
+  head SHA, current step, next step, decisions and their reasons, what was tried and
+  rejected, exact commands that reproduce the current state and run the relevant tests,
+  files touched and files still to touch, blockers, open questions, gotchas, links to
+  the relevant reviews, issues, and runs, where artifacts live, the independent
+  reviewer seat and the SHA that review covers, `claimed_by`, `last_updated` (date,
+  time, zone), and externalized session state: cloud agent ids, routines, paused
+  workflows, and pending human decisions.
 - **When to update it.** At least once a day while the task is open, and always before the
-  agent stops, hands off, or expects to run out of budget. Every daily update includes a
+  agent stops, hands off, expects to run out of budget, or retires. Every daily update includes a
   renewal comment on the task's PR (`claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC`, posted
   by the current holder): a log edit made on a task branch is invisible to a successor
   until it merges, so the PR comment is what keeps the task's activity visible. Push the branch and have its
@@ -165,7 +192,39 @@ agent from one written block.
   can be cut off at any time, and a successor can only claim on a PR. Under
   `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that right asks
   Codex first. A block without a pushed branch and a PR is not eligible for coverage until
-  both exist.
+  both exist. Unpushed work does not count.
+- **Low-token / stop.** When near budget or stopping: push all work, update the handoff
+  entry, and leave a short `resume here` comment on the PR. The comment carries the same
+  cold-start facts as the entry (goal and why, decisions, rejected attempts, commands,
+  files touched and still to touch, open questions, gotchas, and links). Point it at the
+  handoff block and the exact head SHA. Unpushed work does not count.
+- **Cold start test.** Before stopping, check that a fresh agent reading only the PR,
+  the handoff entry, and the repo could take the next step. If the next step depends on
+  chat, fix the entry before stopping.
+- **The PR is the source of truth.** The PR body keeps a gate checklist: required CI
+  green, an independent exact-head review, should-fix findings resolved, and, for a
+  feature PR, the named post-merge check. It also records the last reviewed SHA.
+  The handoff entry points at that body. It does not replace it.
+- **Review findings in one pass.** The reviewer lists every finding at once. The
+  writer then verifies the whole affected section against the real SQL or code,
+  not only the flagged line, and resolves that list in one pass.
+- **Approvals bind to one SHA.** A review verdict and a human go-ahead each apply to
+  one exact head. Neither carries forward to new commits. A new head invalidates the
+  old verdict; pending, acknowledgments, and silence are not PASS. The inheritor never
+  inherits a pass from an older SHA. The merge rule in `docs/agents/CURRENT_STATE.md`
+  is unchanged.
+- **Ownership registry.** `docs/agents/CURRENT_STATE.md` lists the current owner of
+  each open PR or workstream. On retirement, transfer the row. The default inheritor
+  is OG Kush (engineering lead) when no successor is named.
+- **Takeover.** The inheritor reads the handoff, verifies the recorded head SHA matches
+  `origin/<branch>` (the fetch rules below), re-runs or confirms the required checks at
+  that SHA, and gets a fresh independent exact-head review if the head moved. Never
+  inherit a pass from an older SHA.
+- **Retirement.** Retirement is an explicit step. Every open PR gets a current handoff
+  entry, routines are reassigned or deleted and that choice is written in the entry,
+  ownership rows transfer (default inheritor OG Kush), and the holder posts a
+  `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC` PR comment (the crew-bell ring) with
+  the `resume here` facts. Then the holder stops pushing.
 - **Last activity.** A block's last activity is the newer of its `last_updated` as
   recorded on the deploy branch (`verdant-grow-diary`) and its effective claim (below),
   which includes the holder's renewal comments. A `last_updated` that exists only on a

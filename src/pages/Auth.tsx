@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
+import { fetchPlants } from "@/hooks/use-plants";
 import { Navigate, useNavigate, useSearchParams, Link } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,7 @@ import {
 } from "@/lib/signupAcquisitionRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import { resolveReturningSignInRoute } from "@/lib/quickLogStartScreenTargetRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import {
   acceptancePayloadsForCurrentAgreements,
@@ -175,7 +177,8 @@ export default function Auth() {
       if (result.redirected) return; // browser redirects to Google
       // Tokens returned and session set — route to intended destination.
       clearPendingOAuthPostAuthRedirect();
-      nav(postSignInTarget(), { replace: true });
+      const googleTarget = postSignInTarget();
+      if (googleTarget) nav(googleTarget, { replace: true });
     } catch {
       if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
       clearPendingOAuthPostAuthRedirect();
@@ -202,17 +205,54 @@ export default function Auth() {
   const signUpEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
-  function postSignInTarget(): string {
-    if (explicitRedirect) return explicitRedirect;
-    if (!user) return "/onboarding";
-    const saved = getStartScreenChoice(user.id);
-    return saved ? routeForStartScreen(saved) : "/onboarding";
-  }
+  const savedStartScreen = user ? getStartScreenChoice(user.id) : null;
+  const needsQuickLogPlant = !explicitRedirect && savedStartScreen === "quickLog";
+  const [quickLogPlants, setQuickLogPlants] = useState<Awaited<
+    ReturnType<typeof fetchPlants>
+  > | null>(null);
+  const [quickLogPlantsReady, setQuickLogPlantsReady] = useState(false);
 
   useEffect(() => {
-    if (user) nav(postSignInTarget(), { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, nav]);
+    if (!needsQuickLogPlant) {
+      setQuickLogPlants(null);
+      setQuickLogPlantsReady(false);
+      return;
+    }
+    let cancelled = false;
+    setQuickLogPlantsReady(false);
+    fetchPlants()
+      .then((rows) => {
+        if (!cancelled) setQuickLogPlants(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setQuickLogPlants([]);
+      })
+      .finally(() => {
+        if (!cancelled) setQuickLogPlantsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsQuickLogPlant, user?.id]);
+
+  function postSignInTarget(): string | null {
+    if (!user) return "/onboarding";
+    if (needsQuickLogPlant && !quickLogPlantsReady) return null;
+    if (explicitRedirect) return explicitRedirect;
+    if (savedStartScreen === "quickLog") {
+      return resolveReturningSignInRoute({
+        savedChoice: "quickLog",
+        plants: quickLogPlants ?? [],
+      });
+    }
+    return savedStartScreen ? routeForStartScreen(savedStartScreen) : "/onboarding";
+  }
+
+  const signInTarget = user ? postSignInTarget() : null;
+
+  useEffect(() => {
+    if (user && signInTarget) nav(signInTarget, { replace: true });
+  }, [user, nav, signInTarget]);
 
   useEffect(() => {
     if (mode !== "signup") return;
@@ -254,7 +294,10 @@ export default function Auth() {
   // restoration after sign-in.
   if (!hydrated || loading) return null;
 
-  if (user) return <Navigate to={postSignInTarget()} replace />;
+  if (user) {
+    if (!signInTarget) return null;
+    return <Navigate to={signInTarget} replace />;
+  }
 
   const resendCooldownActive = !canResendVerification(
     resendNowTick,
@@ -347,7 +390,8 @@ export default function Auth() {
       signInEmailRef.current?.focus();
       return;
     }
-    nav(postSignInTarget(), { replace: true });
+    const signedInTarget = postSignInTarget();
+    if (signedInTarget) nav(signedInTarget, { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
@@ -450,7 +494,8 @@ export default function Auth() {
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Your account is ready.");
-    nav(postSignInTarget(), { replace: true });
+    const signedUpTarget = postSignInTarget();
+    if (signedUpTarget) nav(signedUpTarget, { replace: true });
   }
 
   async function sendMagicLink() {

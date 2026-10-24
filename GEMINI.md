@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-22.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-22.1**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
@@ -100,14 +100,14 @@ Use small, scoped changes. Avoid broad rewrites.
   or rewrite history. Update branches by merging from base. Open PRs as drafts.
   Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply,
   or production Supabase writes. Drafts remain draft. Chemdawg owns merge only after
-  **35/35 required checks** succeed and Blue Dream, Durban Poison, Critical Mass or
-  Codex gives an independent **PASS at the exact head SHA**. Codex cannot be that
-  reviewer on a PR Codex authored or repaired (for example #1938). Graft's exact-head
-  PASS counts as the outside review on docs-only and low-risk PRs Graft did not author
-  or repair (OWNERSHIP.md allowlist). Migrations, payments or billing, `.github`
-  workflows, security or auth, and dependency or lockfile changes still need Codex
-  (not on a PR Codex authored or repaired), or Blue Dream, Critical Mass, or Durban
-  Poison. A skipped, missing, pending
+  **35/35 required checks** succeed and an actually available, eligible independent
+  reviewer session gives a clean **PASS at the exact head SHA** under OWNERSHIP.md
+  §4.3. Codex cannot accept work Codex authored or repaired. A non-contributing
+  Claude or Grok review session may accept Codex-authored work. Graft's exact-head
+  PASS retains only its existing low-risk allowlist. Governance, migrations,
+  payments or billing, `.github` workflows, security or auth, dependencies or
+  lockfiles and other protected or mixed scopes still need an eligible outside
+  reviewer with all required supplemental evidence. No P1 or P2 may remain. A skipped, missing, pending
   or failed required check is not green. There is no author-integration exception.
   Off-limits paths and named holds still require explicit reassignment before editing.
   Production database changes, spend, publish gates and the publish decision remain
@@ -150,7 +150,10 @@ This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lova
 
 ## Agent Handoff / Coverage
 
-Work belongs to the task, not to the agent doing it. Any agent can be cut off at any time
+Work belongs to the task, not to the agent doing it. Ownership is temporary
+accountability, not permanent dibs. Keep one active implementation writer; a reviewer
+assignment never grants implementation ownership. Claims, releases, explicit
+assignments and named locks below prevent competing writers. Any agent can be cut off at any time
 (token limit, outage, session end), so every open task must be resumable by a different
 agent from one written block.
 
@@ -749,21 +752,27 @@ Codex does not integrate its own work. Chemdawg owns the required-check and inde
 exact-head PASS gate. High-risk work, publish gates and named owner locks retain their
 review and acceptance fences.
 
-Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
-publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. **Codex** is an equal independent
-exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
-Claude may add peer observations but is not the acceptance reviewer.
-Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
-**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
-PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
-tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
-billing, `.github` workflows, security or auth, and dependency or lockfile changes
-still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
-Mass, or Durban Poison.
-Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
-Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
+Independent acceptance routing: select an **actually available, eligible independent
+reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
+**Blue Dream and Critical Mass are retired from future routing**; preserve historical
+receipts. **Codex** remains eligible on work Codex neither authored nor repaired.
+A **non-contributing Claude or Grok review session** may give independent acceptance,
+including for Codex-authored work; **Durban Poison** remains eligible when available.
+Exclude every author and repairer even after a task transfer. A shared GitHub identity
+alone does not establish independence: record session, role, contributor exclusions,
+full 40-character head SHA, complete scope, evidence and verdict.
+Chemdawg's existing merge gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
+protected or mixed scopes still need an eligible outside reviewer. Required CI and
+supplemental evidence, protected-file gates, holds, merge queue and founder-only
+production controls remain. Codex uses normal pushes only: no force-push, merge,
+Publish, SQL apply or production Supabase writes. Drafts remain draft.
+Check the existing request and receipt before pinging; keep one current review request
+per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
+state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record
+BLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence
+are not PASS. Preserve a still-valid independent review without a duplicate request.
 
 Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 

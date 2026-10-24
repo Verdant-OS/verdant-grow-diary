@@ -45,6 +45,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-278-MANUAL-ENVIRONMENT-DISPLAY
+
+```text
+TASK VER-278-MANUAL-ENVIRONMENT-DISPLAY  priority: P2  status: OPEN
+goal: Show the tent's valid Quick Log manual observation on the Tents list and Dashboard Environment strip, with its own source and freshness, matching Tent Detail.
+branch: codex/ver-278-manual-environment-display
+base: verdant-grow-diary at 0451952b355076500fb1d04797d84b96ed9accd8 (2026-10-24 20:23 UTC)
+checkout: git fetch origin codex/ver-278-manual-environment-display verdant-grow-diary && git switch codex/ver-278-manual-environment-display && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED — ownership checkpoint; draft opens before product implementation
+head_sha: 0451952b355076500fb1d04797d84b96ed9accd8 is the verified base, not the resulting checkpoint; read the draft PR for the current full head
+state: ownership checkpoint; diagnosis reproduced with local fixtures, no production reproduction claimed
+next_action: Add failing regressions, then the narrow display correction; verify current head and preserve draft.
+files: src/pages/Tents.tsx; src/pages/Dashboard.tsx (Environment strip only); src/components/TentEnvironmentSnapshotStrip.tsx; new src/lib/tentEnvironmentDisplayRules.ts; new src/test/ver278-*.test.{ts,tsx}; docs/agents/HANDOFF_LOG.md (this block)
+blockers: Independent exact-head acceptance requires an available non-contributing Claude/Grok session or Durban Poison; no such session or approved review transport is available here. Hosted CI at resulting head remains NOT_MEASURED.
+artifacts: VER-278 QA issue and this draft's body; local synthetic reproduction has 6 PASS and 2 expected FAIL, existing targeted suites 47 PASS. No live reproduction.
+reviewer_seat: BLOCKED — independent session unavailable; Codex authors this change and cannot accept it
+review_request: not sent; owner: Codex VER-278 session; permalink: NOT_MEASURED; state: blocked; fallback transfers: 0
+claimed_by: Codex VER-278 session, 2026-10-24 20:23 UTC, direct user assignment: "Codex owns the narrow fix; preserve #1942's separate changes (Recommended)". #1942's tentIds memoization/trends changes and branch remain separate. No claim comment posted; existing comment-approval gate remains.
+last_updated: 2026-10-24 20:23 UTC, by Codex VER-278 session
+limits: VER-225 / Tonight tent card excluded. No changes to existing locked tests, dependencies, lockfiles, global ingestion, auth, RLS, Supabase, alert/Action Queue logic, governance, or #1942/#2510 branches. No merge, ready, auto-merge, deploy, production writes or dispatch.
+```
+
 ### REVIEWER-ROUTING-20261022
 
 ```text

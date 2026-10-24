@@ -3,6 +3,10 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
+import {
+  LANDING_ONBOARDING_BRIDGE_LOADING_LABEL,
+  isOnboardingBridgeCountReady,
+} from "@/lib/onboardingBridgeReadinessRules";
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRules";
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
@@ -24,9 +28,10 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
  *  - No writes, no automation, no device control, no fake-live data.
  */
 export default function LandingAuthedOnboardingBridge() {
-  const { grows, activeGrowId } = useGrows();
-  const { data: tents = [] } = useGrowTents();
-  const { data: plants = [] } = useGrowPlants();
+  const { grows, activeGrowId, loading: growsLoading } = useGrows();
+  const { data: tents = [], isLoading: tentsLoading } = useGrowTents();
+  const { data: plants = [], isLoading: plantsLoading } = useGrowPlants();
+  const countReady = isOnboardingBridgeCountReady({ growsLoading, tentsLoading, plantsLoading });
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
@@ -59,7 +64,16 @@ export default function LandingAuthedOnboardingBridge() {
       className="mt-8 mx-auto max-w-xl rounded-2xl border border-primary/30 bg-primary/5 p-4 md:p-5"
     >
       <div className="flex items-center justify-center mb-2">
-        <OnboardingProgressPill vm={vm} />
+        {countReady ? (
+          <OnboardingProgressPill vm={vm} />
+        ) : (
+          <p
+            data-testid="landing-authed-onboarding-bridge-loading"
+            className="text-[11px] text-muted-foreground"
+          >
+            {LANDING_ONBOARDING_BRIDGE_LOADING_LABEL}
+          </p>
+        )}
       </div>
       <p className="text-center text-sm md:text-base font-medium">
         {vm.isFullyActivated

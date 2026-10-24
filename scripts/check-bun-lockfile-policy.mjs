@@ -31,6 +31,7 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   vite: "8.3.3",
   "launch-editor": "2.14.2",
   postcss: "8.5.18",
+  "body-parser": "2.4.0",
   "fast-uri": "3.1.8",
   "form-data": "4.0.6",
   "follow-redirects": "1.16.1",

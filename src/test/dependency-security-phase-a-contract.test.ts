@@ -155,6 +155,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["launch-editor", [2, 14, 2] as const],
     ["postcss", [8, 5, 18] as const],
     ["esbuild", [0, 28, 1] as const],
+    ["body-parser", [2, 4, 0] as const],
     ["fast-uri", [3, 1, 8] as const],
     ["form-data", [4, 0, 6] as const],
     ["follow-redirects", [1, 16, 1] as const],
@@ -239,6 +240,7 @@ describe("dependency security Phase A resolution floors", () => {
   it("pins only same-major compatible overrides", () => {
     expect(packageJson.overrides).toMatchObject({
       esbuild: "0.28.1",
+      "body-parser": "2.4.0",
       "fast-uri": "3.1.8",
       "form-data": "4.0.6",
       "follow-redirects": "1.16.1",
@@ -246,7 +248,7 @@ describe("dependency security Phase A resolution floors", () => {
       "js-yaml": "4.3.2",
       "launch-editor": "2.14.2",
       hono: "4.13.11",
-      qs: "6.16.0",
+      qs: "6.16.1",
       nanoid: "3.3.18",
       undici: "6.28.1",
     });

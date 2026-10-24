@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-24.4**
+**Sentinel-Version: 2026-10-24.5**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-24.4**
+**Sentinel-Version: 2026-10-24.5**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -88,7 +88,9 @@ illustrative and labeled as such.
 | Owner | The accountable holder of a workstream. Ownership is temporary. |
 | Handoff | The written block a cold agent uses to resume. Chat is not a handoff. |
 | Gate | A condition that must be true at one head SHA before merge, publish, or spend. |
-| Founder | The seat that keeps the four release decisions. Named in the roster. |
+| Founder | The seat that keeps the four release decisions. Named in the roster. Everything else runs without waiting on that seat. |
+| Integration branch | `main`. It is not the deploy branch. Do not push it directly. |
+| Deploy branch | `verdant-grow-diary`. Live behavior is measured here. Do not push it directly. |
 | Roster | `docs/agents/constitution/roster.md`. Replaceable names for seats. |
 
 ## 2. Principles
@@ -175,7 +177,9 @@ The published-migration integrity check hashes files against the base branch.
 If a published migration cannot replay, patch only a disposable copy through
 `config/local-supabase-replay-compatibility.json`, with a reason, after proving
 the relationship. Check that file before proposing a correction. The committed
-migration stays unchanged.
+migration stays unchanged. Before touching any file under `supabase/migrations/`,
+confirm it is new in this change. If it already exists on the target base branch,
+treat it as read-only.
 
 ## 6. Sensors, cultivation, and the doctor
 
@@ -295,8 +299,9 @@ ran and what you skipped.
   supplemental evidence.
 - Payment, migration, and production pull requests stay out of the queue until
   a human approves that exact head SHA. Production database changes, spend,
-  publish gates, and the publish decision remain with the founder. Repository
-  work does not authorize those operations.
+  publish gates, and the publish decision remain with the founder. Everything
+  else runs without waiting on the founder. Repository work does not authorize
+  those operations.
 - Off-limits paths and named holds need an explicit reassignment. The current
   list is in operating state and the roster.
 - There is no shared working branch. Only the agent currently holding a branch,
@@ -434,43 +439,10 @@ for every material measurement.
 
 ## 16. Environment notes
 
-These notes are environment-specific and are kept here because a repository
-check asserts this section's package-manager wording. The runbook is
+These notes are environment-specific. A repository check asserts the package-manager
+wording below, so that wording stays here. The runbook is
 `.claude/skills/run-verdant-grow-diary/SKILL.md`.
 
-## 17. Changelog
-
-- **2026-10-24.3** — Restored rules weakened in 2026-10-24.2: only the branch
-  holder pushes, and nobody edits another holder's branch; a public estimate is
-  not authenticated analytics; measure the publisher and its deployment checks
-  before asserting delivery; layer paths `src/constants/*`, `src/lib/*Rules.ts`,
-  `src/lib/*Service.ts`, `src/lib/*ViewModel.ts`, and no transforms in render
-  bodies; verify fixture identity and ownership before a write; the holder
-  fixes every defect in its scope and does not integrate its own work (Codex
-  specifics stay in the roster); do not invent deployment/indexing outcomes;
-  record the authorized source and provenance; internal secrets stay unexposed.
-  OWNERSHIP.md again wins on ownership and review routing. The stale-open test
-  uses last activity, which includes the effective claim. The pre-gate
-  allowance again includes locating the four context files and a platform
-  context-discovery command. Metered ids are `ai-doctor-review` and `ai-coach`.
-  Repository work does not authorize production database changes, spend,
-  publish gates, or the publish decision.
-- **2026-10-24.2** — Numbered sections, glossary, amendment rule, and quarterly
-  prune. Seat names moved to `docs/agents/constitution/roster.md`. Handoff
-  steps moved to `docs/agents/constitution/handoff-procedure.md`. Testing
-  detail moved to `docs/agents/constitution/testing-standard.md`. That revision
-  ranked this file above OWNERSHIP.md for every conflict and shortened several
-  rules listed in 2026-10-24.3. Those shortenings are reversed.
-- **2026-10-24.1** — Cold-start handoff, exact-SHA approvals, one writer,
-  one-pass review, stale expiry, ship and money hold, repo-wide breakage
-  priority, protected instruction files, post-merge reopen.
-- **2026-10-22.1** — Independent reviewer routing. Retired seats and the
-  eligible set are in the roster.
-- **2026-09-28** — Release rules and handoff coverage. Open tasks resume from
-  the handoff log.
-
----
-## Cursor Cloud specific instructions
 
 Durable, non-obvious notes for running this app in a Cursor Cloud VM. Full, verified
 runbook lives in `.claude/skills/run-verdant-grow-diary/SKILL.md` — read it for details;
@@ -544,10 +516,46 @@ snapshots can differ.
   **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
   and is not one of the twelve: it is the changing shift report, revised several times a
   day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
-  Editing it alone requires no bump — see merged precedent #729 (`1ae167764`) and #746
-  (`a0c30e565`), each a single-file `CURRENT_STATE.md` change with no version change.
+  Editing it alone requires no bump. Single-file edits of this file have merged
+  with no version change. The pull-request numbers for those precedents are in §17.
   An earlier wording of this bullet said `docs/agents/**`, which over-stated the rule
   against the gate that supposedly enforced it.
+
+## 17. Changelog
+
+- **2026-10-24.5** — Operating state does not override `OWNERSHIP.md` on ownership and review routing; the start-here note in `docs/agents/CURRENT_STATE.md` now says the same thing. Extending the repair-all-defects rule and the do-not-integrate-your-own-work rule from the Codex seat to every branch holder is an intended change, recorded here; the Codex wording stays in the roster. Before editing a migration file, confirm it is new. Everything else runs without waiting on the founder. The integration branch is `main`. The deploy branch is `verdant-grow-diary`. Historical single-file `CURRENT_STATE.md` edits that needed no version bump include #729 (`1ae167764`) and #746 (`a0c30e565`).
+- **2026-10-24.4** — Restored the render-body rule in its original words: keep transforms/selectors out of render bodies when possible.
+
+- **2026-10-24.3** — Restored rules weakened in 2026-10-24.2: only the branch
+  holder pushes, and nobody edits another holder's branch; a public estimate is
+  not authenticated analytics; measure the publisher and its deployment checks
+  before asserting delivery; layer paths `src/constants/*`, `src/lib/*Rules.ts`,
+  `src/lib/*Service.ts`, `src/lib/*ViewModel.ts`, and no transforms in render
+  bodies; verify fixture identity and ownership before a write; the holder
+  fixes every defect in its scope and does not integrate its own work (Codex
+  specifics stay in the roster); do not invent deployment/indexing outcomes;
+  record the authorized source and provenance; internal secrets stay unexposed.
+  OWNERSHIP.md again wins on ownership and review routing. The stale-open test
+  uses last activity, which includes the effective claim. The pre-gate
+  allowance again includes locating the four context files and a platform
+  context-discovery command. Metered ids are `ai-doctor-review` and `ai-coach`.
+  Repository work does not authorize production database changes, spend,
+  publish gates, or the publish decision.
+- **2026-10-24.2** — Numbered sections, glossary, amendment rule, and quarterly
+  prune. Seat names moved to `docs/agents/constitution/roster.md`. Handoff
+  steps moved to `docs/agents/constitution/handoff-procedure.md`. Testing
+  detail moved to `docs/agents/constitution/testing-standard.md`. That revision
+  ranked this file above OWNERSHIP.md for every conflict and shortened several
+  rules listed in 2026-10-24.3. Those shortenings are reversed.
+- **2026-10-24.1** — Cold-start handoff, exact-SHA approvals, one writer,
+  one-pass review, stale expiry, ship and money hold, repo-wide breakage
+  priority, protected instruction files, post-merge reopen.
+- **2026-10-22.1** — Independent reviewer routing. Retired seats and the
+  eligible set are in the roster.
+- **2026-09-28** — Release rules and handoff coverage. Open tasks resume from
+  the handoff log.
+
+---
 <!-- SENTINEL-CORE:END -->
 
 ---

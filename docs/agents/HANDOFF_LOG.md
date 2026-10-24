@@ -81,26 +81,26 @@ checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && 
 pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
 head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
 state: pushed draft once this commit is on the remote
-current_step: constitution restructured into numbered sections (2026-10-24.2) on draft #2523
-next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain an independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
+current_step: 2026-10-24.5 should-fixes and nits on draft #2523; prior independent PASS was b163f514d47e7ce5960960d12e0b1ea7e9cf64bc and does not carry
+next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain a fresh independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
 decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
 tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
-commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.1 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
+commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.5 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
 files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/*.md; docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
 files_remaining: none in this slice. .github/pull_request_template.md stays unchanged.
 blockers: independent exact-head review not yet requested; GitHub comment approval gate still applies to a resume-here comment unless Cheeko or Matthew allows it
 open_questions: none for the wording Cheeko approved
 gotchas: A new commit invalidates any review of an older SHA. CURRENT_STATE.md is exempt from Sentinel-Version. Do not force-push. Keep the PR draft.
-links: base branch verdant-grow-diary; no review URL yet
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523 ; PASS at b163f514 only: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523#pullrequestreview-5638392489
 artifacts: this block
 reviewer_seat: an eligible independent session that did not author this PR (not this Cursor Grok session)
 reviewer_sha: none yet
 session_state: Cursor cloud agent on cursor/handoff-continuity-a798; no paused workflow; no pending human decision beyond draft review
-post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.1 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
+post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.5 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
 active_writer: Cursor Grok cloud agent (this session)
 claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
 owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
-last_updated: 2026-10-24 13:10 UTC, by Cursor Grok cloud agent
+last_updated: 2026-10-24 13:40 UTC, by Cursor Grok cloud agent
 ```
 
 ### REVIEWER-ROUTING-20261022

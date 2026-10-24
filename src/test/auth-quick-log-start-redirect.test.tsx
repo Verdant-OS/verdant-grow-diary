@@ -61,12 +61,15 @@ function LocationProbe() {
 }
 
 function AuthHarness({ entry }: { entry: string }) {
-  const [signedIn, setSignedIn] = useState(h.user != null);
-  h.user = signedIn ? { id: "user-1" } : null;
+  const [userId, setUserId] = useState<string | null>(h.user?.id ?? null);
+  h.user = userId ? { id: userId } : null;
   return (
     <MemoryRouter initialEntries={[entry]}>
-      <button type="button" onClick={() => setSignedIn(true)}>
+      <button type="button" onClick={() => setUserId("user-1")}>
         Commit session
+      </button>
+      <button type="button" onClick={() => setUserId("user-2")}>
+        Switch user
       </button>
       <Routes>
         <Route path="/auth" element={<Auth />} />
@@ -155,6 +158,61 @@ describe("Auth start-screen routing", () => {
     fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/dashboard"));
     expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
+  });
+
+  it("opens Quick Log on the eligible plant after sign-in", async () => {
+    setStartScreenChoice("user-1", "quickLog");
+    h.plants.mockResolvedValue([
+      {
+        id: "plant-a",
+        tent_id: "tent-a",
+        grow_id: "grow-a",
+        updated_at: "2026-04-01T00:00:00.000Z",
+      },
+    ]);
+    h.tents.mockResolvedValue([{ id: "tent-a", grow_id: "grow-a", is_archived: false }]);
+    h.grows.mockResolvedValue({ data: [{ id: "grow-a", is_archived: false }], error: null });
+    renderAuth("/auth");
+    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a?open=quick-log"),
+    );
+  });
+
+  it("sends a first-time user with no saved start screen to onboarding", async () => {
+    renderAuth("/auth");
+    fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/onboarding"));
+  });
+
+  it("does not keep the previous user's plant when the signed-in user changes", async () => {
+    setStartScreenChoice("user-1", "quickLog");
+    let resolvePlants: (plants: unknown[]) => void = () => {};
+    h.plants.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePlants = resolve;
+      }),
+    );
+    h.tents.mockResolvedValue([{ id: "tent-a", grow_id: "grow-a", is_archived: false }]);
+    h.grows.mockResolvedValue({ data: [{ id: "grow-a", is_archived: false }], error: null });
+    h.user = { id: "user-1" };
+    renderAuth("/auth");
+    expect(screen.getByTestId("location")).toHaveTextContent("/auth");
+    fireEvent.click(screen.getByRole("button", { name: /switch user/i }));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/onboarding"));
+    resolvePlants([
+      {
+        id: "plant-a",
+        tent_id: "tent-a",
+        grow_id: "grow-a",
+        updated_at: "2026-04-01T00:00:00.000Z",
+      },
+    ]);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("location")).toHaveTextContent("/onboarding");
+    expect(screen.getByTestId("location").textContent).not.toContain("plant-a");
   });
 
   it("falls back to the Dashboard when the plant read hangs", async () => {

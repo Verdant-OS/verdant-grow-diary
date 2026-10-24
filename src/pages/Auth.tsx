@@ -49,6 +49,7 @@ import {
   type QuickLogStartGrow,
 } from "@/lib/quickLogStartScreenTargetRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
+import { applyPostgrestAbortSignal, isSupabaseAbortError } from "@/lib/supabaseAbort";
 import {
   acceptancePayloadsForCurrentAgreements,
   recordOwnAgreementAcceptances,
@@ -233,8 +234,12 @@ export default function Auth() {
       settled = true;
       setQuickLogRoom(emptyRoom);
     }, QUICK_LOG_START_ROOM_TIMEOUT_MS);
-    const growsQuery = supabase.from("grows").select("id,is_archived");
-    void Promise.all([fetchPlants(), fetchTents(), growsQuery])
+    const controller = new AbortController();
+    const growsQuery = applyPostgrestAbortSignal(
+      supabase.from("grows").select("id,is_archived"),
+      controller.signal,
+    );
+    void Promise.all([fetchPlants(controller.signal), fetchTents(controller.signal), growsQuery])
       .then(([plants, tents, growsResult]) => {
         if (settled) return;
         if (growsResult.error) throw growsResult.error;
@@ -247,8 +252,8 @@ export default function Auth() {
           grows: growsResult.data ?? [],
         });
       })
-      .catch(() => {
-        if (settled) return;
+      .catch((error: unknown) => {
+        if (settled || isSupabaseAbortError(error)) return;
         settled = true;
         window.clearTimeout(timer);
         setQuickLogRoom(emptyRoom);
@@ -256,6 +261,7 @@ export default function Auth() {
     return () => {
       settled = true;
       window.clearTimeout(timer);
+      controller.abort();
     };
   }, [needsQuickLogPlant, user?.id]);
 

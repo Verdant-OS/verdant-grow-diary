@@ -5,7 +5,7 @@
  * while the grower was looking at a plant with nothing missing.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation, useNavigate } from "@/lib/react-router-compat";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const probes = vi.hoisted(() => ({ calendarMounts: 0, navTarget: "/timeline" }));

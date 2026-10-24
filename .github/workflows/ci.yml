@@ -799,8 +799,105 @@ jobs:
           for i in 1 2 3 4 5 6 7 8; do
             n=$(( base + i ))
             echo "Running sub-shard ${n}/256 for gate shard ${{ matrix.shard }}/32"
-            bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
+            # Coverage is collected only for gate shard 1/32: instrumenting all
+            # 256 sub-shard processes would add real memory/time overhead to a
+            # job already tuned against repeated OOM (#697). Shard 1 is a
+            # genuine, non-synthetic sample of the real suite — its raw
+            # Istanbul maps are merged into one Cobertura report below.
+            if [[ "${{ matrix.shard }}" == "1" ]]; then
+              bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests --coverage --coverage.reporter=json --coverage.reportsDirectory=coverage-raw/${n}
+            else
+              bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
+            fi
           done
+
+      # Raw per-sub-shard Istanbul coverage maps for gate shard 1/32 only (see
+      # the coverage comment above). Skipped for fork PRs: the follow-up
+      # upload-code-coverage job needs code-quality: write, which forked PRs
+      # cannot be granted.
+      - name: Upload raw coverage sample (gate shard 1/32)
+        if: matrix.shard == 1 && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-raw-typescript
+          path: coverage-raw/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Merges the gate-shard-1/32 raw Istanbul coverage maps (uploaded above)
+  # into a single Cobertura report and re-uploads it as one artifact, so the
+  # elevated-permission upload-coverage-typescript job below never needs to
+  # touch raw per-sub-shard data. Best-effort: a missing or unmergeable
+  # sample (e.g. shard 1 itself failed) skips the rest of this job and the
+  # downstream upload rather than failing CI — coverage reporting augments
+  # this workflow, it is not one of its required gates.
+  merge-coverage-typescript:
+    name: Merge coverage sample into Cobertura report
+    needs: full-suite
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      report-generated: ${{ steps.merge.outcome == 'success' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download raw coverage sample (gate shard 1/32)
+        id: download-raw-coverage
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: coverage-raw-typescript
+          path: coverage-raw
+
+      - name: Merge raw coverage into Cobertura report
+        id: merge
+        if: steps.download-raw-coverage.outcome == 'success'
+        run: node scripts/merge-coverage-reports.mjs coverage-raw coverage-report
+
+      - name: Upload coverage report artifact
+        if: steps.merge.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-report-typescript
+          path: coverage-report/cobertura-coverage.xml
+          if-no-files-found: error
+          retention-days: 7
+
+  # Separate job, per GitHub's own guidance for actions/upload-code-coverage:
+  # the upload needs code-quality: write, while the job that produces the
+  # report runs repository code/dependencies and should not hold that
+  # permission. Communicates with merge-coverage-typescript via the
+  # coverage-report-typescript artifact only.
+  upload-coverage-typescript:
+    name: Upload coverage report (TypeScript)
+    needs: merge-coverage-typescript
+    if: ${{ !cancelled() && needs.merge-coverage-typescript.outputs.report-generated == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      code-quality: write
+    steps:
+      - name: Download coverage report artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: coverage-report-typescript
+
+      - uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1
+        with:
+          file: cobertura-coverage.xml
+          language: TypeScript
+          label: code-coverage-agent
 
   quicklog-correction-measured-values:
     name: Quick Log correction measured values

@@ -66,6 +66,8 @@ e2e/.auth/
 # Vitest coverage reports (cobertura XML); generated locally and in CI,
 # never committed.
 coverage/
+coverage-raw/
+coverage-report/
 
 # Local MCP plugin scratch stores (SQLite + live -wal/-shm); not Verdant data
 .claude/data/

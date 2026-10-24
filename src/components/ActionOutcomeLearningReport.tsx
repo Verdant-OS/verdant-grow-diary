@@ -9,6 +9,7 @@
  *  - Copy stays observational. Never claims an action caused / fixed an
  *    issue. Never ranks groups as best / worst.
  */
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { Link } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { actionDetailPath, alertDetailPath } from "@/lib/routes";
@@ -147,7 +148,7 @@ export default function ActionOutcomeLearningReport({ report, status }: Props) {
                         </span>
                       )}
                       <span className="ml-auto text-xs text-muted-foreground">
-                        {ex.recorded_at ? new Date(ex.recorded_at).toLocaleString() : "—"}
+                        {ex.recorded_at ? formatSnapshotTimestamp(ex.recorded_at) : "—"}
                       </span>
                     </div>
                     {ex.suggested_change && (

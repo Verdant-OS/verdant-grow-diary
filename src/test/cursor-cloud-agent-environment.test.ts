@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES,
+  CURSOR_CLOUD_AGENT_CANONICAL_START_LINES,
   assertCursorCloudAgentInstallScript,
+  assertCursorCloudAgentStartScript,
   parseCursorCloudAgentEnvironment,
 } from "@/lib/cursorCloudAgentEnvironmentRules";
 
@@ -14,33 +17,36 @@ describe("cursor cloud agent environment.json", () => {
     const raw = readFileSync(ENVIRONMENT_JSON_PATH, "utf8");
     const environment = parseCursorCloudAgentEnvironment(raw);
     expect(() => assertCursorCloudAgentInstallScript(environment.install)).not.toThrow();
+    expect(() => assertCursorCloudAgentStartScript(environment.start)).not.toThrow();
+  });
+
+  it("rejects an environment that has no start command", () => {
+    const raw = JSON.stringify({ install: "set -euo pipefail\ntrue\n" });
+    expect(() => parseCursorCloudAgentEnvironment(raw)).toThrow(
+      "cursor_cloud_agent_environment_invalid_shape",
+    );
   });
 });
 
 describe("assertCursorCloudAgentInstallScript", () => {
-  const validInstall = [
-    "set -euo pipefail",
-    "if ! command -v bun >/dev/null 2>&1; then",
-    "  curl -fsSL https://bun.sh/install | bash",
-    '  sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun',
-    '  sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx',
-    "fi",
-    "if [ ! -d node_modules ]; then",
-    "  bun install --frozen-lockfile",
-    "fi",
-    "bunx playwright install chromium",
-  ].join("\n");
+  const validInstall = CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES.join("\n");
+  const pinnedInstaller = CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES.find((line) =>
+    line.includes("bun.sh/install"),
+  );
+  if (!pinnedInstaller) throw new Error("pinned bun installer missing from canonical install");
 
   it("accepts the canonical ordering", () => {
     expect(() => assertCursorCloudAgentInstallScript(validInstall)).not.toThrow();
   });
 
   it("rejects frozen lockfile before Bun bootstrap", () => {
-    const reversed = validInstall.replace(
-      /set -euo pipefail[\s\S]*bun install --frozen-lockfile/,
-      "set -euo pipefail\nbun install --frozen-lockfile\nif ! command -v bun >/dev/null 2>&1; then\nfi",
-    );
-    expect(() => assertCursorCloudAgentInstallScript(reversed)).toThrow(
+    const lines = [...CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES];
+    const frozenAt = lines.indexOf("bun install --frozen-lockfile");
+    const bootstrapAt = lines.indexOf("if ! command -v bun >/dev/null 2>&1; then");
+    const reordered = [lines[0], lines[frozenAt], ...lines.slice(bootstrapAt)].join("\n");
+    expect(bootstrapAt).toBeGreaterThan(0);
+    expect(frozenAt).toBeGreaterThan(bootstrapAt);
+    expect(() => assertCursorCloudAgentInstallScript(reordered)).toThrow(
       "cursor_cloud_agent_install_bun_bootstrap_after_frozen_lockfile",
     );
   });
@@ -49,7 +55,7 @@ describe("assertCursorCloudAgentInstallScript", () => {
     const unconditional = [
       "set -euo pipefail",
       "if ! command -v bun >/dev/null 2>&1; then",
-      "  curl -fsSL https://bun.sh/install | bash",
+      `  ${pinnedInstaller}`,
       "fi",
       'sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun',
       'sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx',
@@ -65,7 +71,7 @@ describe("assertCursorCloudAgentInstallScript", () => {
 
   it("rejects an unguarded frozen install that reinstalls provisioned node_modules", () => {
     const unguarded = validInstall.replace(
-      "if [ ! -d node_modules ]; then\n  bun install --frozen-lockfile\nfi",
+      "if [ ! -d node_modules ]; then\nbun install --frozen-lockfile\nfi",
       "bun install --frozen-lockfile",
     );
     expect(unguarded).not.toContain("node_modules");
@@ -83,7 +89,7 @@ describe("assertCursorCloudAgentInstallScript", () => {
 
   const GUARD_BLOCK = [
     "if [ ! -d node_modules ]; then",
-    "  bun install --frozen-lockfile",
+    "bun install --frozen-lockfile",
     "fi",
   ].join("\n");
 
@@ -158,10 +164,40 @@ describe("assertCursorCloudAgentInstallScript", () => {
     );
   });
 
+  it("rejects an unpinned Bun installer", () => {
+    const unpinned = validInstall.replace(
+      pinnedInstaller,
+      "curl -fsSL https://bun.sh/install | bash",
+    );
+    expect(unpinned).not.toContain('bash -s "bun-v1.3.14"');
+    expect(() => assertCursorCloudAgentInstallScript(unpinned)).toThrow(
+      "cursor_cloud_agent_install_bun_not_pinned",
+    );
+  });
+
   it("rejects a pipefail line that is not the first statement", () => {
     const late = [validInstall.replace("set -euo pipefail\n", ""), "set -euo pipefail"].join("\n");
     expect(() => assertCursorCloudAgentInstallScript(late)).toThrow(
       "cursor_cloud_agent_install_missing_pipefail",
+    );
+  });
+});
+
+describe("assertCursorCloudAgentStartScript", () => {
+  const validStart = CURSOR_CLOUD_AGENT_CANONICAL_START_LINES.join("\n");
+
+  it("accepts a start command that skips a server already on port 8080", () => {
+    expect(validStart).toContain("http://127.0.0.1:8080/");
+    expect(validStart).toContain("exec bun run dev -- --host 127.0.0.1 --port 8080");
+    expect(() => assertCursorCloudAgentStartScript(validStart)).not.toThrow();
+  });
+
+  it("rejects a start command that always launches the dev server", () => {
+    const always = ["set -euo pipefail", "exec bun run dev -- --host 127.0.0.1 --port 8080"].join(
+      "\n",
+    );
+    expect(() => assertCursorCloudAgentStartScript(always)).toThrow(
+      "cursor_cloud_agent_start_not_canonical",
     );
   });
 });

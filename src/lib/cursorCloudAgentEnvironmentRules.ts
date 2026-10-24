@@ -1,12 +1,21 @@
 export type CursorCloudAgentEnvironment = {
   install: string;
+  start: string;
 };
 
 // Every contract line is matched as a whole trimmed line, never as a substring,
 // so a comment or a changed condition cannot satisfy it.
 const PIPEFAIL_LINE = "set -euo pipefail";
 const BUN_BOOTSTRAP_CONDITION = "if ! command -v bun >/dev/null 2>&1; then";
-const BUN_INSTALLER_LINE = "curl -fsSL https://bun.sh/install | bash";
+const BUN_VERSION = "1.3.14";
+const BUN_INSTALLER_LINE = `curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"`;
+const NODE_RUNTIME_GUARD_CONDITION =
+  "if ! /usr/local/bin/node -e 'const [M,m,p]=process.versions.node.split(\".\").map(Number); if (M<22||(M===22&&(m<22||(m===22&&p<1)))) process.exit(1)' >/dev/null 2>&1; then";
+const NODE_RUNTIME_INSTALL_LINE =
+  "curl -fsSL https://nodejs.org/dist/v22.22.2/node-v22.22.2-linux-x64.tar.xz | sudo tar -xJ -C /usr/local --strip-components=1";
+const RIPGREP_GUARD_CONDITION = "if ! command -v rg >/dev/null 2>&1; then";
+const RIPGREP_UPDATE_LINE = "sudo apt-get update";
+const RIPGREP_INSTALL_LINE = "sudo apt-get install -y --no-install-recommends ripgrep";
 const BUN_PATH_SYMLINK_LINE = 'sudo ln -sfn "$HOME/.bun/bin/bun" /usr/local/bin/bun';
 const BUNX_PATH_SYMLINK_LINE = 'sudo ln -sfn "$HOME/.bun/bin/bunx" /usr/local/bin/bunx';
 const NODE_MODULES_GUARD_CONDITION = "if [ ! -d node_modules ]; then";
@@ -21,15 +30,36 @@ const ANY_BUN_INSTALL = /\bbun\s+(?:install|i|add)\b/;
  */
 export const CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES = Object.freeze([
   PIPEFAIL_LINE,
+  NODE_RUNTIME_GUARD_CONDITION,
+  NODE_RUNTIME_INSTALL_LINE,
+  "fi",
   BUN_BOOTSTRAP_CONDITION,
   BUN_INSTALLER_LINE,
   BUN_PATH_SYMLINK_LINE,
   BUNX_PATH_SYMLINK_LINE,
   "fi",
+  RIPGREP_GUARD_CONDITION,
+  RIPGREP_UPDATE_LINE,
+  RIPGREP_INSTALL_LINE,
+  "fi",
   NODE_MODULES_GUARD_CONDITION,
   BUN_FROZEN_INSTALL_LINE,
   "fi",
   PLAYWRIGHT_INSTALL_LINE,
+]);
+
+const START_PATH_LINE = 'export PATH="/usr/local/bin:${HOME}/.bun/bin:${PATH}"';
+const START_ALREADY_RUNNING_CONDITION =
+  "if curl -sf -o /dev/null --max-time 2 http://127.0.0.1:8080/; then";
+const START_DEV_SERVER_LINE = "exec bun run dev -- --host 127.0.0.1 --port 8080";
+
+export const CURSOR_CLOUD_AGENT_CANONICAL_START_LINES = Object.freeze([
+  PIPEFAIL_LINE,
+  START_PATH_LINE,
+  START_ALREADY_RUNNING_CONDITION,
+  "exit 0",
+  "fi",
+  START_DEV_SERVER_LINE,
 ]);
 
 type InstallScriptItem =
@@ -88,7 +118,10 @@ export function parseCursorCloudAgentEnvironment(raw: string): CursorCloudAgentE
     parsed === null ||
     !("install" in parsed) ||
     typeof (parsed as CursorCloudAgentEnvironment).install !== "string" ||
-    (parsed as CursorCloudAgentEnvironment).install.trim().length === 0
+    (parsed as CursorCloudAgentEnvironment).install.trim().length === 0 ||
+    !("start" in parsed) ||
+    typeof (parsed as CursorCloudAgentEnvironment).start !== "string" ||
+    (parsed as CursorCloudAgentEnvironment).start.trim().length === 0
   ) {
     throw new Error("cursor_cloud_agent_environment_invalid_shape");
   }
@@ -123,6 +156,9 @@ export function assertCursorCloudAgentInstallScript(install: string): void {
 
   if (bootstrapIndex < 0) {
     throw new Error("cursor_cloud_agent_install_missing_bun_bootstrap");
+  }
+  if (!lines.includes(BUN_INSTALLER_LINE)) {
+    throw new Error("cursor_cloud_agent_install_bun_not_pinned");
   }
   if (frozenIndex < 0) {
     throw new Error("cursor_cloud_agent_install_missing_frozen_lockfile");
@@ -195,5 +231,22 @@ export function assertCursorCloudAgentInstallScript(install: string): void {
     lines.some((line, i) => line !== CURSOR_CLOUD_AGENT_CANONICAL_INSTALL_LINES[i])
   ) {
     throw new Error("cursor_cloud_agent_install_not_canonical");
+  }
+}
+
+/**
+ * Validates the dev-server start command. A listener already on 127.0.0.1:8080
+ * is left running; otherwise Vite starts on that host and port.
+ */
+export function assertCursorCloudAgentStartScript(start: string): void {
+  const lines = toInstallLines(start);
+  if (lines[0] !== PIPEFAIL_LINE) {
+    throw new Error("cursor_cloud_agent_start_missing_pipefail");
+  }
+  if (
+    lines.length !== CURSOR_CLOUD_AGENT_CANONICAL_START_LINES.length ||
+    lines.some((line, index) => line !== CURSOR_CLOUD_AGENT_CANONICAL_START_LINES[index])
+  ) {
+    throw new Error("cursor_cloud_agent_start_not_canonical");
   }
 }

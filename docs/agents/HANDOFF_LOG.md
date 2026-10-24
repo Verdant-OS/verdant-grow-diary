@@ -12,23 +12,47 @@ An unpushed candidate is not a remote head and must never be treated as hosted C
 
 ## Template
 
+A cold agent (Claude Code, Codex, Cursor, or Grok) must be able to take the next step
+from this entry, the PR, and the repo, with no chat history. Use plain repo paths, full
+SHAs, and URLs. Do not write "as discussed" or "per my earlier message".
+
 ```text
 TASK <id>  priority: publish-gate | P1 | P2 | other  status: OPEN | CLOSED
 goal:
+why:
 branch: codex/<task-id>-<slug> for new Codex tasks; preserve existing names
 base: verdant-grow-diary or the recorded parent branch
-checkout: git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
+checkout: git fetch origin <branch> <base> && git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
 pr: URL or NOT_MEASURED
 head_sha: full exact remote SHA, with observation time
 state: implemented / local only / pushed draft / CI / review / merged / live measured
-next_action: the single smallest next step
-files:
+current_step:
+next_action: the single smallest next step a cold agent can run
+post_merge_check: the check that reopens this work with the same owner if it fails after merge; or NOT_APPLICABLE
+active_writer: the branch holder; only that holder pushes; nobody edits another holder's branch
+decisions: what was decided, and the reason for each
+tried_and_rejected: what was tried, and why it was rejected
+commands: exact commands to reproduce the current state and run the relevant tests
+files_touched: repo paths
+files_remaining: repo paths still to touch
 blockers: blocker and who can clear it
+open_questions:
+gotchas:
+links: review, issue, and run URLs
 artifacts: repository paths or PR/check URLs; local receipts may supplement them
 reviewer_seat:
+reviewer_sha: full SHA the current review or human go-ahead covers; never an older SHA
+session_state: cloud agent ids, routines, paused workflows, pending human decisions
 claimed_by: agent and date/time/zone, or empty
+owner: current owner; on retirement, transfer the CURRENT_STATE row (default inheritor: OG Kush)
 last_updated: YYYY-MM-DD HH:MM CT, by agent
 ```
+
+Before stopping, run the cold start test: a fresh agent reading only the PR, this
+entry, and the repo can take `next_action`. The matching PR comment starts with
+`resume here` and repeats goal, why, decisions, rejected attempts, commands, files
+touched and remaining, open questions, gotchas, links, and the exact head SHA.
+Retirement adds a `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC` comment on the PR.
 
 Before the checkout command, run `git fetch origin <branch> <base>`, then compare the
 freshly fetched `git rev-parse origin/<branch>` with head_sha as AGENTS.md (Agent Handoff /
@@ -50,19 +74,67 @@ active checkout has the branch open; inspect worktree ownership before selecting
 ```text
 TASK PR-2345-BASE-INTEGRATION  priority: P2  status: OPEN
 goal: Integrate the latest deploy base into #2345, preserve the temperature tests, push and refresh CI, obtain eligible outside acceptance, and report queue readiness without merging the PR or deploying.
+why: The live base advanced after the previous integration and conflicts only in this log; the supplemental temperature regressions must survive without reviving the production fix already merged in #2405.
 branch: claude/settings-temperature-reset-label
-base: verdant-grow-diary at 0451952b355076500fb1d04797d84b96ed9accd8
-checkout: git switch claude/settings-temperature-reset-label && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+base: verdant-grow-diary at c14f1b0d18ddedeaeffb7c569789968df3d8d852
+checkout: git fetch origin +refs/heads/claude/settings-temperature-reset-label:refs/remotes/origin/claude/settings-temperature-reset-label +refs/heads/verdant-grow-diary:refs/remotes/origin/verdant-grow-diary && git switch claude/settings-temperature-reset-label && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345
-head_sha: a8e2a28951f5ac838d596e1ba78bf35380f1ef8a (verified remote source checkpoint before this integration commit; read the PR for its resulting full head before resuming or reviewing)
-state: This integration merges base 0451952b. Settings.tsx and all three temperature reset test files are preserved byte-for-byte from source head a8e2a289. The feature delta remains the six supplemental preference-event cases and this handoff. Focused validation: 8 files, 87 passed, 0 failed; local typecheck retains two known diagnostics in the unchanged not-found route test. New-head hosted CI and eligible independent acceptance are NOT_MEASURED here; the prior Codex technical review is not release acceptance.
-next_action: Verify the pushed full head and its CI, then obtain a fresh non-contributing Claude/Grok review through an authenticated session. No PR merge, queue entry or deploy is authorized.
-files: src/test/temperature-unit-reset-events.test.tsx; docs/agents/HANDOFF_LOG.md
-blockers: Claude Code availability check reported loggedIn=false. Grok CLI requires reauthentication. No eligible outside request has been sent, and no Codex self-acceptance is substituted. All nine threads were resolved at source head a8e2a289; recheck after the new push. Open #2434 overlaps one same-document test case; its branch and work remain untouched.
-artifacts: This branch, config/required-status-checks.json, and the PR's new-head checks. Local typecheck result is reported in the chat rather than inherited from another head.
-reviewer_seat: BLOCKED pending an authenticated fresh Claude/Grok session; availability probes only, no review request sent, fallback transfers=0. Earlier-head reviews do not transfer.
-claimed_by: Codex PR #2345 repair session, Matthew's direct assignment on 2026-10-24; no external claim comment posted.
-last_updated: 2026-10-24 20:02 UTC, by Codex PR #2345 repair session
+head_sha: 9b54b0fa702e9bc1bee3330a40cbcdbc6ce8819e (remote source checkpoint verified 2026-10-24 21:03 UTC; read the PR for the resulting integration head, then verify ancestry before resuming)
+state: This integration merges base c14f1b0d. Settings.tsx and all three temperature reset test files are preserved byte-for-byte from source head 9b54b0fa. The feature delta remains six supplemental preference-event cases and this handoff. Source head 9b54b0fa reached 35/35 required checks and security success; those results do not cover this new integration head.
+current_step: Resolved the log-only conflict, preserved the complete base template and HANDOFF-CONTINUITY block, and corrected the checkout, empty public claim field, and CT timestamp reported in the three CodeRabbit threads. The GitHub threads remain unresolved; no replies or resolutions were posted.
+next_action: Read the PR's resulting full head, verify its CI, and check Grok authentication before routing one fresh non-contributing Grok review. No PR merge, queue entry or deploy is authorized.
+post_merge_check: NOT_APPLICABLE (supplemental tests and handoff only; no merge or deployment authorized).
+active_writer: Codex PR #2345 repair session, explicitly assigned the base merge and branch push by Matthew; no takeover of another branch or workstream.
+decisions: Keep all temperature files unchanged, preserve every base handoff block, use a normal merge and push, and keep unsaved radio-choice behavior separate from reactive stored preference.
+tried_and_rejected: A Codex technical review cannot accept a PR Codex repaired. Grok's cached model listing did not establish authentication. No force-push, protection bypass or substitute PR.
+commands: node node_modules/vitest/vitest.mjs run src/test/temperature-unit-preference.test.ts src/test/temperature-unit-preference-hardening.test.ts src/test/temperature-unit-preference-boundary.test.ts src/test/temperature-unit-reset-stored-override.test.tsx src/test/temperature-unit-reset-label.test.tsx src/test/temperature-unit-reset-events.test.tsx src/test/temperature-unit-settings-tile.test.tsx src/test/use-temperature-unit-preference-same-tab.test.tsx --reporter=dot; node scripts/assert-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base c14f1b0d18ddedeaeffb7c569789968df3d8d852 --strict
+files_touched: src/test/temperature-unit-reset-events.test.tsx; docs/agents/HANDOFF_LOG.md (PR delta only; other staged changes are the unmodified incoming base).
+files_remaining: none planned; new reviewer findings require a scoped repair and fresh exact-head review.
+blockers: Grok availability probe still reported authentication failure on 2026-10-24 21:07 UTC; Matthew selected Grok and will sign in locally. No eligible outside request or verdict exists. Public claim/resume comments have not been posted because external comments are outside the user's authorized scope; the empty claimed_by field is not an effective public ownership lock.
+open_questions: Whether an authenticated fresh Grok session is now available; required-check results at the resulting integration head remain NOT_MEASURED.
+gotchas: Re-check the full remote PR head and live base, not stale tracking refs. A source checkpoint is not the resulting commit SHA; new commits invalidate earlier CI and reviews. Open #2434 overlaps one same-document case and remains untouched.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345 ; source-head CI only: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40128113919 ; handoff findings: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345#pullrequestreview-5639778109
+artifacts: config/required-status-checks.json and the PR's resulting-head checks. This merge candidate passed 8 files/87 tests/0 failures, scoped ESLint and Prettier, docs safety, whitespace, strict scorer checks and Sentinel parity. tsgo retained two known getSsrStatus diagnostics in the unchanged not-found-route-status test; full local suite/build were not run. New-head hosted CI remains NOT_MEASURED.
+reviewer_seat: BLOCKED pending an authenticated fresh non-contributing Grok session; no request sent, fallback transfers=0. Earlier Codex technical observations are not acceptance.
+reviewer_sha: NOT_MEASURED; no eligible exact-head PASS.
+session_state: Codex integration coordinator remains active; Grok sign-in pending; no review process launched or routine created. The existing disabled Mocked E2E workflow is not changed by this task.
+claimed_by:
+owner: Codex PR #2345 repair session by explicit user assignment: merge latest base, preserve temperature tests, push, rerun CI, obtain independent review; no PR merge or deploy. This owner record does not assert a posted public claim.
+last_updated: 2026-10-24 16:08 CT, by Codex PR #2345 repair session
+```
+
+### HANDOFF-CONTINUITY-20261024
+
+```text
+TASK HANDOFF-CONTINUITY-20261024  priority: other  status: OPEN
+goal: Docs-only constitution amendment so a retired or out-of-token agent can be resumed immediately, including Cheeko's seven further gates (one writer, one-pass review, stale expiry, ship/money, repo-wide breakages, protected instruction files, post-merge loop).
+why: Unpushed session state and SHA-unbound passes leave the next agent unable to continue. Cheeko approved the continuity rules and the seven gates for this same draft.
+branch: cursor/handoff-continuity-a798
+base: verdant-grow-diary
+checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
+head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
+state: pushed draft once this commit is on the remote
+current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry
+next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain a fresh independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
+decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
+tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
+commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.6 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
+files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/*.md; docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
+files_remaining: none in this slice. .github/pull_request_template.md stays unchanged.
+blockers: independent exact-head review not yet requested; GitHub comment approval gate still applies to a resume-here comment unless Cheeko or Matthew allows it
+open_questions: none for the wording Cheeko approved
+gotchas: A new commit invalidates any review of an older SHA. CURRENT_STATE.md is exempt from Sentinel-Version. Do not force-push. Keep the PR draft.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523 ; PASS at d46e2a3c only: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523#pullrequestreview-5638407206
+artifacts: this block
+reviewer_seat: an eligible independent session that did not author this PR (not this Cursor Grok session)
+reviewer_sha: none yet
+session_state: Cursor cloud agent on cursor/handoff-continuity-a798; no paused workflow; no pending human decision beyond draft review
+post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.6 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
+active_writer: Cursor Grok cloud agent (this session)
+claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-24 13:50 UTC, by Cursor Grok cloud agent
 ```
 
 ### REVIEWER-ROUTING-20261022

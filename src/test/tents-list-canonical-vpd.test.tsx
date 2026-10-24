@@ -5,6 +5,10 @@
  * card derives (VER-189), via tentsListCanonicalVpd, from the same stored rows
  * and the same diary-inclusive snapshot (Codex P2 on #2303). A VPD from another
  * capture keeps its own source and age (Codex P1 on #2303).
+ *
+ * @source-scan-justified: the page-wiring block proves an absence (no per-card
+ * `useLatestSensorSnapshot(` call in the strip) and the single page-level
+ * snapshot read; a resolved module value cannot show that a call is missing.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";

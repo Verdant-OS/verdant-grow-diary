@@ -81,6 +81,14 @@ export const PRICING = {
 export const FOUNDER_LIFETIME_LIMIT = 100;
 export const FOUNDER_LIFETIME_PRICE_USD = 129;
 
+/**
+ * Founder Lifetime is no longer sold (#2028), but existing holders keep the
+ * Pro Blueprint and 100 monthly AI credits (planCatalog), and can still use
+ * credit packs. Tell them so without a price or any purchase wording.
+ */
+export const EXISTING_FOUNDER_HOLDER_NOTE =
+  "Existing Founder members keep the Pro Blueprint for live per-stage SOP scoring and 100 AI Doctor credits per UTC calendar month, and the same one-time packs are available to them.";
+
 export const AI_CREDIT_EXPLAINER = {
   title: "AI Doctor Credits",
   points: [
@@ -90,7 +98,7 @@ export const AI_CREDIT_EXPLAINER = {
     "One-time AI credit packs available",
     "Pro and Craft members can buy one-time credit packs when they need more",
   ],
-  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro includes 100 per month; Craft includes 300. Pro and Craft members who are out of monthly credits can buy a one-time top-up pack (50 for $9, 150 for $19) — packs never expire and are spent only after the monthly allowance.",
+  note: `Included AI Doctor credits work today: Free includes 3 per grow; Pro includes 100 per month; Craft includes 300. ${EXISTING_FOUNDER_HOLDER_NOTE} Pro and Craft members who are out of monthly credits can buy a one-time top-up pack (50 for $9, 150 for $19) — packs never expire and are spent only after the monthly allowance.`,
 } as const;
 
 /**

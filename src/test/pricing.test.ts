@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { AI_CREDIT_EXPLAINER, EXISTING_FOUNDER_HOLDER_NOTE } from "@/constants/pricing";
 import {
   extractMountedAppRoutePaths,
   readAllRouteModuleSources,
@@ -259,11 +260,13 @@ describe("AI Doctor credits", () => {
   });
 
   it("AI credit copy does not sell Founder Lifetime", () => {
-    const explainer = CONSTANTS.slice(
-      CONSTANTS.indexOf("export const AI_CREDIT_EXPLAINER"),
-      CONSTANTS.indexOf("export const CREDIT_PACKS"),
-    );
-    expect(explainer).not.toMatch(/Founder/);
+    // Matthew, 2026-10-24 (#2028): the only Founder sentence allowed is the
+    // existing-holder note, and it carries no price or purchase wording.
+    const text = [...AI_CREDIT_EXPLAINER.points, AI_CREDIT_EXPLAINER.note].join(" ");
+    const founderSentences = text.split(/(?<=[.!?])\s+/).filter((s) => /Founder/.test(s));
+    expect(founderSentences).toEqual([EXISTING_FOUNDER_HOLDER_NOTE]);
+    expect(EXISTING_FOUNDER_HOLDER_NOTE).toMatch(/^Existing Founder members /);
+    expect(EXISTING_FOUNDER_HOLDER_NOTE).not.toMatch(/\$|\bbuy|purchase|\bseat|\bslot|lifetime/i);
     expect(CONSTANTS).toMatch(/100 AI Doctor credits \/ month/);
   });
 

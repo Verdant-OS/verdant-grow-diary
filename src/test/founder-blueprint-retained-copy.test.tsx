@@ -9,6 +9,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
 import { PRICING_TIERS, PURCHASABLE_PRICING_TIERS } from "@/config/pricing";
+import { EXISTING_FOUNDER_HOLDER_NOTE } from "@/constants/pricing";
 
 const BLUEPRINT_FEATURE = "Pro Blueprint: live per-stage SOP scoring";
 
@@ -40,11 +41,17 @@ vi.mock("@/components/RewardedReferralCard", () => ({
   default: () => null,
 }));
 
+vi.mock("@/lib/pricingAnalytics", () => ({
+  trackPricingEvent: vi.fn(),
+  PRICING_ANALYTICS_EVENT: "verdant:analytics",
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: vi.fn() } },
 }));
 
 import Settings from "@/pages/Settings";
+import Pricing from "@/pages/Pricing";
 
 function founderTier() {
   const tier = PRICING_TIERS.find((t) => t.id === "founder_lifetime");
@@ -88,4 +95,25 @@ describe("Founder Lifetime retained Blueprint copy", () => {
     expect(list.textContent?.split(BLUEPRINT_FEATURE)).toHaveLength(2);
     expect(list.textContent).not.toMatch(/300/);
   });
+
+  it.each(["/pricing", "/pricing?plan=founder_lifetime"])(
+    "tells existing Founder members on %s what they keep, with no Founder card or price",
+    (entry) => {
+      render(
+        <MemoryRouter initialEntries={[entry]}>
+          <Pricing />
+        </MemoryRouter>,
+      );
+      const body = document.body.textContent ?? "";
+      expect(body).toContain(EXISTING_FOUNDER_HOLDER_NOTE);
+      expect(EXISTING_FOUNDER_HOLDER_NOTE).toContain(
+        BLUEPRINT_FEATURE.replace("Pro Blueprint: ", ""),
+      );
+      expect(EXISTING_FOUNDER_HOLDER_NOTE).toContain(
+        "100 AI Doctor credits per UTC calendar month",
+      );
+      expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+      expect(body).not.toMatch(/\$129/);
+    },
+  );
 });

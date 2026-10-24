@@ -93,6 +93,7 @@ import {
 } from "@/lib/phenoEvidenceQuickLogTargetGate";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import { phenoHuntKeepersPath } from "@/lib/routes";
+import PhenoHuntAddCandidatesDialog from "@/components/PhenoHuntAddCandidatesDialog";
 import {
   evaluatePhenoCandidateReadiness,
   readinessEvidenceFromCandidateInput,
@@ -1869,6 +1870,13 @@ export default function PhenoHuntWorkspace() {
               <span className="text-xs text-muted-foreground">
                 Name keepers, record clones, and log breeding crosses for this hunt.
               </span>
+              {canWrite && ws.hunt?.id && ws.hunt.growId ? (
+                <PhenoHuntAddCandidatesDialog
+                  huntId={ws.hunt.id}
+                  growId={ws.hunt.growId}
+                  onAdded={ws.reload}
+                />
+              ) : null}
             </nav>
           ) : null}
           <label className="flex items-center gap-2 pt-1 text-sm">

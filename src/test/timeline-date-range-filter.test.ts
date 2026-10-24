@@ -212,7 +212,7 @@ describe("static wiring — src/pages/Timeline.tsx", () => {
 
   it("wires the missing-action jump through the pure rules module", () => {
     expect(src).toMatch(/from "@\/lib\/timelineMissingActionRules"/);
-    expect(src).toMatch(/findNextMissingAction\(recentLaneRawEntries,\s*new Date\(\)\)/);
+    expect(src).toMatch(/findNextMissingAction\(scopedRecentLaneRawEntries,\s*new Date\(\)\)/);
     expect(src).toMatch(/findNewestEntryIdForCategory\(entries,/);
     expect(src).toMatch(/scrollIntoView\(/);
     expect(src).toMatch(/prefers-reduced-motion/);

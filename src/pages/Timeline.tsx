@@ -1707,10 +1707,11 @@ export default function Timeline() {
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
-  // its own logged rhythm. Suggestion-only — the grower decides; Verdant
-  // only points at the grower's own history.
+  // its own logged rhythm. Reads the plant/tent-scoped rows so a filtered
+  // view never surfaces another plant's gap. Suggestion-only — the grower
+  // decides; Verdant only points at the grower's own history.
   function handleFindMissingAction() {
-    const result = findNextMissingAction(recentLaneRawEntries, new Date());
+    const result = findNextMissingAction(scopedRecentLaneRawEntries, new Date());
     setMissingAction(result);
     if (result.status === "found") {
       const targetId = findNewestEntryIdForCategory(entries, result.suggestion.category);
@@ -1857,8 +1858,8 @@ export default function Timeline() {
     return out;
   }, [displayEntries, growEvents, supplementalLinkedGrowEvents]);
   // The Quick Log history lanes follow the same plant/tent filter as the main
-  // list (filming bug #3); unscoped `recentLaneRawEntries` still feeds the
-  // grow-wide evidence counts.
+  // list (filming bug #3), as does "Next missing action"; unscoped
+  // `recentLaneRawEntries` still feeds the grow-wide evidence counts.
   const scopedRecentLaneRawEntries = useMemo(
     () =>
       scopeTimelineQuickLogLaneRows(recentLaneRawEntries, {

@@ -2,7 +2,7 @@
 
 **Source of truth:** `src/lib/appRouteManifest.ts` in this commit, checked against the mounted route modules by `src/test/helpers/routeManifestSyncHarness.ts`.<br>
 **Live index status:** **NOT_MEASURED.** This file records repository metadata, `public/sitemap.xml`, and `public/robots.txt`. It is not a Search Console measurement and it does not claim what `https://verdantgrowdiary.com` returns.<br>
-**Coverage:** 144 of 144 manifest routes — 42 public, 46 authenticated, 32 operator, 6 internal, and 18 redirects.
+**Coverage:** 147 of 147 manifest routes — 42 public, 46 authenticated, 32 operator, 6 internal, and 21 redirects.
 
 ## Reading the matrix
 
@@ -206,16 +206,16 @@ Permanent `vercel.json` redirects (repository config; live application **NOT_MEA
 
 Client redirects in route modules:
 
-- `/features`, `/demo`, `/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`, `/login` (`/auth`), `/register` and `/signup` (`/auth?mode=signup`), `/logs` (`/timeline`), `/action-queue` and `/tasks` (`/actions`), `/ai-doctor` (`/doctor`), `/grow-room` (`/`), `/strains` (`/cultivars`) use `RouteAliasRedirect`.
+- `/features`, `/demo`, `/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`, `/login` (`/auth`), `/register` and `/signup` (`/auth?mode=signup`), `/logs` (`/timeline`), `/action-queue` and `/tasks` (`/actions`), `/ai-doctor` (`/doctor`), `/grow-room` (`/`), `/strains` (`/cultivars`), `/breeding-programs` (`/breeding`), `/agent-integrations` (`/settings/agent-integrations`), `/help` (`/tools/grow-help-toolkit`) use `RouteAliasRedirect`.
 - `/strains/:slug` renders `LegacyStrainSlugRedirect` and also calls `staticRouteHead` for the alias document.
 - `/billing/:plan` renders `LegacyBillingRedirect` (`/pricing` with a canonical plan query).
 - `/upgrade` renders `LegacyUpgradeRedirect` (`/pricing` with allow-listed plan, acquisition, and return intent).
 
 `Disallow` lines also name `/login`, `/signup`, `/register`, `/logs`, `/tasks`, `/action-queue`, and `/billing/`.
 
-Manifest paths (`access: "redirect"`, 18):
+Manifest paths (`access: "redirect"`, 21):
 
-`/action-queue`; `/ai-doctor`; `/billing/:plan`; `/demo`; `/features`; `/grow-room`; `/login`; `/logs`; `/privacy-policy`; `/refund-policy`; `/refunds`; `/register`; `/signup`; `/strains`; `/strains/:slug`; `/tasks`; `/terms-of-service`; `/upgrade`.
+`/action-queue`; `/agent-integrations`; `/ai-doctor`; `/billing/:plan`; `/breeding-programs`; `/demo`; `/features`; `/grow-room`; `/help`; `/login`; `/logs`; `/privacy-policy`; `/refund-policy`; `/refunds`; `/register`; `/signup`; `/strains`; `/strains/:slug`; `/tasks`; `/terms-of-service`; `/upgrade`.
 
 ## Retired routes
 

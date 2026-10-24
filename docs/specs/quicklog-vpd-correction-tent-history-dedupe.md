@@ -5,8 +5,9 @@ applying any SQL, and applying `20261014210000` stay his decisions. Nothing here
 Tracking issue: #2503 (precondition for applying `20261014210000`).
 
 Audited on the deploy branch `verdant-grow-diary` at `65d9964e49eb4b95910bedc59d288d747461da79`.
-Client references to `src/lib/tentManualEnvironmentEventRules.ts` are to open PR #2504 at
-`e713629535e63334332a3820ce111abc6441fefb`. That file does not exist on the deploy branch yet.
+Client references to `src/lib/tentManualEnvironmentEventRules.ts` were audited on PR #2504 at
+`e713629535e63334332a3820ce111abc6441fefb`. #2504 has since merged as `3ef43ee49`, and its rules
+and hook files on the deploy branch are byte-identical to that head (re-checked 2026-10-24).
 
 Claim labels follow `CLAUDE.md`: `established fact` (read in source at the SHA above),
 `source claim` (stated by a log, PR or issue, not re-verified), `inference`, `missing evidence`.
@@ -50,8 +51,7 @@ Assumptions:
 
 - `20261014210000` is not applied in production, so no VPD-corrected row exists there yet
   (`source claim`: HANDOFF_LOG closed block QUICKLOG-CORRECTION-EDITABLE-VALUES; #2503).
-- #2504 merges before the client half of this work. If it does not, the client change moves
-  to whichever PR carries `tentManualEnvironmentEventRules.ts`.
+- #2504 has merged (`3ef43ee49`), so the client half builds directly on the deploy branch.
 
 ## 3. Audit (current behaviour)
 
@@ -180,7 +180,7 @@ grow_events(id)`, an index, a same-owner trigger, a replacement of the save dele
 
 **Migration shape:** none for the link. The A1 harness pins the invariant (§6, P1).
 
-**Client change (`tentManualEnvironmentEventRules.ts`, after #2504):**
+**Client change (`tentManualEnvironmentEventRules.ts`, added by #2504):**
 
 1. Add `created_at` to `TENT_MANUAL_ENV_EVENT_SELECT`, and carry it as `createdAt: string | null`
    on `TentManualEnvironmentEvent`. Add `created_at` to the diary snapshot read and to
@@ -291,7 +291,7 @@ Existing tests to keep green: #2504's `tent-manual-environment-events.test.tsx` 
 | 1                                        | `scripts/run-quicklog-correction-manual-vpd-pg15-harness.mjs`                                                          | New; §6.1                                                                                                                                                                                                      |
 | 1                                        | `.github/workflows/ci.yml`                                                                                             | One step in the existing job (protected scope)                                                                                                                                                                 |
 | 1                                        | `scripts/assert-required-core-migrations-applied.mjs`                                                                  | Add a fingerprint for the new `quicklog_correction_apply_measured_values` body, next to the `quicklog_correct_entry` one (`:97-109`), so a production verify catches `20261014210000` applied without this fix |
-| 2 (client, after #2504 merges)           | `src/lib/tentManualEnvironmentEventRules.ts`                                                                           | §4 C steps 1–5                                                                                                                                                                                                 |
+| 2 (client)                               | `src/lib/tentManualEnvironmentEventRules.ts`                                                                           | §4 C steps 1–5                                                                                                                                                                                                 |
 | 2                                        | `src/hooks/useTentManualEnvironmentEvents.ts`, `src/hooks/useTentManualDiarySnapshots.ts`                              | Select `created_at`                                                                                                                                                                                            |
 | 2                                        | `src/lib/manualSnapshotDiaryAdapter.ts`                                                                                | Measured `vpd_kpa` (§4 A1)                                                                                                                                                                                     |
 | 2                                        | `src/test/fixtures/quicklog-vpd-correction-write-path.json`, `src/test/tent-history-vpd-correction-write-path.test.ts` | New; §6.2                                                                                                                                                                                                      |
@@ -334,7 +334,7 @@ still met by C).
 - [ ] P1–P8 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
 - [ ] T1–T8 pass; both negative gates shown failing, then restored.
 - [ ] `config/local-supabase-replay-compatibility.json` unchanged; the `Published migration
-    integrity` gate green; no merged migration edited.
+integrity` gate green; no merged migration edited.
 - [ ] No table, column, policy, grant or RLS change (diff check).
 - [ ] 35/35 required checks plus an eligible independent PASS at the exact head, per
       `AGENTS.md`. The migration PR also needs Matthew's explicit per-PR decision.

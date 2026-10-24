@@ -58,7 +58,7 @@ head_sha: read the PR's current full head before resuming
 state: spec pushed as a draft for Matthew's review. Recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key).
 next_action: Matthew reviews the option choice; then route an eligible independent review of the spec at its exact head.
 files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
-blockers: Implementation slice 2 depends on open #2504 (adds src/lib/tentManualEnvironmentEventRules.ts). The migration is Matthew's per-PR decision; applying 20261014210000 stays blocked by #2503.
+blockers: None for slice 2: #2504 merged as 3ef43ee49, so src/lib/tentManualEnvironmentEventRules.ts is on the deploy branch. The migration is Matthew's per-PR decision; applying 20261014210000 stays blocked by #2503.
 artifacts: the spec file above
 reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3; this author is excluded
 claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-23 UTC (Matthew's direct assignment)

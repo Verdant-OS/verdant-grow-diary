@@ -273,7 +273,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // Also wait for useRequireAuth (getUser) before mounting protected children
   // (#588): a stale cached session must not let pageContent fire authenticated
   // REST calls until the auth server revalidation settles.
-  if (!hydrated || loading || authStatus === "loading")
+  // A failed revalidation skips the wait for auth, never the hydration render.
+  if (
+    (!hydrated || loading || authStatus === "loading") &&
+    (!hydrated || authStatus !== "revalidation_failed")
+  )
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
@@ -334,6 +338,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         />
         <a
           href="#main-content"
+          onClick={(event) => {
+            // A hash change alone leaves focus on BODY under the router, so
+            // the next Tab restarts at this link. Move focus into main.
+            const main = document.getElementById("main-content");
+            if (!main) return;
+            event.preventDefault();
+            main.focus();
+          }}
           className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Skip to main content

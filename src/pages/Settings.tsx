@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "@/lib/react-router-compat";
 import { useCommittedRouteDeparture } from "@/hooks/useCommittedRouteDeparture";
-import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { Settings as SettingsIcon } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -26,6 +25,7 @@ import {
 } from "@/lib/accountDeletion";
 import { createAccountDeletionContinuation } from "@/lib/accountDeletionContinuationRules";
 import { useAuth } from "@/store/auth";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
 import { PRICING_TIERS } from "@/config/pricing";
@@ -196,12 +196,15 @@ function StartScreenTile({ userId }: { userId: string }) {
 function TemperatureUnitTile() {
   const [choice, setChoice] = useState<TemperatureUnitPreference>(DEFAULT_TEMPERATURE_UNIT);
   // What this device has stored, tracked apart from the unsaved radio choice so
-  // Reset stays available while a non-default override is still persisted.
+  // Reset stays available while a non-default override is still persisted. The
+  // shared hook follows saves in other tabs as well as this one (Codex P2 on
+  // #2345 at f752598a); the unsaved choice is never overwritten.
   const stored = useTemperatureUnitPreference();
   const [feedback, setFeedback] = useState<PreferenceFeedback | null>(null);
 
   useEffect(() => {
-    setChoice(loadTemperatureUnitPreference());
+    const loaded = loadTemperatureUnitPreference();
+    setChoice(loaded);
   }, []);
 
   function onSave() {

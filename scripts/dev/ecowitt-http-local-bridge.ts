@@ -129,6 +129,12 @@ export function parseEcowittBody(
     const k = decodeURIComponent(pair.slice(0, eq).replace(/\+/g, " ")).trim();
     const v = decodeURIComponent(pair.slice(eq + 1).replace(/\+/g, " "));
     if (k.length === 0) continue;
+    // The PASSKEY is a credential, not a reading: a digits-only key such as
+    // "000012345678" must reach the forwarder unchanged (Codex P2 on #2335).
+    if (/^passkey$/i.test(k)) {
+      out[k] = v;
+      continue;
+    }
     const num = Number(v);
     out[k] = Number.isFinite(num) && v.trim() !== "" ? num : v;
   }
@@ -179,7 +185,7 @@ const defaultPublisherFactory: PublisherFactory = async (flags) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
-    throw new Error("mqtt package not installed. Run `bun add mqtt` or use --dry-run.");
+    throw new Error("mqtt package not installed. Run `bun add --no-save mqtt` or use --dry-run.");
   }
   const client = mqtt.connect(flags.mqttUrl, {
     username: flags.mqttUsername ?? undefined,

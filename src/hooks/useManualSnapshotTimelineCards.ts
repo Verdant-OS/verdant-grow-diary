@@ -22,6 +22,11 @@ import {
   selectManualSnapshotsForTimeline,
   type ManualSnapshotTimelineCard,
 } from "@/lib/manualSensorSnapshotViewModel";
+import { fetchTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+import {
+  dropEventsMirroredByDiaryRows,
+  manualEnvironmentEventsToSnapshotRecords,
+} from "@/lib/tentManualEnvironmentEventRules";
 import {
   normalizeTentManualSnapshotIds,
   scanLatestTentManualSnapshots,
@@ -96,15 +101,25 @@ export function useManualSnapshotTimelineCards(
     enabled,
     queryFn: async (): Promise<ManualSnapshotTimelineCard[]> => {
       if (!scope) return [];
-      const rows =
-        scope.kind === "plant"
-          ? await fetchPlantManualSnapshotRows(scope.plantId, limit)
-          : await fetchTentManualSnapshotRows(scope.tentId, limit);
-      const records = diaryRowsToManualSnapshotRecords(rows);
       if (scope.kind === "plant") {
+        const rows = await fetchPlantManualSnapshotRows(scope.plantId, limit);
+        const records = diaryRowsToManualSnapshotRecords(rows);
         return selectManualSnapshotsForTimeline({ records, plantId: scope.plantId });
       }
-      return selectManualSnapshotsForTimeline({ records, tentId: scope.tentId });
+      // Quick Log V2 snapshots live only in grow_events + environment_events,
+      // so the tent timeline reads both shapes (production QA 2026-10-14).
+      const [rows, events] = await Promise.all([
+        fetchTentManualSnapshotRows(scope.tentId, limit),
+        fetchTentManualEnvironmentEvents(scope.tentId, limit),
+      ]);
+      // One Plant Quick Log save returns from both reads; keep it once.
+      const records = [
+        ...diaryRowsToManualSnapshotRecords(rows),
+        ...manualEnvironmentEventsToSnapshotRecords(dropEventsMirroredByDiaryRows(events, rows)),
+      ];
+      // Each read is limited on its own, so re-apply the limit to the merged,
+      // newest-first (id tie-broken) timeline.
+      return selectManualSnapshotsForTimeline({ records, tentId: scope.tentId }).slice(0, limit);
     },
   });
   return {

@@ -500,9 +500,11 @@ describe("Timeline Notes chip means note text (Pollen #1)", () => {
 
     expect(chipCount("All")).toBe(1);
     expect(chipCount("Notes")).toBe(1);
-    expect(chipCount("Measurements")).toBe(2);
     const allRows = () => screen.queryAllByTestId("timeline-entry").map((e) => e.id);
+    // Manual sensor reads load on their own deadline-bounded loader (#2202), so
+    // the receipts arrive after the diary note; count them once they render.
     await waitFor(() => expect(allRows()).toHaveLength(3));
+    expect(chipCount("Measurements")).toBe(2);
     expect(allRows().filter((id) => id.startsWith("timeline-entry-sensor-reading:"))).toHaveLength(
       2,
     );

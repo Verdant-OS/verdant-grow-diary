@@ -101,7 +101,7 @@ any other file.
 
    ```sql
    UPDATE public.diary_entries d
-      SET details = CASE WHEN p_sensor ? 'vpd_kpa'
+      SET details = CASE WHEN jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'
         THEN jsonb_set(<existing temp_f / humidity_percent expression>,
                        '{manual_sensor_snapshot,vpd_kpa}',
                        to_jsonb((p_sensor ->> 'vpd_kpa')::numeric), true)
@@ -110,16 +110,25 @@ any other file.
       AND jsonb_typeof(d.details -> 'manual_sensor_snapshot') = 'object';
    ```
 
+   Guard on `jsonb_typeof(...) = 'number'`, not on `p_sensor ? 'vpd_kpa'`. `jsonb_set` is
+   STRICT. A present-but-null `vpd_kpa` makes `(p_sensor ->> 'vpd_kpa')::numeric` NULL, and
+   `to_jsonb(NULL::numeric)` is NULL, so the `?` guard would set the whole `details` column to
+   NULL. A JSON null, a missing key, or any non-number takes the ELSE branch: temperature and
+   humidity still update, and no `vpd_kpa` key is written. `quicklog_correct_entry` already
+   rejects a null sensor value (`20261014210000:442-468`), but this function is the one being
+   replaced, so the guard lives here.
+
    `create = true` works here because the `WHERE` guarantees the parent object exists. The key
-   is written **only** when the correction carries VPD, so a temperature-only correction adds no
-   `vpd_kpa: null` key. The `sensor_snapshot` UPDATE stays as it is: it still serves rows that do
-   have a `sensor_snapshot`.
+   is written **only** when the correction carries a numeric VPD, so a temperature-only
+   correction adds no `vpd_kpa: null` key. The `sensor_snapshot` UPDATE stays as it is: it still
+   serves rows that do have a `sensor_snapshot`.
 
 4. Repeat `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role` (idempotent; grants
    unchanged).
-5. **Postflight, fail closed.** `prosrc` contains `'{manual_sensor_snapshot,vpd_kpa}'`; the
-   privileges are as in step 2; `quicklog_correct_entry` is unchanged (md5 equals the
-   `20261014210000` body).
+5. **Postflight, fail closed.** `prosrc` contains `'{manual_sensor_snapshot,vpd_kpa}'` and
+   `jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number'`, and it does not contain
+   `p_sensor ? 'vpd_kpa'` as the mirror-VPD branch guard; the privileges are as in step 2;
+   `quicklog_correct_entry` is unchanged (md5 equals the `20261014210000` body).
 6. `COMMIT; NOTIFY pgrst, 'reload schema';`
 
 **Key name.** `vpd_kpa` names its unit, as `temp_f` and `humidity_percent` do. It is the name the
@@ -257,6 +266,7 @@ as an `authenticated` owner.
 | P6               | Preflight fails with `quicklog_correction_manual_vpd_preflight_unrecognized` when `20261014210000` is absent or its body differs. Re-running the migration succeeds and changes nothing.                                                                 |
 | P7 (RED)         | With only `20261014210000` applied, P2 fails on the missing `vpd_kpa`. Record the failing count in the PR body.                                                                                                                                          |
 | P8               | The revision ledger's `previous_state` still holds the original `environment_events` values (F10).                                                                                                                                                       |
+| P9 (null vpd)    | Call `quicklog_correction_apply_measured_values` directly, as a role that may execute it, with `p_sensor` containing `"vpd_kpa": null` and a real temperature change. `quicklog_correct_entry` rejects a null sensor value, so the authenticated path cannot reach this. `details` stays non-null; `temp_f` updates; no `vpd_kpa` key is written. |
 
 The harness also **generates the client fixture** (6.2) and has a `--check` mode that fails when
 the committed fixture differs from a fresh run.
@@ -312,15 +322,21 @@ Existing tests to keep green: #2504's `tent-manual-environment-events.test.tsx` 
 | 1                                        | `.github/workflows/ci.yml`                                                                                                                                               | One step in the existing job (protected scope)                                                                                                                                                                 |
 | 1                                        | `scripts/assert-required-core-migrations-applied.mjs`                                                                                                                    | Add a fingerprint for the new `quicklog_correction_apply_measured_values` body, next to the `quicklog_correct_entry` one (`:97-109`), so a production verify catches `20261014210000` applied without this fix |
 | 2 (client)                               | `src/lib/tentManualEnvironmentEventRules.ts`                                                                                                                             | §4 C steps 1–6                                                                                                                                                                                                 |
-| 2                                        | `src/hooks/useTentManualEnvironmentEvents.ts`, `src/hooks/useTentManualDiarySnapshots.ts`, `src/hooks/useManualSnapshotTimelineCards.ts` (`fetchTentManualSnapshotRows`) | Select `created_at`                                                                                                                                                                                            |     |
+| 2                                        | `src/hooks/useTentManualEnvironmentEvents.ts`, `src/hooks/useTentManualDiarySnapshots.ts`, `src/hooks/useManualSnapshotTimelineCards.ts` (`fetchTentManualSnapshotRows`) | Select `created_at`                                                                                                                                                                                            |
 | 2                                        | `src/lib/manualSnapshotDiaryAdapter.ts`                                                                                                                                  | Measured `vpd_kpa` (§4 A1)                                                                                                                                                                                     |
 | 2                                        | `src/test/fixtures/quicklog-vpd-correction-write-path.json`, `src/test/tent-history-vpd-correction-write-path.test.ts`                                                   | New; §6.2                                                                                                                                                                                                      |
 | 2                                        | `src/lib/tentManualEnvironmentEventRules.ts` comment in `eventMatchesMirrorValues`                                                                                       | Replace the "known gap" note with a pointer to the transaction-key branch                                                                                                                                      |
 
-Slice 2 depends on slice 1's harness for its fixture. Slice 2's rule change is safe to merge
-before the migration is applied. A sibling with matching readings is claimed under either rule
-(T1, T4, T5); the only new claim is the VPD-corrected sibling the value rule refuses (T2), and
-an independent save is never claimed (T3).
+Slice 1 is the migration file and its harness together. The harness applies that file, so it
+does not ship ahead of the migration and it does not become required CI before Matthew's
+per-PR decision on the migration.
+
+Slice 2's test reads a fixture the harness writes. Commit that fixture from one disposable
+harness run inside the slice 1 change; do not hand-build it. Slice 2 is gated on that committed
+fixture, not on applying the migration in production. Slice 2's rule change may merge before
+that apply: a sibling with matching readings is claimed under either rule (T1, T4, T5); the
+only new claim is the VPD-corrected sibling the value rule refuses (T2); an independent save is
+never claimed (T3).
 
 ## 8. Release and apply order (Matthew's decisions)
 
@@ -351,7 +367,9 @@ still met by C).
 
 ## 10. Acceptance
 
-- [ ] P1–P8 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
+- [ ] P1–P9 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
+      P9 calls `quicklog_correction_apply_measured_values` with a null `vpd_kpa` and leaves
+      `details` non-null.
 - [ ] T1–T9 pass; all three negative gates shown failing, then restored.
 - [ ] `config/local-supabase-replay-compatibility.json` unchanged; the `Published migration
 integrity` gate green; no merged migration edited.

@@ -81,8 +81,8 @@ checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && 
 pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
 head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
 state: pushed draft once this commit is on the remote
-current_step: constitution text, handoff template, and CURRENT_STATE registry updated locally
-next_action: Confirm the draft PR is open against verdant-grow-diary, then obtain an independent exact-head review. Do not merge. Do not edit .github/pull_request_template.md in this PR.
+current_step: constitution restructured into numbered sections (2026-10-24.2) on draft #2523
+next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain an independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
 decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
 tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
 commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.1 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary

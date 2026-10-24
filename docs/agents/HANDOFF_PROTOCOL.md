@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-10-24.1**
+**Sentinel-Version: 2026-10-24.2**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -188,8 +188,7 @@ finding. Do not expand the slice because you are already in the file.
 Return `STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE` when a required file is missing or
 instructions conflict.
 
-Conflicts between this protocol, a role file, and `AGENTS.md` resolve in that order:
-`AGENTS.md` wins, then the role file, then this protocol. Report the conflict; do not
-silently pick one.
+Conflicts follow `AGENTS.md` §0.1. Report the conflict; do not silently pick one.
 
-Only Cheek approves what ships. The Council Chair recommends; it does not release.
+Who may approve a ship is the founder seat in `docs/agents/constitution/roster.md`.
+The Council Chair recommends; it does not release.

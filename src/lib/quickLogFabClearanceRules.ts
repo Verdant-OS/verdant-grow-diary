@@ -62,32 +62,73 @@ export const QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS = "pb-24 md:pb-6";
 /** `right-4` on the mobile shell FAB. */
 export const MOBILE_QUICK_LOG_FAB_RIGHT_REM = 1;
 
+/** `px-3` on `#main-content` below `sm`. */
+export const SHELL_MAIN_PADDING_X_REM = 0.75;
+
+/** `sm:px-5` on `#main-content` from `sm` until `md`. */
+export const SHELL_MAIN_PADDING_X_SM_REM = 1.25;
+
 /**
- * Extra inline-end padding (rem) on scrollable page content below `md` so a
- * control at the trailing edge (for example the Timeline "All plants" filter)
- * cannot sit under the fixed FAB. Main already contributes `px-3` (0.75rem);
- * this value is the FAB's right offset plus its width, minus that padding,
- * plus the shared content gap.
+ * Extra inline-end padding (rem) for the Timeline filter row only, so the
+ * "All plants" control clears the FAB. `mainPaddingRem` is the shell's
+ * horizontal padding already applied outside the row (`px-3` or `sm:px-5`).
  */
-export function mobileQuickLogSideClearanceRem(): number {
+export function mobileQuickLogSideClearanceRem(mainPaddingRem: number): number {
   return (
     MOBILE_QUICK_LOG_FAB_RIGHT_REM +
     MOBILE_QUICK_LOG_FAB_HEIGHT_REM +
     QUICK_LOG_FAB_CONTENT_GAP_REM -
-    0.75
+    mainPaddingRem
   );
 }
 
-/** `pr-[4.75rem] md:pr-0` — see `mobileQuickLogSideClearanceRem`. */
-export const QUICK_LOG_FAB_SIDE_CLEARANCE_CLASS = "pr-[4.75rem] md:pr-0";
+/** Timeline filter row only. Not used on the shell page body. */
+export const QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS = [
+  `pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_REM)}rem]`,
+  `sm:pr-[${mobileQuickLogSideClearanceRem(SHELL_MAIN_PADDING_X_SM_REM)}rem]`,
+  "md:pr-0",
+].join(" ");
 
 /**
- * Distance from the viewport bottom to the top of `MobileNav`
- * (`bottom-2` + `h-16` + a 0.5rem gap) plus the safe-area inset.
- * Shared by Sonner and the Radix toast viewport.
+ * Bottom edge of a toast while the signed-in shell's bottom nav and FAB are
+ * on screen: the same 9.5rem stack as `mobileQuickLogContentClearanceRem`
+ * (FAB bottom + height + gap) plus the safe-area inset. Above the FAB, so a
+ * toast does not cover Quick Log.
  */
-export const TOAST_ABOVE_MOBILE_NAV_OFFSET = "calc(5rem + env(safe-area-inset-bottom))";
+export function mobileShellToastBottomOffset(): string {
+  return `calc(${mobileQuickLogContentClearanceRem()}rem + env(safe-area-inset-bottom))`;
+}
 
-/** Radix viewport: sit above the bottom nav from `sm` until `md` hides the nav. */
-export const TOAST_VIEWPORT_OFFSET_CLASS =
-  "sm:bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-0";
+/**
+ * Document-level CSS injected only while `AppShell` (bottom nav) is mounted.
+ * The media queries keep `md+` and, by absence of the tag, public routes on
+ * the library default toast position.
+ */
+export function mobileShellToastOffsetCss(): string {
+  const offset = mobileShellToastBottomOffset();
+  return [
+    "@media (max-width: 767px) {",
+    "  [data-sonner-toaster] {",
+    `    --offset-bottom: ${offset} !important;`,
+    `    --mobile-offset-bottom: ${offset} !important;`,
+    "  }",
+    "}",
+    "@media (min-width: 640px) and (max-width: 767px) {",
+    "  [data-verdant-toast-viewport] {",
+    "    top: auto !important;",
+    `    bottom: ${offset} !important;`,
+    "  }",
+    "}",
+  ].join("\n");
+}
+
+/** Right edge of the Timeline filter content, in CSS pixels, for a viewport width. */
+export function timelineFilterRightPx(viewportPx: number, mainPaddingRem: number): number {
+  const extra = mobileQuickLogSideClearanceRem(mainPaddingRem);
+  return viewportPx - (mainPaddingRem + extra) * 16;
+}
+
+/** Left edge of the mobile FAB, in CSS pixels. */
+export function mobileFabLeftPx(viewportPx: number): number {
+  return viewportPx - (MOBILE_QUICK_LOG_FAB_RIGHT_REM + MOBILE_QUICK_LOG_FAB_HEIGHT_REM) * 16;
+}

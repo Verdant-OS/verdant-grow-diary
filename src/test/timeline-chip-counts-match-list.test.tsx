@@ -440,11 +440,13 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
 
     renderTimeline();
 
-    // On a loaded CI runner the first async render can exceed findByText's 1s default (#2521);
-    // the case's 15s timeout below leaves room for this 5s wait.
-    expect(
-      await screen.findByText("QA Test watering note", undefined, { timeout: 5_000 }),
-    ).toBeInTheDocument();
+    // The two manual sensor readings load after the diary rows and add a "Stage not recorded"
+    // group above them. That shifts the index-based section key and remounts the Vegetative
+    // section, detaching any row node found before it (#2521). Wait for the settled list
+    // (3 diary rows + 2 sensor rows), then look the row up fresh.
+    await screen.findByText("QA Test watering note");
+    await waitFor(() => expect(listedEntries()).toHaveLength(5));
+    expect(screen.getByText("QA Test watering note")).toBeInTheDocument();
     expect(chipCount("All")).toBe(3);
 
     fireEvent.change(screen.getByTestId("timeline-search-input"), {
@@ -457,7 +459,7 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
     expect(chipCount("Notes")).toBe(2);
     expect(chipCount("Measurements")).toBe(1);
     expect(chipCount("Vegetative")).toBe(2);
-  }, 15_000);
+  });
 
   it("counts storage photos before signed URLs resolve and keeps Photos list equal to Photos count", async () => {
     const pending = deferred<void>();

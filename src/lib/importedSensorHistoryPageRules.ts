@@ -4,7 +4,7 @@ export const IMPORTED_SENSOR_HISTORY_PAGE_SIZE = 50;
 /** In imported history, ts may be ingestion time and cannot establish observation time. */
 export function prepareImportedSensorHistoryObservationRows<T extends { ts?: string | null }>(
   rows: readonly T[] | null | undefined,
-): Array<T & { ts: null }> {
+): Array<Omit<T, "ts"> & { ts: null }> {
   return (rows ?? []).map((row) => ({ ...row, ts: null }));
 }
 

@@ -357,10 +357,13 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
 
     renderTimeline();
 
-    expect(await screen.findByText("Plain diary note")).toBeInTheDocument();
+    await screen.findByText("Plain diary note");
     // Manual sensor receipts load after the core read commits (the detached
     // directory read), so wait for them before comparing chips to the list.
+    // Their stage group lands above the diary rows and remounts that section,
+    // so look the row up again on the settled list (#2521).
     await waitFor(() => expect(chipCount("Measurements")).toBe(5));
+    expect(screen.getByText("Plain diary note")).toBeInTheDocument();
 
     expect(chipCount("All")).toBe(6);
     expect(chipCount("All stages")).toBe(6);

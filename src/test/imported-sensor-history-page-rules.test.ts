@@ -4,8 +4,21 @@ import {
   buildImportedSensorHistoryPageSummary,
   formatImportedSensorHistoryObservation,
   normalizeImportedSensorHistorySelection,
+  prepareImportedSensorHistoryObservationRows,
   type ImportedSensorHistorySelection,
 } from "../lib/importedSensorHistoryPageRules";
+
+describe("canonical imported observation rows", () => {
+  it("removes ingestion-time fallback without mutating timestamps or stored values", () => {
+    const input = [{ captured_at: null, ts: "2026-10-24T12:00:00Z", value: 24 }];
+    expect(prepareImportedSensorHistoryObservationRows(input)).toEqual([{ captured_at: null, ts: null, value: 24 }]);
+    expect(input[0].ts).toBe("2026-10-24T12:00:00Z");
+  });
+  it("handles absent rows without inventing observations", () => {
+    expect(prepareImportedSensorHistoryObservationRows(null)).toEqual([]);
+    expect(prepareImportedSensorHistoryObservationRows(undefined)).toEqual([]);
+  });
+});
 
 describe("normalizeImportedSensorHistorySelection", () => {
   it.each([undefined, null, {}])("keeps omitted date bounds open: %s", (input) => {

@@ -8,6 +8,7 @@ import {
   buildImportedSensorHistoryPageSummary,
   formatImportedSensorHistoryObservation,
   normalizeImportedSensorHistorySelection,
+  prepareImportedSensorHistoryObservationRows,
   type ImportedSensorHistorySelection,
 } from "@/lib/importedSensorHistoryPageRules";
 
@@ -21,7 +22,7 @@ function HistoryPages({ tentId }: { tentId: string }) {
   const query = useImportedSensorHistoryPage(tentId, selection);
   const dateId = useId();
   const vm = useMemo(
-    () => buildImportedSensorHistoryViewModel({ readings: query.data?.rows ?? [], limit: IMPORTED_SENSOR_HISTORY_PAGE_SIZE }),
+    () => buildImportedSensorHistoryViewModel({ readings: prepareImportedSensorHistoryObservationRows(query.data?.rows), limit: IMPORTED_SENSOR_HISTORY_PAGE_SIZE }),
     [query.data],
   );
   // A failed/paused refresh must not present a retained count as verified history.

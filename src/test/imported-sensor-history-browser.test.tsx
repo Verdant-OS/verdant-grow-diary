@@ -127,6 +127,17 @@ beforeEach(() => {
 });
 
 describe("ImportedSensorHistoryBrowser", () => {
+  it.each([null, "invalid"])("never presents ingestion time as observation time when captured_at is %s", (captured_at) => {
+    const pageRows = rows(2);
+    pageRows[1] = { ...pageRows[1], captured_at, ts: "2026-11-01T12:34:00.000Z" };
+    setPage(0, successfulPage(pageRows, 2));
+    render(<ImportedSensorHistoryBrowser tentId="tent-A" />);
+    openBrowser();
+    expect(screen.getByRole("status")).toHaveTextContent("Metric readings 1\u20132 of 2");
+    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(2);
+    expect(screen.getByRole("note")).toHaveTextContent("1 readings have no usable observation time or metric");
+    expect(screen.queryByText(/2026-11-01/)).not.toBeInTheDocument();
+  });
   it("starts closed without invoking the additional history query", () => {
     render(<ImportedSensorHistoryBrowser tentId="tent-A" />);
 

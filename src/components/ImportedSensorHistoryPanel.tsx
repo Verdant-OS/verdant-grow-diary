@@ -177,14 +177,15 @@ export default function ImportedSensorHistoryPanel({
           </Button>
         ) : null}
       </div>
+      <ImportedSensorHistoryBrowser key={tentId} tentId={tentId} />
+
+      <h3 className="text-sm font-medium">Newest CSV preview</h3>
       {queryLimit ? (
         <p data-testid="imported-history-query-limit" className="text-xs text-muted-foreground">
           This view requests the newest {queryLimit} available CSV readings by observation time.
           Counts and dates describe the returned readings, not all readings ever saved.
         </p>
       ) : null}
-
-      <ImportedSensorHistoryBrowser key={tentId} tentId={tentId} />
 
       {readStatus === "paused" ? (
         <p

@@ -1,6 +1,13 @@
 /** Pure bounds, page summaries, and UTC labels for read-only CSV history browsing. */
 export const IMPORTED_SENSOR_HISTORY_PAGE_SIZE = 50;
 
+/** In imported history, ts may be ingestion time and cannot establish observation time. */
+export function prepareImportedSensorHistoryObservationRows<T extends { ts?: string | null }>(
+  rows: readonly T[] | null | undefined,
+): Array<T & { ts: null }> {
+  return (rows ?? []).map((row) => ({ ...row, ts: null }));
+}
+
 const DAY_MS = 86_400_000;
 const MAX_PAGE = Math.floor(
   (Number.MAX_SAFE_INTEGER - (IMPORTED_SENSOR_HISTORY_PAGE_SIZE - 1)) /

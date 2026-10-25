@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-285-PRESERVE-MISSING-STAGE
+
+```text
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: Read the draft PR for this branch after first push; no PR existed at the ownership audit.
+head_sha: Read the current remote branch head; this first handoff commit cannot name itself.
+state: Investigation complete; implementation and validation pending.
+current_step: Create the draft, then add a failing mounted regression before changing production code.
+next_action: Run new missing-stage, existing-stage, explicit-change and persisted-fixture-readback tests; implement only the editor stage fix.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts --reporter=dot
+files_touched: docs/agents/HANDOFF_LOG.md
+files_remaining: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx; a small pure stage rules module and its new test only if needed.
+blockers: Local canonical dependency setup and independent review availability not yet verified.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id; readback tests must use a persisted synthetic store and remount, not merely assert optimistic state. No production reads/writes. Existing entry editor details behavior is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: GitHub read at base SHA, Linear issue still Backlog with no comments; all 126 open PR file lists inspected, no EntryEditDialog or stage presentation overlap.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

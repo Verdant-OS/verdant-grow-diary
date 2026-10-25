@@ -357,10 +357,13 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
 
     renderTimeline();
 
-    expect(await screen.findByText("Plain diary note")).toBeInTheDocument();
+    await screen.findByText("Plain diary note");
     // Manual sensor receipts load after the core read commits (the detached
     // directory read), so wait for them before comparing chips to the list.
+    // Their stage group lands above the diary rows and remounts that section,
+    // so look the row up again on the settled list (#2521).
     await waitFor(() => expect(chipCount("Measurements")).toBe(5));
+    expect(screen.getByText("Plain diary note")).toBeInTheDocument();
 
     expect(chipCount("All")).toBe(6);
     expect(chipCount("All stages")).toBe(6);
@@ -440,7 +443,13 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
 
     renderTimeline();
 
-    expect(await screen.findByText("QA Test watering note")).toBeInTheDocument();
+    // The two manual sensor readings load after the diary rows and add a "Stage not recorded"
+    // group above them. That shifts the index-based section key and remounts the Vegetative
+    // section, detaching any row node found before it (#2521). Wait for the settled list
+    // (3 diary rows + 2 sensor rows), then look the row up fresh.
+    await screen.findByText("QA Test watering note");
+    await waitFor(() => expect(listedEntries()).toHaveLength(5));
+    expect(screen.getByText("QA Test watering note")).toBeInTheDocument();
     expect(chipCount("All")).toBe(3);
 
     fireEvent.change(screen.getByTestId("timeline-search-input"), {

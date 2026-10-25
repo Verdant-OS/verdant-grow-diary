@@ -332,7 +332,7 @@ New `src/test/tent-history-vpd-correction-write-path.test.ts`:
 | T4 (S4) | One card; no VPD is invented.                                                                                                                                                                              |
 | T5 (S5) | The value-rule fallback still collapses a legacy mirror with matching readings, and still refuses a VPD-bearing event.                                                                                     |
 | T6      | Null or malformed `created_at` on either side → no transaction-key claim; the fallback applies.                                                                                                            |
-| T7      | Determinism: every permutation of the input rows claims and keeps the same set of ids; each output keeps the order of its own input (step 5), so outputs differ only in order.                             |     |
+| T7      | Determinism: every permutation of the input rows claims and keeps the same set of ids; each output keeps the order of its own input (step 5), so outputs differ only in order.                             |
 | T8      | Two `created_at` values that differ only in microseconds do not match (pins string comparison).                                                                                                            |
 
 **Negative gates:** set aside the C branch (diffed against the base) → T2 and T9 show two

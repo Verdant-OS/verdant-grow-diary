@@ -78,7 +78,7 @@ branch: claude/vibrant-heisenberg-njd6r3
 base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (marked ready for review by its owner after 17:05 UTC 2026-10-24; this session left that owner decision in place)
-head_sha: 253361bec8dee3764c13b4d19180f3debaca8369 (observed 2026-10-24 22:52 UTC; ab9c90a8 was adopted by the Claude claim at 14:13 UTC, and every later commit is a review fix or base merge listed on the PR). The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
+head_sha: f05e0106f3c5d3fd83e4176c163d3bfd41278a31 (observed 2026-10-25 00:51 UTC; descends from the 14:13 UTC claim head ab9c90a8 through review fixes and base merges listed on the PR, including the uncredited acceptance-text fix f05e0106). The commit that records this block sits on top of it; compare against the PR's current head before resuming.
 state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
 next_action: Route an eligible independent review of the spec at its exact head. Matthew's option choice and the migration's per-PR decision remain his.
 files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
@@ -86,7 +86,7 @@ blockers: Slice 2 is blocked on its real-write-path fixture, which only the slic
 artifacts: the spec file above
 reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3. Excluded: author Claude session 01QxMpAHgnpV65y3Yykv8CvE, and the Grok cloud review-fix session (commits 6a30b7ae, e29a451f, ab9c90a8, authored as Cursor Agent) as repairer
 claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-24 14:13 UTC (Matthew reassigned it; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6385243811)
-last_updated: 2026-10-24 22:55 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+last_updated: 2026-10-25 00:55 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
 ```
 
 ### HANDOFF-CONTINUITY-20261024

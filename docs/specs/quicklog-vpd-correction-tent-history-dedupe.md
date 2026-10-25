@@ -397,8 +397,10 @@ still met by C).
 ## 10. Acceptance
 
 - [ ] P1–P11 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
-      P9 calls `quicklog_correction_apply_measured_values` with a null `vpd_kpa` and leaves
-      `details` non-null. P10 runs the step-5 postflight slice against the new body.
+      P9 tests the new mirror UPDATE's `SET` expression in isolation with a null `vpd_kpa`,
+      leaving `details` non-null. P11 calls `quicklog_correct_entry` as an `authenticated` owner
+      with `sensor_values: {"vpd_kpa": null}` and asserts `invalid_changes` with mirror `details`
+      unchanged. P10 runs the step-5 postflight slice against the new body.
 - [ ] T1–T9 pass; all three negative gates shown failing, then restored.
 - [ ] `config/local-supabase-replay-compatibility.json` unchanged; the `Published migration
 integrity` gate green; no merged migration edited.

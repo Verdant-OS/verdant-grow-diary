@@ -92,6 +92,9 @@ vi.mock("sonner", () => ({
 
 type StoredNote = {
   id: string;
+  event_type: "observation";
+  source: "manual";
+  is_deleted: false;
   note: string | null;
   grow_id: string;
   plant_id: string | null;
@@ -105,6 +108,9 @@ function modelOkReply() {
     expect(fn).toBe("quicklog_save_manual");
     committed.set(payload.p_idempotency_key, {
       id: EVENT_ID,
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
       note: payload.p_note,
       grow_id: GROW,
       plant_id: payload.p_target_type === "plant" ? payload.p_target_id : null,
@@ -121,6 +127,9 @@ function modelLostReplyThenReuse() {
       return { data: { ok: true, reused: true, grow_event_id: existing.id }, error: null };
     committed.set(payload.p_idempotency_key, {
       id: EVENT_ID,
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
       note: payload.p_note,
       grow_id: GROW,
       plant_id: payload.p_target_type === "plant" ? payload.p_target_id : null,

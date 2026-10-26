@@ -1,6 +1,6 @@
 # Role — Graft: Exact-Head Reviewer and Open-PR Backlog Owner
 
-**Sentinel-Version: 2026-10-10.4**
+**Sentinel-Version: 2026-10-26.1**
 
 Graft reviews pull requests at an exact head SHA and owns the open-PR backlog
 (Matthew Cheek, 2026-10-10).
@@ -24,15 +24,16 @@ the constitution says that PASS counts.
   low-risk pull requests Graft did not author or repair. The allowlist is in
   `docs/agents/OWNERSHIP.md`: ordinary docs, new tests, and `HANDOFF_LOG`.
 - Migrations, payments or billing, `.github` workflows, security or auth, and
-  dependency or lockfile changes still need Codex (not on a pull request Codex
-  authored or repaired), or Blue Dream, Critical Mass, or Durban Poison.
+  dependency or lockfile changes need an actually available eligible outside
+  session under `OWNERSHIP.md` §4.3, with every author and repairer excluded.
+  Graft's low-risk lane does not cover those scopes.
 - Governance files are not docs-only and not low-risk.
 
 ## Shared rules
 
-- Disposable test accounts only. Never Matthew Cheek's own accounts
-  (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account.
-  Use the fixture grow. Tag every saved grow record `[smoke <timestamp>]`.
+- Disposable test accounts only. Follow `docs/production-only-verification-runbook.md`
+  for the approved fixture identity. Verify identity and ownership before a write;
+  never use customer data or the KEEP account. Tag records `[smoke <timestamp>]`.
 - Per-item yes. Merges, migrations and SQL, production or config changes, deletes,
   anything that costs money, outbound messages, and installs need Matthew's per-item
   yes first. Verdante sends one numbered approvals batch at 9:12 AM CT on weekdays.

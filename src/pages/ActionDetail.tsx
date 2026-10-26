@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -121,7 +121,9 @@ import {
   ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY,
 } from "@/lib/originatingTimelineEventRules";
 import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
+import { useActionEvidenceVerification } from "@/hooks/useActionEvidenceVerification";
 import { useGrows } from "@/store/grows";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -229,6 +231,18 @@ export default function ActionDetail() {
   const { user } = useAuth();
   const { grows } = useGrows();
   const [row, setRow] = useState<ActionRow | null>(null);
+  // #1001: evidence refs are client-carried; verify sensor refs against the
+  // grower's stored readings (RLS) before rendering any source as trusted.
+  const evidenceRefs = useMemo(
+    () => (row ? adaptOriginatingTimelineEventsFromRow(row) : []),
+    [row],
+  );
+  const evidenceVerification = useActionEvidenceVerification(
+    evidenceRefs,
+    row?.tent_id ?? null,
+    row?.target_metric ?? null,
+    row,
+  );
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -727,7 +741,7 @@ export default function ActionDetail() {
           {sanitizeActionCopy(row.suggested_change)}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {sanitizeActionCopy(stripBackPointerTokens(row.reason))}
+          {localizeReadingAtTimestamps(sanitizeActionCopy(stripBackPointerTokens(row.reason)))}
         </p>
         {isAiDoctorDerived(row) &&
           (() => {
@@ -898,7 +912,8 @@ export default function ActionDetail() {
 
                 <div className="mt-3" data-testid="action-detail-alert-evidence-linkage">
                   <EvidenceLinkageBadges
-                    events={adaptOriginatingTimelineEventsFromRow(row)}
+                    events={evidenceRefs}
+                    verification={evidenceVerification}
                     surface="action-queue-suggestion"
                     fallbackCopy={ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY}
                   />
@@ -998,7 +1013,8 @@ export default function ActionDetail() {
 
                 <div className="mt-3" data-testid="action-detail-ai-doctor-evidence-linkage">
                   <EvidenceLinkageBadges
-                    events={adaptOriginatingTimelineEventsFromRow(row)}
+                    events={evidenceRefs}
+                    verification={evidenceVerification}
                     surface="action-queue-suggestion"
                     fallbackCopy={ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY}
                   />

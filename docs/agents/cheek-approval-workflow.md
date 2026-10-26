@@ -85,15 +85,15 @@ another explicit action). Not whether an agent “liked” the work.
 
 ### 3.1 Required mental checklist
 
-1. **What is the single ask?** merge · hold · close · reassign · domain decision  
-2. **What is explicitly not being asked?** (scope discipline)  
-3. **Security:** any `FAIL`? → stop-ship until remediated  
-4. **Blockers:** any `BLOCKED` axis still open? → cannot launder to PASS  
-5. **Required CI** on the PR **head** (not a different branch)  
-6. **Domain decisions** agents cannot average (product windows, ship/no-ship)  
-7. **Ref:** deploy-branch SHA / PR head named  
-8. **Risk / rollback** acceptable  
-9. **Council** — retired (Matthew Cheek, 2026-10-10). Do not wait for a Council recommendation.  
+1. **What is the single ask?** merge · hold · close · reassign · domain decision
+2. **What is explicitly not being asked?** (scope discipline)
+3. **Security:** any `FAIL`? → stop-ship until remediated
+4. **Blockers:** any `BLOCKED` axis still open? → cannot launder to PASS
+5. **Required CI** on the PR **head** (not a different branch)
+6. **Domain decisions** agents cannot average (product windows, ship/no-ship)
+7. **Ref:** deploy-branch SHA / PR head named
+8. **Risk / rollback** acceptable
+9. **Council** — retired (Matthew Cheek, 2026-10-10). Do not wait for a Council recommendation.
 
 ### 3.2 Status vocabulary (reject laundering)
 
@@ -191,31 +191,31 @@ owner control. **Authority** remains Cheek’s either way.
 
 ### 6.1 Standard product PR
 
-1. Author completes PR template + relevant checklists.  
-2. Required CI green on **head**.  
-3. Optional Gemini audit for sensitive areas. There is no Security role and no Council Chair.  
-4. Cheek reviews packet → merge (e.g. squash) to `verdant-grow-diary`.  
+1. Author completes PR template + relevant checklists.
+2. Required CI green on **head**.
+3. Optional Gemini audit for sensitive areas. There is no Security role and no Council Chair.
+4. Cheek reviews packet → merge (e.g. squash) to `verdant-grow-diary`.
 5. If production claims matter: verify with CURRENT_STATE discipline
    (`version.json`, scoped SEO/monitoring, etc.).
 
 ### 6.2 Full multi-agent program slice
 
-1. Serial handoffs complete (no parallel implement of same slice).  
-2. There is no Council step (Matthew Cheek, 2026-10-10). Cheek does not wait for one.  
-3. Cheek **approves, holds, redirects, or reassigns**.  
+1. Serial handoffs complete (no parallel implement of same slice).
+2. There is no Council step (Matthew Cheek, 2026-10-10). Cheek does not wait for one.
+3. Cheek **approves, holds, redirects, or reassigns**.
 4. Only after Cheek approval is “shipped” language valid for that slice.
 
 ### 6.3 Keystone / CI restore
 
-1. Prefer ref-verified base state over stale “land X first” premises.  
-2. Smallest fix PR; required gates green.  
-3. Cheek merges; closes superseded PRs with explicit comments.  
+1. Prefer ref-verified base state over stale “land X first” premises.
+2. Smallest fix PR; required gates green.
+3. Cheek merges; closes superseded PRs with explicit comments.
 4. Non-required reds remain owned separately (do not pretend they passed).
 
 ### 6.4 Docs-only / checklist PRs
 
-1. May merge to establish **process authority** without product behavior change.  
-2. Must not claim implementation PASS (e.g. docs Phase A ≠ freshness shipped).  
+1. May merge to establish **process authority** without product behavior change.
+2. Must not claim implementation PASS (e.g. docs Phase A ≠ freshness shipped).
 3. Implementation remains a separate Cheek decision.
 
 ---
@@ -312,27 +312,27 @@ applies_to_prs:
 
 ## 10. Agent duties when requesting approval
 
-- [ ] Single ask; list what you are **not** asking  
-- [ ] Named ref / PR head  
-- [ ] Required vs non-required CI separated  
-- [ ] Security disposition explicit  
-- [ ] No invented metrics or deploy claims  
-- [ ] BLOCKED axes still labeled BLOCKED  
-- [ ] Rollback notes present for behavior changes  
-- [ ] Do not wait for a Council packet. That role is retired (Matthew Cheek, 2026-10-10)  
-- [ ] `merge_permission: none` roles do not self-merge  
+- [ ] Single ask; list what you are **not** asking
+- [ ] Named ref / PR head
+- [ ] Required vs non-required CI separated
+- [ ] Security disposition explicit
+- [ ] No invented metrics or deploy claims
+- [ ] BLOCKED axes still labeled BLOCKED
+- [ ] Rollback notes present for behavior changes
+- [ ] Do not wait for a Council packet. That role is retired (Matthew Cheek, 2026-10-10)
+- [ ] `merge_permission: none` roles do not self-merge
 
 ---
 
 ## 11. Cheek duties (self-checklist)
 
-- [ ] Packet is complete enough to decide (or hold for missing packet)  
-- [ ] Security FAIL → stop-ship  
-- [ ] Deploy branch / production ref not confused with `main`  
-- [ ] Domain decisions recorded if agents are blocked on them  
-- [ ] One next owner after merge when follow-up exists  
-- [ ] Superseded work closed so the train does not re-litigate  
-- [ ] Role reassignments explicit when changing who implements  
+- [ ] Packet is complete enough to decide (or hold for missing packet)
+- [ ] Security FAIL → stop-ship
+- [ ] Deploy branch / production ref not confused with `main`
+- [ ] Domain decisions recorded if agents are blocked on them
+- [ ] One next owner after merge when follow-up exists
+- [ ] Superseded work closed so the train does not re-litigate
+- [ ] Role reassignments explicit when changing who implements
 
 ---
 

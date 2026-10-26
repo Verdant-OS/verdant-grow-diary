@@ -3,25 +3,29 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-10-10.4**
+**Sentinel-Version: 2026-10-26.1**
 
-Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
-publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. **Codex** is an equal independent
-exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
-Claude may add peer observations but is not the acceptance reviewer.
-Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
-Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under
-the same gates.
-**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
-PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
-tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
-billing, `.github` workflows, security or auth, and dependency or lockfile changes
-still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
-Mass, or Durban Poison.
-Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
-Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
+Independent acceptance routing: select an **actually available, eligible independent
+reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
+**Blue Dream and Critical Mass are retired from future routing**; preserve historical
+receipts. **Codex** remains eligible on work Codex neither authored nor repaired.
+A **non-contributing Claude or Grok review session** may give independent acceptance,
+including for Codex-authored work; **Durban Poison** remains eligible when available.
+Exclude every author and repairer even after a task transfer. A shared GitHub identity
+alone does not establish independence: record session, role, contributor exclusions,
+full 40-character head SHA, complete scope, evidence and verdict.
+Chemdawg's existing merge gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
+protected or mixed scopes still need an eligible outside reviewer. Required CI and
+supplemental evidence, protected-file gates, holds, merge queue and founder-only
+production controls remain. Codex uses normal pushes only: no force-push, merge,
+Publish, SQL apply or production Supabase writes. Drafts remain draft.
+Check the existing request and receipt before pinging; keep one current review request
+per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
+state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record
+BLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence
+are not PASS. Preserve a still-valid independent review without a duplicate request.
 
 Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
 E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
@@ -165,7 +169,7 @@ prefer what the code shows:
 | UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`          |
 | Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                       |
 | Validation | `zod`                                                                                                        |
-| Platform   | Production runs on Cloudflare Workers. Lovable (`@lovable.dev/*` preset, project sync) is no longer the production publisher and is no longer an active agent (Matthew Cheek, 2026-10-10). |
+| Platform   | Lovable (`@lovable.dev/*` preset, project sync). **The production publisher is operating state** — see below |
 
 There is **no `App.tsx` and no react-router** — but see the compat shim below, which is
 what almost all component code imports.
@@ -173,9 +177,12 @@ what almost all component code imports.
 `vite.config.ts` is a thin wrapper over the Lovable preset. The preset already supplies
 tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not re-add them.
 
-**Production runs on Cloudflare Workers.** Lovable is no longer the production publisher and is no longer an active agent (Matthew Cheek, 2026-10-10). Vercel statuses on PRs and commits are not evidence of a production release, and a Vercel failure is not a production failure. Release evidence is live `/version.json` reporting the target SHA. A host configuration file governs production only while
+**Never assume the production publisher, and never reason about `vercel.json` without it.**
+Which platform serves `verdantgrowdiary.com` is operating state. This repository has recorded it
+both ways (Lovable earlier, Vercel's git integration in later measurements), so it lives in
+`docs/agents/CURRENT_STATE.md`, not here. A host configuration file governs production only while
 the measured publisher applies it: `vercel.json`'s redirects and headers fire when Vercel serves the
-apex and are inert under Cloudflare Workers (`docs/seo/lighting-launch-verification.md`,
+apex and are inert under any other host (`docs/seo/lighting-launch-verification.md`,
 §Non-blocking host mismatch, records a period when its redirects returned HTTP 200 with no
 `Location`). Measure the publish trigger, and the deployment behind each production hostname,
 before asserting either (`docs/architecture-contract.md` §14). A merge, or a built production
@@ -365,9 +372,7 @@ Environment and install gotchas are owned by
   regenerate it, re-apply that line.
 - **Editing any of the eighteen governance files bumps all eighteen.** `AGENTS.md`, `CLAUDE.md`,
   `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`,
-  `docs/agents/HANDOFF_PROTOCOL.md` and the twelve `docs/agents/roles/*.md`
-  (`grok`, `claude`, `codex`, `gemini`, `canopy`, `graft`, `root-cause`, `trellis`,
-  `verdante`, `chemdawg`, `golden-toad`, `harvest`) must share one
+  `docs/agents/HANDOFF_PROTOCOL.md` and the twelve `docs/agents/roles/*.md` must share one
   `Sentinel-Version`, and `GEMINI.md`'s `SENTINEL-CORE` block must stay byte-equivalent to
   `AGENTS.md`. Do it with `node scripts/sync-sentinel-mirror.mjs --set-version=YYYY-MM-DD.N`,
   then verify with `node scripts/check-sentinel-version-parity.mjs <base>`.
@@ -400,6 +405,7 @@ pre-resolution SHA do not count. See `docs/agents/merge-queue.md` and
 | What is live, blocked, or approved right now                       | `docs/agents/CURRENT_STATE.md`                   |
 | Running, screenshotting, driving the app                           | `.claude/skills/run-verdant-grow-diary/SKILL.md` |
 | Writing a migration                                                | `docs/contributing-supabase-migrations.md`       |
+| Before installing or enabling an outside agent skill or hook       | `docs/agents/third-party-agent-skills.md`        |
 
 ---
 

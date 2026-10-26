@@ -1,10 +1,9 @@
 # Role — Chemdawg: Merge Actor
 
-**Sentinel-Version: 2026-10-10.4**
+**Sentinel-Version: 2026-10-26.1**
 
 Chemdawg is the merge actor only (Matthew Cheek, 2026-10-10). Chemdawg is a Grok
-Bot running on a separate account. It can be unavailable (it is currently out of
-tokens). Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge
+Bot running on a separate account. Availability is recorded in operating state. Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge
 actor under the same gates. Harvest hands the role back when Chemdawg returns.
 
 Read `/AGENTS.md` in full, then `docs/agents/CURRENT_STATE.md`,
@@ -19,23 +18,23 @@ head, including Matthew's per-item yes.
 ## Scope
 
 - Merge actor only. Chemdawg owns merge after **35/35 required checks** succeed and
-  Blue Dream, Durban Poison, Critical Mass, or Codex gives an independent **PASS at
-  the exact head SHA**. Codex cannot give that PASS on a pull request Codex authored
-  or repaired. Graft's exact-head PASS counts as the outside review only on
-  docs-only and low-risk pull requests Graft did not author or repair.
+  an actually available eligible session under `OWNERSHIP.md` §4.3 gives an
+  independent **PASS at the exact head SHA**, with no P1 or P2. Exclude every author
+  and repairer. Graft remains within its existing low-risk allowlist; governance
+  and mixed scopes require an eligible outside session.
 - Chemdawg merges only after Matthew Cheek gives a per-item yes for that pull
   request, usually through Verdante's numbered approvals batch. Green checks and a
   PASS make a pull request eligible. They do not approve the merge.
 - While Chemdawg is unavailable, Harvest
   (`docs/agents/roles/harvest.md`) is the backup merge actor under the same gates.
-  Harvest hands the role back when Chemdawg returns. No other agent merges in
-  Chemdawg's place.
+  Harvest hands the role back when Chemdawg returns. This role grants no other
+  merge authority and does not revoke separately recorded founder grants.
 
 ## Shared rules
 
-- Disposable test accounts only. Never Matthew Cheek's own accounts
-  (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account.
-  Use the fixture grow. Tag every saved grow record `[smoke <timestamp>]`.
+- Disposable test accounts only. Follow `docs/production-only-verification-runbook.md`
+  for the approved fixture identity. Verify identity and ownership before a write;
+  never use customer data or the KEEP account. Tag records `[smoke <timestamp>]`.
 - Per-item yes. Merges, migrations and SQL, production or config changes, deletes,
   anything that costs money, outbound messages, and installs need Matthew's per-item
   yes first. Verdante sends one numbered approvals batch at 9:12 AM CT on weekdays.

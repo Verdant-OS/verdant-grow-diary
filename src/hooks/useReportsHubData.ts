@@ -104,6 +104,8 @@ export interface ReportsHubData {
   recentSensorReadingCount: number;
   diaryEntriesTotal: number;
   diaryEntriesLast7d: number;
+  /** Active (non-archived) plants on this grow. Absent while the hub read is not ready. */
+  plantCount?: number;
   pendingOutcomeReviewCount: number;
   firstPendingActionId: string | null;
   oldestPendingCompletedAt: string | null;
@@ -340,6 +342,7 @@ export function useReportsHubData(
           alertsWarnRes,
           diaryTotalRes,
           diary7dRes,
+          plantCountRes,
           activityDiaryRowsRes,
           activitySpineRowsRes,
           sensorSummary,
@@ -372,6 +375,11 @@ export function useReportsHubData(
             .eq("severity", "warning"),
           fetchReportsHubDiaryTotal(growId),
           fetchReportsHubDiaryLast7d(growId, sevenDaysAgo),
+          supabase
+            .from("plants")
+            .select("id", { count: "exact", head: true })
+            .eq("grow_id", growId)
+            .eq("is_archived", false),
           // Bounded row windows for the diary + grow_events spine merge. The
           // spine is the canonical Quick Log record; companion diary rows are
           // deduped by linkage and identical (plant_id, timestamp) pairs.
@@ -428,6 +436,7 @@ export function useReportsHubData(
           alertsWarnRes,
           diaryTotalRes,
           diary7dRes,
+          plantCountRes,
         ]) {
           if (
             response.error ||
@@ -492,6 +501,7 @@ export function useReportsHubData(
           recentSensorReadingCount: sensorSummary.recentSensorReadingCount,
           diaryEntriesTotal,
           diaryEntriesLast7d,
+          plantCount: plantCountRes.count ?? 0,
           pendingOutcomeReviewCount: pendingReviews.length,
           firstPendingActionId: pendingReviews[0]?.action_queue_id ?? null,
           oldestPendingCompletedAt: pendingReviews[0]?.completed_at ?? null,

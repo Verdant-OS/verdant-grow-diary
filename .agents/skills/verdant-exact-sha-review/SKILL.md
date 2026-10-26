@@ -11,18 +11,46 @@ The shared box skill `code-review-and-quality` (on the agents' box at `/home/box
 
 ## Roles
 
-| Role                                    | Who                                                                          | Does                                                                                                                                                                                                                                                                      | Never                                                             |
-| --------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Merge actor                             | Chemdawg, a Grok Bot on a separate account (older notes also say Grok 91). While Chemdawg is unavailable, Harvest (Merge Executive) is the backup | Merges under section 4 after Matthew's per-item yes. Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under the same gates. Harvest merges only when Verdante asks, at the exact head SHA, and hands the role back when Chemdawg returns. Harvest's merges go out under the GitHub account on Matthew's Grok Bot box, not Chemdawg's account | Reviews its own work; any agent other than Harvest merging in Chemdawg's place |
-| Code reviewer                           | Blue Dream, Durban Poison (peers)                                            | Returns one verdict on one exact SHA for `.tsx`/UI, auth, RLS, DB and Edge changes                                                                                                                                                                                        | Writes code, pushes, merges, publishes, applies SQL               |
-| Lib / logic / test / docs / QA reviewer | Critical Mass                                                                | Returns one verdict on one exact SHA for lib and logic, tests, docs-only, QA, accessibility, search and content changes (lane per [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) line 74), plus CI, build and dependency PRs that no other reviewer covers (see below) | Same as above                                                     |
-| Low-risk reviewer                       | Graft (PR-review bot)                                                        | Exact-head PASS counts as the outside review on docs-only and low-risk PRs Graft did not author or repair, only when every changed file is on the OWNERSHIP.md allowlist (ordinary docs, new tests, `HANDOFF_LOG.md`), or for draft/backlog cleanup                       | Same as above; reviews a mixed PR or a PR it authored or repaired |
-| Outside reviewer                        | Codex, equal with Blue Dream, Critical Mass and Durban Poison                | Returns one verdict on one exact SHA                                                                                                                                                                                                                                      | Reviews a PR Codex authored or repaired (for example #1938)       |
-| Author                                  | Claude, Codex, Grok 91 (when the owner writes or fixes a change)             | Writes the change and fixes findings                                                                                                                                                                                                                                      | Reviews its own change                                            |
+| Role                            | Who                                                                                                                                                                                                                               | Does                                                                                | Never                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Merge-queue owner               | Grok 91 (older docs and other bots may still call this role Chemdawg or GDP)                                                                                                                                                      | Routes PRs to reviewers, sends findings back to authors, and merges under section 4 | Reviews its own work                                                                                            |
+| Independent acceptance reviewer | Actually available eligible session under OWNERSHIP.md §4.3: Codex on non-Codex-authored work Codex did not repair; non-contributing Claude/Grok review sessions, including for Codex-authored work; Durban Poison when available | Reviews the complete scope and required evidence at one full head SHA               | Writes or repairs while serving as independent reviewer; accepts its own work; merges, publishes or applies SQL |
+| Low-risk reviewer               | Graft, only within the existing OWNERSHIP.md allowlist                                                                                                                                                                            | Exact-head PASS on allowlisted work Graft neither authored nor repaired             | Accepts governance, protected or mixed scopes outside its lane                                                  |
+| Author                          | Claude, Codex, Grok, or another assigned implementation session                                                                                                                                                                   | One active writer implements and fixes findings under a valid claim                 | Accepts its own work                                                                                            |
 
-Every PR type has a reviewer. Codex is an equal independent exact-head reviewer alongside Blue Dream, Critical Mass and Durban Poison, except on a PR Codex authored or repaired (for example #1938). Graft's exact-head PASS counts as the outside review on docs-only and low-risk PRs Graft did not author or repair (the OWNERSHIP.md allowlist); the PASS is void once the head moves. A PR that mixes allowlisted files with any other file goes to the lanes above. Migrations, payments or billing, `.github` workflows, security or auth, and dependency or lockfile changes still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical Mass, or Durban Poison. A PR that spans both lanes (for example a `.tsx` change plus a `*Rules.ts` helper) goes to Blue Dream, Durban Poison or Codex, and the owner may also ask Critical Mass for the lib or docs part. Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. GDP retired on 2026-09-29. Where [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) still gives GDP routing or "Chemdawg only" merges, this skill and the "Start here" section of `docs/agents/CURRENT_STATE.md` describe current practice until OWNERSHIP.md is updated (pending).
+Blue Dream and Critical Mass are retired from future routing. Keep historical receipts
+with their original reviewer, scope, SHA and verdict. Eligible outside sessions review
+all of a PR's scope, including `.tsx`/UI, lib/logic, docs, CI and protected work as
+applicable. Migrations, billing, workflows, security/auth, dependencies, lockfiles,
+locked scorers and all other protected paths retain their gates and supplemental evidence.
+Graft's low-risk allowlist is unchanged. Missing availability, independence or scope
+coverage is BLOCKED. Reviewer eligibility changes no merge-actor assignment or powers.
 
-The owner of a change can't review it. Each slice has one owner and a different reviewer.
+[OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) controls routing and merge ownership. The [roster](../../../docs/agents/constitution/roster.md#conditional-backup-merge-seat) describes Chemdawg and the conditional Harvest backup. This skill and operating state do not override that ownership.
+
+Ownership is temporary accountability, not permanent dibs. Keep one active implementation
+writer with explicit claim/release safeguards under AGENTS.md. Preserve fresh claims,
+named locks and explicit assignments; reviewer fallback never transfers implementation.
+An author or repairer remains excluded after a task transfer. Record reviewer session
+and role, contributor exclusions and how checked, full 40-character head SHA, complete
+scope, evidence and verdict. A shared GitHub identity alone is not evidence of independence.
+
+### One current request per PR/full head
+
+Before pinging, read the existing request and receipt and verify the current full head.
+Preserve a still-valid independent PASS and avoid duplicate requests. Use one canonical
+ledger entry per PR/full head under OWNERSHIP.md §4.3: request owner, reviewer session/role,
+contributor exclusions, scope, evidence, request/receipt permalinks, timestamps,
+fallback-transfer count and `requested`, `running`, `blocked`, `verdict`, or `superseded`.
+A missing authorized transport/permalink is BLOCKED, not successful delivery.
+
+If the reviewer declines, is unavailable or is silent for 60 minutes, supersede that
+assignment and transfer the existing request once to an actually available eligible
+fallback. Recheck head and exclusions first; never keep parallel active requests. If no
+eligible fallback is available, or it becomes unavailable, record BLOCKED and its owner.
+A new head supersedes the old request and invalidates its verdict; fully review the new
+head. Pending requests, acknowledgments and silence are not PASS. Review claims are
+separate from the implementation writer's claim; the latter is not released by a push.
 
 ## 1. Exact SHA or BLOCKED
 
@@ -56,9 +84,9 @@ Return exactly one:
 - `PASS-with-P2` and `FAIL` both go back to the author. The author pushes a new commit with a normal push (hooks on, no `--no-verify`, no force-push of reviewed history).
 - The new head gets a **full re-review**, not a diff-only skim. Earlier verdicts don't carry over.
 - A PR stays **draft** until it merges.
-- Before merge, **all 35 required checks must be green at the merge head** (`gh pr checks <N> --required`). Checks from an older head don't count. The Vercel "Account is blocked." status (and "Vercel Deployments") is not a required check and doesn't block. Production runs on Cloudflare Workers at https://verdantgrowdiary.com. That status is an owner-side account issue. Do not investigate it, rerun it, re-trigger it, or work around it. Do not change deploy settings. Do not count it as a regression.
+- Before merge, **all 35 required checks must be green at the merge head** (`gh pr checks <N> --required`). Checks from an older head don't count. The Vercel "Account is blocked." status (and "Vercel Deployments") is not a required check and doesn't block.
 - **The merge queue is the rule.** **Matthew's decision (2026-10-03, 10:53 PM CT):** all merges go through the merge queue, and the `--admin` bypass is emergency-only, at his call. The `verdant-grow-diary merge queue` ruleset (id 20421416) was active when read on 2026-10-03: squash, all-green grouping, the 35 required checks, linear history, with a bypass for the repository admin role.
-- **Matthew's standing merge-when-green rule covers non-migration PRs:** once a non-migration PR has a clean `PASS` at its exact head SHA and 35/35 required checks are green at that same SHA, the merge-queue owner marks it ready and enqueues it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)). There is no extra wait for a go-ahead. Correction (Matthew Cheek, 2026-10-10, 3:25 PM CT): Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under the same gates. Harvest hands the role back when Chemdawg returns. If the head moves first, the PASS no longer applies.
+- **Matthew's standing merge-when-green rule covers non-migration PRs:** once a non-migration PR has a clean `PASS` at its exact head SHA and 35/35 required checks are green at that same SHA, the merge-queue owner marks it ready and enqueues it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)). Matthew's per-item yes must also cover that exact head before ready/enqueue; green checks and a PASS establish eligibility, not merge approval. If the head moves first, the PASS no longer applies.
 - **Bypass:** Skipping the queue takes the repository-admin bypass. In gh that is `gh pr merge --admin`; because the bypass belongs to the admin role, any admin merge path (the UI bypass option, or a REST or MCP merge by an admin) likely skips the queue too (untested). merge-queue.md line 9 calls that emergency-only, and whether a bypass on green is ever allowed is Matthew's call.
 - Dated note (2026-10-03): #1867, #1869, #1887, #1888 and #1890 merged 5–28 s after being marked ready; #1889 (ready since 2026-10-03 11:13 UTC) merged 53 s after #1890. None has a merge-queue event, so (an inference from the GitHub events, not measured directly) they used the admin bypass. All six merged before the 10:53 PM CT decision above.
 - **Migration PRs need Matthew's explicit decision** (section 6), even after a clean PASS.
@@ -91,13 +119,18 @@ These stand until Matthew lifts them. The live list is kept on the agents' share
 - **Never merge #1740.**
 - **GitHub comments need Matthew's approval** (section 6).
 - **No staging or sandbox site.** Smoke tests run on production only, and only on the test fixture grow.
-- The Vercel "Account is blocked." status is not a required check (section 4). Production is Cloudflare Workers at https://verdantgrowdiary.com. Do not investigate that status.
+- The Vercel "Account is blocked." status is not a required check (section 4).
 - Off-limits to agents unless Matthew names the action: auth, RLS, migrations, Edge functions, `supabase/`, lockfiles.
 
 ## Verdict template
 
 ```text
-[VERDICT] <reviewer>: #<N> @ <full SHA>: <PASS|PASS-with-P2|FAIL|BLOCKED|NOT_MEASURED>, <n> P1, <n> P2. Required checks <x>/35. Head unchanged start and end; draft=<true|false>.
+[VERDICT] <reviewer session/role>: #<N> @ <full 40-character SHA>: <PASS|PASS-with-P2|FAIL|BLOCKED|NOT_MEASURED>, <n> P1, <n> P2. Required checks <x>/35. Head unchanged start and end; draft=<true|false>.
+Reviewer session/role: <identity and role; shared GitHub identity alone is insufficient>
+Contributor exclusions: <authors/repairers; how independence checked>
+Scope: <complete changed scope; protected gates and supplemental evidence>
+Request: <owner; permalink; state; fallback-transfer count>
+Receipt: <verdict evidence permalink; BLOCKED if unavailable>
 P1: <file:line> <evidence> <fix>
 P2-1: <file:line> <evidence> <fix>
 Re-review triggers: <list>

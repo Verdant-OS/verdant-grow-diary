@@ -559,3 +559,95 @@ describe("owner-scoped exact pending Feed", () => {
     expect(clearPendingQuickLogFeeding(value)).toBe(false);
   });
 });
+
+describe("moved-receipt review target on a pending Feed", () => {
+  const target = { growId: "grow-b", tentId: "tent-b", plantId: "plant-b" };
+
+  it("persists the verified destination with receipt_target_moved across reads", () => {
+    const original = record();
+    claimPendingQuickLogFeeding(original);
+    const marked = {
+      ...record(),
+      historyCheckReason: "receipt_target_moved" as const,
+      historyReviewTarget: target,
+    };
+    expect(
+      markPendingQuickLogFeedingHistoryCheck(original, "receipt_target_moved", target),
+    ).toEqual({
+      status: "marked",
+      record: marked,
+    });
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: marked });
+    expect(clearPendingQuickLogFeeding(marked)).toBe(true);
+  });
+
+  it("refuses a review target with any reason other than receipt_target_moved", () => {
+    const original = record();
+    claimPendingQuickLogFeeding(original);
+    const raw = window.sessionStorage.getItem(key());
+    expect(
+      markPendingQuickLogFeedingHistoryCheck(original, "idempotency_key_retracted", target),
+    ).toEqual({ status: "blocked" });
+    expect(window.sessionStorage.getItem(key())).toBe(raw);
+  });
+
+  it.each([
+    ["a target without the moved reason", { historyCheckReason: "idempotency_key_conflict" }],
+    ["a target with no reason", {}],
+    ["a malformed target", { historyCheckReason: "receipt_target_moved", bad: true }],
+  ])("fails closed on a stored record with %s", (_case, extra) => {
+    const { bad, ...rest } = extra as Record<string, unknown>;
+    const historyReviewTarget = bad ? { growId: 42, tentId: null, plantId: null } : target;
+    window.sessionStorage.setItem(
+      key(),
+      JSON.stringify({ ...record(), ...rest, historyReviewTarget }),
+    );
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
+  });
+
+  it.each(["throw", "ignore"] as const)(
+    "keeps the verified destination in the key-scoped fallback marker when the marked write %ss",
+    (mode) => {
+      const original = record();
+      claimPendingQuickLogFeeding(original);
+      const unmarkedRaw = window.sessionStorage.getItem(key());
+      refuseMarkedRecordRewrite(mode);
+      const marked = {
+        ...record(),
+        historyCheckReason: "receipt_target_moved" as const,
+        historyReviewTarget: target,
+      };
+      expect(
+        markPendingQuickLogFeedingHistoryCheck(original, "receipt_target_moved", target),
+      ).toEqual({ status: "marked", record: marked });
+      vi.restoreAllMocks();
+      expect(window.sessionStorage.getItem(key())).toBe(unmarkedRaw);
+      expect(JSON.parse(window.sessionStorage.getItem(historyKey())!)).toEqual({
+        version: 1,
+        idempotencyKey: "feeding-save-12345678",
+        historyCheckReason: "receipt_target_moved",
+        historyReviewTarget: target,
+      });
+      expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: marked });
+      expect(clearPendingQuickLogFeeding(marked)).toBe(true);
+      expect(window.sessionStorage.getItem(historyKey())).toBeNull();
+    },
+  );
+
+  it.each([
+    ["a target beside another reason", "idempotency_key_conflict", target],
+    ["a malformed target", "receipt_target_moved", { growId: 42, tentId: null, plantId: null }],
+  ])("fails closed on a fallback marker carrying %s", (_case, reason, historyReviewTarget) => {
+    claimPendingQuickLogFeeding(record());
+    window.sessionStorage.setItem(
+      historyKey(),
+      JSON.stringify({
+        version: 1,
+        idempotencyKey: "feeding-save-12345678",
+        historyCheckReason: reason,
+        historyReviewTarget,
+      }),
+    );
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
+  });
+});

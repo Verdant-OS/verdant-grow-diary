@@ -89,6 +89,9 @@ export default function Reports() {
     latestSensorCapturedAt: data.latestSensorCapturedAt,
     outcomeTotal: data.outcomeSummary?.total ?? 0,
     alertsOpen: data.alertsOpen,
+    // Unknown while the hub read is still loading, so the card stays hidden
+    // instead of appearing at 0 and disappearing when the count arrives.
+    plantCount: data.status === "ready" ? (data.plantCount ?? null) : null,
   });
 
   const hasNoGrow = !growsLoading && grows.length === 0;

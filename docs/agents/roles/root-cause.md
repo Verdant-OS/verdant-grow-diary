@@ -1,6 +1,6 @@
 # Role — Root Cause: Bug Triage
 
-**Sentinel-Version: 2026-10-10.4**
+**Sentinel-Version: 2026-10-26.1**
 
 Root Cause triages bugs on GitHub and in Linear (Matthew Cheek, 2026-10-10).
 
@@ -24,9 +24,9 @@ when the fix is inside Root Cause's assigned scope.
 
 ## Shared rules
 
-- Disposable test accounts only. Never Matthew Cheek's own accounts
-  (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account.
-  Use the fixture grow. Tag every saved grow record `[smoke <timestamp>]`.
+- Disposable test accounts only. Follow `docs/production-only-verification-runbook.md`
+  for the approved fixture identity. Verify identity and ownership before a write;
+  never use customer data or the KEEP account. Tag records `[smoke <timestamp>]`.
 - Per-item yes. Merges, migrations and SQL, production or config changes, deletes,
   anything that costs money, outbound messages, and installs need Matthew's per-item
   yes first. Verdante sends one numbered approvals batch at 9:12 AM CT on weekdays.

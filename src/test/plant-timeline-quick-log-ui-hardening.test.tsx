@@ -20,7 +20,7 @@
  *  - Read-only UI + pure VM. No schema, RLS, auth, edge-function,
  *    Supabase RPC, AI Doctor, Alerts, or Action Queue changes.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
@@ -86,6 +86,20 @@ function renderSection() {
   );
 }
 
+// Time labels follow the viewer's local zone; pin it so pins are deterministic.
+let savedTz: string | undefined;
+beforeEach(() => {
+  savedTz = process.env.TZ;
+});
+afterEach(() => {
+  if (savedTz === undefined) delete process.env.TZ;
+  else process.env.TZ = savedTz;
+});
+function useChicagoZone(): void {
+  process.env.TZ = "America/Chicago";
+  expect(new Date(2026, 9, 21, 10, 53).toISOString()).toBe("2026-10-21T15:53:00.000Z");
+}
+
 beforeEach(() => {
   nextRows = [];
 });
@@ -93,6 +107,7 @@ beforeEach(() => {
 describe("Plant Timeline — Quick Log UI hardening", () => {
   describe("component renders Quick Log entry as the user sees it", () => {
     it("shows note text, type, occurred_at and Manual source label", async () => {
+      useChicagoZone();
       const occurredAt = "2026-05-12T10:30:00.000Z";
       nextRows = [
         {
@@ -111,8 +126,8 @@ describe("Plant Timeline — Quick Log UI hardening", () => {
       const title = screen.getByTestId("quick-log-grouped-action-title");
       expect(title.textContent).toBe("Note");
       const ts = screen.getByTestId("quick-log-grouped-action-occurred-at");
-      // Formatted via shared helper, anchored in UTC for stability.
-      expect(ts.textContent).toMatch(/2026.*UTC/);
+      // Formatted via shared helper in the viewer's local zone (TZ pinned).
+      expect(ts.textContent).toBe("May 12, 2026, 5:30 AM CDT");
       const source = screen.getByTestId("quick-log-grouped-action-source");
       expect(source.textContent).toBe(QUICK_LOG_MANUAL_SOURCE_LABEL);
       expect(source.textContent).not.toMatch(/live|synced|connected|imported/i);

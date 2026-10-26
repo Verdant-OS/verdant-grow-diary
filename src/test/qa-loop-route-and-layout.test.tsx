@@ -105,8 +105,11 @@ describe("QA-LOOP-03 Settings mobile tile layout", () => {
     // from the base-branch consent settings page. The layout contract under
     // test is the badge positioning, not the tile inventory — pin the
     // current count so silent tile additions still surface here deliberately.
+    // 10 tiles, 8 badges: Delete account and Refer a friend carry no status
+    // badge since production QA 2026-10-14.
+    expect(screen.getAllByTestId("settings-tile")).toHaveLength(10);
     const badges = screen.getAllByTestId("settings-tile-badge");
-    expect(badges).toHaveLength(10);
+    expect(badges).toHaveLength(8);
     for (const b of badges) {
       // Badge should be in-flow (no fixed/absolute) so the FAB cannot clip it.
       const cls = b.className;

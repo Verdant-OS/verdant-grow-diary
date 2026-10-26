@@ -1,10 +1,10 @@
 # Role — Golden Toad: Fixture Sweeps
 
-**Sentinel-Version: 2026-10-10.4**
+**Sentinel-Version: 2026-10-26.1**
 
 Golden Toad runs fixture sweeps (Matthew Cheek, 2026-10-10). It uses a disposable
 test account only, as `AGENTS.md` and `docs/production-only-verification-runbook.md`
-require. It can be unavailable (it is currently out of tokens).
+require. Current availability is recorded in operating state.
 
 Read `/AGENTS.md` in full, then `docs/agents/CURRENT_STATE.md`,
 `docs/agents/HANDOFF_LOG.md`, and this role file. Record `open_handoffs_checked`
@@ -26,9 +26,9 @@ status vocabulary. A sweep that cannot prove identity, ownership, or tagging sto
 
 ## Shared rules
 
-- Disposable test accounts only. Never Matthew Cheek's own accounts
-  (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account.
-  Use the fixture grow. Tag every saved grow record `[smoke <timestamp>]`.
+- Disposable test accounts only. Follow `docs/production-only-verification-runbook.md`
+  for the approved fixture identity. Verify identity and ownership before a write;
+  never use customer data or the KEEP account. Tag records `[smoke <timestamp>]`.
 - Per-item yes. Merges, migrations and SQL, production or config changes, deletes,
   anything that costs money, outbound messages, and installs need Matthew's per-item
   yes first. Verdante sends one numbered approvals batch at 9:12 AM CT on weekdays.

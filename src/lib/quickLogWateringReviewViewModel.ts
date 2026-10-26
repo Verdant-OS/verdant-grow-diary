@@ -1,6 +1,7 @@
 /** Pure review model for the structured Quick Log Water form. */
 
 import type { QuickLogWateringFormState } from "./quickLogWateringFormViewModel";
+import { assessWaterVolumeText } from "./quickLogWaterVolumeWarningRules";
 import {
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
@@ -52,9 +53,9 @@ export function buildWateringReview(
   form: QuickLogWateringFormState,
   tempUnit: TemperatureUnitPreference = "celsius",
 ): WateringReviewModel {
-  const volumeRaw = form.volumeMl.trim();
-  const volume = /^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(volumeRaw) ? Number(volumeRaw) : Number.NaN;
-  const needsInput = !Number.isFinite(volume) || volume <= 0 || volume > 1_000_000;
+  // Same bounded parser as the warning and the save path (including the 50,000 ml ceiling), so the review never
+  // shows a completed record for a volume that cannot save.
+  const needsInput = assessWaterVolumeText(form.volumeMl).status !== "valid";
   const measurements: WateringReviewItem[] = [];
   pushIfPresent(measurements, "Applied volume (ml)", form.volumeMl);
   pushIfPresent(measurements, "Input pH", form.ph);

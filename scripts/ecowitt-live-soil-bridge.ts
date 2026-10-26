@@ -298,7 +298,7 @@ export const CONFIG_ERROR_FIX_HINTS: Record<string, string> = {
   missing_bridge_token:
     "Mint a bridge token in Verdant → Settings → Bridge Tokens (scoped to this tent) and set VERDANT_BRIDGE_TOKEN=vbt_… . Never commit it.",
   mqtt_package_missing:
-    "Install the mqtt client in the environment running the bridge: `bun add mqtt` (or `npm i mqtt`).",
+    "Install the mqtt client in the environment running the bridge: `bun add --no-save mqtt` (leaves package.json and bun.lock unchanged).",
   channel_map_parse_error:
     "ECOWITT_SOIL_CHANNEL_MAP_JSON could not be parsed. Ensure it is single-line valid JSON with no trailing commas, then re-run `config validate`.",
   out_flag_requires_dry_run:
@@ -773,7 +773,7 @@ async function runCli(): Promise<void> {
   } catch {
     emitConfigError(
       "mqtt_package_missing",
-      "mqtt package not installed — run `bun add mqtt` locally",
+      "mqtt package not installed — run `bun add --no-save mqtt` locally",
     );
     process.exit(2);
     return;

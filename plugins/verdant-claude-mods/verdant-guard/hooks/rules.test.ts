@@ -242,3 +242,509 @@ describe("re-review P2 fixes", () => {
     expect(checkMcp("mcp__supabasex__execute_sql", {})).toBe(null);
   });
 });
+
+describe("Codex review fixes", () => {
+  test("P1: a value-taking Playwright option is not counted as a spec filter", () => {
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked --global-timeout 60000",
+      "bunx playwright test --project=chromium-mocked --tsconfig tsconfig.e2e.json",
+      "bunx playwright test --project=chromium-mocked --ui-port 9323",
+      "npx playwright test --project chromium-mocked --only-changed origin/main",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash(
+        "bunx playwright test --project=chromium-mocked --global-timeout 60000 e2e/auth-loading.spec.ts",
+      ),
+    ).toBe(null);
+    expect(
+      checkBash(
+        "bunx playwright test --project=chromium-mocked --global-timeout=60000 auth-loading",
+      ),
+    ).toBe(null);
+  });
+  test("P2: bulk push modes that can include protected branches are denied", () => {
+    for (const cmd of [
+      "git push --all origin",
+      "git push origin --all",
+      "git push --mirror origin",
+      "git push --branches origin",
+      "git push origin :",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push --tags origin")).toBe(null);
+  });
+  test("P2: a wrapper's own options do not hide the command it runs", () => {
+    for (const cmd of [
+      "env -i git push --force origin claude/task",
+      "env --ignore-environment supabase db push",
+      "env -u HOME -C /tmp git push origin main",
+      "env -i PATH=/usr/bin git push -f",
+      'env -S "git push --force origin claude/task"',
+      "sudo -u runner -E git push --force",
+      "sudo --user=runner gh pr merge 1800",
+      "exec -a guard git push --force",
+      "time -p git push --force",
+      "time -f %e -o t.log supabase db push",
+      "env -- git push --force",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -i HOME=/tmp git status")).toBe(null);
+    expect(checkBash("sudo -u runner git push origin claude/task")).toBe(null);
+  });
+  test("P2: clustered short flags do not hide a force-push or --no-verify", () => {
+    for (const cmd of [
+      "git push -uf origin claude/task",
+      "git push -fu origin claude/task",
+      "git push -qf",
+      "git commit -an -m wip",
+      "git commit -anm wip",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push -u origin claude/task")).toBe(null);
+    expect(checkBash("git commit -am 'fix: n-gram'")).toBe(null);
+    expect(checkBash("git commit -m 'fix: no-n here'")).toBe(null);
+  });
+  test("P2: gh pr ready --undo returns a PR to draft and is allowed", () => {
+    expect(checkBash("gh pr ready 1800 --undo")).toBe(null);
+    expect(checkBash("gh pr ready --undo 1800")).toBe(null);
+    expect(checkBash("gh pr ready 1800")).not.toBe(null);
+  });
+});
+
+describe("Codex re-review P1 fixes", () => {
+  test("P1: a value-taking sudo option inside a flag cluster consumes the next token", () => {
+    for (const cmd of [
+      "sudo -Eu runner git push --force",
+      "sudo -nu runner git push origin main",
+      "sudo -Eg wheel supabase db push",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("sudo -Eu runner git push origin claude/task")).toBe(null);
+    expect(checkBash("sudo -urunner git push --force")).not.toBe(null);
+  });
+  test("P1: env -S splits its argument the way a shell would, removing quotes", () => {
+    for (const cmd of [
+      `env -S 'git push "-f" origin claude/task'`,
+      `env -S "git push 'origin' 'main'"`,
+      `env --split-string='git push "--force"'`,
+      `env -iS 'git push -f'`,
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash(`env -S 'git push "origin" "claude/task"'`)).toBe(null);
+  });
+  test("P1: Playwright's optional --debug mode is not counted as a spec filter", () => {
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked --debug inspector",
+      "bunx playwright test --project=chromium-mocked --debug cli",
+      "bunx playwright test --project=chromium-mocked --debug",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked --debug e2e/auth-loading.spec.ts"),
+    ).toBe(null);
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked --debug inspector auth-loading"),
+    ).toBe(null);
+  });
+  test("P1: a wildcard refspec that can expand to a protected branch is denied", () => {
+    for (const cmd of [
+      "git push origin 'refs/heads/*:refs/heads/*'",
+      "git push origin 'refs/heads/*'",
+      "git push origin '*:*'",
+      "git push origin 'refs/*:refs/*'",
+      "git push origin 'refs/heads/m*:refs/heads/m*'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push origin 'refs/heads/claude/*:refs/heads/claude/*'")).toBe(null);
+    expect(checkBash("git push origin 'refs/tags/*:refs/tags/*'")).toBe(null);
+  });
+});
+
+describe("Codex re-review P1: env -S variable expansion", () => {
+  test("an env -S string that expands ${VAR} is refused, since its value is unknown here", () => {
+    for (const cmd of [
+      "F=-f env -S 'git push ${F} origin claude/task'",
+      "env -S 'git push ${FLAGS}'",
+      "env --split-string='${CMD} origin main'",
+      "env -iS '${X}'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S 'git push origin claude/task'")).toBe(null);
+    expect(checkBash('git commit -m "${not} an env split"')).toBe(null);
+  });
+});
+
+describe("Codex re-review P1: env -S escapes and comments", () => {
+  test("an env -S string using env's own escapes or comments is refused", () => {
+    for (const cmd of [
+      String.raw`env -S 'git\_push\_-f\_origin\_claude/task'`,
+      String.raw`env -S 'git push origin claude/task\c -f'`,
+      "env -S 'gh pr ready 1800 #--undo'",
+      String.raw`env --split-string='git\tpush\t-f'`,
+      String.raw`env -S "git\_push\_-f\_origin\_claude/task"`,
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash(`env -S 'git push "origin" claude/task'`)).toBe(null);
+  });
+});
+
+describe("Codex re-review P1s: abbreviations, --undo values, sudo --chroot", () => {
+  test("git accepts unambiguous long-option prefixes, so the guard matches them too", () => {
+    for (const cmd of [
+      "git push --al origin",
+      "git push --mirr origin",
+      "git push --bran origin",
+      "git push --force-w origin claude/task",
+      "git push --force-with origin claude/task",
+      "git push --no-veri origin claude/task",
+      "git pull --reb origin verdant-grow-diary",
+      "git pull --rebase=merges origin verdant-grow-diary",
+      "git commit --no-veri -m wip",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push --atomic origin claude/task")).toBe(null);
+    expect(checkBash("git push --no-thin origin claude/task")).toBe(null);
+    expect(checkBash("git pull --no-rebase origin verdant-grow-diary")).toBe(null);
+  });
+  test("gh pr ready is allowed only when --undo's effective value is true", () => {
+    for (const cmd of [
+      "gh pr ready 1800 --undo --undo=false",
+      "gh pr ready 1800 --undo=false",
+      "gh pr ready 1800 --undo=0",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("gh pr ready 1800 --undo")).toBe(null);
+    expect(checkBash("gh pr ready 1800 --undo=true")).toBe(null);
+    expect(checkBash("gh pr ready 1800 --undo=false --undo")).toBe(null);
+  });
+  test("sudo's -R/--chroot value is consumed before the command is checked", () => {
+    for (const cmd of [
+      "sudo -R /tmp git push --force origin claude/task",
+      "sudo --chroot /tmp git push --force origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+  });
+});
+
+describe("Codex re-review P1: attached env -S argument", () => {
+  test("an -S argument attached to the option is split and checked", () => {
+    for (const cmd of [
+      "env -S'git push -f origin claude/task'",
+      'env -S"git push origin main"',
+      "env -iS'git push --force'",
+      "sudo -urunner git push --force",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S'git push origin claude/task'")).toBe(null);
+  });
+});
+
+describe("Codex re-review P1s: wrapper long-option prefixes, variadic --project", () => {
+  test("env and sudo long options are matched by unambiguous prefix", () => {
+    for (const cmd of [
+      "env --spli='git push -f origin claude/task'",
+      "env --spl 'git push -f origin claude/task'",
+      "sudo --us runner git push --force",
+      "env --chd /tmp git push --force",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env --spli='git push origin claude/task'")).toBe(null);
+  });
+  test("--project without = takes every following word as a project name", () => {
+    for (const cmd of [
+      "bunx playwright test --project chromium-mocked chromium-authed",
+      "bunx playwright test --project chromium-authed chromium-mocked",
+      "bunx playwright test --project chromium-mocked e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-authed --project chromium-mocked",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts"),
+    ).toBe(null);
+    expect(
+      checkBash("bunx playwright test e2e/auth-loading.spec.ts --project chromium-mocked"),
+    ).toBe(null);
+  });
+});
+
+describe("Codex re-review P1s: env -S option re-parse, Playwright project wildcards", () => {
+  test("words split by env -S are parsed again as env options", () => {
+    for (const cmd of [
+      "env -S '-- git push -f origin claude/task'",
+      "env -S '-i git push -f origin claude/task'",
+      "env -S '-u HOME git push --force'",
+      "env --split-string='-C /tmp git push --force'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S '-- git push origin claude/task'")).toBe(null);
+  });
+  test("project selectors match the way Playwright filters projects", () => {
+    for (const cmd of [
+      "bunx playwright test --project='chromium-*'",
+      "bunx playwright test --project '*'",
+      "bunx playwright test --project=*-MOCKED",
+      "bunx playwright test --project=Chromium-Mocked",
+      "bunx playwright test",
+      "bunx playwright test --headed",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project='chromium-*' e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-authed",
+      "bunx playwright test --project='*-authed'",
+      "bunx playwright test e2e/auth-loading.spec.ts",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+  });
+});
+
+describe("shell redirections are not arguments", () => {
+  test("a redirection is neither a package name nor a spec filter", () => {
+    for (const cmd of [
+      "npm i --no-audit 2>&1 | tail -5",
+      "npm i --no-audit > /tmp/install.log",
+      "npm i --no-audit >/tmp/install.log 2>/dev/null",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked 2>&1 | tail -20",
+      "bunx playwright test --project=chromium-mocked > /tmp/pw.log",
+      "bunx playwright test --project=chromium-mocked >/tmp/pw.log",
+      "npm i left-pad 2>&1",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+  });
+});
+
+describe("quoted redirection characters stay arguments", () => {
+  test("a quoted `>` is a word, so the option after it is still checked", () => {
+    for (const cmd of [
+      "git push origin '>' -f",
+      'git push origin ">" --force',
+      "env -S 'git push origin > -f'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+  });
+});
+
+describe("Codex re-review P1: clustered git pull rebase", () => {
+  test("-r inside a short-option cluster is a rebase", () => {
+    for (const cmd of ["git pull -qr origin main", "git pull -vr origin main", "git pull -rq"]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "git pull -q origin main",
+      "git pull -sresolve origin main",
+      "git pull --no-rebase",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+  });
+});
+
+describe("Codex re-review P1: empty or unexpanded Playwright filters", () => {
+  test("a filter that may be empty is not a spec filter", () => {
+    for (const cmd of [
+      'bunx playwright test --project=chromium-mocked ""',
+      "bunx playwright test --project=chromium-mocked ' '",
+      "bunx playwright test --project=chromium-mocked $SPEC",
+      'bunx playwright test --project=chromium-mocked "${SPEC}"',
+      "bunx playwright test --project=chromium-mocked `cat specs.txt`",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts"),
+    ).toBe(null);
+  });
+});
+
+describe("Codex re-review P1: redirections attached to a preceding word", () => {
+  test("the word before an attached redirection is still checked", () => {
+    for (const cmd of [
+      "git push origin main>/tmp/push.log",
+      "git push -f>/tmp/push.log origin claude/task",
+      "git push origin main&>/tmp/push.log",
+      "git push origin main 2>/dev/null",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push origin claude/task>/tmp/push.log")).toBe(null);
+    expect(checkBash("npm i --no-audit>/tmp/install.log")).toBe(null);
+  });
+});
+
+describe("Codex re-review P1: shell expansions as Playwright filters", () => {
+  test("only a plain literal word counts as a spec filter", () => {
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked {,}",
+      "bunx playwright test --project=chromium-mocked {a,}",
+      "bunx playwright test --project=chromium-mocked e2e/*.nomatch",
+      "bunx playwright test --project=chromium-mocked e2e/?",
+      "bunx playwright test --project=chromium-mocked [x]",
+      "bunx playwright test --project=chromium-mocked ~nobody",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts:12",
+      "bunx playwright test --project=chromium-mocked auth-loading",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+  });
+});
+
+describe("Codex re-review: allocated-FD redirections, commit -u mode", () => {
+  test("P1: a {name}> redirection is dropped like a numeric one", () => {
+    for (const cmd of [
+      "env {guardfd}>/tmp/log git push --force origin claude/task",
+      "{fd}>/tmp/log git push -f origin claude/task",
+      "git push origin main {fd}>&2",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("{fd}>/tmp/log git push origin claude/task")).toBe(null);
+  });
+  test("P2: the value attached to commit -u is not scanned for -n", () => {
+    for (const cmd of ["git commit -unormal -m wip", "git commit -uno -m wip"]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+    expect(checkBash("git commit -nu -m wip")).not.toBe(null);
+  });
+});
+
+describe("Codex re-review: expandable Playwright project selectors", () => {
+  test("P1: a --project the shell can expand counts as a mocked selection", () => {
+    for (const cmd of [
+      "P=chromium-mocked; bunx playwright test --project=$P",
+      'bunx playwright test --project "$P"',
+      "bunx playwright test --project=$(echo chromium-mocked)",
+      "bunx playwright test --project=chromium-{mocked,authed}",
+      "bunx playwright test --project=chromium-m?cked",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project=$P e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-authed",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+  });
+});
+
+describe("Codex re-review: --undo after the option terminator", () => {
+  test("P1: `--undo` after `--` is a branch name, not the flag", () => {
+    for (const cmd of ["gh pr ready -- --undo", "gh pr ready -- --undo=true"]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("gh pr ready --undo -- 1800")).toBe(null);
+  });
+});
+
+describe("Codex re-review: sudo assignments between sudo options", () => {
+  test("P1: sudo keeps parsing its options after a VAR=value", () => {
+    for (const cmd of [
+      "sudo VAR=x -u root git push --force origin claude/task",
+      "sudo -n VAR=x -u root git push -f origin claude/task",
+      "sudo A=1 B=2 -E git commit --no-verify -m wip",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("sudo VAR=x -u root git push origin claude/task")).toBe(null);
+  });
+});
+
+describe("Codex re-review: append and subscripted assignment prefixes", () => {
+  test("P1: `+=` and `a[i]=` prefixes do not hide the command", () => {
+    for (const cmd of [
+      "F+=x git push --force origin claude/task",
+      "a[1]=y git push -f origin claude/task",
+      "b[k]+=z git commit --no-verify -m wip",
+      "sudo F+=x git push --force origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("F+=x git push origin claude/task")).toBe(null);
+  });
+});
+
+describe("Codex re-review: Playwright `--`, env's NAME=VALUE grammar", () => {
+  test("P1: nothing after Playwright's `--` narrows the run", () => {
+    for (const cmd of [
+      "bunx playwright test -- --project=chromium-authed",
+      "bunx playwright test -- e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-mocked -- e2e/auth-loading.spec.ts",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts --"),
+    ).toBe(null);
+  });
+  test("P1: env skips every NAME=VALUE operand, not only shell identifiers", () => {
+    for (const cmd of [
+      "env -S '1=x git push -f origin claude/task'",
+      "env 1=x git push --force origin claude/task",
+      "env A-B=x git commit --no-verify -m wip",
+      "env -i 1=x 2=y git push -f origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env 1=x git push origin claude/task")).toBe(null);
+  });
+});
+
+describe("Codex re-review: wrapper assignments after `--`", () => {
+  test("P1: env and sudo still skip NAME=VALUE operands after `--`", () => {
+    for (const cmd of [
+      "env -- 1=x git push -f origin claude/task",
+      "env -S '-- 1=x git push -f origin claude/task'",
+      "env -i -- A=1 B=2 git commit --no-verify -m wip",
+      "sudo -- VAR=x git push --force origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -- 1=x git push origin claude/task")).toBe(null);
+  });
+});
+
+describe("Codex re-review: shell-expandable env -S operands", () => {
+  test("P1: braces, globs, backticks and ~ in an env -S operand fail closed", () => {
+    for (const cmd of [
+      "env -S {git,push,-f} origin claude/task",
+      "env -S git* push -f origin claude/task",
+      "env -S gi? push -f origin claude/task",
+      "env -S [g]it push -f origin claude/task",
+      "env -S `echo git` push -f origin claude/task",
+      "env -S ~/bin/git push -f origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S 'git status'")).toBe(null);
+  });
+});

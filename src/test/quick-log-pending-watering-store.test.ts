@@ -255,7 +255,7 @@ describe("tab-scoped pending Water Quick Log ownership", () => {
   it("accepts the canonical numeric boundaries without normalizing the payload", async () => {
     const pending = record();
     Object.assign(pending.payload, {
-      volume_ml: 1_000_000,
+      volume_ml: 50_000,
       ph: 0,
       ec_ms_cm: 10,
       runoff_ml: 0,
@@ -348,7 +348,13 @@ describe("fail-closed pending Water validation", () => {
     [
       "excessive volume",
       (r) => {
-        r.payload.volume_ml = 1_000_001;
+        r.payload.volume_ml = 50_001;
+      },
+    ],
+    [
+      "pre-ceiling journal volume",
+      (r) => {
+        r.payload.volume_ml = 1_000_000;
       },
     ],
     ["string number", (r) => Object.assign(r.payload, { ph: "6.3" })],

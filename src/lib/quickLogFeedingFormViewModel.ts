@@ -20,7 +20,7 @@
  */
 
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
-import { resolveEcPpm500Pair } from "./ecPpm500PairRules";
+import { isExplicitNegativeDecimal, resolveEcPpm500Pair } from "./ecPpm500PairRules";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 
 // ---------------------------------------------------------------------------
@@ -160,6 +160,9 @@ export type FeedingFormFailureReason =
   | "products:contains_secret"
   | "ec_ppm:mismatch"
   | "numeric:invalid"
+  | "ec_in:negative"
+  | "ec_out:negative"
+  | "runoff_ec:negative"
   | FeedingNumericRangeReason;
 
 /**
@@ -337,6 +340,15 @@ export function buildFeedingFormPayload(input: FeedingFormMapInput): FeedingForm
     ["runoffEc", "runoffPpm", "runoff_ec"],
   ] as const;
   for (const [ecKey, ppmKey, payloadKey] of ecPairs) {
+    if (isExplicitNegativeDecimal(input.form[ecKey])) {
+      const reason =
+        payloadKey === "ec_in"
+          ? "ec_in:negative"
+          : payloadKey === "ec_out"
+            ? "ec_out:negative"
+            : "runoff_ec:negative";
+      return { ok: false, reason };
+    }
     const resolved = resolveEcPpm500Pair(input.form[ecKey], input.form[ppmKey]);
     if (resolved.status === "invalid") return { ok: false, reason: "numeric:invalid" };
     if (resolved.status === "mismatch") return { ok: false, reason: "ec_ppm:mismatch" };
@@ -396,6 +408,12 @@ export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | str
       return "Product entries must not contain tokens or secrets.";
     case "numeric:invalid":
       return "Optional metrics must be valid numbers or left blank.";
+    case "ec_in:negative":
+      return "EC can't be negative.";
+    case "ec_out:negative":
+      return "Output EC can't be negative.";
+    case "runoff_ec:negative":
+      return "Runoff EC can't be negative.";
     case "ec_ppm:mismatch":
       return "EC and PPM must match the 500 scale. Re-enter either value.";
     case "ph:out_of_range":
@@ -419,4 +437,52 @@ export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | str
     default:
       return FEEDING_SAVE_FAILURE_MESSAGE;
   }
+}
+
+/** The three feeding EC fields and their PPM-500 companions. */
+export type FeedingEcFieldKey = "ecIn" | "ecOut" | "runoffEc" | "ppmIn" | "ppmOut" | "runoffPpm";
+
+/** Live-check copy for a negative PPM-500 value, field by field. */
+export const FEEDING_PPM_NEGATIVE_COPY = {
+  ppmIn: "PPM can't be negative.",
+  ppmOut: "Output PPM can't be negative.",
+  runoffPpm: "Runoff PPM can't be negative.",
+} as const;
+
+const FEEDING_EC_NEGATIVE_CHECKS: ReadonlyArray<readonly [FeedingEcFieldKey, string]> = [
+  ["ecIn", feedingFormReasonToHelper("ec_in:negative")],
+  ["ppmIn", FEEDING_PPM_NEGATIVE_COPY.ppmIn],
+  ["ecOut", feedingFormReasonToHelper("ec_out:negative")],
+  ["ppmOut", FEEDING_PPM_NEGATIVE_COPY.ppmOut],
+  ["runoffEc", feedingFormReasonToHelper("runoff_ec:negative")],
+  ["runoffPpm", FEEDING_PPM_NEGATIVE_COPY.runoffPpm],
+];
+
+/** Any typed text that parses to a finite number below zero, exponent forms included. */
+function isTypedNegativeNumber(raw: string | null | undefined): boolean {
+  const trimmed = raw?.trim() ?? "";
+  if (trimmed === "") return false;
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value < 0;
+}
+
+/**
+ * Live check of the feeding EC fields and their PPM-500 companions (#2159).
+ * A negative value, in plain or exponent form, is named under its own field
+ * and blocks Save as soon as it is typed; EC uses the same copy as the
+ * save-time validation. A negative PPM is checked on its own field because
+ * typing it clears the paired EC. Blank, zero and positive values pass here.
+ */
+export function assessFeedingEcFields(form: Pick<QuickLogFeedingFormState, FeedingEcFieldKey>): {
+  fields: Partial<Record<FeedingEcFieldKey, string>>;
+  footerMessage: string | null;
+} {
+  const fields: Partial<Record<FeedingEcFieldKey, string>> = {};
+  let footerMessage: string | null = null;
+  for (const [key, message] of FEEDING_EC_NEGATIVE_CHECKS) {
+    if (!isTypedNegativeNumber(form[key])) continue;
+    fields[key] = message;
+    footerMessage ??= message;
+  }
+  return { fields, footerMessage };
 }

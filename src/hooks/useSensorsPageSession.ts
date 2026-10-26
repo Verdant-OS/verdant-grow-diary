@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { notifyManualSensorCorrectionConfirmed } from "@/lib/manualSensorCorrectionEvents";
 import { invalidateManualSensorCorrectionReaders } from "@/lib/manualSensorCorrectionCache";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import type { TemperatureInputUnit } from "@/lib/sensorInputUnitConversion";
 import {
   createSensorsPageSession,
   reconcileSensorsSelection,
@@ -122,10 +123,14 @@ export function createSensorsPageSessionController(
       ? draft
       : null;
   };
-  const recordFor = (payloads: ManualSnapshotPayloads): PendingManualSnapshot => ({
+  const recordFor = (
+    payloads: ManualSnapshotPayloads,
+    airTempUnit?: TemperatureInputUnit,
+  ): PendingManualSnapshot => ({
     version: 1,
     ownerId,
     payloads,
+    ...(airTempUnit ? { airTempUnit } : {}),
   });
   // Preserve the existing explicit edit/target-change behavior. Only an idle
   // draft deliberately replaced by the grower can retire its stored identity.
@@ -190,7 +195,13 @@ export function createSensorsPageSessionController(
             ? {
                 ...input,
                 defaultTentId: recovery.payloads[0].tent_id,
-                initial: restoreManualSnapshotValues(recovery),
+                // Restore in the unit the grower typed in; a record saved
+                // without it uses the unit the card starts drafts in (the
+                // preference), never the canonical °C the payloads hold.
+                initial: restoreManualSnapshotValues(
+                  recovery,
+                  recovery.airTempUnit ?? input.initial.form.airTempUnit ?? "C",
+                ),
               }
             : input,
         ),
@@ -226,7 +237,14 @@ export function createSensorsPageSessionController(
           claimed.result.status === "claimed" &&
           claimed.result.claim.correctionIdentity === STANDARD_MANUAL_CORRECTION_IDENTITY
         ) {
-          const stored = claimPendingManualSnapshot(recordFor(claimed.result.claim.payloads));
+          // Keep the unit the grower typed in, so a reload shows the same number and unit.
+          const draftValues = session.draft?.values;
+          const stored = claimPendingManualSnapshot(
+            recordFor(
+              claimed.result.claim.payloads,
+              draftValues?.tempUnitOverride ?? draftValues?.form.airTempUnit,
+            ),
+          );
           if (stored.status !== "claimed")
             return {
               ...session,

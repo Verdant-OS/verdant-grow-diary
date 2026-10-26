@@ -28,6 +28,8 @@ import {
 } from "@/lib/startScreenPreferences";
 import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
 import { Sprout } from "lucide-react";
+
+export const ONBOARDING_GROWS_LOADING_COPY = "Loading your grows…";
 import {
   buildStarterQuickLogPrefill,
   STARTER_SETUP_BUTTON_LABEL,
@@ -54,7 +56,12 @@ import {
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
-  const { grows = [], loading: growsLoading, refresh: refreshGrows } = useGrows();
+  const {
+    grows = [],
+    loading: growsLoading = false,
+    error: growsError = null,
+    refresh: refreshGrows,
+  } = useGrows();
   const {
     loading: entitlementLoading,
     lookupFailed: entitlementLookupFailed,
@@ -80,8 +87,40 @@ export default function Onboarding() {
     headingRef.current?.focus();
   }, []);
 
-  if (loading || growsLoading) return null;
+  if (loading) return null;
+  if (growsLoading) {
+    return (
+      <div
+        className="min-h-dvh flex items-center justify-center px-6"
+        role="status"
+        data-testid="onboarding-grows-loading"
+      >
+        <p className="text-sm text-muted-foreground">{ONBOARDING_GROWS_LOADING_COPY}</p>
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/auth" replace />;
+  if (growsError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div
+          role="alert"
+          data-testid="onboarding-grows-error"
+          className="max-w-md space-y-3 text-sm"
+        >
+          <p>We couldn&apos;t load your grows. This is not an empty account.</p>
+          <Button
+            type="button"
+            onClick={() => {
+              void refreshGrows?.();
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
   if (grows.length >= 1) return <Navigate to={routeForStartScreen("dashboard")} replace />;
 
   function go(c: StartScreenChoice, save: boolean) {

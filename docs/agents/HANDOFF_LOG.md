@@ -45,6 +45,36 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY
+
+```text
+TASK CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY  priority: P2  status: OPEN
+goal: Preserve the dated root dependency-audit receipt after #1343 and finish the separate Cursor spike verification required by #1723. Documentation/verification only; not a reopen or revert of #1543.
+why: The root and nested spike have separate manifests and lockfiles. Root audit success does not establish nested audit coverage.
+branch: claude/verify-deploy-tip-dependency-audits
+base: verdant-grow-diary
+checkout: Fetch this existing branch, verify its current full PR head, and use an isolated cloud worktree. Do not resume from the historical audit SHA as if it were the current source head.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2299
+head_sha: 6aa56724cf2010057bacbd15f3b9fd94d2e2a30e (source checkpoint verified before this repair; the resulting full head is in the PR body). Historical Initial plan b07c85ba7ad6b1031dea713d4ec4dd020ee6f8cc was over audited deploy parent 05f5138d08c943921df0ce224af8d9c0837c09d9 (#2296).
+state: Historical root gate PASS at 05f5138d08c943921df0ce224af8d9c0837c09d9, measured 2026-10-21: Dependency & Security CI run 39571694293 and job 119127189913 succeeded, including lockfile policy, check:deps, dependency contract tests, typecheck, build and Playwright. The four historical blocked Hono/js-yaml IDs no longer blocked that root gate; config/dependency-security-exceptions.json had exceptions: []. This is dated root evidence, not current-tip or nested-spike acceptance.
+decisions: #1343 (7266acd6886b22b92bfdf405d04ffa8f05a4edee) raised Hono to 4.13.5, js-yaml to 4.3.2 and Vitest to ^4.1.11. Hono 4.13.11 came later in #2274 (5b3d56bc3cf5cc337045c42573bb65a01d2d9d1d); Vitest ^4.1.12 came in #2294 (ac8c20fa14abe6f2d522b2988ed40d914d404887). The dated root run used those later repairs in ancestry.
+current_step: Documentation scope and provenance corrected; fresh repaired-head CI and outside review are pending. Cursor spike GHSA-82fw-gwwq-j7x9 coverage remains NOT_MEASURED: its separate manifest pinned Vitest 4.1.11, and workflow 334730604 had zero deploy-branch runs when checked. No nested vulnerability or remediation outcome is inferred from a missing run.
+next_action: Verify the resulting PR head and required CI; obtain an eligible non-contributing outside review. For #1723, separately pin the audited current tip and obtain its root and nested audit/version-range receipts, or preserve an explicit scoped follow-up for an unresolved finding. Do not close #1723 from root evidence alone.
+post_merge_check: Confirm the landed handoff retains the dated audit SHA and separate nested NOT_MEASURED state. This docs-only receipt grants no deployment or production verification action.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only this handoff block and the matching PR description. No other branch or file scope is claimed.
+tried_and_rejected: Treating root bun audit as a full-tree nested proof, attributing later versions to #1343, or marking the whole verification CLOSED without the nested evidence.
+commands: node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 6aa56724cf2010057bacbd15f3b9fd94d2e2a30e --strict; git diff --check. See the PR body for actual results, not assumed passes.
+files_touched: docs/agents/HANDOFF_LOG.md (this block only; moved from Closed to Open)
+files_remaining: none planned for the documentation repair; missing audit evidence remains explicit in #1723.
+blockers: Nested/current-tip audit coverage remains NOT_MEASURED. Fresh repaired-head CI and eligible outside acceptance are pending. Codex now contributes this repair and cannot independently accept it. Local Bun/node_modules were unavailable at repair startup.
+artifacts: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293; https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293/job/119127189913; https://github.com/Verdant-OS/verdant-grow-diary/issues/1723
+reviewer_seat: An actually available eligible non-contributing outside session under current OWNERSHIP.md; all receipt authors and repairers are excluded, including this Codex writer. No new review request has been sent by this record.
+reviewer_sha: NOT_MEASURED for the repaired head; earlier reviews are historical.
+historical_metadata: Original receipt claimed_by Claude, 2026-10-21 (time/zone not recorded); its historical reviewer suggestions included Codex, Blue Dream, Critical Mass and Durban Poison. This preserves history and routes no new request to retired seats.
+claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 15:57:06 UTC (matching PR ownership record)
+last_updated: 2026-10-26 16:01:06 UTC, by Codex closeout coordinator
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text
@@ -236,26 +266,6 @@ last_updated: 2026-10-06 16:05 CT, by Claude
 ```
 
 ## Closed
-
-### CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY
-
-```text
-TASK CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY  priority: P2  status: CLOSED
-goal: Verify current deploy-tip dependency audits after #1343; carry #1543 historical failures. Confirm the four Hono/js-yaml advisories and the Vitest/mocker GHSA no longer block at the tip, or open the smallest scoped follow-up for any survivor. Record the exact SHA and run URLs. Verification/documentation only; NOT a reopen or revert of #1543.
-branch: claude/verify-deploy-tip-dependency-audits
-base: verdant-grow-diary
-checkout: none; verification receipt only. Start new work from origin/verdant-grow-diary.
-pr: NOT_MEASURED (verification receipt; no code change opened by this block)
-head_sha: branch head b07c85ba7ad6b1031dea713d4ec4dd020ee6f8cc ("Initial plan") over deploy-tip parent 05f5138d08c943921df0ce224af8d9c0837c09d9 (#2296). The "Initial plan" commit has no own dependency-security run; the meaningful evidence is at the parent.
-state: VERIFIED. Dependency & Security CI run 39571694293 at 05f5138d = conclusion success; job 119127189913 all steps green, including Lockfile policy check, Dependency security scan (check:deps = node scripts/check-dependency-security.mjs over bun audit --json), Dependency security contract tests, typecheck, build, and Playwright (36 passed). The four #1543 advisories no longer block: Hono 1193729/1193730/1193731 (moderate, blocked via BLOCKED_PACKAGES "hono") and js-yaml 1193727 (high, blocked via BLOCKED_SEVERITIES) are absent at the tip after #1343 (merged 7266acd6886b22b92bfdf405d04ffa8f05a4edee) raised hono 4.13.11 / js-yaml 4.3.2 / vitest ^4.1.12 in ancestry. Vitest/@vitest/mocker GHSA-82fw-gwwq-j7x9 is covered by the passing deploy-branch check:deps over the full tree (vitest repaired in ancestry by #1343); the Cursor SDK local orchestration spike (workflow 334730604) has ZERO runs on verdant-grow-diary, so there is no deploy-tip spike run to read. config/dependency-security-exceptions.json has an empty exceptions array: no silent waiver.
-next_action: CLOSED. No surviving/new advisory required a follow-up; no scoped exception added.
-files: docs/agents/HANDOFF_LOG.md (this receipt)
-blockers: none. Local check:deps could not be re-run (bun not on PATH, node_modules absent); evidence is the deploy-tip CI run per the issue's own close criterion to read the completed jobs/logs.
-artifacts: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293 (Dependency & Security CI, success); job https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293/job/119127189913; config/dependency-security-exceptions.json (empty)
-reviewer_seat: Dependency/audit verification receipt. Independent exact-head acceptance per AGENTS.md routing (Codex, or Blue Dream / Critical Mass / Durban Poison); Claude observations are not acceptance.
-claimed_by: Claude, 2026-10-21
-last_updated: 2026-10-21, by Claude (#1723 deploy-tip dependency-audit verification receipt)
-```
 
 ### QUICKLOG-CORRECTION-EDITABLE-VALUES
 

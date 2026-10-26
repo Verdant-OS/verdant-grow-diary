@@ -217,6 +217,25 @@ describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
     });
   });
 
+  it("drops grow-event link keys so the photo row stays a client insert and delete", () => {
+    const row = buildQuickLogPhotoDiaryEntryRow({
+      ...baseInput,
+      extraDetails: {
+        caption: "leaf",
+        linked_grow_event_id: "event-1",
+        grow_event_id: "event-1",
+      },
+    });
+    expect(row.details).toEqual({
+      caption: "leaf",
+      event_type: "quicklog_photo_attachment",
+      source: "manual",
+      attached_to_action: "water",
+    });
+    expect(row.details).not.toHaveProperty("linked_grow_event_id");
+    expect(row.details).not.toHaveProperty("grow_event_id");
+  });
+
   it("eventType override gives standalone Photo saves a displayable type (default marker preserved)", () => {
     const base = {
       ownerId: "owner-1",

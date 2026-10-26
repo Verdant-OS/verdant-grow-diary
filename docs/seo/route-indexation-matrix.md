@@ -193,7 +193,7 @@ Manifest paths (`access: "internal"`, 6):
 
 ## Redirect aliases
 
-These 18 manifest paths are `access: "redirect"`. They are not sitemap `<loc>` values. They have no independent index document except the strain aliases in the inventory, which are `noindex, follow` and canonical to the cultivar URL.
+These 21 manifest paths are `access: "redirect"`. They are not sitemap `<loc>` values. They have no independent index document except the strain aliases in the inventory, which are `noindex, follow` and canonical to the cultivar URL.
 
 Permanent `vercel.json` redirects (repository config; live application **NOT_MEASURED**):
 

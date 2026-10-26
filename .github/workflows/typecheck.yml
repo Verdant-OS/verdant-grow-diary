@@ -3,8 +3,16 @@ name: TypeScript typecheck
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    # Duplicate of ci.yml's required typecheck. Docs-only diffs do not change
+    # the TypeScript program; ci.yml still reports the required check.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   push:
     branches: [main, verdant-grow-diary]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}

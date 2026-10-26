@@ -196,6 +196,9 @@ export function useSensorReadings(
         .order("captured_at", { ascending: false, nullsFirst: false })
         .order("ts", { ascending: false })
         .order("created_at", { ascending: false })
+        // Same unique last key as the tent-window reader, so Tent Detail and
+        // the Dashboard break equal-time ties alike (Copilot on #2459).
+        .order("id", { ascending: false })
         .limit(limit);
       if (tentId) q = q.eq("tent_id", tentId);
       const { data, error } = await q;

@@ -76,18 +76,19 @@ TASK PR-1971-CONFLICT-RESOLUTION  priority: P2  status: OPEN
 goal: Resolve hosted PR #1971 against the current deploy branch without rolling back later governance.
 why: GitHub reports conflicts across governance and role documents.
 branch: canopy/constitution-clash-fixes (hosted); codex/pr1971-resolution (isolated local candidate)
-base: verdant-grow-diary at ab566a23390795c6cf089ef77af57db1f52d5b44
+base: verdant-grow-diary at 3bc6b346f25249db408ca9cb9d2d94c33b3a442b
 checkout: Fetch both branch refs, verify the hosted head below, then merge the current deploy tip in an isolated writable checkout.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1971
 head_sha: Hosted 82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e, observed 2026-10-26. The candidate is local only.
 state: local conflict resolution committed as edb4293d5600df68b4c3333580f2333d1c4b7c38; no branch push attempted
 current_step: All 15 conflicts resolved. Modern numbered constitution/routing retained; hosted badge/role/hosting intent reconciled; eighteen-file Sentinel version 2026-10-26.1. Focused tests: 87 PASS / 0 FAIL / 0 SKIP in 4 files (sequential 30s local timeout); initial parallel run: 85 PASS / 2 timeout FAIL. Mirror, parity and three docs scanners PASS. Governance Node suite: 31 PASS / 0 FAIL / 0 SKIP (720.4s on this Windows machine). Post-commit parity checked the exact deploy base ab566a23 and passed all eighteen governance files.
+base_refresh: Later base commits #2511 and #2309 merged cleanly as 6d51205a658fc3c35fa4c4265691ea9b05869f36. Their 11 changed files are CI/review controls and unrelated tests; the focused governance/safety test sources and dependency inputs are unchanged.
 next_action: Read the final validation receipt and recovery bundle, then obtain explicit clearance for the recorded push hold before a normal fast-forward update of the hosted PR branch. Keep the unavailable cloud amendment separate and recover it before claiming its delivery.
 post_merge_check: NOT_MEASURED; no PR merge or deployment authorized in this task.
 active_writer: Codex, explicitly assigned conflict resolution by the user in the current chat.
 decisions: Retain modern ownership precedence, reviewer exclusions, queue, holds, fixture safety and later base work; use 2026-10-26.1 across eighteen governed files; do not edit the three protected parity scripts.
 tried_and_rejected: Choosing all older PR governance would revert later rules; choosing all base governance would erase the badge/role amendment.
-commands: node scripts/check-sentinel-version-parity.mjs ab566a23390795c6cf089ef77af57db1f52d5b44; node --test scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; node scripts/assert-docs-safety.mjs; git diff --check
+commands: node scripts/check-sentinel-version-parity.mjs 3bc6b346f25249db408ca9cb9d2d94c33b3a442b; node --test scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; node scripts/assert-docs-safety.mjs; git diff --check
 files_touched: PR governance/docs; docs/agents/constitution/roster.md; this log
 files_remaining: Validation-driven corrections only.
 blockers: No clearance observed for the reported GH013/support #4894653 push hold. No push to reproduce the denial. Cloud-local 10088e20a81bbb626de588485aff0437a917784d was unavailable; its cloud-only amendment is not represented as recovered or replaced.

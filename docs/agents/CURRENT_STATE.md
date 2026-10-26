@@ -61,7 +61,7 @@ Read this section first. It doesn't replace the observation log below.
 
 ## Follow-up observation — 2026-10-26 — PR #1971 local conflict repair
 
-- **Local candidate only:** reconcile hosted `82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e` with deploy `ab566a23390795c6cf089ef77af57db1f52d5b44`. Preserve the numbered constitution, current independent-review routing, historical observations, and the pending badge/role/hosting amendment. No application behavior is enabled.
+- **Local candidate only:** reconcile hosted `82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e` with deploy `3bc6b346f25249db408ca9cb9d2d94c33b3a442b`. Preserve the numbered constitution, current independent-review routing, historical observations, and the pending badge/role/hosting amendment. No application behavior is enabled.
 - **Recovery remains separate:** the reported cloud-local `10088e20a81bbb626de588485aff0437a917784d` and its approved cloud-only amendment were unavailable. This candidate starts from the hosted branch; it neither recovers nor replaces that unpublished amendment. Preserve the recovery receipt at https://github.com/Verdant-OS/verdant-grow-diary/pull/1971#issuecomment-6368470866.
 - **Publication BLOCKED:** no clearance was observed for the reported GH013/support #4894653 hold. No push, PR merge, deployment, production operation or scorer unlock was attempted. Fresh independent exact-head review and hosted CI remain NOT_MEASURED for this candidate.
 

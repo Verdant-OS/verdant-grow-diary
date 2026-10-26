@@ -4,8 +4,9 @@
  * this module never trusts a client user_id or a client-supplied grow id.
  *
  * Per plant: conditional tag (same grow as the hunt, untagged) -> number
- * (bounded retry on a duplicate number) -> on any failure, conditional untag so
- * no half-added candidate is left behind. Existing candidates are never written.
+ * (bounded retry on a duplicate number) -> conditional cleanup after a confirmed
+ * tag and a numbering failure. Uncertain tag/cleanup outcomes are reported
+ * explicitly; rollback is not assumed. Existing candidates are never retagged.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
@@ -182,7 +183,11 @@ export async function addPhenoHuntCandidates(
 
     let outcome: AssignCandidateNumberResult | null = null;
     for (let attempt = 0; attempt < PHENO_HUNT_ADD_CANDIDATES_MAX_NUMBER_ATTEMPTS; attempt += 1) {
-      outcome = await assignNumber({ plantId, candidateNumber: nextNumber });
+      outcome = await assignNumber({
+        plantId,
+        candidateNumber: nextNumber,
+        expectedHuntId: huntId,
+      });
       if (outcome.ok || outcome.reason !== "duplicate") break;
       const latest = await readOrdinalBaseline(client, huntId, plantId);
       nextNumber = Math.max(nextNumber, latest ?? nextNumber) + 1;

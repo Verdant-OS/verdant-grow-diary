@@ -16,6 +16,7 @@ import {
 } from "@/lib/growRepo";
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
 import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
+import { readTransientValue } from "@/lib/growsReadRetryRules";
 import { useAuth } from "@/store/auth";
 
 // ---------------------------------------------------------------------------
@@ -249,7 +250,7 @@ export function useGrowTents(growId?: string): UseQueryResult<Tent[]> {
         key,
         // The deadline sits inside run so a timeout is recorded as a failed read
         // and a response that arrives later cannot record rows.
-        run: () => withCriticalReadDeadline(fetchTents(growId)),
+        run: () => readTransientValue(() => withCriticalReadDeadline(fetchTents(growId))),
         emptyValue: () => [] as Tent[],
         isEmpty: isArrEmpty,
       }),
@@ -307,7 +308,10 @@ export function useGrowPlants(
         key,
         // The deadline sits inside run so a timeout is recorded as a failed read
         // and a response that arrives later cannot record rows.
-        run: () => withCriticalReadDeadline(fetchPlants(tentId, growId, { includeArchived })),
+        run: () =>
+          readTransientValue(() =>
+            withCriticalReadDeadline(fetchPlants(tentId, growId, { includeArchived })),
+          ),
         emptyValue: () => [] as Plant[],
         isEmpty: isArrEmpty,
       }),

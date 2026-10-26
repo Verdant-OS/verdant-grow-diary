@@ -199,3 +199,25 @@ export async function readWithGrowRetry<T>(
   }
   return { ok: false, failure };
 }
+
+/**
+ * Run one critical read, then the short backoff sequence, and return the
+ * first success. A non-retryable failure stops immediately. The last failure
+ * is rethrown so callers still record a failed read.
+ */
+export async function readTransientValue<T>(
+  read: () => Promise<T>,
+  controls: GrowRetryControls = {},
+): Promise<T> {
+  let lastError: unknown = new Error("grow_read_failed");
+  const outcome = await readWithGrowRetry(async () => {
+    try {
+      return { ok: true as const, value: await read() };
+    } catch (caught) {
+      lastError = caught;
+      return { ok: false as const, failure: classifyGrowReadFailure(caught) };
+    }
+  }, controls);
+  if (outcome.ok) return outcome.value;
+  throw lastError;
+}

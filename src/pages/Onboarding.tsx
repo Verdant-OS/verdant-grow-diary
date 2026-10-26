@@ -56,12 +56,14 @@ import {
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
-  const {
-    grows = [],
-    loading: growsLoading = false,
-    error: growsError = null,
-    refresh: refreshGrows,
-  } = useGrows();
+  const growsState = useGrows();
+  // A missing provider value or a null list is a failed shape, not an empty
+  // account. Reading `.length` on null is the TypeError class Sentry recorded
+  // on this route (VERDANT-WEB-1; message and stack were redacted).
+  const grows = Array.isArray(growsState?.grows) ? growsState.grows : [];
+  const growsLoading = growsState?.loading === true;
+  const growsError = typeof growsState?.error === "string" ? growsState.error : null;
+  const refreshGrows = growsState?.refresh;
   const {
     loading: entitlementLoading,
     lookupFailed: entitlementLookupFailed,

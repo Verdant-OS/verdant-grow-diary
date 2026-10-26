@@ -21,6 +21,7 @@ vi.mock("@/lib/growRepo", async (importOriginal) => {
 });
 
 import { CRITICAL_READ_DEADLINE_MS } from "@/lib/boundedReadRules";
+import { GROW_READ_RETRY_DELAYS_MS } from "@/lib/growsReadRetryRules";
 import {
   __resetGrowDataMeta,
   getGrowDataMeta,
@@ -55,6 +56,10 @@ describe("a timed-out grow read keeps its failure metadata", () => {
     ["tents", (): { isError: boolean } => useGrowTents(), ["grow", "tents", "all"]],
   ] as const)("does not record late rows for %s", async (_name, hook, key) => {
     const { result } = renderHook(hook, { wrapper });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS + GROW_READ_RETRY_DELAYS_MS[0]);
+    });
+    expect(result.current.isError).toBe(false);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
     });

@@ -73,34 +73,34 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK PR-1971-CONFLICT-RESOLUTION  priority: P2  status: OPEN
-goal: Fix PR #1971 review follow-ups, obtain green exact-head CI and eligible independent PASS, then merge through the queue. Do not deploy.
+goal: Fix PR #1971 review follow-ups, obtain green exact-head CI and a clean eligible independent PASS, then hand the merge packet to Chemdawg or the conditional Harvest backup. Do not deploy.
 why: The conflict repair is published; follow-up review identified stale delivery receipts and an approval-rule inconsistency.
 branch: canopy/constitution-clash-fixes (hosted); codex/pr1971-resolution (isolated local candidate)
 base: verdant-grow-diary at a22bdec653f63fcd7362ce40d5172789175aceee (fresh base merged for the follow-up; confirm current tip before queueing).
 checkout: Fetch both branch refs, verify the hosted head below, then merge the current deploy tip in an isolated writable checkout.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1971
-head_sha: 31bba66fe8c00cbe176bc2c9d5ba300d7c96a8fb (verified published checkpoint on 2026-10-26; this follow-up commit cannot record its own resulting SHA. Read the current full PR head and verify ancestry before acting).
-state: Conflict repair published by Codex with one normal push after Matthew explicitly cleared the push hold. The follow-up in this commit corrects the receipts and grant exception; subsequent CI/review/merge state must be read from the PR.
-current_step: Review follow-ups corrected. Local follow-up validation: 4 files / 87 PASS / 0 FAIL / 0 SKIP; eighteen-file version parity at 2026-10-26.2, mirror sync, three docs scanners and whitespace PASS. Earlier 31 governance tests remain a historical checkpoint result; checker/test bodies are unchanged. New-head hosted CI and independent acceptance must be measured separately.
+head_sha: 7224d310be9164d4bc3c10c9a943dec17042ee2e (published review checkpoint; owner-relayed Grok verdict is BLOCKED, 0 P1 / 1 P2. Read the resulting full PR head after this repair before validating, reviewing or approving it).
+state: Published repair checkpoint received an owner-relayed Grok P2 on merge authority. This follow-up corrects the two operating documents; it creates no Codex merge authority and does not carry the old verdict or approval to a later head.
+current_step: Correct the merge-actor handoff and require fresh per-item approval at the reviewed full head. Governance version remains 2026-10-26.2 because only CURRENT_STATE.md and HANDOFF_LOG.md change; both are exempt from the version set. Previous validation and CI remain historical checkpoint evidence.
 base_refresh: Cleanly merged a22bdec653f63fcd7362ce40d5172789175aceee for the follow-up, including the later Bun setup, Timeline dedupe and temperature-toast changes. These base changes are preserved; this PR introduces no application delta against that base.
-next_action: Verify the resulting full PR head, finish its required and supplemental CI, route one available non-contributing Claude/Grok review session under OWNERSHIP.md §4.3, and enqueue only after a clean exact-head PASS and green gates.
-post_merge_check: Verify merged state, merge SHA ancestry on verdant-grow-diary and queue removal; production deployment/verification remains outside this assignment.
-active_writer: Codex, explicitly assigned conflict resolution by the user in the current chat.
-decisions: Retain modern ownership precedence, reviewer exclusions, queue, holds, fixture safety and later base work; preserve existing founder grants; use 2026-10-26.2 across eighteen governed files; leave the three protected parity scripts byte-identical to hosted 82f1e4ae.
+next_action: Verify the resulting full PR head, finish its required and supplemental CI, and obtain a fresh eligible independent PASS on that SHA. Present the packet to Chemdawg; Harvest may act only under the roster backup conditions, including Chemdawg being unavailable and Verdante asking. Before ready/enqueue, Matthew's per-item yes must cover that same reviewed full SHA. Codex must not mark ready, enqueue, enable auto-merge or integrate this authored/repaired PR.
+post_merge_check: Read back the authorized merge actor's result: merged state, merge SHA ancestry on verdant-grow-diary and queue removal. Production deployment/verification remains outside this assignment.
+active_writer: Codex for repair, validation and evidence preparation only; this claim grants no independent acceptance or merge-seat authority.
+decisions: Keep OWNERSHIP.md and the roster authoritative: Chemdawg is the merge seat; Harvest is only its conditional backup. Require Matthew's per-item yes at the same full head covered by green required/supplemental CI and a clean independent PASS. Do not edit governance, scorer, product or workflow code for this wording repair.
 tried_and_rejected: Choosing all older PR governance would revert later rules; choosing all base governance would erase the badge/role amendment.
 commands: node scripts/check-sentinel-version-parity.mjs a22bdec653f63fcd7362ce40d5172789175aceee; node --test scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; node scripts/assert-docs-safety.mjs; git diff --check
-files_touched: PR governance/docs; docs/agents/constitution/roster.md; this log
+files_touched: docs/agents/CURRENT_STATE.md; docs/agents/HANDOFF_LOG.md
 files_remaining: Validation-driven corrections only.
-blockers: Historical push hold explicitly cleared by Matthew on 2026-10-26; the earlier normal push succeeded. Fresh-head CI and an eligible independent PASS remain required. A fresh Grok review prompt is being prepared for owner delivery; no outside acceptance is claimed.
+blockers: Owner-relayed Grok review at 7224d310be9164d4bc3c10c9a943dec17042ee2e is BLOCKED, with 0 P1 and 1 P2 concerning the merge handoff. The corrected head needs fresh CI, eligible independent PASS and Matthew's per-item yes at that same full SHA before the authorized merge actor acts.
 open_questions: The unavailable cloud-local amendment remains separate and is not claimed as recovered. No production, auth, secret, scorer or deployment permission is granted by this task.
 gotchas: Three parity scripts/tests must remain byte-identical to hosted 82f1e4ae. #2086's pending 36-check proposal is separate; retain 35 required checks.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/1971 ; https://github.com/Verdant-OS/verdant-grow-diary/commit/31bba66fe8c00cbe176bc2c9d5ba300d7c96a8fb ; https://github.com/Verdant-OS/verdant-grow-diary/pull/1971#pullrequestreview-5656487345
 artifacts: Portable source evidence: config/required-status-checks.json, the PR checks tab, the published checkpoint commit, and the review permalink above. Local recovery files are supplemental and are not required to resume.
-reviewer_seat: One actually available eligible non-contributing Claude/Grok session under OWNERSHIP.md §4.3; no current independent acceptance recorded.
-reviewer_sha: NOT_MEASURED
-session_state: Matthew authorized review-follow-up fixes, CI completion, independent acceptance and merge on 2026-10-26. No deploy. Read the current PR/check/review state instead of assuming this checkpoint remains current.
+reviewer_seat: Grok, owner-relayed BLOCKED verdict at the published checkpoint. A fresh eligible non-contributing review of the resulting full head is required; no independent acceptance is claimed.
+reviewer_sha: 7224d310be9164d4bc3c10c9a943dec17042ee2e — BLOCKED, 0 P1 / 1 P2, owner-relayed evidence; not acceptance
+session_state: The owner's requested outcome remains recorded. Under current OWNERSHIP.md and the roster, Codex prepares the fixes and merge packet; Chemdawg or the conditional Harvest backup performs the merge after all exact-head gates. Earlier instructions do not supply a later head's per-item yes. No deploy.
 claimed_by: Codex, 2026-10-26, explicit user assignment
-owner: Codex for this conflict-resolution task; retain the separately recorded cloud work.
+owner: Codex for repair and evidence coordination; merge actor is Chemdawg or the conditional Harvest backup.
 last_updated: 2026-10-26, by Codex
 ```
 

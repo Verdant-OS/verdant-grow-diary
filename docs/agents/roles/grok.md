@@ -1,6 +1,6 @@
 # Role — Grok: Product Intelligence, Adversarial Audit, and Implementation Lead
 
-**Sentinel-Version: 2026-10-26.2**
+**Sentinel-Version: 2026-10-26.3**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

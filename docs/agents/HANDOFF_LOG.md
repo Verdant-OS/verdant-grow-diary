@@ -12,23 +12,47 @@ An unpushed candidate is not a remote head and must never be treated as hosted C
 
 ## Template
 
+A cold agent (Claude Code, Codex, Cursor, or Grok) must be able to take the next step
+from this entry, the PR, and the repo, with no chat history. Use plain repo paths, full
+SHAs, and URLs. Do not write "as discussed" or "per my earlier message".
+
 ```text
 TASK <id>  priority: publish-gate | P1 | P2 | other  status: OPEN | CLOSED
 goal:
+why:
 branch: codex/<task-id>-<slug> for new Codex tasks; preserve existing names
 base: verdant-grow-diary or the recorded parent branch
-checkout: git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
+checkout: git fetch origin <branch> <base> && git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
 pr: URL or NOT_MEASURED
 head_sha: full exact remote SHA, with observation time
 state: implemented / local only / pushed draft / CI / review / merged / live measured
-next_action: the single smallest next step
-files:
+current_step:
+next_action: the single smallest next step a cold agent can run
+post_merge_check: the check that reopens this work with the same owner if it fails after merge; or NOT_APPLICABLE
+active_writer: the branch holder; only that holder pushes; nobody edits another holder's branch
+decisions: what was decided, and the reason for each
+tried_and_rejected: what was tried, and why it was rejected
+commands: exact commands to reproduce the current state and run the relevant tests
+files_touched: repo paths
+files_remaining: repo paths still to touch
 blockers: blocker and who can clear it
+open_questions:
+gotchas:
+links: review, issue, and run URLs
 artifacts: repository paths or PR/check URLs; local receipts may supplement them
 reviewer_seat:
+reviewer_sha: full SHA the current review or human go-ahead covers; never an older SHA
+session_state: cloud agent ids, routines, paused workflows, pending human decisions
 claimed_by: agent and date/time/zone, or empty
+owner: current owner; on retirement, transfer the CURRENT_STATE row (default inheritor: OG Kush)
 last_updated: YYYY-MM-DD HH:MM CT, by agent
 ```
+
+Before stopping, run the cold start test: a fresh agent reading only the PR, this
+entry, and the repo can take `next_action`. The matching PR comment starts with
+`resume here` and repeats goal, why, decisions, rejected attempts, commands, files
+touched and remaining, open questions, gotchas, links, and the exact head SHA.
+Retirement adds a `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC` comment on the PR.
 
 Before the checkout command, run `git fetch origin <branch> <base>`, then compare the
 freshly fetched `git rev-parse origin/<branch>` with head_sha as AGENTS.md (Agent Handoff /
@@ -51,19 +75,94 @@ active checkout has the branch open; inspect worktree ownership before selecting
 TASK BRAND-IDENTITY-20261023  priority: other  status: OPEN
 goal: Link Verdant Grow Diary's application JSON-LD to its existing organization and describe the indoor Grow OS accurately; no claim that this fixes an unmeasured AI answer.
 branch: codex/brand-identity-20261023-app-publisher
-base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79, freshly verified 2026-10-23 UTC
+base: verdant-grow-diary at ab566a23390795c6cf089ef77af57db1f52d5b44, fetched for the conflict repair on 2026-10-26 UTC; original implementation base was 65d9964e49eb4b95910bedc59d288d747461da79
 checkout: git fetch origin codex/brand-identity-20261023-app-publisher verdant-grow-diary && git switch codex/brand-identity-20261023-app-publisher && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2507 (draft; opened before implementation)
-head_sha: fb471c4531b5f3175e23a35f2c7880fe82a5e3be (remote ownership checkpoint); this implementation commit follows it. Read the PR for the resulting full implementation head; this commit cannot record its own SHA.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2507 (opened as draft before implementation; open and non-draft at the 2026-10-26 read; this repair does not change readiness)
+head_sha: 78dd7c0fabf6859179a56db1995ee8ab1937b3e4 (verified remote source checkpoint before this conflict repair); read the PR for the resulting full merge head and verify both this checkpoint and the base are ancestors. This commit cannot record its own SHA.
 state: Application publisher/description correction implemented. New root-head JSON-LD regression: RED 2 failed / 1 passed before the fix; GREEN plus related SEO suites 31 passed / 14 legacy tests skipped / 0 failed across 5 files. Scoped lint/format, docs safety and strict scorer report PASS. Full-project tsc --noEmit PASS with a 6 GB heap after the default 2 GB heap exhausted; no config/dependency/lockfile change. Codex peer review has zero P1/P2 and is not independent acceptance. GitHub transport publishes the locally hooked tree because shell Git cannot authenticate; verify tree equality rather than equating the local and API-created commit IDs.
-next_action: Read the resulting full PR head and current CI, then obtain eligible outside exact-head acceptance. Stay draft; no integration or production action.
+current_step: User assigned merge-conflict repair on 2026-10-26. Merge the fetched deploy base without rewriting history; the only conflict is adjacent additions in this log. Preserve every incoming handoff block and this task's original application/test blobs. Focused validation: 7 files, 124 passed, 14 existing skips, 0 failed; scoped ESLint, Prettier, docs/release safety, Sentinel parity, strict scorer report and whitespace checks PASS. Bun is unavailable on this Windows shell, so the installed Vitest CLI ran with Node; no install or dependency change.
+next_action: Verify the resulting remote full head, confirm both parents and fresh CI, then obtain eligible outside exact-head acceptance. Previous CI/reviews do not cover the new merge head. Do not merge the PR, enqueue it, change readiness, deploy or post a comment.
+commands: node node_modules/vitest/vitest.mjs run src/test/site-application-identity.test.ts src/test/software-application-offers-truth.test.ts src/test/root-canonical-seo.test.ts src/test/seo-metadata.test.ts src/test/verdant-seo-structured-data.test.ts src/test/v0-operating-loop-contract.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts --reporter=dot; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/check-sentinel-version-parity.mjs ab566a23390795c6cf089ef77af57db1f52d5b44; node scripts/scorer-lock.mjs --report --base ab566a23390795c6cf089ef77af57db1f52d5b44 --strict
 files: src/lib/build/siteSoftwareApplicationJsonLd.ts (publisher reference and description only); src/test/site-application-identity.test.ts (new); docs/agents/HANDOFF_LOG.md (this block only)
 blockers: Matthew explicitly assigned Codex the narrow correction despite the #2028/#2023 overlap in this chat on 2026-10-23. Existing Claude branches and broader work remain untouched. #2028 at 334a9f1b657da2a5b899782bc85ea6c8c415bb2b changes a comment in the application module; preserve that independent change when integrating. No shared live-session registry is available. GitHub comments still require separate approval, so no claim/renewal comment is posted.
 artifacts: Draft #2507 records the owner assignment and exact-head evidence. Local identity-red.log / identity-green.log / identity-typecheck*.log are under /workspace/scratch/62688fa4f4c6/. Earlier investigation identified homegrown.guide from Helena's detailed email; actual AI substitution remains NOT_MEASURED.
 reviewer_seat: BLOCKED — eligible non-contributing Claude/Grok session not yet assigned; Codex contributors cannot independently accept this work
 claimed_by: Codex brand-identity session, Matthew's direct narrow assignment 2026-10-23; no takeover of Claude's tasks
-last_updated: 2026-10-23 23:15 UTC, by Codex brand-identity session
-limits: Stay draft. No merge, ready/enqueue, deployment, production write, GitHub comment, root-route/canonical/offer/pricing change, competitor identity claim, sameAs addition, locked-test edit or dependency/lockfile change.
+active_writer: Codex PR #2507 conflict-repair session, directly assigned by Matthew on 2026-10-26; only this PR branch is in scope
+owner: Codex PR #2507 conflict-repair session; no claim on #2028/#2023 or another workstream
+reviewer_sha: NOT_MEASURED for the resulting merge head; no eligible independent acceptance is claimed
+post_merge_check: NOT_MEASURED; after an independently approved merge and founder-controlled deployment, verify the live application JSON-LD publisher resolves to its emitted organization and the description retains the indoor Grow OS and grower-approved decisions. This repair authorizes neither action.
+session_state: Local conflict repair and focused checks; no cloud agent, routine, external review request, comment or production operation started
+last_updated: 2026-10-26 10:16 CT, by Codex PR #2507 conflict-repair session
+limits: Preserve existing PR readiness. No PR merge, ready/enqueue, deployment, production write, GitHub comment, root-route/canonical/offer/pricing change, competitor identity claim, sameAs addition, locked-test edit or dependency/lockfile change.
+```
+
+### PR-2345-BASE-INTEGRATION
+
+```text
+TASK PR-2345-BASE-INTEGRATION  priority: P2  status: OPEN
+goal: Integrate the latest deploy base into #2345, preserve the temperature tests, push and refresh CI, obtain eligible outside acceptance, and report queue readiness without merging the PR or deploying.
+why: The live base added the shared Radix teardown fix after the previous integration; preserve the supplemental temperature regressions while running them with that updated test environment. The production temperature fix already merged in #2405.
+branch: claude/settings-temperature-reset-label
+base: verdant-grow-diary at 0673fe6f7d4afbb92d9485aa6bd4bd605242ed33
+checkout: git fetch origin +refs/heads/claude/settings-temperature-reset-label:refs/remotes/origin/claude/settings-temperature-reset-label +refs/heads/verdant-grow-diary:refs/remotes/origin/verdant-grow-diary && git switch claude/settings-temperature-reset-label && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345
+head_sha: 21890353b5158f990401f31044c8f7f32fc1a2d9 (remote source checkpoint verified 2026-10-24 21:12 UTC; read the PR for the resulting integration head, then verify ancestry before resuming)
+state: This integration merges base 0673fe6f. Settings.tsx and all three temperature reset test files are preserved byte-for-byte from source head 21890353. The PR delta remains six supplemental preference-event cases and this handoff. New-head hosted CI and eligible independent acceptance are NOT_MEASURED; older CI and reviews do not cover this integration head.
+current_step: The latest base merged cleanly. All twelve review threads were resolved at source head 21890353 by the time of the 21:13 UTC read; this coordinator posted no replies or resolutions. Focused validation with the incoming shared setup passed 9 files/91 tests/0 failures.
+next_action: Verify the PR's resulting full head and fresh CI; finish local Grok OAuth sign-in and route one fresh non-contributing Grok review once authentication is verified. No PR merge, queue entry or deploy is authorized.
+post_merge_check: NOT_APPLICABLE (supplemental tests and handoff only; no merge or deployment authorized).
+active_writer: Codex PR #2345 repair session, explicitly assigned the base merge and branch push by Matthew; no takeover of another branch or workstream.
+decisions: Keep all temperature files unchanged, preserve every base handoff block, use a normal merge and push, and keep unsaved radio-choice behavior separate from reactive stored preference.
+tried_and_rejected: A Codex technical review cannot accept a PR Codex repaired. Grok's cached model listing did not establish authentication. No force-push, protection bypass or substitute PR.
+commands: node node_modules/vitest/vitest.mjs run src/test/temperature-unit-preference.test.ts src/test/temperature-unit-preference-hardening.test.ts src/test/temperature-unit-preference-boundary.test.ts src/test/temperature-unit-reset-stored-override.test.tsx src/test/temperature-unit-reset-label.test.tsx src/test/temperature-unit-reset-events.test.tsx src/test/temperature-unit-settings-tile.test.tsx src/test/use-temperature-unit-preference-same-tab.test.tsx src/test/radix-focus-scope-teardown-flush.test.tsx --reporter=dot; node scripts/assert-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 0673fe6f7d4afbb92d9485aa6bd4bd605242ed33 --strict
+files_touched: src/test/temperature-unit-reset-events.test.tsx; docs/agents/HANDOFF_LOG.md (PR delta only; other staged changes are the unmodified incoming base).
+files_remaining: none planned; new reviewer findings require a scoped repair and fresh exact-head review.
+blockers: Grok and Claude Code availability probes remained unauthenticated on 2026-10-24 21:12 UTC. A local Grok OAuth login flow was initiated for Matthew to complete in the browser; no model review has started. Public claim/resume comments remain outside the user's authorized scope; the empty claimed_by field is not an effective public ownership lock.
+open_questions: Whether Grok OAuth has completed; required-check results at the resulting integration head remain NOT_MEASURED.
+gotchas: Re-check the full remote PR head and live base, not stale tracking refs. A source checkpoint is not the resulting commit SHA; new commits invalidate earlier CI and reviews. Open #2434 overlaps one same-document case and remains untouched.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345 ; source-head CI only: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40132885060 ; resolved handoff findings: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345#pullrequestreview-5639778109
+artifacts: config/required-status-checks.json and the PR's resulting-head checks. This merge candidate passed 9 files/91 tests/0 failures, scoped ESLint and Prettier, docs safety, whitespace, strict scorer checks and Sentinel parity. tsgo retained two known getSsrStatus diagnostics in the unchanged not-found-route-status test; full local suite/build were not run. New-head hosted CI remains NOT_MEASURED.
+reviewer_seat: BLOCKED pending an authenticated fresh non-contributing Grok session; no request sent, fallback transfers=0. Earlier Codex technical observations are not acceptance.
+reviewer_sha: NOT_MEASURED; no eligible exact-head PASS.
+session_state: Codex integration coordinator remains active; local Grok OAuth process PID 23316 is awaiting browser sign-in; no review process or routine was created. The existing disabled Mocked E2E workflow is unchanged.
+claimed_by:
+owner: Codex PR #2345 repair session by explicit user assignment: merge latest base, preserve temperature tests, push, rerun CI, obtain independent review; no PR merge or deploy. This owner record does not assert a posted public claim.
+last_updated: 2026-10-24 16:15 CT, by Codex PR #2345 repair session
+```
+
+### HANDOFF-CONTINUITY-20261024
+
+```text
+TASK HANDOFF-CONTINUITY-20261024  priority: other  status: OPEN
+goal: Docs-only constitution amendment so a retired or out-of-token agent can be resumed immediately, including Cheeko's seven further gates (one writer, one-pass review, stale expiry, ship/money, repo-wide breakages, protected instruction files, post-merge loop).
+why: Unpushed session state and SHA-unbound passes leave the next agent unable to continue. Cheeko approved the continuity rules and the seven gates for this same draft.
+branch: cursor/handoff-continuity-a798
+base: verdant-grow-diary
+checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
+head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
+state: pushed draft once this commit is on the remote
+current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry
+next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain a fresh independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
+decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
+tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
+commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.6 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
+files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/*.md; docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
+files_remaining: none in this slice. .github/pull_request_template.md stays unchanged.
+blockers: independent exact-head review not yet requested; GitHub comment approval gate still applies to a resume-here comment unless Cheeko or Matthew allows it
+open_questions: none for the wording Cheeko approved
+gotchas: A new commit invalidates any review of an older SHA. CURRENT_STATE.md is exempt from Sentinel-Version. Do not force-push. Keep the PR draft.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523 ; PASS at d46e2a3c only: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523#pullrequestreview-5638407206
+artifacts: this block
+reviewer_seat: an eligible independent session that did not author this PR (not this Cursor Grok session)
+reviewer_sha: none yet
+session_state: Cursor cloud agent on cursor/handoff-continuity-a798; no paused workflow; no pending human decision beyond draft review
+post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.6 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
+active_writer: Cursor Grok cloud agent (this session)
+claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-24 13:50 UTC, by Cursor Grok cloud agent
 ```
 
 ### REVIEWER-ROUTING-20261022
@@ -109,11 +208,31 @@ last_updated: 2026-10-16 18:19 UTC, by Codex
 limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Deferred ordering risk: cancellation updates acknowledge zero matched rows; stale subscription upserts have no occurred_at guard. No ordering/replay changes, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
 ```
 
+### FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY
+
+```text
+TASK FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY  priority: P2  status: OPEN
+goal: A plant with no health assessment (null, missing or "unknown") reads "Not assessed yet" on /plants and on the plant page, never "unknown". Display only; no schema. Owns the unassessed-health display (owner decision, Matthew 2026-10-22). QA 2/2 on production ebaf1b6a. Fixes #2171 (display half).
+branch: claude/plant-health-not-assessed-label-p4 (fresh branch; ruleset GH013 refuses updates to an existing claude/* branch)
+base: verdant-grow-diary
+checkout: git fetch origin claude/plant-health-not-assessed-label-p4 verdant-grow-diary && git switch claude/plant-health-not-assessed-label-p4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: the PR opened from claude/plant-health-not-assessed-label-p4, superseding https://github.com/Verdant-OS/verdant-grow-diary/pull/2492 (chain: #2330 -> #2490 -> #2492)
+head_sha: 9e0931a9b23b0022d9f7199ac43b0faa25b9d6f2, #2492's head (2026-10-23 20:20 UTC) and the parent of the commit that records this line (a commit cannot contain its own SHA). Re-read the PR for the exact head before resuming.
+state: review. Round 2 (#2490, c1192044) removed a Cursor-added source-regex test; round 3 (#2492, eaff21b9) pinned the capitalize class and dropped Blue Dream routing; Cursor Agent commit 9e0931a9 added a rendered integration test (independently reviewed at 9e0931a9, no blocking findings). Round 4 updates this block only. Application code unchanged since 1807c9a6.
+next_action: 35/35 required checks and an exact-head independent review of the superseding PR by an actually available, eligible session (Codex, Durban Poison, or a non-contributing Claude or Grok review session; AGENTS.md retires Blue Dream from future routing), then the merge queue.
+files: src/lib/plantHealthRules.ts; src/pages/Plants.tsx; src/pages/PlantDetail.tsx; src/test/plant-health-status-label.test.ts; src/test/plant-detail-health-display.test.tsx; src/test/plant-health-unknown-rendering.test.tsx; src/test/plant-health-not-assessed-ui-integration.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. #2140 was narrowed to its schema work at 373fd162 (plantHealthRules.ts, Plants.tsx and the label tests back to base; plants-page-unassessed-health-label.test.tsx deleted), so plantHealthStatusLabel exists in this PR only.
+artifacts: PR #2330 body (RED 27 failed / 4 passed with the fix set aside; neighbours 89 files / 1752 passed)
+reviewer_seat: Codex, Durban Poison, or a non-contributing Claude or Grok review session (.tsx product files); never the author
+claimed_by: Claude, 2026-10-23 20:11 UTC
+last_updated: 2026-10-23 20:25 UTC, by Claude
+```
+
 ### FIX-2171-PLANT-CREATE-INSERT-ERROR
 
 ```text
 TASK FIX-2171-PLANT-CREATE-INSERT-ERROR  priority: P2  status: OPEN
-goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the "not assessed" plants-list label; that is open PR #2140. Fixes #2171.
+goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the unassessed-health label; that display belongs to the #2330 -> #2490 -> #2492 superseding chain (owner decision, Matthew 2026-10-22, superseding the earlier #2140 assignment). Fixes #2171.
 branch: cursor/plant-create-insert-error-99b8
 base: verdant-grow-diary
 checkout: git fetch origin cursor/plant-create-insert-error-99b8 verdant-grow-diary && git switch cursor/plant-create-insert-error-99b8 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
@@ -122,7 +241,7 @@ head_sha: 71be93f03ec13e4ad9d8378a2c10f076f719dd52, remote observed 2026-10-19 1
 state: review. Not merged, so this block stays OPEN; move it to Closed with the landing SHA when #2192 merges.
 next_action: Exact-head Codex review of PR #2192 at its current head, then independent review. No merge from this block.
 files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-failure-notice.test.ts; src/test/plant-create-insert-failure-notice.test.tsx; src/test/plant-create-retry-recovery-notice.test.tsx; docs/agents/HANDOFF_LOG.md
-blockers: none for the repository change. The plants-list health label stays with #2140. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
+blockers: none for the repository change. The unassessed-health label on /plants and the plant page belongs to the #2330 -> #2490 -> #2492 chain (owner decision 2026-10-22); #2140 keeps only its schema work. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
 artifacts: PR #2192 body (RED/GREEN counts for the retry-clear fix); earlier toast-target fail-first 1 failed / 3 skipped before the notifications-region lookup, 10 passed / 0 failed after
 reviewer_seat: Blue Dream (CreatePlantDialog.tsx)
 claimed_by: Claude (close-out session), 2026-10-19 16:14 UTC (VER-216, Matthew 2026-10-19)

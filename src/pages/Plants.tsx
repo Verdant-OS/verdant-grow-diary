@@ -44,7 +44,11 @@ import {
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { dashboardPath, plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { plantHealthTone, type PlantHealthTone } from "@/lib/plantHealthRules";
+import {
+  plantHealthStatusLabel,
+  plantHealthTone,
+  type PlantHealthTone,
+} from "@/lib/plantHealthRules";
 import {
   filterVisiblePlants,
   getArchivedPlantLabel,
@@ -97,11 +101,11 @@ const HEALTH_DOT_CLASSES: Readonly<Record<PlantHealthTone, string>> = {
 };
 
 function formatPlantHealthLabel(health: string | null | undefined): string {
-  return `Plant health: ${health ?? "unknown"}`;
+  return `Plant health: ${plantHealthStatusLabel(health)}`;
 }
 
 function formatPlantHealthAriaLabel(health: string | null | undefined): string {
-  return `Plant health status: ${health ?? "unknown"}. Sensor status is shown separately.`;
+  return `Plant health status: ${plantHealthStatusLabel(health)}. Sensor status is shown separately.`;
 }
 
 export default function Plants() {

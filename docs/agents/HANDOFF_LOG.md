@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SETUP-QUICKLOG-DRAFT-RETRY
+
+```text
+TASK SETUP-QUICKLOG-DRAFT-RETRY  priority: other  status: OPEN
+goal: Keep every typed field in Start Your Room and the first Quick Log observation when a save fails or the grower leaves mid-flow, show a plain error, and let Retry write that same save once. Advance only after the server confirms the save.
+why: A failed or abandoned setup step was dropping names and notes, and a second tap could start another write.
+branch: cursor/setup-quicklog-draft-retry-8b19
+base: verdant-grow-diary
+checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-diary && git switch cursor/setup-quicklog-draft-retry-8b19 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until the draft pull request exists
+head_sha: local only until the first push; refresh this line from git rev-parse HEAD after push
+state: implemented / local only
+current_step: session drafts, plain errors, and retry tests are in the working tree
+next_action: push the branch, open a draft PR against verdant-grow-diary, and read the 35 required checks at that head
+post_merge_check: Full test suite shards and Lint, typecheck, test, build on the merged deploy head; if a required check fails, reopen this task with the same owner
+active_writer: Grok cloud agent on cursor/setup-quicklog-draft-retry-8b19
+decisions: Drafts live in sessionStorage under verdant.session-form.1.{userId}.{formId} and clear only after a confirmed save. Start Your Room reuses one hierarchy row id until that confirmation and blanks a name in the stored draft once its id is set so a later empty form does not inherit a confirmed name. Confirmed Quick Log observation retries keep the same p_idempotency_key, including after remount, by storing that key on the draft. The open-sheet key mint line stays so the existing five-rotation source pin still matches; a stored key overwrites it when present. Viewport coverage is jsdom innerWidth 390 and 1280 because the sheet is not viewport-branched.
+tried_and_rejected: Editing src/test/start-your-room-enter-submits.test.tsx is refused by scripts/scorer-lock.mjs. Restoring confirmed names into sessionStorage made the next test read "Bound TentEnter Tent". Awaiting the first Retry click advanced the wizard before the second click. Treating two sequential Retry clicks as one RPC was wrong: the in-flight flag releases after a definitive rejection, so the second click is a second call with the same key. A remount that minted a new key was rejected because Retry would no longer be one logical save.
+commands: export PATH="$HOME/.bun/bin:$PATH"; NODE_OPTIONS="--max-old-space-size=8192" bun run typecheck; bun run lint; bunx vitest run src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx src/test/start-your-room-enter-submits.test.tsx src/test/start-your-room-resume.test.tsx src/test/quicklog-manual-idempotency-static.test.ts --reporter=dot
+files_touched: src/pages/StartYourRoom.tsx src/components/QuickLogV2Sheet.tsx src/lib/sessionFormDraftRules.ts src/lib/sessionFormDraftStore.ts src/lib/startYourRoomDraftRules.ts src/lib/quickLogObservationDraftRules.ts src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none for the code change. Merge, auto-merge, publish, and production writes are out of scope.
+open_questions: none
+gotchas: Do not restore a confirmed grow, tent, or plant name into the stored draft. Do not add another saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignment; quicklog-manual-idempotency-static.test.ts counts five outside the two abandonment functions. Hydrate Start Your Room only after growsLoading is false, and only restore step when draft.ids.growId is still in the grows list. Effects that read ownerId must be declared after const ownerId. Free plan still does not create a grow automatically.
+links: NOT_MEASURED
+artifacts: local vitest on the files in commands; typecheck passed with NODE_OPTIONS=--max-old-space-size=8192; lint 0 errors
+reviewer_seat: not requested; independent acceptance is still required before merge
+reviewer_sha: none
+session_state: Cursor cloud agent bc-f9381022-de73-5751-86dd-5bf490608b19. No production smoke write.
+claimed_by: Grok, 2026-10-26 11:15 CT
+owner: Grok
+last_updated: 2026-10-26 11:15 CT, by Grok
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

@@ -2,6 +2,17 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
+  isQuickLogObservationDraftEmpty,
+  parseQuickLogObservationDraft,
+  QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+  QUICK_LOG_OBSERVATION_SAVE_ERROR,
+} from "@/lib/quickLogObservationDraftRules";
+import {
+  clearBrowserSessionFormDraft,
+  readBrowserSessionFormDraft,
+  writeBrowserSessionFormDraft,
+} from "@/lib/sessionFormDraftStore";
+import {
   readPendingQuickLogNote,
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
@@ -616,6 +627,7 @@ function QuickLogV2SheetForOwner({
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
+  const observationDraftSuppressedRef = useRef(false);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
   // previous saved-summary state. Bumped whenever the grower starts
   // a new logical submission from the same open sheet.
@@ -1121,10 +1133,19 @@ function QuickLogV2SheetForOwner({
     if (open) {
       setRestoredMediaPending(false);
       setVisitMode("fast_check");
+      const storedDraft = observationDraftSuppressedRef.current
+        ? null
+        : readBrowserSessionFormDraft(
+            user?.id ?? "",
+            QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+            parseQuickLogObservationDraft,
+          );
+      const restoredDraft =
+        storedDraft && !isQuickLogObservationDraftEmpty(storedDraft.form) ? storedDraft.form : null;
       setForm({
-        ...EMPTY_QUICKLOG_V2_FORM,
-        selectedKey: defaultTargetKey ?? null,
-        action: defaultAction,
+        ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
+        selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
+        action: restoredDraft?.action ?? defaultAction,
       });
       manualTempEntryUnitRef.current = null;
       // A new draft has no chip-authored marker, so the provenance record must
@@ -1139,7 +1160,7 @@ function QuickLogV2SheetForOwner({
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
-      setLocalError(null);
+      setLocalError(storedDraft?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
@@ -1158,6 +1179,9 @@ function QuickLogV2SheetForOwner({
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      if (storedDraft?.idempotencyKey) {
+        saveIdempotencyKeyRef.current = storedDraft.idempotencyKey;
+      }
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
       setTentPlantAutoApplied(false);
@@ -1166,7 +1190,33 @@ function QuickLogV2SheetForOwner({
       setTargetFilterQuery("");
       setTentPlantAutoApplied(false);
     }
-  }, [open, defaultTargetKey, defaultAction]);
+  }, [open, defaultTargetKey, defaultAction, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (observationDraftSuppressedRef.current) {
+      if (open && isQuickLogObservationDraftEmpty(form)) {
+        observationDraftSuppressedRef.current = false;
+      }
+      return;
+    }
+    if (!open || postSave || isQuickLogObservationDraftEmpty(form)) return;
+    writeBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
+      form,
+      saveFailed: Boolean(localError),
+      idempotencyKey: saveIdempotencyKeyRef.current,
+    });
+  }, [user?.id, open, form, postSave, localError]);
+
+  useEffect(() => {
+    if (!open || !user?.id || observationDraftSuppressedRef.current) return;
+    const stored = readBrowserSessionFormDraft(
+      user.id,
+      QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+      parseQuickLogObservationDraft,
+    );
+    if (stored?.saveFailed) setLocalError(QUICK_LOG_OBSERVATION_SAVE_ERROR);
+  }, [open, user?.id]);
 
   // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
   // Only when selectedKey is still empty/unset — never rewrite an explicit
@@ -1951,6 +2001,10 @@ function QuickLogV2SheetForOwner({
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      observationDraftSuppressedRef.current = true;
+      if (user?.id) {
+        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+      }
       const savedPlantId = resolved.plantId ?? null;
       if (savedPlantId) {
         const refetchAfter = Date.now();
@@ -2479,6 +2533,10 @@ function QuickLogV2SheetForOwner({
     // best-effort attachment work, so a rejected media promise can never
     // leave the committed server key attached to a new editable draft.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    observationDraftSuppressedRef.current = true;
+    if (user?.id) {
+      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+    }
 
     // The log row is committed from here on. Companion-media failures are
     // PARTIAL SUCCESS: the grower's entry is saved and must be presented as
@@ -3581,6 +3639,7 @@ function QuickLogV2SheetForOwner({
               <Label htmlFor="qlv2-note">Note (optional)</Label>
               <Textarea
                 id="qlv2-note"
+                data-testid="qlv2-note"
                 value={form.note}
                 disabled={submissionLocked}
                 maxLength={NOTE_LIMIT}

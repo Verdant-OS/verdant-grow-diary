@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { CRITICAL_READ_DEADLINE_MS } from "@/lib/boundedReadRules";
+import { GROW_READ_BUDGET_MS } from "@/lib/growsReadRetryRules";
 import { isDashboardSupplementalLoading } from "@/lib/dashboardSupplementalLoadingRules";
 import { resolveTimelineFetchScope } from "@/lib/timelinePageReadStateRules";
 
@@ -176,8 +177,11 @@ describe("onboarding grows check", () => {
   it("leaves loading when the grows read never settles", async () => {
     vi.useFakeTimers();
     renderOnboarding();
+    // A hung grows read uses the full 8s first deadline, then a retry while
+    // leftover budget remains. The error UI is published when GROW_READ_BUDGET_MS
+    // elapses, so advancing only CRITICAL_READ_DEADLINE_MS still shows loading.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(GROW_READ_BUDGET_MS);
     });
     expect(screen.getByTestId("onboarding-grows-error")).toBeInTheDocument();
     expect(screen.queryByTestId("onboarding-grows-loading")).toBeNull();
@@ -249,8 +253,10 @@ describe("grows provider deadline", () => {
       ),
     );
     expect(screen.getByTestId("grows-probe")).toHaveTextContent("loading|ok");
+    // Same budget as the onboarding hang: the first 8s attempt is retried, and
+    // the provider leaves loading only after GROW_READ_BUDGET_MS.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(GROW_READ_BUDGET_MS);
     });
     expect(screen.getByTestId("grows-probe")).toHaveTextContent("ready|error");
   });

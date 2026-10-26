@@ -17,8 +17,10 @@ import { usePlants } from "@/hooks/use-plants";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { deriveDailyGrowCheckStatus, type DailyCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
-import { withGrowId } from "@/lib/routes";
+import { DASHBOARD_SAVED_WORK_LINK_CLASS } from "@/lib/dashboardSavedWorkLinkClass";
+import { plantDetailPath, timelinePath, withGrowId } from "@/lib/routes";
 import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
+import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 
 interface Props {
   /** Compact strip variant (used inside the legacy operator view). */
@@ -32,6 +34,19 @@ interface Props {
    */
   tentIds?: readonly string[] | null;
   className?: string;
+}
+
+function savedWorkHrefs(
+  status: DailyCheckStatus,
+  growId: string | null,
+): { plantHref: string | null; activityHref: string | null } {
+  const plantHref = status.plantId ? plantDetailPath(status.plantId) : null;
+  const anchor = buildTimelineEntryAnchorId(status.lastDiaryEntryId);
+  const diaryMs = status.lastQuickLogAt ? Date.parse(status.lastQuickLogAt) : NaN;
+  const activityMs = status.lastActivityAt ? Date.parse(status.lastActivityAt) : NaN;
+  const diaryIsNewest = Number.isFinite(diaryMs) && diaryMs === activityMs;
+  const entryHref = anchor && diaryIsNewest ? `${timelinePath(growId)}#${anchor}` : null;
+  return { plantHref, activityHref: entryHref };
 }
 
 function relTime(iso: string | null): string {
@@ -172,6 +187,7 @@ export default function DailyGrowCheckStatusCard({
     : null;
 
   const isEmpty = status.kind === "none";
+  const savedWork = savedWorkHrefs(status, growId);
   const tone =
     status.kind === "both"
       ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
@@ -202,12 +218,37 @@ export default function DailyGrowCheckStatusCard({
           <div className="text-sm text-foreground/90 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span data-testid="daily-grow-check-last-activity">
-                Last check activity {relTime(status.lastActivityAt)}
-              </span>
+              {savedWork.activityHref ? (
+                <Link
+                  to={savedWork.activityHref}
+                  data-testid="daily-grow-check-last-activity"
+                  aria-label={`Last check activity ${relTime(status.lastActivityAt)}${
+                    plantName ? `, latest log for ${plantName}` : ""
+                  }`}
+                  className={DASHBOARD_SAVED_WORK_LINK_CLASS}
+                >
+                  Last check activity {relTime(status.lastActivityAt)}
+                </Link>
+              ) : (
+                <span data-testid="daily-grow-check-last-activity">
+                  Last check activity {relTime(status.lastActivityAt)}
+                </span>
+              )}
             </span>
             {tentName && <span data-testid="daily-grow-check-tent-name">· {tentName}</span>}
-            {plantName && <span data-testid="daily-grow-check-plant-name">· {plantName}</span>}
+            {plantName && savedWork.plantHref && (
+              <>
+                <span aria-hidden="true">·</span>
+                <Link
+                  to={savedWork.plantHref}
+                  data-testid="daily-grow-check-plant-name"
+                  aria-label={`Open ${plantName}`}
+                  className={DASHBOARD_SAVED_WORK_LINK_CLASS}
+                >
+                  {plantName}
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">

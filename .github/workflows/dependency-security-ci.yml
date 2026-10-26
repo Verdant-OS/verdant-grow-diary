@@ -5,9 +5,18 @@ on:
   merge_group:
   push:
     branches: [verdant-grow-diary]
+    # Lockfile, audit, and build steps do not read markdown. paths-ignore is
+    # not valid on merge_group, so a docs-only queue entry still runs this
+    # lane. ci.yml stays unfiltered and still reports the required contexts.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   pull_request:
     branches: [verdant-grow-diary]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
 
 # Read-only workflow: no secrets used, no artifacts uploaded that could
 # contain tokens. See scripts/check-dependency-security.mjs for the

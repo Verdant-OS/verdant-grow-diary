@@ -128,6 +128,35 @@ Server-only secrets (configured via Lovable Cloud → Secrets, never in
   the legacy names, which `get-paddle-price` also reads and which hold LIVE ids
   once `PAYMENTS_ENVIRONMENT=live`
 
+At the live switch, these seven names must hold live price ids. `get-paddle-price`
+reads only this set, and `PAYMENTS_ENVIRONMENT` (not `PADDLE_ENVIRONMENT`) selects
+the gateway:
+
+- `PADDLE_PRICE_PRO_MONTHLY`
+- `PADDLE_PRICE_PRO_ANNUAL`
+- `PADDLE_PRICE_CRAFT_MONTHLY`
+- `PADDLE_PRICE_CRAFT_ANNUAL`
+- `PADDLE_PRICE_FOUNDER_LIFETIME`
+- `PADDLE_PRICE_CREDIT_PACK_50`
+- `PADDLE_PRICE_CREDIT_PACK_150`
+
+Before those names are flipped, set the seven sandbox copies. The legacy
+classifier currently maps pro monthly, pro annual, and founder lifetime; the
+craft and credit-pack copies still have to exist so those ids are not left
+only on the shared live names:
+
+- `PADDLE_SANDBOX_PRICE_PRO_MONTHLY`
+- `PADDLE_SANDBOX_PRICE_PRO_ANNUAL`
+- `PADDLE_SANDBOX_PRICE_CRAFT_MONTHLY`
+- `PADDLE_SANDBOX_PRICE_CRAFT_ANNUAL`
+- `PADDLE_SANDBOX_PRICE_FOUNDER_LIFETIME`
+- `PADDLE_SANDBOX_PRICE_CREDIT_PACK_50`
+- `PADDLE_SANDBOX_PRICE_CREDIT_PACK_150`
+
+`PAYMENTS_ENVIRONMENT=live` must be explicit. `PAYMENTS_LIVE_WEBHOOK_SECRET`
+must be set, and the live Paddle notification URL is `payments-webhook?env=live`
+(`env` defaults to sandbox). `PADDLE_ENVIRONMENT` stays `sandbox`.
+
 ## Webhook
 
 Canonical: `payments-webhook` (Lovable lane). Verifies the signature via

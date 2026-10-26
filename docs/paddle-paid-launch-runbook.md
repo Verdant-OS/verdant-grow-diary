@@ -115,6 +115,57 @@ shared with `get-paddle-price`, which selects from the server's
 `PAYMENTS_ENVIRONMENT`, and a live transition would otherwise leave every
 sandbox event classified as `null` with no error raised.
 
+### Price names at the live switch
+
+`get-paddle-price` reads only these seven names, and only an explicit
+`PAYMENTS_ENVIRONMENT` of `live` or `sandbox` selects the gateway. It does not
+read `PADDLE_ENVIRONMENT`. At switch time the seven names hold **live** price ids:
+
+1. `PADDLE_PRICE_PRO_MONTHLY`
+2. `PADDLE_PRICE_PRO_ANNUAL`
+3. `PADDLE_PRICE_CRAFT_MONTHLY`
+4. `PADDLE_PRICE_CRAFT_ANNUAL`
+5. `PADDLE_PRICE_FOUNDER_LIFETIME`
+6. `PADDLE_PRICE_CREDIT_PACK_50`
+7. `PADDLE_PRICE_CREDIT_PACK_150`
+
+Before flipping them, set these seven sandbox copies. The legacy classifier
+maps pro monthly, pro annual, and founder lifetime today; the craft and
+credit-pack copies are still required so those ids are stored off the shared
+live names before the flip:
+
+1. `PADDLE_SANDBOX_PRICE_PRO_MONTHLY`
+2. `PADDLE_SANDBOX_PRICE_PRO_ANNUAL`
+3. `PADDLE_SANDBOX_PRICE_CRAFT_MONTHLY`
+4. `PADDLE_SANDBOX_PRICE_CRAFT_ANNUAL`
+5. `PADDLE_SANDBOX_PRICE_FOUNDER_LIFETIME`
+6. `PADDLE_SANDBOX_PRICE_CREDIT_PACK_50`
+7. `PADDLE_SANDBOX_PRICE_CREDIT_PACK_150`
+
+Also required, and not set by this repository: `PAYMENTS_ENVIRONMENT=live`,
+`PAYMENTS_LIVE_WEBHOOK_SECRET`, and a live Paddle notification whose URL is the
+`payments-webhook` function with `?env=live` (omitting `env` selects sandbox).
+`PADDLE_ENVIRONMENT` stays `sandbox` permanently; `paddle-webhook` returns 403
+otherwise.
+
+### Checkout-disabled artifact (no deploy)
+
+Rollback order, before any production publish:
+
+1. The workflow `Checkout-disabled rollback artifact` builds with
+   `VITE_CHECKOUT_DISABLED="true"` (process env, so the prebuild restore of
+   `.env.production` does not drop the switch) and runs
+   `scripts/verify-checkout-disabled-bundle.mjs`. The receipt artifact
+   `checkout-disabled-rollback-receipt` must show the paused copy and no
+   `Paddle.Initialize`, `Paddle.Checkout.open`, or `Paddle.Environment.set`
+   in the client bundle. That job does not deploy.
+2. The deployable rollback remains a pinned commit that appends
+   `VITE_CHECKOUT_DISABLED="true"` to `.env.production` on a branch that is
+   never merged, built with `bun run build`, and verified the same way.
+   Publishing that commit is a separate owner approval. This pull request
+   does not publish it.
+3. Do not flip `PAYMENTS_ENVIRONMENT` back to `sandbox` as the rollback.
+
 ## Release gate — every box must be green before "ready"
 
 1. [ ] Production project confirmed = `knkwiiywfkbqznbxwqfh` (re-run identity checks above)

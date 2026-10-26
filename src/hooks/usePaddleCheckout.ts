@@ -26,7 +26,7 @@ import {
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
-import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
+import { CHECKOUT_PAUSED_MESSAGE, type PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
@@ -149,6 +149,15 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
 
   const openCheckout = useCallback(
     async (options: OpenCheckoutOptions) => {
+      // Constant kill switch so a checkout-disabled production build drops
+      // Paddle.Checkout.open below. Exact "true" only.
+      if (import.meta.env.VITE_CHECKOUT_DISABLED === "true") {
+        setBlockedReasonCode(null);
+        setBlockedScope("checkout");
+        setBlockedReason(CHECKOUT_PAUSED_MESSAGE);
+        return;
+      }
+
       // Fail-closed gate BEFORE any auth redirect: if checkout cannot run
       // here, we must not detour the user to /auth and then dead-end.
       const env = resolvePaddleCheckout();

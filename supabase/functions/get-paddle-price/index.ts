@@ -12,6 +12,10 @@ import {
   PAID_PLAN_IDS,
 } from "../_shared/lib/lib/paidPlanAllowlist.ts";
 import { creditPackPurchaseEligible } from "../_shared/lib/lib/creditPackEligibility.ts";
+import {
+  GET_PADDLE_PRICE_PLAN_IDS,
+  readGetPaddlePriceCatalog,
+} from "../_shared/getPaddlePriceCatalogEnv.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
@@ -47,21 +51,16 @@ import { creditPackPurchaseEligible } from "../_shared/lib/lib/creditPackEligibi
  * below throws if a plan id is added to the shared allowlist without a
  * corresponding env-var wiring here.
  */
-const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
-  pro_monthly: Deno.env.get("PADDLE_PRICE_PRO_MONTHLY") ?? "",
-  pro_annual: Deno.env.get("PADDLE_PRICE_PRO_ANNUAL") ?? "",
-  craft_monthly: Deno.env.get("PADDLE_PRICE_CRAFT_MONTHLY") ?? "",
-  craft_annual: Deno.env.get("PADDLE_PRICE_CRAFT_ANNUAL") ?? "",
-  founder_lifetime: Deno.env.get("PADDLE_PRICE_FOUNDER_LIFETIME") ?? "",
-  credit_pack_50: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_50") ?? "",
-  credit_pack_150: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_150") ?? "",
-};
+const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = readGetPaddlePriceCatalog((name) =>
+  Deno.env.get(name),
+);
 
 // Cold-start drift guard: fail loudly if PAID_PLAN_IDS gains an entry that
 // SERVER_PRICE_CONFIG doesn't wire an env var for. Silent absence here would
 // otherwise fail-closed only after a checkout attempt.
+const wiredPlanIds: ReadonlySet<string> = new Set(GET_PADDLE_PRICE_PLAN_IDS);
 for (const id of PAID_PLAN_IDS) {
-  if (!(id in SERVER_PRICE_CONFIG)) {
+  if (!(id in SERVER_PRICE_CONFIG) || !wiredPlanIds.has(id)) {
     throw new Error(`SERVER_PRICE_CONFIG missing env wiring for plan id: ${id}`);
   }
 }

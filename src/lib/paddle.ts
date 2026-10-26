@@ -303,6 +303,12 @@ export async function initializePaddle(): Promise<void> {
   if (paddleInitialized) return;
   if (paddleInitPromise) return paddleInitPromise;
 
+  // Constant kill switch so a checkout-disabled production build drops the
+  // Paddle.js init that follows. Exact "true" only, same as the runtime flag.
+  if (import.meta.env.VITE_CHECKOUT_DISABLED === "true") {
+    throw new PaddleCheckoutUnavailableError(CHECKOUT_PAUSED_MESSAGE);
+  }
+
   // Fail closed before loading Paddle.js unless checkout resolved to sandbox
   // or live. A live token resolves live only on a production hostname.
   const env = resolvePaddleCheckout();

@@ -69,6 +69,18 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### LIVE-CHECKOUT-2497-REBASE
+
+```text
+TASK LIVE-CHECKOUT-2497-REBASE  priority: P1  status: OPEN
+goal: Draft-only replay of closed PR #2497 onto current verdant-grow-diary, plus the seven live price names, seven sandbox copies, and a no-deploy checkout-disabled bundle receipt.
+why: Live checkout code existed only on the closed #2497 branch. The release hold stays until Cheeko approves secrets, deploys, webhook registration, merge, and one real purchase.
+branch: cursor/live-checkout-2497-rebase-c00d
+base: verdant-grow-diary
+claimed_by: Cursor Grok cloud agent, 2026-10-26
+resume here: draft PR only. Do not merge, deploy, set secrets, register webhooks, or lift the release hold. claude/* branches are untouched.
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

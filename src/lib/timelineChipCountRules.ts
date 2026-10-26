@@ -14,6 +14,8 @@
  */
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import { isTimelineSensorDerivedDiaryId } from "@/lib/timelineManualSensorMeasurementRules";
+import { ACTION_OUTCOME_DEFAULT_NOTES } from "@/lib/actionOutcomeRules";
+import { QUICK_LOG_MANUAL_READINGS_NOTE } from "@/constants/quickLogGeneratedNoteCopy";
 
 export const EMPTY_TIMELINE_DIARY_PHOTO_IDS: ReadonlySet<string> = new Set();
 
@@ -171,11 +173,15 @@ export function applyTimelineDiaryPhotoEdit(
           )
         : null;
     const samePath = prior?.kind === "storage" && prior.path === ref.path;
+    // An unchanged path keeps its signed URL only when it has one. One still
+    // unsigned (an earlier edit's signing in flight, or a load whose signing
+    // is superseded by this edit) must be signed again, or it stays blank.
+    const keepSignedUrl = samePath && !!before.photo_url;
     return {
-      photo_url: samePath ? before.photo_url : null,
+      photo_url: keepSignedUrl ? before.photo_url : null,
       photoReferenceSource: "details",
       photoIds: withId(true),
-      signStoragePath: samePath ? null : ref.path,
+      signStoragePath: keepSignedUrl ? null : ref.path,
     };
   }
   return {
@@ -184,6 +190,48 @@ export function applyTimelineDiaryPhotoEdit(
     photoIds: withId(false),
     signStoragePath: null,
   };
+}
+
+/**
+ * Whether a row still references `signedPath`, the private path a diary read
+ * asked to sign. An edit saved while that signing was in flight may have
+ * moved the details photo to another path, replaced it with an external URL
+ * or removed it; the late signed URL must then not overwrite the row (nor
+ * put a removed photo back in Photos). A top-level reference is untouched by
+ * a details edit and stays current.
+ */
+export function timelineSignedPhotoPathStillCurrent(
+  row: Pick<TimelineDiaryPhotoEditRow, "details" | "photoReferenceSource">,
+  signedPath: string,
+  viewerUserId: string | null,
+): boolean {
+  const source = row.photoReferenceSource ?? null;
+  if (source === "top") return true;
+  if (source !== "details") return false;
+  const ref = parseDiaryPhotoDisplayReferenceFromRow(
+    { photo_url: null, details: row.details },
+    { viewerUserId },
+  );
+  return ref.kind === "storage" && ref.path === signedPath;
+}
+
+/**
+ * Apply a diary read's initial signed URL to a row. The row is returned
+ * unchanged when the read returned no URL for the path (a partial batch must
+ * not erase a newer URL an edit already signed) or when the row no longer
+ * references the path (an edit moved or removed the photo).
+ */
+export function applyTimelineInitialSignedPhoto<
+  T extends Pick<TimelineDiaryPhotoEditRow, "details" | "photoReferenceSource" | "photo_url">,
+>(
+  row: T,
+  signedPath: string,
+  signedUrl: string | null | undefined,
+  viewerUserId: string | null,
+): T {
+  if (typeof signedUrl !== "string" || signedUrl.length === 0) return row;
+  if (!timelineSignedPhotoPathStillCurrent(row, signedPath, viewerUserId)) return row;
+  return { ...row, photo_url: signedUrl };
 }
 
 /**
@@ -262,4 +310,39 @@ export function timelineEntryCountsAsPhoto(
 ): boolean {
   if (entry.photo_url) return true;
   return diaryPhotoIds.has(entry.id);
+}
+
+/**
+ * The exact placeholder the Quick Log save RPCs store for an empty note
+ * (`COALESCE(NULLIF(btrim(p_note), ''), '(quick log)')`). A grower can type
+ * "(Quick Log)" themselves, and that text is kept, so only this literal is a
+ * placeholder (Codex P2 on #2404 at f504938c).
+ */
+const QUICK_LOG_STORED_PLACEHOLDER = "(quick log)";
+
+/**
+ * Text Verdant writes when the grower typed nothing: the Quick Log RPC
+ * placeholder; Plant Quick Log's manual-readings fallback
+ * (`QUICK_LOG_MANUAL_READINGS_NOTE`, shared with its writer); the photo
+ * fallback `QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE` and video fallback
+ * `QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE`; and the action-outcome default notes
+ * (`ACTION_OUTCOME_DEFAULT_NOTES`). The photo and video writer modules import
+ * the Supabase client, so those two strings are repeated here and pinned to
+ * the writers' exports by test. Codex P1 on #2453 at
+ * 1b2ea901; review of #2464 at 5be715ec.
+ */
+export const GENERATED_NOTE_TEXTS: ReadonlySet<string> = new Set([
+  QUICK_LOG_STORED_PLACEHOLDER,
+  "Photo attached from Quick Log.",
+  "Video attached from Quick Log.",
+  QUICK_LOG_MANUAL_READINGS_NOTE,
+  ...Object.values(ACTION_OUTCOME_DEFAULT_NOTES),
+]);
+
+/**
+ * True when a diary entry carries grower-written note text: not blank, and not
+ * text a Quick Log writer generated because the note was left empty.
+ */
+export function timelineEntryHasNoteText(note: unknown): boolean {
+  return typeof note === "string" && !GENERATED_NOTE_TEXTS.has(note) && note.trim().length > 0;
 }

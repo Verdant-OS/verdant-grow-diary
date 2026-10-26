@@ -81,5 +81,7 @@ public/version.json
 /.wrangler/deploy/config.json
 
 # Local scratch written by the simple-workflow agent plugin (session logs, plans).
-# Anchored to the checkout root so a nested package can keep its own .simple-workflow.
-/.simple-workflow
+# Its session-start hook re-appends these two exact lines whenever either is missing, so
+# keep both verbatim: the slash form matches the directory, the bare form a worktree symlink.
+.simple-workflow/
+.simple-workflow

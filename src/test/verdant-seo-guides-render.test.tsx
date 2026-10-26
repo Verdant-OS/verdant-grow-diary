@@ -268,8 +268,15 @@ describe("/guides/:slug detail — public render", () => {
     expect(document.head.querySelectorAll("script[data-page-ldjson]")).toHaveLength(0);
   });
 
-  it("omits Article schema when a legacy guide has no verified publication date", () => {
-    expect(readStaticRouteJsonLd("/guides/grow-diary-app", "Article")).toBeNull();
+  it("emits Article schema without a publication date when the guide has none", () => {
+    const article = readStaticRouteJsonLd("/guides/grow-diary-app", "Article") as {
+      "@type"?: string;
+      datePublished?: string;
+      dateModified?: string;
+    } | null;
+    expect(article?.["@type"]).toBe("Article");
+    expect(article).not.toHaveProperty("datePublished");
+    expect(article).not.toHaveProperty("dateModified");
   });
 
   it("moves keyboard focus to the deep-linked FAQ accordion item", async () => {

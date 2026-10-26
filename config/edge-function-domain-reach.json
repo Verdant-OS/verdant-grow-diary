@@ -140,9 +140,9 @@
     },
     "paddle-portal-session": {
       "domain": "money",
-      "tables": ["subscriptions"],
+      "tables": ["paddle_customers", "subscriptions"],
       "rpcs": [],
-      "justification": "Single-domain."
+      "justification": "Reads the authenticated caller's subscription and matching environment-scoped Paddle customer mirror before creating a customer portal session. Single money domain; no customer writes."
     },
     "paddle-webhook": {
       "domain": "money",

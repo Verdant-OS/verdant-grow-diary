@@ -30,6 +30,22 @@ function formatFahrenheit(celsius: number): string {
   return `${Number.isInteger(f) ? f.toFixed(0) : f.toFixed(1)}°F`;
 }
 
+/**
+ * Rewrite only "Reading at <ISO>." to the local date/time. Safe for free-text
+ * notes that copy an alert reason (action reasons, Action Queue trace notes):
+ * it leaves every other character, including grower-typed units, untouched.
+ */
+export function localizeReadingAtTimestamps(
+  text: string | null | undefined,
+  formatTimestamp: (date: Date) => string = defaultAlertTimestampFormatter,
+): string {
+  if (typeof text !== "string" || text === "") return "";
+  return text.replace(READING_AT_RE, (whole, iso: string) => {
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) ? `Reading at ${formatTimestamp(new Date(ms))}.` : whole;
+  });
+}
+
 export function formatAlertReasonForDisplay(
   reason: string | null | undefined,
   options: {
@@ -38,11 +54,7 @@ export function formatAlertReasonForDisplay(
   },
 ): string {
   if (typeof reason !== "string" || reason === "") return "";
-  const formatTimestamp = options.formatTimestamp ?? defaultAlertTimestampFormatter;
-  let text = reason.replace(READING_AT_RE, (whole, iso: string) => {
-    const ms = Date.parse(iso);
-    return Number.isFinite(ms) ? `Reading at ${formatTimestamp(new Date(ms))}.` : whole;
-  });
+  let text = localizeReadingAtTimestamps(reason, options.formatTimestamp);
   if (options.temperatureUnit === "fahrenheit") {
     text = text.replace(CELSIUS_RE, (whole, value: string) => {
       const c = Number(value);

@@ -1079,7 +1079,7 @@ async function connectMqttClient(env: RuntimeEnv): Promise<any> {
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
     console.error(
-      "[ecowitt-mqtt-runner] mqtt package not installed. Run `bun add mqtt` or use --dry-run --sample.",
+      "[ecowitt-mqtt-runner] mqtt package not installed. Run `bun add --no-save mqtt` or use --dry-run --sample.",
     );
     process.exit(2);
   }

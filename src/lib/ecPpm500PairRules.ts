@@ -21,6 +21,15 @@ export type EcPpm500Resolution =
   | { readonly status: "mismatch"; readonly ec: null };
 
 const PLAIN_NON_NEGATIVE_DECIMAL = /^(?:\d+(?:\.\d*)?|\.\d+)$/;
+const EXPLICIT_NEGATIVE_DECIMAL = /^-(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/** A typed negative number, as opposed to blank or non-numeric text. */
+export function isExplicitNegativeDecimal(raw: string | null | undefined): boolean {
+  const trimmed = raw?.trim() ?? "";
+  if (!EXPLICIT_NEGATIVE_DECIMAL.test(trimmed)) return false;
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value < 0;
+}
 
 function parseNonNegativeDecimal(raw: string): number | null {
   const trimmed = raw.trim();

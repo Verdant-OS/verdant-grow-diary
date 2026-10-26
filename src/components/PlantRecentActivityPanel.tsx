@@ -24,7 +24,9 @@ import {
   describeQuickLogDetailsFromExtras,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
+import { enrichPlantFeedingDiaryRows } from "@/lib/plantFeedingDisplayRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -188,13 +190,20 @@ function EntryRow({
   );
 }
 
+function withLocalReadingTimestamp<T>(row: T): T {
+  const note = (row as { note?: unknown })?.note;
+  return typeof note === "string" ? { ...row, note: localizeReadingAtTimestamps(note) } : row;
+}
+
 export default function PlantRecentActivityPanel({ plantId, plantName }: Props) {
   const enabled = !!plantId;
   const temperatureUnit = useTemperatureUnitPreference();
   const { data, isLoading, isError, isFetching, refetch, isPending, fetchStatus } =
     usePlantRecentActivity(plantId);
-  const rawRows = enabled ? (data ?? []) : [];
-  const rows = buildPlantRecentActivity(rawRows, {
+  const rawRows = enabled ? enrichPlantFeedingDiaryRows(data ?? []) : [];
+  // Localize "Reading at <ISO>." on the full note: the rules layer clips the
+  // preview at 140 characters, which can split the timestamp.
+  const rows = buildPlantRecentActivity(rawRows.map(withLocalReadingTimestamp), {
     plantId: plantId ?? null,
   });
   // Structured activity detail (e.g. training technique) is recovered from the
@@ -204,6 +213,8 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   const detailLinesById = new Map<string, readonly QuickLogDetailDisplayLine[]>();
   for (const raw of rawRows as Array<{ id?: unknown; details?: unknown }>) {
     if (typeof raw?.id !== "string") continue;
+    // The nutrient line is already in the enriched note preview; adding a
+    // detail badge for it as well rendered the line name twice.
     const lines = describeQuickLogDetailsFromExtras(raw.details, temperatureUnit);
     if (lines.length > 0) detailLinesById.set(raw.id, lines);
   }

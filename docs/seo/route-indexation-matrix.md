@@ -2,7 +2,7 @@
 
 **Source of truth:** `src/lib/appRouteManifest.ts` in this commit, checked against the mounted route modules by `src/test/helpers/routeManifestSyncHarness.ts`.<br>
 **Live index status:** **NOT_MEASURED.** This file records repository metadata, `public/sitemap.xml`, and `public/robots.txt`. It is not a Search Console measurement and it does not claim what `https://verdantgrowdiary.com` returns.<br>
-**Coverage:** 144 of 144 manifest routes — 42 public, 46 authenticated, 32 operator, 6 internal, and 18 redirects.
+**Coverage:** 145 of 145 manifest routes — 43 public, 46 authenticated, 32 operator, 6 internal, and 18 redirects.
 
 ## Reading the matrix
 
@@ -10,7 +10,7 @@
 - **Build artifacts** from `scripts/generate-seo-artifacts.ts` are `dist/seo-manifest.json` and per-route Open Graph PNGs. That script does not write per-route `index.html` files. There is no root `index.html` in this repository. `fileName` on each document is retained metadata.
 - **Client head** means `usePageSeo` (`src/hooks/usePageSeo.ts`). The default is `index, follow` and a self-canonical. `noindex: true` emits `noindex, follow`. It runs after hydration.
 - **Root shell** is `src/routes/__root.tsx`: `robots` `index, follow`, no canonical link, and sitewide Organization, WebSite, and SoftwareApplication JSON-LD. A route with no `head()` keeps that shell until a client head replaces it.
-- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (52 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
+- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (53 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
 - **robots.txt** crawl rules are separate from meta robots. `src/test/robots-private-route-coverage.test.ts` treats a rule as matching when the path equals it or starts with it. Whether a live crawler fetches a URL is **NOT_MEASURED**.
 - `vercel.json` redirects and the `/unsubscribe` `X-Robots-Tag` header are repository configuration. Whether the live host applies that file is **NOT_MEASURED**.
 
@@ -25,6 +25,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/welcome` — robots `index, follow`; sitemap yes; canonical `/welcome`
 - `/pricing` — robots `index, follow`; sitemap yes; canonical `/pricing`
 - `/guides/grow-stage-care-guide` — robots `index, follow`; sitemap yes; canonical `/guides/grow-stage-care-guide`
+- `/guides/advanced-nutrients-feeding-chart-log` — robots `index, follow`; sitemap yes; canonical `/guides/advanced-nutrients-feeding-chart-log`
 - `/tools/blueprint-targets` — robots `index, follow`; sitemap yes; canonical `/tools/blueprint-targets`
 - `/tools/grow-help-toolkit` — robots `index, follow`; sitemap yes; canonical `/tools/grow-help-toolkit`
 - `/tools/vpd-calculator` — robots `index, follow`; sitemap yes; canonical `/tools/vpd-calculator`
@@ -110,7 +111,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 
 - Guide documents (`buildStaticGuideJsonLd`) emit WebPage, FAQPage, and BreadcrumbList. Article is added only when `publishedOn` is set. These 7 guides set it: `/guides/cannabis-grow-light-distance-and-schedule`, `/guides/cannabis-light-stress-light-burn-bleaching-or-heat`, `/guides/oreoz-vs-gelonade-comparison`, `/guides/cannabis-leaf-symptoms`, `/guides/cannabis-leaves-turning-yellow`, `/guides/cannabis-leaf-spots-lesions`, `/guides/cannabis-burnt-crispy-leaf-tips`.
 - No cultivar detail document is indexable today. `buildStaticCultivarJsonLd` still gives each `/cultivars/<slug>` document WebPage, a cultivar collection node, FAQPage, BreadcrumbList, and Article, but all ten are `noindex, follow` (see the inventory), so that schema is not on an indexable document. It would be once a slug reaches `reviewed` or `verified`. The `/cultivars` hub document is indexable and uses the default WebPage node.
-- `/guides` emits WebPage, FAQPage, and BreadcrumbList. `/guides/:slug` is the manifest pattern for `VERDANT_SEO_GUIDES` (28 slugs). `/guides/grow-stage-care-guide` is its own manifest route and its own document.
+- `/guides` emits WebPage, FAQPage, and BreadcrumbList. `/guides/:slug` is the manifest pattern for `VERDANT_SEO_GUIDES` (28 slugs). `/guides/grow-stage-care-guide` is its own manifest route and its own document. `/guides/advanced-nutrients-feeding-chart-log` emits WebPage, Article, FAQPage, BreadcrumbList, and WebApplication. It stores nothing.
 - `/tools/blueprint-targets` emits WebPage, FAQPage, and BreadcrumbList. `/quick-log` emits WebPage, SoftwareApplication, and FAQPage. Other acquisition documents in the inventory use the default WebPage node unless the row above says otherwise.
 - `/cultivars` with a non-empty query string is a client `noindex, follow` variant (`buildCultivarsIndexSeo` in `src/lib/cultivarIndexSeoRules.ts`). The canonical stays `/cultivars`. Those query URLs are not sitemap locs. The clean `/cultivars` document stays `index, follow`.
 
@@ -139,9 +140,9 @@ These manifest paths are public and are not in `STATIC_PUBLIC_OUTPUT_DOCUMENTS`.
 
 Every public manifest path, with or without a static document. `/cultivars/:slug` and `/guides/:slug` are patterns; their concrete paths are inventory lines.
 
-Manifest paths (`access: "public"`, 42):
+Manifest paths (`access: "public"`, 43):
 
-`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/feedback`; `/founder`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/grow-stage-care-guide`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/welcome`.
+`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/feedback`; `/founder`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/grow-stage-care-guide`; `/guides/advanced-nutrients-feeding-chart-log`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/welcome`.
 
 ## Authenticated routes — sitemap excluded, robots.txt disallowed
 

@@ -17,6 +17,14 @@ import {
   VERDANT_SEO_GUIDES,
 } from "../../constants/verdantSeoContent";
 import {
+  FEED_LOG_FAQ,
+  feedLogWebApplicationJsonLd,
+  PUBLIC_FEED_LOG_DESCRIPTION,
+  PUBLIC_FEED_LOG_H1,
+  PUBLIC_FEED_LOG_PATH,
+  PUBLIC_FEED_LOG_TITLE,
+} from "../publicFeedLogRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -557,6 +565,39 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
           },
         ],
       }),
+    ],
+  }),
+  publicDocument(PUBLIC_FEED_LOG_PATH, {
+    title: `${PUBLIC_FEED_LOG_TITLE} | Verdant Grow Diary`,
+    description: PUBLIC_FEED_LOG_DESCRIPTION,
+    imageAlt: "Blank Advanced Nutrients feeding chart log template, planned vs actual by week",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${PUBLIC_FEED_LOG_TITLE} | Verdant Grow Diary`,
+        description: PUBLIC_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${PUBLIC_FEED_LOG_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: PUBLIC_FEED_LOG_H1,
+        description: PUBLIC_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${PUBLIC_FEED_LOG_PATH}`,
+        datePublished: "2026-10-24",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${PUBLIC_FEED_LOG_PATH}`,
+        questions: FEED_LOG_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Advanced Nutrients feeding chart log",
+            url: `${VERDANT_SITE_ORIGIN}${PUBLIC_FEED_LOG_PATH}`,
+          },
+        ],
+      }),
+      feedLogWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${PUBLIC_FEED_LOG_PATH}`),
     ],
   }),
   publicDocument("/tools/blueprint-targets", {

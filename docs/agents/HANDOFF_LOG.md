@@ -69,6 +69,38 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### FEED-LOG-PUBLIC-GUIDE
+
+```text
+TASK FEED-LOG-PUBLIC-GUIDE  priority: other  status: OPEN
+goal: Ship the public Advanced Nutrients planned-vs-actual feed log at /guides/advanced-nutrients-feeding-chart-log as a draft PR. No merge and no deploy.
+why: The standalone HTML log needs the same public-route, sitemap, and consent-gated analytics pattern as the other guides, with no browser or server storage.
+branch: cursor/advanced-nutrients-feed-log-b938
+base: verdant-grow-diary
+checkout: git fetch origin cursor/advanced-nutrients-feed-log-b938 verdant-grow-diary && git switch cursor/advanced-nutrients-feed-log-b938
+pr: NOT_MEASURED until the draft is opened
+head_sha: NOT_MEASURED until the first push
+state: local only
+current_step: tests for rules, page, and analytics are green locally; typecheck passed with NODE_OPTIONS=--max-old-space-size=8192
+next_action: push the branch, open the draft PR, and wait for the 35 required checks
+post_merge_check: NOT_APPLICABLE until merge is requested
+active_writer: cursor cloud agent on cursor/advanced-nutrients-feed-log-b938
+decisions: Planned amounts start blank. The page does not embed manufacturer dosages. Tolerance default is ±10% and is labeled as the grower's tolerance. Analytics events are feed_log_* and fire only when readAnalyticsConsent() is granted.
+tried_and_rejected: A first test draft assumed a different rules API (worked-example rows and ml/L chart constants). The shipped rules module uses FeedLogState and blank cells, so the tests were rewritten to that API.
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/public-feed-log-rules.test.ts src/test/public-feed-log-page.test.tsx src/test/public-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx
+files_touched: src/lib/publicFeedLogRules.ts src/lib/publicFeedLogAnalytics.ts src/pages/PublicFeedLog.tsx src/routes/guides.advanced-nutrients-feeding-chart-log.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts public/sitemap.xml docs/seo/route-indexation-matrix.md src/pages/GuidesIndex.tsx src/constants/verdantSeoContent.ts scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts src/test/public-feed-log-*.ts src/test/public-feed-log-page.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx
+files_remaining: none for the draft
+blockers: required CI is NOT_MEASURED until the draft PR runs
+open_questions: none
+gotchas: The page keeps Fahrenheit in the temperature column. CSV and copy do not claim the log is saved. Signup CTAs go to /auth?mode=signup.
+links: uploads brief 2026-10-24-advanced-nutrients-feeding-log
+reviewer: NOT_MEASURED
+review_sha: NOT_MEASURED
+session_state: cursor cloud agent implementing the public guide
+resume here: after the draft PR URL and head SHA are known, record them in this block and watch the 35 required checks
+last_updated: 2026-10-26
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

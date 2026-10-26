@@ -160,6 +160,17 @@ export default function GuidesIndex() {
             </li>
           ))}
           <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/advanced-nutrients-feeding-chart-log" className="block">
+              <h3 className="font-semibold text-lg">
+                Advanced Nutrients feeding chart log: planned vs actual
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Record what you actually fed against the official chart. The page does not store the
+                numbers.
+              </p>
+            </Link>
+          </li>
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
             <Link to="/guides/grow-stage-care-guide" className="block">
               <h3 className="font-semibold text-lg">
                 Grow-stage care guide: seedling, veg, and flower checklists

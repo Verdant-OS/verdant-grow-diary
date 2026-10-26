@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PLANT-HASH-SCROLL-OFFSET
+
+```text
+TASK PLANT-HASH-SCROLL-OFFSET  priority: other  status: OPEN
+goal: Give every plant-detail hash target the same sticky-header scroll offset (scroll-mt-16) before PR #2285 switches landings to scrollIntoView block start.
+why: Independent review of #2285 found #plant-harvest-evidence has no scroll-mt-16, and could not locate the plant-recent-activity target.
+branch: cursor/plant-hash-scroll-offset-509a
+base: verdant-grow-diary
+checkout: git fetch origin cursor/plant-hash-scroll-offset-509a verdant-grow-diary && git switch cursor/plant-hash-scroll-offset-509a && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft opened from this branch; read the PR URL from GitHub after the first push
+head_sha: read origin/cursor/plant-hash-scroll-offset-509a after push
+state: implemented; draft after push
+current_step: harvest trigger and recent-activity card both carry scroll-mt-16; rendered-page test covers every mapped id
+next_action: Keep the PR draft. Do not merge. Do not touch claude/plant-hash-scroll-align-top or PR #2285.
+post_merge_check: bunx vitest run src/test/plant-detail-hash-scroll-offset.test.tsx — a failure reopens this slice with the same owner
+active_writer: Cursor Grok cloud agent (this session)
+decisions: plant-recent-activity is rendered on the Card in PlantRecentActivityPanel (also mounted from the archived timeline view). It already had scroll-mt-20; change it to scroll-mt-16 so the offset matches the other mapped targets. Add scroll-mt-16 on the disclosure trigger only when it owns an anchor id (harvest evidence). Export PLANT_DETAIL_KNOWN_ANCHOR_IDS for the regression test.
+tried_and_rejected: none
+commands: bunx vitest run src/test/plant-detail-hash-scroll-offset.test.tsx src/test/plant-detail-disclosure-section.test.tsx src/test/plant-detail-disclosure-rules.test.ts --reporter=dot
+files_touched: src/components/PlantDetailDisclosureSection.tsx; src/components/PlantRecentActivityPanel.tsx; src/lib/plantDetailDisclosureRules.ts; src/test/plant-detail-hash-scroll-offset.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: Do not edit claude/plant-hash-scroll-align-top. scroll-mt-16 is a 4rem offset; replacing scroll-mt-20 on the recent-activity card changes that margin by 1rem under the current center alignment.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2285
+artifacts: src/test/plant-detail-hash-scroll-offset.test.tsx
+reviewer_seat: not requested; this session authored the change
+reviewer_sha: none
+session_state: Cursor cloud agent; draft only; no merge
+claimed_by: Cursor Grok cloud agent, 2026-10-26
+owner: Cursor Grok cloud agent
+last_updated: 2026-10-26 12:16 CT, by Cursor Grok cloud agent
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

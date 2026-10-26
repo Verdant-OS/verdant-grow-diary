@@ -771,7 +771,7 @@ function wireControls() {
   $("undoSaved").onclick = undoSaved;
   $("returnToday").onclick = () => goToIndex(TODAY_INDEX);
   $("histRange").oninput = (e) => goToIndex(Number(e.target.value));
-  $("histPrev").onclick = () => goToIndex(state.viewIndex - 1);
+  $("histPrev").onclick = () => goToIndex(Math.max(0, state.viewIndex - 1));
   $("histNext").onclick = () => goToIndex(state.viewIndex + 1);
   $("dlgCancel").addEventListener("close", () => {
     if ($("dlgCancel").returnValue === "discard") discardDraft();

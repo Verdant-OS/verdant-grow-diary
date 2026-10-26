@@ -21,13 +21,37 @@ Supabase access, no real diary writes, no sensors, no billing, no Action Queue.
 No install step. From the repository root:
 
 ```bash
-node --test spikes/tent-garden-prototype/test/*.check.mjs   # 33 checks
+node --test spikes/tent-garden-prototype/test/*.check.mjs   # 94 checks
 cd spikes/tent-garden-prototype && python3 -m http.server 8081
 # open http://127.0.0.1:8081/
 ```
 
 Any static file server works. Three.js `0.170.0` loads as a pinned ES module from
 jsDelivr via the import map in `index.html`; nothing else is fetched.
+
+### Earlier boundary verification (2026-10-26)
+
+Earlier now stays on the oldest recorded snapshot instead of sending `-1` to
+`goToIndex` and jumping to Today. The caller clamps that step to zero; the existing
+`pointAt(-1) -> Today` fallback and all nine original check scripts are unchanged.
+
+- Published baseline `67bc60eff04b470afa8979dd743fc228a34082e7`: 89 passed, 0 failed,
+  0 skipped across the nine existing scripts.
+- After normal integration of deploy `e18e067af80fcb3eb32b37f1e046fa725bba8a9d`
+  (merge `bfeee39d298d9e270ffc8a8cebe4e1cef0039e66`), the new boundary file failed
+  1 of 5 cases on unchanged prototype source: Earlier moved index 0 to Today at index 2.
+- With the one-line caller repair: all ten scripts pass, 94 passed / 0 failed /
+  0 skipped. The five new cases cover repeated Earlier at the oldest snapshot,
+  normal arrow traversal, slider/Return To Today bindings, empty recorded history,
+  and preservation of an unsaved edit draft.
+
+The new check executes the actual control bindings and `goToIndex` source with the
+real history rules. Directly importing this standalone UI would initialize the DOM
+and CDN-backed scene, so only DOM lookup, rendering and toast are replaced in the
+Node harness; the assertions check the resulting navigation state. This is local
+code verification, not browser, phone, production or independent acceptance.
+Claude's prototype authorship is retained; Codex authored this bounded repair.
+Child #2240 and the D1–D4 integration decisions remain unchanged.
 
 ### Why the CDN import, and the bounded dependency proposal
 

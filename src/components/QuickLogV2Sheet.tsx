@@ -628,6 +628,7 @@ function QuickLogV2SheetForOwner({
   // during the same tick.
   const saveInFlightRef = useRef(false);
   const observationDraftSuppressedRef = useRef(false);
+  const observationUnconfirmedRef = useRef(false);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
   // previous saved-summary state. Bumped whenever the grower starts
   // a new logical submission from the same open sheet.
@@ -1179,7 +1180,8 @@ function QuickLogV2SheetForOwner({
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
-      if (storedDraft?.idempotencyKey) {
+      observationUnconfirmedRef.current = Boolean(storedDraft?.saveFailed);
+      if (storedDraft?.saveFailed && storedDraft.idempotencyKey) {
         saveIdempotencyKeyRef.current = storedDraft.idempotencyKey;
       }
       setRecentSuggestionDismissed(false);
@@ -1203,20 +1205,10 @@ function QuickLogV2SheetForOwner({
     if (!open || postSave || isQuickLogObservationDraftEmpty(form)) return;
     writeBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
       form,
-      saveFailed: Boolean(localError),
-      idempotencyKey: saveIdempotencyKeyRef.current,
+      saveFailed: observationUnconfirmedRef.current,
+      idempotencyKey: observationUnconfirmedRef.current ? saveIdempotencyKeyRef.current : null,
     });
   }, [user?.id, open, form, postSave, localError]);
-
-  useEffect(() => {
-    if (!open || !user?.id || observationDraftSuppressedRef.current) return;
-    const stored = readBrowserSessionFormDraft(
-      user.id,
-      QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
-      parseQuickLogObservationDraft,
-    );
-    if (stored?.saveFailed) setLocalError(QUICK_LOG_OBSERVATION_SAVE_ERROR);
-  }, [open, user?.id]);
 
   // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
   // Only when selectedKey is still empty/unset — never rewrite an explicit
@@ -2467,6 +2459,11 @@ function QuickLogV2SheetForOwner({
       }
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
+      observationUnconfirmedRef.current =
+        !quickLogSaveRequiresHistoryCheck(reason) &&
+        reason !== "receipt_mismatch" &&
+        reason !== "receipt_unverified" &&
+        reason !== "receipt_target_moved";
       if (quickLogSaveRequiresHistoryCheck(reason) && exactManualSubmission) {
         const movedScope =
           reason === "receipt_target_moved" ? resolveQuickLogConfirmedScope(resolved, res) : null;
@@ -2534,9 +2531,7 @@ function QuickLogV2SheetForOwner({
     // leave the committed server key attached to a new editable draft.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     observationDraftSuppressedRef.current = true;
-    if (user?.id) {
-      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
-    }
+    observationUnconfirmedRef.current = false;
 
     // The log row is committed from here on. Companion-media failures are
     // PARTIAL SUCCESS: the grower's entry is saved and must be presented as
@@ -2670,6 +2665,9 @@ function QuickLogV2SheetForOwner({
         : null;
       if (recoveryClearFailed) setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
       manualRetrySubmissionRef.current = null;
+    }
+    if (user?.id) {
+      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
     }
     const successMessage =
       submissionAction === "water"

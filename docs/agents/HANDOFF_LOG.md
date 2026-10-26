@@ -78,11 +78,11 @@ why: A failed or abandoned setup step was dropping names and notes, and a second
 branch: cursor/setup-quicklog-draft-retry-8b19
 base: verdant-grow-diary
 checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-diary && git switch cursor/setup-quicklog-draft-retry-8b19 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft pull request exists
-head_sha: local only until the first push; refresh this line from git rev-parse HEAD after push
-state: implemented / local only
-current_step: session drafts, plain errors, and retry tests are in the working tree
-next_action: push the branch, open a draft PR against verdant-grow-diary, and read the 35 required checks at that head
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
+head_sha: d5f134b926be9dd1b2569f7e106ff28e350bfb96 at 2026-10-26 11:20 CT; refresh if a later commit moves the head
+state: pushed draft
+current_step: draft PR #2541 is open; required checks are the next measurement
+next_action: read the 35 required checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 at head d5f134b926be9dd1b2569f7e106ff28e350bfb96 and do not merge
 post_merge_check: Full test suite shards and Lint, typecheck, test, build on the merged deploy head; if a required check fails, reopen this task with the same owner
 active_writer: Grok cloud agent on cursor/setup-quicklog-draft-retry-8b19
 decisions: Drafts live in sessionStorage under verdant.session-form.1.{userId}.{formId} and clear only after a confirmed save. Start Your Room reuses one hierarchy row id until that confirmation and blanks a name in the stored draft once its id is set so a later empty form does not inherit a confirmed name. Confirmed Quick Log observation retries keep the same p_idempotency_key, including after remount, by storing that key on the draft. The open-sheet key mint line stays so the existing five-rotation source pin still matches; a stored key overwrites it when present. Viewport coverage is jsdom innerWidth 390 and 1280 because the sheet is not viewport-branched.
@@ -93,7 +93,7 @@ files_remaining: none for this slice
 blockers: none for the code change. Merge, auto-merge, publish, and production writes are out of scope.
 open_questions: none
 gotchas: Do not restore a confirmed grow, tent, or plant name into the stored draft. Do not add another saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignment; quicklog-manual-idempotency-static.test.ts counts five outside the two abandonment functions. Hydrate Start Your Room only after growsLoading is false, and only restore step when draft.ids.growId is still in the grows list. Effects that read ownerId must be declared after const ownerId. Free plan still does not create a grow automatically.
-links: NOT_MEASURED
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
 artifacts: local vitest on the files in commands; typecheck passed with NODE_OPTIONS=--max-old-space-size=8192; lint 0 errors
 reviewer_seat: not requested; independent acceptance is still required before merge
 reviewer_sha: none

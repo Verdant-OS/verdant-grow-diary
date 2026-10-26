@@ -26,8 +26,14 @@ function walk(dir, out = []) {
   return out;
 }
 
-const dist = resolve("dist");
-const files = walk(join(dist, "client"));
+const roots = [resolve(".output/public"), resolve(".output/server")].filter((dir) => {
+  try {
+    return statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
+});
+const files = roots.flatMap((dir) => walk(dir));
 let pausedHits = 0;
 const forbiddenHits = [];
 
@@ -41,10 +47,10 @@ for (const file of files) {
 
 const receipt = {
   checkedAt: new Date().toISOString(),
-  clientJsFiles: files.length,
+  bundleFiles: files.length,
   pausedCopyHits: pausedHits,
   forbiddenHits,
-  pass: pausedHits > 0 && forbiddenHits.length === 0,
+  pass: files.length > 0 && pausedHits > 0 && forbiddenHits.length === 0,
 };
 
 const receiptPath = resolve("checkout-disabled-bundle-receipt.json");

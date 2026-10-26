@@ -223,6 +223,8 @@ function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]
           `<li><a href="/guides/${escapeStaticHtml(candidate.slug)}">${escapeStaticHtml(candidate.h1)}</a></li>`,
       ),
     '<li><a href="/guides">All grower guides</a></li>',
+    '<li><a href="/glossary">Cultivation glossary</a></li>',
+    '<li><a href="/docs/mcp-api">MCP API reference</a></li>',
     '<li><a href="/welcome">See how Verdant works</a></li>',
     '<li><a href="/pricing">Compare Free and Pro pricing</a></li>',
   ].join("");
@@ -346,26 +348,24 @@ function buildStaticWebPageJsonLd(metadata: {
 
 function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
   const url = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
-  const article = guide.publishedOn
-    ? buildArticleJsonLd({
-        headline: guide.h1,
-        description: guide.description,
-        url,
-        datePublished: guide.publishedOn,
-        dateModified: guide.modifiedOn,
-        image: DEFAULT_OG_IMAGE,
-        authorName: "Verdant Grow Diary",
-        publisherName: "Verdant Grow Diary",
-        siteUrl: VERDANT_SITE_ORIGIN,
-      })
-    : null;
+  const article = buildArticleJsonLd({
+    headline: guide.h1,
+    description: guide.description,
+    url,
+    ...(guide.publishedOn ? { datePublished: guide.publishedOn } : {}),
+    ...(guide.modifiedOn ? { dateModified: guide.modifiedOn } : {}),
+    image: DEFAULT_OG_IMAGE,
+    authorName: "Verdant Grow Diary",
+    publisherName: "Verdant Grow Diary",
+    siteUrl: VERDANT_SITE_ORIGIN,
+  });
   return [
     buildStaticWebPageJsonLd({ title: guide.title, description: guide.description, url }),
     buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
     buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url }],
     }),
-    ...(article ? [article] : []),
+    article,
   ];
 }
 
@@ -557,6 +557,14 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
           },
         ],
       }),
+      buildArticleJsonLd({
+        headline: "Grow-stage care guide",
+        description:
+          "A searchable grow-stage care guide with watering, nutrients, environment, and harvest checklists for seedling, vegetative, and flower stages.",
+        url: `${VERDANT_SITE_ORIGIN}/guides/grow-stage-care-guide`,
+        image: DEFAULT_OG_IMAGE,
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
     ],
   }),
   publicDocument("/tools/blueprint-targets", {
@@ -592,19 +600,19 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/tools/grow-help-toolkit", {
     title: "Free Nutrient, Grow Light & Cost Calculators | Verdant",
     description:
-      "Plan nutrient recipes, canopy lighting, electricity and cost per dried saleable gram in one private browser-only toolkit. Formulas and units are shown with every result.",
+      "Plan nutrient recipes, lighting, electricity, and cost per dried gram in a private browser toolkit. Formulas stay visible.",
     imageAlt: "Verdant Grow Help Toolkit calculators",
   }),
   publicDocument("/tools/vpd-calculator", {
     title: "Free Cannabis VPD Calculator by Growth Stage | Verdant",
     description:
-      "Calculate air VPD from manual temperature and humidity inputs, then compare it with a conservative stage-aware range. No upload, live telemetry, diagnosis, or device control.",
+      "Calculate air VPD from manual temperature and humidity, then compare a conservative stage range. No upload or device control.",
     imageAlt: "Verdant VPD calculator",
   }),
   publicDocument("/hardware-integrations", {
     title: "Sensor & Hardware Integrations | Verdant Grow Diary",
     description:
-      "Hardware-neutral Grow OS. Connect Ecowitt, ESP32, MQTT, webhook, or Raspberry Pi sensors read-only, or import CSVs. Bring your own gear — the grower stays in control.",
+      "Hardware-neutral Grow OS. Read Ecowitt, ESP32, MQTT, webhook, or Raspberry Pi sensors, or import CSVs. You stay in control.",
     imageAlt: "Verdant sensor and hardware integrations",
   }),
   publicDocument("/how-ai-doctor-works", {
@@ -622,7 +630,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/quick-log", {
     title: "Free 30-Second Quick Log Starter | Verdant Grow Diary",
     description:
-      "Try the Verdant Quick Log without an account: nickname a plant, jot one note, and keep the draft on your device. Create a free account when you want it in your grow diary.",
+      "Try Quick Log without an account: nickname a plant, jot one note, and keep the draft on your device until you save it.",
     imageAlt: "Verdant 30-second Quick Log starter",
     jsonLd: [
       buildStaticWebPageJsonLd({
@@ -652,7 +660,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/creator-beta", {
     title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
     description:
-      "Controlled beta for serious growers, breeders, and grower-educators. See how Verdant turns plant logs, photos, sensor snapshots, phenotype notes, and lab evidence into one clear plant history.",
+      "Controlled beta for growers, breeders, and educators. Logs, photos, sensors, and phenotype notes become one plant history.",
     imageAlt: "Verdant Creator & Breeder Beta",
   }),
   // Owner adjudication 2026-08-20: /breeder-beta keeps its breeder-oriented
@@ -665,7 +673,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   crossCanonicalDocument("/breeder-beta", "/creator-beta", {
     title: "Verdant Breeder Beta | Verdant Grow Diary",
     description:
-      "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
+      "Controlled beta for breeders and pheno hunters. Lab evidence and sensory notes stay recorded. The breeder decides what advances.",
     imageAlt: "Verdant Breeder Beta",
   }),
   publicDocument("/pheno-comparison", {
@@ -677,7 +685,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/pheno-expression-showcase", {
     title: "Pheno Expression Showcase — Verdant Grow Diary",
     description:
-      "Ten example phenotypes — loud gas, dessert, fruit, yield-monster, frost bomb, and more — laid side by side. Demo data only; Verdant never picks a keeper for you.",
+      "Ten example phenotypes laid side by side. Demo data only. Verdant never picks a keeper for you.",
     imageAlt: "Verdant pheno expression showcase (sample data)",
   }),
   publicDocument("/privacy", {

@@ -66,6 +66,20 @@ function upsertMeta(selector: string, attr: "name" | "property", key: string, co
  */
 const OWNED_ATTR = "data-page-seo-owned";
 
+/** Parameter URLs keep the clean path as the self-canonical. */
+export function stripQueryAndHash(value: string): string {
+  if (value.startsWith("http")) {
+    try {
+      const parsed = new URL(value);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return value;
+    }
+  }
+  const noHash = value.split("#")[0] ?? value;
+  return noHash.split("?")[0] ?? noHash;
+}
+
 function upsertLink(rel: string, href: string) {
   let el = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
   if (!el) {
@@ -92,7 +106,7 @@ export function usePageSeo(seo: PageSeo): void {
   useEffect(() => {
     // `path` still keys the route-owned og:image below; only the canonical
     // identity moves when a variant concedes its ranking URL.
-    const canonicalTarget = canonicalPath ?? path;
+    const canonicalTarget = stripQueryAndHash(canonicalPath ?? path);
     const url = canonicalTarget.startsWith("http")
       ? canonicalTarget
       : `${SITE_ORIGIN}${canonicalTarget}`;

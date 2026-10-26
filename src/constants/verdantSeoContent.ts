@@ -233,7 +233,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Grow log app vs grow journal | Verdant Grow Diary",
     h1: "Grow log app vs grow journal: what serious growers actually need",
     description:
-      "A grow log app captures structured, timestamped, plant-scoped data. A grow journal captures notes. Here is what serious growers actually need — and why plant memory beats loose pages.",
+      "A grow log app stores timestamped, plant-scoped data. A journal stores notes. Plant memory is what serious growers keep.",
     targetKeyword: "grow log app",
     intro:
       "A grow journal is a notebook. A grow log app is a structured, timestamped, plant-scoped record. Both can be useful, but only one of them survives multiple runs and helps you diagnose problems fast. Here is the difference — and why plant memory is the outcome that matters.",
@@ -269,7 +269,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Accurate Grow Room VPD: Sensor & Leaf Checks | Verdant",
     h1: "How to calculate grow room VPD from trustworthy inputs",
     description:
-      "Calculate grow room VPD from verified temperature, humidity, leaf-temperature, placement, and calibration evidence without mistaking an estimate for sensor truth.",
+      "Calculate grow-room VPD from verified temperature, humidity, leaf temperature, and placement. An estimate is not sensor truth.",
     targetKeyword: "grow room VPD tracker",
     intro:
       "A grow room VPD tracker is only as trustworthy as the evidence behind its inputs. VPD is calculated, not directly measured, and it inherits every error in air temperature, relative humidity, leaf-temperature basis, probe placement, and time. A screen can update every minute and still be wrong for the canopy. Treat the result as authoritative only when its inputs have current evidence; otherwise label it air VPD, conditional, stale, or untrusted and verify what is missing before changing the room.",
@@ -654,7 +654,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "AI grow doctor: diagnosis needs evidence | Verdant",
     h1: "AI grow doctor: why good diagnosis needs logs, photos, and sensors",
     description:
-      "Why an AI grow doctor cannot reliably diagnose a plant from one photo — and how Verdant uses logs, photos, and source-labeled sensor context to give cautious, evidence-cited guidance.",
+      "An AI grow doctor cannot diagnose a plant from one photo. Verdant uses logs, photos, and source-labeled sensors, and stays cautious.",
     targetKeyword: "AI grow doctor",
     intro:
       "One photo of a leaf is not enough. An AI grow doctor that answers with confidence from a single image is guessing. Verdant's AI Doctor uses the plant's recent logs, photos, source-labeled sensor snapshots, and stage context — and it will tell you what is missing instead of pretending to know.",
@@ -762,7 +762,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "How to start a grow journal (in 30 seconds) | Verdant Grow Diary",
     h1: "How to start a grow journal without overthinking it",
     description:
-      "How to start a grow journal that survives past week two: one plant, one honest note, and a 30-second first entry you can try without an account — the draft stays on your device until you keep it.",
+      "Start a grow journal that lasts past week two: one plant, one honest note, and a 30-second entry. The draft stays on your device.",
     targetKeyword: "how to start a grow journal",
     intro:
       "Most grow journals die in the first two weeks — not because growers stop caring, but because the format asks for too much. If you are wondering how to start a grow journal that you will actually keep, start smaller than you think: one plant, one nickname, one honest note about what you did or saw today.",
@@ -882,7 +882,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Grow journal template you can use right now | Verdant Grow Diary",
     h1: "A grow journal template that fits in 30 seconds",
     description:
-      "A practical grow journal template: plant, entry type, stage, note, and one number when it matters — usable as an interactive starter in your browser, no account needed.",
+      "A grow journal template: plant, entry type, stage, note, and one number when it matters. Use it in the browser, no account needed.",
     targetKeyword: "grow journal template",
     intro:
       "Most grow journal template downloads are spreadsheets with twenty columns you will stop filling by Friday. A template earns its keep when it is small enough to complete every time: which plant, what kind of entry, what stage, one note, and one number when the entry type calls for it.",
@@ -1374,7 +1374,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Bud rot (Botrytis) identification | Verdant Grow Diary",
     h1: "Bud rot (Botrytis) identification and prevention with sensor history",
     description:
-      "Catch bud rot (Botrytis) early using photos, humidity logs, and VPD history — source-labeled sensor context, not guesswork, so you spot high-risk periods before the canopy is lost.",
+      "Spot bud rot (Botrytis) early with photos, humidity logs, and VPD history. Source-labeled context, not a guess.",
     targetKeyword: "bud rot identification",
     intro:
       "Bud rot identification is a race against a fungus that hides inside the flower before it shows on the outside. Botrytis cinerea thrives when humidity climbs, temperatures drop overnight, and airflow through the canopy stalls. Verdant does not diagnose bud rot for you — but the same plant memory and sensor truth that power the rest of the app make early signs visible, and let you review the humidity and VPD history around the moment things went wrong.",
@@ -1475,7 +1475,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Cannabis nutrient schedule by stage | Verdant Grow Diary",
     h1: "Cannabis nutrient schedule: what plants need at each stage, and how often to feed",
     description:
-      "What cannabis plants need in each stage, how often to feed, and how to read feed vs runoff EC — plus how to recover from nutrient burn. Directional guidance and your own record, not a brand chart.",
+      "What cannabis plants need by stage, how often to feed, and how to read feed versus runoff EC. Your record, not a brand chart.",
     targetKeyword: "cannabis nutrient schedule",
     intro:
       "Most nutrient questions come down to three: what does the plant need right now, how often should I feed it, and what do I do when I have overdone it. The honest answer to all three starts the same way — there is no universal schedule. Cultivar, medium, light intensity, and room temperature all move the target, which is why two growers following the same chart get different results. What travels is the method: feed conservatively, measure what goes in and what comes out, change one thing at a time, and keep a record you can actually compare against.",
@@ -1737,7 +1737,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Oreoz vs Gelonade: pheno expression compared | Verdant",
     h1: "Oreoz vs Gelonade: comparing pheno expression, structure, and what to record per cut",
     description:
-      "A cautious Oreoz vs Gelonade comparison for growers running multiple cuts — reported structure and aroma directions, what public descriptions can't tell you, and the evidence to log per pheno.",
+      "A cautious Oreoz vs Gelonade comparison for growers running multiple cuts: reported structure, aroma, and what to log per pheno.",
     targetKeyword: "oreoz vs gelonade",
     intro:
       "Oreoz vs gelonade searches usually come from one of two places: choosing what to pop next, or trying to work out which cut in a tent is actually worth keeping. Public cultivar descriptions are directional, not predictive — two growers running the same pack can end up with plants that look and smell nothing alike. This comparison stays honest about that. It sets out what is commonly reported for each cultivar, names what those reports do not prove, and shows the per-plant record Verdant keeps so your own phenos, not a marketing blurb, decide the keeper.",
@@ -1942,7 +1942,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Cannabis Leaf Spots and Lesions: Evidence Checks | Verdant",
     h1: "Cannabis leaf spots and lesions: preserve distribution, surfaces, and timing",
     description:
-      "Use an evidence-first checklist for cannabis leaf spots and lesions: distribution, both leaf surfaces, recent inputs, environment, progression, and honest uncertainty.",
+      "An evidence checklist for cannabis leaf spots: distribution, both surfaces, recent inputs, environment, and what stays uncertain.",
     targetKeyword: "cannabis leaf spots",
     intro:
       "Spots and lesions can overlap across physical damage, residue, spray response, pests, pathogens, environment, root-zone problems, and nutrition. A single photograph should not turn that overlap into certainty. Record the distribution and compare how the pattern changes.",

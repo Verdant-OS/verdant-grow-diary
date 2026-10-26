@@ -21,7 +21,7 @@ export default function BreederBeta() {
   usePageSeo({
     title: "Verdant Breeder Beta | Verdant Grow Diary",
     description:
-      "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
+      "Controlled beta for breeders and pheno hunters. Lab evidence and sensory notes stay recorded. The breeder decides what advances.",
     path: "/breeder-beta",
     canonicalPath: "/creator-beta",
   });

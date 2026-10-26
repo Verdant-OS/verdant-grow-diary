@@ -16,7 +16,7 @@ export const PUBLIC_QUICK_LOG_STARTER_COPY = {
   /** Browser-tab / SEO title (brand-suffixed per house convention). */
   seoTitle: "Free 30-Second Quick Log Starter | Verdant Grow Diary",
   seoDescription:
-    "Try the Verdant Quick Log without an account: nickname a plant, jot one note, and keep the draft on your device. Create a free account when you want it in your grow diary.",
+    "Try Quick Log without an account: nickname a plant, jot one note, and keep the draft on your device until you save it.",
   valueLine:
     "No account needed. Nickname a plant, jot what you did or saw, and the draft stays on this device until you decide to keep it.",
   formHeading: "Your first quick log",

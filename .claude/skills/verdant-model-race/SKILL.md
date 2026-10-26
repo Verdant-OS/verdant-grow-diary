@@ -1,6 +1,6 @@
 ---
 name: verdant-model-race
-description: Puts two different model families on the same well-specified Verdant problem in isolated worktrees and lets executed evidence choose the result. Both candidates run the same tests and checks; the one that passes more of them with the smaller, in-scope diff wins, and the loser is discarded. Use for a hard bug fix or a contained implementation where one model's blind spot is a real risk, and only when asked to race it. It never runs an external model CLI without the user's explicit go-ahead for that exact command, never opens two PRs, and is never an independent review.
+description: Puts two different model families on the same well-specified Verdant problem in isolated worktrees and lets executed evidence choose the result. Both candidates run the same tests and checks; only candidates meeting every fence, target, regression and reverse-check criterion qualify, and the smaller in-scope diff wins among qualifying candidates. Use for a hard bug fix or a contained implementation where one model's blind spot is a real risk, and only when asked to race it. It never runs an external model CLI without the user's explicit go-ahead for that exact command, never opens two PRs, and is never an independent review.
 ---
 
 # verdant-model-race — let the evidence pick
@@ -78,8 +78,10 @@ Run the **same** checks in each worktree yourself. Do not trust a racer's own re
 | 4     | Fix set aside → the check fails again | Set-aside-and-rerun, as in `verdant-root-cause` |
 | 5     | Smaller in-scope diff                 | `git diff --stat` against BASE                  |
 
-The first criterion where the two differ decides the race. If both fail criterion 1 or 2,
-there is no winner. Report that, with the evidence, and do not merge pieces by hand.
+Criteria 1–4 are prerequisites for each candidate. Disqualify any candidate that fails one;
+if neither qualifies, there is no winner. Compare the in-scope diffs only among qualifying
+candidates, using criterion 5 when both qualify. Report the result with the evidence, and do
+not merge pieces by hand.
 
 Where the two candidates **disagree in approach**, write the disagreement down even if one
 clearly wins. It marks the spot reviewers should look at.

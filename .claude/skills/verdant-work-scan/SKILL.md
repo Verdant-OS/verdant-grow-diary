@@ -29,7 +29,7 @@ read-only scan of ready and blocked work (see `docs/agents/third-party-agent-ski
 2. `docs/agents/HANDOFF_LOG.md`: every block under **Open**, with its priority, branch, PR,
    head SHA, `claimed_by` and `last_updated`.
 3. GitHub, for each open block's PR and for open PRs in the area: state, draft, head SHA,
-   mergeable state, the 36 required contexts by name (`config/required-status-checks.json`),
+   mergeable state, the current required contexts by name (`config/required-status-checks.json`),
    review threads, and `claimed_by:` or `released_by:` comments.
 4. The deploy branch tip: `git fetch origin verdant-grow-diary && git log -1 origin/verdant-grow-diary`.
 

@@ -45,6 +45,34 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-2086-FOUR-SKILL-INSTRUCTIONS
+
+```text
+TASK CODEX-2086-FOUR-SKILL-INSTRUCTIONS  priority: P2  status: OPEN
+goal: Repair only four prospective instruction defects already present in #2086's new author-side skills.
+why: Future routing named retired seats, work-scan assumed 36 required contexts, root-cause exonerated a branch from a red base check alone, and model-race could select a known-regressing candidate.
+branch: claude/new-session-nms5b8
+base: verdant-grow-diary; instructions read at a22bdec653f63fcd7362ce40d5172789175aceee. No base integration is authorized in this bounded slice.
+checkout: Fetch the existing branch, verify the actual full PR head and effective scoped claim, and use an isolated authorized worktree. Preserve every unrelated hunk and existing hold; do not run a base merge for this slice.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2086
+head_sha: 98b660ab13d2e3087364d1bc5faeb333b20590c8 (verified starting checkpoint; the resulting pushed full head belongs in the current PR packet).
+state: Four bounded text repairs are implemented. Consult the current PR packet for the resulting published head, normal commit/push and fresh CI/review receipts. The register, process-audit, protected scorers and twelve governed files are preserved; this does not complete or accept the whole PR.
+decisions: Route under current OWNERSHIP eligibility; read current context names without a fixed count; compare exact baseline/branch failures; require model-race criteria 1-4 before diff-size selection. Preserve historical register facts and exact-command model-dispatch approval.
+commands: bun install --frozen-lockfile using canonical Bun1.3.14; scoped prettier --check; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 98b660ab13d2e3087364d1bc5faeb333b20590c8 --strict; existing documentation-safety tests; git diff --check. Command receipts, not this list, establish results.
+validation: Canonical frozen setup succeeded with 914 packages. Scoped Prettier, whitespace, strict scorer report, docs-safety (all three categories), automated-phenotyping scanner and release-docs scanner (nine files) passed; three existing documentation test files passed 83/83. Protected/unchanged-file hashes and original handoff bytes were verified. No new test was added for prose. A saved manual model-race counterexample shows both candidates failing the existing no-regressions criterion: the old first-difference rule chose the smaller broken candidate; the corrected prerequisites yield no winner. This is logical instruction evidence, not an empirical model trial or full-PR PASS. Normal-hook/push results belong in the resulting-head PR packet.
+files_touched: .claude/skills/verdant-scope-split/SKILL.md; .claude/skills/verdant-work-scan/SKILL.md; .claude/skills/verdant-root-cause/SKILL.md; .claude/skills/verdant-model-race/SKILL.md; docs/agents/HANDOFF_LOG.md (this block only, required by the current handoff procedure).
+files_remaining: None planned outside this four-skill repair; the remaining #2086 work is explicitly held.
+blockers: Whole #2086 remains blocked on original nine-path grant verification, distinct 36-context/live-settings authority and #1876 ordering/integration. Original grants remain author-attested/NOT_VERIFIED, not disproven. This slice does not clear those conditions.
+next_action: Parent closeout coordinator verifies the resulting full head and actual check/push receipts or records the publication blocker, preserves whole-PR holds, and coordinates the remaining protected/integration authority before outside full-scope acceptance. No setup/hook block permits an alternate tree, bypass or replacement PR.
+active_writer: Codex /root/preflight_2251, session01a16de3-1885-74b8-8142-25b4c333d0cd, only this four-skill slice and its own metadata. No full protected-scope takeover.
+claimed_by: Codex /root/preflight_2251, 2026-10-26 22:34 UTC, https://github.com/Verdant-OS/verdant-grow-diary/pull/2086#issuecomment-6428933142
+reviewer_seat: Eligible non-contributing outside Claude/Grok under current OWNERSHIP; actual assignment NOT_MEASURED and owned by the parent coordinator. Every author/repairer, including all Codex sessions after this repair, is excluded from independent acceptance.
+reviewer_sha: NOT_MEASURED for the resulting repaired head. No full #2086 acceptance, review request, ready transition or queue action is made by this writer.
+release_steps_measured: NOT_MEASURED. No plugin/hook installation, model dispatch, deployment, settings, production or database action is authorized.
+artifacts: /workspace/scratch/claude-closeout-20261026/2086-evidence/; content-2086-six-files-20261026T2230.md; model-race-counterexample.md inside the evidence folder.
+last_updated: 2026-10-26 22:38 UTC, by the bounded Codex documentation writer
+```
+
 ### CLAUDE-CODE-ACTION-002
 
 ```text

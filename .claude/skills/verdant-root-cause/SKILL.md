@@ -40,8 +40,9 @@ SEEN:    <first seen at which SHA or time; "unknown" is allowed>
 Check these before root-causing anything:
 
 1. **Red on the base too?** Run the same check against `origin/verdant-grow-diary`, or read its
-   latest run there. If the base is red, the failure is not this change's. Report it, and look
-   for an existing fix to port.
+   latest run there. Record the exact baseline failure and check whether the branch adds or
+   worsens a failure. A red base check alone does not rule out a branch regression. Report the
+   baseline and continue the causal check; look for an existing fix to port.
 2. **Known red lane?** Check `docs/agents/CURRENT_STATE.md` for lanes recorded as red, retired
    or owner-blocked. The Vercel "Account is blocked." status, for example, is not to be
    investigated.

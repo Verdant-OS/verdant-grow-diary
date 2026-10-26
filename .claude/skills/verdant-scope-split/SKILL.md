@@ -89,8 +89,9 @@ next to unrelated work, split it out:
 - The twelve versioned governance files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
   `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`
   and `docs/agents/roles/*.md`. Editing any of them bumps all twelve.
-- `bun.lock` or `package.json` dependencies, and `.github/workflows/*`. These need Codex, Blue
-  Dream, Critical Mass or Durban Poison, not Graft.
+- `bun.lock` or `package.json` dependencies, and `.github/workflows/*`. These need an actually
+  available, eligible independent reviewer under `docs/agents/OWNERSHIP.md` §4.3, not Graft.
+  Exclude every author and repairer.
 - Payments, billing, entitlements and AI credits.
 - Generated files: `src/routeTree.gen.ts`, `src/integrations/supabase/types.ts`,
   `supabase/functions/mcp/index.ts` and `supabase/functions/_shared/lib`. Regenerate these with

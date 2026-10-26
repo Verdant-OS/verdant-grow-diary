@@ -6,7 +6,10 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 
 import PublicVpdChart from "@/pages/PublicVpdChart";
-import { PUBLIC_VPD_CALCULATOR_CROSS_LINK_PATH } from "@/lib/publicVpdChartRules";
+import {
+  PUBLIC_VPD_CALCULATOR_CROSS_LINK_PATH,
+  PUBLIC_VPD_CHART_STAGES,
+} from "@/lib/publicVpdChartRules";
 
 function renderPage() {
   return render(
@@ -152,6 +155,41 @@ describe("public VPD chart page", () => {
     await user.tab();
     expect(offset()).toHaveValue(-2);
     expect(screen.getByText("1.06 kPa")).toBeInTheDocument();
+  });
+
+  it("keeps the advertised Celsius maximum after commit", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "°C" }));
+    const air = () => screen.getByLabelText(/Air temperature/);
+    expect(screen.getByText("Range: 10–37.8 °C")).toBeInTheDocument();
+
+    await user.clear(air());
+    await user.type(air(), "37.8");
+    await user.tab();
+    expect(air()).toHaveValue(37.8);
+
+    await user.clear(air());
+    await user.type(air(), "38");
+    await user.tab();
+    expect(air()).toHaveValue(37.8);
+  });
+
+  it("offers account creation without promising to save this reading", () => {
+    renderPage();
+    expect(screen.queryByRole("link", { name: /log this reading/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create a free Verdant account" })).toHaveAttribute(
+      "href",
+      "/signup",
+    );
+  });
+
+  it("renders stage ranges from the rules table", () => {
+    renderPage();
+    for (const stage of PUBLIC_VPD_CHART_STAGES) {
+      const label = `${stage.name} (${stage.min.toFixed(1)}–${stage.max.toFixed(1)} kPa)`;
+      expect(screen.getByRole("heading", { name: label })).toBeInTheDocument();
+    }
   });
 
   it("links to the stage-aware VPD calculator", () => {

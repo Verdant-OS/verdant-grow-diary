@@ -137,6 +137,18 @@ export function publicVpdChartCelsiusToFahrenheit(celsius: number): number {
   return celsius * 1.8 + 32;
 }
 
+/** Fahrenheit air-temperature bounds. Canonical state stays in °F. */
+export const PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MIN = 50;
+export const PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MAX = 100;
+export const PUBLIC_VPD_CHART_AIR_CELSIUS_MIN = 10;
+/**
+ * One-decimal display of 100 °F. 38 °C is 100.4 °F, which the Fahrenheit
+ * ceiling would pull back down, so the Celsius control stops at 37.8.
+ */
+export const PUBLIC_VPD_CHART_AIR_CELSIUS_MAX = Number(
+  publicVpdChartFahrenheitToCelsius(PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MAX).toFixed(1),
+);
+
 /** Offset conversion multiplies by 5/9. It does not subtract 32. */
 export function publicVpdChartOffsetFahrenheitToCelsius(offsetF: number): number {
   return offsetF * (5 / 9);
@@ -295,9 +307,22 @@ export function publicVpdChartAirTemperatureFromDisplay(
   displayed: number,
   unit: PublicVpdChartUnit,
 ): number {
-  if (unit === "F") return publicVpdChartClamp(displayed, 50, 100);
-  const clampedC = publicVpdChartClamp(displayed, 10, 38);
-  return publicVpdChartClamp(publicVpdChartCelsiusToFahrenheit(clampedC), 50, 100);
+  if (unit === "F")
+    return publicVpdChartClamp(
+      displayed,
+      PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MIN,
+      PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MAX,
+    );
+  const clampedC = publicVpdChartClamp(
+    displayed,
+    PUBLIC_VPD_CHART_AIR_CELSIUS_MIN,
+    PUBLIC_VPD_CHART_AIR_CELSIUS_MAX,
+  );
+  return publicVpdChartClamp(
+    publicVpdChartCelsiusToFahrenheit(clampedC),
+    PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MIN,
+    PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MAX,
+  );
 }
 
 export function publicVpdChartOffsetFromDisplay(

@@ -7,6 +7,10 @@ import {
   calculatePublicVpdChartFromFahrenheit,
   classifyPublicVpdChartCell,
   PUBLIC_VPD_CALCULATOR_CROSS_LINK_PATH,
+  PUBLIC_VPD_CHART_AIR_CELSIUS_MAX,
+  PUBLIC_VPD_CHART_AIR_CELSIUS_MIN,
+  PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MAX,
+  PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MIN,
   PUBLIC_VPD_CHART_DEFAULTS,
   PUBLIC_VPD_CHART_DESCRIPTION,
   PUBLIC_VPD_CHART_FAQ,
@@ -203,14 +207,24 @@ export default function PublicVpdChart() {
                 Air temperature ({isFahrenheit ? "°F" : "°C"})
               </label>
               <p id="air-temp-range-hint" className="text-sm text-[#526656]">
-                {isFahrenheit ? "Range: 50–100 °F" : "Range: 10–38 °C"}
+                {isFahrenheit
+                  ? `Range: ${PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MIN}–${PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MAX} °F`
+                  : `Range: ${PUBLIC_VPD_CHART_AIR_CELSIUS_MIN}–${PUBLIC_VPD_CHART_AIR_CELSIUS_MAX} °C`}
               </p>
               <DraftNumberInput
                 id="air-temp-number"
                 describedBy="air-temp-range-hint"
                 committed={displayedAir}
-                min={isFahrenheit ? 50 : 10}
-                max={isFahrenheit ? 100 : 38}
+                min={
+                  isFahrenheit
+                    ? PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MIN
+                    : PUBLIC_VPD_CHART_AIR_CELSIUS_MIN
+                }
+                max={
+                  isFahrenheit
+                    ? PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MAX
+                    : PUBLIC_VPD_CHART_AIR_CELSIUS_MAX
+                }
                 step={0.1}
                 inputMode="decimal"
                 onCommit={(raw) => {
@@ -321,7 +335,7 @@ export default function PublicVpdChart() {
           </p>
           <p className="mt-3 text-sm">
             <Link to="/signup" className="underline">
-              Log this reading in Verdant
+              Create a free Verdant account
             </Link>
           </p>
         </section>
@@ -331,10 +345,11 @@ export default function PublicVpdChart() {
             VPD chart by growth stage
           </h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <h3 className="text-base font-semibold">Clone and seedling VPD: 0.4–0.8 kPa</h3>
-            <h3 className="text-base font-semibold">Veg VPD: 0.8–1.2 kPa</h3>
-            <h3 className="text-base font-semibold">Early flower VPD: 1.0–1.5 kPa</h3>
-            <h3 className="text-base font-semibold">Late flower VPD: 1.2–1.6 kPa</h3>
+            {PUBLIC_VPD_CHART_STAGES.map((stage) => (
+              <h3 key={stage.id} className="text-base font-semibold">
+                {stage.name} ({stage.min.toFixed(1)}–{stage.max.toFixed(1)} kPa)
+              </h3>
+            ))}
           </div>
           <p className="mt-3 text-sm">
             Overlapping band rule: cells matching {selectedStage.name}:{" "}

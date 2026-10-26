@@ -139,6 +139,8 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/feedback",
   "/tools/grow-help-toolkit",
   "/tools/vpd-calculator",
+  // Public stage chart and leaf-offset calculator: static page, no Supabase.
+  "/vpd-chart",
   // Public per-stage target-band reference: renders static constants only,
   // no Supabase fetch — must render signed-out with zero private-table hits.
   "/tools/blueprint-targets",

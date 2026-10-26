@@ -103,7 +103,6 @@ owner: Codex PR #2345 repair session by explicit user assignment: merge latest b
 last_updated: 2026-10-24 16:15 CT, by Codex PR #2345 repair session
 ```
 
-
 ### VPD-CHART-PAGE
 
 ```text
@@ -113,15 +112,15 @@ branch: cursor/vpd-chart-page-3b09
 base: verdant-grow-diary
 checkout: git fetch origin cursor/vpd-chart-page-3b09 verdant-grow-diary && git switch cursor/vpd-chart-page-3b09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2533
-head_sha: e3ee6124df7257ea10109da1cf9fa82644b06e80 is the idle-blur commit. Sour Diesel passed fc7265e521c5b301bdddab97240a82a363dda429 only. This merge of origin/verdant-grow-diary 3bc6b346f25249db408ca9cb9d2d94c33b3a442b follows and cannot name its own SHA.
-state: Clicking °F or °C still commits an open draft, then converts. Blur and Enter commit only when a draft exists. Base 3bc6b346 is merged. PR-2345-BASE-INTEGRATION stays ahead of this block because it is P2.
-next_action: Confirm required CI on the merge head of #2533. Independent review of that head is unassigned. Do not merge the PR.
-files: eslint.config.js; src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; src/test/public-vpd-chart-page.test.tsx; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md
+head_sha: 8b5e4abb80445ad1b3e918b4b9099b92cb29b3fd merged the base. Codex P2s on that head are being repaired in the following commit, which cannot name its own SHA. Sour Diesel passed fc7265e521c5b301bdddab97240a82a363dda429 only.
+state: Celsius air temperature stops at 37.8 °C, the one-decimal display of 100 °F. /vpd-chart is in the mobile public sweep and the SEO indexation matrix. The signup link says create an account and does not promise to log the entered reading. Stage headings come from PUBLIC_VPD_CHART_STAGES.
+next_action: Confirm 35/35 required checks on the repair head of #2533. Do not merge or enable auto-merge. A new exact-head review is still required.
+files: eslint.config.js; src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; src/test/public-vpd-chart-page.test.tsx; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md; docs/seo/route-indexation-matrix.md; e2e/auth-route-protection-mobile.spec.ts
 blockers: none for repository work. No publish, SQL, or production write.
 artifacts: uploaded HTML and brief are not in the repo
 reviewer_seat: independent Claude or Grok session that did not author this slice; this Grok session cannot accept it
 claimed_by: Grok cloud session, 2026-10-24 20:10 UTC
-last_updated: 2026-10-26 16:00 UTC, by Grok
+last_updated: 2026-10-26 16:20 UTC, by Grok
 ```
 
 ### HANDOFF-CONTINUITY-20261024

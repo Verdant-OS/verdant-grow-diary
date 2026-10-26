@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculatePublicVpdChartFromFahrenheit,
+  PUBLIC_VPD_CHART_AIR_CELSIUS_MAX,
   PUBLIC_VPD_CHART_WEB_APPLICATION_JSON_LD,
   publicVpdChartAirTemperatureFromDisplay,
   publicVpdChartDisplayedAirTemperature,
@@ -38,6 +39,10 @@ describe("public VPD chart math", () => {
 
     expect(publicVpdChartAirTemperatureFromDisplay(25, "C")).toBeCloseTo(77, 5);
     expect(publicVpdChartOffsetFromDisplay(-1.1, "C")).toBeCloseTo(-1.98, 2);
+    expect(PUBLIC_VPD_CHART_AIR_CELSIUS_MAX).toBe(37.8);
+    expect(publicVpdChartAirTemperatureFromDisplay(37.8, "C")).toBe(100);
+    expect(publicVpdChartDisplayedAirTemperature(100, "C")).toBe(37.8);
+    expect(publicVpdChartAirTemperatureFromDisplay(38, "C")).toBe(100);
     expect(publicVpdChartAirTemperatureFromDisplay(0, "C")).toBe(50);
     expect(publicVpdChartOffsetFromDisplay(9, "F")).toBe(5);
   });

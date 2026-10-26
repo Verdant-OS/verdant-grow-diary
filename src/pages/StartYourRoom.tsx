@@ -119,6 +119,7 @@ export default function StartYourRoom() {
   const pendingRowIdsRef = useRef(pendingRowIds);
   pendingRowIdsRef.current = pendingRowIds;
   const draftHydratedFor = useRef<string | null>(null);
+  const [draftOwnerReady, setDraftOwnerReady] = useState<string | null>(null);
   const [verificationRetrying, setVerificationRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
@@ -139,19 +140,36 @@ export default function StartYourRoom() {
       START_YOUR_ROOM_DRAFT_FORM_ID,
       parseStartYourRoomDraft,
     );
-    if (!draft) return;
+    if (!draft) {
+      setStep("grow");
+      setForm({ ...DEFAULT_START_YOUR_ROOM_FORM });
+      setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
+      setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
+      setError(null);
+      setDraftOwnerReady(ownerId);
+      return;
+    }
     const growStillHere =
       draft.ids.growId != null && grows.some((grow) => grow.id === draft.ids.growId);
     setForm(draft.form);
-    if (draft.saveError) setError(draft.saveError);
-    if (draft.step === "grow" || growStillHere) setPendingRowIds(draft.pendingRowIds);
-    if (!growStillHere) return;
-    setIds(draft.ids);
-    setStep(draft.step);
+    setError(draft.saveError);
+    if (draft.step === "grow" || growStillHere) {
+      setPendingRowIds(draft.pendingRowIds);
+    } else {
+      setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
+    }
+    if (growStillHere) {
+      setIds(draft.ids);
+      setStep(draft.step);
+    } else {
+      setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
+      setStep("grow");
+    }
+    setDraftOwnerReady(ownerId);
   }, [ownerId, grows, growsLoading]);
 
   useEffect(() => {
-    if (!ownerId) return;
+    if (!ownerId || draftHydratedFor.current !== ownerId || draftOwnerReady !== ownerId) return;
     if (step === "done") {
       clearBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID);
       return;
@@ -163,7 +181,7 @@ export default function StartYourRoom() {
       pendingRowIds,
       saveError: error,
     });
-  }, [ownerId, step, form, ids, pendingRowIds, error]);
+  }, [ownerId, draftOwnerReady, step, form, ids, pendingRowIds, error]);
 
   const plantsFetchKey = useRef<string | null>(null);
   const [plantReadAttempt, setPlantReadAttempt] = useState(0);

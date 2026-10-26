@@ -79,28 +79,28 @@ branch: cursor/setup-quicklog-draft-retry-8b19
 base: verdant-grow-diary
 checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-diary && git switch cursor/setup-quicklog-draft-retry-8b19 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
-head_sha: d5f134b926be9dd1b2569f7e106ff28e350bfb96 at 2026-10-26 11:20 CT; refresh if a later commit moves the head
+head_sha: read origin/cursor/setup-quicklog-draft-retry-8b19 after the hydration repair push; the reviewed head was e78fa42c17cdc9f04daca72b89f21e794a6c5fae
 state: pushed draft
-current_step: draft PR #2541 is open. Observation drafts mark saveFailed only for unconfirmed saves, so Timeline recovery and a later new note keep their own key. Required checks were still queued at 2026-10-26 12:00 CT.
-next_action: read the 35 required checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 at head d5f134b926be9dd1b2569f7e106ff28e350bfb96 and do not merge
+current_step: P1 and P2 from review 5658257939 are fixed in StartYourRoom. The draft is not written until that owner has been hydrated, and an owner with no draft resets the wizard before any write under the new key. Quick Log was not changed. Latest verdant-grow-diary was merged.
+next_action: read the 35 required checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 at the post-repair head and do not merge. The previous independent review does not cover the new head.
 post_merge_check: Full test suite shards and Lint, typecheck, test, build on the merged deploy head; if a required check fails, reopen this task with the same owner
 active_writer: Grok cloud agent on cursor/setup-quicklog-draft-retry-8b19
 decisions: Drafts live in sessionStorage under verdant.session-form.1.{userId}.{formId} and clear only after a confirmed save. Start Your Room reuses one hierarchy row id until that confirmation and blanks a name in the stored draft once its id is set so a later empty form does not inherit a confirmed name. Confirmed Quick Log observation retries keep the same p_idempotency_key, including after remount, by storing that key on the draft. The open-sheet key mint line stays so the existing five-rotation source pin still matches; a stored key overwrites it when present. Viewport coverage is jsdom innerWidth 390 and 1280 because the sheet is not viewport-branched.
 tried_and_rejected: Editing src/test/start-your-room-enter-submits.test.tsx is refused by scripts/scorer-lock.mjs. Restoring confirmed names into sessionStorage made the next test read "Bound TentEnter Tent". Awaiting the first Retry click advanced the wizard before the second click. Treating two sequential Retry clicks as one RPC was wrong: the in-flight flag releases after a definitive rejection, so the second click is a second call with the same key. A remount that minted a new key was rejected because Retry would no longer be one logical save.
-commands: export PATH="$HOME/.bun/bin:$PATH"; NODE_OPTIONS="--max-old-space-size=8192" bun run typecheck; bun run lint; bunx vitest run src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx src/test/start-your-room-enter-submits.test.tsx src/test/start-your-room-resume.test.tsx src/test/quicklog-manual-idempotency-static.test.ts --reporter=dot
-files_touched: src/pages/StartYourRoom.tsx src/components/QuickLogV2Sheet.tsx src/lib/sessionFormDraftRules.ts src/lib/sessionFormDraftStore.ts src/lib/startYourRoomDraftRules.ts src/lib/quickLogObservationDraftRules.ts src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx docs/agents/HANDOFF_LOG.md
+commands: export PATH="$HOME/.bun/bin:$PATH"; NODE_OPTIONS="--max-old-space-size=8192" bun run typecheck; bunx vitest run src/test/start-your-room-draft-hydration.test.tsx src/test/start-your-room-draft-retry.test.tsx src/test/start-your-room-enter-submits.test.tsx src/test/start-your-room-resume.test.tsx --reporter=dot
+files_touched: src/pages/StartYourRoom.tsx src/components/QuickLogV2Sheet.tsx src/lib/sessionFormDraftRules.ts src/lib/sessionFormDraftStore.ts src/lib/startYourRoomDraftRules.ts src/lib/quickLogObservationDraftRules.ts src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx src/test/start-your-room-draft-hydration.test.tsx docs/agents/HANDOFF_LOG.md
 files_remaining: none for this slice
 blockers: none for the code change. Merge, auto-merge, publish, and production writes are out of scope.
 open_questions: none
-gotchas: Do not restore a confirmed grow, tent, or plant name into the stored draft. Do not add another saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignment; quicklog-manual-idempotency-static.test.ts counts five outside the two abandonment functions. Hydrate Start Your Room only after growsLoading is false, and only restore step when draft.ids.growId is still in the grows list. Effects that read ownerId must be declared after const ownerId. Free plan still does not create a grow automatically.
+gotchas: Do not restore a confirmed grow, tent, or plant name into the stored draft. Do not add another saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignment; quicklog-manual-idempotency-static.test.ts counts five outside the two abandonment functions. Hydrate Start Your Room only after growsLoading is false, and only restore step when draft.ids.growId is still in the grows list. Do not persist until draftHydratedFor matches the current owner and the hydrated state has committed; a same-tick write still sees the empty form and would erase the stored draft. An owner change with no draft must reset the form, ids, pending row ids, error, and step before any write under the new key. src/test/start-your-room-draft-retry.test.tsx is scorer-locked; new hydration cases live in src/test/start-your-room-draft-hydration.test.tsx. Effects that read ownerId must be declared after const ownerId. Free plan still does not create a grow automatically.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
 artifacts: local vitest on the files in commands; typecheck passed with NODE_OPTIONS=--max-old-space-size=8192; lint 0 errors
-reviewer_seat: not requested; independent acceptance is still required before merge
-reviewer_sha: none
-session_state: Cursor cloud agent bc-f9381022-de73-5751-86dd-5bf490608b19. No production smoke write.
+reviewer_seat: independent review 5658257939 at e78fa42c17cdc9f04daca72b89f21e794a6c5fae found P1 and P2; that verdict does not cover the repair head
+reviewer_sha: e78fa42c17cdc9f04daca72b89f21e794a6c5fae (superseded by the repair)
+session_state: Cursor cloud agent on cursor/setup-quicklog-draft-retry-8b19. No production smoke write.
 claimed_by: Grok, 2026-10-26 11:15 CT
 owner: Grok
-last_updated: 2026-10-26 11:15 CT, by Grok
+last_updated: 2026-10-26 15:10 CT, by Grok
 ```
 
 ### PR-2345-BASE-INTEGRATION

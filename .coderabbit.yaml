@@ -32,6 +32,7 @@ tone_instructions: >-
 
 reviews:
   profile: chill
+  allow_author_approval: false
   request_changes_workflow: false
   high_level_summary: true
   high_level_summary_in_walkthrough: true
@@ -303,10 +304,13 @@ reviews:
   auto_review:
     enabled: true
     auto_incremental_review: true
-    drafts: false
+    drafts: true
     ignore_title_keywords:
       - "[skip review]"
       - "[no review]"
+
+  pre_merge_checks:
+    override_requested_reviewers_only: true
 
   finishing_touches:
     docstrings:

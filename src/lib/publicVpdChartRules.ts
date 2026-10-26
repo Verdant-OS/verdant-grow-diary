@@ -70,6 +70,41 @@ export const PUBLIC_VPD_CHART_STAGES: readonly PublicVpdChartStage[] = Object.fr
   }),
 ]);
 
+export function publicVpdChartStageRangeKpa(stage: PublicVpdChartStage): string {
+  return `${stage.min.toFixed(1)}–${stage.max.toFixed(1)} kPa`;
+}
+
+export function publicVpdChartStageHeading(stage: PublicVpdChartStage): string {
+  return `${stage.name} (${publicVpdChartStageRangeKpa(stage)})`;
+}
+
+function joinPublicVpdChartClauses(clauses: readonly string[]): string {
+  if (clauses.length <= 1) return clauses[0] ?? "";
+  if (clauses.length === 2) return `${clauses[0]} and ${clauses[1]}`;
+  return `${clauses.slice(0, -1).join(", ")}, and ${clauses[clauses.length - 1]}`;
+}
+
+/** Intro targets. Names and kPa bounds come from PUBLIC_VPD_CHART_STAGES. */
+export function publicVpdChartCommonTargetsSentence(): string {
+  const clauses = PUBLIC_VPD_CHART_STAGES.map(
+    (stage) => `${publicVpdChartStageRangeKpa(stage)} for ${stage.name}`,
+  );
+  return `Common grower targets are ${joinPublicVpdChartClauses(clauses)}.`;
+}
+
+/** Heatmap source line. Groups stages that share one source string. */
+export function publicVpdChartSourcesSentence(): string {
+  const groups: { source: string; labels: string[] }[] = [];
+  for (const stage of PUBLIC_VPD_CHART_STAGES) {
+    const label = `${stage.name} ${publicVpdChartStageRangeKpa(stage)}`;
+    const last = groups[groups.length - 1];
+    if (last && last.source === stage.source) last.labels.push(label);
+    else groups.push({ source: stage.source, labels: [label] });
+  }
+  const parts = groups.map((group) => `${group.source} (${group.labels.join(", ")})`);
+  return `Sources: ${parts.join(", ")}. Common grower targets, not strict rules. Updated Oct 2026.`;
+}
+
 export const PUBLIC_VPD_CHART_FAQ = Object.freeze([
   Object.freeze({
     question: "What is a good VPD for veg?",

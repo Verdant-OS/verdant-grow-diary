@@ -21,6 +21,9 @@ import {
   PUBLIC_VPD_CHART_STAGES,
   PUBLIC_VPD_CHART_TITLE,
   publicVpdChartAirTemperatureFromDisplay,
+  publicVpdChartCommonTargetsSentence,
+  publicVpdChartSourcesSentence,
+  publicVpdChartStageHeading,
   publicVpdChartClamp,
   publicVpdChartDisplayedAirTemperature,
   publicVpdChartDisplayedOffset,
@@ -161,9 +164,8 @@ export default function PublicVpdChart() {
         </h1>
         <p className="max-w-3xl text-base leading-7">
           Vapor Pressure Deficit (VPD) measures the difference in kilopascals (kPa) between moisture
-          saturation inside the leaf and moisture in the surrounding grow tent air. Common grower
-          targets are 0.4–0.8 kPa for clones and seedlings, 0.8–1.2 kPa for veg, 1.0–1.5 kPa for
-          early flower, and 1.2–1.6 kPa for late flower.
+          saturation inside the leaf and moisture in the surrounding grow tent air.{" "}
+          {publicVpdChartCommonTargetsSentence()}
         </p>
         <p className="text-sm text-[#526656]">
           Calculated from values you entered. This is not a live sensor reading.
@@ -290,7 +292,7 @@ export default function PublicVpdChart() {
               >
                 {PUBLIC_VPD_CHART_STAGES.map((stage) => (
                   <option key={stage.id} value={stage.id}>
-                    {stage.name} ({stage.min.toFixed(1)}–{stage.max.toFixed(1)} kPa)
+                    {publicVpdChartStageHeading(stage)}
                   </option>
                 ))}
               </select>
@@ -325,7 +327,7 @@ export default function PublicVpdChart() {
             ) : (
               matches.map((stage) => (
                 <span key={stage.id} className="rounded-full bg-white/70 px-2 py-1 text-sm">
-                  {stage.name} ({stage.min.toFixed(1)}–{stage.max.toFixed(1)} kPa)
+                  {publicVpdChartStageHeading(stage)}
                 </span>
               ))
             )}
@@ -347,7 +349,7 @@ export default function PublicVpdChart() {
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PUBLIC_VPD_CHART_STAGES.map((stage) => (
               <h3 key={stage.id} className="text-base font-semibold">
-                {stage.name} ({stage.min.toFixed(1)}–{stage.max.toFixed(1)} kPa)
+                {publicVpdChartStageHeading(stage)}
               </h3>
             ))}
           </div>
@@ -441,11 +443,7 @@ export default function PublicVpdChart() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm">
-            Sources: Spider Farmer blog (clone/seedling 0.4–0.8 kPa, veg 0.8–1.2 kPa), Gorilla Grow
-            Tent VPD chart guide (early flower 1.0–1.5 kPa), Aroya VPD chart (late flower 1.2–1.6
-            kPa). Common grower targets, not strict rules. Updated Oct 2026.
-          </p>
+          <p className="mt-3 text-sm">{publicVpdChartSourcesSentence()}</p>
         </section>
 
         <section>

@@ -9,6 +9,9 @@ import PublicVpdChart from "@/pages/PublicVpdChart";
 import {
   PUBLIC_VPD_CALCULATOR_CROSS_LINK_PATH,
   PUBLIC_VPD_CHART_STAGES,
+  publicVpdChartCommonTargetsSentence,
+  publicVpdChartSourcesSentence,
+  publicVpdChartStageHeading,
 } from "@/lib/publicVpdChartRules";
 
 function renderPage() {
@@ -186,9 +189,13 @@ describe("public VPD chart page", () => {
 
   it("renders stage ranges from the rules table", () => {
     renderPage();
+    const text = document.body.textContent ?? "";
+    expect(text).toContain(publicVpdChartCommonTargetsSentence());
+    expect(text).toContain(publicVpdChartSourcesSentence());
     for (const stage of PUBLIC_VPD_CHART_STAGES) {
-      const label = `${stage.name} (${stage.min.toFixed(1)}–${stage.max.toFixed(1)} kPa)`;
-      expect(screen.getByRole("heading", { name: label })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: publicVpdChartStageHeading(stage) }),
+      ).toBeInTheDocument();
     }
   });
 

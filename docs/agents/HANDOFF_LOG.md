@@ -45,6 +45,30 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-2262-DELETED-PROFILE-DIARY-FALLBACK
+
+```text
+TASK CLAUDE-2262-DELETED-PROFILE-DIARY-FALLBACK  priority: P2  status: OPEN
+goal: Finish #2262's acknowledged deleted own-storage profile-photo case on /plants: after profile resolution fails, show the newest owned diary photo while retaining valid/loading profile priority and existing owner guards/batch cap.
+why: The original selector excluded a syntactically valid owned profile reference even after its storage object failed to sign, leaving a placeholder despite an available diary photo.
+branch: claude/plants-card-diary-photo-fallback
+base: verdant-grow-diary
+checkout: Fetch this existing branch, verify the current full remote PR head and effective claim, then use an isolated authorized cloud worktree. Do not overwrite another writer or resume from a historical head.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2262
+head_sha: ad03fb2776eb396edd5b011af0873cec9b2be8fd (verified source checkpoint before this repair; the resulting pushed full head is recorded in the PR body).
+state: Bounded repair implemented locally. The profile presenter reports only a settled resolution failure; /plants keys failures by viewer and exact photo reference, then enables its existing capped/owned diary fallback. Replacement profiles retain loading priority. No profile/signer security guard is weakened.
+validation: Canonical Bun 1.3.14 frozen install succeeded with manifest/lock hashes unchanged. Corrected NEW rendered regression RED at the source checkpoint: 2 failed / 2 passed. GREEN: 52 related files / 804 tests passed, including the 4 new cases and all existing photo-fallback tests. Full TypeScript, scoped ESLint/Prettier and strict scorer report passed. Broader full-suite attempt was interrupted without a terminal result; full suite NOT_MEASURED, partial log preserved. See current PR packet for subsequent actual head/check receipts.
+next_action: Complete normal commit/push and current-base compatibility, verify the resulting full remote head, then fresh required/supplemental CI and eligible non-contributing outside acceptance. Preserve draft and every blocking finding until independently disposed; no ready/queue/merge from this writer.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only this existing photo-error repair and its matching handoff/PR metadata. The ordinary October20 photo claim had no fresh renewal/named photo lock in inspected current PR/deploy coverage. Shared fleet/private state unavailable; stop on a conflicting claim or changed head. Named #2171 health-display assignment is preserved and no health-label/rule hunk is touched.
+files_touched: src/components/PlantPhoto.tsx; src/lib/plantListPhotoFallbackRules.ts; src/pages/Plants.tsx (photo hunk only); NEW src/test/plants-card-deleted-profile-fallback.test.tsx; docs/agents/HANDOFF_LOG.md (this block only).
+scorers: Existing tracked tests/assertions are unchanged; no scorer unlock requested or performed. New behavioral coverage tests deleted-profile fallback, valid/loading profile priority, rerender signing stability and replacement-reference isolation.
+blockers: Fresh new-head CI, complete full-suite evidence and outside exact-head acceptance remain pending. No verified Grok team/session destination or pickup exists for this closeout; parent has requested the missing relay/destination. A prepared packet or generic request is not an accepted handoff.
+reviewer_seat: Actually available eligible non-contributing outside session under current OWNERSHIP.md. Exclude original Claude session01LRVX3wQuKiAwobpaHuYvqk, all original authors/repairers and this Codex writer. Codex cannot accept Codex-repaired work. No duplicate or obsolete-head request.
+release_steps_measured: NOT_MEASURED. Post-merge check owner is the existing closeout coordinator; after a separately authorized release, verify served version ancestry. No live storage write, account QA, deployment, migration or production change is authorized here.
+claimed_by: Codex closeout session01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 17:43:52 UTC (matching PR ownership record).
+last_updated: 2026-10-26 17:59:04 UTC, by Codex closeout coordinator
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text

@@ -41,9 +41,8 @@ export function liftDiaryEventType(raw: unknown): Record<string, unknown> {
 /**
  * A profile photo PlantPhoto can display without a diary fallback. Blank,
  * malformed and other-owner references resolve to nothing there, so they get
- * the fallback too. A storage reference whose object is missing is only known
- * after signing; it keeps the placeholder rather than flashing a diary photo
- * over a valid profile photo while it loads.
+ * the fallback too. Storage references retain priority while signing; the
+ * caller can enable a fallback after that exact profile reference fails.
  */
 function hasUsableProfilePhoto(plant: PlantListPhotoFallbackPlant, viewerUserId: string): boolean {
   const kind = parsePlantProfilePhotoReference(plant.photo, { viewerUserId }).kind;
@@ -72,13 +71,19 @@ export function selectPlantListPhotoFallbackRows(input: {
   plants: ReadonlyArray<PlantListPhotoFallbackPlant>;
   diaryRows: ReadonlyArray<unknown> | null | undefined;
   viewerUserId: string | null | undefined;
+  /** Only profiles whose current reference has actually failed to resolve. */
+  unavailableProfilePhotoPlantIds?: ReadonlySet<string>;
   limit?: number;
 }): DiaryRow[] {
   const viewerUserId = input.viewerUserId ?? null;
   if (!viewerUserId || !Array.isArray(input.diaryRows)) return [];
   const limit = input.limit ?? PLANT_LIST_PHOTO_FALLBACK_LIMIT;
   const wanted = input.plants
-    .filter((plant) => !hasUsableProfilePhoto(plant, viewerUserId))
+    .filter(
+      (plant) =>
+        input.unavailableProfilePhotoPlantIds?.has(plant.id) ||
+        !hasUsableProfilePhoto(plant, viewerUserId),
+    )
     .map((plant) => plant.id);
   if (wanted.length === 0) return [];
   const wantedSet = new Set(wanted);

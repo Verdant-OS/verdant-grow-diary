@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import PlantPhotoView from "@/components/PlantPhotoView";
 import { usePlantProfilePhotoSource } from "@/hooks/usePlantProfilePhotoSource";
 
@@ -9,6 +10,8 @@ interface Props {
    * photo from useDiaryPhotoDisplayRows), so it is rendered as given.
    */
   fallbackSrc?: string | null;
+  /** Notify the caller after this exact profile reference fails to resolve. */
+  onProfileUnavailable?: (source: string) => void;
   alt?: string;
   className?: string;
   iconClassName?: string;
@@ -28,6 +31,7 @@ interface Props {
 export default function PlantPhoto({
   src,
   fallbackSrc,
+  onProfileUnavailable,
   alt = "",
   className,
   iconClassName,
@@ -36,6 +40,16 @@ export default function PlantPhoto({
   testId,
 }: Props) {
   const resolved = usePlantProfilePhotoSource(src);
+  useEffect(() => {
+    if (
+      resolved.isError &&
+      !resolved.isLoading &&
+      !resolved.displayUrl &&
+      typeof src === "string"
+    ) {
+      onProfileUnavailable?.(src);
+    }
+  }, [onProfileUnavailable, resolved.displayUrl, resolved.isError, resolved.isLoading, src]);
   const fallbackUrl = typeof fallbackSrc === "string" && fallbackSrc.trim() ? fallbackSrc : null;
   if (!resolved.displayUrl && fallbackUrl) {
     return (

@@ -69,6 +69,44 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-2090-CENSUS-SELECTION-PRESERVATION
+
+```text
+TASK PR-2090-CENSUS-SELECTION-PRESERVATION  priority: P2  status: OPEN
+goal: Deliver the authorized selection-preservation fix, census restoration diagnostics and focused regressions on the existing #2090 branch; keep draft.
+why: Real Chromium reproduced selection collapsing from [0,22] to [22,22] inside registration/adoption. Delete then left the placeholder in both DOM and RHF state. The controlled reproduction establishes the mechanism, not historical CI event timing.
+branch: codex/2016-grow-target-validation
+local_branch: codex/pr2090-census-diagnostics-local
+base: verdant-grow-diary; prepared on #2090 source head af353626e5189e368adde3b7b42c707b2d6a2fdc
+checkout: Fetch origin codex/2016-grow-target-validation; read #2090's full current head, verify the fetched ref equals it and that af353626e5189e368adde3b7b42c707b2d6a2fdc is an ancestor before using this receipt. Preserve the existing PR branch.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2090
+head_sha: af353626e5189e368adde3b7b42c707b2d6a2fdc (verified remote source checkpoint before this repair's first push on 2026-10-26; not the resulting repair commit. Refresh the PR for its resulting full head and fresh CI.)
+state: Validated local repair prepared for normal push. This block travels with the repair commit; no resulting-head hosted CI or acceptance is claimed here.
+current_step: Local unit/component regressions PASS 129/0/0 across four files; real Chromium PASS 3/0/0 with zero retries. The previously failing selection/hydration/Delete case now keeps [0,22] and clears DOM and RHF state. Scoped native type check, lint, format and whitespace PASS.
+next_action: Read the resulting #2090 head and its automatic CI. Do not reuse source-head CI or manually rerun a workflow without authority.
+post_merge_check: Run the credential-free hydration/clearing regressions at the merged source head; reopen this slice if selection collapses or DOM and RHF clearing diverge. Deployed behavior remains NOT_MEASURED until separately authorized and verified.
+active_writer: Codex PR #2090 census/selection repair session, directly assigned local implementation and then normal push by Matthew. No takeover of #1934 or another branch.
+decisions: Preserve selection start/end/direction only for a connected focused field whose captured text survives registration; never take focus. Retain registration, typed-value adoption, census timeouts, replacement guards and fatal assertions. Collect extra DOM diagnostics only after the restoration decision is fixed as failure.
+tried_and_rejected: Do not add a hydration wait, blanket retry, forced clearing, expected-failure exemption or weakened assertion. The nonempty React defaultValue limitation is a separate deferred reproduction. Advisory Codex checks are not independent acceptance.
+commands: node node_modules/vitest/vitest.mjs run src/test/census-restoration-diagnostics.test.ts src/test/core-link-form-census-rules.test.ts src/test/support-form-clearing-hydration.test.tsx src/test/support-forms-prehydration-input.test.tsx --reporter=dot
+browser_command: Set E2E_BASE_URL=http://127.0.0.1:9 and PLAYWRIGHT_RETRIES=0; node node_modules/@playwright/test/cli.js test --project=chromium-mocked e2e/core-link-form-census-hydration.spec.ts --workers=1 --retries=0 --reporter=list. This inline fixture aborts every request and starts no application server.
+files_touched: src/lib/preHydrationFormInput.ts; e2e/core-link-form-census.spec.ts; e2e/lib/censusRestoration.ts; e2e/core-link-form-census-hydration.spec.ts; src/test/core-link-form-census-rules.test.ts; src/test/census-restoration-diagnostics.test.ts; src/test/support-form-clearing-hydration.test.tsx; docs/agents/HANDOFF_LOG.md (this block only).
+files_remaining: None planned for this repair; future reviewer findings require scoped changes and new exact-head evidence.
+scorer_authority: Matthew explicitly assigned the census diagnostics/regressions and their push. The existing census spec and rules test have narrowly recorded unlocks; two rules-test call-shape pins change for the diagnostic argument. No assertion or timeout is relaxed. Clear temporary unlocks after delivery.
+blockers: New-head automatic CI and eligible independent acceptance are NOT_MEASURED. Earlier full-project type checks found two missing-getSsrStatus diagnostics at src/test/not-found-route-status.test.tsx:56,83 in unchanged code; the scoped repair check passes. Full unit suite and build were not run.
+open_questions: Whether the historical failed CI jobs used the controlled selection-loss interleaving; no action trace existed for those executions. Broader nonempty server-default preservation remains outside this repair.
+gotchas: A normal push invalidates older exact-head CI/review receipts. Keep draft; no force-push, workflow rerun, public comment/body update, PR merge, deployment, dependency/auth/schema change or live write is authorized.
+collision_audit: #1934 at 4eea14ba9d69c1835e2754624f0ed3c258b94f15 changes the census import and tail visibleLogControls extraction only. Its exact census patch passes a read-only apply check against this repair. Preserve that separate writer's work.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2090 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/1934 ; historical failure https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40349605505/job/121752381834
+artifacts: The committed regression/diagnostic files provide portable reproduction. Supplemental local receipts are C:/Users/G8/verdant-work/pr2090-census-diagnostics-evidence/SELECTION-FIX.md and its browser-results-selection-fix observations. Those paths are not hosted evidence.
+reviewer_seat: An actually available eligible non-contributing outside session under OWNERSHIP.md 4.3 is required before acceptance; none requested or claimed here. Exclude the Codex repair coordinator and contributing private_review_2090 child.
+reviewer_sha: NOT_MEASURED; no independent exact-head PASS for the resulting repair.
+session_state: Delivery coordinator active; child delivery audit completed advisory only; no background monitor, workflow rerun, external request or production action started.
+claimed_by: Codex, 2026-10-26 17:49 CT, by direct bounded user assignment; no public claim/resume comment because external posts remain prohibited.
+owner: Codex PR #2090 census/selection repair session; keep the existing PR branch and all unrelated holds.
+last_updated: 2026-10-26 17:49 CT, by Codex
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

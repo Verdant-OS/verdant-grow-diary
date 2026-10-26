@@ -14,6 +14,7 @@
  * it reads the element's value before react-hook-form's ref runs, and when
  * that value differs from what the server rendered, it restores it through
  * `setValue` so the DOM and the form state agree.
+ * Focused fields also keep their selection across those value writes.
  *
  * No React, no Supabase, no clock.
  */
@@ -55,11 +56,53 @@ export function registerKeepingTypedText<T extends FieldValues>(
       ref: (element: unknown) => {
         // Read before react-hook-form's ref writes the default value.
         const typed = preHydrationTypedValue(element);
+        const field = element as HTMLInputElement | HTMLTextAreaElement | null;
+        let selection: {
+          start: number;
+          end: number;
+          direction: "forward" | "backward" | "none";
+        } | null = null;
+        try {
+          if (
+            typed !== null &&
+            field?.isConnected &&
+            field.ownerDocument.activeElement === field &&
+            typeof field.selectionStart === "number" &&
+            typeof field.selectionEnd === "number" &&
+            typeof field.setSelectionRange === "function"
+          ) {
+            selection = {
+              start: field.selectionStart,
+              end: field.selectionEnd,
+              direction: field.selectionDirection ?? "none",
+            };
+          }
+        } catch {
+          // Optional selection APIs must not prevent text adoption.
+        }
         registration.ref(element);
         // The comparison also keeps this a no-op on every later re-attach,
         // when the typed text already is the form value.
         if (typed !== null && typed !== form.getValues(name)) {
           form.setValue(name, typed as PathValue<T, N>, { shouldDirty: true });
+        }
+        if (
+          selection &&
+          field?.isConnected &&
+          field.ownerDocument.activeElement === field &&
+          field.value === typed
+        ) {
+          try {
+            if (
+              field.selectionStart !== selection.start ||
+              field.selectionEnd !== selection.end ||
+              field.selectionDirection !== selection.direction
+            ) {
+              field.setSelectionRange(selection.start, selection.end, selection.direction);
+            }
+          } catch {
+            // Registration can change whether the field supports selection.
+          }
         }
       },
     };

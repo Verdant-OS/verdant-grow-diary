@@ -69,6 +69,33 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CRONK-FEED-LOG-IN-PLACE
+
+```text
+TASK CRONK-FEED-LOG-IN-PLACE  priority: other  status: OPEN
+goal: Upgrade the existing public guide /guides/cronk-nutrients-grow-diary in place to the planned-vs-actual Cronk feed log. Keep that URL. Draft PR only.
+why: The QA-passed standalone HTML replaces the prose guide. Sibling drafts #2542 and #2545 are new URLs; this page already exists, so a dedicated file route replaces the generic slug document.
+branch: cursor/cronk-nutrients-feed-log-26be
+base: verdant-grow-diary
+checkout: git fetch origin cursor/cronk-nutrients-feed-log-26be verdant-grow-diary && git switch cursor/cronk-nutrients-feed-log-26be
+pr: draft, created after the first push; see the PR for this branch
+head_sha: recorded in the follow-up handoff update on this branch after the implementation commit
+state: implemented locally; not pushed at the time this block was first written
+current_step: Unit tests for the feed log, sitemap custom URL, and static SEO documents passed. Draft PR is the next step.
+next_action: Push the branch and open one draft PR against verdant-grow-diary. Do not merge, publish, or enqueue.
+post_merge_check: After merge and publish, https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary serves the H1 "Cronk Nutrients Grow Diary: Log Your Feeding Chart, Planned vs Actual" and canonical /guides/cronk-nutrients-grow-diary. Until publish this is NOT_MEASURED.
+active_writer: Cursor cloud agent on cursor/cronk-nutrients-feed-log-26be (Grok session assigned this slice). Do not push claude/* branches.
+decisions: CTA href /auth?mode=signup with no UTM params, matching Athena draft #2545. Breadcrumb Home is https://verdantgrowdiary.com/welcome (VERDANT_GUIDES_BREADCRUMB_ITEMS), Grower Guides is /guides. datePublished 2026-07-16 from commit 137241b75377c8cc2beef0651e62abaf25172db9 and the prior sitemap lastmod. dateModified 2026-10-26. VPD links are /guides/grow-room-vpd-tracker and /tools/vpd-calculator. JSON-LD is WebPage plus Article, FAQPage, WebApplication, and BreadcrumbList once; the generic slug document was removed so the old graph is not also emitted. Analytics uses readAnalyticsConsent then verdant:analytics and window.gtag event only. No page gtag loader and no second page_view. Related logs point at /guides/advanced-nutrients-feeding-chart-log and /guides/athena-feed-chart-log; reverse links wait on #2542 and #2545.
+tried_and_rejected: Copying the HTML gtag snippet and UTM query onto signup CTAs. Rendering the wide table at phone width. Linking /vpd-chart, which is not on this base.
+commands: bunx vitest run src/test/cronk-feed-log-rules.test.ts src/test/cronk-feed-log-analytics.test.ts src/test/cronk-feed-log-page.test.tsx src/test/cronk-nutrient-priority.test.ts src/test/verdant-seo-guides.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/route-indexation-matrix.test.ts src/test/static-public-seo-documents.test.ts src/test/sitemap-public-route-parity.test.ts src/test/operator-route-mobile-coverage.test.ts src/test/root-canonical-seo.test.ts src/test/core-link-form-census-rules.test.ts --reporter=dot
+files_touched: src/pages/CronkFeedLog.tsx; src/routes/guides.cronk-nutrients-grow-diary.tsx; src/lib/cronkFeedLogRules.ts; src/lib/cronkFeedLogAnalytics.ts; src/test/cronk-feed-log-*.ts; src/test/cronk-feed-log-page.test.tsx; src/constants/verdantSeoContent.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/appRouteManifest.ts; src/pages/GuidesIndex.tsx; src/routeTree.gen.ts; public/sitemap.xml; docs/seo/route-indexation-matrix.md; scripts/seo-runtime-smoke.mjs; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-guides-public-links.test.tsx; src/test/verdant-seo-sitemap-robots.test.ts; src/test/cronk-nutrient-priority.test.ts; e2e/auth-route-protection-mobile.spec.ts
+files_remaining: none for this slice
+blockers: none for the draft
+open_questions: required CI at the pushed head is NOT_MEASURED until the checks finish
+gotchas: routeTree.gen.ts was patched by hand because the generator was not run. Shared-file edits stay additive with #2542 and #2545: cronk document is the last core acquisition document; the guides index card is after the grow-stage card; the manifest entry is after /guides/:slug. Scorer unlocks are gitignored. Disclaimer stays on the page.
+resume_here: draft PR against verdant-grow-diary; do not merge
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

@@ -227,6 +227,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/guides", access: "public", description: "Grower guides index." },
   { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
   {
+    path: "/guides/cronk-nutrients-grow-diary",
+    access: "public",
+    description: "Cronk Nutrients planned-vs-actual feed log. Stores nothing in the browser.",
+  },
+  {
     path: "/guides/grow-stage-care-guide",
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",

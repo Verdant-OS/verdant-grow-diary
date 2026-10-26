@@ -96,6 +96,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/hardware-integrations",
   "/guides",
   "/guides/:slug",
+  "/guides/cronk-nutrients-grow-diary",
   "/guides/grow-stage-care-guide",
   // Exact ID-free Customer Mode guide: static/noindex and must make no
   // private-table requests. Dynamic /customer/:shareId remains retired.

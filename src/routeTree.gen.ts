@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 
 // @ts-nocheck
 
@@ -77,6 +77,7 @@ import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
 import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
+import { Route as GuidesCronkNutrientsGrowDiaryRouteImport } from './routes/guides.cronk-nutrients-grow-diary'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
 import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
@@ -494,6 +495,12 @@ const GuidesGrowStageCareGuideRoute =
   GuidesGrowStageCareGuideRouteImport.update({
     id: '/guides/grow-stage-care-guide',
     path: '/guides/grow-stage-care-guide',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const GuidesCronkNutrientsGrowDiaryRoute =
+  GuidesCronkNutrientsGrowDiaryRouteImport.update({
+    id: '/guides/cronk-nutrients-grow-diary',
+    path: '/guides/cronk-nutrients-grow-diary',
     getParentRoute: () => rootRouteImport,
   } as any)
 const InternalContextualPhenoComparisonDemoRoute =
@@ -999,6 +1006,7 @@ export interface FileRoutesByFullPath {
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/cronk-nutrients-grow-diary': typeof GuidesCronkNutrientsGrowDiaryRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1145,6 +1153,7 @@ export interface FileRoutesByTo {
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/cronk-nutrients-grow-diary': typeof GuidesCronkNutrientsGrowDiaryRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1295,6 +1304,7 @@ export interface FileRoutesById {
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/cronk-nutrients-grow-diary': typeof GuidesCronkNutrientsGrowDiaryRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1444,6 +1454,7 @@ export interface FileRouteTypes {
     | '/cultivars/$slug'
     | '/docs/mcp-api'
     | '/guides/$slug'
+    | '/guides/cronk-nutrients-grow-diary'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1590,6 +1601,7 @@ export interface FileRouteTypes {
     | '/cultivars/$slug'
     | '/docs/mcp-api'
     | '/guides/$slug'
+    | '/guides/cronk-nutrients-grow-diary'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1739,6 +1751,7 @@ export interface FileRouteTypes {
     | '/cultivars/$slug'
     | '/docs/mcp-api'
     | '/guides/$slug'
+    | '/guides/cronk-nutrients-grow-diary'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1863,6 +1876,7 @@ export interface RootRouteChildren {
   CultivarsSlugRoute: typeof CultivarsSlugRoute
   DocsMcpApiRoute: typeof DocsMcpApiRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
+  GuidesCronkNutrientsGrowDiaryRoute: typeof GuidesCronkNutrientsGrowDiaryRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
@@ -2351,6 +2365,13 @@ declare module '@tanstack/react-router' {
       path: '/guides/$slug'
       fullPath: '/guides/$slug'
       preLoaderRoute: typeof GuidesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/cronk-nutrients-grow-diary': {
+      id: '/guides/cronk-nutrients-grow-diary'
+      path: '/guides/cronk-nutrients-grow-diary'
+      fullPath: '/guides/cronk-nutrients-grow-diary'
+      preLoaderRoute: typeof GuidesCronkNutrientsGrowDiaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guides/grow-stage-care-guide': {
@@ -3188,6 +3209,7 @@ const rootRouteChildren: RootRouteChildren = {
   CultivarsSlugRoute: CultivarsSlugRoute,
   DocsMcpApiRoute: DocsMcpApiRoute,
   GuidesSlugRoute: GuidesSlugRoute,
+  GuidesCronkNutrientsGrowDiaryRoute: GuidesCronkNutrientsGrowDiaryRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,

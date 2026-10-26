@@ -26,6 +26,16 @@ import {
   type GrowStage,
 } from "../../constants/growStageCareGuide";
 import { PUBLIC_QUICK_LOG_STARTER_COPY } from "../../constants/publicQuickLogStarterCopy";
+import {
+  CRONK_FEED_LOG_DATE_MODIFIED,
+  CRONK_FEED_LOG_DATE_PUBLISHED,
+  CRONK_FEED_LOG_DESCRIPTION,
+  CRONK_FEED_LOG_FAQ,
+  CRONK_FEED_LOG_H1,
+  CRONK_FEED_LOG_PATH,
+  CRONK_FEED_LOG_TITLE,
+  cronkFeedLogWebApplicationJsonLd,
+} from "../cronkFeedLogRules";
 import { FOUNDER_SOCIAL_META } from "../../constants/founderSocialMeta";
 import {
   NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
@@ -722,6 +732,42 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "Reference for the Verdant Grow OS MCP server: grows, diary, sensor, and bounded Grow Walk context reads — parameters, response examples, and safety invariants.",
     imageAlt: "Verdant Grow OS MCP API reference",
+  }),
+  publicDocument(CRONK_FEED_LOG_PATH, {
+    title: `${CRONK_FEED_LOG_TITLE} | Verdant Grow Diary`,
+    description: CRONK_FEED_LOG_DESCRIPTION,
+    imageAlt: "Blank Cronk Nutrients feed log, planned vs actual by week",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${CRONK_FEED_LOG_TITLE} | Verdant Grow Diary`,
+        description: CRONK_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${CRONK_FEED_LOG_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: CRONK_FEED_LOG_H1,
+        description: CRONK_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${CRONK_FEED_LOG_PATH}`,
+        datePublished: CRONK_FEED_LOG_DATE_PUBLISHED,
+        dateModified: CRONK_FEED_LOG_DATE_MODIFIED,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${CRONK_FEED_LOG_PATH}`,
+        questions: CRONK_FEED_LOG_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Cronk Nutrients Grow Diary",
+            url: `${VERDANT_SITE_ORIGIN}${CRONK_FEED_LOG_PATH}`,
+          },
+        ],
+      }),
+      cronkFeedLogWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${CRONK_FEED_LOG_PATH}`),
+    ],
   }),
 ];
 

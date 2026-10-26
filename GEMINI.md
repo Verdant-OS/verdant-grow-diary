@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-26.1**
+**Sentinel-Version: 2026-10-26.2**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-26.1**
+**Sentinel-Version: 2026-10-26.2**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -311,7 +311,9 @@ ran and what you skipped.
   Repository work does not authorize
   those operations.
 - Every merge also needs the founder's per-item yes at that exact head SHA.
-  Review and green checks establish eligibility, not approval to merge. Other
+  Existing explicit founder grants keep their recorded scope; this rule does not
+  revoke them or broaden their authority. Review and green checks establish
+  eligibility, not approval to merge. Other
   per-item approval actions are recorded in the roster. Low-risk repository work
   outside those gates may proceed under its existing assignment.
 - Off-limits paths and named holds need an explicit reassignment. The current
@@ -543,6 +545,9 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants
+  in the per-item merge rule, matching the roster and ownership policy. No new merge
+  authority, review waiver or production permission is created.
 - **2026-10-26.1** — Reconcile the pending role and badge amendment with the numbered
   constitution and available-session independent review. Eighteen governed files;
   Security and Council are retired, with safety and quality review retained in the

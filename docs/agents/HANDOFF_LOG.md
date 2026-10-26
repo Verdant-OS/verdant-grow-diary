@@ -73,32 +73,32 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK PR-1971-CONFLICT-RESOLUTION  priority: P2  status: OPEN
-goal: Resolve hosted PR #1971 against the current deploy branch without rolling back later governance.
-why: GitHub reports conflicts across governance and role documents.
+goal: Fix PR #1971 review follow-ups, obtain green exact-head CI and eligible independent PASS, then merge through the queue. Do not deploy.
+why: The conflict repair is published; follow-up review identified stale delivery receipts and an approval-rule inconsistency.
 branch: canopy/constitution-clash-fixes (hosted); codex/pr1971-resolution (isolated local candidate)
-base: verdant-grow-diary at 3bc6b346f25249db408ca9cb9d2d94c33b3a442b
+base: verdant-grow-diary at a22bdec653f63fcd7362ce40d5172789175aceee (fresh base merged for the follow-up; confirm current tip before queueing).
 checkout: Fetch both branch refs, verify the hosted head below, then merge the current deploy tip in an isolated writable checkout.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1971
-head_sha: Hosted 82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e, observed 2026-10-26. The candidate is local only.
-state: local conflict resolution committed as edb4293d5600df68b4c3333580f2333d1c4b7c38; no branch push attempted
-current_step: All 15 conflicts resolved. Modern numbered constitution/routing retained; hosted badge/role/hosting intent reconciled; eighteen-file Sentinel version 2026-10-26.1. Focused tests: 87 PASS / 0 FAIL / 0 SKIP in 4 files (sequential 30s local timeout); initial parallel run: 85 PASS / 2 timeout FAIL. Mirror, parity and three docs scanners PASS. Governance Node suite: 31 PASS / 0 FAIL / 0 SKIP (720.4s on this Windows machine). Post-commit parity checked the exact deploy base ab566a23 and passed all eighteen governance files.
-base_refresh: Later base commits #2511 and #2309 merged cleanly as 6d51205a658fc3c35fa4c4265691ea9b05869f36. Their 11 changed files are CI/review controls and unrelated tests; the focused governance/safety test sources and dependency inputs are unchanged.
-next_action: Read the final validation receipt and recovery bundle, then obtain explicit clearance for the recorded push hold before a normal fast-forward update of the hosted PR branch. Keep the unavailable cloud amendment separate and recover it before claiming its delivery.
-post_merge_check: NOT_MEASURED; no PR merge or deployment authorized in this task.
+head_sha: 31bba66fe8c00cbe176bc2c9d5ba300d7c96a8fb (verified published checkpoint on 2026-10-26; this follow-up commit cannot record its own resulting SHA. Read the current full PR head and verify ancestry before acting).
+state: Conflict repair published by Codex with one normal push after Matthew explicitly cleared the push hold. The follow-up in this commit corrects the receipts and grant exception; subsequent CI/review/merge state must be read from the PR.
+current_step: Review follow-ups corrected. Local follow-up validation: 4 files / 87 PASS / 0 FAIL / 0 SKIP; eighteen-file version parity at 2026-10-26.2, mirror sync, three docs scanners and whitespace PASS. Earlier 31 governance tests remain a historical checkpoint result; checker/test bodies are unchanged. New-head hosted CI and independent acceptance must be measured separately.
+base_refresh: Cleanly merged a22bdec653f63fcd7362ce40d5172789175aceee for the follow-up, including the later Bun setup, Timeline dedupe and temperature-toast changes. These base changes are preserved; this PR introduces no application delta against that base.
+next_action: Verify the resulting full PR head, finish its required and supplemental CI, route one available non-contributing Claude/Grok review session under OWNERSHIP.md §4.3, and enqueue only after a clean exact-head PASS and green gates.
+post_merge_check: Verify merged state, merge SHA ancestry on verdant-grow-diary and queue removal; production deployment/verification remains outside this assignment.
 active_writer: Codex, explicitly assigned conflict resolution by the user in the current chat.
-decisions: Retain modern ownership precedence, reviewer exclusions, queue, holds, fixture safety and later base work; use 2026-10-26.1 across eighteen governed files; do not edit the three protected parity scripts.
+decisions: Retain modern ownership precedence, reviewer exclusions, queue, holds, fixture safety and later base work; preserve existing founder grants; use 2026-10-26.2 across eighteen governed files; leave the three protected parity scripts byte-identical to hosted 82f1e4ae.
 tried_and_rejected: Choosing all older PR governance would revert later rules; choosing all base governance would erase the badge/role amendment.
-commands: node scripts/check-sentinel-version-parity.mjs 3bc6b346f25249db408ca9cb9d2d94c33b3a442b; node --test scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; node scripts/assert-docs-safety.mjs; git diff --check
+commands: node scripts/check-sentinel-version-parity.mjs a22bdec653f63fcd7362ce40d5172789175aceee; node --test scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; node scripts/assert-docs-safety.mjs; git diff --check
 files_touched: PR governance/docs; docs/agents/constitution/roster.md; this log
 files_remaining: Validation-driven corrections only.
-blockers: No clearance observed for the reported GH013/support #4894653 push hold. No push to reproduce the denial. Cloud-local 10088e20a81bbb626de588485aff0437a917784d was unavailable; its cloud-only amendment is not represented as recovered or replaced.
-open_questions: Recover the cloud patch/bundle under /workspace/1971-cloud-only-deliverables/; confirm how to preserve its unpublished amendment before publication.
+blockers: Historical push hold explicitly cleared by Matthew on 2026-10-26; the earlier normal push succeeded. Fresh-head CI and an eligible independent PASS remain required. A fresh Grok review prompt is being prepared for owner delivery; no outside acceptance is claimed.
+open_questions: The unavailable cloud-local amendment remains separate and is not claimed as recovered. No production, auth, secret, scorer or deployment permission is granted by this task.
 gotchas: Three parity scripts/tests must remain byte-identical to hosted 82f1e4ae. #2086's pending 36-check proposal is separate; retain 35 required checks.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/1971#issuecomment-6368470866
-artifacts: C:/Users/G8/.codex/visualizations/2026/10/26/01a178c3-0cb1-7d81-816a-e07668e30911/pr1971-resolution/ (final validation receipt, scoped patch and verified Git bundle).
-reviewer_seat: Eligible non-contributing outside session under OWNERSHIP.md §4.3; NOT_MEASURED.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/1971 ; https://github.com/Verdant-OS/verdant-grow-diary/commit/31bba66fe8c00cbe176bc2c9d5ba300d7c96a8fb ; https://github.com/Verdant-OS/verdant-grow-diary/pull/1971#pullrequestreview-5656487345
+artifacts: Portable source evidence: config/required-status-checks.json, the PR checks tab, the published checkpoint commit, and the review permalink above. Local recovery files are supplemental and are not required to resume.
+reviewer_seat: One actually available eligible non-contributing Claude/Grok session under OWNERSHIP.md §4.3; no current independent acceptance recorded.
 reviewer_sha: NOT_MEASURED
-session_state: Local read-only peer scope audit; not independent acceptance. No merge, deploy, production operation or scorer unlock.
+session_state: Matthew authorized review-follow-up fixes, CI completion, independent acceptance and merge on 2026-10-26. No deploy. Read the current PR/check/review state instead of assuming this checkpoint remains current.
 claimed_by: Codex, 2026-10-26, explicit user assignment
 owner: Codex for this conflict-resolution task; retain the separately recorded cloud work.
 last_updated: 2026-10-26, by Codex

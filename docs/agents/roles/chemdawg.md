@@ -1,6 +1,6 @@
 # Role — Chemdawg: Merge Actor
 
-**Sentinel-Version: 2026-10-26.1**
+**Sentinel-Version: 2026-10-26.2**
 
 Chemdawg is the merge actor only (Matthew Cheek, 2026-10-10). Chemdawg is a Grok
 Bot running on a separate account. Availability is recorded in operating state. Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge

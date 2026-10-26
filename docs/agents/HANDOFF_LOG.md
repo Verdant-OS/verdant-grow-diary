@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ENV-CHART-TOOLTIP-PRECISION
+
+```text
+TASK ENV-CHART-TOOLTIP-PRECISION  priority: other  status: OPEN
+goal: Round Environment chart tooltip values to the same decimals as the matching value cards so a binary float such as 75.00200000000001°F is not shown.
+why: Cheeko reported the raw float on demo tent Veg B. The tooltip formatter printed the number unchanged while cards use fixed decimals.
+branch: cursor/env-chart-tooltip-rounding-309a
+base: verdant-grow-diary
+checkout: git fetch origin cursor/env-chart-tooltip-rounding-309a verdant-grow-diary && git switch cursor/env-chart-tooltip-rounding-309a && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft opened from this branch; read the PR URL after push
+head_sha: read origin/cursor/env-chart-tooltip-rounding-309a after push
+state: local implementation; draft after push
+current_step: formatter rounds tooltip values; Y-axis ticks unchanged
+next_action: confirm draft PR CI at the pushed head; do not merge or mark ready
+post_merge_check: hover the Environment chart on a tent whose temperature is not a clean tenth and confirm the tooltip matches the value card decimals
+active_writer: Cursor Grok cloud agent (this session)
+decisions: Tooltip decimals are temp 1, humidity 1, VPD 2, CO2 0, soil 1, PPFD 0. Y-axis tickDecimals stay as they were. Existing exact tooltip string pins for 72°F and 72°C were renegotiated to 72.0°F and 72.0°C.
+tried_and_rejected: Reusing formatSensorChartYTick would keep temperature at 0 decimals and would not match the value cards.
+commands: bunx vitest run src/test/sensor-chart-tooltip-precision.test.ts src/test/sensor-chart-unit-labels.test.ts src/test/sensor-chart-metric-units.test.ts src/test/aud-006-sensor-chart-axis.test.ts src/test/ppfd-chart-ai-context-and-export.test.tsx --reporter=dot
+files_touched: src/lib/sensorChartAxisRules.ts; src/test/sensor-chart-tooltip-precision.test.ts; src/test/sensor-chart-unit-labels.test.ts; src/test/sensor-chart-metric-units.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: Scorer lock required an unlock before the existing tooltip string pins could change. The unlock file is gitignored.
+links: draft PR after push
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: none
+session_state: Cursor cloud agent; draft only; no merge
+claimed_by: Cursor Grok cloud agent, 2026-10-26 18:55 UTC
+owner: Cursor Grok cloud agent
+last_updated: 2026-10-26 18:55 UTC, by Cursor Grok cloud agent
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

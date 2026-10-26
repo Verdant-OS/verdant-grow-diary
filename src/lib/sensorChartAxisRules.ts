@@ -8,8 +8,8 @@
  * safe gutter width per metric and a compact tick formatter that keeps
  * units visible without overflowing.
  *
- * Pure rules only. No React, no Recharts. Tooltip behavior and stored data
- * semantics are unchanged.
+ * Pure rules only. No React, no Recharts. Stored data semantics are unchanged.
+ * Tooltip values are rounded to the same decimals as the environment value cards.
  *
  * Temperature labels follow the saved °F/°C display preference. Callers should
  * pass the unit explicitly (from useTemperatureUnitPreference) to keep these
@@ -124,6 +124,21 @@ export function formatSensorChartYTick(
   return `${rounded}${sep}${unit}`;
 }
 
+/**
+ * Decimal places for tooltip values. Matches the environment value cards
+ * (dashboard strip: temperature and humidity 1, VPD 2) and the sensor
+ * presenter for the remaining chart metrics. Y-axis ticks stay on
+ * `tickDecimals` and are intentionally coarser.
+ */
+const TOOLTIP_DECIMALS: Record<SensorChartMetricKey, number> = {
+  temp: 1,
+  rh: 1,
+  vpd: 2,
+  co2: 0,
+  soil: 1,
+  ppfd: 0,
+};
+
 /** Tooltip-side formatter — uses the long unit (legend-consistent). */
 export function formatSensorChartTooltipValue(
   value: number,
@@ -134,7 +149,8 @@ export function formatSensorChartTooltipValue(
   const m = SENSOR_CHART_METRIC_META[metric];
   const unit = displayUnitOf(m, metric, temperatureUnit);
   const sep = /^[A-Za-zµ]/.test(unit) ? " " : "";
-  return `${value}${sep}${unit}`;
+  const shown = value.toFixed(TOOLTIP_DECIMALS[metric]);
+  return `${shown}${sep}${unit}`;
 }
 
 /**

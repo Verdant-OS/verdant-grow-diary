@@ -132,7 +132,7 @@ describe("legend / tooltip unit consistency", () => {
     const unit = getSensorMetricUnit("temp", "celsius");
     expect(unit).toBe("°C");
     expect(sensorChartLegendLabel("temp", "celsius")).toContain(unit);
-    expect(formatSensorChartTooltipValue(72, "temp", "celsius")).toBe("72°C");
+    expect(formatSensorChartTooltipValue(72, "temp", "celsius")).toBe("72.0°C");
     expect(formatSensorMetricValue("temp", 72, "celsius")).toBe("72°C");
   });
 });

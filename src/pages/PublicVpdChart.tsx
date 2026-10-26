@@ -3,6 +3,7 @@ import { Link } from "@/lib/react-router-compat";
 
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useHydrated } from "@/hooks/useHydrated";
 import {
   calculatePublicVpdChartFromFahrenheit,
   classifyPublicVpdChartCell,
@@ -13,11 +14,14 @@ import {
   PUBLIC_VPD_CHART_AIR_FAHRENHEIT_MIN,
   PUBLIC_VPD_CHART_DEFAULTS,
   PUBLIC_VPD_CHART_DESCRIPTION,
+  PUBLIC_VPD_CHART_ESTIMATE_NOTE,
   PUBLIC_VPD_CHART_FAQ,
   PUBLIC_VPD_CHART_H1,
   PUBLIC_VPD_CHART_HEATMAP_F_ROWS,
   PUBLIC_VPD_CHART_HEATMAP_RH_COLS,
   PUBLIC_VPD_CHART_PATH,
+  PUBLIC_VPD_CHART_SOURCES,
+  PUBLIC_VPD_CHART_STAGE_SUMMARY,
   PUBLIC_VPD_CHART_STAGES,
   PUBLIC_VPD_CHART_TITLE,
   publicVpdChartAirTemperatureFromDisplay,
@@ -25,12 +29,10 @@ import {
   publicVpdChartDisplayedAirTemperature,
   publicVpdChartDisplayedOffset,
   publicVpdChartFahrenheitToCelsius,
-  publicVpdChartMatchingStages,
   publicVpdChartMoveFocus,
   publicVpdChartNearestHeatmapCell,
   publicVpdChartOffsetFahrenheitToCelsius,
   publicVpdChartOffsetFromDisplay,
-  publicVpdChartSelectedStageVerdict,
   publicVpdChartStageById,
   type PublicVpdChartStageId,
   type PublicVpdChartUnit,
@@ -101,6 +103,7 @@ function DraftNumberInput({
 }
 
 export default function PublicVpdChart() {
+  const hydrated = useHydrated();
   const [unit, setUnit] = useState<PublicVpdChartUnit>(PUBLIC_VPD_CHART_DEFAULTS.unit);
   const [airTempF, setAirTempF] = useState<number>(PUBLIC_VPD_CHART_DEFAULTS.airTempF);
   const [rh, setRh] = useState<number>(PUBLIC_VPD_CHART_DEFAULTS.rh);
@@ -119,8 +122,6 @@ export default function PublicVpdChart() {
     [airTempF, offsetF, rh],
   );
   const selectedStage = publicVpdChartStageById(stageId);
-  const matches = publicVpdChartMatchingStages(calculation.vpdRounded);
-  const band = classifyPublicVpdChartCell(calculation.vpdRounded, stageId);
   const nearest = publicVpdChartNearestHeatmapCell(airTempF, rh);
   const nearestIndex = {
     row: PUBLIC_VPD_CHART_HEATMAP_F_ROWS.indexOf(nearest.rowF),
@@ -139,7 +140,11 @@ export default function PublicVpdChart() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f7f3] text-[#162419]">
+    <div
+      data-testid="public-vpd-chart-page"
+      data-hydrated={hydrated ? "true" : "false"}
+      className="min-h-screen bg-[#f4f7f3] text-[#162419]"
+    >
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
         <Link to="/" className="inline-flex items-center gap-2 font-semibold">
           <BrandLogo className="h-8 w-8" />
@@ -161,9 +166,8 @@ export default function PublicVpdChart() {
         </h1>
         <p className="max-w-3xl text-base leading-7">
           Vapor Pressure Deficit (VPD) measures the difference in kilopascals (kPa) between moisture
-          saturation inside the leaf and moisture in the surrounding grow tent air. Common grower
-          targets are 0.4–0.8 kPa for clones and seedlings, 0.8–1.2 kPa for veg, 1.0–1.5 kPa for
-          early flower, and 1.2–1.6 kPa for late flower.
+          saturation inside the leaf and moisture in the surrounding grow tent air.{" "}
+          {PUBLIC_VPD_CHART_STAGE_SUMMARY}
         </p>
         <p className="text-sm text-[#526656]">
           Calculated from values you entered. This is not a live sensor reading.
@@ -299,39 +303,25 @@ export default function PublicVpdChart() {
         </section>
 
         <section
-          className={`rounded-xl border p-4 ${BAND_CLASS[band.cssClass] ?? "bg-white"}`}
+          className="rounded-xl border bg-white p-4"
           aria-live="polite"
           aria-label="Calculated VPD"
         >
           <p className="text-sm">Calculated from values you entered</p>
           <p className="font-display text-4xl font-bold">{calculation.vpdFormatted} kPa</p>
           <p>
-            Computed leaf temp:{" "}
+            Assumed leaf temp:{" "}
             {isFahrenheit
               ? `${leafF.toFixed(1)} °F (${calculation.leafTempC.toFixed(1)} °C)`
               : `${calculation.leafTempC.toFixed(1)} °C (${leafF.toFixed(1)} °F)`}
           </p>
           <p>Leaf SVP: {calculation.svpLeaf.toFixed(2)} kPa</p>
           <p>Air actual vapor pressure: {calculation.avpAir.toFixed(2)} kPa</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {calculation.vpdRounded < 0.4 ? (
-              <span className="rounded-full bg-white/70 px-2 py-1 text-sm">
-                Below 0.4 kPa — very low (damp, mold risk)
-              </span>
-            ) : calculation.vpdRounded > 1.6 ? (
-              <span className="rounded-full bg-white/70 px-2 py-1 text-sm">
-                Above 1.6 kPa — very high (plant stress)
-              </span>
-            ) : (
-              matches.map((stage) => (
-                <span key={stage.id} className="rounded-full bg-white/70 px-2 py-1 text-sm">
-                  {stage.name} ({stage.min.toFixed(1)}–{stage.max.toFixed(1)} kPa)
-                </span>
-              ))
-            )}
-          </div>
-          <p className="mt-2 font-medium">
-            {publicVpdChartSelectedStageVerdict(calculation.vpdRounded, stageId)}
+          <p className="mt-2 font-medium">{PUBLIC_VPD_CHART_ESTIMATE_NOTE}</p>
+          <p className="mt-2 text-sm">
+            <Link to={PUBLIC_VPD_CALCULATOR_CROSS_LINK_PATH} className="underline">
+              Verify measurements for a stage comparison
+            </Link>
           </p>
           <p className="mt-3 text-sm">
             <Link to="/signup" className="underline">
@@ -344,6 +334,9 @@ export default function PublicVpdChart() {
           <h2 id="chart-heading" className="text-2xl font-semibold">
             VPD chart by growth stage
           </h2>
+          <p className="mt-2 text-sm">
+            Reference bands for hypothetical values, not a verified target status for your plants.
+          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PUBLIC_VPD_CHART_STAGES.map((stage) => (
               <h3 key={stage.id} className="text-base font-semibold">
@@ -441,11 +434,7 @@ export default function PublicVpdChart() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm">
-            Sources: Spider Farmer blog (clone/seedling 0.4–0.8 kPa, veg 0.8–1.2 kPa), Gorilla Grow
-            Tent VPD chart guide (early flower 1.0–1.5 kPa), Aroya VPD chart (late flower 1.2–1.6
-            kPa). Common grower targets, not strict rules. Updated Oct 2026.
-          </p>
+          <p className="mt-3 text-sm">{PUBLIC_VPD_CHART_SOURCES}</p>
         </section>
 
         <section>

@@ -14,6 +14,8 @@ export const PUBLIC_VPD_CHART_TITLE =
 export const PUBLIC_VPD_CHART_DESCRIPTION =
   "Free VPD calculator in °F or °C with leaf temp offset, plus a VPD chart for clones, veg, early and late flower. Then log your own readings in Verdant." as const;
 export const PUBLIC_VPD_CHART_H1 = "VPD Chart and Calculator for Every Growth Stage" as const;
+export const PUBLIC_VPD_CHART_ESTIMATE_NOTE =
+  "Illustrative estimate using an assumed leaf-temperature offset. No verified target status. Measure leaf temperature at the canopy and verify temperature/RH calibration before comparing with a stage target." as const;
 
 export const PUBLIC_VPD_CALCULATOR_CROSS_LINK_PATH = "/tools/vpd-calculator" as const;
 
@@ -69,6 +71,23 @@ export const PUBLIC_VPD_CHART_STAGES: readonly PublicVpdChartStage[] = Object.fr
     source: "Aroya VPD chart",
   }),
 ]);
+
+function stageRange(stage: PublicVpdChartStage): string {
+  return `${stage.min.toFixed(1)}–${stage.max.toFixed(1)} kPa`;
+}
+
+const [clone, veg, earlyFlower, lateFlower] = PUBLIC_VPD_CHART_STAGES;
+
+export const PUBLIC_VPD_CHART_STAGE_SUMMARY =
+  `Common grower targets are ${stageRange(clone)} for clones and seedlings, ` +
+  `${stageRange(veg)} for veg, ${stageRange(earlyFlower)} for early flower, ` +
+  `and ${stageRange(lateFlower)} for late flower.`;
+
+export const PUBLIC_VPD_CHART_SOURCES =
+  `Sources: ${clone.source} (clone/seedling ${stageRange(clone)}, veg ${stageRange(veg)}), ` +
+  `${earlyFlower.source} (early flower ${stageRange(earlyFlower)}), ` +
+  `${lateFlower.source} (late flower ${stageRange(lateFlower)}). ` +
+  "Common grower targets, not strict rules. Updated Oct 2026.";
 
 export const PUBLIC_VPD_CHART_FAQ = Object.freeze([
   Object.freeze({

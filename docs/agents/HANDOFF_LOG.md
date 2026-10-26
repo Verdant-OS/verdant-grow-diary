@@ -12,23 +12,47 @@ An unpushed candidate is not a remote head and must never be treated as hosted C
 
 ## Template
 
+A cold agent (Claude Code, Codex, Cursor, or Grok) must be able to take the next step
+from this entry, the PR, and the repo, with no chat history. Use plain repo paths, full
+SHAs, and URLs. Do not write "as discussed" or "per my earlier message".
+
 ```text
 TASK <id>  priority: publish-gate | P1 | P2 | other  status: OPEN | CLOSED
 goal:
+why:
 branch: codex/<task-id>-<slug> for new Codex tasks; preserve existing names
 base: verdant-grow-diary or the recorded parent branch
-checkout: git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
+checkout: git fetch origin <branch> <base> && git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
 pr: URL or NOT_MEASURED
 head_sha: full exact remote SHA, with observation time
 state: implemented / local only / pushed draft / CI / review / merged / live measured
-next_action: the single smallest next step
-files:
+current_step:
+next_action: the single smallest next step a cold agent can run
+post_merge_check: the check that reopens this work with the same owner if it fails after merge; or NOT_APPLICABLE
+active_writer: the branch holder; only that holder pushes; nobody edits another holder's branch
+decisions: what was decided, and the reason for each
+tried_and_rejected: what was tried, and why it was rejected
+commands: exact commands to reproduce the current state and run the relevant tests
+files_touched: repo paths
+files_remaining: repo paths still to touch
 blockers: blocker and who can clear it
+open_questions:
+gotchas:
+links: review, issue, and run URLs
 artifacts: repository paths or PR/check URLs; local receipts may supplement them
 reviewer_seat:
+reviewer_sha: full SHA the current review or human go-ahead covers; never an older SHA
+session_state: cloud agent ids, routines, paused workflows, pending human decisions
 claimed_by: agent and date/time/zone, or empty
+owner: current owner; on retirement, transfer the CURRENT_STATE row (default inheritor: OG Kush)
 last_updated: YYYY-MM-DD HH:MM CT, by agent
 ```
+
+Before stopping, run the cold start test: a fresh agent reading only the PR, this
+entry, and the repo can take `next_action`. The matching PR comment starts with
+`resume here` and repeats goal, why, decisions, rejected attempts, commands, files
+touched and remaining, open questions, gotchas, links, and the exact head SHA.
+Retirement adds a `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC` comment on the PR.
 
 Before the checkout command, run `git fetch origin <branch> <base>`, then compare the
 freshly fetched `git rev-parse origin/<branch>` with head_sha as AGENTS.md (Agent Handoff /
@@ -51,18 +75,29 @@ active checkout has the branch open; inspect worktree ownership before selecting
 TASK CLAUDE-1949-QUICKLOG-LOCAL-TIMEZONE  priority: P2  status: OPEN
 goal: Quick Log timeline clocks, day groups and snapshot strip follow the viewer's timezone; stored values stay UTC.
 branch: cursor/quicklog-local-timezone-ec09
+historical_branch_2026_10_21: cursor/quicklog-local-timezone-ec09
 base: verdant-grow-diary
-checkout: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 (draft)
-head_sha: 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da (observed 2026-10-21 19:20 UTC, origin/cursor/quicklog-local-timezone-ec09)
-state: pushed draft (returned to draft 2026-10-21 19:44 UTC at Matthew's direction, per AGENTS.md "Open PRs as drafts"). Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
 files: src/lib/quickLogGroupedTimelineFilterViewModel.ts; src/components/QuickLogGroupedTimelineSection.tsx; src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts; src/components/AiDoctorPhase1TimelineEvidenceCard.tsx; src/lib/quickLogSnapshotStripAdapter.ts; 9 test files (4 renegotiated pins approved 2026-10-09 and 2026-10-21)
-blockers: none for the repository change
-artifacts: PR body Scorer-lock record and Tests run.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:45 CT, by Claude
+head_sha: 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da (observed 2026-10-21 19:20 UTC, origin/cursor/quicklog-local-timezone-ec09)
+historical_state_2026_10_21: pushed draft (returned to draft 2026-10-21 19:44 UTC at Matthew's direction, per AGENTS.md "Open PRs as drafts"). Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
+historical_next_action_2026_10_21: Merge steward checks the head.
+historical_blockers_2026_10_21: none for the repository change
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:45 CT, by Claude
+state: OPEN/draft at the observed full head. Current-base compatibility and current acceptance/check evidence must be rechecked; the October21 PASS remains historical evidence.
+checkout: Fetch this existing source branch and verify the current full PR head and effective holder before any write. Historical commands and checkpoints are not authority to overwrite active work.
+next_action: Existing source holder resolves the branch conflict under current approvals, then refreshes checks and eligible exact-head review. No source claim is created by this log update.
+blockers: Current source ownership/holds and exact-head CI/acceptance require the live PR evidence described above. Old green checks or dated PASSes do not clear a changed head.
+reviewer_seat: An actually available eligible independent session under current OWNERSHIP.md, excluding all authors and repairers. Preserve any still-valid source receipt; no duplicate request is created by this log.
+claimed_by: NOT_MEASURED for the current active session; consult effective PR claims. The historical claim is preserved above, not released, renewed or transferred by this documentation update.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body Scorer-lock record and Tests run.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
 ```
 
 ### CLAUDE-2307-PHENO-ADD-CANDIDATES
@@ -71,18 +106,29 @@ last_updated: 2026-10-21 14:45 CT, by Claude
 TASK CLAUDE-2307-PHENO-ADD-CANDIDATES  priority: P2  status: OPEN
 goal: Add plants to an existing pheno hunt from the workspace and the plant page, numbered after the existing candidates (hunt 78523688: 16 -> 18); owner-only, no migration.
 branch: claude/pheno-hunt-add-candidates
+historical_branch_2026_10_21: claude/pheno-hunt-add-candidates
 base: verdant-grow-diary
-checkout: git fetch origin claude/pheno-hunt-add-candidates verdant-grow-diary && git switch claude/pheno-hunt-add-candidates && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2307 (draft)
-head_sha: 4f50ef1363f434b8cf05976831c50788837afaeb (observed 2026-10-21 19:20 UTC, origin/claude/pheno-hunt-add-candidates)
-state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:31 UTC; posted with Matthew's approval): the ed5a4a61 P1 is resolved (ambiguous tag write never undone; tag_unconfirmed) and stale results are dropped across navigation generations. 35/35 required green, all 18 threads resolved; Codex bot found no major issues at 4f50ef13.
-next_action: Merge steward checks the head. Any new commit voids the PASS.
 files: src/lib/phenoHuntAddCandidatesRules.ts; src/lib/phenoHuntAddCandidatesService.ts; src/components/PhenoHuntAddCandidatesDialog.tsx; src/components/AddToPhenoHuntButton.tsx; src/pages/PhenoHuntWorkspace.tsx; src/pages/PlantDetail.tsx; src/test/pheno-hunt-add-candidates.test.ts; src/test/pheno-hunt-add-candidates-ui.test.tsx
-blockers: none for the repository change. RLS/trigger behaviour against a real DB and production 16 -> 18 are NOT_MEASURED.
-artifacts: PR body Tests section; RED/GREEN in commit messages bcbe2792 (3 RED, 40/40) and 4f50ef13 (2 RED, 42/42).
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:40 CT, by Claude
+head_sha: de93327b0225eb0b58f28d27cebf70209cf06156 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 4f50ef1363f434b8cf05976831c50788837afaeb (observed 2026-10-21 19:20 UTC, origin/claude/pheno-hunt-add-candidates)
+historical_state_2026_10_21: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:31 UTC; posted with Matthew's approval): the ed5a4a61 P1 is resolved (ambiguous tag write never undone; tag_unconfirmed) and stale results are dropped across navigation generations. 35/35 required green, all 18 threads resolved; Codex bot found no major issues at 4f50ef13.
+historical_next_action_2026_10_21: Merge steward checks the head. Any new commit voids the PASS.
+historical_blockers_2026_10_21: none for the repository change. RLS/trigger behaviour against a real DB and production 16 -> 18 are NOT_MEASURED.
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:40 CT, by Claude
+state: OPEN/non-draft after Matthew-approved ready transition. A subsequent external base merge changed the head; all old 4f50ef13 verdicts are historical and do not accept the new head.
+checkout: Fetch this existing source branch and verify the current full PR head and effective holder before any write. Historical commands and checkpoints are not authority to overwrite active work.
+next_action: Reconcile the intervening writer; verify fresh CI and obtain eligible independent full-head acceptance before queue admission. Do not resume or accept the old source checkpoint.
+blockers: Current source ownership/holds and exact-head CI/acceptance require the live PR evidence described above. Old green checks or dated PASSes do not clear a changed head.
+reviewer_seat: An actually available eligible independent session under current OWNERSHIP.md, excluding all authors and repairers. Preserve any still-valid source receipt; no duplicate request is created by this log.
+claimed_by: NOT_MEASURED for the current active session; consult effective PR claims. The historical claim is preserved above, not released, renewed or transferred by this documentation update.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body Tests section; RED/GREEN in commit messages bcbe2792 (3 RED, 40/40) and 4f50ef13 (2 RED, 42/42).; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/pheno-hunt-add-candidates verdant-grow-diary && git switch claude/pheno-hunt-add-candidates && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
 ```
 
 ### CLAUDE-2261-BLANK-RECORD-DOWNLOAD-LINKS
@@ -91,38 +137,29 @@ last_updated: 2026-10-21 14:40 CT, by Claude
 TASK CLAUDE-2261-BLANK-RECORD-DOWNLOAD-LINKS  priority: P2  status: OPEN
 goal: Link the #2260 blank observation record downloads from the grower guides, plus internal-link map ranks 1-3.
 branch: claude/seo-blank-record-download-links
+historical_branch_2026_10_21: claude/seo-blank-record-download-links
 base: verdant-grow-diary
-checkout: git fetch origin claude/seo-blank-record-download-links verdant-grow-diary && git switch claude/seo-blank-record-download-links && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2261 (draft)
-head_sha: 3e3de6251dfd2b8ea2827d706e19fc4e12fc9059 (observed 2026-10-21 19:20 UTC, origin/claude/seo-blank-record-download-links)
-state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2 at 038064b3; the href-count P2 is resolved. CI 70 success / 17 skipped incl. 32 shards and the main build (per the verdict).
-next_action: After #2260 merges, merge base here (a new head needs fresh checks and a fresh verdict); then the merge steward checks the head.
 files: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/build/staticPublicSeoDocuments.ts; src/test/seo-blank-record-download-links.test.tsx; src/test/seo-guide-internal-link-map.test.tsx; src/test/internal-link-manifest-integrity.test.ts (approved .csv pin, 2026-10-20); plus #2260's five files
-blockers: Merge order: #2260 first. The inherited #2260 PDF needs its own acceptance; this verdict did not visually review it.
-artifacts: PR body Commits / Renegotiated scorer / Tests sections.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:40 CT, by Claude
-```
-
-### CLAUDE-2301-COMMUNITY-V1-TASK2A-PROOF
-
-```text
-TASK CLAUDE-2301-COMMUNITY-V1-TASK2A-PROOF  priority: P2  status: OPEN
-goal: Community V1 Task 2A: fail-first security proof (37 runtime cases, catalog SQL, dispatch-only workflow) before the migration exists.
-branch: claude/community-v1-task2a-proof
-base: verdant-grow-diary
-checkout: git fetch origin claude/community-v1-task2a-proof verdant-grow-diary && git switch claude/community-v1-task2a-proof && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2301 (draft)
-head_sha: d0a009fb98c0d7bd5091f12a11e84932ffb0bb9a (observed 2026-10-21 19:20 UTC, origin/claude/community-v1-task2a-proof)
-state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:31 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at d0a009fb.
-next_action: Merge steward checks the head; after merge, dispatching the RED run (expect=red) on verdant-grow-diary is an owner action.
-files: .github/workflows/community-v1-db-proof.yml; scripts/security/community-v1-db-proof.mjs; scripts/security/run-community-v1-db-security.mjs; src/test/community-v1-db-proof-runner.test.ts; src/test/integration/community-v1-authority.integration.test.ts; supabase/tests/community_v1_permissions.sql
-blockers: RED receipt against a disposable local Supabase is NOT_MEASURED until dispatched after merge. Non-required Supabase Preview fails on ai_credit_grants 42P07 (not this PR's).
-artifacts: PR body Tests run section.
-reviewer_seat: Codex (.github workflow + security harness), exact head. Claude authored it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:40 CT, by Claude
+head_sha: 3e3de6251dfd2b8ea2827d706e19fc4e12fc9059 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 3e3de6251dfd2b8ea2827d706e19fc4e12fc9059 (observed 2026-10-21 19:20 UTC, origin/claude/seo-blank-record-download-links)
+historical_state_2026_10_21: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2 at 038064b3; the href-count P2 is resolved. CI 70 success / 17 skipped incl. 32 shards and the main build (per the verdict).
+historical_next_action_2026_10_21: After #2260 merges, merge base here (a new head needs fresh checks and a fresh verdict); then the merge steward checks the head.
+historical_blockers_2026_10_21: Merge order: #2260 first. The inherited #2260 PDF needs its own acceptance; this verdict did not visually review it.
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:40 CT, by Claude
+state: OPEN/draft at the observed full head. The parent #2260/PDF acceptance prerequisite remains; old source PASS is not an override.
+checkout: Fetch this existing source branch and verify the current full PR head and effective holder before any write. Historical commands and checkpoints are not authority to overwrite active work.
+next_action: Preserve the existing source writer and valid historical review. Verify parent #2260 and PDF acceptance plus current head, holds and required evidence before integration.
+blockers: Current source ownership/holds and exact-head CI/acceptance require the live PR evidence described above. Old green checks or dated PASSes do not clear a changed head.
+reviewer_seat: An actually available eligible independent session under current OWNERSHIP.md, excluding all authors and repairers. Preserve any still-valid source receipt; no duplicate request is created by this log.
+claimed_by: NOT_MEASURED for the current active session; consult effective PR claims. The historical claim is preserved above, not released, renewed or transferred by this documentation update.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body Commits / Renegotiated scorer / Tests sections.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/seo-blank-record-download-links verdant-grow-diary && git switch claude/seo-blank-record-download-links && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
 ```
 
 ### CLAUDE-2023-HOME-CONSOLIDATION
@@ -131,138 +168,119 @@ last_updated: 2026-10-21 14:40 CT, by Claude
 TASK CLAUDE-2023-HOME-CONSOLIDATION  priority: P2  status: OPEN
 goal: Make / the only home page: /welcome, /features and /demo 308 to /; sitemap and static SEO docs drop /welcome.
 branch: cursor/welcome-home-redirect-05d3
+historical_branch_2026_10_21: cursor/welcome-home-redirect-05d3
 base: verdant-grow-diary
-checkout: git fetch origin cursor/welcome-home-redirect-05d3 verdant-grow-diary && git switch cursor/welcome-home-redirect-05d3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2023 (draft)
-head_sha: 543e03308d29e626be743cc48e62cd1bdc691220 (observed 2026-10-21 19:20 UTC, origin/cursor/welcome-home-redirect-05d3)
-state: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head. If #2310 merges first, merge base here; that new head needs fresh checks and a fresh verdict.
 files: 71 files; see the PR (Worker redirects, sitemap, llms.txt, verdantSeoContent.ts, appRouteManifest.ts, legal shell, tests)
-blockers: Live redirect/canonical behaviour NOT_MEASURED until released. #2028 owns the llms.txt Pricing wording.
-artifacts: PR body Evidence section; coordination note with #2310.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:40 CT, by Claude
+head_sha: 543e03308d29e626be743cc48e62cd1bdc691220 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 543e03308d29e626be743cc48e62cd1bdc691220 (observed 2026-10-21 19:20 UTC, origin/cursor/welcome-home-redirect-05d3)
+historical_state_2026_10_21: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:30 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at the 18:07 UTC check.
+historical_next_action_2026_10_21: Merge steward checks the head. If #2310 merges first, merge base here; that new head needs fresh checks and a fresh verdict.
+historical_blockers_2026_10_21: Live redirect/canonical behaviour NOT_MEASURED until released. #2028 owns the llms.txt Pricing wording.
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:40 CT, by Claude
+state: OPEN/non-draft; admitted through the normal exact-head merge queue at2026-10-26 17:01:02 UTC. At the last coordinator read, position 5 awaits predecessor groups. No merge is observed.
+checkout: Fetch this existing source branch and verify the current full PR head and effective holder before any write. Historical commands and checkpoints are not authority to overwrite active work.
+next_action: The existing Codex queue coordinator monitors the existing entry through synthetic validation and actual merge; do not enqueue twice. Refresh exact-head gates if anything changes.
+blockers: Current source ownership/holds and exact-head CI/acceptance require the live PR evidence described above. Old green checks or dated PASSes do not clear a changed head.
+reviewer_seat: An actually available eligible independent session under current OWNERSHIP.md, excluding all authors and repairers. Preserve any still-valid source receipt; no duplicate request is created by this log.
+claimed_by: NOT_MEASURED for the current active session; consult effective PR claims. The historical claim is preserved above, not released, renewed or transferred by this documentation update.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body Evidence section; coordination note with #2310.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin cursor/welcome-home-redirect-05d3 verdant-grow-diary && git switch cursor/welcome-home-redirect-05d3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
 ```
 
-### CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA
+### PR-2345-BASE-INTEGRATION
 
 ```text
-TASK CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA  priority: P2  status: OPEN
-goal: Ship /guides/grow-stage-care-guide FAQPage and BreadcrumbList JSON-LD in the first SSR response (Ahrefs Article-schema audit 2026-10-21). No Article or dates; publishedOn gate preserved.
-branch: claude/verdant-closeout-handoff-phofrz
-base: verdant-grow-diary
-checkout: git fetch origin claude/verdant-closeout-handoff-phofrz verdant-grow-diary && git switch claude/verdant-closeout-handoff-phofrz && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2310 (draft)
-head_sha: 9d05deae12eca8117dea5e1859ebf18fc11fe28b (observed 2026-10-21 19:20 UTC, origin/claude/verdant-closeout-handoff-phofrz)
-state: pushed draft. 35/35 required checks green; Codex bot found no major issues. Merges cleanly with #2023 (combined 4 files, 35/35).
-next_action: Wait for the owner-assistant Codex exact-head verdict at 9d05deae.
-files: src/lib/build/staticPublicSeoDocuments.ts; src/pages/GrowStageCareGuide.tsx; src/test/grow-stage-care-schema-ssr.test.tsx
-blockers: Codex exact-head verdict pending. Shares two files with #2023: whichever merges second merges base.
-artifacts: RED 3 of 5 with the fix set aside; GREEN 5/5, neighbours 10 files 283/283. Coordination note on #2023.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+TASK PR-2345-BASE-INTEGRATION  priority: P2  status: OPEN
+goal: Integrate the latest deploy base into #2345, preserve the temperature tests, push and refresh CI, obtain eligible outside acceptance, and report queue readiness without merging the PR or deploying.
+why: The live base added the shared Radix teardown fix after the previous integration; preserve the supplemental temperature regressions while running them with that updated test environment. The production temperature fix already merged in #2405.
+branch: claude/settings-temperature-reset-label
+base: verdant-grow-diary at 0673fe6f7d4afbb92d9485aa6bd4bd605242ed33
+checkout: git fetch origin +refs/heads/claude/settings-temperature-reset-label:refs/remotes/origin/claude/settings-temperature-reset-label +refs/heads/verdant-grow-diary:refs/remotes/origin/verdant-grow-diary && git switch claude/settings-temperature-reset-label && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345
+head_sha: 21890353b5158f990401f31044c8f7f32fc1a2d9 (remote source checkpoint verified 2026-10-24 21:12 UTC; read the PR for the resulting integration head, then verify ancestry before resuming)
+state: This integration merges base 0673fe6f. Settings.tsx and all three temperature reset test files are preserved byte-for-byte from source head 21890353. The PR delta remains six supplemental preference-event cases and this handoff. New-head hosted CI and eligible independent acceptance are NOT_MEASURED; older CI and reviews do not cover this integration head.
+current_step: The latest base merged cleanly. All twelve review threads were resolved at source head 21890353 by the time of the 21:13 UTC read; this coordinator posted no replies or resolutions. Focused validation with the incoming shared setup passed 9 files/91 tests/0 failures.
+next_action: Verify the PR's resulting full head and fresh CI; finish local Grok OAuth sign-in and route one fresh non-contributing Grok review once authentication is verified. No PR merge, queue entry or deploy is authorized.
+post_merge_check: NOT_APPLICABLE (supplemental tests and handoff only; no merge or deployment authorized).
+active_writer: Codex PR #2345 repair session, explicitly assigned the base merge and branch push by Matthew; no takeover of another branch or workstream.
+decisions: Keep all temperature files unchanged, preserve every base handoff block, use a normal merge and push, and keep unsaved radio-choice behavior separate from reactive stored preference.
+tried_and_rejected: A Codex technical review cannot accept a PR Codex repaired. Grok's cached model listing did not establish authentication. No force-push, protection bypass or substitute PR.
+commands: node node_modules/vitest/vitest.mjs run src/test/temperature-unit-preference.test.ts src/test/temperature-unit-preference-hardening.test.ts src/test/temperature-unit-preference-boundary.test.ts src/test/temperature-unit-reset-stored-override.test.tsx src/test/temperature-unit-reset-label.test.tsx src/test/temperature-unit-reset-events.test.tsx src/test/temperature-unit-settings-tile.test.tsx src/test/use-temperature-unit-preference-same-tab.test.tsx src/test/radix-focus-scope-teardown-flush.test.tsx --reporter=dot; node scripts/assert-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 0673fe6f7d4afbb92d9485aa6bd4bd605242ed33 --strict
+files_touched: src/test/temperature-unit-reset-events.test.tsx; docs/agents/HANDOFF_LOG.md (PR delta only; other staged changes are the unmodified incoming base).
+files_remaining: none planned; new reviewer findings require a scoped repair and fresh exact-head review.
+blockers: Grok and Claude Code availability probes remained unauthenticated on 2026-10-24 21:12 UTC. A local Grok OAuth login flow was initiated for Matthew to complete in the browser; no model review has started. Public claim/resume comments remain outside the user's authorized scope; the empty claimed_by field is not an effective public ownership lock.
+open_questions: Whether Grok OAuth has completed; required-check results at the resulting integration head remain NOT_MEASURED.
+gotchas: Re-check the full remote PR head and live base, not stale tracking refs. A source checkpoint is not the resulting commit SHA; new commits invalidate earlier CI and reviews. Open #2434 overlaps one same-document case and remains untouched.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345 ; source-head CI only: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40132885060 ; resolved handoff findings: https://github.com/Verdant-OS/verdant-grow-diary/pull/2345#pullrequestreview-5639778109
+artifacts: config/required-status-checks.json and the PR's resulting-head checks. This merge candidate passed 9 files/91 tests/0 failures, scoped ESLint and Prettier, docs safety, whitespace, strict scorer checks and Sentinel parity. tsgo retained two known getSsrStatus diagnostics in the unchanged not-found-route-status test; full local suite/build were not run. New-head hosted CI remains NOT_MEASURED.
+reviewer_seat: BLOCKED pending an authenticated fresh non-contributing Grok session; no request sent, fallback transfers=0. Earlier Codex technical observations are not acceptance.
+reviewer_sha: NOT_MEASURED; no eligible exact-head PASS.
+session_state: Codex integration coordinator remains active; local Grok OAuth process PID 23316 is awaiting browser sign-in; no review process or routine was created. The existing disabled Mocked E2E workflow is unchanged.
+claimed_by:
+owner: Codex PR #2345 repair session by explicit user assignment: merge latest base, preserve temperature tests, push, rerun CI, obtain independent review; no PR merge or deploy. This owner record does not assert a posted public claim.
+last_updated: 2026-10-24 16:15 CT, by Codex PR #2345 repair session
 ```
 
-### CLAUDE-2297-COMMUNITY-OCCURRED-DATE
+### HANDOFF-CONTINUITY-20261024
 
 ```text
-TASK CLAUDE-2297-COMMUNITY-OCCURRED-DATE  priority: P2  status: OPEN
-goal: Community V1 Task 1 follow-up: occurredDate in the publication and digest rules.
-branch: claude/community-v1-occurred-date
+TASK HANDOFF-CONTINUITY-20261024  priority: other  status: OPEN
+goal: Docs-only constitution amendment so a retired or out-of-token agent can be resumed immediately, including Cheeko's seven further gates (one writer, one-pass review, stale expiry, ship/money, repo-wide breakages, protected instruction files, post-merge loop).
+why: Unpushed session state and SHA-unbound passes leave the next agent unable to continue. Cheeko approved the continuity rules and the seven gates for this same draft.
+branch: cursor/handoff-continuity-a798
 base: verdant-grow-diary
-checkout: git fetch origin claude/community-v1-occurred-date verdant-grow-diary && git switch claude/community-v1-occurred-date && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2297 (draft)
-head_sha: c0ec5f00414afd165cd92361084286275422d559 (observed 2026-10-21 19:20 UTC, origin/claude/community-v1-occurred-date)
-state: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
-files: src/lib/communityPublicationRules.ts; src/lib/communityTypes.ts; src/test/community-digest-rules.test.ts; src/test/community-publication-rules.test.ts
-blockers: none for the repository change
-artifacts: PR body.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
+head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
+state: pushed draft once this commit is on the remote
+current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry
+next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain a fresh independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
+decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
+tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
+commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.6 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
+files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/*.md; docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
+files_remaining: none in this slice. .github/pull_request_template.md stays unchanged.
+blockers: independent exact-head review not yet requested; GitHub comment approval gate still applies to a resume-here comment unless Cheeko or Matthew allows it
+open_questions: none for the wording Cheeko approved
+gotchas: A new commit invalidates any review of an older SHA. CURRENT_STATE.md is exempt from Sentinel-Version. Do not force-push. Keep the PR draft.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523 ; PASS at d46e2a3c only: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523#pullrequestreview-5638407206
+artifacts: this block
+reviewer_seat: an eligible independent session that did not author this PR (not this Cursor Grok session)
+reviewer_sha: none yet
+session_state: Cursor cloud agent on cursor/handoff-continuity-a798; no paused workflow; no pending human decision beyond draft review
+post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.6 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
+active_writer: Cursor Grok cloud agent (this session)
+claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-24 13:50 UTC, by Cursor Grok cloud agent
 ```
 
-### CLAUDE-2303-TENT-PAGE-CANONICAL-VPD
+### REVIEWER-ROUTING-20261022
 
 ```text
-TASK CLAUDE-2303-TENT-PAGE-CANONICAL-VPD  priority: P2  status: OPEN
-goal: Tent page VPD uses the canonical calculation and fallback freshness.
-branch: claude/tent-page-canonical-vpd
-base: verdant-grow-diary
-checkout: git fetch origin claude/tent-page-canonical-vpd verdant-grow-diary && git switch claude/tent-page-canonical-vpd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2303 (draft)
-head_sha: 0a55d871b970d998ff085995827e0b952d1bfed9 (observed 2026-10-21 19:20 UTC, origin/claude/tent-page-canonical-vpd)
-state: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
-files: src/lib/tentDetailVpdRules.ts; src/pages/TentDetail.tsx; src/test/tent-detail-vpd-fallback-freshness.test.tsx
-blockers: none for the repository change
-artifacts: PR body.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
-```
-
-### CLAUDE-2304-FEEDING-NEGATIVE-EC
-
-```text
-TASK CLAUDE-2304-FEEDING-NEGATIVE-EC  priority: P2  status: OPEN
-goal: Quick Log feeding form rejects typed negative EC values, including exponent forms.
-branch: claude/plant-feeding-ec-in-negative
-base: verdant-grow-diary
-checkout: git fetch origin claude/plant-feeding-ec-in-negative verdant-grow-diary && git switch claude/plant-feeding-ec-in-negative && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2304 (draft)
-head_sha: 6be2183a75ee48fff0493387e2cafa19cb3b3c69 (observed 2026-10-21 19:20 UTC, origin/claude/plant-feeding-ec-in-negative)
-state: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
-files: src/lib/quickLogFeedingFormViewModel.ts; src/components/QuickLogFeedingForm.tsx; src/components/QuickLogV2Sheet.tsx; src/test/quick-log-v2-sheet-feeding-negative-ec.test.tsx
-blockers: none for the repository change
-artifacts: PR body.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
-```
-
-### CLAUDE-2305-MANUAL-SENSOR-DRAFT-UNIT
-
-```text
-TASK CLAUDE-2305-MANUAL-SENSOR-DRAFT-UNIT  priority: P2  status: OPEN
-goal: A restored manual sensor draft keeps the temperature unit it was entered in.
-branch: claude/manual-sensor-draft-unit-preference
-base: verdant-grow-diary
-checkout: git fetch origin claude/manual-sensor-draft-unit-preference verdant-grow-diary && git switch claude/manual-sensor-draft-unit-preference && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2305 (draft)
-head_sha: 4cc9c36d1f28a179d6ffbb0106778cad8db39c5d (observed 2026-10-21 19:20 UTC, origin/claude/manual-sensor-draft-unit-preference)
-state: pushed draft. Codex PASS at this head; native save/retrieve passed (run 39647054999); 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
-files: src/lib/manualSensorPendingSnapshotStore.ts; src/hooks/useSensorsPageSession.ts; src/test/manual-sensor-restored-draft-unit-preference.test.tsx
-blockers: none for the repository change
-artifacts: PR body.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
-```
-
-### CLAUDE-2306-PHOTO-PENDING-SAVE-LOG
-
-```text
-TASK CLAUDE-2306-PHOTO-PENDING-SAVE-LOG  priority: P2  status: OPEN
-goal: Quick Log keeps a photo that is still validating when Save Log is pressed.
-branch: claude/upload-photo-save-log-keeps-photo
-base: verdant-grow-diary
-checkout: git fetch origin claude/upload-photo-save-log-keeps-photo verdant-grow-diary && git switch claude/upload-photo-save-log-keeps-photo && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2306 (draft)
-head_sha: 8dc28600a3b7e10d35f5d6db96c043415d52f49c (observed 2026-10-21 19:20 UTC, origin/claude/upload-photo-save-log-keeps-photo)
-state: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
-next_action: Merge steward checks the head.
-files: src/components/QuickLog.tsx; src/components/QuickLogAllActivitiesSection.tsx; src/lib/quickLogPendingSectionPhotoRules.ts; src/test/quick-log-dialog-save-log-pending-section-photo.test.tsx
-blockers: none for the repository change
-artifacts: PR body.
-reviewer_seat: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
-claimed_by: Claude, 2026-10-21 14:20 CT
-last_updated: 2026-10-21 14:20 CT, by Claude
+TASK REVIEWER-ROUTING-20261022  priority: P2  status: OPEN
+goal: Matthew-approved bounded reviewer routing: retire Blue Dream/Critical Mass for future requests, allow available eligible independent sessions, preserve all acceptance and production gates.
+branch: codex/reviewer-routing-20261022
+base: verdant-grow-diary at ebaf1b6afa7fb8cfa7fb8090914c8633f7537a98, verified 2026-10-22 UTC
+checkout: git fetch origin codex/reviewer-routing-20261022 verdant-grow-diary && git switch codex/reviewer-routing-20261022 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2328 (draft; preserve draft; no existing branch or PR taken over)
+head_sha: e71049cec2214784a26b3a47c7075ab3a24d0ae9 (ownership checkpoint pushed and draft #2328 opened 2026-10-22 03:02 UTC); routing implementation commit follows. Read current full PR head before any review; this commit cannot record its own resulting SHA.
+state: bounded routing implemented after pushed ownership checkpoint/draft #2328. Local 31 governance regression tests and 71 focused Vitest cases pass; twelve-file version/parity, mirror, format, docs-safety and strict scorer report pass. This commit follows the ownership checkpoint; consult the PR for its resulting full head and hosted CI. Original checkout and #1971/#2086 branches untouched.
+next_action: Verify draft #2328 at its resulting full implementation head and hosted CI; assign one actually available independent Claude/Grok review session through permitted transport. Keep draft; no merge, ready/enqueue or production action.
+files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/{claude,codex,council-chair,gemini,grok,security}.md; docs/agents/OWNERSHIP.md; docs/agents/CURRENT_STATE.md (active header only); .agents/skills/verdant-exact-sha-review/SKILL.md; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: Broad governance overlaps remain; Matthew approved this session as sole writer for only the narrow reviewer-routing correction on 2026-10-22 (parent question: designate this task sole writer while leaving #1971/#2086 unrelated work and branches untouched; Matthew: "Yeah"). This designation resolves the routing-slice collision, grants no takeover or review PASS, and changes no other assignments. Rechecked overlaps: #1971 canopy/constitution-clash-fixes at 82f1e4ae2f59852e9a6fe9b2bd99b63227a07e9e (51 files), #2086 claude/new-session-nms5b8 at 98b660ab13d2e3087364d1bc5faeb333b20590c8 (35 files). No fresh 24-hour claim or matching deploy HANDOFF_LOG block observed; staleness is not reassignment. #1971 issuecomment-6222081602 preserves the existing governance writer after last Canopy claim issuecomment-6102182294. The 12-file parity bump also overlaps #2028/#1879/#1876. Shared live-session registry unavailable. No claim/release comment posted; existing comment-approval gate remains.
+artifacts: draft #2328 body records current full head and actual local/hosted evidence; local supporting receipts in /workspace/reviewer-routing-deliverables/. Sentinel-Version 2026-10-22.1 across exactly 12 files; no parity expansion or checker/test/pin edits. Original proposal hash retained separately; it is not this implementation commit identity.
+reviewer_seat: BLOCKED — no independent available Claude/Grok session assigned; Codex is proposal author and cannot accept it; Graft governance lane excluded
+review_request: not sent; owner: Codex reviewer-routing session; permalink: NOT_MEASURED; state: blocked (no independent session/approved transport assigned); fallback transfers: 0
+claimed_by: Codex reviewer-routing session, 2026-10-22 03:01 UTC (Matthew direct bounded sole-writer designation; no claim on #1971/#2086; no GitHub claim comment posted because separate comment-approval gate remains)
+last_updated: 2026-10-22 03:04 UTC, by Codex reviewer-routing session
+limits: #2303/#2304 existing independent PASSes are preserved and are not review work here. #2312 moved to 588fe03c; the old 720e9b3 PASS cannot transfer. No merge, ready, auto-merge, enqueue, deploy, production dispatch, SQL, runtime automation, hooks, GitHub settings, security, billing, secret or protected-scorer changes.
 ```
 
 ### PADDLE-WIRE-001-NORMALIZATION
@@ -286,11 +304,31 @@ last_updated: 2026-10-16 18:19 UTC, by Codex
 limits: Historical terminal-skipped events still return duplicate_skipped and do not recover under current replay policy. Deferred ordering risk: cancellation updates acknowledge zero matched rows; stale subscription upserts have no occurred_at guard. No ordering/replay changes, SQL, production access, secrets, billing settings, deployment, merge, ready/enqueue, root dependency/lockfile edits, #2028 changes or HOLD #1250 changes. Never merge #1740; knk lock preserved.
 ```
 
+### FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY
+
+```text
+TASK FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY  priority: P2  status: OPEN
+goal: A plant with no health assessment (null, missing or "unknown") reads "Not assessed yet" on /plants and on the plant page, never "unknown". Display only; no schema. Owns the unassessed-health display (owner decision, Matthew 2026-10-22). QA 2/2 on production ebaf1b6a. Fixes #2171 (display half).
+branch: claude/plant-health-not-assessed-label-p4 (fresh branch; ruleset GH013 refuses updates to an existing claude/* branch)
+base: verdant-grow-diary
+checkout: git fetch origin claude/plant-health-not-assessed-label-p4 verdant-grow-diary && git switch claude/plant-health-not-assessed-label-p4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: the PR opened from claude/plant-health-not-assessed-label-p4, superseding https://github.com/Verdant-OS/verdant-grow-diary/pull/2492 (chain: #2330 -> #2490 -> #2492)
+head_sha: 9e0931a9b23b0022d9f7199ac43b0faa25b9d6f2, #2492's head (2026-10-23 20:20 UTC) and the parent of the commit that records this line (a commit cannot contain its own SHA). Re-read the PR for the exact head before resuming.
+state: review. Round 2 (#2490, c1192044) removed a Cursor-added source-regex test; round 3 (#2492, eaff21b9) pinned the capitalize class and dropped Blue Dream routing; Cursor Agent commit 9e0931a9 added a rendered integration test (independently reviewed at 9e0931a9, no blocking findings). Round 4 updates this block only. Application code unchanged since 1807c9a6.
+next_action: 35/35 required checks and an exact-head independent review of the superseding PR by an actually available, eligible session (Codex, Durban Poison, or a non-contributing Claude or Grok review session; AGENTS.md retires Blue Dream from future routing), then the merge queue.
+files: src/lib/plantHealthRules.ts; src/pages/Plants.tsx; src/pages/PlantDetail.tsx; src/test/plant-health-status-label.test.ts; src/test/plant-detail-health-display.test.tsx; src/test/plant-health-unknown-rendering.test.tsx; src/test/plant-health-not-assessed-ui-integration.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. #2140 was narrowed to its schema work at 373fd162 (plantHealthRules.ts, Plants.tsx and the label tests back to base; plants-page-unassessed-health-label.test.tsx deleted), so plantHealthStatusLabel exists in this PR only.
+artifacts: PR #2330 body (RED 27 failed / 4 passed with the fix set aside; neighbours 89 files / 1752 passed)
+reviewer_seat: Codex, Durban Poison, or a non-contributing Claude or Grok review session (.tsx product files); never the author
+claimed_by: Claude, 2026-10-23 20:11 UTC
+last_updated: 2026-10-23 20:25 UTC, by Claude
+```
+
 ### FIX-2171-PLANT-CREATE-INSERT-ERROR
 
 ```text
 TASK FIX-2171-PLANT-CREATE-INSERT-ERROR  priority: P2  status: OPEN
-goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the "not assessed" plants-list label; that is open PR #2140. Fixes #2171.
+goal: When creating a plant fails, show the error in the dialog and as a toast, and keep the typed form. Do not redo the unassessed-health label; that display belongs to the #2330 -> #2490 -> #2492 superseding chain (owner decision, Matthew 2026-10-22, superseding the earlier #2140 assignment). Fixes #2171.
 branch: cursor/plant-create-insert-error-99b8
 base: verdant-grow-diary
 checkout: git fetch origin cursor/plant-create-insert-error-99b8 verdant-grow-diary && git switch cursor/plant-create-insert-error-99b8 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
@@ -299,7 +337,7 @@ head_sha: 71be93f03ec13e4ad9d8378a2c10f076f719dd52, remote observed 2026-10-19 1
 state: review. Not merged, so this block stays OPEN; move it to Closed with the landing SHA when #2192 merges.
 next_action: Exact-head Codex review of PR #2192 at its current head, then independent review. No merge from this block.
 files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-failure-notice.test.ts; src/test/plant-create-insert-failure-notice.test.tsx; src/test/plant-create-retry-recovery-notice.test.tsx; docs/agents/HANDOFF_LOG.md
-blockers: none for the repository change. The plants-list health label stays with #2140. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
+blockers: none for the repository change. The unassessed-health label on /plants and the plant page belongs to the #2330 -> #2490 -> #2492 chain (owner decision 2026-10-22); #2140 keeps only its schema work. #2219 (tent-select reopen guard and focus return) is a separate in-flight PR on the same dialog; its lines are left untouched here.
 artifacts: PR #2192 body (RED/GREEN counts for the retry-clear fix); earlier toast-target fail-first 1 failed / 3 skipped before the notifications-region lookup, 10 passed / 0 failed after
 reviewer_seat: Blue Dream (CreatePlantDialog.tsx)
 claimed_by: Claude (close-out session), 2026-10-19 16:14 UTC (VER-216, Matthew 2026-10-19)
@@ -456,6 +494,223 @@ last_updated: 2026-10-06 16:05 CT, by Claude
 ```
 
 ## Closed
+
+### CLAUDE-2301-COMMUNITY-V1-TASK2A-PROOF
+
+```text
+TASK CLAUDE-2301-COMMUNITY-V1-TASK2A-PROOF  priority: P2  status: CLOSED
+goal: Community V1 Task 2A: fail-first security proof (37 runtime cases, catalog SQL, dispatch-only workflow) before the migration exists.
+branch: claude/community-v1-task2a-proof
+historical_branch_2026_10_21: claude/community-v1-task2a-proof
+base: verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2301 (draft)
+files: .github/workflows/community-v1-db-proof.yml; scripts/security/community-v1-db-proof.mjs; scripts/security/run-community-v1-db-security.mjs; src/test/community-v1-db-proof-runner.test.ts; src/test/integration/community-v1-authority.integration.test.ts; supabase/tests/community_v1_permissions.sql
+head_sha: d0a009fb98c0d7bd5091f12a11e84932ffb0bb9a (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: d0a009fb98c0d7bd5091f12a11e84932ffb0bb9a (observed 2026-10-21 19:20 UTC, origin/claude/community-v1-task2a-proof)
+historical_state_2026_10_21: pushed draft. Codex clean PASS at this exact head (owner-assistant verdict, 2026-10-21 19:31 UTC; posted with Matthew's approval), replacing the PASS-with-P2; the description-only P2 is resolved. 35/35 required green at d0a009fb.
+historical_next_action_2026_10_21: Merge steward checks the head; after merge, dispatching the RED run (expect=red) on verdant-grow-diary is an owner action.
+historical_blockers_2026_10_21: RED receipt against a disposable local Supabase is NOT_MEASURED until dispatched after merge. Non-required Supabase Preview fails on ai_credit_grants 42P07 (not this PR's).
+historical_reviewer_seat_2026_10_21: Codex (.github workflow + security harness), exact head. Claude authored it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:40 CT, by Claude
+state: Source PR #2301 CLOSED UNMERGED at 2026-10-23T02:43:05Z. The existing holder recorded supersession by #2408 in https://github.com/Verdant-OS/verdant-grow-diary/pull/2301#issuecomment-6356111214. This records the prior closure, not a new closure action or an assertion that every replacement fix is independently accepted.
+checkout: original branch/history preserved; do not delete unmerged work. Read the existing closure receipt and surviving PR before resuming.
+next_action: Follow the preserved replacement #2408 and its existing holder/holds; do not reopen or implement a duplicate from this historical block.
+blockers: Replacement integration/acceptance and underlying issue resolution were not measured by this documentation repair; closure of this PR is not proof of either.
+reviewer_seat: no new acceptance of the closed source PR is requested.
+claimed_by: no new writer claim; historical original holder and closure receipt are preserved.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body Tests run section.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/community-v1-task2a-proof verdant-grow-diary && git switch claude/community-v1-task2a-proof && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
+```
+
+### CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA
+
+```text
+TASK CLAUDE-2310-STAGE-GUIDE-SSR-SCHEMA  priority: P2  status: CLOSED
+goal: Ship /guides/grow-stage-care-guide FAQPage and BreadcrumbList JSON-LD in the first SSR response (Ahrefs Article-schema audit 2026-10-21). No Article or dates; publishedOn gate preserved.
+branch: claude/verdant-closeout-handoff-phofrz
+historical_branch_2026_10_21: claude/verdant-closeout-handoff-phofrz
+base: verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2310 (draft)
+files: src/lib/build/staticPublicSeoDocuments.ts; src/pages/GrowStageCareGuide.tsx; src/test/grow-stage-care-schema-ssr.test.tsx
+head_sha: 5601b54f2e3b04597a04eda451a4ef560c089fe5 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 9d05deae12eca8117dea5e1859ebf18fc11fe28b (observed 2026-10-21 19:20 UTC, origin/claude/verdant-closeout-handoff-phofrz)
+historical_state_2026_10_21: pushed draft. 35/35 required checks green; Codex bot found no major issues. Merges cleanly with #2023 (combined 4 files, 35/35).
+historical_next_action_2026_10_21: Wait for the owner-assistant Codex exact-head verdict at 9d05deae.
+historical_blockers_2026_10_21: Codex exact-head verdict pending. Shares two files with #2023: whichever merges second merges base.
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:20 CT, by Claude
+state: Source PR #2310 MERGED at 2026-10-22T16:08:14Z as bba1efca4bb499e484ef0acba15f3be2dd83d4ec; that merge is an ancestor of verified deploy-base 3bc6b346f25249db408ca9cb9d2d94c33b3a442b. This closes the original repository branch task, not its release or live behavior.
+checkout: none for this merged PR; preserve the original branch/history. Any separately authorized new work starts from the verified current deploy branch.
+next_action: CLOSED for this source PR. Consult the original merge and existing release owner before any release follow-up. No production verification is authorized by this record.
+blockers: none for the observed repository merge. Deployment and live behavior were not measured by this log reconciliation.
+reviewer_seat: historical source acceptance remains in its original PR receipts; this log update grants no new acceptance.
+claimed_by: none for the merged source PR; the historical claim is preserved above.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: RED 3 of 5 with the fix set aside; GREEN 5/5, neighbours 10 files 283/283. Coordination note on #2023.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/verdant-closeout-handoff-phofrz verdant-grow-diary && git switch claude/verdant-closeout-handoff-phofrz && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
+```
+
+### CLAUDE-2297-COMMUNITY-OCCURRED-DATE
+
+```text
+TASK CLAUDE-2297-COMMUNITY-OCCURRED-DATE  priority: P2  status: CLOSED
+goal: Community V1 Task 1 follow-up: occurredDate in the publication and digest rules.
+branch: claude/community-v1-occurred-date
+historical_branch_2026_10_21: claude/community-v1-occurred-date
+base: verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2297 (draft)
+files: src/lib/communityPublicationRules.ts; src/lib/communityTypes.ts; src/test/community-digest-rules.test.ts; src/test/community-publication-rules.test.ts
+head_sha: c0ec5f00414afd165cd92361084286275422d559 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: c0ec5f00414afd165cd92361084286275422d559 (observed 2026-10-21 19:20 UTC, origin/claude/community-v1-occurred-date)
+historical_state_2026_10_21: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
+historical_next_action_2026_10_21: Merge steward checks the head.
+historical_blockers_2026_10_21: none for the repository change
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:20 CT, by Claude
+state: Source PR #2297 MERGED at 2026-10-24T09:40:01Z as e5d4335295d15c99cb3a146f1e5ded302876edba; that merge is an ancestor of verified deploy-base 3bc6b346f25249db408ca9cb9d2d94c33b3a442b. This closes the original repository branch task, not its release or live behavior.
+checkout: none for this merged PR; preserve the original branch/history. Any separately authorized new work starts from the verified current deploy branch.
+next_action: CLOSED for this source PR. Consult the original merge and existing release owner before any release follow-up. No production verification is authorized by this record.
+blockers: none for the observed repository merge. Deployment and live behavior were not measured by this log reconciliation.
+reviewer_seat: historical source acceptance remains in its original PR receipts; this log update grants no new acceptance.
+claimed_by: none for the merged source PR; the historical claim is preserved above.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/community-v1-occurred-date verdant-grow-diary && git switch claude/community-v1-occurred-date && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
+```
+
+### CLAUDE-2303-TENT-PAGE-CANONICAL-VPD
+
+```text
+TASK CLAUDE-2303-TENT-PAGE-CANONICAL-VPD  priority: P2  status: CLOSED
+goal: Tent page VPD uses the canonical calculation and fallback freshness.
+branch: claude/tent-page-canonical-vpd
+historical_branch_2026_10_21: claude/tent-page-canonical-vpd
+base: verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2303 (draft)
+files: src/lib/tentDetailVpdRules.ts; src/pages/TentDetail.tsx; src/test/tent-detail-vpd-fallback-freshness.test.tsx
+head_sha: b49c32aee65ae31bf2542ba02a7229e575c6da35 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 0a55d871b970d998ff085995827e0b952d1bfed9 (observed 2026-10-21 19:20 UTC, origin/claude/tent-page-canonical-vpd)
+historical_state_2026_10_21: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
+historical_next_action_2026_10_21: Merge steward checks the head.
+historical_blockers_2026_10_21: none for the repository change
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:20 CT, by Claude
+state: Source PR #2303 CLOSED UNMERGED at 2026-10-23T02:43:02Z. The existing holder recorded supersession by #2407 in https://github.com/Verdant-OS/verdant-grow-diary/pull/2303#issuecomment-6356110890. The capture-ID residual remains unwaived, as the holder explicitly recorded. This records the prior closure, not a new closure action or an assertion that every replacement fix is independently accepted.
+checkout: original branch/history preserved; do not delete unmerged work. Read the existing closure receipt and surviving PR before resuming.
+next_action: Follow the preserved replacement #2407 and its existing holder/holds; do not reopen or implement a duplicate from this historical block.
+blockers: Replacement integration/acceptance and underlying issue resolution were not measured by this documentation repair; closure of this PR is not proof of either.
+reviewer_seat: no new acceptance of the closed source PR is requested.
+claimed_by: no new writer claim; historical original holder and closure receipt are preserved.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/tent-page-canonical-vpd verdant-grow-diary && git switch claude/tent-page-canonical-vpd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
+```
+
+### CLAUDE-2304-FEEDING-NEGATIVE-EC
+
+```text
+TASK CLAUDE-2304-FEEDING-NEGATIVE-EC  priority: P2  status: CLOSED
+goal: Quick Log feeding form rejects typed negative EC values, including exponent forms.
+branch: claude/plant-feeding-ec-in-negative
+historical_branch_2026_10_21: claude/plant-feeding-ec-in-negative
+base: verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2304 (draft)
+files: src/lib/quickLogFeedingFormViewModel.ts; src/components/QuickLogFeedingForm.tsx; src/components/QuickLogV2Sheet.tsx; src/test/quick-log-v2-sheet-feeding-negative-ec.test.tsx
+head_sha: 217eddbed406020ec054cf9074dfbbfe5c59e441 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 6be2183a75ee48fff0493387e2cafa19cb3b3c69 (observed 2026-10-21 19:20 UTC, origin/claude/plant-feeding-ec-in-negative)
+historical_state_2026_10_21: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
+historical_next_action_2026_10_21: Merge steward checks the head.
+historical_blockers_2026_10_21: none for the repository change
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:20 CT, by Claude
+state: Source PR #2304 CLOSED UNMERGED at 2026-10-24T10:42:40Z. The existing holder recorded supersession by #2522 in https://github.com/Verdant-OS/verdant-grow-diary/pull/2304#issuecomment-6383244829. This records the prior closure, not a new closure action or an assertion that every replacement fix is independently accepted.
+checkout: original branch/history preserved; do not delete unmerged work. Read the existing closure receipt and surviving PR before resuming.
+next_action: Follow the preserved replacement #2522 and its existing holder/holds; do not reopen or implement a duplicate from this historical block.
+blockers: Replacement integration/acceptance and underlying issue resolution were not measured by this documentation repair; closure of this PR is not proof of either.
+reviewer_seat: no new acceptance of the closed source PR is requested.
+claimed_by: no new writer claim; historical original holder and closure receipt are preserved.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/plant-feeding-ec-in-negative verdant-grow-diary && git switch claude/plant-feeding-ec-in-negative && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
+```
+
+### CLAUDE-2305-MANUAL-SENSOR-DRAFT-UNIT
+
+```text
+TASK CLAUDE-2305-MANUAL-SENSOR-DRAFT-UNIT  priority: P2  status: CLOSED
+goal: A restored manual sensor draft keeps the temperature unit it was entered in.
+branch: claude/manual-sensor-draft-unit-preference
+historical_branch_2026_10_21: claude/manual-sensor-draft-unit-preference
+base: verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2305 (draft)
+files: src/lib/manualSensorPendingSnapshotStore.ts; src/hooks/useSensorsPageSession.ts; src/test/manual-sensor-restored-draft-unit-preference.test.tsx
+head_sha: 4cc9c36d1f28a179d6ffbb0106778cad8db39c5d (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 4cc9c36d1f28a179d6ffbb0106778cad8db39c5d (observed 2026-10-21 19:20 UTC, origin/claude/manual-sensor-draft-unit-preference)
+historical_state_2026_10_21: pushed draft. Codex PASS at this head; native save/retrieve passed (run 39647054999); 35/35 required green at the 18:07 UTC check.
+historical_next_action_2026_10_21: Merge steward checks the head.
+historical_blockers_2026_10_21: none for the repository change
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:20 CT, by Claude
+state: Source PR #2305 MERGED at 2026-10-24T13:38:21Z as 28bbf13842b06a745126ba17a80e4abe5226f6bc; that merge is an ancestor of verified deploy-base 3bc6b346f25249db408ca9cb9d2d94c33b3a442b. This closes the original repository branch task, not its release or live behavior.
+checkout: none for this merged PR; preserve the original branch/history. Any separately authorized new work starts from the verified current deploy branch.
+next_action: CLOSED for this source PR. Consult the original merge and existing release owner before any release follow-up. No production verification is authorized by this record.
+blockers: none for the observed repository merge. Deployment and live behavior were not measured by this log reconciliation.
+reviewer_seat: historical source acceptance remains in its original PR receipts; this log update grants no new acceptance.
+claimed_by: none for the merged source PR; the historical claim is preserved above.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/manual-sensor-draft-unit-preference verdant-grow-diary && git switch claude/manual-sensor-draft-unit-preference && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
+```
+
+### CLAUDE-2306-PHOTO-PENDING-SAVE-LOG
+
+```text
+TASK CLAUDE-2306-PHOTO-PENDING-SAVE-LOG  priority: P2  status: CLOSED
+goal: Quick Log keeps a photo that is still validating when Save Log is pressed.
+branch: claude/upload-photo-save-log-keeps-photo
+historical_branch_2026_10_21: claude/upload-photo-save-log-keeps-photo
+base: verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2306 (draft)
+files: src/components/QuickLog.tsx; src/components/QuickLogAllActivitiesSection.tsx; src/lib/quickLogPendingSectionPhotoRules.ts; src/test/quick-log-dialog-save-log-pending-section-photo.test.tsx
+head_sha: 655c386adbdb0486500926288b1d7cd352fdb0b0 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
+historical_head_sha_2026_10_21: 8dc28600a3b7e10d35f5d6db96c043415d52f49c (observed 2026-10-21 19:20 UTC, origin/claude/upload-photo-save-log-keeps-photo)
+historical_state_2026_10_21: pushed draft. Codex PASS at this head; 35/35 required green at the 18:07 UTC check.
+historical_next_action_2026_10_21: Merge steward checks the head.
+historical_blockers_2026_10_21: none for the repository change
+historical_reviewer_seat_2026_10_21: Codex at the exact head (Matthew, 2026-10-21: Codex replaces Blue Dream for this batch). Claude authored or repaired it and cannot accept it.
+historical_claimed_by_2026_10_21: Claude, 2026-10-21 14:20 CT
+historical_last_updated_2026_10_21: 2026-10-21 14:20 CT, by Claude
+state: Source PR #2306 MERGED at 2026-10-24T14:47:44Z as 351cad86eac06ffebb4a083853594de3ccc6b47d; that merge is an ancestor of verified deploy-base 3bc6b346f25249db408ca9cb9d2d94c33b3a442b. This closes the original repository branch task, not its release or live behavior.
+checkout: none for this merged PR; preserve the original branch/history. Any separately authorized new work starts from the verified current deploy branch.
+next_action: CLOSED for this source PR. Consult the original merge and existing release owner before any release follow-up. No production verification is authorized by this record.
+blockers: none for the observed repository merge. Deployment and live behavior were not measured by this log reconciliation.
+reviewer_seat: historical source acceptance remains in its original PR receipts; this log update grants no new acceptance.
+claimed_by: none for the merged source PR; the historical claim is preserved above.
+implementation_claim_renewal: NONE. This is factual log reconciliation only; no underlying source ownership is granted.
+release_steps_measured: NOT_MEASURED. Deployment and live behavior are separate from the recorded GitHub outcome.
+artifacts: PR body.; current PR state observed 2026-10-26T17:19:32.689322+00:00
+historical_checkout_2026_10_21: git fetch origin claude/upload-photo-save-log-keeps-photo verdant-grow-diary && git switch claude/upload-photo-save-log-keeps-photo && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+last_updated: 2026-10-26 17:21:48 UTC, by Codex closeout session 01a16de3 (documentation only)
+```
 
 ### QUICKLOG-CORRECTION-EDITABLE-VALUES
 

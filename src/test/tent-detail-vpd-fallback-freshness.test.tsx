@@ -15,6 +15,7 @@ const OWNED_TENT = {
 
 const state = vi.hoisted(() => ({
   rows: [] as SensorReadingLike[],
+  rowsError: false,
   manuals: [] as SensorReading[],
   tent: null as unknown,
   manualArgs: [] as unknown[],
@@ -22,6 +23,7 @@ const state = vi.hoisted(() => ({
   manualError: false,
   manualRefetch: vi.fn(() => Promise.resolve([])),
   stability: null as unknown,
+  snapshot: { status: "idle", snapshot: null } as { status: string; snapshot: unknown },
 }));
 
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "owner-1" } }) }));
@@ -44,7 +46,7 @@ vi.mock("@/hooks/useGrowData", async (original) => ({
   }),
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadings: () => ({ data: state.rows, isPending: false, isError: false }),
+  useSensorReadings: () => ({ data: state.rows, isPending: false, isError: state.rowsError }),
 }));
 vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
   useSensorsQuickLogManualReadings: (tentId: unknown) => {
@@ -80,7 +82,14 @@ vi.mock("@/components/WateringCadenceHistoryStrip", () => ({ default: () => null
 vi.mock("@/components/DrybackMonitoringStrip", () => ({ default: () => null }));
 vi.mock("@/components/TentAiDoctorSessionsPanel", () => ({ default: () => null }));
 vi.mock("@/components/StageBadge", () => ({ default: () => null }));
-vi.mock("@/components/MetricChip", () => ({ default: () => null }));
+vi.mock("@/components/MetricChip", () => ({
+  default: ({ label, value }: { label: string; value: unknown }) => (
+    <span data-testid={`metric-chip-${label}`}>{String(value)}</span>
+  ),
+}));
+vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
+  useLatestSensorSnapshot: () => state.snapshot,
+}));
 vi.mock("@/components/SensorChart", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogV2Fab", () => ({ default: () => null }));
 vi.mock("@/components/CreatePlantDialog", () => ({ default: () => null }));
@@ -106,6 +115,10 @@ vi.mock("@/components/StartPhenoHuntButton", () => ({ default: () => null }));
 vi.mock("@/components/TentPendingOutcomeNotice", () => ({ default: () => null }));
 
 import TentDetail from "@/pages/TentDetail";
+import { buildTonightTentMetrics } from "@/lib/tonightTentHomeViewModel";
+import { formatSensorValue } from "@/lib/sensorFormat";
+import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
+import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
 const NOW = new Date("2026-10-15T12:00:00.000Z");
 const clients: QueryClient[] = [];
@@ -146,6 +159,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   state.rows = [];
+  state.rowsError = false;
   state.manuals = [];
   state.tent = OWNED_TENT;
   state.manualArgs = [];
@@ -153,6 +167,7 @@ beforeEach(() => {
   state.manualError = false;
   state.manualRefetch.mockClear();
   state.stability = null;
+  state.snapshot = { status: "idle", snapshot: null };
 });
 
 afterEach(() => {
@@ -176,6 +191,53 @@ describe("Tent detail fallback VPD freshness", () => {
     // No stored snapshot: the shared Environment header claims nothing.
     expect(screen.queryByTestId("tent-detail-sensor-source")).toBeNull();
     expect(screen.queryByTestId("tent-detail-sensor-captured")).toBeNull();
+  });
+
+  it("withholds a stored VPD whose own row is quality-flagged, even with no climate pair (Codex P1 at 307b10f4)", () => {
+    const ts = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+    // The Dashboard selector drops this row; Tonight is therefore missing, and
+    // the header is the only thing still holding the value.
+    state.rows = [
+      {
+        metric: "vpd_kpa",
+        value: 1.2,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "invalid",
+      } as never,
+    ];
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+    expect(screen.queryByTestId("tent-detail-vpd-stage-hint")).toBeNull();
+    expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
+    // Withheld, but labelled: never silently dropped (Codex P1 on #2437 at 9ddaa0ae).
+    expect(screen.getByTestId("tent-detail-vpd-rejected")).toHaveTextContent("VPD invalid");
+  });
+
+  it("checks a flagged live VPD against its own source, not the cohort's manual aggregate (Copilot P1 on #2430)", () => {
+    const ts = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+    // A valid manual temperature makes the header snapshot's aggregate source
+    // manual; the VPD row itself is live and quality-invalid.
+    state.rows = [
+      { id: "r-temp", metric: "temperature_c", value: 24, ts, captured_at: ts, source: "manual" },
+      {
+        id: "r-vpd",
+        metric: "vpd_kpa",
+        value: 1.2,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "invalid",
+      } as never,
+    ];
+    // The raw refresh failed: the cached rows stay, Tonight carries no
+    // rejection evidence from them.
+    state.rowsError = true;
+    state.snapshot = { status: "unavailable", snapshot: null };
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+    expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
   });
 
   it("does not let a fresh temperature-only row make an old Quick Log VPD current", () => {
@@ -241,9 +303,14 @@ describe("Tent detail mixed-metric provenance (Codex P1 4288338459)", () => {
     expect(screen.getByTestId("tent-detail-sensor-captured")).toHaveTextContent("5 minutes ago");
     // The live temp/RH are fresh; the old manual VPD must not mark them stale.
     expect(screen.queryByTestId("tent-detail-sensor-stale")).toBeNull();
-    expect(screen.getByTestId("tent-detail-vpd-source")).toHaveTextContent("Manual reading");
-    expect(screen.getByTestId("tent-detail-vpd-captured")).toHaveTextContent("2 days ago");
-    expect(screen.getByTestId("tent-detail-vpd-stale")).toBeVisible();
+    // #2268 / VER-189: the fresh same-capture live pair's calculated VPD wins over the
+    // two-day-old manual VPD, as on the Dashboard Tonight card, with its own provenance.
+    expect(screen.getByTestId("tent-detail-vpd-provenance")).toHaveTextContent(
+      "Calculated from temperature and RH",
+    );
+    expect(screen.getByTestId("tent-detail-vpd-source")).toHaveTextContent("Live sensor");
+    expect(screen.getByTestId("tent-detail-vpd-captured")).toHaveTextContent("5 minutes ago");
+    expect(screen.queryByTestId("tent-detail-vpd-stale")).toBeNull();
   });
 
   it("shows no separate VPD provenance when the stored snapshot observed VPD", () => {
@@ -268,7 +335,9 @@ describe("Tent detail VPD sensor truth (Copilot 4286153360)", () => {
       { metric: "vpd_kpa", value: 1.2, ts, captured_at: ts, source: "live" },
     ];
     mount();
-    // Header: the snapshot rejected this VPD and no fallback brings it back.
+    // Header: the snapshot rejected this VPD and no fallback brings it back,
+    // including the resolver's rejection branch (Codex P1 at d6ef3a20).
+    expect(screen.queryByTestId("metric-chip-VPD")?.textContent ?? "").not.toContain("1.2");
     expect(screen.queryByTestId("tent-detail-vpd-stage-hint")).toBeNull();
     expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
     // Card: the rejected VPD is not graded.
@@ -313,5 +382,267 @@ describe("Tent detail manual-history read (Codex security 4288384000, Copilot 42
     expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toBeVisible();
     fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
     expect(state.manualRefetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// #2268 / VER-189: the tent page's VPD chip shows the Dashboard Tonight card's value.
+describe("Tent detail VPD agrees with the Dashboard Tonight card", () => {
+  const hoursAgo = (hours: number) =>
+    new Date(NOW.getTime() - hours * 60 * 60 * 1000).toISOString();
+  const row = (metric: string, value: number, at: string) => ({
+    metric,
+    value,
+    ts: at,
+    captured_at: at,
+    tent_id: "tent-1",
+    source: "manual",
+  });
+  const tonightVpd = () =>
+    buildTonightTentMetrics({
+      rows: state.rows as never,
+      rowsRead: { status: "success" },
+      snapshot: state.snapshot as never,
+      now: NOW,
+    }).find((metric) => metric.key === "vpd");
+  const shown = (value: number) => formatSensorValue("vpd_kpa", value).replace(/\s*kPa$/, "");
+
+  it("QA #2268 (2/2 on ebaf1b6a): 80°F/50% then 85°F/45% read 1.75 then 2.26 kPa, never the stored 1.30", () => {
+    // 80°F = 26.667°C, 85°F = 29.444°C; the Dashboard shows 1.75 then 2.26.
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(24)),
+      row("temperature_c", (80 - 32) / 1.8, hoursAgo(2)),
+      row("humidity_pct", 50, hoursAgo(2)),
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", calculated: true });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("1.75");
+    expect(screen.getByTestId("metric-chip-VPD")).not.toHaveTextContent("1.3");
+    expect(screen.getByTestId("metric-chip-VPD").textContent).not.toMatch(
+      /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
+    );
+    cleanup();
+
+    state.rows = [
+      ...state.rows,
+      row("temperature_c", (85 - 32) / 1.8, hoursAgo(1)),
+      row("humidity_pct", 45, hoursAgo(1)),
+    ];
+    mount();
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("2.26");
+    expect(screen.getByTestId("tent-detail-vpd-provenance").textContent).not.toMatch(
+      /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
+    );
+  });
+
+  it("replaces a day-old stored VPD with a newer same-capture temperature and RH pair", () => {
+    const pairAt = hoursAgo(16);
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(24)),
+      row("temperature_c", 30, pairAt),
+      row("humidity_pct", 46, pairAt),
+    ];
+    mount();
+    const expected = calculateVpdKpa({ tempC: 30, rhPercent: 46 })!;
+    expect(tonightVpd()).toMatchObject({ state: "value", value: expected, calculated: true });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(expected));
+    expect(screen.getByTestId("metric-chip-VPD")).not.toHaveTextContent("1.3");
+    expect(screen.getByTestId("tent-detail-vpd-provenance")).toHaveTextContent(
+      "Calculated from temperature and RH",
+    );
+  });
+
+  it("counts a newer Quick Log pair from the diary-inclusive snapshot, as the Dashboard does", () => {
+    state.rows = [row("vpd_kpa", 1.3, hoursAgo(24))];
+    state.snapshot = {
+      status: "ok",
+      snapshot: { source: "diary", ts: hoursAgo(16), temp: 30, rh: 46, vpd: null },
+    };
+    mount();
+    const expected = tonightVpd();
+    expect(expected).toMatchObject({ state: "value", calculated: true });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(expected!.value!));
+  });
+
+  it("shows no VPD when the newest same-capture pair is invalid, never the older stored value", () => {
+    const pairAt = hoursAgo(16);
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(24)),
+      row("temperature_c", 30, pairAt),
+      row("humidity_pct", 100, pairAt),
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "invalid" });
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+  });
+
+  it("keeps a stored VPD that is newer than the temperature and RH pair", () => {
+    const pairAt = hoursAgo(24);
+    state.rows = [
+      row("vpd_kpa", 1.3, hoursAgo(2)),
+      row("temperature_c", 30, pairAt),
+      row("humidity_pct", 46, pairAt),
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.3, calculated: false });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(1.3));
+    expect(screen.queryByTestId("tent-detail-vpd-provenance")).toBeNull();
+  });
+
+  // Copilot P1 on #2303: Tonight runs no realism check, so the chosen VPD and
+  // its same-capture temperature and RH are checked before the tent page adopts it.
+  it("does not adopt a VPD whose capture has unrealistic RH when a newer CO2-only capture follows", () => {
+    const badAt = new Date(NOW.getTime() - 10 * 60 * 1000).toISOString();
+    const co2At = new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+    state.rows = [
+      { ...row("temperature_c", 24, badAt), source: "live" },
+      { ...row("humidity_pct", 150, badAt), source: "live" },
+      { ...row("vpd_kpa", 1.2, badAt), source: "live" },
+      { ...row("co2_ppm", 800, co2At), source: "live" },
+    ];
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.2 });
+    expect(screen.queryByTestId("metric-chip-VPD")?.textContent ?? "").not.toContain("1.2");
+  });
+
+  it("does not adopt a diary snapshot VPD whose RH is unrealistic when there are no stored rows", () => {
+    state.snapshot = {
+      status: "ok",
+      snapshot: { source: "diary", ts: hoursAgo(1), temp: 24, rh: 150, vpd: 1.2 },
+    };
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.2 });
+    expect(screen.queryByTestId("metric-chip-VPD")?.textContent ?? "").not.toContain("1.2");
+  });
+
+  // Copilot P2 on #2303: an equal value from a different, fresher observation
+  // still needs its own provenance line.
+  it("shows the VPD's own provenance when an equal value comes from a fresher observation", () => {
+    const oldAt = hoursAgo(48);
+    state.rows = [
+      { ...row("temperature_c", 25, oldAt), source: "live" },
+      { ...row("humidity_pct", 60, oldAt), source: "live" },
+      { ...row("vpd_kpa", 1.3, oldAt), source: "live" },
+    ];
+    state.snapshot = {
+      status: "ok",
+      snapshot: {
+        // An Environment Check envelope (manual), not a generic diary blob.
+        source: "manual",
+        ts: new Date(NOW.getTime() - 5 * 60 * 1000).toISOString(),
+        temp: null,
+        rh: null,
+        vpd: 1.3,
+      },
+    };
+    mount();
+    expect(tonightVpd()).toMatchObject({ state: "value", value: 1.3, calculated: false });
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent(shown(1.3));
+    const provenance = screen.getByTestId("tent-detail-vpd-provenance");
+    expect(within(provenance).getByTestId("tent-detail-vpd-captured")).toHaveTextContent(
+      "5 minutes ago",
+    );
+    expect(within(provenance).queryByTestId("tent-detail-vpd-stale")).toBeNull();
+  });
+});
+
+// Copilot and the independent review of #2459 at de8c1b27: every withheld VPD
+// is labelled on the rendered page, and each header metric keeps its device.
+describe("Tent detail labels every withheld VPD", () => {
+  const recent = () => new Date(NOW.getTime() - 5 * 60 * 1000).toISOString();
+
+  it("labels a snapshot-only VPD that fails sensor truth", () => {
+    const ts = recent();
+    state.snapshot = {
+      status: "ok",
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        source: "live",
+        ts,
+        vpd: 9.9,
+        metric_refs: { vpd: { id: "snap-vpd", captured_at: ts, source: "live" } },
+      },
+    };
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+    expect(screen.getByTestId("tent-detail-vpd-rejected")).toHaveTextContent("VPD invalid");
+  });
+
+  it("labels a quality-ok stored VPD the header rejects as unrealistic", () => {
+    const ts = recent();
+    state.rows = [
+      {
+        id: "r-vpd",
+        metric: "vpd_kpa",
+        value: 9.9,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+      } as never,
+    ];
+    mount();
+    expect(screen.queryByTestId("metric-chip-VPD")).toBeNull();
+    expect(screen.getByTestId("tent-detail-vpd-rejected")).toHaveTextContent("VPD invalid");
+  });
+
+  it("keeps one device's VPD beside another device's rejected RH at the same instant", () => {
+    const ts = recent();
+    state.rows = [
+      {
+        id: "r-rh",
+        metric: "humidity_pct",
+        value: 150,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+        device_id: "gw-b",
+      } as never,
+      {
+        id: "r-vpd",
+        metric: "vpd_kpa",
+        value: 1.1,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+        device_id: "gw-a",
+      } as never,
+    ];
+    mount();
+    expect(screen.queryByTestId("tent-detail-vpd-rejected")).toBeNull();
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("1.1");
+  });
+
+  it("does not withhold one device's VPD for another device's flagged VPD at the same instant", () => {
+    const ts = recent();
+    state.rows = [
+      {
+        id: "r-vpd-a",
+        metric: "vpd_kpa",
+        value: 1.1,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "ok",
+        device_id: "gw-a",
+      } as never,
+      {
+        id: "r-vpd-b",
+        metric: "vpd_kpa",
+        value: 1.3,
+        ts,
+        captured_at: ts,
+        source: "live",
+        quality: "invalid",
+        device_id: "gw-b",
+      } as never,
+    ];
+    // Tonight has nothing to offer, so the stored row's own trust decides.
+    state.rowsError = true;
+    state.snapshot = { status: "unavailable", snapshot: null };
+    mount();
+    expect(screen.queryByTestId("tent-detail-vpd-rejected")).toBeNull();
+    expect(screen.getByTestId("metric-chip-VPD")).toHaveTextContent("1.1");
   });
 });

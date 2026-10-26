@@ -19,6 +19,7 @@
 
 import {
   buildManualSnapshotChangeContext,
+  classifyChangeContextMetric,
   groupManualReadingsToSnapshots,
   type ChangeContextDelta,
   type ChangeContextMetric,
@@ -26,7 +27,6 @@ import {
   type ChangeContextSnapshot,
   type ChangeContextSuppressedDelta,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
-import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
@@ -39,6 +39,7 @@ export const HISTORY_METRIC_DISPLAY_ORDER: ChangeContextMetric[] = [
   "soil_moisture_pct",
   "soil_ec_ms_cm",
   "reservoir_ph",
+  "reservoir_ec_ms_cm",
 ];
 
 export const DEFAULT_HISTORY_LIMIT = 5;
@@ -59,6 +60,8 @@ export interface HistoryInvalidChip {
 }
 
 export interface ManualSnapshotHistoryEntry {
+  /** Unique per snapshot (two saves may share a ts). */
+  key: string;
   ts: string;
   /** Valid (realism-passing) metric chips only. */
   metrics: HistoryMetricChip[];
@@ -87,6 +90,7 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   soil_moisture_pct: "Soil",
   soil_ec_ms_cm: "Soil EC",
   reservoir_ph: "pH",
+  reservoir_ec_ms_cm: "Reservoir EC",
 };
 
 function formatMetricChip(
@@ -116,6 +120,8 @@ function formatMetricChip(
       return { key, label: "Soil EC", formatted: `${value.toFixed(2)} mS/cm` };
     case "reservoir_ph":
       return { key, label: "pH", formatted: value.toFixed(2) };
+    case "reservoir_ec_ms_cm":
+      return { key, label: "Reservoir EC", formatted: `${value.toFixed(2)} mS/cm` };
   }
 }
 
@@ -134,7 +140,7 @@ function chipsFromSnapshot(
   for (const key of HISTORY_METRIC_DISPLAY_ORDER) {
     const v = s.metrics[key];
     if (v === undefined) continue;
-    const truth = classifyManualMetric(key, v);
+    const truth = classifyChangeContextMetric(key, v);
     if (!truth.valid) {
       invalidKeys.add(key);
       invalidChips.push({
@@ -192,6 +198,7 @@ export function buildManualSnapshotHistoryList(
     });
     const { metrics, invalidChips } = chipsFromSnapshot(snap, temperatureUnit);
     out.push({
+      key: snap.key ?? snap.ts,
       ts: snap.ts,
       metrics,
       invalidChips,

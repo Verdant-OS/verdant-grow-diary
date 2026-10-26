@@ -69,6 +69,33 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-2293-VALID-RANGE-EMPTY-COPY
+
+```text
+TASK PR-2293-VALID-RANGE-EMPTY-COPY  priority: P2  status: OPEN
+goal: Resolve #2293's three existing review findings: truthful direction-neutral range help, calendar-valid range activation, and mounted Timeline-to-panel/query-bound regression coverage.
+why: An end-only range can exclude later logs, while impossible URL dates previously activated range-empty copy despite null query bounds. The original four tests did not cover the page's date-filter prop.
+branch: claude/quicklog-history-filter-empty-text (preserve existing name)
+base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d; conflict-free normal merge produced 7be6598c3f3230de56c1255dfe559bf7ea42c54c.
+checkout: Fetch the existing branch and base, read the current full PR head, compare ancestry, and use the isolated existing-branch worktree. Never recreate, rename or force-push. Do not resolve any Timeline conflict without coordinating Cursor's #2283 hold.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2293 (draft, verified after conversion)
+head_sha: Remote source checkpoint 2ab73e4e586729626084d41f779336bcd1bd5a5b, verified 2026-10-26 20:24 UTC. This repair commit follows local base-merge 7be6598c3f3230de56c1255dfe559bf7ea42c54c; read the PR for the resulting full repair head because a commit cannot contain its own SHA.
+state: Local two-helper repair implemented after meaningful RED in two NEW regression files. Confirmed RED: 11 failed / 15 passed at unchanged merged runtime; GREEN: 26 passed / 0 failed. The 22-file focused set passes 219 / 0 / 0, including every direct helper importer and existing mounted local-day query coverage. Full TypeScript check exited 0; scoped lint/format, scorer-lock, three docs-safety scanners and whitespace checks pass. Final normal-hook and remote-push results are recorded in the PR metadata.
+decisions: Keep Timeline.tsx and QuickLogHistoryPanels.tsx unchanged from the normal base merge. Reuse the existing calendar query-bound builder in isTimelineDateFilterValue; its module has no imports, so the new dependency cannot create a cycle. Preserve the valid side of a mixed invalid/valid range, local-day/DST bounds, leap days, inverted-range no-op, and Clear behavior. Filtered help refers to entries outside the range instead of assuming earlier entries.
+tried_and_rejected: Fixing only the boolean-consuming panel cannot recover discarded raw-date validity. No URL-reading panel workaround, hand-written calendar table, tracked-test unlock, dependency substitution, Timeline edit or duplicate review was used. Initial RED included one new-test reference to a detached DOM node after Clear; re-querying the live panel corrected that test setup, then confirmed RED remained 11 failed / 15 passed before runtime edits.
+current_step: Local verification is complete; finish cold-start metadata, normal hooks/commit, and the final remote head/claim checkpoint before a normal existing-branch push.
+next_action: Root coordinator verifies the resulting full head and fresh required CI, then routes one eligible independent non-contributing Claude/Grok review for the complete PR. This Codex repair team cannot accept its work. Keep draft; no queue, merge, deployment or production action.
+post_merge_check: Once independently accepted and landed, verify a valid date range uses range-empty copy, Clear restores unfiltered copy, impossible URL dates apply no bound or range-empty claim, and end-only help is direction-neutral. Hosted behavior is NOT_MEASURED; no production write is authorized here.
+files: This repair changes only src/lib/quickLogRecentEmptyStateRules.ts; src/lib/timelineEvidenceFilterRules.ts; NEW src/test/quick-log-recent-empty-range-copy.test.tsx; NEW src/test/timeline-recent-empty-filter-wiring.test.tsx; this HANDOFF_LOG block. The PR's original Timeline/panel prop wiring and original tracked test remain preserved.
+commands: Prepend /workspace/scratch/claude-closeout-20261026/tools/bun-1.3.14 to PATH. Use NODE_OPTIONS=--max-old-space-size=6144 for tsc. bun install --frozen-lockfile; bunx vitest run src/test/timeline-recent-empty-filter-wiring.test.tsx src/test/quick-log-recent-empty-range-copy.test.tsx; bun run typecheck; scoped eslint/Prettier; node scripts/scorer-lock.mjs --report --strict; three docs-safety scanners; git diff --check. The focused 22-file run also includes all tests importing timelineEvidenceFilterRules or quickLogRecentEmptyStateRules plus timeline-date-range-rules and timeline-local-day-query-integration.
+blockers: Fresh hosted CI and independent full-head acceptance NOT_MEASURED. No existing scorer is changed. Stop on another valid writer claim, remote head drift, a locked-pin conflict or a merge conflict on held paths. Private/fleet/unpushed state is unavailable.
+artifacts: /workspace/scratch/claude-closeout-20261026/2293-evidence/{frozen-install,red,red-confirmed,green,focused,typecheck,lint,format,scorer,docs-safety,release-docs-safety,phenotyping-docs-safety}.log. Source head and public claim are above; no local result is production acceptance.
+reviewer_seat: Root selects an actually available eligible non-contributing outside reviewer under OWNERSHIP.md section 4.3. Exclude original Claude session_016Ym79BwSvGTrmSyMeN9zsA, this Codex repair writer/team, and actual integration contributors. Retired Blue Dream receives no new request; preserve historical receipts.
+claimed_by: Codex closeout repair /root/preflight_2251 (#2293 lane), 2026-10-26 20:23 UTC; https://github.com/Verdant-OS/verdant-grow-diary/pull/2293#issuecomment-6426484502 (posted 20:24:04 UTC, read back with no competing claim).
+last_updated: 2026-10-26 20:30 UTC, by Codex closeout repair /root/preflight_2251.
+limits: No manual Timeline/panel/locked-test/dependency/lockfile/workflow/security-setting edit, no #2283 removal/pagination change, no #2539/Paddle or production/secrets work, and no desktop/browser control. Root owns outside review; no self-acceptance.
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

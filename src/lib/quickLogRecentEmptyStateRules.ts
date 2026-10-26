@@ -14,7 +14,7 @@ export const QUICK_LOG_RECENT_EMPTY_COPY = {
   },
   dateFiltered: {
     title: "No Quick Logs in this date range",
-    help: "Clear or widen the date filter to see earlier entries.",
+    help: "Clear or widen the date filter to see entries outside this range.",
   },
 } as const;
 

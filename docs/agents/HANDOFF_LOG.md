@@ -81,8 +81,8 @@ checkout: git fetch origin cursor/athena-feed-chart-log-431f verdant-grow-diary 
 pr: opened as a draft from this branch; read the PR URL from GitHub after the first push
 head_sha: read origin/cursor/athena-feed-chart-log-431f after push; this block is in the first commit
 state: pushed draft once this commit is on the remote
-current_step: page, route, sitemap, guides index, indexation matrix, and consent-gated feed_log_* events including feed_log_line_changed are implemented
-next_action: read the 35 required checks on the draft PR and fix only failures that belong to this branch. Do not merge. Do not deploy.
+current_step: APP_ROUTES lists /guides/athena-feed-chart-log before /guides/grow-stage-care-guide so the path sort matches Array.sort. The latest verdant-grow-diary was merged with a normal merge.
+next_action: read required CI on the new head. The pheno-comparison-v0 failure at 07f3de95 was the same unsorted manifest, because that workflow path-filters src/lib/appRouteManifest.ts. Do not merge. Do not deploy.
 post_merge_check: NOT_APPLICABLE until merge is requested. After a future merge, confirm https://verdantgrowdiary.com/guides/athena-feed-chart-log returns the page and /version.json reports the merge SHA.
 active_writer: Cursor Grok cloud agent on cursor/athena-feed-chart-log-431f
 decisions: Planned amounts start blank. The page does not embed Athena dosages. Tolerance default is 10% and is labeled as the grower's setting. Analytics events are feed_log_* and fire only when readAnalyticsConsent() is granted. All three CTAs use Link to /auth?mode=signup, the same href and cta_location click tracking as draft #2542. The Advanced Nutrients reverse link is not on this base; it needs to land with or after draft #2542. /vpd-chart is not a route on this base, so the VPD chart label points at /guides/grow-room-vpd-tracker.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: Cursor Grok cloud agent implementing the public guide; no paused workflow
 claimed_by: Cursor Grok cloud agent, 2026-10-26
 owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
-last_updated: 2026-10-26 12:44 CT, by Cursor Grok cloud agent
+last_updated: 2026-10-26 15:10 CT, by Cursor Grok cloud agent
 ```
 
 ### PR-2345-BASE-INTEGRATION

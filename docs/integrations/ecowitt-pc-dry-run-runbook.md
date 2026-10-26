@@ -33,60 +33,213 @@ EcoWitt gateway
 
 ## Windows workaround: Verdant HTTP bridge
 
+Commands below are shown twice. PowerShell blocks are for Windows.
+`bash` blocks are for Linux and macOS. `cd` into the checkout you cloned.
+A path such as `/path/to/verdant-grow-diary` or
+`C:\src\verdant-grow-diary` is only a placeholder. Do not use a personal
+OneDrive path: `bun install` fails under OneDrive paths on Windows.
+
+### Before you start — install and start the Mosquitto broker
+
+Start the broker before any subscriber, the HTTP bridge, or the dry-run
+consumer. Those clients connect to `127.0.0.1:1883`. If nothing is
+listening there, the bridge exits with `ECONNREFUSED`.
+
+Windows — install the broker, then check whether it is already
+listening. The installer often registers a service. Do not start
+`mosquitto.exe` in this step:
+
+```powershell
+winget install EclipseFoundation.Mosquitto
+Get-Service mosquitto
+netstat -ano | findstr :1883
+```
+
+Debian/Ubuntu — `apt-get install` starts the `mosquitto` service and
+binds port 1883. Check that before any manual start:
+
+```bash
+sudo apt-get update && sudo apt-get install -y mosquitto mosquitto-clients
+systemctl is-active mosquitto
+ss -ltn 'sport = :1883'
+```
+
+macOS (Homebrew) — check for a listener before starting another broker:
+
+```bash
+brew install mosquitto
+lsof -iTCP:1883 -sTCP:LISTEN
+```
+
+Windows manual start, only when `Get-Service mosquitto` is not `Running`
+and `findstr` printed nothing. Write the config under `$env:TEMP`, not
+under `C:\Program Files\mosquitto`:
+
+```powershell
+@"
+listener 1883 127.0.0.1
+allow_anonymous true
+"@ | Set-Content -Encoding ascii "$env:TEMP\verdant-mosquitto.conf"
+& "C:\Program Files\mosquitto\mosquitto.exe" -v -c "$env:TEMP\verdant-mosquitto.conf"
+```
+
+Manual start, Linux or macOS, only when those checks show nothing
+listening on 1883. The config binds the broker to localhost:
+
+```bash
+cat > /tmp/verdant-mosquitto-local.conf <<'EOF'
+listener 1883 127.0.0.1
+allow_anonymous true
+EOF
+mosquitto -v -c /tmp/verdant-mosquitto-local.conf
+```
+
+Leave that terminal open. Verbose logs should include
+`Opening ipv4 listen socket on port 1883`. `ss` (or `lsof`) should show
+`127.0.0.1:1883`, not `0.0.0.0:1883`. Do not point this broker at a
+production host. `allow_anonymous true` is only for this localhost
+listener with no password; it is not a remote broker.
+
+### Before you start — install the MQTT client without touching tracked files
+
+The HTTP bridge and the dry-run consumer both load the `mqtt` package at
+runtime. It is not a dependency of the repository, so install it with
+`--no-save`, which leaves `package.json` and `bun.lock` unchanged:
+
+```powershell
+cd \path\to\verdant-grow-diary
+bun add --no-save mqtt
+```
+
+```bash
+cd /path/to/verdant-grow-diary
+bun add --no-save mqtt
+```
+
+This install step installs all repository packages, not only `mqtt`. Its
+prepare script creates the ignored `.husky/_/` folder (that folder ignores
+its own contents). `node_modules/` is ignored too. Do not run plain `bun add mqtt`
+in the checkout: it rewrites the tracked `package.json` and `bun.lock`.
+`git status` should show nothing new after this step. Re-run it if
+`node_modules` is deleted.
+
 ### Terminal 1 — Mosquitto subscriber (sanity check)
+
+The broker from the previous step must already be running.
 
 ```powershell
 cd "C:\Program Files\mosquitto"
 .\mosquitto_sub.exe -h 127.0.0.1 -p 1883 -t "ecowitt/#" -v
 ```
 
+```bash
+mosquitto_sub -h 127.0.0.1 -p 1883 -t "ecowitt/#" -v
+```
+
 ### Terminal 2 — start the Verdant HTTP bridge
 
 ```powershell
-cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
+cd \path\to\verdant-grow-diary
+bun run dev:ecowitt-http-bridge
+```
+
+```bash
+cd /path/to/verdant-grow-diary
 bun run dev:ecowitt-http-bridge
 ```
 
 Default settings (override with `--port`, `--endpoint`, `--mqtt-url`,
 `--topic`, or the matching `ECOWITT_*` env vars):
 
-| Setting       | Default                  | Env var                |
-| ------------- | ------------------------ | ---------------------- |
-| HTTP port     | `8080`                   | `ECOWITT_HTTP_PORT`    |
-| HTTP endpoint | `/data/report`           | `ECOWITT_HTTP_ENDPOINT`|
-| MQTT broker   | `mqtt://127.0.0.1:1883`  | `ECOWITT_MQTT_URL`     |
-| MQTT topic    | `ecowitt/grow`           | `ECOWITT_MQTT_TOPIC`   |
+| Setting       | Default                 | Env var                 |
+| ------------- | ----------------------- | ----------------------- |
+| HTTP port     | `8080`                  | `ECOWITT_HTTP_PORT`     |
+| HTTP endpoint | `/data/report`          | `ECOWITT_HTTP_ENDPOINT` |
+| MQTT broker   | `mqtt://127.0.0.1:1883` | `ECOWITT_MQTT_URL`      |
+| MQTT topic    | `ecowitt/grow`          | `ECOWITT_MQTT_TOPIC`    |
 
 `/data/report` and `/data/report/` are both accepted.
 
 Use `--dry-run` (or `bun run dev:ecowitt-http-bridge:dry-run`) to parse
 and log without publishing to MQTT.
 
-### Terminal 3 — local sanity POST
+### Terminal 3 — Verdant dry-run consumer
+
+Start this **before** the sanity POST. `--once` processes the _next_
+message to arrive, and the HTTP bridge does not publish retained
+messages, so anything posted before the consumer subscribes is missed.
+
+```powershell
+cd \path\to\verdant-grow-diary
+# The runner refuses to start without UPSTREAM_MODE; ecowitt_raw is the mode for this HTTP bridge.
+$env:UPSTREAM_MODE="ecowitt_raw"
+$env:ECOWITT_MQTT_URL="mqtt://127.0.0.1:1883"
+$env:ECOWITT_MQTT_TOPIC="ecowitt/grow"
+bun run dev:ecowitt-mqtt:dry-run -- --once --write-report
+```
+
+```bash
+cd /path/to/verdant-grow-diary
+# The runner refuses to start without UPSTREAM_MODE; ecowitt_raw is the mode for this HTTP bridge.
+export UPSTREAM_MODE=ecowitt_raw
+export ECOWITT_MQTT_URL=mqtt://127.0.0.1:1883
+export ECOWITT_MQTT_TOPIC=ecowitt/grow
+bun run dev:ecowitt-mqtt:dry-run -- --once --write-report
+```
+
+Wait for `[ecowitt-mqtt-runner] subscribed ecowitt/grow`, give it a
+second, then go to Terminal 4. The runner prints that line as it sends the
+subscribe request, before the broker confirms it, so a POST sent in the same
+instant can still be missed. The runner exits after the first message and writes a
+redacted report to `./tmp/ecowitt-last-ingest-report.json`. Paste it
+into `/operator/ecowitt-bridge-status` for inspection. No live ingest
+occurs in dry-run mode.
+
+### Terminal 4 — local sanity POST
 
 ```powershell
 curl.exe -X POST "http://127.0.0.1:8080/data/report" `
   -d "temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"
 ```
 
-Expected: HTTP `200`, and Mosquitto subscriber prints a JSON message on
-`ecowitt/grow` containing the metrics plus `received_at`, `transport`
-(`ecowitt_http_local_bridge`), and `topic`.
-
-### Terminal 4 — Verdant dry-run consumer
-
-Only after Mosquitto is actually flowing data:
-
-```powershell
-$env:ECOWITT_MQTT_URL="mqtt://127.0.0.1:1883"
-$env:ECOWITT_MQTT_TOPIC="ecowitt/grow"
-bun run dev:ecowitt-mqtt:dry-run -- --once --write-report
+```bash
+curl -X POST "http://127.0.0.1:8080/data/report" \
+  -d "temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"
 ```
 
-The runner writes a redacted report to
-`./tmp/ecowitt-last-ingest-report.json`. Paste it into
-`/operator/ecowitt-bridge-status` for inspection. No live ingest occurs
-in dry-run mode.
+Expected: HTTP `200`, and Mosquitto subscriber prints a JSON message on
+`ecowitt/grow` containing the metrics plus `received_at`, `transport`
+(`ecowitt_http_local_bridge`), and `topic`. If Terminal 3 was not yet
+subscribed, start it again and POST again.
+
+This hand-made payload checks the transport only. It carries no
+`dateutc`, and its report shows `payload_kind: "unknown"`,
+`reasons: ["missing_captured_at"]` and an empty `metric_keys` list.
+That is the expected fail-closed result, not a healthy reading. A real
+gateway upload carries `dateutc`; its report should show
+`payload_kind: "real_ecowitt_gateway"` and the mapped `metric_keys`.
+`reasons` is empty only for a fresh, valid reading. A stale reading reports
+`stale_timestamp`, and an out-of-range value reports an `invalid_*` reason
+such as `invalid_humidity` or `invalid_temperature`. Those are correct
+fail-closed results, not a broken dry run.
+
+### Stop and clean up
+
+Press Ctrl+C in each terminal you opened: the dry-run consumer (it also
+exits on its own after one message), the HTTP bridge, the Mosquitto
+subscriber, and `mosquitto -v -c` if you started the broker yourself.
+
+On Debian/Ubuntu, run this only if you installed Mosquitto for this
+dry run and do not already use that service. Leave an existing broker
+alone:
+
+```bash
+sudo systemctl disable --now mosquitto
+```
+
+`tmp/` is ignored. The redacted report at
+`tmp/ecowitt-last-ingest-report.json` stays on disk until you delete it
+and does not show up in `git status`.
 
 ---
 
@@ -160,7 +313,7 @@ live ingest.
    ```
 
 2. **Mosquitto unreachable** — fast-path printed `MQTT broker not
-   reachable on mqtt://127.0.0.1:1883`. Mosquitto is not running or
+reachable on mqtt://127.0.0.1:1883`. Mosquitto is not running or
    not bound to localhost. Subscribe to confirm:
 
    ```powershell
@@ -173,6 +326,14 @@ live ingest.
    ```powershell
    netstat -ano | findstr :1883
    netstat -ano | findstr :8080
+   ```
+
+   ```bash
+   # Debian/Ubuntu
+   systemctl is-active mosquitto
+   ss -ltn 'sport = :1883'
+   # macOS
+   lsof -iTCP:1883 -sTCP:LISTEN
    ```
 
 4. **Re-run the doctor** — confirm recommended LAN IPv4 and Mosquitto
@@ -231,8 +392,6 @@ Notes:
   dry-run never sends to the webhook.
 - Live send remains manual and is only run after the redacted
   dry-run report has been reviewed.
-
-
 
 ## Fast Windows path
 

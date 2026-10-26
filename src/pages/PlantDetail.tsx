@@ -37,6 +37,7 @@ import {
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
+import { usePlantDetailPhotoStripItems } from "@/hooks/usePlantDetailPhotoStripItems";
 import PhotoDiagnosisReviewDialog from "@/components/PhotoDiagnosisReviewDialog";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActionResponse";
@@ -110,6 +111,7 @@ import {
 } from "@/lib/plantDetailBlockedStateViewModel";
 import { useSearchParams } from "@/lib/react-router-compat";
 import { PlantMemoryEpisodesSection } from "@/components/PlantMemoryEpisodesSection";
+import { normalizePlantHealth, plantHealthStatusLabel } from "@/lib/plantHealthRules";
 
 function BlockedStateBackLink({ action }: { action: PlantDetailBlockedStateAction }) {
   return (
@@ -295,7 +297,6 @@ export default function PlantDetail() {
   const { openGroups, setGroupOpen, revealAndNavigate } = usePlantDetailDisclosureNavigation({
     plantId: plant?.id ?? null,
   });
-  const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   // Same query key as PlantQuickStatusStrip, so this adds no request.
   const recentActivityQuery = usePlantRecentActivity(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
@@ -359,6 +360,17 @@ export default function PlantDetail() {
     plant: plant ?? null,
     contextTentId,
     contextGrowId,
+  });
+  // The photo lookup is an unbounded diary read plus private-photo signing.
+  // Only the active plant view renders the strip and hero fallback, so keep it
+  // off for loading, blocked, not-found and archived URLs. The strip reuses it.
+  const isActivePlantView = loadState === "ready" && !blockedView && !!plant;
+  const photoStrip = usePlantDetailPhotoStripItems(plant?.id ?? null, {
+    enabled: isActivePlantView,
+  });
+  // Same unbounded diary read, so the gallery count waits for the active view too.
+  const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null, {
+    enabled: isActivePlantView,
   });
 
   if (loadState === "loading") {
@@ -471,7 +483,7 @@ export default function PlantDetail() {
     isArchived: plant.isArchived,
   });
   return (
-    <div>
+    <div className="min-w-0 max-w-full">
       <QuickLogV2Fab defaultTargetKey={`plant:${plant.id}`} />
       <Button asChild variant="ghost" size="sm" className="mb-3">
         <Link to={plantsPath()}>
@@ -556,6 +568,7 @@ export default function PlantDetail() {
       >
         <PlantDetailPhotoStrip
           plantId={plant.id}
+          photoStrip={photoStrip}
           growId={plant.growId ?? null}
           onUploadPhoto={() => setQuickLogOpen(true)}
           onReviewPhoto={({ photoId, dateLabel, latestReview }) => {
@@ -615,6 +628,7 @@ export default function PlantDetail() {
           <div className="min-w-0 rounded-2xl glass overflow-hidden lg:col-span-1">
             <PlantPhoto
               src={plant.photo}
+              fallbackSrc={photoStrip.items[0]?.thumbnailUrl ?? null}
               alt={plant.name}
               className="aspect-square"
               caption="No plant photo yet"
@@ -625,6 +639,7 @@ export default function PlantDetail() {
               tentId={plant.tentId ?? null}
               tentName={tent?.name ?? null}
               growId={plant.growId ?? null}
+              plantId={plant.id}
             />
             <PlantRecentMoveCard plantId={plant.id} />
             <div className="grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">
@@ -699,7 +714,14 @@ export default function PlantDetail() {
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Health</div>
-                <div className="capitalize">{plant.health}</div>
+                <div
+                  data-testid="plant-detail-health"
+                  className={
+                    normalizePlantHealth(plant.health) === "unknown" ? undefined : "capitalize"
+                  }
+                >
+                  {plantHealthStatusLabel(plant.health)}
+                </div>
               </div>
             </div>
             <div className="min-w-0">

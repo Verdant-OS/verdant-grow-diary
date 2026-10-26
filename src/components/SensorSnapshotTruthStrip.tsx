@@ -10,6 +10,7 @@
  *    what the read model already exposes.
  */
 import { Badge } from "@/components/ui/badge";
+import { formatSnapshotCapturedAt } from "@/lib/alertReasonDisplayRules";
 import type {
   SensorSnapshotReadModel,
   SensorSnapshotReadModelTone,
@@ -68,7 +69,11 @@ export function SensorSnapshotTruthStrip({
       </div>
 
       <p className="text-[11px] text-muted-foreground" data-testid={`${testId}-captured`}>
-        {model.capturedAtLabel}
+        {/* The read model's label carries the raw stored ISO; show the viewer's local time
+            through the shared helper (#2270, #2313, #2315). */}
+        {model.capturedAt
+          ? `Captured: ${formatSnapshotCapturedAt(model.capturedAt)}`
+          : model.capturedAtLabel}
       </p>
 
       {model.warnings.length > 0 ? (

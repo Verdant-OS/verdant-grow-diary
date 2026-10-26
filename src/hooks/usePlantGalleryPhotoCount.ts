@@ -7,6 +7,8 @@
  * Photos without contradicting each other.
  *
  * No writes. No mutations. No AI calls. No alerts. No Action Queue.
+ * With `enabled: false` it starts no diary read and returns 0, so Plant
+ * Detail keeps it off until the active plant view renders.
  */
 import { useMemo } from "react";
 
@@ -18,11 +20,15 @@ import {
   PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
 } from "@/lib/plantPhotoPreviewStrip";
 
-export function usePlantGalleryPhotoCount(plantId: string | null | undefined): number {
-  const { data: rawDiary } = useDiaryEntries();
+export function usePlantGalleryPhotoCount(
+  plantId: string | null | undefined,
+  options?: { enabled?: boolean },
+): number {
+  const enabled = options?.enabled ?? true;
+  const { data: rawDiary } = useDiaryEntries({ enabled });
 
   return useMemo(() => {
-    if (!plantId || !rawDiary || rawDiary.length === 0) return 0;
+    if (!enabled || !plantId || !rawDiary || rawDiary.length === 0) return 0;
     const lifted = rawDiary.map((raw) => {
       const r = (raw ?? {}) as Record<string, unknown>;
       if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
@@ -39,5 +45,5 @@ export function usePlantGalleryPhotoCount(plantId: string | null | undefined): n
       rows: photoRows,
       limit: PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
     }).length;
-  }, [plantId, rawDiary]);
+  }, [enabled, plantId, rawDiary]);
 }

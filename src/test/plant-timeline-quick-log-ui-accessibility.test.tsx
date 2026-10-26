@@ -18,7 +18,7 @@
  * schema, RLS, auth, edge-function, RPC, AI Doctor, Alerts, Action
  * Queue, automation, device-control, or fake-live-data changes.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -80,6 +80,20 @@ function renderSection() {
       <QuickLogGroupedTimelineSection scope="plant" plantId={PLANT} tentId={TENT} />
     </QueryClientProvider>,
   );
+}
+
+// Time labels follow the viewer's local zone; pin it so pins are deterministic.
+let savedTz: string | undefined;
+beforeEach(() => {
+  savedTz = process.env.TZ;
+});
+afterEach(() => {
+  if (savedTz === undefined) delete process.env.TZ;
+  else process.env.TZ = savedTz;
+});
+function useChicagoZone(): void {
+  process.env.TZ = "America/Chicago";
+  expect(new Date(2026, 9, 21, 10, 53).toISOString()).toBe("2026-10-21T15:53:00.000Z");
 }
 
 beforeEach(() => {
@@ -274,11 +288,12 @@ describe("Quick Log action labels via shared helpers", () => {
     expect(mod.toTimelineItem(base).title).toBe("Diagnosis");
   });
 
-  it("formatQuickLogOccurredAt produces a deterministic, UTC-stable string", () => {
+  it("formatQuickLogOccurredAt produces a deterministic, viewer-local string", () => {
+    useChicagoZone();
     const out = formatQuickLogOccurredAt("2026-03-15T09:00:00.000Z");
-    // Stable across machines/timezones — UTC-anchored.
+    // Viewer-local with the zone named; deterministic under a pinned TZ.
     expect(out).toMatch(/2026/);
-    expect(out).toMatch(/UTC$/);
+    expect(out).toBe("Mar 15, 2026, 4:00 AM CDT");
     // Invalid input is passed through, never invented as "now".
     expect(formatQuickLogOccurredAt("not-a-date")).toBe("not-a-date");
     expect(formatQuickLogOccurredAt("")).toBe("");

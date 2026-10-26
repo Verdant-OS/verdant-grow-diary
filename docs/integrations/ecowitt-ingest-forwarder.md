@@ -1,0 +1,209 @@
+# EcoWitt MQTT → `ecowitt-ingest` forwarder
+
+The PC-side step between the local HTTP bridge and Verdant's channel router.
+
+```text
+GW3000B ──HTTP──► ecowitt-http-local-bridge ──MQTT──► ecowitt-ingest-forwarder ──HTTPS──► ecowitt-ingest
+         (LAN)    (local only, never Verdant)  (local)  (dry-run by default)      (Bearer vbt_)
+```
+
+The bridge is deliberately local-only (test-pinned: no `fetch`, no token). This
+forwarder is the separate, explicitly gated tool that reads the same topic and
+forwards each raw gateway upload to the `ecowitt-ingest` edge function. That
+function routes every channel to the tent whose
+`tents.hardware_config.ecowitt` declares it (`air_channels`, `soil_channels`),
+fingerprints the PASSKEY (never uses it as auth), and persists only
+freshness-approved rows. See `docs/ecowitt-live-canary-runbook.md` for the
+tent config shape and the first-time canary.
+
+## Status
+
+EcoWitt ingest is **dry-run only** until the gates in
+`docs/ecowitt-future-real-ingest-gates.md` are cleared by the owner. `--live`
+is the mechanism for the canary and for ingest once that is approved; running
+it is an owner decision, never an agent's.
+
+## Commands
+
+The script imports the `mqtt` package at run time; it is deliberately not a
+repository dependency. Install it once per checkout without touching
+`package.json` or the lockfile:
+
+```powershell
+cd "<repo>"
+bun add --no-save mqtt@5.16.1
+```
+
+```powershell
+cd "<repo>"
+$env:ECOWITT_MQTT_URL="mqtt://127.0.0.1:1883"
+$env:ECOWITT_MQTT_TOPIC="ecowitt/grow"
+
+# Dry run (default): parse and summarise channels. It connects to the MQTT
+# broker above and subscribes, but never POSTs to ecowitt-ingest.
+bun run dev:ecowitt-forwarder -- --once
+
+# Live (owner-gated): forward to ecowitt-ingest with a bridge token.
+$env:ECOWITT_INGEST_URL="https://<project-ref>.supabase.co/functions/v1/ecowitt-ingest"
+$env:VERDANT_BRIDGE_TOKEN="vbt_..."   # paste only into this window, never into chat
+bun run dev:ecowitt-forwarder:live -- --once
+```
+
+`--once` exits `0` for a dry run, an `accepted: true` forward, or a duplicate on the
+retry after an unreadable `2xx` (see below), and `1` otherwise.
+The outcome is printed to the console, redacted. The forwarder writes no files;
+an earlier version's `--write-report` option is gone and is now refused as an
+unknown argument. A report file an earlier run left in `tmp/` is not touched.
+
+## Fail-closed rules
+
+- `--live` refuses to start unless `ECOWITT_INGEST_URL` is exactly the Verdant
+  project's function URL (`APPROVED_INGEST_URLS`: `https://<project>.supabase.co/functions/v1/ecowitt-ingest`
+  or `https://<project>.functions.supabase.co/ecowitt-ingest`, no userinfo,
+  query or fragment) and `VERDANT_BRIDGE_TOKEN` has the `vbt_` shape. A raw
+  gateway payload carries the PASSKEY, so it is never posted anywhere else.
+- The live POST times out after 15 s and retries only the transient cases in
+  `docs/bridge-client-retry-guidance.md` (timeout, network failure, HTTP 408,
+  429, 5xx) with Full Jitter, at most 4 retries. A `200` carrying
+  `error: "insert_failed"` (the write is an idempotent upsert) or
+  `reason: "tent_lookup_failed"` (nothing was written yet) is retried the same way. 4xx auth and payload errors and the other `200` reasons, such as
+  `timestamp_stale`, are final.
+- A `429` with a whole-seconds `Retry-After` waits that long (capped at 45 s)
+  instead of the jittered delay; any other `Retry-After` value falls back to Full Jitter.
+- `--once` exits `0` only for a dry run or a `2xx` response with
+  `accepted: true`. One exception: when an earlier attempt got a `2xx` whose body
+  could not be read, a retry answered with `accepted: false`, `inserted: 0` and
+  `skipped_duplicate` above 0 means the first attempt's write landed. It is
+  logged as `deliveredAs: "duplicate_on_retry"` and exits `0`. A duplicate on
+  the first attempt still exits `1`. A broker connect timeout (20 s), broker
+  error, rejected subscription or missing `mqtt` package exits `2` instead of
+  hanging.
+- The summary echoes only checked fields. `dateutc` must be the EcoWitt
+  `YYYY-MM-DD HH:MM:SS` form `ecowitt-ingest` accepts, or the message is
+  rejected (`invalid_dateutc`). Free-form upload strings such as `stationtype`
+  are never shown.
+- A message without `PASSKEY` or `dateutc` (for example the runbook's
+  hand-made sanity POST) is rejected locally and never forwarded. A `dateutc`
+  that is not in the EcoWitt form is rejected (`invalid_dateutc`), whether or
+  not it contains the PASSKEY. A valid `dateutc` that contains the upload's
+  PASSKEY (possible with a short or date-shaped key such as `-`) is forwarded
+  unchanged; only the summary's copy is replaced with
+  `[redacted: contains PASSKEY]`, so the credential value never reaches a
+  summary string. Any 32-hex run inside a logged string is redacted whether or
+  not it stands alone.
+- The dry-run channel summary counts only the keys `ecowitt-ingest` routes:
+  `temp{n}f` and `humidity{n}` for air, `soilmoisture{n}` for soil.
+- The live POST is sent with `redirect: "manual"`: a redirect from the
+  validated URL is reported as `network_error` (`redirect_refused_<status>`)
+  after the first attempt, never followed and never retried with the PASSKEY
+  and token. Its unread body is cancelled before the result is reported.
+- A final status (for example `401`) whose body cannot be read is reported
+  with that status and reason `response_unreadable`, and is not re-sent; only
+  a retryable status (408, 429, 5xx) is retried.
+- A `--mqtt-url` containing a control character (tab, CR, LF or another C0
+  character) is refused before anything is logged.
+- `--mqtt-url` must use `mqtt://`, `mqtts://`, `ws://` or `wss://`. MQTT.js
+  sends any other scheme (for example `https://`) as plaintext MQTT, so it is
+  refused before connecting. `mqtt://` and `ws://` are accepted only for a
+  loopback broker (`localhost`, a canonical `127.x.x.x` with octets 0–255, `[::1]`); a remote broker needs
+  `mqtts://` or `wss://`, because the credentials and PASSKEY uploads would
+  otherwise travel unencrypted.
+- `ws://` and `wss://` to an IPv6 address (`ws://[::1]`) are refused: MQTT.js
+  drops the brackets and builds a WebSocket URL nothing accepts. Use
+  `mqtt://[::1]` or a hostname.
+- Credentials in both `--mqtt-url` and `ECOWITT_MQTT_USERNAME` /
+  `ECOWITT_MQTT_PASSWORD` are refused: MQTT.js would use the URL ones. Set them
+  in one place.
+- The startup line shows the broker as scheme, host and port only; the path,
+  query and fragment are never logged.
+- A set `MQTTJS_SOCKS_PROXY` is refused before connecting: MQTT.js would route
+  the broker connection through that proxy.
+- `--mqtt-url` credentials containing `:` (literally or as `%3A`, in the
+  username or the password) are refused: MQTT.js splits them at the last `:`.
+  So are credentials the URL parser rewrites (a space becomes `%20`), because
+  that spelling is not the one redacted. So is a password with an empty
+  username (`mqtt://:secret@broker`), which MQTT.js would send as the
+  username `:secret`. So is a decoded line break (CR, LF, U+2028, U+2029) in
+  either credential. Use `ECOWITT_MQTT_USERNAME` and `ECOWITT_MQTT_PASSWORD`.
+- Broker query values are registered for redaction as typed, as well as parsed
+  and decoded, so a topic that repeats one is redacted in its own spelling.
+- `--live` is refused while `HTTPS_PROXY`, `HTTP_PROXY` or `ALL_PROXY` (either
+  case) is set: Bun's fetch would send the bridge token and PASSKEY through
+  that proxy.
+- `BUN_CONFIG_VERBOSE_FETCH` (any non-empty value) and `NODE_TLS_REJECT_UNAUTHORIZED`
+  (anything but `1`) are refused before connecting: the first prints the bridge
+  token and PASSKEY body, the second disables certificate checks.
+- WebSocket brokers (`ws://`, `wss://`) are capped at the same inbound frame
+  bound through `wsOptions.maxPayload`.
+- Any non-empty `DEBUG` is refused before connecting. MQTT.js transports print
+  the broker URL, query credentials included, and its packet parser prints
+  gateway payloads, PASSKEY included, through their own loggers, outside
+  redaction. Unset `DEBUG` to run the forwarder.
+- A message whose `PASSKEY` or `dateutc` is not a string is rejected locally
+  (`invalid_passkey` / `invalid_dateutc`); nothing is coerced.
+  The HTTP bridge keeps `PASSKEY` as the exact string it received, so a
+  digits-only key such as `000012345678` arrives unchanged.
+- `--once` claims the first message before any await, so a second upload
+  arriving while the first is in flight is ignored, never forwarded. Once that
+  message is claimed, a broker error is logged and does not abort its POST;
+  the message's own result sets the exit code.
+- `--once` also exits `2` when the broker connection closes or goes offline
+  before a message is claimed; there is nothing to reconnect for.
+- The `--once` deadline (20 s) covers both the connection and the subscription
+  acknowledgement; a broker that connects but never answers the subscribe
+  ends the run with exit `2` instead of hanging.
+- Every inbound MQTT packet passes a stream guard before MQTT.js parses it. A
+  fixed header declaring more than 65 KiB (one 64 KiB message plus 1 KiB for
+  its header, topic and packet id), or a remaining length longer than four
+  bytes, closes the connection before the body is read, and the run exits `2`
+  in either mode. The guard works on every transport MQTT.js builds and on
+  every reconnect. It holds no data itself; what can be in memory at once is
+  the socket's current read chunk (set by the runtime, not by the guard), the
+  guard's readable buffer, and one partial packet of at most 65 KiB. The
+  readable buffer pauses the socket at the runtime's default high-water mark
+  (64 KiB on Node 22 and Bun), but a chunk is pushed whole first, so it can
+  hold up to that mark plus one full socket chunk.
+  This does not depend on MQTT 5 `maximumPacketSize`, which a broker may ignore
+  and MQTT.js checks only after buffering the whole packet.
+- The 64 KiB message bound is then applied to the raw frame before it is
+  decoded or queued, so the backlog never holds more than 32 bounded messages.
+- Continuous mode handles at most 4 messages at once and queues at most 32
+  more; anything beyond that is dropped with a `dropped_backlog_full` log line,
+  so a burst or a slow ingest never fans out into unbounded POSTs and retries.
+  A broker close/offline is logged and left to the client's own reconnect;
+  each reconnect subscribes again and waits for the broker's own acknowledgement.
+- Every runtime log line (message handling, forwarding, retries) passes
+  through a redactor at every depth. Startup refusals are fixed, value-free
+  messages printed directly; they do not pass through the redactor. In runtime
+  lines `PASSKEY`, `MAC`, tokens (also when embedded in another string or a
+  URL), MAC addresses in any common form, and the configured MQTT username and password (literally, in any
+  case, URI-encoded, at any length) never appear. Each upload is checked
+  against its own PASSKEY, in any case; nothing carries over between messages.
+  The Mosquitto watcher window still shows the raw topic, so crop it from
+  anything you share.
+- Arguments are read in order. An unknown argument, a repeated flag, or
+  `--topic` / `--mqtt-url` without a non-empty value is refused before any
+  connection. An unknown argument is reported by position only, so a mistyped
+  `--password=…` is never printed. A malformed broker URL is refused by the
+  checks below. A URL that passes them but that the MQTT client still fails
+  to open exits `2` with a fixed `mqtt_connect_failed` line that carries
+  neither the URL nor the error text.
+- A refused subscription (error, no grant, or QoS 128), a subscription that is
+  never acknowledged within 20 s, and a refused connection (bad credentials)
+  each exit `2` in continuous mode as well, instead of staying connected while
+  consuming nothing. Network errors and drops are left to the client's
+  reconnect.
+- The ingest response is read up to 16 KiB; a longer body is cancelled and
+  reported as `response_too_large`. When nothing is stored, the outcome counts
+  the documented `dropped[]` reason codes and names the router channel keys
+  involved (`temp2f`, `humidity2`, …), never tenant ids.
+
+## What it never does
+
+No Supabase SDK, no `service_role`, no direct database access, no Action
+Queue, no alerts, no automation, no device control. Enforced by
+`src/test/ecowitt-ingest-forwarder-safety.test.ts`.
+
+What `--live` does do: an accepted POST asks `ecowitt-ingest` to persist
+`sensor_readings` rows and update bridge-token usage in production. That is the
+owner-gated effect live mode exists for; dry-run has none of it.

@@ -14,6 +14,12 @@ on:
   merge_group:
   push:
     branches: [verdant-grow-diary, main]
+    # Duplicate of ci.yml's required 32 shards. paths-ignore is not valid on
+    # merge_group, so the queue still runs these 16 batches. A docs-only
+    # deploy-branch push skips them. ci.yml has no path filter.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}

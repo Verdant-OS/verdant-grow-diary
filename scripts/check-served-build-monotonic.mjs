@@ -6,8 +6,10 @@
 // Reads public build metadata only. It never deploys, never writes to production and
 // uses no secrets or tokens. The only write is the local state file (--write-file),
 // and only on PASS, so a FAIL keeps alerting until production moves forward again.
-// A missing checkpoint (first run, cache miss or eviction) BLOCKS unless the run was
-// explicitly initialized (--initialize), so an evicted cache never silently re-baselines.
+// A missing checkpoint (first run, cache miss or eviction) records the served SHA as
+// the baseline and exits 0. Later runs compare against that checkpoint. A rollback or
+// a diverged served SHA FAILs and does not overwrite it. --initialize is accepted and
+// does not skip a comparison when a checkpoint is already present.
 // Exit 0 PASS, 1 FAIL, 2 BLOCKED.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -36,10 +38,14 @@ export function evaluateServedBuild({
   if (!isSha(servedSha)) return { status: "BLOCKED", reason: "served_unreadable" };
   if (servedOnDeployBranch !== true)
     return { status: "FAIL", reason: "served_not_on_deploy_branch" };
-  if (previousSha === null || previousSha === undefined || previousSha === "")
-    return initialize === true
-      ? { status: "PASS", reason: "baseline_recorded" }
-      : { status: "BLOCKED", reason: "previous_missing" };
+  // No checkpoint yet: seed from the served SHA. A scheduled run can arm the alert
+  // without a manual dispatch. initialize is accepted and does not change this
+  // outcome. An existing checkpoint is still compared below, including when
+  // initialize is set.
+  if (previousSha === null || previousSha === undefined || previousSha === "") {
+    void initialize;
+    return { status: "PASS", reason: "baseline_recorded" };
+  }
   // A recorded state that is not a commit SHA cannot be compared; fail closed and keep it.
   if (!isSha(previousSha)) return { status: "BLOCKED", reason: "previous_unreadable" };
   if (servedSha === previousSha) return { status: "PASS", reason: "unchanged" };
@@ -53,11 +59,6 @@ export function formatServedBuildSummary({ status, reason }, { servedSha, previo
     `served=${servedSha || "none"} previous=${previousSha || "none"}`
   );
 }
-
-export const SERVED_BUILD_PREVIOUS_MISSING_HINT =
-  "served-build-monotonic: the previous checkpoint was unavailable (first run, cache miss " +
-  "or eviction), so there is nothing to compare against. Re-initialize by dispatching the " +
-  "'Served build monotonic check' workflow with initialize=true.";
 
 /**
  * The I/O sequence with every effect injected, so the write-only-on-PASS rule is testable
@@ -98,7 +99,6 @@ export async function runServedBuildCheck({
   });
   if (result.status === "PASS") writeServed(servedSha);
   log(formatServedBuildSummary(result, { servedSha, previousSha }));
-  if (result.reason === "previous_missing") log(SERVED_BUILD_PREVIOUS_MISSING_HINT);
   return { ...result, servedSha, previousSha, exitCode: SERVED_BUILD_EXIT_CODES[result.status] };
 }
 

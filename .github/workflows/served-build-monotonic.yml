@@ -3,8 +3,13 @@ name: Served build monotonic check
 # Post-deploy alert for production moving BACKWARD to an older build (incident #2123).
 # Reads public build metadata (https://verdantgrowdiary.com/version.json) and git ancestry
 # on the deploy branch only. It never deploys, never writes to production and uses no
-# secrets. A FAIL fails this job: that failure is the alert. A missing checkpoint (cache
-# miss or eviction) BLOCKS; re-initialize by dispatching with initialize=true.
+# secrets. The baseline is an Actions cache entry (.served-build/previous.sha), not a
+# repo file, artifact or Actions variable. A missing checkpoint seeds that file from
+# the served SHA and this job saves the cache only after the check exits 0, so the
+# first successful run arms the alert. A later FAIL (served build moved backward or
+# diverged) fails this job — that failure is the alert — and does not save a new
+# checkpoint. The initialize dispatch input remains, and it does not skip a comparison
+# when a checkpoint already exists.
 on:
   schedule:
     - cron: "*/30 * * * *"

@@ -14,12 +14,29 @@ import {
 } from "@/lib/sensor/sensorSourceRules";
 import {
   selectDashboardSensorEvidenceRows,
+  selectRejectedQualityRows,
   type DashboardSensorEvidenceRow,
 } from "@/lib/dashboardSensorEvidenceRules";
 import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import type {
+  SensorSnapshotCaptureEvidence,
+  SensorSnapshotRejectedQualityRow,
+} from "@/lib/sensorSnapshotCaptureEvidence";
+import {
+  rowCaptureRef,
+  snapshotCaptureRef,
+  captureRefIn,
+  captureRefsKnown,
+  captureRefsMatch,
+  sensorCaptureRef,
+  type SensorCaptureRef,
+} from "@/lib/sensorCaptureRefRules";
+
+/** Source label for a generic diary snapshot (historical, not a manual envelope). */
+export const DIARY_SOURCE_LABEL = "Diary note";
 
 export const TONIGHT_TENT_HOME_COPY = {
   missing: "Missing",
@@ -121,7 +138,11 @@ const METRICS: ReadonlyArray<{ key: TonightMetricKey; label: string; readingMetr
   { key: "vpd", label: "VPD", readingMetric: "vpd_kpa" },
 ];
 
-export type TonightSensorRow = DashboardSensorEvidenceRow & { id?: string };
+export type TonightSensorRow = DashboardSensorEvidenceRow & {
+  id?: string;
+  /** Capture identity when the row stands in for another record (a diary entry). */
+  capture_ref?: string | null;
+};
 
 export type TonightRowsReadStatus = "loading" | "error" | "refresh_error" | "success";
 
@@ -137,6 +158,9 @@ export interface TonightSnapshotInput {
     metric_refs?: SensorSnapshot["metric_refs"];
     /** Present when the whole snapshot came from one diary row. */
     diary_evidence_ref?: SensorSnapshot["diary_evidence_ref"];
+    /** The diary entry a generic blob came from: capture identity only. */
+    diary_capture_id?: SensorSnapshotCaptureEvidence["diary_capture_id"];
+    rejected_quality_rows?: SensorSnapshotCaptureEvidence["rejected_quality_rows"];
   } | null;
 }
 
@@ -154,18 +178,45 @@ export interface TonightMetricView {
   ageText: string | null;
   /** True only for VPD derived from temperature and RH (no stored vpd_kpa). */
   calculated: boolean;
+  /**
+   * The stored records behind the value (`sensorCaptureRefRules`): the row or
+   * diary entry it was read from, or both inputs of a calculated VPD. A null
+   * entry is an unknown identity (Codex P1 on #2303 at fa8edcff).
+   */
+  captureRefs?: readonly (SensorCaptureRef | null)[];
+  /**
+   * True when the value comes from a generic diary snapshot (raw source
+   * `diary`): historical context, never a healthy current cue on surfaces that
+   * grade it (`isDashboardSnapshotEligibleForHealthyCues`; Codex P1 on #2303
+   * at 4bd3fae7). Tonight labels it "Diary note" (`DIARY_SOURCE_LABEL`), never
+   * Manual (Codex P1 on #2303 at 0994ea2a).
+   */
+  historical?: true;
+  /**
+   * The temperature (°C) and RH (%) a calculated VPD was derived from, which
+   * can be an older same-capture pair than the temperature and RH the card
+   * shows. Capture checks validate these, not the displayed values (Codex P2
+   * on #2303 at 3e689090).
+   */
+  inputs?: { temp: number; rh: number };
 }
 
 /** Allowed clock skew before a capture time counts as "in the future". */
 const FUTURE_SKEW_MS = 60_000;
+/** Tonight's future-skew threshold, for surfaces that must agree with it (#2303). */
+export const TONIGHT_FUTURE_SKEW_MS = FUTURE_SKEW_MS;
 
 interface Candidate {
   value: number;
   source: SensorSource;
   at: string;
   epochMs: number;
-  /** 0 = sensor row, 1 = diary-inclusive snapshot; deterministic tie-break. */
-  origin: 0 | 1;
+  /**
+   * 0 = sensor row, 1 = diary-inclusive snapshot, 2 = a rejected VPD (a
+   * rejection placeholder, or a raw VPD whose capture has a rejected sibling);
+   * deterministic tie-break.
+   */
+  origin: 0 | 1 | 2;
   /** Set only on a VPD candidate derived from temperature and RH. */
   calculated?: true;
   /**
@@ -176,6 +227,17 @@ interface Candidate {
    * still shown on their own but never feed a calculated VPD.
    */
   ownSource: boolean;
+  /** Capture identity of the record(s) behind this candidate. */
+  refs: readonly (SensorCaptureRef | null)[];
+  /** From a generic diary snapshot (raw source `diary`). */
+  historical?: true;
+  /** The temperature and RH a calculated VPD came from. */
+  inputs?: { temp: number; rh: number };
+}
+
+/** A generic diary snapshot, as opposed to an Environment Check or manual-snapshot envelope. */
+function isDiarySource(source: unknown): boolean {
+  return typeof source === "string" && source.trim().toLowerCase() === "diary";
 }
 
 /** Snapshot sources map onto the canonical vocabulary; "unavailable" carries no reading. */
@@ -210,6 +272,22 @@ function snapshotMetricSourceProven(
   return ref != null && normalizeSensorSource(ref.source) === source;
 }
 
+/**
+ * The source of one snapshot metric: its own row's source when the snapshot
+ * carries that metric's exact ref (a mixed-source snapshot must not lend its
+ * aggregate source to every metric — Codex P1 on #2303 at 4a304fe3). A diary
+ * record, or a legacy snapshot without refs, keeps the record's own source.
+ */
+function snapshotMetricSource(
+  snap: TonightSnapshot,
+  key: TonightMetricKey,
+  aggregate: SensorSource,
+): SensorSource {
+  if (snap.source === "diary" || snap.diary_evidence_ref) return aggregate;
+  const ref = snap.metric_refs?.[key];
+  return ref ? normalizeSensorSource(ref.source) : aggregate;
+}
+
 function parseAt(value: string | null | undefined): { at: string; epochMs: number } | null {
   if (typeof value !== "string" || value.length === 0) return null;
   const epochMs = Date.parse(value);
@@ -233,6 +311,23 @@ function usableCandidate(candidate: Candidate, nowMs: number): Candidate | null 
     return { ...candidate, source: "stale" };
   }
   return candidate;
+}
+
+/**
+ * True when every VPD candidate at `derived`'s instant is a rejection with a
+ * known identity disjoint from the pair's own known records. A direct valid
+ * reading, or an unknown identity, keeps its precedence.
+ */
+function equalTimeRejectionsOnly(candidates: readonly Candidate[], derived: Candidate): boolean {
+  if (!captureRefsKnown(derived.refs)) return false;
+  return candidates
+    .filter((candidate) => candidate.epochMs === derived.epochMs)
+    .every(
+      (candidate) =>
+        candidate.origin === 2 &&
+        captureRefsKnown(candidate.refs) &&
+        !candidate.refs.some((ref) => captureRefIn(ref, derived.refs)),
+    );
 }
 
 function newestFirst(a: Candidate, b: Candidate): number {
@@ -287,7 +382,12 @@ function calculatedVpdCandidate(
     const matchingRh = provenRhs.find(
       (candidateRh) =>
         candidateRh.epochMs === candidateTemp.epochMs &&
-        compositeVpdSource(candidateTemp.source, candidateRh.source) != null,
+        compositeVpdSource(candidateTemp.source, candidateRh.source) != null &&
+        // Known, disjoint captures (two devices at one instant) are not a pair
+        // (Copilot on #2451 at 6d0fa53c).
+        (!captureRefsKnown(candidateTemp.refs) ||
+          !captureRefsKnown(candidateRh.refs) ||
+          candidateTemp.refs.some((ref) => captureRefIn(ref, candidateRh.refs))),
     );
     if (matchingRh) {
       temp = candidateTemp;
@@ -297,6 +397,17 @@ function calculatedVpdCandidate(
     }
   }
 
+  // The unpaired fallback must not combine two known, different captures at
+  // one instant either (Copilot on #2459 at de8c1b27).
+  if (
+    !paired &&
+    temp.epochMs === rh.epochMs &&
+    captureRefsKnown(temp.refs) &&
+    captureRefsKnown(rh.refs) &&
+    !temp.refs.some((ref) => captureRefIn(ref, rh.refs))
+  ) {
+    return { kind: "underivable" };
+  }
   const older = temp.epochMs <= rh.epochMs ? temp : rh;
   const source = compositeVpdSource(temp.source, rh.source);
   if (source == null) return { kind: "underivable" };
@@ -306,6 +417,9 @@ function calculatedVpdCandidate(
     origin: 0 as const,
     calculated: true as const,
     ownSource: true,
+    refs: [...temp.refs, ...rh.refs],
+    inputs: { temp: temp.value, rh: rh.value },
+    ...(temp.historical || rh.historical ? { historical: true as const } : {}),
   };
   // RH pinned at 0% or 100% is a stuck sensor, not a reading (same guard as the Environment ribbon).
   const vpd = rhIsPinned(rh.value)
@@ -358,6 +472,37 @@ function compositeVpdSource(a: SensorSource, b: SensorSource): SensorSource | nu
   return null;
 }
 
+const CLIMATE_METRIC_PATTERN = /^(temp|temperature|humidity|rh|vpd)(_|$)/i;
+
+export function isClimateMetric(metric: unknown): boolean {
+  return typeof metric === "string" && CLIMATE_METRIC_PATTERN.test(metric.trim());
+}
+
+/**
+ * Whether the capture at `ref` / `atMs` carries a sibling row the snapshot
+ * read dropped for intake quality or an explicit stale/invalid source.
+ * Matched by record identity when both are known, else by instant (ambiguous
+ * captures are withheld). Such a capture is never shown as current, as the
+ * raw-row capture gate already decides for the tents list and Tent Detail
+ * (Codex P1 on #2303 at 4a304fe3). It applies to every candidate from that
+ * capture, the raw row as well as the snapshot copy (Codex P1 at b2606eca).
+ */
+function captureHasRejectedSibling(
+  rejected: readonly SensorSnapshotRejectedQualityRow[],
+  ref: SensorCaptureRef | null,
+  atMs: number,
+): boolean {
+  return rejected.some((row) => {
+    // Only a climate sibling (temperature, RH, VPD) taints the capture: a
+    // degraded CO2 or soil reading says nothing about the air metrics (Copilot
+    // on #2303 at b49c32ae).
+    if (!isClimateMetric(row.metric)) return false;
+    const rowRef = sensorCaptureRef(row.captured_at, row.source, row.device_id);
+    if (ref && rowRef) return captureRefsMatch(ref, rowRef);
+    return Number.isFinite(atMs) && Date.parse(row.captured_at) === atMs;
+  });
+}
+
 /**
  * Newest finite candidate per metric, each keeping its own source and capture
  * time. A newer RH-only record never renews temperature. VPD with no stored
@@ -378,6 +523,14 @@ export function buildTonightTentMetrics(input: {
   const byKey = new Map<TonightMetricKey, Candidate[]>();
   for (const metric of METRICS) byKey.set(metric.key, []);
 
+  const snap = input.snapshot.status === "ok" ? input.snapshot.snapshot : null;
+  // Rejected siblings come from the raw rows as well as the snapshot, so a raw
+  // candidate is withheld even while the snapshot is loading or unavailable
+  // (Codex P1 on #2303 at 413fdbd2).
+  const rejectedSiblings: SensorSnapshotRejectedQualityRow[] = [
+    ...(snap?.rejected_quality_rows ?? []),
+    ...(rowsFailed(input.rowsRead.status) ? [] : selectRejectedQualityRows(input.rows ?? [])),
+  ];
   for (const { key, readingMetric } of METRICS) {
     const candidates = byKey.get(key)!;
     for (const row of evidenceRows) {
@@ -385,16 +538,22 @@ export function buildTonightTentMetrics(input: {
       if (typeof row.value !== "number" || !Number.isFinite(row.value)) continue;
       const when = parseAt(row.captured_at ?? row.ts);
       if (!when) continue;
+      const ref = rowCaptureRef(row);
+      const siblingRejected = captureHasRejectedSibling(rejectedSiblings, ref, when.epochMs);
       candidates.push({
         value: row.value,
-        source: normalizeSensorSource(row.source),
+        source: siblingRejected ? "invalid" : normalizeSensorSource(row.source),
         ...when,
-        origin: 0,
+        // A raw VPD from a rejected capture ranks with the rejection
+        // placeholders, so an independent valid VPD at the same instant is
+        // not hidden behind it (Copilot on #2442 at e50d6087).
+        origin: key === "vpd" && siblingRejected ? 2 : 0,
         ownSource: true,
+        refs: [ref],
+        ...(isDiarySource(row.source) ? { historical: true as const } : {}),
       });
     }
 
-    const snap = input.snapshot.status === "ok" ? input.snapshot.snapshot : null;
     const snapValue = snap ? snap[key] : null;
     const snapSource = snap ? snapshotSource(snap.source) : null;
     const snapWhen = snap ? parseAt(snap.ts) : null;
@@ -405,13 +564,44 @@ export function buildTonightTentMetrics(input: {
       typeof snapValue === "number" &&
       Number.isFinite(snapValue)
     ) {
+      const snapRef = snapshotCaptureRef(snap, key);
+      const atMs = Date.parse(snap.metric_refs?.[key]?.captured_at ?? snap.ts ?? "");
+      const metricSource = captureHasRejectedSibling(rejectedSiblings, snapRef, atMs)
+        ? "invalid"
+        : snapshotMetricSource(snap, key, snapSource);
       candidates.push({
         value: snapValue,
-        source: snapSource,
+        source: metricSource,
         ...snapWhen,
-        origin: 1,
-        ownSource: snapshotMetricSourceProven(snap, key, snapSource),
+        // An invalid snapshot VPD ranks with the other rejections, so it never
+        // blocks an independent equal-time calculation (Copilot on #2451).
+        origin: key === "vpd" && metricSource === "invalid" ? 2 : 1,
+        ownSource: snapshotMetricSourceProven(snap, key, metricSource),
+        refs: [snapRef],
+        ...(isDiarySource(snap.source) ? { historical: true as const } : {}),
       });
+    }
+    // A VPD row rejected on its own (quality or explicit stale/invalid source)
+    // stays terminal: it is the newest VPD evidence, so an older valid VPD
+    // must not surface behind it (Codex P1 on #2303 at 6a242e1f).
+    if (key === "vpd") {
+      for (const rejected of rejectedSiblings) {
+        if (rejected.metric !== readingMetric) continue;
+        const when = parseAt(rejected.captured_at);
+        if (!when) continue;
+        candidates.push({
+          value: 0,
+          source: "invalid",
+          ...when,
+          // Last on an equal-time tie: a same-capture candidate is already
+          // invalid through captureHasRejectedSibling, so a tie means an
+          // independent capture, which stays valid; a strictly newer rejection
+          // still wins (Copilot P1 on #2430 at fcd86356).
+          origin: 2,
+          ownSource: false,
+          refs: [sensorCaptureRef(rejected.captured_at, rejected.source, rejected.device_id)],
+        });
+      }
     }
     candidates.sort(newestFirst);
   }
@@ -432,6 +622,19 @@ export function buildTonightTentMetrics(input: {
     // #2268: when the temperature and RH the card shows are one capture newer
     // than every stored VPD, that pair's calculated VPD replaces the stored one.
     // An older pair is never used beside newer displayed inputs.
+    vpdCandidates.unshift(derived.candidate);
+  } else if (
+    derived.kind === "derived" &&
+    derived.paired &&
+    derived.candidate.source !== "invalid" &&
+    isDisplayedCandidate(derived.inputs.temp, byKey.get("temp")![0], nowMs) &&
+    isDisplayedCandidate(derived.inputs.rh, byKey.get("rh")![0], nowMs) &&
+    derived.candidate.epochMs === vpdCandidates[0].epochMs &&
+    equalTimeRejectionsOnly(vpdCandidates, derived.candidate)
+  ) {
+    // Only rejections share the pair's instant, and none is the pair's own
+    // capture: the independent calculation stands, as an independent stored
+    // VPD would (Copilot on #2437 and #2442 at e50d6087).
     vpdCandidates.unshift(derived.candidate);
   }
 
@@ -474,10 +677,16 @@ export function buildTonightTentMetrics(input: {
       state: invalid ? "invalid" : "value",
       value: invalid ? null : best.value,
       source,
-      sourceLabel: sensorSourceLabel(source),
+      // A generic diary snapshot is historical context, never an Environment
+      // Check: the card shows it as a diary note, not "Manual" (Codex P1 on
+      // #2303 at 0994ea2a).
+      sourceLabel: best.historical && !invalid ? DIARY_SOURCE_LABEL : sensorSourceLabel(source),
       capturedAt: best.at,
       ageText: formatAgeLabel(Math.max(0, ageMs)),
       calculated: best.calculated === true,
+      captureRefs: best.refs,
+      ...(best.historical ? { historical: true as const } : {}),
+      ...(best.inputs ? { inputs: best.inputs } : {}),
     };
   });
 }

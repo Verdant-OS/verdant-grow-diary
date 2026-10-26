@@ -235,12 +235,14 @@ function Row({
   row,
   integrityHandle,
   correctionValues,
+  environmentCheckDetails,
   correctionCount,
   onEntryChanged,
 }: {
   row: QuickLogHistoryRow;
   integrityHandle?: QuickLogEntryHandleRef | null;
   correctionValues?: ReturnType<typeof correctionValuePropsFromDiaryDetails>;
+  environmentCheckDetails?: unknown;
   correctionCount?: number;
   onEntryChanged?: () => void;
 }) {
@@ -278,6 +280,7 @@ function Row({
             plantId={row.plantId}
             tentId={row.tentId}
             correctionValues={correctionValues ?? null}
+            environmentCheckDetails={environmentCheckDetails}
             onChanged={onEntryChanged}
           />
         )}
@@ -316,7 +319,9 @@ function Row({
           data-testid="quicklog-history-note-summary"
         >
           <p className="text-sm font-medium text-muted-foreground">Note</p>
-          <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">{row.noteBody}</p>
+          <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap [overflow-wrap:anywhere]">
+            {row.noteBody}
+          </p>
         </div>
       ) : row.photoUrl ? (
         <p
@@ -422,6 +427,7 @@ function QuickLogHistorySection({
                 row={r}
                 integrityHandle={handle}
                 correctionValues={correctionValuePropsFromDiaryDetails(raw?.details)}
+                environmentCheckDetails={raw?.details}
                 // Edited chrome only after a successful resolve (status === "ok").
                 // pending and unavailable must not look like confident edits/no-edits.
                 correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}

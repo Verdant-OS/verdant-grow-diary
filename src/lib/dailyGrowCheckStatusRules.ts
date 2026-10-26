@@ -44,6 +44,8 @@ export interface DailyCheckStatus {
   tentId: string | null;
   /** Plant id derived from the most recent contributing diary entry. */
   plantId: string | null;
+  /** Id of today's newest diary entry, when one exists. Null for sensor-only days. */
+  lastDiaryEntryId: string | null;
   /** Short label safe to render in the UI. Never claims "completed". */
   label: string;
   /** True if the activity occurred today (local to `now`). */
@@ -131,6 +133,7 @@ export function deriveDailyGrowCheckStatus(input: DailyCheckStatusInput): DailyC
       lastQuickLogAt: null,
       tentId: null,
       plantId: null,
+      lastDiaryEntryId: null,
       label: DAILY_CHECK_LABELS.none,
       occurredToday: false,
     };
@@ -176,6 +179,7 @@ export function deriveDailyGrowCheckStatus(input: DailyCheckStatusInput): DailyC
     lastQuickLogAt,
     tentId: newest?.tent_id ?? null,
     plantId: topDiary?.plant_id ?? null,
+    lastDiaryEntryId: topDiary && topDiary._id.length > 0 ? topDiary._id : null,
     label,
     occurredToday: true,
   };

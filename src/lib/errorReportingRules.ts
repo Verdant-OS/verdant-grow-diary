@@ -130,6 +130,10 @@ export interface ManualReportContext {
   readonly source?: string;
   readonly route?: string;
   readonly handled?: boolean;
+  /** Grows-list failure class. Allowlisted; never a message or token. */
+  readonly failureKind?: "timeout" | "network" | "db";
+  /** Stable machine code such as a Postgres SQLSTATE. */
+  readonly failureCode?: string;
 }
 
 /**
@@ -378,13 +382,19 @@ export function scrubEvent<T>(event: T): T {
   return next as T;
 }
 
+const FAILURE_CODE = /^[A-Za-z0-9_]{1,40}$/;
+
 function scrubTags(tags: unknown): Record<string, string> | undefined {
   if (!tags || typeof tags !== "object" || Array.isArray(tags)) return undefined;
   const record = tags as Record<string, unknown>;
+  const failureCode = record.failure_code;
   const rebuilt = manualReportTags({
     source: typeof record.source === "string" ? record.source : undefined,
     route: typeof record.route === "string" ? record.route : undefined,
     handled: eventHandled(record.handled),
+    failureKind: failureKindTag(record.failure_kind),
+    failureCode:
+      typeof failureCode === "string" && FAILURE_CODE.test(failureCode) ? failureCode : undefined,
   });
   return Object.keys(rebuilt).length > 0 ? rebuilt : undefined;
 }
@@ -392,6 +402,14 @@ function scrubTags(tags: unknown): Record<string, string> | undefined {
 export function normalizeCaughtError(error: unknown): Error {
   if (error instanceof Error) return error;
   return new Error(REDACTED);
+}
+
+const FAILURE_KINDS = new Set(["timeout", "network", "db"]);
+
+function failureKindTag(value: unknown): ManualReportContext["failureKind"] {
+  return typeof value === "string" && FAILURE_KINDS.has(value)
+    ? (value as ManualReportContext["failureKind"])
+    : undefined;
 }
 
 export function manualReportTags(
@@ -408,6 +426,12 @@ export function manualReportTags(
     const pathShaped =
       route.startsWith("/") || route.startsWith("http://") || route.startsWith("https://");
     if (route && pathShaped && !/\s/.test(route)) tags.route = route;
+  }
+  if (context.failureKind && FAILURE_KINDS.has(context.failureKind)) {
+    tags.failure_kind = context.failureKind;
+  }
+  if (typeof context.failureCode === "string" && FAILURE_CODE.test(context.failureCode)) {
+    tags.failure_code = context.failureCode;
   }
   return tags;
 }

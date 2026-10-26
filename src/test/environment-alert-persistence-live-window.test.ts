@@ -16,8 +16,8 @@
  *     as if the problem started this instant.
  *   - `listAlerts` orders by `first_seen_at DESC`, so that row sorts to the
  *     top as the newest alert.
- *   - Persistence dedupes only against rows with `status: "open"`, so
- *     acknowledging or dismissing lets the same alert be re-created for as
+ *   - Persistence dedupes against active rows (`open` or `acknowledged`),
+ *     so dismissing or resolving lets the same alert be re-created for as
  *     long as the reading stays inside the window.
  *
  * These tests exist so the tighter bar cannot silently drift back: forwarding

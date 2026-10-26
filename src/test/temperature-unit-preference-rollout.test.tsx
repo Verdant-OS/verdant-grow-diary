@@ -221,7 +221,7 @@ describe("Tent surfaces (TentDetail + Tents) render preferred unit on chips", ()
     // temp chip still flips °F/°C with the grower's setting.
     expect(TENTS).toContain("loadTemperatureUnitPreference()");
     expect(TENTS).toContain("temperatureUnit={temperatureUnit}");
-    expect(TENT_SNAPSHOT_STRIP).toContain("{ temperatureUnit }");
+    expect(TENT_SNAPSHOT_STRIP).toMatch(/buildTentSnapshotView\([^)]*\{\s*temperatureUnit,/);
     expect(TENTS).not.toContain('unit="°F"');
     expect(TENT_SNAPSHOT_STRIP).not.toContain('unit="°F"');
   });

@@ -13,6 +13,7 @@ import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEviden
 import { useGrows } from "@/store/grows";
 import { useGrowTents, useGrowPlants } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { isUuid } from "@/lib/isUuid";
 
 /**
  * Compact onboarding bridge shown on `/welcome` for authenticated users
@@ -31,15 +32,27 @@ export default function LandingAuthedOnboardingBridge() {
   const { grows, activeGrowId, loading: growsLoading } = useGrows();
   const { data: tents = [], isLoading: tentsLoading } = useGrowTents();
   const { data: plants = [], isLoading: plantsLoading } = useGrowPlants();
-  const countReady = isOnboardingBridgeCountReady({ growsLoading, tentsLoading, plantsLoading });
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
     plants,
     preferredGrowId: activeGrowId,
   });
-  const { data: readings = [] } = useSensorReadings(activationGraph.tentId);
+  const {
+    data: readings = [],
+    isPending: sensorPending,
+    isLoading: sensorLoading,
+  } = useSensorReadings(activationGraph.tentId);
   const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  const countReady = isOnboardingBridgeCountReady({
+    growsLoading,
+    tentsLoading,
+    plantsLoading,
+    // Disabled queries remain pending. Only a queryable connected tent
+    // contributes sensor evidence to this count.
+    sensorReadPending: isUuid(activationGraph.tentId) && (sensorPending || sensorLoading),
+    activationEvidencePending: activationEvidence.status === "loading",
+  });
   const connectedSensorRows = activationGraph.tentId
     ? readings.filter((row) => row.tent_id === activationGraph.tentId)
     : [];

@@ -78,7 +78,7 @@ why: Live checkout code existed only on the closed #2497 branch. The release hol
 branch: cursor/live-checkout-2497-rebase-c00d
 base: verdant-grow-diary
 claimed_by: Cursor Grok cloud agent, 2026-10-26
-resume here: draft PR only. Do not merge, deploy, set secrets, register webhooks, or lift the release hold. claude/* branches are untouched. Local evidence: catalog/host tests 79 PASS, hook tests 37 PASS, typecheck PASS, checkout-disabled bundle receipt PASS (paused copy present, no Paddle init/open). Full suite is the PR's 35 required checks.
+resume here: draft PR only. Do not merge, deploy, set secrets, register webhooks, or lift the release hold. claude/* branches are untouched. Shard 13/20 failed because sellable-tier-chain and get-paddle-price-craft-env-fail-closed still scanned the inline SERVER_PRICE_CONFIG object. Those pins now follow the pure catalog helper.
 ```
 
 ### PR-2345-BASE-INTEGRATION

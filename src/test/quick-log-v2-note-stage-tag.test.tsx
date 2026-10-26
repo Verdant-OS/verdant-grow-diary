@@ -202,6 +202,20 @@ describe("V2 Note stage tag (mounted sheet)", () => {
     expect(payload.p_stage).toBe("veg");
   });
 
+  it("sends the selected tent's stage as p_stage on a new Note saved to a tent target", async () => {
+    modelOkReply();
+    renderSheet(`tent:${TENT}`);
+    typeNote();
+    save();
+    await expectSaved();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const payload = rpcMock.mock.calls[0][1] as QuickLogV2SavePayload;
+    expect(payload.p_target_type).toBe("tent");
+    expect(payload.p_target_id).toBe(TENT);
+    expect(payload.p_action).toBe("note");
+    expect(payload.p_stage).toBe("flower");
+  });
+
   it("leaves p_stage unset when the selected plant's stage is unknown (never invents a stage, never falls back to the tent)", async () => {
     modelOkReply();
     renderSheet(`plant:${PLANT_NO_STAGE}`);

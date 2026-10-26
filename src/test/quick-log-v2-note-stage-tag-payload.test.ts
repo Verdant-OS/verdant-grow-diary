@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 
 const resolved = {
@@ -34,12 +33,5 @@ describe("repro: Quick Log V2 note saved with stage=null (V2 Note stage tag)", (
     expect(built.ok).toBe(true);
     if (built.ok)
       expect((built as { payload: { p_stage?: string } }).payload.p_stage).toBeUndefined();
-  });
-
-  it("QuickLogV2Sheet passes the resolved target stage into the builder (regression pin)", () => {
-    const src = readFileSync("src/components/QuickLogV2Sheet.tsx", "utf8");
-    const call = src.slice(src.indexOf("const built = buildQuickLogV2SavePayload({"));
-    const body = call.slice(0, call.indexOf("});") + 3);
-    expect(body).toMatch(/\bstage:\s*targetStage\b/);
   });
 });

@@ -1870,8 +1870,10 @@ function QuickLogV2SheetForOwner({
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
-        // New V2 Note submissions only: tag the diary row with the resolved
-        // target's stage (plant, else tent). The builder normalizes and omits
+        // New V2 Note submissions only: tag the diary row with the stage of
+        // the resolved target itself — the plant stage when the target is a
+        // plant, the tent stage when the target is a tent. A plant whose
+        // stage is missing stays untagged. The builder normalizes and omits
         // unknown values. Retries replay the stored payload, so a later stage
         // change never rewrites an in-flight save.
         stage: targetStage,

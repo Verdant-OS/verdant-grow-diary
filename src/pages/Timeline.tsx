@@ -3232,7 +3232,10 @@ export default function Timeline() {
                                           if (!rows.some((row) => row.id === removedId)) return;
                                           const next = rows.filter((row) => row.id !== removedId);
                                           entriesSnapshotRef.current = next;
-                                          setEntries(next);
+                                          // Preserve pagination or photo updates queued before this removal.
+                                          setEntries((current) =>
+                                            current.filter((row) => row.id !== removedId),
+                                          );
                                           setEntriesTotal(diaryEntriesTotalAfterRemoval);
                                         }
                                       )({

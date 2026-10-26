@@ -267,6 +267,8 @@
     "dev:ecowitt-mqtt:publish-sample": "bun run scripts/dev/ecowitt-mqtt-runner.ts --sample --once",
     "dev:ecowitt-http-bridge": "bun run scripts/dev/ecowitt-http-local-bridge.ts",
     "dev:ecowitt-http-bridge:dry-run": "bun run scripts/dev/ecowitt-http-local-bridge.ts --dry-run",
+    "dev:ecowitt-forwarder": "bun run scripts/dev/ecowitt-ingest-forwarder.ts",
+    "dev:ecowitt-forwarder:live": "bun run scripts/dev/ecowitt-ingest-forwarder.ts --live",
     "dev:ecowitt-doctor": "bun run scripts/dev/ecowitt-windows-doctor.ts",
     "dev:ecowitt-bridge-smoke": "bun run scripts/dev/ecowitt-local-bridge-smoke.ts",
     "dev:ecowitt-fast-path": "bun run scripts/dev/ecowitt-windows-fast-path.ts",
@@ -401,7 +403,7 @@
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^3.24.2"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@actions/artifact": "^6.2.1",
@@ -458,6 +460,7 @@
   "overrides": {
     "@hono/node-server": "2.0.10",
     "@modelcontextprotocol/sdk": "1.32.0",
+    "body-parser": "2.4.0",
     "esbuild": "0.28.1",
     "fast-uri": "3.1.8",
     "form-data": "4.0.6",
@@ -471,10 +474,11 @@
     "nanoid": "3.3.18",
     "postcss-selector-parser": "7.1.6",
     "proxy-addr": "2.0.8",
-    "qs": "6.16.0",
+    "qs": "6.16.1",
     "seroval": "1.6.8",
     "shell-quote": "1.12.0",
     "source-map-js": "1.2.2",
-    "undici": "6.28.1"
+    "undici": "6.29.1",
+    "zod": "4.6.7"
   }
 }

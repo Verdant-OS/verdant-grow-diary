@@ -35,21 +35,21 @@ and bridge-token auth.
 
 ## Required local tools
 
-| Tool                                         | Purpose                                             |
-| -------------------------------------------- | --------------------------------------------------- |
-| **Mosquitto** (or any MQTT broker)           | Local broker on `127.0.0.1:1883`                    |
-| **ecowitt2mqtt** (or equivalent publisher)   | Publishes GW1200 packets to MQTT                    |
-| **MQTT Explorer** *(optional)*               | Inspect the `ecowitt/grow` topic                    |
-| **Verdant repo scripts** (this repo)         | Normalize + POST to the validated ingest webhook    |
-| **`mqtt` npm package** *(only for live mode)* | `bun add mqtt` — not needed for `--dry-run --sample` |
+| Tool                                          | Purpose                                                                                                         |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Mosquitto** (or any MQTT broker)            | Local broker on `127.0.0.1:1883`                                                                                |
+| **ecowitt2mqtt** (or equivalent publisher)    | Publishes GW1200 packets to MQTT                                                                                |
+| **MQTT Explorer** _(optional)_                | Inspect the `ecowitt/grow` topic                                                                                |
+| **Verdant repo scripts** (this repo)          | Normalize + POST to the validated ingest webhook                                                                |
+| **`mqtt` npm package** _(only for live mode)_ | `bun add --no-save mqtt` (leaves `package.json` and `bun.lock` unchanged) — not needed for `--dry-run --sample` |
 
 ---
 
 ## Topic convention
 
-| Item   | Default          |
-| ------ | ---------------- |
-| Topic  | `ecowitt/grow`   |
+| Item   | Default                 |
+| ------ | ----------------------- |
+| Topic  | `ecowitt/grow`          |
 | Broker | `mqtt://127.0.0.1:1883` |
 
 ---
@@ -60,11 +60,11 @@ The runner selects its upstream adapter mode **strictly from
 configuration** — never from topic shapes, payload sniffing, or any
 other inference.
 
-| `UPSTREAM_MODE`  | What it consumes                                              | Posture |
-| ---------------- | ------------------------------------------------------------- | ------- |
-| `ecowitt_raw`    | ecowitt2mqtt raw JSON on `ECOWITT_MQTT_TOPIC` (existing path) | unchanged — dry-run or validated webhook POST |
-| `ha_json`        | Home Assistant selective-JSON envelopes, one per message      | **dry-run only** — report output, no POST |
-| `ha_statestream` | HA MQTT Statestream separate-topic wire format (`<prefix>/<domain>/<object_id>/state`, `/last_updated`, per-attribute topics), assembled per entity | **dry-run only** — report output, no POST |
+| `UPSTREAM_MODE`  | What it consumes                                                                                                                                    | Posture                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `ecowitt_raw`    | ecowitt2mqtt raw JSON on `ECOWITT_MQTT_TOPIC` (existing path)                                                                                       | unchanged — dry-run or validated webhook POST |
+| `ha_json`        | Home Assistant selective-JSON envelopes, one per message                                                                                            | **dry-run only** — report output, no POST     |
+| `ha_statestream` | HA MQTT Statestream separate-topic wire format (`<prefix>/<domain>/<object_id>/state`, `/last_updated`, per-attribute topics), assembled per entity | **dry-run only** — report output, no POST     |
 
 Fail-closed rules:
 
@@ -97,23 +97,23 @@ network calls, write no rows, and control no devices.
 
 ## Required env vars
 
-| Var                    | Meaning                                                  |
-| ---------------------- | -------------------------------------------------------- |
-| `UPSTREAM_MODE`        | Adapter mode: `ecowitt_raw` \| `ha_json` \| `ha_statestream` (required, fail-closed) |
+| Var                    | Meaning                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `UPSTREAM_MODE`        | Adapter mode: `ecowitt_raw` \| `ha_json` \| `ha_statestream` (required, fail-closed)                           |
 | `VERDANT_INGEST_URL`   | Full ingest URL, `https://<ref>.supabase.co/functions/v1/sensor-ingest-webhook` (`ecowitt_raw` live POST only) |
-| `VERDANT_BRIDGE_TOKEN` | Bridge token (`vbt_...`) — keep secret (`ecowitt_raw` live POST only) |
-| `VERDANT_TENT_ID`      | Target tent UUID (`ecowitt_raw` only)                    |
-| `HA_MQTT_MAPPING_PATH` | Path to exact-entity mapping JSON (required for `ha_json` / `ha_statestream`) |
+| `VERDANT_BRIDGE_TOKEN` | Bridge token (`vbt_...`) — keep secret (`ecowitt_raw` live POST only)                                          |
+| `VERDANT_TENT_ID`      | Target tent UUID (`ecowitt_raw` only)                                                                          |
+| `HA_MQTT_MAPPING_PATH` | Path to exact-entity mapping JSON (required for `ha_json` / `ha_statestream`)                                  |
 
 ## Optional env vars
 
-| Var                     | Default                  | Notes                                |
-| ----------------------- | ------------------------ | ------------------------------------ |
-| `VERDANT_PLANT_ID`      | *(none)*                 | Metadata only                        |
-| `ECOWITT_MQTT_URL`      | `mqtt://127.0.0.1:1883`  | Local broker URL                     |
-| `ECOWITT_MQTT_TOPIC`    | `ecowitt/grow`           | Topic the runner subscribes to       |
-| `ECOWITT_MQTT_USERNAME` | *(none)*                 | If broker requires auth              |
-| `ECOWITT_MQTT_PASSWORD` | *(none)*                 | If broker requires auth              |
+| Var                     | Default                 | Notes                          |
+| ----------------------- | ----------------------- | ------------------------------ |
+| `VERDANT_PLANT_ID`      | _(none)_                | Metadata only                  |
+| `ECOWITT_MQTT_URL`      | `mqtt://127.0.0.1:1883` | Local broker URL               |
+| `ECOWITT_MQTT_TOPIC`    | `ecowitt/grow`          | Topic the runner subscribes to |
+| `ECOWITT_MQTT_USERNAME` | _(none)_                | If broker requires auth        |
+| `ECOWITT_MQTT_PASSWORD` | _(none)_                | If broker requires auth        |
 
 ---
 
@@ -152,7 +152,7 @@ Dry-run mode:
 export VERDANT_INGEST_URL=https://<ref>.supabase.co/functions/v1/sensor-ingest-webhook
 export VERDANT_BRIDGE_TOKEN=vbt_xxxxxxxxxxxxxxxx
 export VERDANT_TENT_ID=00000000-0000-4000-8000-000000000000
-bun add mqtt
+bun add --no-save mqtt  # never plain `bun add mqtt`: it rewrites package.json and bun.lock
 bun run dev:ecowitt-mqtt
 ```
 
@@ -202,13 +202,13 @@ and/or **stale**; webhook **rejected**; snapshot trust **never** Live.
 
 ## Expected webhook results
 
-| Payload                       | Webhook            | Verdant trust badge   |
-| ----------------------------- | ------------------ | --------------------- |
-| Valid fresh                   | 200 accepted       | **Live** + Ecowitt    |
-| Valid older than 15 minutes   | 4xx stale_reading  | **Stale**             |
-| Impossible temp/RH/CO2 only   | 4xx invalid_metric | **Invalid**           |
-| Malformed JSON / missing tent | 4xx invalid_payload | **Invalid**           |
-| Bad bridge token              | 401 auth_failed    | **Invalid**           |
+| Payload                       | Webhook             | Verdant trust badge |
+| ----------------------------- | ------------------- | ------------------- |
+| Valid fresh                   | 200 accepted        | **Live** + Ecowitt  |
+| Valid older than 15 minutes   | 4xx stale_reading   | **Stale**           |
+| Impossible temp/RH/CO2 only   | 4xx invalid_metric  | **Invalid**         |
+| Malformed JSON / missing tent | 4xx invalid_payload | **Invalid**         |
+| Bad bridge token              | 401 auth_failed     | **Invalid**         |
 
 Stale or invalid telemetry is **never** promoted to Live.
 
@@ -216,16 +216,16 @@ Stale or invalid telemetry is **never** promoted to Live.
 
 ## Troubleshooting
 
-| Symptom                            | Likely cause / fix                                       |
-| ---------------------------------- | -------------------------------------------------------- |
-| `missing VERDANT_INGEST_URL`       | Export the env var. Use `--dry-run` to verify shape.     |
-| HTTP 401 / `auth_failed`           | Bridge token rejected — rotate via `mint-bridge-token`.  |
-| HTTP 403 / `forbidden`             | Token not authorized for this tent. Check `VERDANT_TENT_ID`. |
-| `invalid tent id`                  | Tent UUID does not exist or token cannot see it.         |
-| `malformed_payload`                | EcoWitt JSON missing `dateutc` / `tempf` / `humidity`.   |
+| Symptom                                       | Likely cause / fix                                                           |
+| --------------------------------------------- | ---------------------------------------------------------------------------- |
+| `missing VERDANT_INGEST_URL`                  | Export the env var. Use `--dry-run` to verify shape.                         |
+| HTTP 401 / `auth_failed`                      | Bridge token rejected — rotate via `mint-bridge-token`.                      |
+| HTTP 403 / `forbidden`                        | Token not authorized for this tent. Check `VERDANT_TENT_ID`.                 |
+| `invalid tent id`                             | Tent UUID does not exist or token cannot see it.                             |
+| `malformed_payload`                           | EcoWitt JSON missing `dateutc` / `tempf` / `humidity`.                       |
 | `invalid_temp` / `invalid_rh` / `invalid_co2` | Sensor reporting impossible values — check unit settings (F vs C, % vs raw). |
-| `stale_reading`                    | Captured >15 min ago. Verdant will not promote to Live.  |
-| Network timeout                    | Retry; the runner does not tight-loop on failure.        |
+| `stale_reading`                               | Captured >15 min ago. Verdant will not promote to Live.                      |
+| Network timeout                               | Retry; the runner does not tight-loop on failure.                            |
 
 ---
 
@@ -274,4 +274,3 @@ The runner re-redacts the bridge token before writing and prints a
 - Stale / invalid / unknown attempts **never** render as Live.
 - Provider chip (Ecowitt) is rendered separately from the trust badge.
 - No DB writes. No Edge Function calls from the page.
-

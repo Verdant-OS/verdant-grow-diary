@@ -20,6 +20,9 @@ import {
   type TodayCheckMethod,
 } from "@/lib/dailyGrowCheckConsistencyRules";
 import { isActivePlant, type ArchivedPlantLike } from "@/lib/archivedPlantVisibilityRules";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import { plantDetailPath, timelinePath } from "@/lib/routes";
+import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 
 export interface PanelPlantInput extends ArchivedPlantLike {
   id: string;
@@ -61,6 +64,14 @@ export interface DashboardDailyGrowCheckRow {
   ctaHref: string;
   /** True when CTA should be rendered. False when already checked today. */
   showCta: boolean;
+  /** Plant detail page for this row. */
+  plantHref: string;
+  /**
+   * Today's matching diary entry on the timeline, or the plant's diary
+   * section when the check is a sensor snapshot with no diary row.
+   * Null when nothing is logged today.
+   */
+  latestActivityHref: string | null;
 }
 
 export type DashboardDailyGrowCheckEmptyVariant = "none" | "no-plants-scoped" | "no-plants-all";
@@ -99,6 +110,49 @@ function plantTentId(p: PanelPlantInput): string | null {
 
 function plantGrowId(p: PanelPlantInput): string | null {
   return (p.growId ?? p.grow_id ?? null) || null;
+}
+
+function latestTodayDiaryEntryId(
+  entries: ConsistencyInput["diaryEntries"],
+  plantId: string,
+  now: Date,
+): string | null {
+  // Same local-day bucket as buildDailyGrowCheckHistory: [start, next local day).
+  // A timestamp on a later calendar day is not today's check.
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const start = dayStart.getTime();
+  const end = dayEnd.getTime();
+  let best: { at: number; created: number; id: string } | null = null;
+  for (const entry of entries) {
+    if (entry.plant_id !== plantId) continue;
+    const at = Date.parse(entry.entry_at ?? "");
+    if (!Number.isFinite(at) || at < start || at >= end) continue;
+    const id = typeof entry.id === "string" ? entry.id : "";
+    const created = Date.parse(entry.created_at ?? "") || at;
+    const newer =
+      !best ||
+      at > best.at ||
+      (at === best.at && created > best.created) ||
+      (at === best.at && created === best.created && id > best.id);
+    if (newer) best = { at, created, id };
+  }
+  return best && best.id.length > 0 ? best.id : null;
+}
+
+function latestActivityHrefForRow(args: {
+  plantId: string;
+  growId: string | null;
+  checkedToday: boolean;
+  diaryEntryId: string | null;
+}): string | null {
+  if (!args.checkedToday) return null;
+  const plantHref = plantDetailPath(args.plantId);
+  const diaryHref = `${plantHref}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}`;
+  const anchor = buildTimelineEntryAnchorId(args.diaryEntryId);
+  if (!anchor) return diaryHref;
+  return `${timelinePath(args.growId)}#${anchor}`;
 }
 
 function scopeToGrow(plants: PanelPlantInput[], scopedGrowId: string | null): PanelPlantInput[] {
@@ -198,6 +252,13 @@ export function buildDashboardDailyGrowCheckPanel(
         methodLabel,
         ctaHref: `/daily-check?plantId=${plant.id}&from=dashboard`,
         showCta: !checkedToday,
+        plantHref: plantDetailPath(plant.id),
+        latestActivityHref: latestActivityHrefForRow({
+          plantId: plant.id,
+          growId: plantGrowId(plant),
+          checkedToday,
+          diaryEntryId: latestTodayDiaryEntryId(input.diaryEntries, plant.id, input.now),
+        }),
       };
       return row;
     })

@@ -4,8 +4,19 @@
 
 Read this section first. It doesn't replace the observation log below.
 
-- **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29. Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. Where OWNERSHIP.md and this section disagree on roles or merging, this section describes current practice until OWNERSHIP.md is updated (pending).
+- **OWNERSHIP.md still wins on ownership and review routing.** `AGENTS.md` §0.1 says so, and this file does not override it. GDP retired on 2026-09-29. Grok 91 routes and merges in practice; older docs may still say Chemdawg or GDP. A stale row is corrected in `OWNERSHIP.md`. This section records practice. It is not a second precedence.
+- **Open workstream owners.** Each open PR or workstream has one current owner and one active writer, named here and in its `docs/agents/HANDOFF_LOG.md` block (`claimed_by` / `owner`). There is no shared working branch. Only that holder pushes, and no agent edits files on another holder's branch. On retirement, transfer the row in the same update as the handoff. When no successor is named, the default inheritor is **OG Kush (engineering lead)**. A review pass does not transfer with the row: it stays bound to the SHA it named. This amendment does not backfill historical rows; existing blocks keep the owner already recorded on them.
+- **Paused workflows.** None are recorded by this amendment. A paused workflow is not resumed from memory: record its owner and re-enable date here before leaving it paused. A check that is red across PRs (for example a dependency audit) is top-priority work.
+- **Ship and money gate.** Payment, migration, and production PRs stay out of the merge queue until a human approves that exact SHA. That approval does not carry to a later commit.
+- **Release steps measured.** `.github/pull_request_template.md` was not edited (`.github` stays out of this amendment). Until that template gains the line, every feature PR body includes:
+
+  `- [ ] Release steps measured — named post-merge check, and the result after merge (or NOT_MEASURED, with the reason)`
+
+  A failure of that named check reopens the work with the same owner.
+- **Stale work.** A PR untouched for 14 or more days, or more than 500 commits behind `verdant-grow-diary`, is closed with a superseded/stale note. Keep the branch. An owner claim stops the close.
+- **Review in one pass.** The reviewer lists all findings at once. The writer verifies the whole affected section against the real SQL or code, not only the flagged line.
 - **Roles:**
+  - OG Kush: engineering lead and default inheritor of an open workstream whose holder retires without naming a successor.
   - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
   - Blue Dream and Critical Mass: retired from future reviewer routing; historical receipts remain.
   - Available eligible independent sessions: Codex on work Codex neither authored nor repaired; non-contributing Claude or Grok review sessions, including for Codex-authored work; Durban Poison when actually available. Apply OWNERSHIP.md §4.3 to the complete scope, including protected and supplemental evidence gates.

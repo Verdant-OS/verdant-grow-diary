@@ -117,6 +117,16 @@ import { isQueryGrowScopeMismatch } from "@/lib/detailGrowScopeRules";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
 import TentPendingOutcomeNotice from "@/components/TentPendingOutcomeNotice";
+import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
+import {
+  resolveTentDetailVpd,
+  tentDetailHeaderRejection,
+  tentDetailVpdRowUntrusted,
+  tentDetailCaptureClimate,
+  tentDetailVpdNeedsOwnProvenance,
+} from "@/lib/tentDetailVpdRules";
+import { withMetricDeviceIds } from "@/lib/dashboardSensorEvidenceRules";
 
 const EMPTY_TENT_PLANTS: never[] = [];
 
@@ -211,23 +221,76 @@ export default function TentDetail() {
   const nowMs = useNowTick();
   const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
-  const headerVpdObservation = resolveDisplayedVpdObservation({
-    snapshotVpd: snap?.vpd,
-    snapshotVpdRejected: header.truth?.invalidFields.includes("vpd") ?? false,
+  // The header's truth check is realism only and keeps a vpd_kpa row whose own
+  // intake quality flag is not ok. The Dashboard selector drops that row, so
+  // the tent page withholds it the same way the header withholds a realism
+  // rejection: no snapshot value, rejection noted (Codex P1 on #2303 at 307b10f4).
+  // The VPD's own source, not the snapshot's aggregate: one manual metric in
+  // the cohort makes `snap.source` manual (Copilot P1 on #2430 at fcd86356).
+  // Each header metric's device, so its capture refs never match another
+  // device at the same instant (Copilot and Codex on #2451 at 6d0fa53c).
+  const snapWithDevices = snap ? withMetricDeviceIds(snap, readings) : snap;
+  const storedVpdRowUntrusted = tentDetailVpdRowUntrusted(
+    readings,
+    header.capturedAt,
+    snap?.metric_refs?.vpd?.source ?? null,
+    snapWithDevices?.metric_device_ids?.vpd ?? null,
+  );
+  const storedVpdObservation = resolveDisplayedVpdObservation({
+    snapshotVpd: storedVpdRowUntrusted ? null : snap?.vpd,
+    snapshotVpdRejected:
+      (header.truth?.invalidFields.includes("vpd") ?? false) || storedVpdRowUntrusted,
     snapshotCapturedAt: header.capturedAt,
     snapshotSource: snap?.source ?? null,
     snapshotStale: header.stale,
     fallback: sharedVpdSeries[0] ?? null,
     nowMs,
   });
+  // One VPD per tent (#2268, VER-189): the Dashboard Tonight card's choice for
+  // this tent, from the same stored rows and diary-inclusive snapshot, so a
+  // newer same-capture temperature and RH pair beats an older stored VPD here too.
+  const tonightSnapshot = useLatestSensorSnapshot(tent?.growId ?? null, tent ? [tent.id] : []);
+  const tonightMetrics = buildTonightTentMetrics({
+    rows: readings,
+    rowsRead: {
+      status: sensorReadings.isError ? "error" : sensorReadings.isPending ? "loading" : "success",
+    },
+    snapshot: { status: tonightSnapshot.status, snapshot: tonightSnapshot.snapshot },
+    now: new Date(nowMs),
+  });
+  const headerVpdObservation = resolveTentDetailVpd({
+    tonight: tonightMetrics.find((metric) => metric.key === "vpd"),
+    existing: storedVpdObservation,
+    rejectedCapturedAt: header.capturedAt,
+    // The stored VPD is the snapshot's own exactly when that value was passed in.
+    ...tentDetailHeaderRejection(header.truth, snapWithDevices, {
+      existingIsSnapshotVpd: !storedVpdRowUntrusted && Number.isFinite(snap?.vpd ?? NaN),
+    }),
+    // The pair a calculated VPD came from, not the displayed temperature and
+    // RH (Codex P2 on #2303 at 3e689090).
+    contributors: tonightMetrics.find((metric) => metric.key === "vpd")?.inputs ?? null,
+    captureClimate: tentDetailCaptureClimate(
+      readings,
+      tonightSnapshot.status === "ok" ? tonightSnapshot.snapshot : null,
+    ),
+    nowMs,
+  });
   const headerVpd = headerVpdObservation.value;
   // A fallback VPD carries its own provenance on a VPD-specific element. The
   // shared Environment header keeps the stored snapshot's source, time and
   // staleness, because its temperature and RH come from that snapshot.
-  const vpdFromFallback =
-    headerVpdObservation.value !== null && (snap?.vpd === null || snap?.vpd === undefined);
+  const vpdFromFallback = tentDetailVpdNeedsOwnProvenance({
+    observation: headerVpdObservation,
+    header: {
+      vpd: snap?.vpd,
+      source: snap?.source ?? null,
+      capturedAt: header.capturedAt,
+      stale: header.stale,
+    },
+  });
   const fallbackVpdSourceLabel = vpdFromFallback
-    ? formatSensorSourceLabel({ source: headerVpdObservation.source })
+    ? (headerVpdObservation.sourceLabel ??
+      formatSensorSourceLabel({ source: headerVpdObservation.source }))
     : null;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
@@ -506,12 +569,26 @@ export default function TentDetail() {
             </p>
           );
         })()}
+      {(headerVpd === null || headerVpd === undefined) &&
+        (storedVpdRowUntrusted || headerVpdObservation.rejected) && (
+          // A rejected VPD (quality flag, realism or capture gate) is labelled,
+          // never silently dropped
+          // (Codex P1 on #2437 at 9ddaa0ae).
+          <p
+            className="text-[11px] text-destructive -mt-3 mb-4"
+            data-testid="tent-detail-vpd-rejected"
+          >
+            VPD invalid — the latest VPD reading did not pass a sensor check.
+          </p>
+        )}
       {vpdFromFallback && (
         <p
           className="text-[11px] text-muted-foreground -mt-3 mb-4 flex flex-wrap items-center gap-2"
           data-testid="tent-detail-vpd-provenance"
         >
-          <span>VPD reading</span>
+          <span>
+            {headerVpdObservation.calculated ? TONIGHT_TENT_HOME_COPY.calculatedVpd : "VPD reading"}
+          </span>
           {fallbackVpdSourceLabel && (
             <span className="rounded-md border px-1.5 py-0.5" data-testid="tent-detail-vpd-source">
               {fallbackVpdSourceLabel}

@@ -7,6 +7,8 @@ import {
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { projectRootZoneManualObservationFromDetails } from "./rootZoneManualObservationRules";
 import { isUuid } from "./isUuid";
+import type { UnreadableWaterRecoveryClear } from "./quickLogUnreadableWaterRecoveryRules";
+import { QUICK_LOG_WATER_VOLUME_MAX_ML } from "./quickLogWateringFormViewModel";
 import {
   quickLogSaveRequiresHistoryCheck,
   type QuickLogHistoryCheckReason,
@@ -184,7 +186,9 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
     (p.plant_id != null && !isUuid(p.plant_id))
   )
     return false;
-  if (!numberInRange(p.volume_ml, Number.MIN_VALUE, 1_000_000)) return false;
+  // Same single-watering ceiling as the Water form: a journal written before
+  // the ceiling (or crafted in session storage) must not replay 1,000,000 ml.
+  if (!numberInRange(p.volume_ml, Number.MIN_VALUE, QUICK_LOG_WATER_VOLUME_MAX_ML)) return false;
   if (
     !OPTIONAL_NUMERIC_RANGES.every(
       ([key, min, max]) =>
@@ -304,6 +308,14 @@ function readHistoryMarker(
           marker.historyReviewTarget as PendingQuickLogHistoryReviewTarget,
         ),
       };
+}
+
+function markerUnreadable(ownerId: string): boolean {
+  try {
+    return readHistoryMarker(ownerId, "").status === "blocked";
+  } catch {
+    return true;
+  }
 }
 
 /** A leftover marker names a retired key, so it can never attach to a new Water. */
@@ -478,5 +490,55 @@ export async function reconcilePendingQuickLogWateringHistoryDiscard(
     });
   } catch {
     return { status: "blocked" };
+  }
+}
+
+/**
+ * The grower’s explicit "Check Timeline, then clear" escape for a blocked typed
+ * Water journal. Under the owner recovery lock it removes only the owner-scoped
+ * key that cannot be read: the journal itself, or, when the journal is readable,
+ * its history marker (the journal then returns as an ordinary pending record).
+ * It never replays, never removes a readable record, and never touches the
+ * starter key or another owner’s keys.
+ */
+export async function clearUnreadablePendingQuickLogWatering(
+  ownerId: string | null | undefined,
+): Promise<UnreadableWaterRecoveryClear> {
+  try {
+    if (!id(ownerId)) return { status: "failed" };
+    const locks = window.navigator.locks;
+    if (!locks?.request) return { status: "failed" };
+    return await locks.request(waterRecoveryLockKey(ownerId), { mode: "exclusive" }, () => {
+      const current = readPendingQuickLogWatering(ownerId);
+      if (current.status === "empty") return { status: "already_cleared" as const };
+      if (current.status === "pending") return { status: "readable" as const };
+      let journalReadable = false;
+      try {
+        const raw = window.sessionStorage.getItem(storageKey(ownerId));
+        journalReadable = raw !== null && validRecord(JSON.parse(raw), ownerId);
+      } catch {
+        journalReadable = false;
+      }
+      const unreadableKey = journalReadable
+        ? typedWaterHistoryMarkerKey(ownerId)
+        : storageKey(ownerId);
+      window.sessionStorage.removeItem(unreadableKey);
+      if (window.sessionStorage.getItem(unreadableKey) !== null)
+        return { status: "failed" as const };
+      // With the journal gone, an unreadable marker would block the next Water.
+      // It is the same Water’s other unreadable key; a readable one is inert.
+      if (!journalReadable && markerUnreadable(ownerId)) {
+        window.sessionStorage.removeItem(typedWaterHistoryMarkerKey(ownerId));
+        if (window.sessionStorage.getItem(typedWaterHistoryMarkerKey(ownerId)) !== null)
+          return { status: "failed" as const };
+      }
+      const after = readPendingQuickLogWatering(ownerId);
+      if (after.status === "empty") return { status: "cleared" as const };
+      return after.status === "pending"
+        ? { status: "readable" as const }
+        : { status: "failed" as const };
+    });
+  } catch {
+    return { status: "failed" };
   }
 }

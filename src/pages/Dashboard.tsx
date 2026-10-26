@@ -60,6 +60,15 @@ import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRul
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import {
+  mergeVpdStabilityInputs,
+  quickLogManualsForTent,
+  QUICK_LOG_MANUAL_HISTORY_COPY,
+  resolveManualHistoryReadState,
+  vpdStabilityInputsFromWideReadings,
+} from "@/lib/vpdStabilityInputRules";
+import QuickLogManualHistoryNotice from "@/components/QuickLogManualHistoryNotice";
 import { useNowTick } from "@/hooks/useNowTick";
 import { describeCurrentStateStaleWindow } from "@/lib/sensorTruthCanon";
 import { isUuid } from "@/lib/isUuid";
@@ -67,6 +76,7 @@ import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useEnvironmentTrends } from "@/hooks/useEnvironmentTrends";
+import { isDashboardSupplementalLoading } from "@/lib/dashboardSupplementalLoadingRules";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
 import {
   compareSnapshotToTargets,
@@ -111,6 +121,9 @@ import { SOURCE_LABEL, formatValue, isSnapshotStale } from "@/lib/sensorSnapshot
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import AlertReasonText from "@/components/AlertReasonText";
+import { mergeDashboardChartReadingsWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 
 import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
@@ -153,6 +166,7 @@ import {
   buildTonightTentMetrics,
   resolveTonightTentSelection,
 } from "@/lib/tonightTentHomeViewModel";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Renders the grower's overview for a valid URL-selected grow or the full account.
@@ -190,6 +204,7 @@ export default function Dashboard() {
   // evidence-only rows and the grouped projection contains no raw payload.
   const dashboardSensorRows = selectDashboardSensorEvidenceRows(rawReadings);
   const readings = groupDashboardSensorReadings(dashboardSensorRows);
+  const temperatureUnit = useTemperatureUnitPreference();
   // Per-tent sensor windows for the stability summary. Each tent gets its
   // own 200-row window so a busy tent cannot push another tent's VPD rows
   // out of a shared global cap. Read-only; no writes.
@@ -197,6 +212,38 @@ export default function Dashboard() {
   // column — only query real UUIDs; a non-UUID id cannot have rows, so its
   // absence is established (same guard as the Tents list).
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
+  // Every tent's strip grade uses this same multi-tent manual read (per-tent
+  // windows). A pending or failed read is disclosed beside the stored
+  // readings, never read as "no manual history".
+  const stripManuals = chartQuickLogManualQuery;
+  const stripManualsReadState =
+    tentIds.length > 0 ? resolveManualHistoryReadState(stripManuals) : "ready";
+  const quickLogManualsIncomplete =
+    chartQuickLogManualQuery.isPending ||
+    chartQuickLogManualQuery.isError ||
+    chartQuickLogManualQuery.fetchStatus === "fetching";
+  const sensorReadingsIncomplete =
+    Boolean(dashboardReadingsQuery.isLoading) ||
+    Boolean((dashboardReadingsQuery as { isPending?: boolean }).isPending) ||
+    Boolean(dashboardReadingsQuery.isError) ||
+    Boolean((dashboardReadingsQuery as { isFetching?: boolean }).isFetching) ||
+    (dashboardReadingsQuery as { fetchStatus?: string }).fetchStatus === "fetching";
+  const exportIncomplete = quickLogManualsIncomplete || sensorReadingsIncomplete;
+  const quickLogManualReadings = chartQuickLogManualQuery.data ?? [];
+  const dashboardExportReadings = mergeDashboardChartReadingsWithQuickLogManuals(
+    readings as unknown as SensorReading[],
+    quickLogManualReadings,
+  );
+  // Pick the first tent that actually has readings so the chart isn't blank
+  // when tents[0] has none but other tents do. Falls back to tents[0] (or null).
+  const chartTent =
+    tents.find((t) => dashboardExportReadings.some((r) => r.tentId === t.id)) ?? tents[0] ?? null;
+  const chartTentName = chartTent?.name ?? "Tent";
+  const chartReadings = chartTent
+    ? dashboardExportReadings.filter((r) => r.tentId === chartTent.id)
+    : [];
+  const tentNamesById = Object.fromEntries(tents.map((t) => [t.id, t.name]));
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
     useSensorReadingsByTents(tentIds);
   // Freshness is time-relative: re-evaluate the snapshot strip's clock every
@@ -243,7 +290,8 @@ export default function Dashboard() {
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
-  const targetsState = useGrowTargets(scopedGrowId ?? null);
+  const targetsState = useGrowTargets(scopedGrowId ?? null, { retryOnUnavailable: true });
+  const targetsPending = targetsState.status !== "ok";
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);
   const currentSensorSnapshot = snapshotReadState.confirmedSnapshot;
@@ -375,6 +423,7 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
+    targetsPending,
     // Gated on current tent and plant reads; see stageReadsCurrentForWrite.
     enabled: !!scopedGrowId && stageReadsCurrentForWrite,
     stage: alertContextStage,
@@ -400,6 +449,10 @@ export default function Dashboard() {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
+    const stabilityReadings = mergeVpdStabilityInputs(
+      rs,
+      vpdStabilityInputsFromWideReadings(quickLogManualsForTent(stripManuals.data, t.id)),
+    );
     const envStage = resolveTentEnvironmentStage({
       tentId: t.id,
       tentGrowId: t.growId ?? null,
@@ -412,7 +465,7 @@ export default function Dashboard() {
       }),
       plants: plantsForStage,
     });
-    const stability = computeEnvironmentStability(rs, { stage: envStage });
+    const stability = computeEnvironmentStability(stabilityReadings, { stage: envStage });
     return {
       tent: t,
       envStage,
@@ -500,7 +553,7 @@ export default function Dashboard() {
   // Non-landmark container: AppShell already owns the <main> landmark around
   // the route Outlet, so the page root must not nest another.
   return (
-    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+    <div className="min-w-0 max-w-full space-y-4 md:space-y-6" data-testid="dashboard-root">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -624,7 +677,7 @@ export default function Dashboard() {
               </Button>
             </div>
             {(() => {
-              const anyReading = latestPerTent.some((x) => !!x.last);
+              const anyReading = latestPerTent.some((x) => !!x.last) || chartReadings.length > 0;
               const hasPendingTentRead = tentIds.some(
                 (tentId) => sensorStatusByTent[tentId] === "loading",
               );
@@ -795,22 +848,6 @@ export default function Dashboard() {
                   )}
                   <div className="grid lg:grid-cols-3 gap-4">
                     {(() => {
-                      // Pick the first tent that actually has readings so the chart
-                      // isn't blank when tents[0] has none but other tents do.
-                      // Falls back to tents[0] (or null) so the label + empty state
-                      // still make sense.
-                      const chartTent =
-                        tents.find((t) =>
-                          (readings as unknown as SensorReading[]).some((r) => r.tentId === t.id),
-                        ) ??
-                        tents[0] ??
-                        null;
-                      const chartTentName = chartTent?.name ?? "Tent";
-                      const chartReadings = chartTent
-                        ? (readings as unknown as SensorReading[]).filter(
-                            (r) => r.tentId === chartTent.id,
-                          )
-                        : [];
                       const latest = chartReadings.slice(-1)[0];
                       return (
                         <div className="lg:col-span-2 glass rounded-2xl p-4">
@@ -865,7 +902,20 @@ export default function Dashboard() {
                                 testIdPrefix="dashboard-environment-ribbon"
                               />
                               <div className="mt-4">
-                                <SensorChart data={chartReadings} metric="temp" height={200} />
+                                <SensorChart
+                                  data={chartReadings}
+                                  exportData={dashboardExportReadings}
+                                  tentNamesById={tentNamesById}
+                                  exportDisabled={exportIncomplete}
+                                  exportDisabledReason={
+                                    chartQuickLogManualQuery.isError ||
+                                    dashboardReadingsQuery.isError
+                                      ? "Sensor or Quick Log history could not be checked — CSV export is disabled until all sources load."
+                                      : "Refreshing sensor and Quick Log history…"
+                                  }
+                                  metric="temp"
+                                  height={200}
+                                />
                               </div>
                             </>
                           )}
@@ -904,6 +954,14 @@ export default function Dashboard() {
                         })()}
                       </div>
 
+                      <QuickLogManualHistoryNotice
+                        state={stripManualsReadState}
+                        onRetry={() => {
+                          void stripManuals.refetch();
+                        }}
+                        testIdPrefix="dashboard-manual-history"
+                        className="mb-2"
+                      />
                       <div className="space-y-2.5">
                         {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
@@ -911,6 +969,7 @@ export default function Dashboard() {
                             tentRows as BuildTentSnapshotInput[],
                             envStage,
                             nowTick,
+                            { temperatureUnit },
                           );
                           // Pending/failed reads must not masquerade as established
                           // absence or as data. Non-UUID ids (mock-fallback tents)
@@ -929,9 +988,16 @@ export default function Dashboard() {
                                     ? "sensor refresh unavailable, last loaded readings shown"
                                     : "sensor refresh unavailable, no last loaded readings"
                                   : null;
+                          const manualHistoryLabel =
+                            !isUuid(tent.id) || stripManualsReadState === "ready"
+                              ? null
+                              : stripManualsReadState === "unavailable"
+                                ? QUICK_LOG_MANUAL_HISTORY_COPY.ariaUnavailable
+                                : QUICK_LOG_MANUAL_HISTORY_COPY.ariaPending;
                           const ariaParts = [
                             tent.name,
                             sensorReadStatusLabel,
+                            manualHistoryLabel,
                             snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
                             snapView.hasReading
                               ? `last updated ${snapView.lastUpdatedDisplay}`
@@ -1132,7 +1198,7 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <p className="text-sm font-medium">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{a.reason}</p>
+                <AlertReasonText reason={a.reason} className="text-xs text-muted-foreground" />
               </li>
             ))}
           </ul>
@@ -1436,8 +1502,12 @@ export default function Dashboard() {
                 Open Timeline →
               </Link>
             </div>
-            {trendsState.status === "loading" || trendsState.status === "idle" ? (
+            {isDashboardSupplementalLoading(trendsState.status) ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : trendsState.status === "idle" ? (
+              <p className="text-sm text-muted-foreground">
+                Environment trends have not started for this view.
+              </p>
             ) : trendsState.status === "unavailable" ? (
               <p className="text-sm text-muted-foreground">Trend data unavailable.</p>
             ) : trendsState.trends.status === "empty" ? (
@@ -1648,6 +1718,7 @@ export default function Dashboard() {
                 quality,
                 targets: targetsCmp,
                 stage: alertContextStage,
+                now: nowTick,
               });
               // Candidates above are DISPLAY-scoped and stay source-aware, so a
               // manual reading current for 24h still shows its warning. Saving
@@ -1722,7 +1793,10 @@ export default function Dashboard() {
                               </Badge>
                               <span className="font-medium text-sm">{a.title}</span>
                             </div>
-                            <p className="text-xs text-muted-foreground">{a.reason}</p>
+                            <AlertReasonText
+                              reason={a.reason}
+                              className="text-xs text-muted-foreground"
+                            />
                             {scopedGrowId && (
                               <div className="mt-1">
                                 <Button
@@ -1813,9 +1887,9 @@ export default function Dashboard() {
           >
             Recent activity
           </h2>
-          <div className="grid lg:grid-cols-2 gap-4 mt-2">
-            <section className="glass rounded-2xl p-4" aria-label="Recent activity">
-              <div className="flex items-center justify-between mb-3">
+          <div className="grid min-w-0 lg:grid-cols-2 gap-4 mt-2">
+            <section className="min-w-0 glass rounded-2xl p-4" aria-label="Recent activity">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="font-display font-semibold">Recent Activity</h2>
                 <Link
                   to={timelinePath(scopedGrowId)}
@@ -1833,13 +1907,17 @@ export default function Dashboard() {
                   testId="dashboard-no-recent-check-in-recovery"
                 />
               )}
-              {recent.status === "loading" || recent.status === "idle" ? (
+              {isDashboardSupplementalLoading(recent.status) ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : recent.status === "idle" ? (
+                <p className="text-sm text-muted-foreground">
+                  Recent activity has not started for this view.
+                </p>
               ) : recent.status === "unavailable" ? (
                 <p className="text-sm text-muted-foreground">Recent activity unavailable.</p>
-              ) : recent.items.length === 0 ? (
+              ) : recent.status === "ok" && recent.items.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No recent activity yet.</p>
-              ) : (
+              ) : recent.status === "ok" ? (
                 <ul className="space-y-2">
                   {recent.items.map((item) => (
                     <li
@@ -1850,7 +1928,7 @@ export default function Dashboard() {
                         <Badge variant="outline" className="text-[10px] uppercase">
                           {item.kind === "diary" ? "Diary Entry" : "Action Queue Event"}
                         </Badge>
-                        <span className="text-xs truncate">{item.title}</span>
+                        <span className="min-w-0 text-xs truncate">{item.title}</span>
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(item.ts), {
                             addSuffix: true,
@@ -1868,11 +1946,11 @@ export default function Dashboard() {
                     </li>
                   ))}
                 </ul>
-              )}
+              ) : null}
             </section>
 
             <section
-              className="glass rounded-2xl p-4"
+              className="min-w-0 glass rounded-2xl p-4"
               aria-label="Pending actions"
               data-testid="dashboard-approval-queue-section"
             >
@@ -1898,11 +1976,15 @@ export default function Dashboard() {
                 className="mb-3"
                 testId="dashboard-approval-queue-safe-by-design"
               />
-              {pending.status === "loading" || pending.status === "idle" ? (
+              {isDashboardSupplementalLoading(pending.status) ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : pending.status === "idle" ? (
+                <p className="text-sm text-muted-foreground">
+                  Pending actions have not started for this view.
+                </p>
               ) : pending.status === "unavailable" ? (
                 <p className="text-sm text-muted-foreground">Pending actions unavailable.</p>
-              ) : pending.items.length === 0 ? (
+              ) : pending.status === "ok" && pending.items.length === 0 ? (
                 <div
                   data-testid="dashboard-approval-queue-empty"
                   className="rounded-lg border border-dashed border-border/60 bg-secondary/10 p-3 text-sm"
@@ -1913,7 +1995,7 @@ export default function Dashboard() {
                     {APPROVAL_QUEUE_EMPTY_COPY.hint}
                   </p>
                 </div>
-              ) : (
+              ) : pending.status === "ok" ? (
                 <ul className="space-y-2">
                   {pending.items.map((a) => {
                     const severity = mapRiskToSeverity(a.risk_level);
@@ -1929,7 +2011,7 @@ export default function Dashboard() {
                           <Badge variant="outline" className="text-[10px] uppercase">
                             {a.risk_level} risk
                           </Badge>
-                          <span className="text-xs font-medium truncate">
+                          <span className="min-w-0 text-xs font-medium truncate">
                             {sanitizeActionCopy(a.suggested_change)}
                           </span>
                           <span className="ml-auto text-xs text-muted-foreground">
@@ -1967,7 +2049,9 @@ export default function Dashboard() {
                         </div>
                         {a.reason && (
                           <p className="text-xs mt-2 italic text-muted-foreground">
-                            {sanitizeActionCopy(stripBackPointerTokens(a.reason))}
+                            {localizeReadingAtTimestamps(
+                              sanitizeActionCopy(stripBackPointerTokens(a.reason)),
+                            )}
                           </p>
                         )}
                         <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -2008,7 +2092,7 @@ export default function Dashboard() {
                     );
                   })}
                 </ul>
-              )}
+              ) : null}
             </section>
           </div>
         </>

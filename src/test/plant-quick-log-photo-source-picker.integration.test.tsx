@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { timelineEntryHasNoteText } from "@/lib/timelineChipCountRules";
 
 const uploadCalls: Array<{ bucket: string; path: string; file: File }> = [];
 const saveCalls: Array<Record<string, unknown>> = [];
@@ -352,7 +353,12 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     const library = document.getElementById(
       "plant-quick-log-photo-library-input",
     ) as HTMLInputElement;
-    await pickFile(library, makeImage("gallery.png"));
+    await pickFile(
+      library,
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "gallery.png", {
+        type: "image/jpeg",
+      }),
+    );
 
     await waitFor(() => expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeTruthy());
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
@@ -495,6 +501,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
       expect(saveCalls).toHaveLength(1);
     });
     expect(saveCalls[0].p_note).toBe("Photo attached from Quick Log.");
+    expect(timelineEntryHasNoteText(saveCalls[0].p_note)).toBe(false);
     expect(typeof (saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe("string");
   });
 
@@ -512,6 +519,8 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
       expect(saveCalls).toHaveLength(1);
     });
     expect(saveCalls[0].p_note).toBe("Manual readings captured from Quick Log.");
+    // Review of #2468 at 3de9b7a8: the writer's fallback is not counted as a grower Note.
+    expect(timelineEntryHasNoteText(saveCalls[0].p_note)).toBe(false);
     expect(saveCalls[0].p_details).toMatchObject({
       manual_sensor_snapshot: {
         temp_f: 78,

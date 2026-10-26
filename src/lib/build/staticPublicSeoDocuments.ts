@@ -534,6 +534,30 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "A searchable grow-stage care guide with watering, nutrients, environment, and harvest checklists for seedling, vegetative, and flower stages.",
     imageAlt: "Verdant grow-stage care guide",
     bodyFallbackHtml: buildStaticGrowStageCareBodyFallback(),
+    // Registered here, not injected from a useEffect: staticRouteHead emits
+    // these in the route's first SSR response, so a crawler that never
+    // hydrates still receives the FAQPage and BreadcrumbList nodes.
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: "Grow stage care guide | Seedling, Veg, and Flower checklists | Verdant",
+        description:
+          "A searchable grow-stage care guide with watering, nutrients, environment, and harvest checklists for seedling, vegetative, and flower stages.",
+        url: `${VERDANT_SITE_ORIGIN}/guides/grow-stage-care-guide`,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}/guides/grow-stage-care-guide`,
+        questions: GROW_STAGE_CARE_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Grow stage care guide",
+            url: `${VERDANT_SITE_ORIGIN}/guides/grow-stage-care-guide`,
+          },
+        ],
+      }),
+    ],
   }),
   publicDocument("/tools/blueprint-targets", {
     title: "Grow stage target bands | Temperature, humidity, EC, pH, PPFD | Verdant",

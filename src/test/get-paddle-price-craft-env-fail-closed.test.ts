@@ -16,6 +16,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  GET_PADDLE_PRICE_CATALOG_ENV_NAMES,
+  readGetPaddlePriceCatalog,
+} from "../../supabase/functions/_shared/getPaddlePriceCatalogEnv.ts";
 
 const SRC = readFileSync(
   resolve(process.cwd(), "supabase/functions/get-paddle-price/index.ts"),
@@ -25,21 +29,20 @@ const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]
 
 describe("get-paddle-price — Craft env-var wiring", () => {
   it("reads PADDLE_PRICE_CRAFT_MONTHLY and PADDLE_PRICE_CRAFT_ANNUAL into SERVER_PRICE_CONFIG", () => {
-    expect(SRC).toMatch(
-      /craft_monthly:\s*Deno\.env\.get\(["']PADDLE_PRICE_CRAFT_MONTHLY["']\)\s*\?\?\s*["']{2}/,
-    );
-    expect(SRC).toMatch(
-      /craft_annual:\s*Deno\.env\.get\(["']PADDLE_PRICE_CRAFT_ANNUAL["']\)\s*\?\?\s*["']{2}/,
-    );
+    expect(GET_PADDLE_PRICE_CATALOG_ENV_NAMES.craft_monthly).toBe("PADDLE_PRICE_CRAFT_MONTHLY");
+    expect(GET_PADDLE_PRICE_CATALOG_ENV_NAMES.craft_annual).toBe("PADDLE_PRICE_CRAFT_ANNUAL");
+    expect(SRC).toMatch(/const SERVER_PRICE_CONFIG[^=]*=\s*readGetPaddlePriceCatalog\(/);
   });
 
   it("defaults an unset env var to empty string (never undefined leaking through)", () => {
-    // The `?? ""` fallback is what makes the length===0 branch below meaningful.
-    const craftLines = SRC.split("\n").filter((l) => /craft_(monthly|annual):/.test(l));
-    expect(craftLines).toHaveLength(2);
-    for (const line of craftLines) {
-      expect(line).toMatch(/\?\?\s*["']{2}\s*,?\s*$/);
-    }
+    const catalog = readGetPaddlePriceCatalog(() => undefined);
+    expect(catalog.craft_monthly).toBe("");
+    expect(catalog.craft_annual).toBe("");
+    const helper = readFileSync(
+      resolve(process.cwd(), "supabase/functions/_shared/getPaddlePriceCatalogEnv.ts"),
+      "utf8",
+    );
+    expect(helper).toMatch(/getEnv\(name\) \?\? ""/);
   });
 });
 

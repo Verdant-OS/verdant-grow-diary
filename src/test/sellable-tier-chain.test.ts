@@ -15,15 +15,17 @@
  * from it instead of keeping a hand-maintained copy, so the primary invariant
  * is checked against real exported values rather than scraped text.
  *
- * Two things are still scanned as text, deliberately: `SERVER_PRICE_CONFIG`
- * lives in a Deno edge module with `npm:` specifiers vitest cannot resolve,
- * and the derivation check exists precisely to catch the derivation being
- * replaced by a literal list again.
+ * The catalog env names are imported from the pure helper. The edge entry
+ * still cannot be imported here (`npm:` specifiers), so the wiring line that
+ * assigns `SERVER_PRICE_CONFIG` from that helper is scanned as text. The
+ * webhook derivation check exists to catch that derivation being replaced
+ * by a literal list again.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CREDIT_PACK_IDS, PAID_PLAN_IDS, SUBSCRIPTION_PLAN_IDS } from "@/lib/paidPlanAllowlist";
+import { GET_PADDLE_PRICE_CATALOG_ENV_NAMES } from "../../supabase/functions/_shared/getPaddlePriceCatalogEnv.ts";
 
 /**
  * Remove JS comments so a commented-out entry cannot satisfy a substring
@@ -87,34 +89,7 @@ function edgeSource(...segments: string[]): string {
 const WEBHOOK = edgeSource("payments-webhook", "eventProcessor.ts");
 const PRICE_FN = edgeSource("get-paddle-price", "index.ts");
 
-/**
- * Ids inside a braced literal. Handles bare object keys (`credit_pack_50: 50`)
- * as well as quoted members — missing the bare-key form silently yields an
- * empty set, which would make assertions vacuously true. The trailing `\s*:`
- * also prevents prefix collisions: `credit_pack_50` cannot match inside
- * `credit_pack_500`.
- */
-function idsInBlock(block: string): Set<string> {
-  const found = new Set<string>();
-  for (const id of PAID_PLAN_IDS) {
-    const quoted = block.includes(`"${id}"`) || block.includes(`'${id}'`);
-    const bareKey = new RegExp(`(^|[\\s,{])${id}\\s*:`, "m").test(block);
-    if (quoted || bareKey) found.add(id);
-  }
-  return found;
-}
-
-function extract(source: string, pattern: RegExp, label: string): Set<string> {
-  const match = source.match(pattern);
-  if (!match) throw new Error(`Could not locate ${label}`);
-  return idsInBlock(match[1]);
-}
-
-const serverPriceConfigIds = extract(
-  PRICE_FN,
-  /SERVER_PRICE_CONFIG[^=]*=\s*\{([\s\S]*?)\n\};/,
-  "SERVER_PRICE_CONFIG",
-);
+const serverPriceConfigIds = new Set(Object.keys(GET_PADDLE_PRICE_CATALOG_ENV_NAMES));
 
 const sorted = (s: Iterable<string>) => [...s].sort();
 
@@ -157,6 +132,7 @@ describe("sellable-tier chain", () => {
   });
 
   it("resolves a server price for every purchasable id", () => {
+    expect(PRICE_FN).toMatch(/const SERVER_PRICE_CONFIG[^=]*=\s*readGetPaddlePriceCatalog\(/);
     // Without an entry, get-paddle-price returns unknown_plan /
     // price_not_configured and checkout never opens — advertised but unbuyable.
     for (const id of PAID_PLAN_IDS) {

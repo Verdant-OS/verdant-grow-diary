@@ -2119,12 +2119,13 @@ function QuickLogV2SheetForOwner({
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
-        // New V2 Note submissions only: tag the diary row with the stage of
-        // the resolved target itself — the plant stage when the target is a
-        // plant, the tent stage when the target is a tent. A plant whose
-        // stage is missing stays untagged. The builder normalizes and omits
-        // unknown values. Retries replay the stored payload, so a later stage
-        // change never rewrites an in-flight save.
+        // New manual Note saves only. Feed returns above this call. Water
+        // builds its own payload and skips this builder. A retry replays the
+        // stored payload, so a later stage change does not rewrite it.
+        // Pass the stage stored on the resolved target: the plant's stage for
+        // a plant, the tent's stage for a tent. Neither target borrows the
+        // other's stage. The builder keeps a canonical stage and omits a
+        // missing or unknown one.
         stage: targetStage,
         volumeMl: form.volumeMl,
         note: form.note,

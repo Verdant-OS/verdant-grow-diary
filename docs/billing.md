@@ -1,10 +1,14 @@
 # Verdant Billing
 
-## Status: sandbox / test mode only
+## Status: live checkout on the production hostname, held behind backend readiness
 
-Verdant is currently configured for **Paddle sandbox only**. No live charges
-are accepted. No real money moves. No customer is granted Pro entitlement
-from the client.
+The tracked production client token is live-class (`live_`). Live checkout
+opens only on `verdantgrowdiary.com` and `www.verdantgrowdiary.com`; every
+other host (preview URLs, localhost) is unavailable for a live token, and
+a sandbox-class (`test_`) token stays sandbox everywhere. This build must not
+reach customers until the backend readiness checks in
+[Live checkout release sequence](#live-checkout-release-sequence) pass. No
+customer is granted Pro entitlement from the client.
 
 ## Compliance note
 
@@ -31,27 +35,70 @@ What Verdant does not sell:
 Verdant is a software tool. The grower is responsible for complying with
 all laws applicable to cultivation in their own jurisdiction.
 
-## Plans (sandbox)
+## Plans
 
-| Plan             | Price           | Cadence  | Slug               |
-| ---------------- | --------------- | -------- | ------------------ |
-| Pro Monthly      | $12             | / month  | `pro-monthly`      |
-| Pro Annual       | $99             | / year   | `pro-annual`       |
-| Founder Lifetime | $129 (one-time) | one-time | `founder-lifetime` |
+What the pricing page sells, from `src/constants/pricing.ts` (amounts) and
+`get-paddle-price` (the seven SKUs it resolves):
 
-Founder Lifetime is limited to the first 100 buyers. Founder Lifetime includes
-100 AI Doctor credits per month; additional credit packs are planned later but
-are not live yet.
+| Plan / pack        | Price           | Cadence  | Checkout SKU       |
+| ------------------ | --------------- | -------- | ------------------ |
+| Pro Monthly        | $12             | / month  | `pro_monthly`      |
+| Pro Annual         | $99             | / year   | `pro_annual`       |
+| Craft Monthly      | $29             | / month  | `craft_monthly`    |
+| Craft Annual       | $249            | / year   | `craft_annual`     |
+| Founder Lifetime   | $129 (one-time) | one-time | `founder_lifetime` |
+| AI credit pack 50  | $9 (one-time)   | one-time | `credit_pack_50`   |
+| AI credit pack 150 | $19 (one-time)  | one-time | `credit_pack_150`  |
+
+Included AI Doctor credits: Free 3 per grow; Pro and Founder 100 per month;
+Craft 300 per month. Founder Lifetime is a limited early-supporter offer.
+Credit packs are one-time top-ups for any active paid entitlement that
+includes a monthly AI allowance: Pro and Craft subscriptions, and Founder
+Lifetime (one-time, but it carries the monthly bucket). They never expire and
+are spent only after the monthly allowance.
+
+Deliberate unavailable cases at launch. Each must show a calm, scoped block,
+never a page-wide one (see [Live checkout release sequence](#live-checkout-release-sequence)):
+
+- **Craft** has no live Paddle product today, so `get-paddle-price` returns
+  `price_not_configured`. That block is per SKU: only the Craft button that was
+  tried (monthly or annual) changes to "Join the Craft launch list"; the other
+  Craft button stays available until it is tried, and other plans are
+  unaffected.
+- **Founder Lifetime** returns `plan_sold_out` once the cap is reached.
+- **Credit packs** return `pack_requires_monthly_plan` for a grower without an
+  active paid entitlement that includes a monthly AI allowance, which blocks
+  both packs and leaves subscriptions open.
 
 ## Configuration
 
 The **canonical** client env var is `VITE_PAYMENTS_CLIENT_TOKEN` (Lovable
-built-in Paddle integration). The tracked development and production builds
-both use a sandbox-class (`test_`) token. The client authorizes checkout only
-when that exact class is present. A `live_`, missing, or malformed token fails
-closed as unavailable on every hostname; a production hostname never enables
-live checkout by itself. Classify tokens by prefix only and never print or
-copy their values into logs, tickets, or review comments.
+built-in Paddle integration). The committed `.env.production` carries the
+live-class (`live_`) production token; the prebuild gate requires the bundled
+token to equal it and refuses a sandbox (`test_`) token, and the production
+smoke refuses a sandbox committed token, so a later commit cannot quietly
+restore sandbox checkout in production. Client resolution:
+
+Paddle's documented client-token shape is the prefix plus exactly 27
+letters/digits. The runtime and the production prebuild gate both require it.
+
+- `test_` plus exactly 27 letters/digits → sandbox on every host.
+- `live_` plus exactly 27 letters/digits → live only on
+  `verdantgrowdiary.com` / `www.verdantgrowdiary.com`; unavailable on every
+  other host.
+- Missing or malformed, for either prefix (for example `test_invalid`,
+  `live_invalid`, or a payload with `_`, `-` or the wrong length) →
+  unavailable everywhere, and a malformed value fails the production build.
+- `VITE_CHECKOUT_DISABLED="true"` (exact string) → unavailable everywhere,
+  including production, with paused copy. This is the rollback switch; see
+  [Live checkout rollback](#live-checkout-rollback).
+
+Paddle.js is initialized with `Environment.set("production")` for live and
+`Environment.set("sandbox")` for sandbox. Entitlement reads always read live
+rows; sandbox rows are read only for a `test_` token. Check a token by its
+prefix and shape only, never by printing it: never copy a value into logs,
+tickets, or review comments. A publishable client token is public by design, but it still goes
+only in `.env.production`, never in a review comment.
 
 Legacy BYO client env vars (`VITE_PADDLE_ENVIRONMENT`,
 `VITE_PADDLE_CLIENT_TOKEN`, `VITE_PADDLE_PRICE_*`) are `@deprecated` and only
@@ -163,47 +210,164 @@ specifically reports that the new overload is absent. See
 for the mandatory pause, residual expand-stage exposure, verification evidence,
 and rollback order.
 
-## Coordinated production-to-sandbox settings transition
+## Live checkout release sequence
 
-The source policy and tracked production token are sandbox-only. Making the
-deployed stack match that policy is a coordinated operator change, not a
-client-token-only flip:
+Backend readiness is verified **before** this build reaches customers. Merging
+the live-token change into `verdant-grow-diary` makes it the build the
+configured publisher deploys to production; customer exposure starts when the
+live `/version.json` reports the merge SHA, and from then the live token opens
+checkout. Nothing in this document treats the merge itself as the release. The
+merge waits until steps 1–5 are green **and** every standing check in
+[What must be true before live payments open to customers](#what-must-be-true-before-live-payments-open-to-customers)
+is done; step 6 is the merge followed by post-merge deployment verification.
 
-1. Confirm the sandbox secret and price-ID **names** are present without
-   printing their values.
-2. Pin `PAYMENTS_ENVIRONMENT=sandbox` and legacy `PADDLE_ENVIRONMENT=sandbox`.
-3. Confirm `PAYMENTS_SANDBOX_WEBHOOK_SECRET`, `PADDLE_SANDBOX_API_KEY`, and all
-   sandbox catalog price IDs belong to the same Paddle sandbox account.
-4. Publish the build that contains both the sandbox-class production client
-   token and the exact-sandbox runtime gate.
-5. Run `docs/paddle-sandbox-smoke.md` against the published app. If any layer
-   disagrees, disable checkout or roll back to the prior reviewed release;
-   never solve a mismatch by enabling live checkout ad hoc.
+1. **#2229 merged and `payments-webhook` redeployed.** Merge the shared
+   webhook-verifier packaging repair through the queue. Confirm Lovable has
+   pulled the merged source, then (owner-named Edge deploy) redeploy
+   `payments-webhook`, `delete-account` and `paddle-portal-session`. Record
+   each reported result with its submitted-source fingerprint, then verify the
+   live deployment receipt for each (version and last-updated time in Lovable
+   Cloud, or a boot log line). A deploy tool's success message or a sync
+   commit is not a receipt. Don't redeploy solely because an unrelated file
+   (for example a test) differs in Lovable's working copy.
+2. **Server selector read.** The owner reads `PAYMENTS_ENVIRONMENT` in the
+   production backend (Lovable Cloud project `knkwiiywfkbqznbxwqfh`) and
+   confirms it is exactly `live`. Never infer it from the client token.
+   `get-paddle-price` returns `503 price_resolution_unavailable` for an unset
+   or invalid value. This read comes before the `get-paddle-price` deploy and
+   before customer exposure.
+   Then, with its own owner approval, deploy `get-paddle-price` and record
+   its fingerprint and live receipt the same way.
+3. **Every sellable SKU resolves.** From a signed-in production session, call
+   `get-paddle-price` once for each SKU the pricing page sells and record its
+   HTTP status and log line (`reason`, `stage`, `env_var_configured`):
+   `pro_monthly`, `pro_annual`, `craft_monthly`, `craft_annual`,
+   `founder_lifetime`, `credit_pack_50`, `credit_pack_150` (packs need a
+   session whose paid plan includes a monthly AI allowance, such as Pro or
+   Founder). Each must return a live price ID, or
+   a deliberate calm block: `price_not_configured` for a product that does not
+   exist in live Paddle (Craft today) or `plan_sold_out`. Any SKU returning
+   `price_resolution_unavailable` (for example a live product whose
+   `PADDLE_PRICE_*` secret is empty or holds a sandbox ID) blocks: the client
+   cannot tell that from a shared failure, so one click on it closes checkout
+   for every plan on the page.
+4. **Webhook path decided, read-only.** Paddle notification logs for both live
+   destinations, live rows in `lovable_paddle_events`, and `payments-webhook`
+   logs. Choose the canonical destination from that evidence. A live test
+   event is a production write and needs its own authorization.
+5. **Rollback artifact built and verified** (below) before the merge.
+6. **Merge, then confirm the deploy (post-merge verification).** Measure the configured publisher and its
+   deployment for the merge commit. Until the live `/version.json` names that
+   commit, production still runs the previous build and no live verification
+   applies. Once it does, confirm `/pricing` shows "Secure checkout by Paddle".
+   A real-money verification charge needs the owner's explicit approval of
+   amount, account, and refund plan.
+
+There is no operator-only gate in this build. From the deploy until a
+rollback, any visitor on the production hostname can open live checkout.
+
+## Live checkout rollback
+
+Rollback is a deploy, not a toggle. `VITE_CHECKOUT_DISABLED` is read at build
+time, so turning live checkout off means publishing the pinned rollback SHA
+below: a full build and a production deploy. The expected time to roll back is
+one publish cycle of the configured publisher, from the promotion step until
+the live `/version.json` reports the rollback SHA. That duration is
+`NOT_MEASURED`. Record it when the rollback artifact is verified, and live
+checkout stays open until the rollback deploy is serving.
+
+The rollback artifact is a **pinned commit**, not a working-tree edit. The
+prebuild step (`restore-env-production-from-head.mjs`) resets
+`.env.production` to `HEAD` before every build, so an uncommitted switch is
+silently discarded. Build it like this:
+
+1. Before the merge, start from the exact reviewed #2230 head (the merge commit
+   does not exist yet).
+2. Add one commit, on a branch that is never merged, that only appends
+   `VITE_CHECKOUT_DISABLED="true"` to `.env.production`, next to the unchanged
+   live token.
+3. Build that commit with the normal `bun run build` (prebuild included) and
+   record its SHA as the rollback SHA.
+4. Verify that exact SHA (below). This is the pre-merge gate.
+5. Before enqueueing (pre-merge gate): the reviewed head must already contain
+   the current base, so the merge tree will equal the reviewed head and the
+   pinned artifact. If the base moves after review, update the PR, get a fresh
+   exact-head review, and rebuild and re-verify the artifact on the new head
+   before enqueueing. Never enqueue while the artifact's parent differs from
+   the head being merged. Enqueue only into an empty merge queue, and enqueue
+   nothing else until this PR lands, so no other entry can land first. If the
+   queue tip changes anyway while this PR is queued, remove it from the queue
+   before it merges, update it, get a fresh exact-head review, and rebuild and
+   re-verify the artifact before re-enqueueing. The merge must never land on a
+   tree that differs from the verified artifact's parent.
+6. After the merge, confirm `git diff <reviewed head> <merge commit>` is
+   empty. This is a check of step 5, not a recovery path: a non-empty diff
+   means step 5 failed. Treat it as a release incident, ship the one-line
+   switch on top of the merge commit as the emergency action, and rebuild and
+   verify the artifact on the merge commit before closing it.
+
+On every host, including the production
+hostname, it resolves checkout to unavailable before Paddle.js loads, before
+any price lookup, and before any redirect. `/pricing` and the payments banner
+show "Checkout paused". It does not touch tokens, secrets, entitlement reads,
+`payments-webhook`, or `paddle-portal-session`, so existing live subscribers
+keep their access and billing management.
+
+Before the merge, verify the artifact under production-host conditions:
+
+- `src/test/paddle-live-checkout-production-host.test.tsx` runs on
+  `https://verdantgrowdiary.com/` and proves the switch blocks init, price
+  lookup and the hook, and that the paused banner hydrates without mismatch.
+- Build the artifact and load `/pricing` with `verdantgrowdiary.com` mapped to
+  the built server: paused copy, `openCheckout` blocks, no request to
+  `cdn.paddle.com`. A control build without the switch, on the same mapping,
+  must show live copy, so the result comes from the switch.
+
+There is no staging environment (`AGENTS.md`, production only), and a live
+token is unavailable on any non-production host anyway, so a preview deploy
+cannot exercise this path. After a real rollback deploy, the owner confirms
+on production that `/pricing` shows "Checkout paused" and no Paddle.js
+request is made.
+
+Keep it deployable as a pinned commit. To roll back, state the action and its
+effect on live subscriptions, then deploy that commit.
+
+Do **not** use these as a generic rollback:
+
+- Flipping `PAYMENTS_ENVIRONMENT` back to `sandbox`. That breaks live portal
+  and price lookups for existing customers, and recreates a sandbox/live
+  hybrid if a live client is still served.
+- Restoring an earlier `test_`-token build. That reopens sandbox checkout
+  against a live server selector.
+- Revoking the live client token or rotating secrets as a reflex. Revoke the
+  token only if it must be invalidated, and say so first.
 
 This repository change does not mutate Lovable/Paddle/Supabase settings.
 
-## What is still required before live payments can be proposed
+## What must be true before live payments open to customers
 
-Live checkout is intentionally unsupported by current source. A future change
-requires explicit owner authorization and one coordinated, independently
-reviewed transition covering client code and copy, a live-class production
-token, server environment selectors, live API/webhook secrets, live price IDs,
-notification destinations, tests, smoke evidence, monitoring, and rollback.
-No individual token or settings flip authorizes live checkout.
+The owner chose `PAYMENTS_ENVIRONMENT=live` for this release.
+That choice covers the client change; it does not make any single
+token or settings flip sufficient. The release sequence above is the order.
 
-Before proposing that transition:
+Standing checks. Each one is a pre-merge gate for the live release, alongside
+steps 1–5 of the release sequence; none is optional, because the merge lets
+the publisher expose live checkout:
 
 - [ ] Complete Paddle live verification (merchant of record onboarding).
 - [ ] Confirm acceptable use policy fit for Verdant (software-only).
 - [ ] Refund / chargeback / adjustment handling beyond "record and ignore"
       (currently `adjustment.created/updated` events are stored but not
       auto-acted on; operator-manual only).
-- [ ] Customer portal / "manage subscription" surface for the grower
-      (Settings currently shows a placeholder dialog).
+- [ ] Customer portal verified: Settings → "Manage subscription" (the existing
+      `SubscriptionTile` flow, `src/lib/customerPortal.ts` → the
+      `paddle-portal-session` Edge function) opens the Paddle customer portal
+      for a live subscriber after the redeploy. No payment is made to check it.
 - [ ] Tax / receipt copy reviewed for software-only positioning.
-- [ ] Sandbox smoke green per `docs/paddle-sandbox-smoke.md` (Pro Monthly,
-      Pro Annual, Founder Lifetime, duplicate-delivery idempotency,
-      cancel-and-resubscribe).
+- [ ] Pre-transition sandbox evidence recorded per `docs/paddle-sandbox-smoke.md`
+      (Pro Monthly, Pro Annual, Founder Lifetime, duplicate-delivery
+      idempotency, cancel-and-resubscribe). Do not reconfigure production to
+      sandbox to rerun it; live validation is the release sequence above.
 - [ ] Prepare the code, configuration, secrets, price IDs, notification
       destinations, public copy, tests, and rollback as one reviewed change;
       apply none of them independently.

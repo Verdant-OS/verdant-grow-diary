@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CREATOR-BETA-NOINDEX-20261026
+
+```text
+TASK CREATOR-BETA-NOINDEX-20261026  priority: other  status: OPEN
+goal: Hide /creator-beta and its /breeder-beta canonical from search engines. Pages, copy, and links stay.
+why: Cheeko, 2026-10-26, hide /creator-beta from search and ship it live as soon as review allows. /breeder-beta canonicalises to /creator-beta, so it is noindex too.
+branch: cursor/creator-beta-noindex-2708
+base: verdant-grow-diary
+checkout: git fetch origin cursor/creator-beta-noindex-2708 verdant-grow-diary && git switch cursor/creator-beta-noindex-2708 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft against verdant-grow-diary; read the PR URL from GitHub after the first push
+head_sha: read origin/cursor/creator-beta-noindex-2708 after push
+state: local implementation before the first push
+current_step: noindex, follow on both static documents, route heads, and hydrated heads; both locs removed from public/sitemap.xml; STATIC_ONLY_ROUTES emptied because the pages left STATIC_PUBLIC_SEO_DOCUMENTS
+next_action: Confirm the draft PR head, hosted CI, and an independent exact-head review. Do not merge, mark ready, or deploy.
+post_merge_check: After merge and publish, confirm live HTML for /creator-beta and /breeder-beta returns robots noindex, follow and that public/sitemap.xml on verdantgrowdiary.com omits both locs. NOT_MEASURED until then.
+active_writer: Cursor Grok cloud agent (this session)
+decisions: Same noindex, follow path as other hidden public documents (STATIC_PUBLIC_NOINDEX_DOCUMENTS plus usePageSeo noindex). Keep the 2026-08-20 cross-canonical. Renegotiated scripts/public-route-parity.config.mjs and the SEO tests that required these URLs to stay indexable.
+tried_and_rejected: Leaving the pages inside STATIC_PUBLIC_SEO_DOCUMENTS would fail the indexable-robots pin. Disallow in robots.txt was not requested.
+commands: bun run typecheck; bunx vitest run src/test/creator-beta-noindex.test.tsx src/test/breeder-beta-cross-canonical.test.ts src/test/sitemap-public-route-parity.test.ts src/test/static-public-seo-documents.test.ts src/test/route-indexation-matrix.test.ts src/test/static-social-documents-no-conflicting-robots.test.ts src/test/static-route-head-fidelity.test.ts src/test/creator-beta-page.test.tsx src/test/breeder-beta-page.test.tsx --reporter=dot
+files_touched: src/lib/build/staticPublicSeoDocuments.ts; src/pages/CreatorBeta.tsx; src/pages/BreederBeta.tsx; public/sitemap.xml; scripts/public-route-parity.config.mjs; docs/seo/route-indexation-matrix.md; src/test/creator-beta-noindex.test.tsx; src/test/breeder-beta-cross-canonical.test.ts; src/test/static-public-seo-documents.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none in this slice
+blockers: independent exact-head review not requested; this session authored the change and cannot accept it
+open_questions: none
+gotchas: A new commit invalidates review. Draft stays draft. No production smoke write. scorer-lock required an unlock for the parity allowlist and the renegotiated tests; the unlock file is git-ignored.
+links: NOT_MEASURED until the draft PR exists
+artifacts: this block
+reviewer_seat: an eligible independent session that did not author this PR
+reviewer_sha: none
+session_state: Cursor cloud agent; no paused workflow
+claimed_by: Cursor Grok cloud agent, 2026-10-26 19:20 UTC
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-26 14:25 CT, by Cursor Grok cloud agent
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

@@ -17,6 +17,7 @@ export default function CreatorBeta() {
     description:
       "Controlled beta for serious growers, breeders, and grower-educators. See how Verdant turns plant logs, photos, sensor snapshots, phenotype notes, and lab evidence into one clear plant history.",
     path: "/creator-beta",
+    noindex: true,
   });
 
   return (

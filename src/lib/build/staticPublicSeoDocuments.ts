@@ -450,10 +450,9 @@ function aliasDocument(
  * `noindex, follow`. This helper keeps the variant's OWN copy and leaves it
  * affirmatively indexable — only the canonical identity moves.
  *
- * Do not "simplify" this into `aliasDocument`. Pairing `noindex` with a
- * cross-canonical sends crawlers two contradictory instructions about the same
- * URL, and the variant would also lose the audience-specific title and
- * description that justify its existence.
+ * Do not "simplify" this into `aliasDocument`. The variant keeps its own
+ * title and description. Pass `robots: "noindex, follow"` only when an owner
+ * decision hides that URL from search, as with /breeder-beta on 2026-10-26.
  *
  * `metadata.url` is the single source for `<link rel="canonical">`, `og:url`,
  * and the WebPage JSON-LD `@id`, so pointing it at the canonical target keeps
@@ -647,27 +646,6 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "Alphabetized reference of cannabis breeding, cultivation, and phenotype terms — searchable and category-filterable for serious growers.",
     imageAlt: "Verdant cultivation glossary",
   }),
-  // /creator-beta is declared FIRST so it is the primary in the manifest's
-  // duplicate-canonical report; /breeder-beta below points at it.
-  publicDocument("/creator-beta", {
-    title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
-    description:
-      "Controlled beta for serious growers, breeders, and grower-educators. See how Verdant turns plant logs, photos, sensor snapshots, phenotype notes, and lab evidence into one clear plant history.",
-    imageAlt: "Verdant Creator & Breeder Beta",
-  }),
-  // Owner adjudication 2026-08-20: /breeder-beta keeps its breeder-oriented
-  // title and description and stays indexable, but concedes its ranking URL to
-  // /creator-beta. Both routes render the same <BetaLanding> component —
-  // measured 233 of ~237 shared unique visible tokens, identical h1 and every
-  // h2 — so two self-canonical URLs would compete on the same queries.
-  // It is intentionally absent from public/sitemap.xml: never advertise a URL
-  // whose canonical points somewhere else. See scripts/public-route-parity.config.mjs.
-  crossCanonicalDocument("/breeder-beta", "/creator-beta", {
-    title: "Verdant Breeder Beta | Verdant Grow Diary",
-    description:
-      "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
-    imageAlt: "Verdant Breeder Beta",
-  }),
   publicDocument("/pheno-comparison", {
     title: "Pheno Comparison Preview — Verdant Grow Diary",
     description:
@@ -799,6 +777,22 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
       title: OREOZ_GELONADE_CUSTOMER_SEO.title,
       description: OREOZ_GELONADE_CUSTOMER_SEO.description,
       imageAlt: "Next Door Cannabis Oreoz and Gelonade comparison",
+      robots: "noindex, follow",
+    }),
+    // 2026-10-26, owner: hide /creator-beta from search. The page stays public.
+    // /breeder-beta still canonicalises here (2026-08-20) and is noindex too.
+    publicDocument("/creator-beta", {
+      title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
+      description:
+        "Controlled beta for serious growers, breeders, and grower-educators. See how Verdant turns plant logs, photos, sensor snapshots, phenotype notes, and lab evidence into one clear plant history.",
+      imageAlt: "Verdant Creator & Breeder Beta",
+      robots: "noindex, follow",
+    }),
+    crossCanonicalDocument("/breeder-beta", "/creator-beta", {
+      title: "Verdant Breeder Beta | Verdant Grow Diary",
+      description:
+        "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
+      imageAlt: "Verdant Breeder Beta",
       robots: "noindex, follow",
     }),
   ]);

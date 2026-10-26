@@ -103,6 +103,21 @@ describe("static public SEO documents", () => {
           robots: "noindex, follow",
         }),
       }),
+      expect.objectContaining({
+        path: "/creator-beta",
+        metadata: expect.objectContaining({
+          url: `${VERDANT_SITE_ORIGIN}/creator-beta`,
+          robots: "noindex, follow",
+        }),
+      }),
+      expect.objectContaining({
+        path: "/breeder-beta",
+        canonicalPath: "/creator-beta",
+        metadata: expect.objectContaining({
+          url: `${VERDANT_SITE_ORIGIN}/creator-beta`,
+          robots: "noindex, follow",
+        }),
+      }),
     ]);
     expect(
       STATIC_PUBLIC_SEO_DOCUMENTS.some(

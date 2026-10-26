@@ -6,9 +6,11 @@ It is not a Verdant product integration or a substitute for the canonical
 
 ## Closed scope
 
-New files in `spikes/shared-project-context/` only. Node built-ins, explicit
-synthetic JSON input, bounded search/read/export/import, immutable record IDs and
-provenance, project isolation, stale/conflict labels, and three **simulated**
+New spike files stay in `spikes/shared-project-context/`. The sole allowed file
+outside that directory is `.github/workflows/shared-project-context-spike.yml`,
+the dedicated workflow for this spike's existing tests and restricted demo.
+Node built-ins, explicit synthetic JSON input, bounded search/read/export/import,
+immutable record IDs and provenance, project isolation, stale/conflict labels, and three **simulated**
 clients using one read contract. All included records and commits are invented.
 
 No upstream package installation, conversation capture, private notes, filesystem
@@ -46,16 +48,16 @@ read-only instance before writes are disabled. An import envelope is exactly
 `{version:1, synthetic:true, projectId, records:[...]}`. Unknown fields, dangerous
 prototype keys, malformed dates, invalid references and excess limits fail closed.
 
-| Record field | Required value |
-| --- | --- |
-| `projectId` | Lowercase slug, starts with a letter; 1–48 characters |
-| `id` | `sha256:` plus 64 lowercase hex digits, derived from all canonical fields below |
-| `text` | Nonblank factual text, at most 2,048 UTF-16 code units; untrusted data |
-| `kind` | `fact`, `constraint`, or `exact-head` |
-| `source` | Exactly `{type, location, commit}`; commit is 40 lowercase hex digits |
-| `observedAt` | Valid UTC timestamp, exactly `YYYY-MM-DDTHH:mm:ss.sssZ` |
-| `verification` | Declared `verified` or `unverified`; a synthetic assertion |
-| `expiresAt` | `null` or a valid UTC timestamp after `observedAt` |
+| Record field                  | Required value                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `projectId`                   | Lowercase slug, starts with a letter; 1–48 characters                                    |
+| `id`                          | `sha256:` plus 64 lowercase hex digits, derived from all canonical fields below          |
+| `text`                        | Nonblank factual text, at most 2,048 UTF-16 code units; untrusted data                   |
+| `kind`                        | `fact`, `constraint`, or `exact-head`                                                    |
+| `source`                      | Exactly `{type, location, commit}`; commit is 40 lowercase hex digits                    |
+| `observedAt`                  | Valid UTC timestamp, exactly `YYYY-MM-DDTHH:mm:ss.sssZ`                                  |
+| `verification`                | Declared `verified` or `unverified`; a synthetic assertion                               |
+| `expiresAt`                   | `null` or a valid UTC timestamp after `observedAt`                                       |
 | `supersedes`, `conflictsWith` | Unique record IDs, at most 16 each; same-project references must exist in combined store |
 
 `source.type` is `fixture-uri` (`fixture://slug/path`) or `repo-path` (relative
@@ -74,11 +76,11 @@ Hashes establish content identity, **not authenticity, truth or authorization**;
 a caller can construct a new synthetic record with a new ID.
 
 ```js
-import { ContextStore } from './context.mjs';
-import { PROJECT_ID, fixtureJSON, NOW, headsJSON } from './fixtures.mjs';
+import { ContextStore } from "./context.mjs";
+import { PROJECT_ID, fixtureJSON, NOW, headsJSON } from "./fixtures.mjs";
 const store = new ContextStore({ projectId: PROJECT_ID, initialJSON: fixtureJSON });
 const options = { now: NOW, headsJSON: headsJSON() };
-const matches = store.search('sample', { ...options, limit: 3 });
+const matches = store.search("sample", { ...options, limit: 3 });
 const result = store.read(matches[0].record.id, options);
 const snapshot = store.exportJSON(); // caller may explicitly carry this string
 const restarted = new ContextStore({ projectId: PROJECT_ID, initialJSON: snapshot });
@@ -140,6 +142,23 @@ closing the draft reverses the experiment without runtime infrastructure cleanup
 
 ## Verification receipt
 
+Current measured local run, **2026-10-26 23:18:31 UTC**, Node **24.19.0**:
+
+```sh
+node --test spikes/shared-project-context/context.test.mjs
+```
+
+Result: **22 PASS / 0 FAIL / 0 SKIP** (22 tests executed). Run identifier:
+`local-readme-20261026T231831Z`, executed in the authorized cloud worktree at
+source checkpoint `473f17e59c26b4b4f84a38435b00676ab5966046`. This is an actual
+local run, not a hosted CI receipt or a count inferred from test declarations.
+The code and test bytes remain unchanged by this README-only correction; the
+resulting commit SHA is reported separately after the normal push. This run does
+not establish full-application checks, hosted CI or live behavior.
+
+<details>
+<summary>Historical author receipt — 2026-10-21, before the later test additions</summary>
+
 Author checks on 2026-10-21 with Node 24.19.0: **19 PASS / 0 FAIL / 0 SKIP**,
 including exports through two separate Node processes and untouched source bytes
 and modification time. The restricted demo above also passes. Five disposable
@@ -156,6 +175,8 @@ remaining issues; repository independent acceptance is pending. The draft PR
 description binds the final source head to the evidence. Final collision refresh:
 115 open PRs inspected, no other PR lists this new directory.
 
+</details>
+
 ## Preflight receipt
 
 2026-10-21: base `verdant-grow-diary` at
@@ -166,6 +187,14 @@ open PRs; none listed the new directory. #2290 and merged #2284 concern the
 distinct Cursor SDK spike, which is excluded. #2133 concerns operational handoffs;
 this experiment implements no handoff delivery or authority. Shared fleet locks
 and other-chat activity unavailable; no global collision guarantee. GitHub
-comments remain outside this task's permission. Independent acceptance routes to
-Critical Mass; the author cannot provide it. The PR description carries current
-head, validation and next-step evidence; canonical governance is unchanged.
+comments remain outside this task's permission.
+
+Current acceptance routing (owner update, 2026-10-26): obtain independent
+exact-head review from an actually available, non-contributing **Sour Diesel or
+Jack Herer** session. All authors and repairers are excluded; Codex is repair-only
+and cannot supply independent acceptance of this Codex-authored work. **OG Kush**
+may merge only after all **35 required checks** are green and **Matthew gives his
+yes at that same full reviewed head**, with the other holds preserved. Codex must
+not mark ready, queue, enable auto-merge or merge. No deployment is authorized.
+The PR description carries head, validation and next-step evidence; canonical
+governance is unchanged.

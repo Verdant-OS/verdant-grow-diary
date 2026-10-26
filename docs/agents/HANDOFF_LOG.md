@@ -81,7 +81,7 @@ checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-d
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
 head_sha: d5f134b926be9dd1b2569f7e106ff28e350bfb96 at 2026-10-26 11:20 CT; refresh if a later commit moves the head
 state: pushed draft
-current_step: draft PR #2541 is open; required checks are the next measurement
+current_step: draft PR #2541 is open. Observation drafts mark saveFailed only for unconfirmed saves, so Timeline recovery and a later new note keep their own key. Required checks were still queued at 2026-10-26 12:00 CT.
 next_action: read the 35 required checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 at head d5f134b926be9dd1b2569f7e106ff28e350bfb96 and do not merge
 post_merge_check: Full test suite shards and Lint, typecheck, test, build on the merged deploy head; if a required check fails, reopen this task with the same owner
 active_writer: Grok cloud agent on cursor/setup-quicklog-draft-retry-8b19

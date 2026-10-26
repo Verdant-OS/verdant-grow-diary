@@ -79,10 +79,10 @@ branch: cursor/advanced-nutrients-feed-log-b938
 base: verdant-grow-diary
 checkout: git fetch origin cursor/advanced-nutrients-feed-log-b938 verdant-grow-diary && git switch cursor/advanced-nutrients-feed-log-b938
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2542
-head_sha: cc9b0110966632b52aad373ee55350dd3d37508d at the feature commit; a later handoff-only commit may move the tip
+head_sha: d969e495d0f0f43f0ac8b2be425623885f5fdc3d was the head that failed shard 2 and pheno-comparison-v0; the sort fix moves the tip
 state: pushed draft
-current_step: draft PR #2542 is open; required checks are NOT_MEASURED until GitHub reports them
-next_action: read the 35 required checks on #2542 and fix only failures that belong to this branch
+current_step: APP_ROUTES now lists /guides/advanced-nutrients-feeding-chart-log before /guides/grow-stage-care-guide so the ascending-path pin passes
+next_action: confirm Full test suite shard 2/32 and pheno-comparison-v0 at the new head; leave the PR draft
 post_merge_check: NOT_APPLICABLE until merge is requested
 active_writer: cursor cloud agent on cursor/advanced-nutrients-feed-log-b938
 decisions: Planned amounts start blank. The page does not embed manufacturer dosages. Tolerance default is ±10% and is labeled as the grower's tolerance. Analytics events are feed_log_* and fire only when readAnalyticsConsent() is granted.

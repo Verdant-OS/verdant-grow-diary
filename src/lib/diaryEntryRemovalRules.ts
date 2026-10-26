@@ -136,3 +136,15 @@ export function diaryEntriesTotalAfterRemoval(total: number | null): number | nu
   if (total === null) return null;
   return Math.max(0, total - 1);
 }
+
+/**
+ * A removal that started on one Timeline page may finish after navigation or
+ * a refresh. Apply it only while that page's read is still the one on screen.
+ */
+export function diaryRemovalCompletionStillCurrent(
+  origin: { requestId: number; readKey: string | null },
+  current: { requestId: number; readKey: string | null },
+): boolean {
+  if (origin.readKey === null || current.readKey === null) return false;
+  return origin.requestId === current.requestId && origin.readKey === current.readKey;
+}

@@ -224,6 +224,7 @@ import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityC
 import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
 import {
   diaryEntriesTotalAfterRemoval,
+  diaryRemovalCompletionStillCurrent,
   isLinkedQuickLogDiaryDetails,
 } from "@/lib/diaryEntryRemovalRules";
 import {
@@ -595,6 +596,7 @@ export default function Timeline() {
   const [supplementalLoading, setSupplementalLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
   const readRequestIdRef = useRef(0);
+  const entriesSnapshotRef = useRef<Entry[]>([]);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -719,6 +721,7 @@ export default function Timeline() {
   });
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
+  entriesSnapshotRef.current = entries;
 
   // Same fail-closed grow-list gate as the owner name directory: no
   // supplemental tents / sensor_readings while ownership proof is
@@ -3075,12 +3078,28 @@ export default function Timeline() {
                                       plantId={e.plant_id ?? null}
                                       tentId={e.tent_id ?? null}
                                       showFollowUp
-                                      onRemoved={(removedId) => {
-                                        setEntries((rows) =>
-                                          rows.filter((r) => r.id !== removedId),
-                                        );
-                                        setEntriesTotal(diaryEntriesTotalAfterRemoval);
-                                      }}
+                                      onRemoved={(
+                                        (origin: { requestId: number; readKey: string | null }) =>
+                                        (removedId: string) => {
+                                          if (
+                                            !diaryRemovalCompletionStillCurrent(origin, {
+                                              requestId: readRequestIdRef.current,
+                                              readKey: activeReadKeyRef.current,
+                                            })
+                                          ) {
+                                            return;
+                                          }
+                                          const rows = entriesSnapshotRef.current;
+                                          if (!rows.some((row) => row.id === removedId)) return;
+                                          const next = rows.filter((row) => row.id !== removedId);
+                                          entriesSnapshotRef.current = next;
+                                          setEntries(next);
+                                          setEntriesTotal(diaryEntriesTotalAfterRemoval);
+                                        }
+                                      )({
+                                        requestId: readRequestIdRef.current,
+                                        readKey: activeReadKey,
+                                      })}
                                     />
                                   </>
                                 ) : null}

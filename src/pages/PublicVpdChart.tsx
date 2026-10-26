@@ -20,11 +20,12 @@ import {
   PUBLIC_VPD_CHART_HEATMAP_F_ROWS,
   PUBLIC_VPD_CHART_HEATMAP_RH_COLS,
   PUBLIC_VPD_CHART_PATH,
-  PUBLIC_VPD_CHART_SOURCES,
-  PUBLIC_VPD_CHART_STAGE_SUMMARY,
   PUBLIC_VPD_CHART_STAGES,
   PUBLIC_VPD_CHART_TITLE,
   publicVpdChartAirTemperatureFromDisplay,
+  publicVpdChartCommonTargetsSentence,
+  publicVpdChartSourcesSentence,
+  publicVpdChartStageHeading,
   publicVpdChartClamp,
   publicVpdChartDisplayedAirTemperature,
   publicVpdChartDisplayedOffset,
@@ -167,7 +168,7 @@ export default function PublicVpdChart() {
         <p className="max-w-3xl text-base leading-7">
           Vapor Pressure Deficit (VPD) measures the difference in kilopascals (kPa) between moisture
           saturation inside the leaf and moisture in the surrounding grow tent air.{" "}
-          {PUBLIC_VPD_CHART_STAGE_SUMMARY}
+          {publicVpdChartCommonTargetsSentence()}
         </p>
         <p className="text-sm text-[#526656]">
           Calculated from values you entered. This is not a live sensor reading.
@@ -294,7 +295,7 @@ export default function PublicVpdChart() {
               >
                 {PUBLIC_VPD_CHART_STAGES.map((stage) => (
                   <option key={stage.id} value={stage.id}>
-                    {stage.name} ({stage.min.toFixed(1)}–{stage.max.toFixed(1)} kPa)
+                    {publicVpdChartStageHeading(stage)}
                   </option>
                 ))}
               </select>
@@ -340,7 +341,7 @@ export default function PublicVpdChart() {
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PUBLIC_VPD_CHART_STAGES.map((stage) => (
               <h3 key={stage.id} className="text-base font-semibold">
-                {stage.name} ({stage.min.toFixed(1)}–{stage.max.toFixed(1)} kPa)
+                {publicVpdChartStageHeading(stage)}
               </h3>
             ))}
           </div>
@@ -434,7 +435,7 @@ export default function PublicVpdChart() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm">{PUBLIC_VPD_CHART_SOURCES}</p>
+          <p className="mt-3 text-sm">{publicVpdChartSourcesSentence()}</p>
         </section>
 
         <section>

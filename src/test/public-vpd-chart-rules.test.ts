@@ -3,13 +3,18 @@ import { describe, expect, it } from "vitest";
 import {
   calculatePublicVpdChartFromFahrenheit,
   PUBLIC_VPD_CHART_AIR_CELSIUS_MAX,
+  PUBLIC_VPD_CHART_STAGES,
   PUBLIC_VPD_CHART_WEB_APPLICATION_JSON_LD,
   publicVpdChartAirTemperatureFromDisplay,
+  publicVpdChartCommonTargetsSentence,
   publicVpdChartDisplayedAirTemperature,
   publicVpdChartDisplayedOffset,
   publicVpdChartMatchingStages,
   publicVpdChartMoveFocus,
   publicVpdChartOffsetFromDisplay,
+  publicVpdChartSourcesSentence,
+  publicVpdChartStageHeading,
+  publicVpdChartStageRangeKpa,
 } from "@/lib/publicVpdChartRules";
 
 describe("public VPD chart math", () => {
@@ -45,6 +50,30 @@ describe("public VPD chart math", () => {
     expect(publicVpdChartAirTemperatureFromDisplay(38, "C")).toBe(100);
     expect(publicVpdChartAirTemperatureFromDisplay(0, "C")).toBe(50);
     expect(publicVpdChartOffsetFromDisplay(9, "F")).toBe(5);
+  });
+
+  it("builds the intro and source sentences from the stage table", () => {
+    const targets = publicVpdChartCommonTargetsSentence();
+    const sources = publicVpdChartSourcesSentence();
+    expect(targets.startsWith("Common grower targets are ")).toBe(true);
+    expect(sources.startsWith("Sources: ")).toBe(true);
+    expect(sources.endsWith("Common grower targets, not strict rules. Updated Oct 2026.")).toBe(
+      true,
+    );
+    for (const stage of PUBLIC_VPD_CHART_STAGES) {
+      expect(publicVpdChartStageHeading(stage)).toBe(
+        `${stage.name} (${publicVpdChartStageRangeKpa(stage)})`,
+      );
+      expect(targets).toContain(`${publicVpdChartStageRangeKpa(stage)} for ${stage.name}`);
+      expect(sources).toContain(stage.source);
+      expect(sources).toContain(`${stage.name} ${publicVpdChartStageRangeKpa(stage)}`);
+    }
+    const sharedSource = PUBLIC_VPD_CHART_STAGES[0]?.source;
+    const shared = PUBLIC_VPD_CHART_STAGES.filter((stage) => stage.source === sharedSource);
+    expect(shared.length).toBeGreaterThan(1);
+    expect(sources).toContain(
+      `${sharedSource} (${shared.map((stage) => `${stage.name} ${publicVpdChartStageRangeKpa(stage)}`).join(", ")})`,
+    );
   });
 
   it("moves heatmap focus one cell and keeps the WebApplication URL", () => {

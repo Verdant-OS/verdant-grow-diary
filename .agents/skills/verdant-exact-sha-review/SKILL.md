@@ -13,7 +13,7 @@ The shared box skill `code-review-and-quality` (on the agents' box at `/home/box
 
 | Role                            | Who                                                                                                                                                                                                                               | Does                                                                                | Never                                                                                                           |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Merge-queue owner               | Grok 91 (older docs and other bots may still call this role Chemdawg or GDP)                                                                                                                                                      | Routes PRs to reviewers, sends findings back to authors, and merges under section 4 | Reviews its own work                                                                                            |
+| Merge-queue owner               | Matthew's current explicit assignment under OWNERSHIP.md and the roster; PR #1971 names its Codex coordinator under the held founder exception                                                                                   | Routes PRs to reviewers, sends findings back to authors, and merges under section 4 only after all approvals and holds clear | Reviews its own work                                                                                            |
 | Independent acceptance reviewer | Actually available eligible session under OWNERSHIP.md §4.3: Codex on non-Codex-authored work Codex did not repair; non-contributing Claude/Grok review sessions, including for Codex-authored work; Durban Poison when available | Reviews the complete scope and required evidence at one full head SHA               | Writes or repairs while serving as independent reviewer; accepts its own work; merges, publishes or applies SQL |
 | Low-risk reviewer               | Graft, only within the existing OWNERSHIP.md allowlist                                                                                                                                                                            | Exact-head PASS on allowlisted work Graft neither authored nor repaired             | Accepts governance, protected or mixed scopes outside its lane                                                  |
 | Author                          | Claude, Codex, Grok, or another assigned implementation session                                                                                                                                                                   | One active writer implements and fixes findings under a valid claim                 | Accepts its own work                                                                                            |
@@ -26,7 +26,15 @@ locked scorers and all other protected paths retain their gates and supplemental
 Graft's low-risk allowlist is unchanged. Missing availability, independence or scope
 coverage is BLOCKED. Reviewer eligibility changes no merge-actor assignment or powers.
 
-[OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) controls routing and merge ownership. The [roster](../../../docs/agents/constitution/roster.md#conditional-backup-merge-seat) describes Chemdawg and the conditional Harvest backup. This skill and operating state do not override that ownership.
+[OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) controls routing and merge ownership.
+The [roster's named PR #1971 exception](../../../docs/agents/constitution/roster.md#pr-1971-merge-actor-exception-and-hold)
+records Matthew's assignment of that PR's Codex coordinator as merge actor after
+Chemdawg/Grok 91 retired. It explicitly overrides older actor and no-author-integration
+text for PR #1971 only, while all contributing Codex sessions remain excluded from
+independent acceptance. Harvest does not inherit the assignment. The current
+**do-not-merge-or-deploy hold** remains; no ready/enqueue/auto-merge/merge may occur
+until Matthew later lifts it and approves the final reviewed full SHA after all
+gates pass. This skill and operating state do not override that ownership or hold.
 
 Ownership is temporary accountability, not permanent dibs. Keep one active implementation
 writer with explicit claim/release safeguards under AGENTS.md. Preserve fresh claims,

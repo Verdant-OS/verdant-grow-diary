@@ -4,7 +4,7 @@
 
 - **Repo:** `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`
 - **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.
-- **Last revised:** 2026-10-22, proposed bounded reviewer-routing correction approved by Matthew; historical Graft low-risk lane retained. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
+- **Last revised:** 2026-10-26, Matthew's named PR #1971 merge-actor exception and explicit merge hold recorded. The 2026-10-22 bounded reviewer-routing correction and historical Graft low-risk lane remain. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
 
 ---
 
@@ -48,15 +48,41 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 
 Every merge requires Matthew's per-item yes at the exact head SHA, as well as the
 required CI, independent review, queue and hold gates. Green checks and a PASS
-establish eligibility, not merge approval. Chemdawg is the merge seat; while it is
-unavailable, Harvest is the conditional backup under
-[the roster](constitution/roster.md#conditional-backup-merge-seat). Existing explicit
-founder grants keep their recorded scope. Approval actions and low-risk exceptions
-are listed in [the roster](constitution/roster.md#per-item-approval).
+establish eligibility, not merge approval. Matthew's current explicit assignment
+defines the actor. Chemdawg/Grok 91 is retired; Harvest does not inherit PR #1971.
+See the named exception below and [the roster](constitution/roster.md#pr-1971-merge-actor-exception-and-hold).
+Existing explicit founder grants keep their recorded scope. Approval actions and
+low-risk exceptions are listed in [the roster](constitution/roster.md#per-item-approval).
+
+### PR 1971 merge actor exception and hold
+
+Matthew's direct 2026-10-26 assignment selects the **Codex PR #1971 coordinating
+session** as this PR's merge actor after retiring Chemdawg. For **PR #1971 only**,
+this is an explicit exception to the default "Codex does not merge/integrate its
+own work" and "no author-integration exception" statements in this file, the
+constitution, roster, role profiles and review skill. It also supersedes their
+older Chemdawg/Grok 91/conditional-Harvest routing for this PR. Historical profiles
+are not a current assignment, and no other Codex task gains integration authority.
+
+**The exception is currently held.** Matthew's latest instruction authorizes this
+documentation repair, ordinary push and fresh CI, and explicitly says **do not
+merge or deploy yet**. No ready, enqueue, auto-merge or merge is permitted until
+Matthew later lifts that hold and gives his per-item yes at the final reviewed
+full 40-character head SHA. The actor assignment itself is not that approval.
+
+Then, at that same unchanged head, require all 35 required contexts and applicable
+supplemental checks successful, a complete-scope eligible outside clean PASS with
+zero P1/P2, verified reviewer session and contributor exclusions, no blocking
+finding/HOLD/scorer-lock issue/draft/conflict, and the normal merge queue with
+`expectedHeadOid`. Every contributing Codex session, including this coordinator
+and its subagents, remains ineligible for independent acceptance. A later head
+needs fresh CI, a full review and approval. No production or deployment authority
+is granted. The [roster's matching exception](constitution/roster.md#pr-1971-merge-actor-exception-and-hold)
+and this section control older default actor text below for PR #1971.
 
 ### Codex: the repo, CI, builds, connectors, and CI/build reviews
 
-- **Repo.** CI, builds and repository repairs. Matthew configures the separate scoped identity, branch rulesets and code-owner protections. Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply or production Supabase writes. Drafts stay draft. Chemdawg merges only after 35/35 required checks succeed and an eligible independent reviewer session under §4.3 gives a clean PASS on the exact head SHA. Codex cannot be that reviewer on a PR Codex authored or repaired (for example #1938). Graft's exact-head PASS counts as that outside review on docs-only and low-risk PRs Graft did not author or repair (section 2). Production operations require Matthew's separate approval.
+- **Repo.** CI, builds and repository repairs. Matthew configures the separate scoped identity, branch rulesets and code-owner protections. Codex uses normal PR-branch pushes: no force-push, Publish, SQL apply or production Supabase writes. Its merge authority is limited to an existing explicit founder grant, including the held PR #1971 exception above; no default authority is created. Drafts stay draft until an authorized ready/enqueue step. The assigned merge actor needs 35/35 required checks, applicable supplemental evidence and an eligible independent full-head clean PASS under §4.3. Codex cannot supply that PASS on work it authored or repaired (for example #1938). Graft's outside-review lane remains section 2's docs-only/low-risk allowlist. Production operations require Matthew's separate approval.
 - **CI infrastructure.** Workflows, runners, check definitions, re-runs, and fixing flaky or broken checks.
 - **Build pipelines.** Builds and deployment pipeline configuration. Production runs on Cloudflare Workers at https://verdantgrowdiary.com. Vercel checks do not establish a production release. There are no preview or staging targets. Production publishing stays with the hosting owner, and the publish decision stays with Matthew (section 1).
 - **The three connectors** (section 4). Codex builds, runs, and fixes them:
@@ -64,18 +90,22 @@ are listed in [the roster](constitution/roster.md#per-item-approval).
   - the routing channel with Grand Daddy Grok
   - reviewer routing to available eligible independent sessions (section 4.3)
 - **Independent exact-head review.** Codex remains eligible for independent non-Codex-authored work that Codex did not repair. Non-contributing Claude or Grok review sessions may provide independent acceptance, including for Codex-authored work. Durban Poison remains eligible when actually available. Apply session, contributor-exclusion, scope and evidence checks in §4.3; role name or shared GitHub identity alone proves nothing.
-  - An independent verdict on Codex's own work must come from an eligible non-contributing outside session. There is no author-integration exception; publish gates and named owner locks retain their fences (open item O2).
+  - An independent verdict on Codex's own work must come from an eligible non-contributing outside session. The named PR #1971 exception above changes only that PR's prospective merge actor, not independent acceptance; all other work retains the default no-author-integration rule. Publish gates and named owner locks retain their fences (open item O2).
 - **This file.** Codex keeps it current and accurate.
 
 ### Grand Daddy Grok (GDP): routing and product calls
 
 - **Routing decisions.** Which slice runs next, which reviewer gets which PR, overrides, and holds.
 - **Slice naming.** GDP routes priorities and named slices. Codex may start authorized repository repairs and resume a claimed handoff without waiting for another GDP paste. One task uses one branch and one current holder.
-- **Opening PRs.** GDP routes work; Codex builds authorized repairs as drafts. Chemdawg owns merge under the current exact-head gate below.
-- **Merge rule (Matthew's current standing order).** Chemdawg merges only after 35/35 required checks succeed and a clean PASS from an eligible independent reviewer session under §4.3 covers the exact head SHA. Codex cannot give that PASS on a PR Codex authored or repaired (for example #1938). Graft's exact-head PASS counts as the outside review on docs-only and low-risk PRs Graft did not author or repair (section 2). Missing, skipped, pending or failed required checks are not green. P1 and publish gates retain their assigned review and hold fences.
+- **Opening PRs.** Codex builds authorized repairs as drafts. Merge ownership follows Matthew's current explicit assignment, including the held PR #1971 exception above; do not route new work to retired Chemdawg/Grok 91.
+- **Merge rule (Matthew's current standing order).** The assigned actor merges only after per-item approval, 35/35 required checks, applicable supplemental evidence and a clean complete-scope PASS from an eligible independent session under §4.3 at the same full head. Codex cannot give that PASS on a PR it authored or repaired (for example #1938). Graft's outside-review lane remains limited to section 2. Missing, skipped, pending, cancelled or failed required checks are not green. Every explicit merge/publish hold remains, including PR #1971's current no-merge hold.
 - **Spend proposals.** GDP writes the proposal. Approval stays with Matthew.
 
-### Chemdawg (Engineering Lead): pre-checks, CI status, and reviewer assignment
+### Chemdawg: historical pre-check, CI-status and reviewer-assignment profile
+
+Chemdawg/Grok 91 is retired from current routing. The following earlier role
+description is preserved as history; it cannot assign or merge PR #1971. Its
+current actor and hold are the named founder exception above.
 
 - **Pre-checks.** On every PR head, Chemdawg checks scope, the closed file plan, tests, and that CI is finished.
 - **Verdict format.** Three lines, posted in the routing channel:
@@ -125,7 +155,7 @@ are listed in [the roster](constitution/roster.md#per-item-approval).
 | Reviewer assignment and claim ledger                     | Chemdawg's pre-check under §4.3; GDP can route within the same independence and evidence gates                                                       |
 | Review verdicts                                          | Available eligible independent session under §4.3; Codex excluded on Codex-authored/repaired work; Graft only within the existing low-risk allowlist |
 | Opening PRs                                              | Any agent with repository access may open its own authorized draft PR                                                                                                             |
-| Merging PRs                                              | Chemdawg, or conditional Harvest backup per the roster, after per-item approval, 35/35 required SUCCESS and independent exact-head PASS; named holds remain                                                      |
+| Merging PRs                                              | Matthew's current explicit actor assignment; PR #1971 uses the named Codex exception above and remains held. Per-item exact-head approval, 35/35 required SUCCESS, applicable supplemental checks and an eligible independent full-head PASS remain required. |
 | Edits to this file                                       | Codex                                                                                                                                                |
 | Anything not listed                                      | GDP decides and adds a row here                                                                                                                      |
 
@@ -203,8 +233,9 @@ hooks, channel membership, GitHub settings or existing assignments.
 2. Routing integration: parser, tags, and digest. About 1 to 2 hours (estimate), since the channel itself is live.
 3. Auto-assignment, about 4 to 8 hours (estimate).
 
-Codex builds each one as a draft PR. Chemdawg owns merge after the exact-head
-required-check and independent-PASS gate. An independent reviewer verdict is reported
+Codex builds each one as a draft PR. Matthew's current explicit actor assignment
+controls merge after the exact-head approval, required-check and independent-PASS
+gate; the PR #1971 exception above remains held. An independent reviewer verdict is reported
 only when actually obtained. Codex posts `[READY]` only when the connector is measured live.
 
 ## 5. The loop, end to end (no human step)
@@ -231,7 +262,7 @@ A FAIL at step 4 or step 7 goes back to step 3 automatically.
 
 ## 7. Open items (owner in brackets)
 
-- **O1: superseded by Matthew's current standing order.** The earlier proposed self-integration phases grant no current authority. Codex does not merge; Chemdawg owns merge only after 35/35 required checks and a clean independent exact-head PASS from an eligible session under §4.3 (Codex excluded on Codex-authored/repaired work). Graft's exact-head PASS counts as the outside review on section 2 docs-only and low-risk PRs Graft did not author or repair.
+- **O1: superseded by Matthew's current standing order.** The earlier proposed self-integration phases grant no current authority. The named PR #1971 founder exception above is a separate, currently held assignment, not a revival of those phases or a general Codex merge grant. Otherwise the default no-author-integration rule remains. Every authorized merge still needs 35/35 required checks, applicable supplemental gates and a clean eligible independent full-head PASS under §4.3 (Codex excluded on Codex-authored/repaired work). Graft's outside-review lane remains limited to section 2 docs-only and low-risk work Graft did not author or repair.
 - **O2 [Codex + Chemdawg]: review truth.** Codex cannot give its own code, or a PR Codex repaired, an independent PASS (for example #1938). Publish-gate acceptance and all named owner locks remain. Historical review receipts retain their original reviewer and SHA.
 - **O3 [Matthew + Codex]: scoped identity.** The current connector acts as Matthew's admin account. Matthew creates a separate scoped identity and protections; Codex then measures allowed and refused operations. No permissions have been granted by the setup document, and code-owner review does not itself reject file pushes.
 - **O4: historical receipt.** Critical Mass and Toad Venom joined the routing channel on 2026-09-28. MotorBreath is on call outside it. This historical receipt does not establish present availability or route future work to Critical Mass.

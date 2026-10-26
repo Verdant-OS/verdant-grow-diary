@@ -108,7 +108,7 @@ goal: Add plants to an existing pheno hunt from the workspace and the plant page
 branch: claude/pheno-hunt-add-candidates
 historical_branch_2026_10_21: claude/pheno-hunt-add-candidates
 base: verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2307 (draft)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2307 (open, not a draft, not in the merge queue; observed 2026-10-26)
 files: src/lib/phenoHuntAddCandidatesRules.ts; src/lib/phenoHuntAddCandidatesService.ts; src/components/PhenoHuntAddCandidatesDialog.tsx; src/components/AddToPhenoHuntButton.tsx; src/pages/PhenoHuntWorkspace.tsx; src/pages/PlantDetail.tsx; src/test/pheno-hunt-add-candidates.test.ts; src/test/pheno-hunt-add-candidates-ui.test.tsx
 head_sha: de93327b0225eb0b58f28d27cebf70209cf06156 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
 historical_head_sha_2026_10_21: 4f50ef1363f434b8cf05976831c50788837afaeb (observed 2026-10-21 19:20 UTC, origin/claude/pheno-hunt-add-candidates)
@@ -170,7 +170,7 @@ goal: Make / the only home page: /welcome, /features and /demo 308 to /; sitemap
 branch: cursor/welcome-home-redirect-05d3
 historical_branch_2026_10_21: cursor/welcome-home-redirect-05d3
 base: verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2023 (draft)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2023 (open, not a draft, in the merge queue; observed 2026-10-26)
 files: 71 files; see the PR (Worker redirects, sitemap, llms.txt, verdantSeoContent.ts, appRouteManifest.ts, legal shell, tests)
 head_sha: 543e03308d29e626be743cc48e62cd1bdc691220 (GitHub PR head observed 2026-10-26T17:19:32.689322+00:00).
 historical_head_sha_2026_10_21: 543e03308d29e626be743cc48e62cd1bdc691220 (observed 2026-10-21 19:20 UTC, origin/cursor/welcome-home-redirect-05d3)

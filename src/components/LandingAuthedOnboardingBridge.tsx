@@ -30,8 +30,8 @@ import { isUuid } from "@/lib/isUuid";
  */
 export default function LandingAuthedOnboardingBridge() {
   const { grows, activeGrowId, loading: growsLoading } = useGrows();
-  const { data: tents = [], isLoading: tentsLoading } = useGrowTents();
-  const { data: plants = [], isLoading: plantsLoading } = useGrowPlants();
+  const { data: tents = [], isLoading: tentsLoading, isPending: tentsPending } = useGrowTents();
+  const { data: plants = [], isLoading: plantsLoading, isPending: plantsPending } = useGrowPlants();
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
@@ -46,8 +46,8 @@ export default function LandingAuthedOnboardingBridge() {
   const activationEvidence = useOneTentActivationEvidence(activationGraph);
   const countReady = isOnboardingBridgeCountReady({
     growsLoading,
-    tentsLoading,
-    plantsLoading,
+    tentsLoading: tentsPending || tentsLoading,
+    plantsLoading: plantsPending || plantsLoading,
     // Disabled queries remain pending. Only a queryable connected tent
     // contributes sensor evidence to this count.
     sensorReadPending: isUuid(activationGraph.tentId) && (sensorPending || sensorLoading),
@@ -76,7 +76,12 @@ export default function LandingAuthedOnboardingBridge() {
       data-testid="landing-authed-onboarding-bridge"
       className="mt-8 mx-auto max-w-xl rounded-2xl border border-primary/30 bg-primary/5 p-4 md:p-5"
     >
-      <div className="flex items-center justify-center mb-2">
+      <div
+        className="flex items-center justify-center mb-2"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {countReady ? (
           <OnboardingProgressPill vm={vm} />
         ) : (

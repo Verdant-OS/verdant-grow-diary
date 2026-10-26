@@ -79,16 +79,16 @@ branch: claude/onboarding-count-consistency
 base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
 checkout: Fetch this existing branch and base; verify the live PR full head and writer claim before adopting it in an isolated cloud worktree. Preserve child #2384 and use normal merges and pushes.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2291
-head_sha: ad18f7298871f37ef58bb4e6e525818da43b652a (remote source checkpoint verified before this repair; the resulting full head and observation time belong in the PR description).
+head_sha: a832255292cbd5c3e9e573419360e183fa6c3d90 (published initial repair, verified before this review follow-up; resulting full head and observation time belong in the current PR description).
 state: Local scoped repair and normal base integration; no hosted-CI or outside acceptance is inferred.
-current_step: New rendered regression failed four cases before repair and passed all six after it; 27 focused files / 270 tests passed with the integrated base. Existing tracked tests and child #2384 are unchanged by this repair.
+current_step: Initial evidence-readiness repair is published at a8322552 with 27 files / 270 passes. Review follow-up uses REAL core query hooks and offline onlineManager: new suite RED 3 failed / 1 passed; core pending fix leaves only the polite-status case failing; combined GREEN is 28 focused files / 274 tests passed. All existing tracked tests and child #2384 remain unchanged by this follow-up.
 next_action: Verify the resulting remote head, fresh named required/supplemental checks, and one eligible non-contributing outside full-scope review; preserve draft until owner-authorized readiness and queue gates are satisfied.
 post_merge_check: Verify the served version includes the merge and confirm the loading-to-exact-count transition using authorized QA; live authenticated behavior remains NOT_MEASURED until separately measured.
 active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only the bridge, readiness helper, new rendered regression, this block and matching PR metadata. No child #2384, ManualSensorReadingCard, Timeline, or unrelated writer scope.
-decisions: Wait for initial sensor pending/loading only when the connected tent is queryable; disabled queries must not hang a no-tent graph. Activation evidence loading is unresolved. Preserve optional/legacy loading-flag compatibility.
+decisions: Always-enabled tent/plant reads wait for isPending or isLoading, including an offline first read. Sensor pending/loading matters only for a queryable connected tent; disabled queries must not hang a no-tent graph. Activation evidence loading is unresolved. Preserve loading-flag fallback for mocks. Keep one persistent role=status, polite atomic region for loading and settled count.
 tried_and_rejected: Displaying a numeric count while an evidence source is unresolved; weakening existing assertions; treating disabled-query pending as an active read; claiming a queued workflow or writer test as independent acceptance.
 commands: node node_modules/vitest/vitest.mjs run src/test/landing-authed-onboarding-bridge-evidence-readiness.test.tsx --pool=forks --maxWorkers=1; node node_modules/typescript/bin/tsc --noEmit; node scripts/scorer-lock.mjs --report --base e18e067af80fcb3eb32b37f1e046fa725bba8a9d --strict; node scripts/assert-docs-safety.mjs; git diff --check.
-files_touched: src/components/LandingAuthedOnboardingBridge.tsx; src/lib/onboardingBridgeReadinessRules.ts; src/test/landing-authed-onboarding-bridge-evidence-readiness.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only). Normal base integration inherits existing approved base files unchanged.
+files_touched: src/components/LandingAuthedOnboardingBridge.tsx; src/lib/onboardingBridgeReadinessRules.ts; src/test/landing-authed-onboarding-bridge-evidence-readiness.test.tsx (initial repair, untouched in follow-up); src/test/landing-authed-onboarding-bridge-paused-core-reads.test.tsx (NEW follow-up); docs/agents/HANDOFF_LOG.md (this block only). Normal base integration inherits existing approved base files unchanged.
 files_remaining: None planned for this repair; respond to fresh findings within current approval fences.
 blockers: Fresh exact-head hosted checks and outside acceptance are pending. Codex repaired this PR and cannot independently accept it. No production action is authorized.
 open_questions: Actual available outside reviewer pickup after the current-head CI precheck.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED for the repaired head; old-head receipts remain histo
 session_state: Codex writer in isolated authorized cloud worktree; release and live behavior NOT_MEASURED.
 claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 18:32:05 UTC (matching PR claim).
 owner: Codex closeout coordinator for this bounded repair; outside reviewer and normal merge gates remain separate.
-last_updated: 2026-10-26 19:01 UTC, by Codex closeout coordinator
+last_updated: 2026-10-26 19:28 UTC, by Codex closeout coordinator
 ```
 
 ### PR-2345-BASE-INTEGRATION

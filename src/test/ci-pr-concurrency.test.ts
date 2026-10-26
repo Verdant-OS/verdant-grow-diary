@@ -122,15 +122,26 @@ describe("resolved PR workflow concurrency", () => {
         if (!Object.hasOwn(workflow.on, trigger)) continue;
         expect(workflow.on[trigger]?.["paths-ignore"], `${name} ${trigger}`).toEqual(docsOnlySkip);
       }
-      if (workflow.on.merge_group) {
-        expect(workflow.on.merge_group["paths-ignore"], name).toBeUndefined();
+      if (Object.hasOwn(workflow.on, "merge_group")) {
+        const config = workflow.on.merge_group ?? {};
+        expect(config, name).not.toHaveProperty("paths");
+        expect(config, name).not.toHaveProperty("paths-ignore");
       }
     }
-    const ci = readFileSync(resolve(workflowsDir, "ci.yml"), "utf8");
-    const security = readFileSync(resolve(workflowsDir, "security-regression.yml"), "utf8");
-    expect(ci).not.toMatch(/\n\s+paths-ignore:/);
-    expect(security).not.toMatch(/\n\s+paths-ignore:/);
   });
+
+  it.each(["ci.yml", "security-regression.yml"])(
+    "keeps the required triggers in %s free of path filters",
+    (name) => {
+      const workflow = readWorkflow(name);
+      for (const trigger of ["pull_request", "push", "merge_group"]) {
+        expect(workflow.on, name).toHaveProperty(trigger);
+        const config = workflow.on[trigger] ?? {};
+        expect(config, `${name} ${trigger}`).not.toHaveProperty("paths");
+        expect(config, `${name} ${trigger}`).not.toHaveProperty("paths-ignore");
+      }
+    },
+  );
 
   it("preserves all required CI contexts and their draft execution", () => {
     const ci = readWorkflow("ci.yml");

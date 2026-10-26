@@ -78,29 +78,29 @@ why: The original text-only guard missed a paths filter on required workflows; t
 branch: codex/pr2511-required-trigger-guards
 base: verdant-grow-diary at 234a215990e64fd1db7b025c9336ff2baac8840c (#2511 merge)
 checkout: git fetch origin codex/pr2511-required-trigger-guards verdant-grow-diary && git switch codex/pr2511-required-trigger-guards && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED - follow-up draft explicitly authorized by Matthew on 2026-10-26; opening follows this ownership checkpoint
-head_sha: NOT_MEASURED - starting commit 234a215990e64fd1db7b025c9336ff2baac8840c; read the resulting full remote head from the PR after the first push
-state: ownership checkpoint; one-file test repair local and unstaged; no workflow or application edit retained
-current_step: Preparing the authorized successor draft. Original #2511 merged externally at 2026-10-26T15:30:49Z. Its eight changed file blobs are identical at the merge and at original head 8be3e494d6840d8aab01f3b9d0b1338aeb7918c1.
-next_action: Push checkpoint and open the draft, then commit the test guard and refresh exact-head validation. Keep draft; no merge or production action.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2547 (draft; explicitly authorized by Matthew on 2026-10-26; keep draft)
+head_sha: 69a6543bc4a60d8bdb8cf57c0e649d8eeab1508f (pushed ownership checkpoint). This next commit adds the tested repair; read #2547 for its resulting full remote head and verify this checkpoint is its ancestor before resuming.
+state: test guard implemented and locally validated; draft #2547 opened from the pushed ownership checkpoint; next normal commit carries the repair and this refreshed handoff
+current_step: Required trigger tests parse YAML and reject paths/paths-ignore for push, pull_request and merge_group, including bare queue declarations. Original #2511 merged externally at 2026-10-26T15:30:49Z. Its eight changed file blobs are identical at the merge and at original head 8be3e494d6840d8aab01f3b9d0b1338aeb7918c1.
+next_action: Verify #2547's current full head and its required/supplemental CI. After green, route one eligible outside exact-head reviewer; Codex cannot accept its repair. Keep draft; no merge, ready/enqueue or deploy.
 post_merge_check: Run src/test/ci-pr-concurrency.test.ts on the resulting deploy head; any regression reopens this work with Codex. NOT_MEASURED until merged.
-active_writer: Codex in this chat, directly assigned by Matthew; no claim on another branch or workstream
+active_writer: Codex PR2511 follow-up coordinator, directly assigned by Matthew; no claim on another branch or workstream
 decisions: Preserve all workflow behavior; parse YAML using the existing loader; inspect all required event keys including bare merge_group; add only this handoff block beside the test fix.
-tried_and_rejected: The original regex guard passed four injected paths filters. The initial shared dependencies had router 1.170.18 below required ^1.170.41 and produced two getSsrStatus type errors; replaced only the isolated checkout's dependency junction with a successful frozen Bun 1.3.14 install. No manifest or lockfile changed. PowerShell has no bunx alias; use bun x or the installed Node CLI.
+tried_and_rejected: The original regex guard passed four injected paths filters. The initial shared dependencies had router 1.170.18 below required ^1.170.41 and produced two getSsrStatus type errors; replaced only the isolated checkout's dependency junction with a successful frozen Bun 1.3.14 install. No manifest or lockfile changed. Interrupted full typecheck runs have no final receipt. npm's npx launcher rejected the existing zod override (EOVERRIDE); the unchanged hook now uses the exact installed lint-staged CLI through an external task-local launcher, with all checks retained. A bunx executable alias supplies the hook's missing Windows launcher.
 commands: bun run typecheck; bun run typecheck:tsgo; bun x vitest run src/test/ci-pr-concurrency.test.ts src/test/dependency-security-ci-workflow.test.ts src/test/full-suite-pr-gate-workflow.test.ts src/test/workflow-branch-filter-liveness.test.ts src/test/knowledge-library-ci-wiring.test.ts src/test/v0-operating-loop-contract.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts --reporter=dot; node scripts/scorer-lock.mjs --report --strict --base 234a215990e64fd1db7b025c9336ff2baac8840c; git diff --check
 files_touched: src/test/ci-pr-concurrency.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
-files_remaining: Commit the local test fix and update this block after draft creation; no app/workflow/schema changes planned
-blockers: Eligible independent outside acceptance NOT_MEASURED; Codex repaired this work and cannot accept it. Initial stale-dependency typecheck failure retained; clean-install validation running. New-head CI not inherited from #2511.
+files_remaining: none planned after this repair commit; any reviewer finding needs a scoped fix and fresh exact-head review
+blockers: Eligible independent outside acceptance NOT_MEASURED; Codex repaired this work and cannot accept it. New-head required/supplemental CI is NOT_MEASURED until read back after this push; #2511 results do not transfer. Public resume/claim comments remain outside the authorized transport scope.
 open_questions: Exact-head required and supplemental check results after push; available eligible independent reviewer session
 gotchas: Preserve #2086's separate 35-to-36-context pin. Refreshed 122-open collision audit found no competing trigger-guard repair; 27 HANDOFF_LOG PRs touch separate blocks. Do not recreate #2511's retired branch.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2511
-artifacts: Preliminary local six-file run 57 PASS / 0 FAIL / 0 SKIP and separate docs safety 67 PASS / 0 FAIL / 0 SKIP; actionlint 1.7.7 passed seven original workflows. Repaired guards rejected 12/12 injected filters; original guard missed four paths cases. Temporary workflow edits restored byte-for-byte. Re-run final successor with the frozen installation.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2547 ; predecessor https://github.com/Verdant-OS/verdant-grow-diary/pull/2511
+artifacts: Frozen-install final local run: seven files, 124 PASS / 0 FAIL / 0 SKIP. Native typecheck bun run typecheck:tsgo PASS, exit 0 / zero diagnostics. Scoped ESLint, two-file Prettier, whitespace, contract resolution, docs safety and release docs safety PASS. Strict scorer report against base passed with exactly one declared strengthened scorer. Checkpoint pre-commit passed all unchanged hook checks and docs regression 67/67 (overlaps the 124, not additional unique tests). actionlint 1.7.7 passed seven unchanged original workflows. Repaired guards rejected 12/12 injected filters; original guard missed four paths cases; workflow bytes restored. Full local suite/build and production smoke NOT_MEASURED.
 reviewer_seat: NOT_MEASURED - one actually available eligible non-contributing Claude/Grok session or Durban Poison under OWNERSHIP.md section 4.3; no request sent
 reviewer_sha: NOT_MEASURED - no eligible exact-head PASS
-session_state: Codex coordinator and read-only audit helpers; no automation or hosted dispatch created; no pending human decision
+session_state: Codex coordinator with completed read-only QA/collision helpers; no automation, hosted dispatch or reviewer request created; no pending human decision
 claimed_by: Codex by Matthew's direct task assignment and explicit follow-up draft authorization on 2026-10-26; no public claim comment posted
 owner: Codex PR2511 follow-up session; no retirement or transfer
-last_updated: 2026-10-26 10:55 CT, by Codex
+last_updated: 2026-10-26 13:18 CT, by Codex
 limits: Test and handoff only. No GitHub comments, merge, ready/enqueue, publish/deploy, SQL/APPLY, secrets, dependency manifest/lockfile edits, auth, RLS, Edge, Action Queue or device changes.
 ```
 

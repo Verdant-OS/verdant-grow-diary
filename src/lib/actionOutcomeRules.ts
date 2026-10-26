@@ -87,7 +87,7 @@ export type OutcomeDraftResult =
 // Default notes (conservative, grower-recorded text only)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_NOTES: Record<OutcomeStatus, string> = {
+export const ACTION_OUTCOME_DEFAULT_NOTES: Readonly<Record<OutcomeStatus, string>> = {
   improved: "Grower recorded this action as improved after follow-up.",
   unchanged: "Grower recorded no clear change after follow-up.",
   worsened: "Grower recorded the condition as worsened after follow-up.",
@@ -149,7 +149,7 @@ export function buildActionOutcomeDiaryDraft(
   }
 
   const growerNote = nonEmptyString(grower.note);
-  const note = growerNote ?? DEFAULT_NOTES[outcomeStatus];
+  const note = growerNote ?? ACTION_OUTCOME_DEFAULT_NOTES[outcomeStatus];
 
   const metric = nonEmptyString(action.target_metric);
   const suggested = nonEmptyString(action.suggested_change);

@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import { QUICK_LOG_MANUAL_READINGS_NOTE } from "@/constants/quickLogGeneratedNoteCopy";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
   buildManualSensorSnapshot,
@@ -139,7 +140,7 @@ function buildTimelineNote(rawNote: string, hasPhoto: boolean, hasManualReadings
   const note = rawNote.trim();
   if (note) return note;
   if (hasPhoto) return "Photo attached from Quick Log.";
-  if (hasManualReadings) return "Manual readings captured from Quick Log.";
+  if (hasManualReadings) return QUICK_LOG_MANUAL_READINGS_NOTE;
   return "";
 }
 

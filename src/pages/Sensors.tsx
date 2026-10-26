@@ -693,14 +693,18 @@ export default function Sensors() {
                   <GrowDataSourceBadge classification={metricClassification} />
                 )}
               </div>
-              {state.showChart ? (
+              {state.showChart && metricReadings.length > 0 ? (
                 <SensorChart data={metricReadings} metric={m.key} height={200} />
               ) : (
                 <p
                   className="text-xs text-muted-foreground py-6 text-center"
                   data-testid={`sensors-empty-${m.key}`}
                 >
-                  {unresolvedManualMetric ? manualHistoryMessage : state.message}
+                  {unresolvedManualMetric || (isDerived && manualHistoryIncomplete)
+                    ? manualHistoryMessage
+                    : isDerived && state.kind === "derived"
+                      ? "No recorded VPD history to chart yet. The value below is calculated from temperature and humidity."
+                      : state.message}
                 </p>
               )}
               {m.key === "vpd" && isDerived && (

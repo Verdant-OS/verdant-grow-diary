@@ -157,11 +157,7 @@ describe("static public SEO documents", () => {
           }),
         ]),
       );
-      const hiddenFromSearch =
-        document.path === "/creator-beta" || document.path === "/breeder-beta";
-      expect(document.metadata.robots ?? "index, follow").toBe(
-        hiddenFromSearch ? "noindex, follow" : "index, follow",
-      );
+      expect(document.metadata.robots ?? "index, follow").toBe("index, follow");
     }
 
     const cultivarCanonical = STATIC_PUBLIC_SEO_DOCUMENTS.find(

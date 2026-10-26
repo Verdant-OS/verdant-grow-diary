@@ -17,7 +17,6 @@ export default function CreatorBeta() {
     description:
       "Controlled beta for growers, breeders, and educators. Logs, photos, sensors, and phenotype notes become one plant history.",
     path: "/creator-beta",
-    noindex: true,
   });
 
   return (

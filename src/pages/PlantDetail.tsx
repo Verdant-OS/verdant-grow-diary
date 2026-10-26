@@ -112,6 +112,7 @@ import {
 } from "@/lib/plantDetailBlockedStateViewModel";
 import { useSearchParams } from "@/lib/react-router-compat";
 import { PlantMemoryEpisodesSection } from "@/components/PlantMemoryEpisodesSection";
+import { normalizePlantHealth, plantHealthStatusLabel } from "@/lib/plantHealthRules";
 
 function BlockedStateBackLink({ action }: { action: PlantDetailBlockedStateAction }) {
   return (
@@ -715,7 +716,14 @@ export default function PlantDetail() {
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Health</div>
-                <div className="capitalize">{plant.health}</div>
+                <div
+                  data-testid="plant-detail-health"
+                  className={
+                    normalizePlantHealth(plant.health) === "unknown" ? undefined : "capitalize"
+                  }
+                >
+                  {plantHealthStatusLabel(plant.health)}
+                </div>
               </div>
             </div>
             <div className="min-w-0">

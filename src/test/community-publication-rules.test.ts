@@ -14,7 +14,7 @@ const entry = (overrides: Partial<PublicationDraft> = {}): PublicationDraft => (
   sourceEntryHandle: "entry-1",
   sourceRevision: "rev-1",
   sourceJournalLabel: "Tent A journal",
-  occurredAt: "2026-10-01T12:00:00Z",
+  occurredDate: "2026-10-01",
   action: "watering",
   note: "Watered to runoff.",
   stage: null,
@@ -151,12 +151,12 @@ describe("validatePublicationDrafts", () => {
     ).toBe(false);
   });
 
-  it("rejects an entry without a source handle, revision, action or valid time", () => {
+  it("rejects an entry without a source handle, revision, action or valid date", () => {
     for (const bad of [
       entry({ sourceEntryHandle: "" }),
       entry({ sourceRevision: " " }),
       entry({ action: "" }),
-      entry({ occurredAt: "not-a-time" }),
+      entry({ occurredDate: "not-a-date" }),
       entry({ stage: "  " }),
       entry({ mediaRevisionHandle: "" }),
     ]) {
@@ -178,12 +178,35 @@ describe("validatePublicationDrafts", () => {
     }
   });
 
-  it("rejects an occurredAt without Z or an offset, or on an impossible date", () => {
-    for (const occurredAt of ["2026-10-01T12:00:00", "2026-02-30T12:00:00Z"]) {
-      expect(validatePublicationDrafts([entry({ occurredAt })], "publish")).toEqual({
+  it("rejects an occurredDate that carries a time of day or is not a real calendar date", () => {
+    for (const occurredDate of [
+      "2026-10-01T12:00:00Z",
+      "2026-10-01T00:00:00",
+      "2026-10-01 ",
+      "2026-10-1",
+      "20261001",
+      "2026-02-30",
+      "2026-13-01",
+      "2027-02-29",
+      "0099-01-01",
+    ]) {
+      expect(validatePublicationDrafts([entry({ occurredDate })], "publish")).toEqual({
         ok: false,
         code: "invalid",
       });
+    }
+  });
+
+  it("accepts an unselected date (null) and a real calendar date, including a leap day", () => {
+    for (const occurredDate of [null, "2028-02-29", "2026-12-31"]) {
+      expect(validatePublicationDrafts([entry({ occurredDate })], "publish").ok).toBe(true);
+    }
+  });
+
+  it("returns invalid instead of throwing when an untrusted draft omits or mistypes the date", () => {
+    for (const occurredDate of [undefined, 20261001, {}]) {
+      const bad = { ...entry(), occurredDate } as unknown as PublicationDraft;
+      expect(validatePublicationDrafts([bad], "publish")).toEqual({ ok: false, code: "invalid" });
     }
   });
 

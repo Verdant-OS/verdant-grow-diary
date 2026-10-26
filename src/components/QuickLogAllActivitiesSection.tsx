@@ -183,6 +183,8 @@ export interface QuickLogAllActivitiesSectionProps {
   reviewedStarterHandoffKey?: string | null;
   /** Fires only after persistence confirms success. */
   onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void;
+  /** Reports whether a selected photo is waiting for this section's own Save. */
+  onPendingPhotoChange?: (pending: boolean) => void;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -297,6 +299,7 @@ export default function QuickLogAllActivitiesSection({
   requestedNote = null,
   reviewedStarterHandoffKey = null,
   onSaveSuccess,
+  onPendingPhotoChange,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -325,6 +328,18 @@ export default function QuickLogAllActivitiesSection({
   // bucket; the diary row's photo_url column carries the bare storage path.
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const photoContentGenerationRef = useRef(0);
+  // A chosen PNG is still pending while its signature is read; photoFile stays
+  // null until that check passes, so track the read separately.
+  const [photoValidating, setPhotoValidating] = useState(false);
+  // Only the Photo activity can save a chosen photo. Switching to another
+  // activity hides the Photo editor without clearing it, so a photo left there
+  // must not hold the dialog's Save log behind a section the grower can't see.
+  const hasPendingPhoto = selected?.id === "photo" && (photoFile !== null || photoValidating);
+  useEffect(() => {
+    if (!onPendingPhotoChange) return;
+    onPendingPhotoChange(hasPendingPhoto);
+    return () => onPendingPhotoChange(false);
+  }, [hasPendingPhoto, onPendingPhotoChange]);
   // A lost diary-insert response cannot prove the uploaded object is orphaned.
   // Keep the object and lock only the exact grow/tent/plant target that owns
   // the uncertain write. A target switch must not disable a different plant's
@@ -609,6 +624,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     photoContentGenerationRef.current += 1;
+    setPhotoValidating(false);
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
@@ -644,6 +660,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     photoContentGenerationRef.current += 1;
+    setPhotoValidating(false);
     setPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
       setSelectedDraft(null);
@@ -787,6 +804,7 @@ export default function QuickLogAllActivitiesSection({
       setDetailValues({});
       envCheckTempEntryUnitRef.current = null;
       photoContentGenerationRef.current += 1;
+      setPhotoValidating(false);
       setPhotoFile(null);
     },
     [
@@ -1475,6 +1493,7 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
         photoContentGenerationRef.current += 1;
+        setPhotoValidating(false);
         setPhotoFile(null);
         setSelectedDraft(null);
         setErrorReason(null);
@@ -1891,12 +1910,14 @@ export default function QuickLogAllActivitiesSection({
                       const file = e.target.files?.[0] ?? null;
                       if (!file) {
                         photoContentGenerationRef.current += 1;
+                        setPhotoValidating(false);
                         setPhotoFile(null);
                         return;
                       }
                       const check = validatePlantProfilePhotoFile(file);
                       if (!check.ok) {
                         photoContentGenerationRef.current += 1;
+                        setPhotoValidating(false);
                         const failure = check as { ok: false; message: string };
                         setPhotoFile(null);
                         setErrorReason(failure.message);
@@ -1905,6 +1926,7 @@ export default function QuickLogAllActivitiesSection({
                       }
                       if (!fileClaimsPng(file)) {
                         photoContentGenerationRef.current += 1;
+                        setPhotoValidating(false);
                         setErrorReason(null);
                         setErrorForActivity(null);
                         setPhotoFile(file);
@@ -1912,12 +1934,14 @@ export default function QuickLogAllActivitiesSection({
                       }
                       const generation = photoContentGenerationRef.current + 1;
                       photoContentGenerationRef.current = generation;
+                      setPhotoValidating(true);
                       setPhotoFile(null);
                       setErrorReason(null);
                       setErrorForActivity(null);
                       void validateQuickLogPngClaim(file).then(
                         (content) => {
                           if (generation !== photoContentGenerationRef.current) return;
+                          setPhotoValidating(false);
                           if (!content.ok) {
                             setPhotoFile(null);
                             setErrorReason(content.message);
@@ -1930,6 +1954,7 @@ export default function QuickLogAllActivitiesSection({
                         },
                         () => {
                           if (generation !== photoContentGenerationRef.current) return;
+                          setPhotoValidating(false);
                           setPhotoFile(null);
                           setErrorReason("That photo could not be read. Try a different file.");
                           setErrorForActivity("photo");
@@ -2179,6 +2204,7 @@ export default function QuickLogAllActivitiesSection({
                   onClick={() => {
                     if (isMutationBlocked()) return;
                     photoContentGenerationRef.current += 1;
+                    setPhotoValidating(false);
                     setPhotoFile(null);
                     setSelectedDraft(null);
                     setNote("");

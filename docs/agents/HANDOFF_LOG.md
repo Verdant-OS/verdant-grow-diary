@@ -78,7 +78,11 @@ why: Live checkout code existed only on the closed #2497 branch. The release hol
 branch: cursor/live-checkout-2497-rebase-c00d
 base: verdant-grow-diary
 claimed_by: Cursor Grok cloud agent, 2026-10-26
-resume here: draft PR only. Do not merge, deploy, set secrets, register webhooks, or lift the release hold. claude/* branches are untouched. Shard 13/20 failed because sellable-tier-chain and get-paddle-price-craft-env-fail-closed still scanned the inline SERVER_PRICE_CONFIG object. Those pins now follow the pure catalog helper.
+resume here: draft PR only. Do not merge, deploy, set secrets, register webhooks, or lift the release hold. claude/* branches are untouched. Shard 13/20 failed because sellable-tier-chain and get-paddle-price-craft-env-fail-closed still scanned the inline SERVER_PRICE_CONFIG object. Those pins now follow the pure catalog helper. Shard 9 ci-pr-concurrency failed because .github/workflows/checkout-disabled-rollback-artifact.yml is a pull_request workflow with no concurrency group and no ready_for_review type. That file now uses the standard per-PR concurrency group with cancel-in-progress, and pull_request types include ready_for_review. The job still builds only with VITE_CHECKOUT_DISABLED=true and does not deploy. Latest verdant-grow-diary (e18e067af) was merged; no rebase, no force-push, bun.lock untouched.
+current_step: workflow concurrency fix plus base merge; local tests still to confirm before the stop
+next_action: Confirm origin head after the workflow push, then read required CI at that SHA. Pending is not a pass. Keep the PR draft. Release hold stays.
+files_touched: .github/workflows/checkout-disabled-rollback-artifact.yml; docs/agents/HANDOFF_LOG.md; plus the earlier live-checkout replay files
+last_updated: 2026-10-26 15:15 CT, by Cursor Grok cloud agent
 ```
 
 ### PR-2345-BASE-INTEGRATION

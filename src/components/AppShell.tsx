@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useManualSensorCorrectionRefresh } from "@/hooks/useManualSensorCorrectionRefresh";
 import { useHydrated } from "@/hooks/useHydrated";
+import { useSearchShortcut } from "@/hooks/useSearchShortcut";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   buildSignedOutRedirect,
@@ -24,6 +25,7 @@ import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
 import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
+import SearchShortcutHint from "./SearchShortcutHint";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
 import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
@@ -36,6 +38,7 @@ import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import {
   QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
   QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
+  mobileShellToastOffsetCss,
 } from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -162,26 +165,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     entitlement.effectivePlanId !== "free";
   useCheckoutReturnCompletionTracking(paidDestinationReady);
 
-  // Global ⌘K / Ctrl+K shortcut to open the search palette. Guarded so
-  // it does not steal keystrokes while the grower is typing in an input,
-  // textarea, or contenteditable surface.
-  useEffect(() => {
-    function isTypingTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      if (target.isContentEditable) return true;
-      const tag = target.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-    }
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        if (isTypingTarget(e.target)) return;
-        e.preventDefault();
-        setSearchOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useSearchShortcut(setSearchOpen);
 
   useEffect(() => {
     function onOpenV2(event: Event) {
@@ -290,7 +274,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // Also wait for useRequireAuth (getUser) before mounting protected children
   // (#588): a stale cached session must not let pageContent fire authenticated
   // REST calls until the auth server revalidation settles.
-  if (!hydrated || loading || authStatus === "loading")
+  // A failed revalidation skips the wait for auth, never the hydration render.
+  if (
+    (!hydrated || loading || authStatus === "loading") &&
+    (!hydrated || authStatus !== "revalidation_failed")
+  )
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
@@ -351,6 +339,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         />
         <a
           href="#main-content"
+          onClick={(event) => {
+            // A hash change alone leaves focus on BODY under the router, so
+            // the next Tab restarts at this link. Move focus into main.
+            const main = document.getElementById("main-content");
+            if (!main) return;
+            event.preventDefault();
+            main.focus();
+          }}
           className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Skip to main content
@@ -382,7 +378,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   <Search className="h-4 w-4" />
                   <span className="hidden lg:inline">Search…</span>
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">
-                    ⌘K
+                    <SearchShortcutHint />
                   </kbd>
                 </button>
                 {/* Mobile-reachable search entry: the ⌘K composite button
@@ -465,6 +461,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             </footer>
           </main>
         </div>
+
+        {/* Only while this shell (and its bottom nav) is mounted, and only below md. */}
+        <style data-testid="mobile-shell-toast-offset">{mobileShellToastOffsetCss()}</style>
 
         {/* Mobile floating + — same QuickLogV2 entry as header/+ */}
         <button

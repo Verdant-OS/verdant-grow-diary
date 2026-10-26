@@ -11,6 +11,7 @@ import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import { hasQuickLogMaturityEvidence } from "./quickLogMaturityEvidenceRules";
 import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEvidenceRules";
 import { buildManualSensorProvenance } from "./manualSensorProvenanceRules";
+import { assessWaterVolumeText } from "./quickLogWaterVolumeWarningRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -93,11 +94,13 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
 
   let volume: number | null = null;
   if (action === "water") {
-    const v = parseOptionalNumber(input.volumeMl);
-    if (v === "invalid" || v === null || v <= 0) {
-      return { ok: false, reason: "invalid_volume" };
-    }
-    volume = v;
+    // Same exact raw-text assessment as the Water form and legacy adapter: the
+    // 50,000 ml ceiling is compared before Number() can round an entry such as
+    // "50000.000000000001" down to an accepted 50000.
+    const assessed = assessWaterVolumeText(input.volumeMl);
+    if (assessed.status === "too_large") return { ok: false, reason: "volume_too_large" };
+    if (assessed.status !== "valid") return { ok: false, reason: "invalid_volume" };
+    volume = assessed.volumeMl;
   }
 
   const t = parseOptionalNumber(input.temperatureC);

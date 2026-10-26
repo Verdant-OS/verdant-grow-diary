@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 const WEBHOOK = read("supabase/functions/paddle-webhook/index.ts");
-const VERIFIER = read("supabase/functions/paddle-webhook/verifyPaddleSignature.ts");
+const VERIFIER = read("supabase/functions/_shared/verifyPaddleSignature.ts");
 const MIGRATION = read(
   "supabase/migrations/20260714230000_paddle_paid_launch_ordering_and_founder.sql",
 );

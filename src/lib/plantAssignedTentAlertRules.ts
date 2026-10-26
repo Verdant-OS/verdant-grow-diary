@@ -11,6 +11,7 @@
  */
 
 import type { AlertRow, AlertSeverityRow, AlertStatusRow } from "@/lib/alerts";
+import { ACTIVE_ALERT_STATUSES } from "@/lib/alertActiveStatusRules";
 
 export interface PlantAssignedTentAlertRow {
   id: string;
@@ -55,7 +56,7 @@ const SEVERITY_LABEL: Record<AlertSeverityRow, string> = {
  * in two places independently is what made the `acknowledged` branch below
  * unreachable in the running app.
  */
-export const ASSIGNED_TENT_ALERT_STATUSES: readonly AlertStatusRow[] = ["open", "acknowledged"];
+export const ASSIGNED_TENT_ALERT_STATUSES: readonly AlertStatusRow[] = ACTIVE_ALERT_STATUSES;
 
 function isActive(status: AlertStatusRow): boolean {
   return ASSIGNED_TENT_ALERT_STATUSES.includes(status);

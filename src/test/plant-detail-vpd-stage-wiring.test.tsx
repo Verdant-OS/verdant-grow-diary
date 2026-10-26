@@ -25,6 +25,19 @@ vi.mock("@/hooks/usePlantTentLatestReadings", () => ({
   usePlantTentLatestReadings: vi.fn(),
 }));
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
+// The panel also reads Quick Log manual grow_events (#2115); settle that read
+// with no rows so these checks still see only the slice above.
+vi.mock("@/hooks/usePlantManualEnvironmentReadings", () => ({
+  usePlantManualEnvironmentReadings: () => ({
+    data: [],
+    isError: false,
+    isPending: false,
+    isLoading: false,
+    isFetching: false,
+    fetchStatus: "idle",
+    refetch: () => Promise.resolve(),
+  }),
+}));
 
 const ROOT = resolve(__dirname, "../..");
 const PANEL_SRC = readFileSync(

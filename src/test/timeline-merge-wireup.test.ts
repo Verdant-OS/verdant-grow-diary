@@ -171,8 +171,15 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
   });
 
   it("feeds the merged read stream into both root-zone history panels", () => {
-    expect(TIMELINE_SRC).toMatch(/<WateringHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
-    expect(TIMELINE_SRC).toMatch(/<FeedingHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
+    // Scoped to the Timeline plant/tent filter (filming bug #3); the scoped
+    // feed is derived from the same merged stream.
+    expect(TIMELINE_SRC).toMatch(
+      /<WateringHistoryPanel\s+rawEntries=\{scopedRecentLaneRawEntries\}/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /<FeedingHistoryPanel\s+rawEntries=\{scopedRecentLaneRawEntries\}/,
+    );
+    expect(TIMELINE_SRC).toMatch(/scopeTimelineQuickLogLaneRows\(recentLaneRawEntries,/);
   });
 
   it("derives anchor reservations from the post-filter diary page slice", () => {

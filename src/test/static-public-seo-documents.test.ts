@@ -38,6 +38,7 @@ describe("static public SEO documents", () => {
       "/pricing",
       "/guides",
       "/guides/grow-stage-care-guide",
+      "/guides/athena-feed-chart-log",
       "/cultivars",
       "/tools/grow-help-toolkit",
       "/tools/vpd-calculator",

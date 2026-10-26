@@ -231,6 +231,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",
   },
+  {
+    path: "/guides/athena-feed-chart-log",
+    access: "public",
+    description: "Public planned-vs-actual Athena feed log. In-memory only.",
+  },
   { path: "/hardware-integrations", access: "public" },
   { path: "/health", access: "auth", description: "Authenticated app health page." },
   {

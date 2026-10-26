@@ -79,7 +79,7 @@ branch: cursor/public-seo-audit-fixes-0b51
 base: verdant-grow-diary
 checkout: git fetch origin cursor/public-seo-audit-fixes-0b51 verdant-grow-diary && git switch cursor/public-seo-audit-fixes-0b51 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: draft; read the PR URL from GitHub after the first push
-head_sha: read origin/cursor/public-seo-audit-fixes-0b51 after push
+head_sha: ef9c6e3754e8cdac950a7ec31500a0f934ac2d6d
 state: implemented locally, draft after push
 current_step: Article JSON-LD is emitted for every VERDANT_SEO_GUIDES page and the grow-stage care guide. datePublished is included only when publishedOn exists. Organization logo on the root graph is an ImageObject. IndexNow is a public key file plus scripts/indexnow-submit.mjs, which does not call the network unless INDEXNOW_SUBMIT=1. /creator-beta stays in the sitemap and is not newly linked.
 next_action: Keep the PR draft. Do not merge, enqueue, or deploy. Enable IndexNow only after this commit is live by running INDEXNOW_SUBMIT=1 node scripts/indexnow-submit.mjs. Cheeko decides whether /creator-beta should gain an internal link or be noindexed.

@@ -31,8 +31,9 @@ const replacedGroups = [
   "core-link-form-census.yml",
   "irrigation-evidence-gate.yml",
   "google-analytics-e2e.yml",
-  "typecheck-build-push.yml",
 ] as const;
+
+const docsOnlySkip = ["**/*.md", "docs/**"];
 
 // Non-required, non-security PR workflows that wait for ready_for_review instead of
 // running on every draft push. ci.yml, security-regression.yml and the mustBeGreen
@@ -95,6 +96,40 @@ describe("resolved PR workflow concurrency", () => {
     for (const name of draftSkippedWorkflows) {
       for (const job of Object.values(readWorkflow(name).jobs)) expect(job.if).toBe(skipDraftPr);
     }
+  });
+
+  it("cancels superseded feature-branch pushes of the non-required tsgo build", () => {
+    expect(readWorkflow("typecheck-build-push.yml").concurrency).toEqual({
+      group: "${{ github.workflow }}-${{ github.ref }}",
+      "cancel-in-progress":
+        "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/verdant-grow-diary' && github.ref != 'refs/heads/main') }}",
+    });
+  });
+
+  it("skips docs-only diffs on duplicate non-required workflows", () => {
+    for (const name of [
+      "lint.yml",
+      "typecheck.yml",
+      "typecheck-build-push.yml",
+      "dependency-security-ci.yml",
+      "vitest-full-suite-pr-gate.yml",
+    ]) {
+      const text = readFileSync(resolve(workflowsDir, name), "utf8");
+      const workflow = load(text) as {
+        on: Record<string, { "paths-ignore"?: string[] } | null>;
+      };
+      for (const trigger of ["pull_request", "push"] as const) {
+        if (!Object.hasOwn(workflow.on, trigger)) continue;
+        expect(workflow.on[trigger]?.["paths-ignore"], `${name} ${trigger}`).toEqual(docsOnlySkip);
+      }
+      if (workflow.on.merge_group) {
+        expect(workflow.on.merge_group["paths-ignore"], name).toBeUndefined();
+      }
+    }
+    const ci = readFileSync(resolve(workflowsDir, "ci.yml"), "utf8");
+    const security = readFileSync(resolve(workflowsDir, "security-regression.yml"), "utf8");
+    expect(ci).not.toMatch(/\n\s+paths-ignore:/);
+    expect(security).not.toMatch(/\n\s+paths-ignore:/);
   });
 
   it("preserves all required CI contexts and their draft execution", () => {

@@ -1145,7 +1145,7 @@ export default function DailyCheck() {
                 onSaved={() => handleSubmitSuccess("sensor")}
               />
               <p className="mt-2 min-w-0 break-words text-[11px] text-muted-foreground">
-                Saved as <strong>manual</strong>, not live sensor data.{" "}
+                Saved as <strong>manual</strong>, not live sensor data. Saved display preference:{" "}
                 {dailyCheckManualSnapshotUnitNote(temperatureUnit)}
               </p>
               <div className="mt-3 flex min-w-0 gap-2">

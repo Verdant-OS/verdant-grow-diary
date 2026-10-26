@@ -48,6 +48,7 @@ import {
   QUICKLOG_RETRACTION_REASON_CHIPS,
   QUICKLOG_REVISION_NOTE_MAX_LENGTH,
   QUICKLOG_REVISION_REASON_LABELS,
+  quickLogCorrectionEnvironmentCheckReadingsNote,
   quickLogRevisionFailureCopy,
   type QuickLogCorrectionChanges,
   type QuickLogCorrectionSensorValues,
@@ -71,6 +72,8 @@ export interface QuickLogEntryIntegrityControlsProps {
   currentPlantId?: string | null;
   /** Volume, dose, or sensor values for this entry type. Omitted for other types. */
   correctionValues?: QuickLogCorrectionValueContext | null;
+  /** Saved `details`; Environment checks get a note on readings the dialog has no field for. */
+  environmentCheckDetails?: unknown;
   /** Invalidation scope (best-effort; broad prefixes are used regardless). */
   plantId?: string | null;
   tentId?: string | null;
@@ -202,6 +205,7 @@ function RevisionControls({
   currentOccurredAt,
   currentPlantId,
   correctionValues,
+  environmentCheckDetails,
   plantId,
   tentId,
   growId,
@@ -223,6 +227,9 @@ function RevisionControls({
   const editsSensor =
     correctionValues?.kind === "sensor" ||
     (correctionValues?.kind === "watering" && correctionValues.sensor != null);
+  const readingsNote = quickLogCorrectionEnvironmentCheckReadingsNote(environmentCheckDetails, {
+    offersAirReadingFields: editsSensor,
+  });
   const [volumeDraft, setVolumeDraft] = useState<string>(volumeDraftFrom(correctionValues));
   const [doseDraft, setDoseDraft] = useState<string>(
     correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
@@ -478,6 +485,14 @@ function RevisionControls({
                   className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
                 />
               </label>
+            )}
+            {readingsNote && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="quicklog-correct-readings-note"
+              >
+                {readingsNote}
+              </p>
             )}
             {editsSensor && (
               <div className="space-y-2">

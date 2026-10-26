@@ -114,7 +114,7 @@ Add a one-line load-bearing comment on the wrapper, in the style of the `__root.
 
 ## 5. Change list (one commit)
 
-### 5.1 Production — `src/pages/Dashboard.tsx` (route to **Blue Dream**)
+### 5.1 Production — `src/pages/Dashboard.tsx` (eligible independent UI review)
 
 1. Delete the `<Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">…</Button>`
    block (lines 509-515 at `a980489a`) and its comment.
@@ -131,7 +131,7 @@ E1 handoff (`control: "dashboard-ready"`, `toBeEnabled()` stays) is posted on #1
 (issuecomment-5935387971) and carried forward to #1849 (issuecomment-5936685946). The
 owner of #1849 acknowledged it. The edit itself is in §5.2 once #1849 has landed.
 
-### 5.2 E2E (route to **Critical Mass**)
+### 5.2 E2E (eligible independent E2E review)
 
 | Spec                                                                        | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -248,10 +248,11 @@ show GREEN.
 5. Diff touches only: `Dashboard.tsx`, the e2e specs E2–E4 (plus E1 once #1849 has landed), U1–U4, the new test,
    the D1.1-A pins in §5.4 if chosen, and `AppShell.tsx` only under D1.2-B. No route,
    schema, RLS, auth, edge-function, migration, dependency or copy-constant change.
-6. Reviewers: Blue Dream (`Dashboard.tsx`), Critical Mass (tests/e2e). The owner does not
-   self-review. The merge-queue owner merges only after 35/35 required checks and an
-   independent PASS on the exact head. OWNERSHIP.md §2 names that role Chemdawg; per
-   `docs/agents/CURRENT_STATE.md` §Start here, Grok 91 holds it in current practice.
+6. Route the complete scope to one actually available eligible non-contributing independent
+   session under OWNERSHIP.md §4.3, including UI and E2E coverage and all contributor exclusions.
+   Codex cannot accept work Codex authored or repaired. The current assigned merge-queue owner
+   acts only after 35/35 required checks, applicable supplemental evidence and an independent
+   exact-head PASS; named protected-file, product and production holds remain.
 
 ---
 
@@ -300,11 +301,9 @@ that was wrong (finding on #1844, comment 4158072653).
 
 ## 9. Handoff
 
-- **Owner (implementation):** Claude, per user assignment 2026-10-01, once §1 clears.
-- **Independent reviewers:** Blue Dream (`.tsx`), Critical Mass (tests, e2e).
+- **Historical implementation owner:** Claude, assigned 2026-10-01. The landed #1844 implementation and its dated decisions remain history. Matthew reassigned this #1934 docs/helper closeout to Codex on 2026-10-26 20:50 UTC with Claude stopped; no new Dashboard implementation or test unlock is granted.
+- **Independent review:** one actually available eligible non-contributing session covering the full current PR under OWNERSHIP.md §4.3. Preserve earlier contributors and exclude this Codex repair team; historical reviewer mentions are not future requests.
 - **Coordination:** #1849's owner (a Claude session, reassigned from Codex 2026-10-01). E1 is
   handled by this slice after #1849 lands; acknowledged in issuecomment-5936713821.
 - **Routing and product calls:** GDP (D1.1 and D1.2 blocking; D1.3 and D2 non-blocking).
-- **Merge:** the merge-queue owner (Chemdawg in OWNERSHIP.md; Grok 91 in current practice per
-  CURRENT_STATE.md §Start here), after 35/35 required checks and an independent PASS on the exact
-  head; no auto-merge.
+- **Merge:** the currently assigned merge-queue owner, through the normal protected queue only after all 35 required checks, applicable supplemental evidence, clean independent exact-head acceptance and holds. An eligible exact-head queue request may wait for merge-group validation; do not bypass protections or treat an earlier review as current. This specification grants no merge or deployment authority.

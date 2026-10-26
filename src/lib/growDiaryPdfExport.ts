@@ -11,13 +11,17 @@
  *    device control, no schema/RLS/Edge changes.
  *  - Never invents chart data — falls back to a summary table and
  *    explicitly states that charts were unavailable.
- *  - Sensor `source` labels are preserved verbatim. `stale`, `invalid`,
- *    and `demo` are flagged and never summarized as "healthy".
+ *  - Sensor `source` labels are the canonical six (live, manual, csv, demo,
+ *    stale, invalid) via resolveSensorSourceDisplayCanon. Bridge / vendor
+ *    tokens are shown only as separate provenance, never as the Source
+ *    label. `stale`, `invalid`, and `demo` are flagged and never
+ *    summarized as "healthy".
  *  - Does not render raw payloads, tokens, secrets, or internal IDs.
  */
 
 import type { CountValue } from "@/lib/growStatus";
 import type { RecentItem } from "@/lib/growStatus";
+import { resolveSensorSourceDisplayCanon } from "@/lib/sensorSourceDisplayCanon";
 
 /** Minimal grow context accepted by the PDF builder. */
 export interface GrowDiaryPdfGrowContext {
@@ -79,6 +83,8 @@ export interface GrowDiaryPdfModel {
     count: number;
     healthy: boolean;
     note: string;
+    /** Raw transport/vendor token as provenance copy (e.g. "Bridge"), never the label. */
+    provenance: string | null;
   }>;
   charts: Array<{ label: string; summary: string }>;
   chartsUnavailableNote: string | null;
@@ -87,13 +93,7 @@ export interface GrowDiaryPdfModel {
 }
 
 const HEALTHY_SOURCES = new Set(["live", "manual", "csv"]);
-const FLAGGED_SOURCES = new Set(["demo", "stale", "invalid", "unknown"]);
-
-function normSource(s: string): string {
-  const v = (s ?? "").toString().toLowerCase().trim();
-  if (!v) return "unknown";
-  return v;
-}
+const FLAGGED_SOURCES = new Set(["demo", "stale", "invalid"]);
 
 function countText(c: CountValue | undefined): string {
   if (c === undefined) return "—";
@@ -134,6 +134,10 @@ function safeSlug(s: string): string {
       .slice(0, 60) || "grow"
   );
 }
+
+/** Note for a sensor source printed under its canonical name instead of the stored alias. */
+export const GROW_DIARY_PDF_SOURCE_NORMALIZED_NOTE =
+  "Source label normalized to its canonical name; it may differ from the stored label.";
 
 export function buildGrowDiaryReportFilename(growName: string, now: Date): string {
   return `verdant-grow-diary-${safeSlug(growName)}-${localDate(now)}.pdf`;
@@ -183,18 +187,25 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
   }));
 
   const sensorSources = (input.sensorSources ?? []).map((s) => {
-    const src = normSource(s.source);
+    const canon = resolveSensorSourceDisplayCanon(s.source);
+    const src = canon.canonical;
     const healthy = HEALTHY_SOURCES.has(src);
     const flagged = FLAGGED_SOURCES.has(src);
+    // An alias such as pi_bridge, user or import is printed under its canonical
+    // name, so the note must not claim the stored label was kept as-is.
+    const relabeled = canon.rawToken !== null && canon.rawToken !== src;
     return {
       label: src,
       count: Math.max(0, Math.floor(s.count) || 0),
       healthy,
       note: flagged
         ? "Flagged — not treated as current healthy data."
-        : healthy
-          ? "Source label preserved from ingest."
-          : "Source label preserved.",
+        : relabeled
+          ? GROW_DIARY_PDF_SOURCE_NORMALIZED_NOTE
+          : healthy
+            ? "Source label preserved from ingest."
+            : "Source label preserved.",
+      provenance: canon.provenanceLabel,
     };
   });
 
@@ -224,7 +235,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
     chartsUnavailableNote,
     isEmpty,
     safetyFooter:
-      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor source labels are preserved; stale/invalid/demo readings are not treated as healthy.",
+      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor sources are shown under their canonical labels, which may differ from the stored labels; stale/invalid/demo readings are not treated as healthy.",
   };
 }
 
@@ -266,7 +277,7 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
     ? `<ul class="sources">${model.sensorSources
         .map(
           (s) =>
-            `<li><span class="badge ${s.healthy ? "healthy" : "flag"}">${esc(s.label)}</span> · ${s.count} reading${s.count === 1 ? "" : "s"} · ${esc(s.note)}</li>`,
+            `<li><span class="badge ${s.healthy ? "healthy" : "flag"}">${esc(s.label)}</span>${s.provenance ? ` · via ${esc(s.provenance)}` : ""} · ${s.count} reading${s.count === 1 ? "" : "s"} · ${esc(s.note)}</li>`,
         )
         .join("")}</ul>`
     : `<p class="muted">No sensor snapshots included in this export.</p>`;

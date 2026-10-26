@@ -26,26 +26,30 @@ const REQUIRED_LOCKFILES = Object.freeze(["bun.lock"]);
 // retiring that lock removes no security floor.
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
-  "@modelcontextprotocol/sdk": "1.31.0",
-  hono: "4.13.7",
-  vite: "6.4.3",
+  "@modelcontextprotocol/sdk": "1.32.0",
+  hono: "4.13.11",
+  vite: "8.3.3",
+  "launch-editor": "2.14.2",
   postcss: "8.5.18",
   "fast-uri": "3.1.8",
   "form-data": "4.0.6",
+  "follow-redirects": "1.16.1",
   "js-yaml": "4.3.2",
-  qs: "6.16.0",
+  qs: "6.16.1",
+  "body-parser": "2.4.0",
   ajv: "6.15.0",
   picomatch: "2.3.2",
   vitest: "4.1.11",
   "@vitest/mocker": "4.1.11",
   esbuild: "0.28.1",
   "brace-expansion": "1.1.21",
-  undici: "6.28.1",
+  undici: "6.29.1",
   "proxy-addr": "2.0.8",
   seroval: "1.6.3",
   "shell-quote": "1.11.0",
   "source-map-js": "1.2.2",
   "postcss-selector-parser": "7.1.6",
+  zod: "4.6.7",
 });
 // Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
 // Absence is safe; every copy must still be patched if it returns transitively.
@@ -60,6 +64,10 @@ export const BUN_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
     4: null,
     5: "5.0.12",
   }),
+  // GHSA-xjj6-f33q-929c: >=6.23.0 <6.29.1, >=7.18.0 <7.30.1, >=8.0.0 <8.12.2.
+  // Deliberately "patched release of each major or nothing": each floor also rejects
+  // older releases of its major that this advisory does not cover (e.g. 7.0.0-7.17.x).
+  undici: Object.freeze({ 6: "6.29.1", 7: "7.30.1", 8: "8.12.2" }),
 });
 // Patched minimatch within the two majors that carried the advisory. Other
 // majors present in the graph (for example 5.x and 10.x) are outside it.

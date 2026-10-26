@@ -334,6 +334,42 @@ export function markPendingQuickLogNoteHistoryCheck(
   }
 }
 
+/**
+ * Carry a post-claim payload change (the uploaded photo path in `p_details`)
+ * into the unchanged pending Note before dispatch. `quicklog_save_manual`
+ * hashes `p_details` into its replay lock, so the record a reload restores
+ * must present the exact payload the RPC saw; a stale journal would retry
+ * the same key with a different hash (idempotency_key_conflict) or, if the
+ * first attempt never committed, save the Note without its photo.
+ * Same key only; the caller's record must be the stored one; verified by
+ * read-back, and blocked means the RPC must not be sent.
+ */
+export function updatePendingQuickLogNotePayload(
+  record: PendingQuickLogNote,
+  payload: QuickLogV2SavePayload,
+): { status: "updated"; record: PendingQuickLogNote } | { status: "blocked" } {
+  try {
+    if (!validRecord(record, record.ownerId)) return { status: "blocked" };
+    if (payload.p_idempotency_key !== record.payload.p_idempotency_key) {
+      return { status: "blocked" };
+    }
+    const current = readPendingQuickLogNote(record.ownerId);
+    if (current.status !== "pending" || !sameRecord(current.record, record)) {
+      return { status: "blocked" };
+    }
+    const next: PendingQuickLogNote = { ...current.record, payload };
+    if (!validRecord(next, record.ownerId)) return { status: "blocked" };
+    const raw = JSON.stringify(next);
+    window.sessionStorage.setItem(storageKey(record.ownerId), raw);
+    const verified = readPendingQuickLogNote(record.ownerId);
+    return verified.status === "pending" && sameRecord(verified.record, next)
+      ? { status: "updated", record: verified.record }
+      : { status: "blocked" };
+  } catch {
+    return { status: "blocked" };
+  }
+}
+
 /** A late completion can remove only its own unchanged owner/key/payload. */
 export function clearPendingQuickLogNote(record: PendingQuickLogNote): boolean {
   try {

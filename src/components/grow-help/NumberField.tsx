@@ -18,14 +18,22 @@ export interface NumberFieldProps {
   className?: string;
   placeholder?: string;
   integer?: boolean;
+  /** Reject a value equal to `min` too (for quantities that must be above zero). */
+  minExclusive?: boolean;
 }
 
 function numberFieldError(
   value: number | null,
-  options: Pick<NumberFieldProps, "label" | "min" | "max" | "required" | "integer">,
+  options: Pick<
+    NumberFieldProps,
+    "label" | "min" | "max" | "required" | "integer" | "minExclusive"
+  >,
 ): string | null {
   if (value === null) return options.required ? `Enter ${options.label.toLowerCase()}.` : null;
   if (!Number.isFinite(value)) return `${options.label} must be a number.`;
+  if (options.minExclusive && value <= options.min) {
+    return `${options.label} must be greater than ${options.min}.`;
+  }
   if (value < options.min || value > options.max) {
     return `${options.label} must be between ${options.min} and ${options.max}.`;
   }
@@ -50,6 +58,7 @@ export default function NumberField({
   className,
   placeholder,
   integer = false,
+  minExclusive = false,
 }: NumberFieldProps) {
   // Preserve an empty editing draft even when a parent keeps a non-null
   // fallback. Mobile users can backspace and type a replacement without the
@@ -69,7 +78,14 @@ export default function NumberField({
     }
   }, [draft, value]);
   const effectiveValue = draft === null ? value : draft.trim() === "" ? null : Number(draft.trim());
-  const error = numberFieldError(effectiveValue, { label, min, max, required, integer });
+  const error = numberFieldError(effectiveValue, {
+    label,
+    min,
+    max,
+    required,
+    integer,
+    minExclusive,
+  });
   const helpId = help ? `${id}-help` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [helpId, errorId].filter(Boolean).join(" ") || undefined;

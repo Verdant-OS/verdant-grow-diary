@@ -1,777 +1,385 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-24.6**
 
-_Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
-Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
+This is the long-running constitution for every agent and every human who changes
+this repository. It states durable principles, then rules, then where the procedures
+live. Names of people, seats, and tools live in the replaceable roster
+(`docs/agents/constitution/roster.md`). Facts that change daily live in
+`docs/agents/CURRENT_STATE.md`.
 
-Ownership and review routing: see `docs/agents/OWNERSHIP.md`. It wins on those
-points; Matthew Cheek's explicit current instructions control any conflicting permission.
+`ggsSentinel*` modules and `docs/v0-sentinel-stop-ship-checklist.md` are the sensor
+smoke runner. They are not this document.
 
-This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
-engineering, data, safety, and release rules. Platform-specific bootstraps live at the
-repository root; detailed responsibilities live in `docs/agents/roles/`.
+## Contents
 
-Operational facts that change — active branch and PR, production status, blockers,
-validation evidence, approved slice, and agent assignments — belong in
-`docs/agents/CURRENT_STATE.md`, not in this constitution.
+0. How this document works
+1. Glossary
+2. Principles
+3. Product
+4. Safety
+5. Data, schema, and migrations
+6. Sensors, cultivation, and the doctor
+7. Money and credits
+8. Action queue
+9. Engineering
+10. Testing and evidence
+11. Release and gates
+12. Handoff
+13. Review
+14. Startup gate
+15. Status vocabulary
+16. Environment notes
+17. Changelog
 
-> **Naming note:** `ggsSentinel*` modules and
-> `docs/v0-sentinel-stop-ship-checklist.md` refer to the GGS sensor smoke runner. They
-> are unrelated to this agent-governance Sentinel Code.
+Procedures (normative detail): `docs/agents/constitution/handoff-procedure.md`,
+`docs/agents/constitution/testing-standard.md`, `docs/agents/constitution/roster.md`.
 
-## Product Context
+## 0. How this document works
 
-Verdant is a standalone Grow OS.
+### 0.1 Precedence
 
-Verdant helps growers turn plant logs, photos, sensor readings, alerts, cautious AI, and grower-approved actions into safer decisions and better harvests.
+When two instructions conflict, higher wins. Report the conflict. Do not pick in silence.
 
-Core product promise:
+1. The founder's explicit current instruction. It controls any conflicting permission.
+2. On ownership and review routing, `docs/agents/OWNERSHIP.md` wins.
+3. This constitution.
+4. Role files.
+5. Task instructions, the handoff block, and the handoff protocol.
 
-> Plant memory. Sensor truth. Better decisions.
+Operating state records facts, owners, and locks. It does not override a numbered
+rule or OWNERSHIP.md on ownership and review routing.
 
-Verdant is not tied to Next Door Cannabis unless explicitly requested.
+### 0.2 Amendment
 
-Current product priority:
+Change this constitution only by a reviewed pull request. Bump `Sentinel-Version`
+on all twelve governed files in that same change, and record the change in §17.
+Hooks and agents do not edit instruction files except inside that pull request.
+The twelve are this file, its platform mirrors, the handoff protocol, the agents
+readme, and the role files. `docs/agents/CURRENT_STATE.md` is not one of them.
+
+### 0.3 Periodic review
+
+At least quarterly, the engineering lead prunes rules that no longer change a
+decision. Pruning is an amendment under §0.2. A rule with no case in the last
+review stays only when it still forbids a real harm.
+
+### 0.4 What does not belong here
+
+Bot names, vendor names, pull-request numbers, and today's incidents. Put the
+current holder in the roster or in operating state. Examples in this file are
+illustrative and labeled as such.
+
+## 1. Glossary
+
+| Term | Meaning |
+| --- | --- |
+| Head SHA | The full commit the pull request currently points at. |
+| Exact-head review | An independent verdict on that one head SHA. It dies when the head moves. |
+| Writer | The holder of the branch. Only that holder pushes. Nobody edits another holder's branch. There is no shared working branch. |
+| Owner | The accountable holder of a workstream. Ownership is temporary. |
+| Handoff | The written block a cold agent uses to resume. Chat is not a handoff. |
+| Gate | A condition that must be true at one head SHA before merge, publish, or spend. |
+| Founder | The seat that keeps the four release decisions. Named in the roster. Everything else runs without waiting on that seat. |
+| Integration branch | `main`. It is not the deploy branch. Do not push it directly. |
+| Deploy branch | `verdant-grow-diary`. Live behavior is measured here. Do not push it directly. |
+| Roster | `docs/agents/constitution/roster.md`. Replaceable names for seats. |
+
+## 2. Principles
+
+- Diary first, sensors second, AI third, automation last.
+- A merge is not a deployment. Green CI is not proof of indexing. A public
+  estimate is not authenticated analytics. An unverified sensor value is not
+  healthy live data. If you cannot measure it, say so.
+- Small, scoped changes. Preserve behavior a task did not ask to change.
+- One writer, one branch, one workstream. Work belongs to the task.
+- The grower decides. The product may suggest. It does not act on hardware by itself.
+- Evidence has a source. Invented metrics are a defect.
+- Any agent, current or later, and any human, must be able to resume from the
+  pull request, the handoff, and the repo.
+
+## 3. Product
+
+Verdant is a standalone grow operating system: plant logs, photos, sensor
+readings, alerts, cautious AI, and grower-approved actions.
+
+Promise: plant memory, sensor truth, better decisions.
+
+It is not tied to any sister brand unless a task says so.
+
+Priority loop, and the limit on scope until that loop is clean, safe, and tested:
 
 ```text
 Grow -> Tent -> Plant -> Quick Log -> Timeline -> Sensor Snapshot -> AI Doctor -> Alert -> Approval-Required Action Queue
 ```
 
-Do not expand into community, competitions, public mode, broad enterprise features, heavy automation, or device control until the One-Tent Loop is clean, safe, and tested.
+Do not expand into community, competitions, public mode, broad enterprise
+features, heavy automation, or device control until that loop is ready.
 
----
+Build, then audit, then fix, then CI, then publish, then measure on live, then fix.
 
-## Build Philosophy
+## 4. Safety
 
-Follow this order:
-
-```text
-Diary first.
-Sensors second.
-AI third.
-Automation last.
-```
-
-Default workflow:
-
-```text
-Build -> Audit -> Fix -> CI Test -> Publish -> Measure on live -> Fix
-```
-
-A merge is not a deployment. Green CI is not proof of indexing. A public estimate is not
-authenticated analytics. An unverified sensor value is not healthy live data. When an
-outcome cannot be measured, report the blocker instead of claiming success.
-
-Use small, scoped changes. Avoid broad rewrites.
-
----
-
-## Release and Environment Rules
-
-- **Production only.** Verdant has no sandbox, staging, preview, or non-production smoke
-  environment. Build, verify, and smoke against production
-  (`https://verdantgrowdiary.com`). Smoke writes by `cheekhimself@gmail.com` go only to its own
-  grow, tagged `[smoke <timestamp>]`. Never touch customer data or use the KEEP account.
-  Verify the fixture identity and ownership before a write. A task that asks for a
-  non-production target is out of date; report it instead of building one.
-- **CI probes production or nothing.** No push-triggered job may probe a non-production
-  database. The production schema verifier runs only by manual dispatch from the deploy
-  branch, in its protected environment. A red check that probes a retired environment is
-  a CI defect to fix, not a schema verdict.
-- **How a release reaches users.** Measure the configured publisher and its actual
-  deployment checks before asserting delivery. Agents never publish, promote, or roll back. They prepare a
-  release packet (live SHA, target SHA, commits, checks at the target, the deployment URL,
-  the rollback target) and hand over one promotion step. A merge is not a release until
-  `/version.json` on live reports the SHA.
-- **Ship before test.** Once CI is green and the reviewer has passed a fix, getting it live
-  comes before more testing. Public-page probes against a live build that doesn't contain
-  the fix measure nothing; report them `NOT_MEASURED`. Signed-in verification starts after
-  the fix is live.
-- **Git and merges.** Never push directly to `verdant-grow-diary` or `main`, force-push,
-  or rewrite history. Update branches by merging from base. Open PRs as drafts.
-  Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply,
-  or production Supabase writes. Drafts remain draft. Chemdawg owns merge only after
-  **35/35 required checks** succeed and Blue Dream, Durban Poison, Critical Mass or
-  Codex gives an independent **PASS at the exact head SHA**. Codex cannot be that
-  reviewer on a PR Codex authored or repaired (for example #1938). Graft's exact-head
-  PASS counts as the outside review on docs-only and low-risk PRs Graft did not author
-  or repair (OWNERSHIP.md allowlist). Migrations, payments or billing, `.github`
-  workflows, security or auth, and dependency or lockfile changes still need Codex
-  (not on a PR Codex authored or repaired), or Blue Dream, Critical Mass, or Durban
-  Poison. A skipped, missing, pending
-  or failed required check is not green. There is no author-integration exception.
-  Off-limits paths and named holds still require explicit reassignment before editing.
-  Production database changes, spend, publish gates and the publish decision remain
-  with Matthew; repository work does not authorize those operations.
-- **One task, one branch, one holder.** New Codex branches use
-  `codex/<task-id>-<slug>` in lowercase. There is no shared working branch.
-  Only the agent currently holding a
-  branch, per the effective claim (see Agent Handoff / Coverage) in `docs/agents/HANDOFF_LOG.md` or on the task's PR, pushes to it, and no agent edits files on
-  another holder's branch. The task goes with the branch: whoever holds the branch holds
-  the task. Preserve the original names of existing branches when resuming them.
-  A block records one branch and one PR; stacked work (a parent and a child PR) uses one
-  block per branch. A block that still lists several branches counts as one block per
-  branch: a claim on one of its PRs covers only that PR's branch, and the holder splits
-  the block at the next log update.
-- **Repair ownership and intake.** Codex fixes every discovered defect in its assigned
-  repository scope itself. New work arrives as `@codex` PR comments. A coverage record
-  preserves resumable evidence; it does not delegate implementation or grant new authority.
-- **Matthew Cheek keeps four decisions:** production database changes, the spend ceiling,
-  anything that gates a publish, and the publish decision itself. Everything else runs
-  without waiting on him.
-- **Off-limits without Matthew's approval:** migrations and SQL, `supabase/`, RLS, auth,
-  Edge functions, the Action Queue, lockfiles, and device control. If a fix needs one,
-  stop that item, write it up as an escalation, and move on.
-- **Standing locks** (the production database lock, named PR holds such as HOLD #1250)
-  are listed in `docs/agents/CURRENT_STATE.md` and bind every agent until removed there.
-
-Local/CI fixtures validate code, not production. See
-`docs/production-only-verification-runbook.md` for fixture identity, tagging and receipts.
-
-## Multi-Agent Coordination
-
-This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lovable) at once, sometimes on the same feature independently, without either side knowing.
-
-- Before starting substantial new work, check recent merged PRs and open PRs (`gh pr list --state all`, `git log`) for the same or an overlapping feature area. Do not build a second implementation of something that already shipped or is already in review elsewhere.
-- If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
-- Only one implementation of a given feature should ever be merged. If two exist, surface the collision in your report instead of resolving it unilaterally.
-- Clean up your own disposable worktrees/branches once work lands or is abandoned. Don't leave scratch checkouts behind for someone else to find and puzzle over later.
-
----
-
-## Agent Handoff / Coverage
-
-Work belongs to the task, not to the agent doing it. Any agent can be cut off at any time
-(token limit, outage, session end), so every open task must be resumable by a different
-agent from one written block.
-
-- **One place to look.** Every in-flight task has a handoff block in
-  `docs/agents/HANDOFF_LOG.md`. The log is not a versioned governance file; editing it
-  needs no `Sentinel-Version` bump.
-- **What a block holds.** Task id and priority, goal, branch, base, the exact checkout
-  command, PR and exact head SHA, current state, next action, files touched, blockers,
-  where artifacts live, the independent reviewer seat, `claimed_by`, and `last_updated`
-  (date, time, zone). Use the template at the top of the log.
-- **When to update it.** At least once a day while the task is open, and always before the
-  agent stops, hands off, or expects to run out of budget. Every daily update includes a
-  renewal comment on the task's PR (`claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC`, posted
-  by the current holder): a log edit made on a task branch is invisible to a successor
-  until it merges, so the PR comment is what keeps the task's activity visible. Push the branch and have its
-  draft PR open before implementation begins, not only before a planned stop: an agent
-  can be cut off at any time, and a successor can only claim on a PR. Under
-  `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that right asks
-  Codex first. A block without a pushed branch and a PR is not eligible for coverage until
-  both exist.
-- **Last activity.** A block's last activity is the newer of its `last_updated` as
-  recorded on the deploy branch (`verdant-grow-diary`) and its effective claim (below),
-  which includes the holder's renewal comments. A `last_updated` that exists only on a
-  task branch does not count. A block with both a pushed branch and a PR is open for anyone
-  when it has no effective claim or its last activity is older than 24 hours.
-- **Eligible coverage.** Any agent may resume an open block as defined above, subject to
-  explicit assignments and named locks.
-  A fresh claim is not available for takeover. The handoff block carries the context
-  needed to resume. A claim is valid only when it is posted while the block is open, or
-  by the agent already holding the block's effective claim (a renewal). A block's
-  effective claim is the newest valid claim among its log `claimed_by` and the
-  `claimed_by:` comments on its PR, ordered by when they were posted, unless that
-  claim's holder has since posted a `released_by:` comment (below), in which case the
-  block has no effective claim. Read the PR's claim and release comments before treating
-  a block as unclaimed or stale. A claim posted while another
-  agent's valid claim is under 24 hours old is not valid: when two agents race for the
-  same open block, the first claim posted holds it. The current holder can end its claim
-  early, for a deliberate transfer or when it stops work, with a PR comment reading
-  `released_by: <agent>, <YYYY-MM-DD HH:MM> UTC`, optionally followed by
-  `to <successor>`; it stops pushing before posting. A release leaves the block with no
-  effective claim, so the block is open at once. A release that names a successor makes
-  only that agent's claim valid for the next 24 hours. Before resuming, claim the task with a
-  comment on its PR that reads `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner
-  decision 2026-10-01), then re-read the PR's comments; if another agent's valid claim was
-  posted before yours, yours is not valid, so stop and touch nothing. A successor never
-  opens the PR itself; a block without one is not yet eligible.
-  A valid claim takes effect when posted: from then on you hold the branch and the
-  previous holder stops pushing. The effective claim is the current `claimed_by` and
-  counts toward the block's last activity; carry it into the block at the next log
-  update. Fetch the branch and compare `git rev-parse origin/<branch>` with the
-  block's head SHA. If they match, continue. If the remote is ahead (the PR's current
-  head equals `origin/<branch>` and `git merge-base --is-ancestor <head_sha>
-  origin/<branch>` succeeds), the previous holder pushed after the last log update:
-  adopt that remote head, name it in your claim comment, and record it at the next log
-  update. If the remote has diverged from or rewritten the recorded head, stop and
-  reconcile with the effective claim. Then check out the branch and run
-  `git merge --ff-only origin/<branch>`, so a stale local copy cannot stand in for the
-  remote head; if the fast-forward fails, stop and reconcile. Only then run the block's checkout command, which ends with the base merge,
-  and continue on the same branch. Never rename, recreate, or force-push it.
-- **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
-  and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an
-  explicit assignment. If you have no assigned task, select the highest-priority
-  eligible open block: a pushed branch and a PR, and either no effective claim or a last
-  activity (the newer of `last_updated` and the effective claim) older than 24 hours, with
-  no conflicting assignment or named lock. Priority order: publish gate, then P1, then P2, then everything else.
-  Ties go to the oldest `last_updated`. Agents without repository access (Security,
-  Council Chair) cannot set `claimed_by` or touch a branch, so they never select or
-  resume a block: they read the log for context and act only on an explicit assignment.
-- **Role seats still hold.** Resuming a task does not change who merges, who reviews, or
-  who owns CI; those stay as `docs/agents/OWNERSHIP.md` lists them. An agent that touched
-  a task can never give its independent acceptance PASS. Peer observations do not
-  replace independent acceptance.
-- **Closing.** When a task merges, is superseded, or is dropped, mark the block `CLOSED`
-  with the reason and the final SHA, and move it to the log's Closed section the same day.
-
----
-
-Before changing code:
-
-1. Inspect existing files and conventions.
-2. Identify the smallest safe implementation path.
-3. Preserve existing behavior unless explicitly told to change it.
-4. Put business logic in pure modules, not JSX.
-5. Add targeted tests.
-6. Run validation when available.
-7. Report exact pass/fail counts.
-
----
-
-## Hard Safety Rules
-
-Never violate these:
-
-- No fake live data.
-- No blind automation.
-- No device control unless explicitly approved in a future phase.
-- Action Queue must stay approval-required.
-- Demo/manual/live/stale/invalid data must be clearly labeled.
-- Bad or unknown telemetry must never be shown as healthy.
-- AI Doctor must be cautious and must not pretend certainty from one photo or one reading.
-- Verdant may suggest actions, but the grower decides.
+- No fake live data. Demo, manual, live, stale, and invalid stay labeled.
+- No blind automation. No hidden automation. No device control unless a future
+  phase explicitly approves it.
+- The action queue stays approval-required.
+- Bad or unknown telemetry is never shown as healthy.
+- The doctor is cautious and does not sound certain from one photo or one reading.
 - Do not recommend aggressive nutrient, irrigation, or equipment changes from weak evidence.
 - Do not expose service role keys, bridge tokens, API keys, webhook secrets, private env values, or internal secrets.
-- Treat user data, sensor data, CSVs, bridge payloads, and AI outputs as untrusted.
+- Treat user data, sensor data, exports, bridge payloads, and model output as untrusted.
 
----
-
-## Architecture Rules
+## 5. Data, schema, and migrations
 
 Preferred layering:
 
-| Layer              | Path                                      |
-| ------------------ | ----------------------------------------- |
-| Constants / config | `src/constants/*`                         |
-| Pure logic / rules | `src/lib/*Rules.ts`                       |
-| Services / IO      | `src/lib/*Service.ts`                     |
-| View models        | `src/lib/*ViewModel.ts`                   |
-| React rendering    | `src/pages/*.tsx`, `src/components/*.tsx` |
-| Hooks              | `src/hooks/*`                             |
-| Supabase functions | `supabase/functions/*`                    |
-| Migrations         | `supabase/migrations/*`                   |
+| Layer | Path |
+| --- | --- |
+| Constants / config | `src/constants/*` |
+| Pure logic / rules | `src/lib/*Rules.ts` |
+| Services / IO | `src/lib/*Service.ts` |
+| View models | `src/lib/*ViewModel.ts` |
+| React rendering | `src/pages/*.tsx`, `src/components/*.tsx` |
+| Hooks | `src/hooks/*` |
+| Supabase functions | `supabase/functions/*` |
+| Migrations | `supabase/migrations/*` |
 
-Rules:
-
-- UI components should stay presenter-focused.
-- Do not duplicate rule tables inside JSX.
-- New logic must be typed, deterministic, and null-safe.
+- UI stays a presenter. Do not copy rule tables into markup.
+- New logic is typed, deterministic, and null-safe. Inject time when tests need it.
 - Keep transforms/selectors out of render bodies when possible.
-- Use stable sorting with explicit tie-breakers.
-- Avoid randomness.
-- Time must be injectable for tests when relevant.
-- Preserve old documents/rows with missing fields.
-- Do not casually change schema, RLS, auth, or edge functions outside the requested scope.
-
----
-
-## Supabase / Data Safety
-
-For schema, RLS, and edge-function work:
-
-- Audit first.
-- Report existing conventions.
-- Do not silently alter existing tables.
-- No anon grants unless explicitly required and justified.
-- Client users must not be able to self-grant access, billing status, roles, credits, device permissions, or admin privileges.
-- Server-side enforcement must not trust client `user_id`.
-- Use `auth.uid()` / verified JWT user server-side.
-- Service role may be used only in server/admin/test setup contexts, never in client code.
-- If a task is tests-only, do not "fix" schema or policies. Stop and report blockers.
-
-RLS pattern to prefer:
-
-```text
-authenticated SELECT own rows only
-no client INSERT/UPDATE/DELETE policies
-service_role writes only
-runtime harness for money/security paths
-```
-
----
-
-## Migration Immutability Rules
-
-Once a migration file is merged into a base branch, it is permanent history. Never edit it again, for any reason.
-
-- Do not rewrite, gut, or "no-op" an already-merged migration file, even to correct a mistake in it.
-- Do not apply a new feature, fix, or entitlement change by editing an already-recorded migration. Ship a new additive migration instead, with a fresh timestamp.
-- If a previously-merged migration needs correction, write a new migration that adjusts state going forward. Never alter the old file's body.
-- Before touching any file under `supabase/migrations/`, confirm it is new in this change. If it already exists on the target base branch, treat it as read-only.
-- Editing history doesn't undo what already ran in production — it only breaks what a freshly provisioned environment (local dev, CI, disaster recovery) ends up with, silently and with no signal that anything is wrong.
-
-There is no exception. In particular, "this migration is broken and could never
-have succeeded anywhere, so editing it is harmless" is **not** a licence to edit
-it. That reasoning is seductive and wrong: it is unfalsifiable from inside a PR,
-and the rule exists precisely because the cost of being mistaken is invisible.
-The `Published migration integrity` CI gate enforces this by comparing SHA-256
-hashes against the base branch, and it will fail the PR.
-
-### When a published migration is genuinely broken
-
-A forward migration cannot always help — if the broken statement aborts the
-replay, nothing after it runs. Use the repo's sanctioned mechanism instead:
-
-- `config/local-supabase-replay-compatibility.json` declares, per file, either a
-  `compatibility_noops` entry (a later export duplicating an earlier change) or a
-  `compatibility_patches` entry (a minimal find/replace applied at replay time).
-- The replay preparer verifies each `source_sha256` and rewrites only a copy
-  inside a disposable workdir. The committed migration is never modified, so the
-  integrity gate stays green.
-- Every entry records a `reason`. Per that file's own notes: do not add one
-  merely to silence a reset failure — prove the relationship first.
-
-Check this config **before** proposing any migration correction. A defect you are
-about to "fix" may already be handled here, in which case the correct change is
-none at all.
-
----
-
-## Sensor Truth Rules
-
-Every sensor reading should include:
-
-- source
-- captured_at / timestamp
-- tent_id
-- plant_id when relevant
-- confidence
-- raw_payload when available
-
-Allowed source labels:
-
-```text
-live
-manual
-csv
-demo
-stale
-invalid
-```
-
-Flag suspicious telemetry:
-
-- Celsius shown as Fahrenheit
-- uS/cm shown as mS/cm
-- humidity stuck at 0 or 100
-- soil moisture stuck at 0 or 100
-- pH outside realistic range
-- old readings shown as current
-- default/demo values presented as live
-
-Never classify invalid or unknown telemetry as healthy.
-
----
-
-## AI Doctor Rules
-
-AI Doctor should use as much context as available:
-
-- plant stage
-- strain
-- medium
-- pot size
-- recent watering
-- recent feeding
-- sensor snapshots
-- recent photos
-- diary entries
-- alerts
-- grow targets
-- plant history
-
-AI Doctor output should include:
-
-```text
-Summary
-Likely issue
-Confidence
-Evidence
-Missing information
-Possible causes
-Immediate action
-What not to do
-24-hour follow-up
-3-day recovery plan
-Risk level
-Action Queue suggestion, if appropriate
-```
-
-If context is missing, say what is missing. Do not guess.
-
-Do not make one-photo diagnoses sound certain.
-
----
-
-## Monetization / Entitlements Rules
-
-Current billing foundation:
-
-- `profiles.tier` is XP/gamification only. Never use it as billing.
-- `public.subscriptions` is the sole billing entitlement source of truth.
-- Live rows grant production access; sandbox rows grant access only when the
-  server has explicitly resolved `PAYMENTS_ENVIRONMENT=sandbox`.
-- `public.billing_subscriptions` is a legacy sandbox/operator-audit surface
-  only. It must never grant an entitlement.
-- Absence of an entitling `public.subscriptions` row resolves to Free.
-- Client entitlement reads are presentation-only.
-- Server-side checks are authoritative for paid/costly features.
-- Founder Lifetime is Pro-like access with capped AI credits, never unlimited AI.
-- Do not add checkout, webhook, provider SDKs, pricing copy, PaywallCta edits, or UI gating unless specifically requested.
-
-Capability logic belongs in:
-
-```text
-src/lib/entitlements/*
-```
-
-Do not hardcode plan gates in JSX.
-
-Avoid:
-
-```ts
-if (plan === "pro") ...
-```
-
-Prefer capability helpers:
-
-```ts
-canUseCapability(entitlement, "advancedExports");
-```
-
----
-
-## AI Credit Enforcement Rules
-
-AI usage is a real cost surface.
-
-Backend enforcement must happen server-side before model calls.
-
-Rules:
-
-- Meter `ai-doctor-review` and `ai-coach`.
-- Free: 3 AI credits per grow.
-- Pro monthly: 100 AI credits per UTC calendar month.
-- Pro annual: 100 AI credits per UTC calendar month.
-- Founder lifetime: 100 AI credits per UTC calendar month.
-- Founder AI credits are capped, never unlimited.
-- Client cannot set `user_id`, weight, model tier, or plan.
-- Edge functions decide model tier/weight.
-- Refund failed model calls with append-only reversal rows.
-- Use runtime tests for RLS and spend/race behavior.
-- Quota denials should be calm, expected responses, not crashes.
-
-Do not add UI paywall behavior during backend enforcement slices unless requested.
-
----
-
-## Action Queue Rules
-
-Action Queue is approval-required.
-
-AI or alerts may suggest actions, but Verdant must not execute device commands by default.
-
-Action Queue items should include:
-
-- reason
-- risk level
-- related grow/tent/plant/alert when available
-- status
-- audit trail
-
-Do not auto-create action queue items unless the task explicitly asks for it.
-
-Do not add device control.
-
----
-
-## Cultivation Guidance Rules
-
-Base cultivation guidance on proven horticultural best practices and practical grow-room experience.
-
-Avoid:
-
-- bro-science
-- miracle fixes
-- overconfident photo diagnosis
-- aggressive autoflower recovery advice
-- heavy-stress recommendations for weak plants
-- nutrient/irrigation changes from weak evidence
-
-Default priority:
-
-```text
-1. Environmental stability
-2. Root-zone and watering correctness
-3. Nutrient moderation
-4. Low-stress canopy management
-5. AI/action recommendations only after context is clear
-```
-
-Autoflowers:
-
-- avoid unnecessary transplant shock
-- avoid heavy defoliation
-- avoid high-stress recovery tactics
-- prioritize stable VPD, watering, root health, and gentle feeding
-
----
-
-## Testing Standard
-
-Every logic change should include targeted tests for:
-
-1. Happy path
-2. Edge boundaries
-3. Null / invalid inputs
-4. Deterministic repeatability
-5. Regression for the specific bug or risk
-6. Safety/fence assertions where relevant
-
-For security/billing/RLS:
-
-- static scan tests are useful but not enough
-- add runtime harnesses when possible
-- prove client roles cannot mutate protected tables
-
-### Contract tests must assert against resolved values, not source text
-
-A contract test over a config or module MUST import it and assert on the
-resolved value. Matching a regex against the file's source text is not
-permitted for this purpose.
-
-Source-text matching cannot distinguish a live setting from one that is
-commented out, moved into a narrower scope, or duplicated — all three read
-identically to a text match while only the first still holds. This is not
-hypothetical: `playwright-action-timeout-fence` originally regex-matched
-`playwright.config.ts`, and replacing the setting with
-`// was actionTimeout: 15_000, …` left the guard **green**. A one-line
-comment-out, the most common way anyone disables a setting, defeated it.
-
-`scripts/check-contract-test-resolution.mjs` enforces this for tests that
-guard `playwright.config.ts` / `vitest.config.ts`. `src/test/playwright-config-retry-policy.test.ts`
-is the reference implementation: `await import()` the config, assert on the
-object.
-
-Where resolving is genuinely impossible, the test declares
-`@source-scan-justified: <reason>` so the exception is visible in the diff
-rather than silently absent, and the checker prints it on every run. State
-the blocker you actually hit — not a plausible one. The single current
-exception is `vitest-config-react-plugin-contract`: importing `vitest.config`
-under jsdom trips esbuild's TextEncoder invariant, and `@vitest-environment
-node` instead breaks the shared `src/test/setup.ts` (it defines
-`window.scrollTo`). An empty reason is rejected.
-
-Source-text scanning remains correct for what it is actually good at —
-proving a string, pattern, or forbidden construct is absent from a file
-(secret scans, "no `continue-on-error`", generated-artifact shape). The rule
-is about verifying _effective configuration_, not about banning `readFileSync`.
-
-### Never commit while an automated review is mutating the working tree
-
-Adversarial self-review passes verify that a new test genuinely fails without
-its fix by **reverting production files in place, running the test, and
-restoring them**. A commit taken during that window captures a reverted or
-half-restored tree.
-
-Before any `git commit` that follows or accompanies an automated review, run
-`git status` and confirm the tree contains only the intended changes. On a
-branch with auto-merge armed, a commit taken mid-experiment ships the revert.
-
-Report:
-
-```text
-Targeted tests:
-Full suite:
-Type-check:
-Runtime harness:
-Skipped:
-Introduced failures:
-Pre-existing failures:
-```
-
-Do not claim full validation if it was not run.
-
----
-
-## Validation Commands
-
-Use the repo's actual package manager and scripts.
-
-Prefer existing conventions.
-
-Common commands (verified on the deploy branch, 2026-08-19):
-
-```bash
-bun run typecheck
-bun run typecheck:tsgo
-bunx vitest run --reporter=dot
-bun run scripts/run-billing-rls-harness.ts
-bun run scripts/run-ai-credits-rls-harness.ts
-```
-
-Branch note: `bun run type-check` and `tsconfig.app.json` are `main`-branch
-conventions and do not exist on `verdant-grow-diary`. Verify scripts against the
-branch you are on before citing them.
-
-If a command is unavailable, report that honestly and use the closest existing command.
-
----
-
-## Required Response Format For Implementation Tasks
-
-Use this structure:
-
-```text
-Summary
-Requirements / assumptions
-Audit findings
-File-level plan
-Implementation notes
-Tests added
-Validation commands
-Validation results
-Safety verdict
-Deferred items
-Risk / rollback notes
-```
-
-For audit-only tasks, do not write code unless the user explicitly asks.
-
-For tests-only tasks, do not change app/schema/policy code unless the task explicitly permits it.
-
----
-
-## Scope Discipline
-
-When a task says "no schema changes," do not change schema.
-
-When a task says "no UI changes," do not touch UI.
-
-When a task says "audit first," report findings before building.
-
-When a task says "server-side only," do not add UI gating.
-
-When a task says "foundation only," do not claim the feature is complete.
-
-Prefer partial, safe completion over broad risky completion.
-
----
-
-## Forbidden Shortcuts
-
-Do not:
-
-- Reuse `profiles.tier` for billing.
-- Add `requiredTier` routing unless explicitly requested.
-- Add checkout/webhook/provider SDKs inside entitlement foundation work.
-- Add service_role to client code.
-- Treat demo data as live.
-- Create hidden automation.
-- Execute device commands.
-- Auto-write action queue items from alerts unless requested.
-- Change existing public copy during backend/security slices.
-- Add broad rewrites to fix narrow bugs.
-- Hide skipped validation.
-- Report "all green" unless all relevant validation actually passed.
-
----
-
-## Good Verdant Build Behavior
-
-Prefer:
-
-- Small PRs.
-- Pure helpers first.
-- Presenter-only UI.
-- RLS-first data design.
-- Runtime harnesses for sensitive permissions.
-- Append-only ledgers for billing/credits/audit trails.
-- Cautious AI.
-- Source-labeled telemetry.
-- Clear rollback notes.
-- Exact pass/fail counts.
-
-Every change should make Verdant more trustworthy.
-
----
-
-# Agent Role Routing
-
-Before using tools beyond read-only context acquisition or changing files, identify your
-assigned role and read its file.
-
-- Codex must read `docs/agents/roles/codex.md`.
-- Grok must read `docs/agents/roles/grok.md`.
-- Claude must read `docs/agents/roles/claude.md`.
-- Gemini must read `docs/agents/roles/gemini.md`.
-- Security reviewer must read `docs/agents/roles/security.md`.
-- Council Chair must read `docs/agents/roles/council-chair.md`.
-
-Any agent may resume an open task from its block in `docs/agents/HANDOFF_LOG.md` under
-Agent Handoff / Coverage. Claim it first with a `claimed_by:` comment on the task's PR, as
-that section describes. Do not start a second implementation of a task someone else has
-claimed, in the log or on its PR, within the last 24 hours.
-
-Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-20,
-refined). Explicit assignments, named locks and the current coverage claim control
-who researches, architects, implements,
-audits, tests, or independently reviews. Default strengths differ; they are preference,
-not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
-example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
-and no competing Timeline / Alerts / Action Queue rewrite).
-
-Every slice names its independent review route, and at any moment one agent holds the
-claim to build it. An agent that touched a slice cannot give it an independent PASS.
-Codex does not integrate its own work. Chemdawg owns the required-check and independent
-exact-head PASS gate. High-risk work, publish gates and named owner locks retain their
-review and acceptance fences.
-
-Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
-publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. **Codex** is an equal independent
-exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
-Claude may add peer observations but is not the acceptance reviewer.
-Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
-**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
-PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
-tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
-billing, `.github` workflows, security or auth, and dependency or lockfile changes
-still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
-Mass, or Durban Poison.
-Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
-Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
-
-Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
-
-```text
-Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
-```
-
-That sequence is a preferred path, not rank. The current task may require only a scoped
-subset of those stages. Do not create parallel implementations of the same slice.
-
-The only action permitted before the gate below is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
-acknowledgment can be truthful. Listing files solely to locate those four documents, or
-using a platform context-discovery command such as `grok inspect`, is also permitted.
-No application-code inspection, network mutation, recommendation, or repository write is
-permitted before the acknowledgment.
+- Stable sorts with explicit tie-breakers. No randomness in rules.
+- Preserve old rows that omit fields.
+- Do not change schema, row-level security, auth, or edge functions outside the task.
+
+For schema, row-level security, and edge work: audit first, report the existing
+convention, do not alter a table silently. No anonymous grants unless the task
+requires and justifies them. Clients cannot grant themselves access, billing,
+roles, credits, device permissions, or admin. The server uses the verified user,
+never a client-supplied user id. The service role stays in server, admin, and
+test setup, never in client code. A tests-only task does not "fix" schema.
+
+Preferred row-level pattern: authenticated select of one's own rows; no client
+insert, update, or delete; service role writes; a runtime harness for money and
+security paths.
+
+Merged migrations are permanent. Do not rewrite, gut, or no-op one. Ship a new
+additive migration. "It could never have succeeded" is not a reason to edit it.
+The published-migration integrity check hashes files against the base branch.
+If a published migration cannot replay, patch only a disposable copy through
+`config/local-supabase-replay-compatibility.json`, with a reason, after proving
+the relationship. Check that file before proposing a correction. The committed
+migration stays unchanged. Before touching any file under `supabase/migrations/`,
+confirm it is new in this change. If it already exists on the target base branch,
+treat it as read-only.
+
+## 6. Sensors, cultivation, and the doctor
+
+Every reading has source, captured time, tent, plant when relevant, confidence,
+and raw payload when available. Sources: `live`, `manual`, `csv`, `demo`,
+`stale`, `invalid`.
+
+Flag unit swaps (temperature, conductivity), humidity or soil moisture stuck at
+0 or 100, unrealistic pH, old readings shown as current, and defaults shown as live.
+
+Cultivation advice follows horticultural practice and grow-room experience.
+Avoid miracle fixes, overconfident photo diagnosis, heavy stress on weak plants,
+and aggressive autoflower recovery. Order: environment, then roots and water,
+then moderate nutrients, then low-stress canopy, then AI or actions once context
+is clear. For autoflowers, avoid transplant shock, heavy defoliation, and
+high-stress recovery. Prefer stable vapor-pressure deficit, watering, root
+health, and gentle feeding.
+
+The doctor uses stage, strain, medium, pot size, recent water and feed, sensor
+snapshots, photos, diary, alerts, targets, and history. Output covers summary,
+likely issue, confidence, evidence, missing information, possible causes,
+immediate action, what not to do, 24-hour follow-up, 3-day recovery, risk, and
+an action-queue suggestion only when appropriate. Missing context is stated.
+It is not guessed.
+
+## 7. Money and credits
+
+- Profile tier is gamification, never billing.
+- The subscriptions table is the only entitlement source. Live rows grant
+  production access. Sandbox rows grant access only when the server has resolved
+  the payments environment to sandbox. The legacy billing-subscriptions surface
+  never grants entitlement. No entitling row means Free.
+- Client entitlement reads are presentation. The server decides paid and costly features.
+- Founder lifetime is pro-like access with capped credits, never unlimited.
+- Do not add checkout, webhooks, provider SDKs, pricing copy, paywall calls, or
+  UI gates unless the task asks.
+- Capability checks live under `src/lib/entitlements/`. Do not hardcode a plan
+  name in the interface. Prefer a capability helper. Illustrative shape:
+  `canUseCapability(entitlement, "advancedExports")`.
+- Do not add a required-tier route unless the task asks.
+- Do not reuse profile tier for billing, and do not put the service role in client code.
+
+Meter `ai-doctor-review` and `ai-coach` before the model call. Free: 3 credits
+per grow. Paid monthly, paid annual, and founder lifetime: 100 credits per UTC
+calendar month, capped. The client cannot set user id, weight, model tier, or
+plan. The edge function decides tier and weight. Refund a failed call with an
+append-only reversal. Quota denial is a calm response. Do not add a paywall
+during a backend enforcement slice unless the task asks. Use a runtime harness
+for row-level security and for spend races.
+
+## 8. Action queue
+
+Items include reason, risk, related grow, tent, plant, or alert when available,
+status, and an audit trail. Models and alerts may suggest. They do not run
+devices, and they do not create queue items unless the task asks. Do not add
+device control.
+
+## 9. Engineering
+
+Before code: read the existing files, take the smallest safe path, preserve
+behavior, put logic in pure modules, add targeted tests, validate, report
+pass and fail counts.
+
+Scope words bind: "no schema", "no UI", "audit first", "server-side only", and
+"foundation only" mean what they say. Prefer a partial safe completion.
+
+Forbidden shortcuts: checkout or provider SDKs inside entitlement foundation
+work; treating demo data as live; executing device commands; auto-writing the
+action queue; changing public copy during a backend or security slice; a broad
+rewrite for a narrow bug; hiding a skipped check; saying "all green" when it
+was not run.
+
+Prefer small pull requests, pure helpers, presenter UI, row-level security
+first, runtime harnesses, append-only ledgers, cautious AI, labeled telemetry,
+rollback notes, and exact counts.
+
+One implementation of a feature. Before substantial new work, look for an open
+or merged change in the same area. If one exists, stop and report the collision.
+Clean up your own disposable worktrees when the work lands or is abandoned.
+
+## 10. Testing and evidence
+
+Detail: `docs/agents/constitution/testing-standard.md`.
+
+Cover the happy path, boundaries, nulls, repeatability, the regression, and
+safety fences. Security and billing need a runtime harness when one can be run.
+Contract tests assert the resolved value, not a regex over source. Declare
+`@source-scan-justified` only when resolving is impossible, with the real reason.
+Do not commit while an automated review has reverted the tree. Report what you
+ran and what you skipped.
+
+## 11. Release and gates
+
+- Production only. No sandbox, staging, preview, or other smoke environment.
+  Verify and smoke on the production host. Verify the fixture identity and
+  ownership before any write. A task that asks for a non-production target is
+  out of date; report it. Local and CI fixtures validate code, not production.
+  Identity, tagging, and receipts: `docs/production-only-verification-runbook.md`.
+- CI probes production or it probes nothing. No push-triggered job probes a
+  non-production database. The production schema verifier runs only by manual
+  dispatch from the deploy branch, in its protected environment. A red check
+  that probes a retired environment is a CI defect, not a schema verdict.
+- Measure the configured publisher and its actual deployment checks before
+  asserting delivery. Agents never publish, promote, or roll back. They prepare a packet: live SHA,
+  target SHA, commits, checks at the target, deployment URL, rollback target,
+  and one promotion step. A merge is not a release until the live version
+  endpoint reports the SHA.
+- Ship a reviewed, green fix before more testing. Probes of a live build that
+  lacks the fix are `NOT_MEASURED`. Signed-in verification starts after it is live.
+- Never push the deploy branch or the integration branch directly, force-push,
+  or rewrite history. Update by merging from the base. Open pull requests as drafts.
+- Merge only through the merge queue, after every required check is green at
+  that head and an independent exact-head review passes, with no P1 or P2.
+  A skipped, missing, pending, or failed required check is not green. There is
+  no author-integration exception. The merge seat is named in the roster.
+  Protected and mixed scopes still need an eligible outside reviewer and their
+  supplemental evidence.
+- Payment, migration, and production pull requests stay out of the queue until
+  a human approves that exact head SHA. Production database changes, spend,
+  publish gates, and the publish decision remain with the founder. Everything
+  else runs without waiting on the founder. Repository work does not authorize
+  those operations.
+- Off-limits paths and named holds need an explicit reassignment. The current
+  list is in operating state and the roster.
+- There is no shared working branch. Only the agent currently holding a branch,
+  per the effective claim in `docs/agents/HANDOFF_LOG.md` or on the task's pull
+  request, pushes it, and no agent edits files on another holder's branch.
+  Operating state records that holder. The task goes with the branch. Preserve
+  branch names. Stacked work is one block per branch.
+- The holder fixes every discovered defect in its assigned repository scope.
+  New work for that scope arrives as comments that name the seat. A coverage
+  record preserves resumable evidence. It does not delegate implementation or
+  grant new authority. The holder does not integrate its own work. The roster
+  names the seat.
+- A check that is red across pull requests is top-priority work. A paused
+  workflow records an owner and a re-enable date in operating state.
+- A pull request untouched for 14 or more days, or more than 500 commits behind
+  its base, is closed as superseded or stale. Keep the branch unless an owner claims it.
+- Every feature pull request names its post-merge check. A failure reopens the
+  work with the same owner. The body includes a "release steps measured" line.
+  The GitHub template is unchanged until a later amendment; the line's wording
+  is in operating state.
+- Agent instruction files are protected (§0.2).
+
+## 12. Handoff
+
+Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
+`docs/agents/HANDOFF_LOG.md`. The log is not a versioned governance file.
+
+- Write the block before the first push. Update it at every stop. Unpushed work
+  does not count.
+- The block is self-sufficient for any agent or human: goal and why, decisions
+  and reasons, rejected attempts, exact commands, files touched and files still
+  to touch, open questions, gotchas, links, head SHA, reviewer and the SHA that
+  review covers, and session state (agent ids, routines, paused workflows,
+  pending human decisions). No chat pointers.
+- Before stopping, run the cold start test. Push, update the entry, and leave
+  `resume here` on the pull request.
+- The pull request body is the gate checklist and the last reviewed SHA.
+- A review and a human go-ahead bind to one head SHA. They do not carry forward.
+- On retirement, transfer the owner row. The default inheritor is the
+  engineering lead on the roster. Post `handed off`, then stop pushing.
+- Takeover verifies the head SHA, re-checks required CI, and gets a new
+  exact-head review if the head moved.
+- One active writer. A reviewer assignment is not write access. Claims,
+  releases, assignments, and named locks prevent a second writer.
+- A block's last activity is the newer of its `last_updated` on the deploy
+  branch and its effective claim, including the holder's renewal comments. A
+  `last_updated` that exists only on a task branch does not count. A block with
+  both a pushed branch and a pull request is open when it has no effective
+  claim or that last activity is older than 24 hours, and no assignment or lock
+  conflicts. Priority: publish gate, P1, P2, then the rest. Oldest update wins a tie.
+- Closing a merged, superseded, or dropped task moves the block to Closed the
+  same day with the reason and the final SHA.
+
+## 13. Review
+
+- The reviewer did not author or repair the change. Exclude those people even
+  after a transfer. Record session, role, who was excluded, the full head SHA,
+  the scope, the evidence, and the verdict.
+- One current review request per pull request per head SHA: owner, link, and
+  state (`requested`, `running`, `blocked`, `verdict`, or `superseded`).
+  Check the existing request before asking again. Transfer an unavailable
+  reviewer once. Otherwise record `BLOCKED`. Pending, acknowledgments, and
+  silence are not a pass. Keep a still-valid review. Do not duplicate it.
+- A new head invalidates the old verdict.
+- The reviewer lists every finding at once. The writer fixes the whole affected
+  section against the real SQL or code in one pass.
+- Peer comments are not the independent pass. Someone who touched the change
+  cannot pass it.
+- Who may sit the review is the roster, applied to the whole scope, including
+  protected files and supplemental evidence.
+- Role files say each seat's default strength. Strength is not rank. Before
+  work beyond the startup read, the seat reads its role file:
+  `docs/agents/roles/codex.md`, `docs/agents/roles/grok.md`,
+  `docs/agents/roles/claude.md`, `docs/agents/roles/gemini.md`,
+  `docs/agents/roles/security.md`, `docs/agents/roles/council-chair.md`.
+
+## 14. Startup gate
+
+Before tools beyond read-only context, or any edit, read this file,
+`docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned
+role file. The only action permitted before the gate is read-only acquisition
+of those four files so the acknowledgment can be truthful. Listing files solely
+to locate those four documents, or using a platform context-discovery command
+such as `grok inspect`, is also permitted. No application-code inspection,
+network mutation, recommendation, or repository write is permitted before the
+acknowledgment.
 
 MANDATORY STARTUP GATE
 
@@ -801,28 +409,32 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.
 
-## Status Vocabulary
+## 15. Status vocabulary
 
-Use these values literally. Never turn a blocked or unmeasured verification into a pass.
+Use these words. A blocked or unmeasured check is never a pass.
 
-| Status           | Meaning                                                              |
-| ---------------- | -------------------------------------------------------------------- |
-| `PASS`           | Direct evidence verified the check                                   |
-| `FAIL`           | Direct evidence verified a defect                                    |
-| `BLOCKED`        | Access, permission, credential, or dependency prevented verification |
-| `NO_BASELINE`    | No earlier measurement exists for comparison                         |
-| `NO_DATA`        | The authorized source was reachable but returned no data             |
-| `NOT_MEASURED`   | The metric was not measured; this is never a perfect score           |
-| `SKIPPED`        | The check was intentionally not run; report its reason separately    |
-| `NOT_APPLICABLE` | The check does not apply to this target                              |
+| Status | Meaning |
+| --- | --- |
+| `PASS` | Direct evidence verified the check |
+| `FAIL` | Direct evidence verified a defect |
+| `BLOCKED` | Access, permission, credential, or dependency prevented verification |
+| `NO_BASELINE` | No earlier measurement exists for comparison |
+| `NO_DATA` | The authorized source was reachable but returned no data |
+| `NOT_MEASURED` | The metric was not measured. This is never a perfect score |
+| `SKIPPED` | The check was not run. Report why |
+| `NOT_APPLICABLE` | The check does not apply |
 
-Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink
-counts, conversion rates, audience sizes, sensor health, or deployment/indexing outcomes.
-Record the authorized source and provenance for every material measurement.
+Never invent search volume, traffic, keyword difficulty, CPC, domain rating,
+backlink counts, conversion rates, audience sizes, sensor health, or
+deployment/indexing outcomes. Record the authorized source and provenance
+for every material measurement.
 
----
+## 16. Environment notes
 
-## Cursor Cloud specific instructions
+These notes are environment-specific. A repository check asserts the package-manager
+wording below, so that wording stays here. The runbook is
+`.claude/skills/run-verdant-grow-diary/SKILL.md`.
+
 
 Durable, non-obvious notes for running this app in a Cursor Cloud VM. Full, verified
 runbook lives in `.claude/skills/run-verdant-grow-diary/SKILL.md` — read it for details;
@@ -841,9 +453,8 @@ snapshots can differ.
   scripts run under **`bun`** in both observed snapshots. Per
   `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
   (managed environments pre-provision it), use it as-is — do not reinstall. If it's
-  absent, do **not** reach for `bun install --frozen-lockfile` first; go straight to the
-  SKILL's verified npm public-registry-override bootstrap. Install behavior has differed
-  across sessions, which is why the SKILL doesn't recommend trying bun first:
+  absent, use `bun install --frozen-lockfile` as the SKILL's supported setup path.
+  Historical install observations below do not authorize an unpinned npm fallback:
   - One session found `bun install --frozen-lockfile` worked fine against the public
     registry, and the VM startup script already ran it — no reinstall needed unless a
     run failed on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
@@ -855,9 +466,8 @@ snapshots can differ.
     override** instead, and `bun` itself was a pre-baked system dependency under
     `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
     script.
-  - Don't assume either session's behavior carries over to a new one — check
-    `node_modules` first, and if an install is actually needed, prefer the SKILL's
-    verified bootstrap over guessing.
+  - Check `node_modules` first. If the frozen install fails, report the exact blocker
+    as `BLOCKED`; do not install an unpinned npm tree or regenerate the lockfile.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
   `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.
@@ -898,7 +508,44 @@ snapshots can differ.
   **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
   and is not one of the twelve: it is the changing shift report, revised several times a
   day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
-  Editing it alone requires no bump — see merged precedent #729 (`1ae167764`) and #746
-  (`a0c30e565`), each a single-file `CURRENT_STATE.md` change with no version change.
+  Editing `docs/agents/CURRENT_STATE.md` alone requires no bump. Single-file edits
+  of `docs/agents/CURRENT_STATE.md` have merged with no version change
+  (`1ae167764`, `a0c30e565`).
   An earlier wording of this bullet said `docs/agents/**`, which over-stated the rule
   against the gate that supposedly enforced it.
+
+## 17. Changelog
+
+- **2026-10-24.6** — The environment note names `docs/agents/CURRENT_STATE.md` as the file whose single-file edits need no version bump. Those precedents are commits `1ae167764` and `a0c30e565`.
+- **2026-10-24.5** — Operating state does not override `OWNERSHIP.md` on ownership and review routing; the start-here note in `docs/agents/CURRENT_STATE.md` now says the same thing. Extending the repair-all-defects rule and the do-not-integrate-your-own-work rule from the Codex seat to every branch holder is an intended change, recorded here; the Codex wording stays in the roster. Before editing a migration file, confirm it is new. Everything else runs without waiting on the founder. The integration branch is `main`. The deploy branch is `verdant-grow-diary`.
+- **2026-10-24.4** — Restored the render-body rule in its original words: keep transforms/selectors out of render bodies when possible.
+- **2026-10-24.3** — Restored rules weakened in 2026-10-24.2: only the branch
+  holder pushes, and nobody edits another holder's branch; a public estimate is
+  not authenticated analytics; measure the publisher and its deployment checks
+  before asserting delivery; layer paths `src/constants/*`, `src/lib/*Rules.ts`,
+  `src/lib/*Service.ts`, `src/lib/*ViewModel.ts`, and no transforms in render
+  bodies; verify fixture identity and ownership before a write; the holder
+  fixes every defect in its scope and does not integrate its own work (Codex
+  specifics stay in the roster); do not invent deployment/indexing outcomes;
+  record the authorized source and provenance; internal secrets stay unexposed.
+  OWNERSHIP.md again wins on ownership and review routing. The stale-open test
+  uses last activity, which includes the effective claim. The pre-gate
+  allowance again includes locating the four context files and a platform
+  context-discovery command. Metered ids are `ai-doctor-review` and `ai-coach`.
+  Repository work does not authorize production database changes, spend,
+  publish gates, or the publish decision.
+- **2026-10-24.2** — Numbered sections, glossary, amendment rule, and quarterly
+  prune. Seat names moved to `docs/agents/constitution/roster.md`. Handoff
+  steps moved to `docs/agents/constitution/handoff-procedure.md`. Testing
+  detail moved to `docs/agents/constitution/testing-standard.md`. That revision
+  ranked this file above OWNERSHIP.md for every conflict and shortened several
+  rules listed in 2026-10-24.3. Those shortenings are reversed.
+- **2026-10-24.1** — Cold-start handoff, exact-SHA approvals, one writer,
+  one-pass review, stale expiry, ship and money hold, repo-wide breakage
+  priority, protected instruction files, post-merge reopen.
+- **2026-10-22.1** — Independent reviewer routing. Retired seats and the
+  eligible set are in the roster.
+- **2026-09-28** — Release rules and handoff coverage. Open tasks resume from
+  the handoff log.
+
+---

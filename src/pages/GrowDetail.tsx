@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { Link } from "@/lib/react-router-compat";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -39,14 +40,15 @@ import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import StartBreedingLogButton from "@/components/StartBreedingLogButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import GrowArchiveControlButton from "@/components/GrowArchiveControlButton";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 import GrowPendingOutcomeNotice from "@/components/GrowPendingOutcomeNotice";
 
 /**
- * Read-only grow detail hub. Presentational only — all data loading +
- * derivation live in @/hooks/useGrowDetailData and @/lib/growStatus.
- * No writes. No ai-coach call. No device-control surface.
+ * Grow detail hub. Presentational — all data loading + derivation live in
+ * @/hooks/useGrowDetailData and @/lib/growStatus; archive/restore writes live in
+ * @/components/GrowArchiveControlButton. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
   const {
@@ -161,9 +163,9 @@ export default function GrowDetail() {
         {grow.notes && <p className="text-sm text-muted-foreground mt-1">{grow.notes}</p>}
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <Field label="Started" value={new Date(grow.started_at).toLocaleString()} />
-          <Field label="Created" value={new Date(grow.created_at).toLocaleString()} />
-          <Field label="Updated" value={new Date(grow.updated_at).toLocaleString()} />
+          <Field label="Started" value={formatSnapshotTimestamp(grow.started_at)} />
+          <Field label="Created" value={formatSnapshotTimestamp(grow.created_at)} />
+          <Field label="Updated" value={formatSnapshotTimestamp(grow.updated_at)} />
         </dl>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -207,6 +209,11 @@ export default function GrowDetail() {
             <FileDown className="h-4 w-4" aria-hidden="true" />
             Export PDF
           </Button>
+          <GrowArchiveControlButton
+            growId={grow.id}
+            isArchived={grow.is_archived}
+            onChanged={refetch}
+          />
         </div>
       </header>
 
@@ -240,6 +247,7 @@ export default function GrowDetail() {
           description="Manage plants in this grow."
           count={counts.plants}
           countLabel="plants"
+          singularLabel="plant"
         />
         <HubLink
           to={tentsPath(growId)}
@@ -248,6 +256,7 @@ export default function GrowDetail() {
           description="Tents linked to this grow."
           count={counts.tents}
           countLabel="tents"
+          singularLabel="tent"
         />
         <HubLink
           to={actionsPath(growId)}
@@ -270,8 +279,6 @@ export default function GrowDetail() {
           icon={<Sparkles className="h-4 w-4" />}
           title="Dashboard"
           description="Open the dashboard scoped to this grow."
-          count="unavailable"
-          countLabel="dashboard"
         />
         {showPostGrowReport && (
           <HubLink
@@ -288,8 +295,6 @@ export default function GrowDetail() {
           icon={<GraduationCap className="h-4 w-4" />}
           title="Learning review"
           description="Completed actions, grower-recorded outcomes, and next-run decisions."
-          count="unavailable"
-          countLabel="learning review"
         />
       </section>
 
@@ -334,7 +339,7 @@ export default function GrowDetail() {
                   </Badge>
                   <span className="text-xs truncate">{item.title}</span>
                   <span className="ml-auto text-xs text-muted-foreground">
-                    {new Date(item.ts).toLocaleString()}
+                    {formatSnapshotTimestamp(item.ts)}
                   </span>
                 </div>
                 {item.detail && (
@@ -406,7 +411,7 @@ function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
                   <span className="text-[11px] text-muted-foreground">metric: {o.metric}</span>
                 )}
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {o.recorded_at ? new Date(o.recorded_at).toLocaleString() : "—"}
+                  {o.recorded_at ? formatSnapshotTimestamp(o.recorded_at) : "—"}
                 </span>
               </div>
               {o.suggested_change && (
@@ -493,23 +498,30 @@ function HubLink({
   description,
   count,
   countLabel,
+  singularLabel,
 }: {
   to: string;
   icon: React.ReactNode;
   title: string;
   description: string;
-  count: CountValue;
-  countLabel: string;
+  count?: CountValue;
+  countLabel?: string;
+  singularLabel?: string;
 }) {
+  const label = count === 1 && singularLabel ? singularLabel : countLabel;
   return (
     <Link to={to} className="glass rounded-2xl p-4 hover:bg-secondary/20 transition-colors block">
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         {icon}
         {title}
-        <span className="ml-auto text-xs font-normal text-muted-foreground">
-          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span>{" "}
-          {countLabel}
-        </span>
+        {count !== undefined && countLabel ? (
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>
+              {formatCount(count)}
+            </span>{" "}
+            {label}
+          </span>
+        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
     </Link>
@@ -566,7 +578,7 @@ function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string
         </div>
         <div>
           <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">Last diary</dt>
-          <dd>{status.lastDiaryAt ? new Date(status.lastDiaryAt).toLocaleDateString() : "—"}</dd>
+          <dd>{status.lastDiaryAt ? formatSnapshotTimestamp(status.lastDiaryAt) : "—"}</dd>
         </div>
       </dl>
       <div className="flex gap-3 mt-3 text-xs">

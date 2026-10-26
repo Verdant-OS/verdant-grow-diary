@@ -66,6 +66,10 @@ vi.mock("@/integrations/supabase/client", () => ({
         ? {
             select: () => ({
               eq: (_column: string, id: string) => ({
+                // Mirrors the real builder: the receipt readback passes its deadline signal.
+                abortSignal() {
+                  return this;
+                },
                 maybeSingle: async () => {
                   const args = rpcMock.mock.calls.at(-1)?.[1];
                   return {
@@ -90,6 +94,10 @@ vi.mock("@/integrations/supabase/client", () => ({
           ? {
               select: () => ({
                 eq: (_column: string, id: string) => ({
+                  // Mirrors the real builder: the receipt readback passes its deadline signal.
+                  abortSignal() {
+                    return this;
+                  },
                   maybeSingle: async () => {
                     const args = rpcMock.mock.calls.at(-1)?.[1];
                     return {

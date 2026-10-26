@@ -222,6 +222,13 @@ in `src/test/signed-in-readonly-proof.test.ts:507-556` and
    references a secret. At least one step before it is a checkout of `${{ github.sha }}`
    with `persist-credentials: false` (the runner must exist on disk), and every step
    before it is such a checkout.
+   Check inheritance as well as the step's own mapping: parse workflow-level `env`
+   and the target job's `env`, and reject `secrets.*` references in either. Resolve
+   the environment of each pre-verifier checkout and the verifier with the workflow,
+   job and step precedence applied; none may inherit a secret binding. Preserve the
+   existing job-level secret assertions, and explicitly cover workflow-level
+   inheritance. A step-only scan or an exact seven-key verifier mapping does not
+   establish this: a workflow-level binding can reach both steps unchanged.
 3. The existing pin assertions still hold: checkout `ref` is `${{ github.sha }}`, and the
    pin compares against `GITHUB_SHA` and writes `E2E_EXPECTED_SHA`.
 4. The existing `if:` gate matrices (`signed-in-readonly-proof.test.ts:540-556` and the
@@ -231,6 +238,12 @@ in `src/test/signed-in-readonly-proof.test.ts:507-556` and
    workflow's contract suite must FAIL on the B.2 assertion. Record both failing counts
    per workflow in the PR body next to the RED counts in §5.C, then restore and show
    0 failures.
+6. Mutation evidence for inherited secrets, in each of the four workflows: add a
+   synthetic workflow-level `env` binding whose value references
+   `${{ secrets.PROOF_TEST_SECRET }}`, leaving the job and verifier mappings unchanged.
+   The B.2 inheritance assertion must FAIL. Record the failing count per workflow,
+   restore the original YAML and show 0 failures. This is a local contract mutation;
+   do not create, retrieve or dispatch with any real secret.
 
 **C. RED proof**
 
@@ -288,10 +301,13 @@ Verdict: **safe to implement**, as a tightening that only removes false-PASS pat
   (Matthew's one-time exception for #2055 and #2057, 2026-10-13). Merge by Chemdawg after
   35/35.
 - **Independent acceptance of the implementation PR:** a separate reviewer eligible for
-  `.github/workflows` and scorer-locked test files under `docs/agents/OWNERSHIP.md` §2 and
-  `AGENTS.md`: Blue Dream, Critical Mass or Durban Poison, or Codex only if Codex neither
-  implemented nor repaired it. Graft's #2057 exception does not extend to that PR unless
-  Matthew grants a separate explicit exception.
+  the complete `.github/workflows` and scorer-locked file scope under the current
+  `docs/agents/OWNERSHIP.md` §4.3 and `AGENTS.md`. Select an actually available eligible
+  independent session, record its identity and exclude all authors and repairers.
+  Codex cannot accept a Codex-authored or Codex-repaired implementation. Preserve the
+  protected workflow/scorer approval gates; review eligibility grants no unlock,
+  dispatch or production authority. Graft's dated #2057 exception does not extend to
+  that PR unless Matthew grants a separate explicit exception.
 
 ## 8. Known unknowns
 

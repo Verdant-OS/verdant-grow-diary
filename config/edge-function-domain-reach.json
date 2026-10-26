@@ -140,9 +140,9 @@
     },
     "paddle-portal-session": {
       "domain": "money",
-      "tables": ["subscriptions"],
+      "tables": ["paddle_customers", "subscriptions"],
       "rpcs": [],
-      "justification": "Single-domain."
+      "justification": "Reads the authenticated caller's subscription and matching environment-scoped Paddle customer mirror before creating a customer portal session. Single money domain; no customer writes."
     },
     "paddle-webhook": {
       "domain": "money",
@@ -155,6 +155,7 @@
       "tables": ["lovable_paddle_events", "paddle_customers", "subscriptions"],
       "rpcs": [
         "allocate_lovable_founder_lifetime",
+        "clawback_lovable_credit_pack",
         "grant_lovable_credit_pack",
         "revoke_lovable_founder_lifetime_by_transaction"
       ],

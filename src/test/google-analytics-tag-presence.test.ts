@@ -16,26 +16,38 @@ const ROOT_ROUTE = read("src/routes/__root.tsx");
 const LOADER = read("src/lib/googleAnalyticsLoader.ts");
 const CONSTANTS = read("src/constants/analytics.ts");
 const HOOK = read("src/hooks/useGoogleAnalyticsPageViews.ts");
+const AHREFS_LOADER = read("src/lib/ahrefsAnalyticsLoader.ts");
+const CONSENT_RUNTIME = read("src/lib/analyticsConsentRuntime.ts");
 
 describe("Google Analytics consent gate", () => {
   it("resolves the measurement ID in one place, from the connector env var", () => {
     expect(CONSTANTS).toContain("VITE_LOVABLE_CONNECTOR_GOOGLE_ANALYTICS_API_KEY");
-    expect(CONSTANTS).toMatch(/GOOGLE_ANALYTICS_MEASUREMENT_ID_FALLBACK\s*=\s*["']G-[A-Z0-9]{10}["']/);
+    expect(CONSTANTS).toMatch(
+      /GOOGLE_ANALYTICS_MEASUREMENT_ID_FALLBACK\s*=\s*["']G-[A-Z0-9]{10}["']/,
+    );
   });
-
 
   it("does not ship the gtag.js tag in the root head", () => {
     expect(ROOT_ROUTE).not.toContain("https://www.googletagmanager.com/gtag/js?id=");
+    expect(ROOT_ROUTE).not.toContain("https://analytics.ahrefs.com/analytics.js");
   });
 
   it("mounts the consent banner and the consent-gated loader", () => {
     expect(ROOT_ROUTE).toContain("AnalyticsConsentBanner");
-    expect(ROOT_ROUTE).toContain("loadGoogleAnalytics");
-    expect(ROOT_ROUTE).toMatch(/decision === "granted"/);
+    expect(ROOT_ROUTE).toContain("applyAnalyticsConsentDecision");
+    expect(CONSENT_RUNTIME).toContain("loadGoogleAnalytics");
+    expect(CONSENT_RUNTIME).toMatch(/decision === "granted"/);
+    expect(CONSENT_RUNTIME).toContain("loadAhrefsAnalytics");
+    expect(CONSENT_RUNTIME).toContain("removeAhrefsAnalyticsScript");
   });
 
   it("loads the gtag.js script only from the loader", () => {
     expect(LOADER).toContain("https://www.googletagmanager.com/gtag/js?id=");
+  });
+
+  it("loads the Ahrefs tag only from its consent-gated loader", () => {
+    expect(AHREFS_LOADER).toContain("AHREFS_WEB_ANALYTICS_SCRIPT_SRC");
+    expect(AHREFS_LOADER).toContain("AHREFS_WEB_ANALYTICS_KEY");
   });
 
   it("disables the raw-location initial page view", () => {

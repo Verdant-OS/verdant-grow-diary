@@ -144,7 +144,7 @@ async function defaultSubscribe(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
-    throw new Error("mqtt package not installed; run `bun add mqtt`");
+    throw new Error("mqtt package not installed; run `bun add --no-save mqtt`");
   }
   const client = mqtt.connect(mqttUrl, { reconnectPeriod: 0, connectTimeout: 2000 });
   await new Promise<void>((resolve, reject) => {

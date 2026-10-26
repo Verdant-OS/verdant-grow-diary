@@ -24,9 +24,10 @@ Grow → Tent → Plant → Diary/Logs → Photo → Sensor Snapshot → AI Doct
 ## Grow Help Toolkit
 
 `/tools/grow-help-toolkit` is a client-side nutrient, grow-light, and expense
-planner. It uses no account, backend, analytics, device control, or live sensor
-data. The last inputs are stored only in browser `localStorage`; CSV and print
-exports are also generated in the browser.
+planner. It requires no account or Toolkit backend, sends no calculator inputs
+to analytics, and uses no device control or live sensor data. The last inputs
+are stored only in browser `localStorage`; CSV and print exports are also
+generated in the browser.
 
 Core formulas:
 
@@ -55,6 +56,12 @@ not measured PAR maps. Nutrient EC/PPM ranges are typical starting references,
 not guarantees. Cost-per-weight accepts dried saleable weight only and never
 prefills a yield or market price. Optional N/P/K ppm entries are grower-entered
 planning notes only; they do not infer a dose without product elemental analysis.
+
+The in-app About panel keeps the reviewed capability sources beside a short note
+explaining what each reference informed. It also links bidirectionally with the
+public VPD calculator (`/tools/vpd-calculator`), grow-stage target bands
+(`/tools/blueprint-targets`), and grow guides (`/guides`). Those pages are separate
+references: calculator inputs are never placed in a URL or transferred between tools.
 
 ## Local setup
 
@@ -394,10 +401,10 @@ required migration exists on disk but has not been applied to the target
 environment.
 
 The `.github/workflows/required-money-migrations.yml` workflow runs this
-check against both sandbox and live. It reads each DB connection string
-from its protected GitHub environment:
+check against live only, by manual dispatch from the deploy branch with a
+typed `LIVE` confirmation. Verdant has no sandbox database lane. It reads
+the DB connection string from its protected GitHub environment:
 
-- `verdant-sandbox` → `SUPABASE_DB_URL_SANDBOX`
 - `verdant-production` → `SUPABASE_DB_URL`
 
 ### Setting the GitHub secrets
@@ -407,14 +414,13 @@ from its protected GitHub environment:
    URI format). It looks like
    `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
    The password is the database password, not the anon or service-role key.
-2. In GitHub, open **Settings → Environments → verdant-sandbox** and create
-   `SUPABASE_DB_URL_SANDBOX` with the sandbox project's URL.
-3. Open **Settings → Environments → verdant-production** and create
+2. In GitHub, open **Settings → Environments → verdant-production** and create
    `SUPABASE_DB_URL` with the live project's URL.
-4. Re-run the `required-money-migrations` workflow to confirm both jobs
-   go green. If a job errors with exit code `2`, the URL is wrong or the
-   pooler is unreachable; exit code `1` means a required migration is
-   missing from that environment and must be applied before deploying.
+3. Dispatch the `required-money-migrations` workflow with `target_env=live`
+   and `confirm_live=LIVE` to confirm the job goes green. If it errors with
+   exit code `2`, the URL is wrong or the pooler is unreachable; exit code
+   `1` means a required migration is missing from production and must be
+   applied before deploying.
 
 Rotate these secrets whenever the database password is rotated.
 
@@ -424,12 +430,7 @@ Requires `psql` on `PATH` (`brew install libpq` on macOS,
 `sudo apt-get install postgresql-client` on Debian/Ubuntu).
 
 ```bash
-# Sandbox
-SUPABASE_DB_URL='postgresql://postgres.<sandbox-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
-  TARGET_ENV=sandbox \
-  node scripts/assert-required-money-migrations-applied.mjs
-
-# Live
+# Live (Verdant has no sandbox database)
 SUPABASE_DB_URL='postgresql://postgres.<live-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
   TARGET_ENV=live \
   node scripts/assert-required-money-migrations-applied.mjs
@@ -536,10 +537,10 @@ Runtime:
 
 Environment variables:
 
-| Variable          | Required?       | Purpose                                                                                                                                            |
-| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SUPABASE_DB_URL` | Yes (diff mode) | Direct Postgres connection string used by `psql`. In CI, each protected environment binds its own environment secret into this process variable.   |
-| `TARGET_ENV`      | Optional        | `sandbox` or `live`. Used for target-identity validation and stamped into JSON/SARIF output as `target_env`; it does not select a fallback secret. |
+| Variable          | Required?       | Purpose                                                                                                                                                                 |
+| ----------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_DB_URL` | Yes (diff mode) | Direct Postgres connection string used by `psql`. In CI, each protected environment binds its own environment secret into this process variable.                        |
+| `TARGET_ENV`      | Optional        | `live` (Verdant has no sandbox database). Used for target-identity validation and stamped into JSON/SARIF output as `target_env`; it does not select a fallback secret. |
 
 The connection string must be the **direct** Postgres URL for the target
 project (usually `postgres://postgres:<PASSWORD>@db.<REF>.supabase.co:5432/postgres`),
@@ -557,7 +558,7 @@ required-money-migrations manifest.
 
 ```json
 {
-  "target_env": "sandbox",
+  "target_env": "live",
   "expected": [
     {
       "file": "supabase/migrations/20260615120000_ai_credit_spend.sql",
@@ -582,13 +583,16 @@ one prefix + filename per line, suitable for `diff` / `comm`.
 
 #### Worked example
 
-End-to-end local run against sandbox, capturing both human and machine
-output:
+End-to-end read-only run against production, capturing both human and
+machine output. Verdant has no sandbox database. Production credentials are
+Matthew's; the usual route is the protected manual workflow
+(`required-money-migrations.yml` with `target_env=live` and
+`confirm_live=LIVE`).
 
 ```bash
-# 1) Export the sandbox DB URL for this shell session.
-export SUPABASE_DB_URL="postgres://postgres:${SANDBOX_DB_PASSWORD}@db.bzatgtgjvuojpoxcknaa.supabase.co:5432/postgres"
-export TARGET_ENV=sandbox
+# 1) Export the production DB URL for this shell session (read-only check).
+export SUPABASE_DB_URL="postgres://postgres:<PASSWORD>@db.<LIVE_REF>.supabase.co:5432/postgres"
+export TARGET_ENV=live
 
 # 2) Snapshot expected prefixes offline (no DB call).
 mkdir -p audit/expected
@@ -612,7 +616,7 @@ Expected: 12   Applied: 12   Missing: 0
 
 20260615120000  20260615120000  OK       supabase/migrations/20260615120000_ai_credit_spend.sql
 ...
-✓ All required migrations present in sandbox.
+✓ All required migrations present in live.
 exit=0
 ```
 
@@ -624,7 +628,7 @@ Expected: 12   Applied: 11   Missing: 1
 20260615120000  20260615120000  OK       supabase/migrations/20260615120000_ai_credit_spend.sql
 20260714120000                  MISSING  supabase/migrations/20260714120000_referral_conversion_fix.sql
 ...
-✗ 1 required migration(s) not applied in sandbox. Do NOT deploy.
+✗ 1 required migration(s) not applied in live. Do NOT deploy.
 exit=1
 ```
 
@@ -639,7 +643,7 @@ node scripts/diff-money-migration-prefixes.mjs --json \
 
 ```bash
 # 1) Full diff: expected (manifest) vs. actual (target DB).
-#    Requires SUPABASE_DB_URL. TARGET_ENV=sandbox|live labels and validates
+#    Requires SUPABASE_DB_URL. TARGET_ENV=live labels and validates
 #    the selected target; it does not select a fallback connection variable.
 node scripts/diff-money-migration-prefixes.mjs
 
@@ -816,7 +820,7 @@ confirm all four:
 - [ ] The run was triggered by `push` or `pull_request` on a branch you
       have permission to see (not a fork PR).
 - [ ] `upload-sarif` step logs `SARIF upload complete` (not `Resource
-  not accessible` or `Invalid SARIF file`).
+not accessible` or `Invalid SARIF file`).
 
 If all four are true and findings still don't show, jump to the
 _Security tab looks empty (GitHub UI gotchas)_ table below — the cause
@@ -1104,13 +1108,23 @@ against **this** commit. If the verification step doesn't see the
 analysis or the expected number of results, the job fails — so silent
 upload regressions can't slip through as green.
 
+It reads the production database, so it keeps the same guards as the
+canonical `.github/workflows/prefix-diff-sarif.yml`: manual dispatch only,
+from the deploy branch, with a typed `LIVE` confirmation, in the protected
+`verdant-production` environment. Never add a `pull_request` or `push`
+trigger to a job that holds the production DB secret.
+
 ```yaml
 # .github/workflows/prefix-diff-sarif-verify.yml
 name: prefix-diff-sarif-verify
 
 on:
-  pull_request:
   workflow_dispatch:
+    inputs:
+      confirm_live:
+        description: "Type LIVE to run the read-only check against the production database"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -1119,6 +1133,8 @@ permissions:
 
 jobs:
   sarif:
+    if: ${{ github.ref == 'refs/heads/verdant-grow-diary' && inputs.confirm_live == 'LIVE' }}
+    environment: verdant-production
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -1133,8 +1149,8 @@ jobs:
       - name: Run prefix-diff (SARIF)
         id: diff
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          TARGET_ENV: sandbox
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          TARGET_ENV: live
         run: |
           set +e
           bun run scripts/diff-money-migration-prefixes.mjs \
@@ -1152,7 +1168,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: prefix-diff.sarif
-          category: prefix-diff-${{ env.TARGET_ENV || 'sandbox' }}
+          category: prefix-diff-${{ env.TARGET_ENV || 'live' }}
           wait-for-processing: true # blocks until GitHub finishes ingesting
 
       # 4. Verify: the analysis exists for THIS sha, and the alert count matches SARIF.
@@ -1160,8 +1176,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          CATEGORY: prefix-diff-${{ env.TARGET_ENV || 'sandbox' }}
+          SHA: ${{ github.sha }}
+          CATEGORY: prefix-diff-${{ env.TARGET_ENV || 'live' }}
         run: |
           set -euo pipefail
           AUTH=(-H "Authorization: Bearer $GH_TOKEN"
@@ -1175,7 +1191,7 @@ jobs:
           # 4a. Analysis for this sha + category must exist.
           echo "Looking up analysis for sha=$SHA category=$CATEGORY ..."
           analysis=$(curl -sS "${AUTH[@]}" \
-            "https://api.github.com/repos/$REPO/code-scanning/analyses?ref=refs/pull/${{ github.event.pull_request.number }}/head&sarif_id=${{ steps.upload.outputs.sarif-id }}")
+            "https://api.github.com/repos/$REPO/code-scanning/analyses?ref=${{ github.ref }}&sarif_id=${{ steps.upload.outputs.sarif-id }}")
           echo "$analysis" | jq '.[0] // "NONE"'
           test "$(echo "$analysis" | jq 'length')" -gt 0
 
@@ -1204,13 +1220,13 @@ jobs:
 
 **What each step guarantees.**
 
-| Step                     | Fails when                                                                 |
-| ------------------------ | -------------------------------------------------------------------------- |
-| Run prefix-diff (SARIF)  | The tool crashed _before_ writing SARIF (test `-s` catches empty files).   |
-| Validate SARIF structure | Missing `partialFingerprints`, empty rule catalog, malformed `version`.    |
-| Upload SARIF             | Missing `security-events: write`, invalid SARIF, or fork PR upload denied. |
-| Verify alerts landed     | No analysis exists for this sha, or the alert count ≠ SARIF result count.  |
-| Upload artifacts         | Never — runs under `if: always()` so failures still ship the SARIF.        |
+| Step                     | Fails when                                                                |
+| ------------------------ | ------------------------------------------------------------------------- |
+| Run prefix-diff (SARIF)  | The tool crashed _before_ writing SARIF (test `-s` catches empty files).  |
+| Validate SARIF structure | Missing `partialFingerprints`, empty rule catalog, malformed `version`.   |
+| Upload SARIF             | Missing `security-events: write`, or invalid SARIF.                       |
+| Verify alerts landed     | No analysis exists for this sha, or the alert count ≠ SARIF result count. |
+| Upload artifacts         | Never — runs under `if: always()` so failures still ship the SARIF.       |
 
 **Notes.**
 
@@ -1220,12 +1236,11 @@ jobs:
 - Use `${{ steps.upload.outputs.sarif-id }}` to scope the analysis
   lookup to _this_ upload; otherwise a concurrent workflow on the same
   sha can mask a failure.
-- For fork PRs, step 3 is skipped by GitHub. Guard step 4 with
-  `if: github.event.pull_request.head.repo.full_name == github.repository`
-  if you accept fork contributions.
-- The alert-count assertion is deliberately strict. If your workflow
-  runs on both `push` and `pull_request`, dedupe by scoping the API
-  query to the exact `sarif_id`, not `ref` alone.
+- The job only runs on manual dispatch from the deploy branch, so fork PRs
+  never reach it and it never holds the production secret on untrusted code.
+- The alert-count assertion is deliberately strict. If several dispatches
+  run on the same ref, dedupe by scoping the API query to the exact
+  `sarif_id`, not `ref` alone.
 
 ##### Verifying uploaded findings in GitHub code scanning
 
@@ -1242,7 +1257,9 @@ this order:
   `Invalid SARIF file` or `Path does not exist`, the file wasn't
   generated — jump to the `--sarif` troubleshooting table above.
 - On the run summary page, the **Artifacts** section should list
-  `money-migration-audit-sandbox` (or `-live`) containing `diff.sarif`.
+  `prefix-diff-sarif-live` containing `prefix-diff-live.sarif` and
+  `prefix-diff-live.json`. (There is no sandbox lane: the workflow is
+  manual dispatch against LIVE only.)
   Download it and re-check locally with the `jq -e` self-check from the
   "Sample SARIF output" section.
 
@@ -1253,7 +1270,7 @@ this order:
   - **Tool:** `diff-money-migration-prefixes`
   - **Branch:** the branch the workflow ran on (defaults to the default branch)
   - **Category:** `money-migration-drift` (or whatever `category:` you
-    passed to `upload-sarif`; sandbox and live should be distinct)
+    passed to `upload-sarif`)
   - **Rule:** optional — filter to `money-migration-drift`,
     `money-migration-malformed`, or `money-migration-tooling`
 - Each row shows the migration file, the rule ID, and severity **Error**.
@@ -1314,7 +1331,7 @@ Via the GitHub UI:
 
 - Repo → **Actions** → the failed/passing run → scroll to **Artifacts**
   at the bottom of the summary page.
-- Click `money-migration-audit-sandbox` (or `-live`) to download a
+- Click `money-migration-audit-live` to download a
   `.zip`. The bundle contains at least:
   ```
   diff.sarif                    # SARIF uploaded to Code scanning
@@ -1335,8 +1352,8 @@ gh run list --workflow required-money-migrations.yml --limit 5
 # Download every artifact from a specific run into ./artifacts/
 gh run download <run-id> --dir artifacts/
 
-# Or just the sandbox bundle
-gh run download <run-id> --name money-migration-audit-sandbox --dir artifacts/
+# Or just the live bundle
+gh run download <run-id> --name money-migration-audit-live --dir artifacts/
 ```
 
 If the run was on a PR from a fork, `gh run download` requires
@@ -1349,8 +1366,8 @@ Use the same `TARGET_ENV` and DB URL the failing job used (check the
 job's `env:` block) so the comparison is apples-to-apples:
 
 ```bash
-TARGET_ENV=sandbox \
-SUPABASE_DB_URL_SANDBOX="$SUPABASE_DB_URL_SANDBOX" \
+TARGET_ENV=live \
+SUPABASE_DB_URL="$SUPABASE_DB_URL" \
   node scripts/diff-money-migration-prefixes.mjs \
     --sarif --sarif-out=local-diff.sarif
 ```
@@ -1367,7 +1384,7 @@ jq -S 'del(
     .runs[].invocations,
     .runs[].tool.driver.semanticVersion,
     .runs[].results[].locations[].physicalLocation.artifactLocation.uriBaseId
-  )' artifacts/money-migration-audit-sandbox/diff.sarif > /tmp/ci.norm.json
+  )' artifacts/money-migration-audit-live/diff.sarif > /tmp/ci.norm.json
 
 jq -S 'del(
     .runs[].invocations,
@@ -1380,7 +1397,7 @@ diff -u /tmp/ci.norm.json /tmp/local.norm.json
 
 Zero diff = your local environment reproduces the CI finding exactly.
 Any diff is real drift between environments (usually a migration
-applied locally but not in sandbox, or vice versa).
+applied locally but not in production, or vice versa).
 
 **Step 4 — Compare just the findings.**
 
@@ -1396,7 +1413,7 @@ extract_fps() {
     | @tsv' "$1" | sort
 }
 
-diff <(extract_fps artifacts/money-migration-audit-sandbox/diff.sarif) \
+diff <(extract_fps artifacts/money-migration-audit-live/diff.sarif) \
      <(extract_fps local-diff.sarif)
 ```
 
@@ -1411,8 +1428,8 @@ in the **JSON schema** section above. Sanity-check the counts match the
 SARIF:
 
 ```bash
-jq '.summary' artifacts/money-migration-audit-sandbox/prefix-diff-cli.json
-jq '.runs[0].results | length' artifacts/money-migration-audit-sandbox/diff.sarif
+jq '.summary' artifacts/money-migration-audit-live/prefix-diff-cli.json
+jq '.runs[0].results | length' artifacts/money-migration-audit-live/diff.sarif
 ```
 
 `summary.driftCount + summary.malformedCount + summary.toolingCount`
@@ -1457,11 +1474,11 @@ Assume this SARIF shape (matches what
         ]
       }
     },
-    "automationDetails": { "id": "money-migration-drift-sandbox/2026-07-22T12:00:00Z" },
+    "automationDetails": { "id": "prefix-diff-live/2026-07-22T12:00:00Z" },
     "results": [{
       "ruleId": "money-migration-drift",
       "level": "error",
-      "message": { "text": "Required money migration not applied in sandbox: prefix 20260715120000…" },
+      "message": { "text": "Required money migration not applied in live: prefix 20260715120000…" },
       "locations": [{
         "physicalLocation": {
           "artifactLocation": { "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql" },
@@ -1476,18 +1493,18 @@ Assume this SARIF shape (matches what
 
 **Alert list columns (Security → Code scanning table).**
 
-| UI column / element                       | SARIF field                                                                                                  | Example value                                                             |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Alert title (bold, first line)            | `runs[].results[].message.text` (first line, truncated)                                                      | _Required money migration not applied in sandbox: prefix 20260715120000…_ |
-| Rule ID chip (small, next to title)       | `runs[].results[].ruleId`                                                                                    | `money-migration-drift`                                                   |
-| Tool filter dropdown value                | `runs[].tool.driver.name`                                                                                    | `diff-money-migration-prefixes`                                           |
-| Severity pill (colored dot + label)       | `runs[].results[].level` (or the rule's `defaultConfiguration.level` when omitted on the result)             | `error` → red **Error**; `warning` → yellow; `note` → blue                |
-| File path (grey, under the title)         | `runs[].results[].locations[0].physicalLocation.artifactLocation.uri`                                        | `supabase/migrations/20260715120000_ai_credit_spend.sql`                  |
-| Line-number suffix on the file path       | `runs[].results[].locations[0].physicalLocation.region.startLine`                                            | `:1`                                                                      |
-| Branch column                             | The Git ref the workflow ran on (from `GITHUB_REF`), not a SARIF field                                       | `main`, `pr/1234`                                                         |
-| Category filter value                     | `upload-sarif` step's `category:` input (mirrored into `runs[].automationDetails.id` as `<category>/<uuid>`) | `money-migration-drift-sandbox`                                           |
-| Alert number (`#123`, in the URL)         | Assigned by GitHub on first upload; stable across re-runs that share the same fingerprint                    | `#123`                                                                    |
-| Status column (Open / Closed / Dismissed) | Derived: presence of the fingerprint in the latest SARIF + any manual dismissal on this alert number         | _Open_, _Closed – Fixed_, _Closed – Dismissed (Won't fix)_                |
+| UI column / element                       | SARIF field                                                                                                  | Example value                                                          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Alert title (bold, first line)            | `runs[].results[].message.text` (first line, truncated)                                                      | _Required money migration not applied in live: prefix 20260715120000…_ |
+| Rule ID chip (small, next to title)       | `runs[].results[].ruleId`                                                                                    | `money-migration-drift`                                                |
+| Tool filter dropdown value                | `runs[].tool.driver.name`                                                                                    | `diff-money-migration-prefixes`                                        |
+| Severity pill (colored dot + label)       | `runs[].results[].level` (or the rule's `defaultConfiguration.level` when omitted on the result)             | `error` → red **Error**; `warning` → yellow; `note` → blue             |
+| File path (grey, under the title)         | `runs[].results[].locations[0].physicalLocation.artifactLocation.uri`                                        | `supabase/migrations/20260715120000_ai_credit_spend.sql`               |
+| Line-number suffix on the file path       | `runs[].results[].locations[0].physicalLocation.region.startLine`                                            | `:1`                                                                   |
+| Branch column                             | The Git ref the workflow ran on (from `GITHUB_REF`), not a SARIF field                                       | `main`, `pr/1234`                                                      |
+| Category filter value                     | `upload-sarif` step's `category:` input (mirrored into `runs[].automationDetails.id` as `<category>/<uuid>`) | `prefix-diff-live`                                                     |
+| Alert number (`#123`, in the URL)         | Assigned by GitHub on first upload; stable across re-runs that share the same fingerprint                    | `#123`                                                                 |
+| Status column (Open / Closed / Dismissed) | Derived: presence of the fingerprint in the latest SARIF + any manual dismissal on this alert number         | _Open_, _Closed – Fixed_, _Closed – Dismissed (Won't fix)_             |
 
 **Alert detail page (click a row).**
 
@@ -1531,7 +1548,7 @@ category          = "money-migration-drift-<env>"       # from upload-sarif inpu
 
 Any change to those fields (renaming the tool, renaming a rule, editing
 the prefix on a required migration file, or changing the `category:`
-between sandbox and live) will create a **new** alert instead of
+between targets) will create a **new** alert instead of
 updating the existing one. Keep them stable across runs unless you
 deliberately want a fresh alert stream.
 
@@ -1605,7 +1622,7 @@ surfaces in a PR's **Files changed** tab.
         {
           "ruleId": "money-migration-drift",
           "level": "error",
-          "message": { "text": "Expected prefix 20260715120000 but sandbox has 20260715115959." },
+          "message": { "text": "Expected prefix 20260715120000 but live has 20260715115959." },
           "locations": [
             {
               "physicalLocation": {
@@ -1621,7 +1638,7 @@ surfaces in a PR's **Files changed** tab.
         {
           "ruleId": "money-migration-drift",
           "level": "error",
-          "message": { "text": "Expected prefix 20260716090000 but sandbox has 20260716085500." },
+          "message": { "text": "Expected prefix 20260716090000 but live has 20260716085500." },
           "locations": [
             {
               "physicalLocation": {
@@ -1639,7 +1656,7 @@ surfaces in a PR's **Files changed** tab.
         {
           "ruleId": "money-migration-drift",
           "level": "error",
-          "message": { "text": "Expected prefix 20260717000000 but sandbox has 20260716235959." },
+          "message": { "text": "Expected prefix 20260717000000 but live has 20260716235959." },
           "locations": [
             {
               "physicalLocation": {
@@ -2025,14 +2042,14 @@ what you're seeing.
 - Click the red gutter marker. An inline expandable panel opens directly
   below line 1 with three visible pieces:
 
-  | UI element                                                                                 | SARIF field it comes from                                          |
-  | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-  | Bold header, e.g. **`Code scanning / diff-money-migration-prefixes`**                      | `runs[0].tool.driver.name`                                         |
-  | Rule ID chip, e.g. `money-migration-drift`                                                 | `results[i].ruleId`                                                |
-  | Severity pill (**Error** in red)                                                           | `results[i].level` (`"error"` → red, `"warning"` → yellow)         |
-  | Message text — _"Required money migration not applied in sandbox: prefix 20260715120000…"_ | `results[i].message.text`                                          |
-  | **View alert** link (bottom-right of panel)                                                | Deep-link to `Security → Code scanning → alert #N` for this result |
-  | **Dismiss** dropdown (_False positive_, _Used in tests_, _Won't fix_)                      | Writes a `dismissal` back to the alert; SARIF file is unchanged    |
+  | UI element                                                                              | SARIF field it comes from                                          |
+  | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+  | Bold header, e.g. **`Code scanning / diff-money-migration-prefixes`**                   | `runs[0].tool.driver.name`                                         |
+  | Rule ID chip, e.g. `money-migration-drift`                                              | `results[i].ruleId`                                                |
+  | Severity pill (**Error** in red)                                                        | `results[i].level` (`"error"` → red, `"warning"` → yellow)         |
+  | Message text — _"Required money migration not applied in live: prefix 20260715120000…"_ | `results[i].message.text`                                          |
+  | **View alert** link (bottom-right of panel)                                             | Deep-link to `Security → Code scanning → alert #N` for this result |
+  | **Dismiss** dropdown (_False positive_, _Used in tests_, _Won't fix_)                   | Writes a `dismissal` back to the alert; SARIF file is unchanged    |
 
 **Step 4 — Confirm the finding matches your local SARIF.**
 
@@ -2157,13 +2174,13 @@ reappears in the freshly uploaded SARIF:
 
 **Common gotchas.**
 
-| Symptom                                                        | Cause / fix                                                                                                                                                                              |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dismissed alert reappears as a **new** Open alert after re-run | The fingerprint changed (e.g. filename renamed, migrationVersion prefix shifted). Dismissals are per-fingerprint.                                                                        |
-| Alert stuck on **Open** even after applying the migration      | Wrong `TARGET_ENV` in the re-run — the job is still pointed at the environment where drift exists.                                                                                       |
-| PR annotation lingers after dismissal                          | Browser cache. Hard-reload the _Files changed_ tab.                                                                                                                                      |
-| Alert flips to **Fixed** then back to **Open** on the next run | Two workflows uploading with the **same** `category:` but different DB targets are overwriting each other. Give each env a distinct category (`money-migration-drift-sandbox`, `-live`). |
-| Timeline shows the re-run but status didn't change             | The re-run used a cached `diff.sarif` artifact instead of regenerating it. Confirm the CLI step actually ran (check the job log, not just `upload-sarif`).                               |
+| Symptom                                                        | Cause / fix                                                                                                                                                                       |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dismissed alert reappears as a **new** Open alert after re-run | The fingerprint changed (e.g. filename renamed, migrationVersion prefix shifted). Dismissals are per-fingerprint.                                                                 |
+| Alert stuck on **Open** even after applying the migration      | Wrong `TARGET_ENV` in the re-run — the job is still pointed at the environment where drift exists.                                                                                |
+| PR annotation lingers after dismissal                          | Browser cache. Hard-reload the _Files changed_ tab.                                                                                                                               |
+| Alert flips to **Fixed** then back to **Open** on the next run | Two workflows uploading with the **same** `category:` but different DB targets are overwriting each other. Give each target a distinct category (for example `prefix-diff-live`). |
+| Timeline shows the re-run but status didn't change             | The re-run used a cached `diff.sarif` artifact instead of regenerating it. Confirm the CLI step actually ran (check the job log, not just `upload-sarif`).                        |
 
 ##### Fingerprint collisions: when alerts merge vs split
 
@@ -2203,7 +2220,7 @@ the two results:
 | Different file, same line/message                    | **different**  | same               | same           | **1 alert.** Alert's _Location_ changes to the new URI. The previous file loses its annotation. Ambiguous — usually a fingerprint bug.                                                               |
 | Two results in the **same SARIF run** with same key  | any            | any                | any            | **1 alert.** GitHub keeps the **first** `results[]` entry and drops the rest silently. Check `jq '[.runs[0].results[] \| .partialFingerprints] \| group_by(.) \| map(select(length>1))' diff.sarif`. |
 | Different `ruleId`, same fingerprint                 | same           | same               | same           | **2 alerts.** `ruleId` is part of the key. Expected when a finding is reclassified.                                                                                                                  |
-| Same fingerprint, different upload `category:`       | same           | same               | same           | **2 alerts** (one per category stream). This is why sandbox/live use distinct categories.                                                                                                            |
+| Same fingerprint, different upload `category:`       | same           | same               | same           | **2 alerts** (one per category stream). This is why each target uses a distinct category.                                                                                                            |
 | Same fingerprint, different Git ref (branch/PR head) | same           | same               | same           | **2 alerts**, one per ref. Merging the PR into the default branch does **not** merge the alerts — the default-branch run creates its own.                                                            |
 
 **When alerts split (new alert appears instead of updating).**
@@ -2231,7 +2248,7 @@ Any of these will produce a fresh Open alert while the old one stays as
 - If you need to relocate a finding within the same file (line moved
   after a migration edit), let the fingerprint stay the same. The
   gutter marker follows to the new `startLine` automatically.
-- If you want the finding to **split** (e.g. sandbox vs live are now
+- If you want the finding to **split** (e.g. two targets are now
   genuinely separate findings), change the fingerprint deliberately
   (add `targetEnv` if you weren't already) and upload with distinct
   `category:` values.
@@ -2268,7 +2285,7 @@ top-to-bottom — the fixes are ordered by how often each one bites:
 | Upload step logs `Resource not accessible by integration`                   | Missing `permissions: security-events: write` on the workflow/job                                 | Add at the workflow or job level: `permissions:\n  security-events: write\n  contents: read`. Re-run.                                            |
 | Upload succeeds on PR but Security tab is empty for the PR head branch      | GitHub only stores PR-scoped alerts when the workflow runs on `pull_request`, not `push`          | Trigger the workflow on `pull_request:` (not only `push:`). Existing `push` runs populate the target branch instead.                             |
 | Findings show on default branch but not on the feature branch               | Same as above — `push` events attach findings to the pushed branch only                           | Push the branch, or add a `pull_request` trigger so the PR head branch gets its own scan.                                                        |
-| Sandbox and live findings collide / one overwrites the other                | Both uploads used the same `category:`                                                            | Give each env a distinct category: `category: money-migration-drift-sandbox` and `-live`. Findings are keyed on `(tool, category, ref)`.         |
+| Findings from two targets collide / one overwrites the other                | Both uploads used the same `category:`                                                            | Give each target a distinct category, for example `category: prefix-diff-live`. Findings are keyed on `(tool, category, ref)`.                   |
 | Fork PR: upload step is skipped with a permissions warning                  | GitHub blocks `security-events: write` for pull requests **from forks** by design                 | Expected. Findings only appear once the PR merges (workflow re-runs on `push` to the default branch) or when run via `pull_request_target`.      |
 | Security tab entirely missing from repo nav                                 | Repo is in an org that disabled Advanced Security, or you lack **Security** permission            | Org owner: **Organization → Settings → Code security** → enable. Individual: ask a maintainer for the **Security manager** role or write access. |
 | Findings visible in the Security tab but no red gutter on **Files changed** | PR annotations only render if the SARIF was uploaded from the **same PR run**, on the PR head SHA | Confirm the workflow ran on the PR (not just `main`). Re-run the workflow on the PR to attach annotations to the current head SHA.               |
@@ -2408,7 +2425,7 @@ export H_VER="X-GitHub-Api-Version: 2022-11-28"
    ```
 
    Fix: pick one stable category per environment
-   (`prefix-diff-sandbox`, `prefix-diff-live`) and don't rename it.
+   (for example `prefix-diff-live`) and don't rename it.
 
 8. **Code scanning disabled or permission missing.**
    The upload step would have failed loudly, but it's worth confirming
@@ -2480,11 +2497,11 @@ schema-valid SARIF 2.1.0 documents you can paste through
 [the OASIS SARIF validator](https://sarifweb.azurewebsites.net/Validation)
 or `jq` before wiring up `upload-sarif`.
 
-**Sample invocation** (drift against sandbox, file + stdout for inspection):
+**Sample invocation** (drift against production, file + stdout for inspection):
 
 ```bash
-TARGET_ENV=sandbox \
-SUPABASE_DB_URL_SANDBOX="postgres://..." \
+TARGET_ENV=live \
+SUPABASE_DB_URL="postgres://..." \
 node scripts/diff-money-migration-prefixes.mjs \
   --sarif --sarif-out=audit/money-migrations/diff.sarif
 
@@ -2547,7 +2564,7 @@ jq '{version, schema: ."$schema", runs: (.runs | length),
           "ruleId": "money-migration-drift",
           "level": "error",
           "message": {
-            "text": "Required money migration not applied in sandbox: prefix 20260715120000 (supabase/migrations/20260715120000_ai_credit_spend.sql)",
+            "text": "Required money migration not applied in live: prefix 20260715120000 (supabase/migrations/20260715120000_ai_credit_spend.sql)",
           },
           "locations": [
             {
@@ -2561,7 +2578,7 @@ jq '{version, schema: ."$schema", runs: (.runs | length),
           ],
           "partialFingerprints": {
             "migrationVersion": "20260715120000",
-            "targetEnv": "sandbox",
+            "targetEnv": "live",
           },
         },
       ],
@@ -2612,12 +2629,15 @@ outside Actions — useful for a quick eyeball, but the text diff on
 stdout is easier to read:
 
 ```bash
+# Requires SUPABASE_DB_URL to be exported already (read-only production check),
+# e.g. export SUPABASE_DB_URL="postgres://postgres:<PASSWORD>@db.<LIVE_REF>.supabase.co:5432/postgres"
+
 # Print annotations to stderr; keep the text diff on stdout.
-TARGET_ENV=sandbox node scripts/diff-money-migration-prefixes.mjs \
+TARGET_ENV=live node scripts/diff-money-migration-prefixes.mjs \
   --github-annotations
 
 # Capture just the annotations for inspection.
-TARGET_ENV=sandbox node scripts/diff-money-migration-prefixes.mjs \
+TARGET_ENV=live node scripts/diff-money-migration-prefixes.mjs \
   --github-annotations 2> annotations.txt
 ```
 
@@ -2635,13 +2655,16 @@ TARGET_ENV=live bun run prefix-diff:annotations
 2. The **PR "Files changed" tab**, as red gutter markers on the exact
    `supabase/migrations/<file>.sql` (or manifest) referenced by `file=`.
 
-Minimal step:
+Minimal step. It holds the production DB secret, so put it only in a job
+guarded like the canonical `prefix-diff-sarif.yml`: manual dispatch from the
+deploy branch, `inputs.confirm_live == 'LIVE'`, and
+`environment: verdant-production`. Never in a `pull_request` or `push` job.
 
 ```yaml
 - name: Prefix diff (annotations)
   env:
-    TARGET_ENV: sandbox
-    SUPABASE_DB_URL_SANDBOX: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+    TARGET_ENV: live
+    SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
   run: node scripts/diff-money-migration-prefixes.mjs --github-annotations
 ```
 
@@ -2655,34 +2678,33 @@ Common failure modes and the fastest fix for each. All apply to both
 `scripts/assert-required-money-migrations-applied.mjs` and
 `scripts/diff-money-migration-prefixes.mjs` unless noted.
 
-| Symptom                                                                   | Likely cause                                                                                                                        | Quickest fix                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`    | `SUPABASE_DB_URL` is not set                                                                                                        | `export SUPABASE_DB_URL=...` and set `TARGET_ENV=sandbox` or `TARGET_ENV=live` to match that connection. Verify with `env \| grep SUPABASE_DB_URL`.                                                                                                                           |
-| `psql: command not found` / `spawn psql ENOENT`                           | Postgres client not installed or not on `PATH`                                                                                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`.                                                                                                                                       |
-| Applied-check reports drift but sandbox is definitely up to date          | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox)                                                              | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.                                                                                                                                       |
-| `psql: FATAL: password authentication failed`                             | Stale or wrong pooler credentials in the DB URL                                                                                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`.                                                                                                                             |
-| `Tracker query failed` / SARIF `money-migration-tooling`                  | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB)                                                        | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.                                                                                                                                           |
-| Exit `1` immediately, no drift table                                      | Manifest entry missing a 14-digit prefix (`money-migration-malformed`)                                                              | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`.                                                                                                                       |
-| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs                                                                   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.                                                                                                                                                 |
-| CI green locally, red in Actions                                          | The protected environment's DB secret is missing or misnamed                                                                        | In **Settings → Environments**, verify `verdant-sandbox` has `SUPABASE_DB_URL_SANDBOX` and `verdant-production` has `SUPABASE_DB_URL`. Each workflow binds its environment secret to the process variable `SUPABASE_DB_URL`; neither uses `DATABASE_URL` or a fallback alias. |
-| Sandbox smoke script hangs                                                | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement                                                          | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                                                                                                                                                          |
-| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push.         |
+| Symptom                                                                   | Likely cause                                                                                                                        | Quickest fix                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`    | `SUPABASE_DB_URL` is not set                                                                                                        | `export SUPABASE_DB_URL=...` and set `TARGET_ENV=live` to match that connection. Verify it is set without printing it: `test -n "$SUPABASE_DB_URL" && echo set`.                                                                                                      |
+| `psql: command not found` / `spawn psql ENOENT`                           | Postgres client not installed or not on `PATH`                                                                                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`.                                                                                                                               |
+| Applied-check reports drift but the target is definitely up to date       | `TARGET_ENV` does not match the database the URL points at                                                                          | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.                                                                                                                               |
+| `psql: FATAL: password authentication failed`                             | Stale or wrong pooler credentials in the DB URL                                                                                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL" -c 'select 1'`.                                                                                                                             |
+| `Tracker query failed` / SARIF `money-migration-tooling`                  | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB)                                                        | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.                                                                                                                                   |
+| Exit `1` immediately, no drift table                                      | Manifest entry missing a 14-digit prefix (`money-migration-malformed`)                                                              | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`.                                                                                                               |
+| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs                                                                   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.                                                                                                                                         |
+| CI green locally, red in Actions                                          | The protected environment's DB secret is missing or misnamed                                                                        | In **Settings → Environments**, verify `verdant-production` has `SUPABASE_DB_URL`. The workflow binds that environment secret to the process variable `SUPABASE_DB_URL`; it uses no `DATABASE_URL` or fallback alias.                                                 |
+| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push. |
 
 ##### `--sarif` specific issues
 
 Symptoms and fixes unique to the SARIF output path:
 
-| Symptom                                                                                                       | Likely cause                                                                                                 | Quickest fix                                                                                                                               |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `jq: parse error: Invalid numeric literal` when piping `--sarif` into `jq`                                    | Text diff was mixed into stdout (e.g. `--sarif-out=PATH` was passed, so stdout has the human diff, not JSON) | For piping to `jq`, use `--sarif` **without** `--sarif-out`. Or read the file: `jq . audit/money-migrations/diff.sarif`.                   |
-| `jq: error: Cannot iterate over null` on `.runs[0].results[]`                                                 | Clean run — SARIF has an empty `results: []` array, which is valid                                           | Guard with `//`: `jq '.runs[0].results // [] \| length'`. Empty results = no drift, not a failure.                                         |
-| `upload-sarif` step: `Path does not exist: audit/money-migrations/diff.sarif`                                 | You passed `--sarif` (stdout) instead of `--sarif-out=PATH`, or the step exited before the file was written  | Always use `--sarif-out=PATH` in CI. Add `if: always()` on the upload step so tooling failures (exit `2`) still upload the SARIF.          |
-| `upload-sarif` rejects the file: `Invalid SARIF file`                                                         | stdout was redirected on top of workflow-command output, or the file is empty                                | Use `--sarif-out=PATH` (never `--sarif > path` in CI). Verify locally: `jq '.version, .runs \| length' path/to/diff.sarif`.                |
-| SARIF file exists but code scanning shows **no** findings on a known-drifted DB                               | Wrong `category:` on `upload-sarif`, or the file was overwritten by a later clean run                        | Use a stable `category: money-migration-drift` per env; upload sandbox and live to distinct categories so they don't overwrite.            |
-| Non-zero exit (`1` or `2`) fails the workflow before `upload-sarif` runs                                      | Default `run:` step short-circuits on non-zero exit                                                          | Append `\|\| true` to the diff step and gate the real failure on the `upload-sarif` outcome, or put `upload-sarif` under `if: always()`.   |
-| Exit `2` with SARIF that only contains a `money-migration-tooling` result                                     | DB URL missing, `psql` missing, or tracker query failed — no drift was actually evaluated                    | Fix the tooling cause first (see the main troubleshooting table). Exit `2` is never drift; treat it as infrastructure, not data.           |
-| SARIF `results[].locations[0].physicalLocation.artifactLocation.uri` is a manifest path, not a migration file | Finding is `money-migration-malformed` or `money-migration-tooling` — no specific migration to point at      | Expected. Only `money-migration-drift` results point at `supabase/migrations/<file>.sql`.                                                  |
-| Duplicate annotations in code scanning after re-running the workflow                                          | `partialFingerprints` mismatch (e.g. `TARGET_ENV` changed between runs)                                      | Keep `TARGET_ENV` stable per category. The script fingerprints on `(migrationVersion, targetEnv)` — changing either creates a new finding. |
+| Symptom                                                                                                       | Likely cause                                                                                                 | Quickest fix                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `jq: parse error: Invalid numeric literal` when piping `--sarif` into `jq`                                    | Text diff was mixed into stdout (e.g. `--sarif-out=PATH` was passed, so stdout has the human diff, not JSON) | For piping to `jq`, use `--sarif` **without** `--sarif-out`. Or read the file: `jq . audit/money-migrations/diff.sarif`.                                                       |
+| `jq: error: Cannot iterate over null` on `.runs[0].results[]`                                                 | Clean run — SARIF has an empty `results: []` array, which is valid                                           | Guard with `//`: `jq '.runs[0].results // [] \| length'`. Empty results = no drift, not a failure.                                                                             |
+| `upload-sarif` step: `Path does not exist: audit/money-migrations/diff.sarif`                                 | You passed `--sarif` (stdout) instead of `--sarif-out=PATH`, or the step exited before the file was written  | Always use `--sarif-out=PATH` in CI. Add `if: always()` on the upload step so tooling failures (exit `2`) still upload the SARIF.                                              |
+| `upload-sarif` rejects the file: `Invalid SARIF file`                                                         | stdout was redirected on top of workflow-command output, or the file is empty                                | Use `--sarif-out=PATH` (never `--sarif > path` in CI). Verify locally: `jq '.version, .runs \| length' path/to/diff.sarif`.                                                    |
+| SARIF file exists but code scanning shows **no** findings on a known-drifted DB                               | Wrong `category:` on `upload-sarif`, or the file was overwritten by a later clean run                        | Use a stable category per target. The canonical workflow uploads live results as `category: prefix-diff-live`; give any other target its own category so they don't overwrite. |
+| Non-zero exit (`1` or `2`) fails the workflow before `upload-sarif` runs                                      | Default `run:` step short-circuits on non-zero exit                                                          | Append `\|\| true` to the diff step and gate the real failure on the `upload-sarif` outcome, or put `upload-sarif` under `if: always()`.                                       |
+| Exit `2` with SARIF that only contains a `money-migration-tooling` result                                     | DB URL missing, `psql` missing, or tracker query failed — no drift was actually evaluated                    | Fix the tooling cause first (see the main troubleshooting table). Exit `2` is never drift; treat it as infrastructure, not data.                                               |
+| SARIF `results[].locations[0].physicalLocation.artifactLocation.uri` is a manifest path, not a migration file | Finding is `money-migration-malformed` or `money-migration-tooling` — no specific migration to point at      | Expected. Only `money-migration-drift` results point at `supabase/migrations/<file>.sql`.                                                                                      |
+| Duplicate annotations in code scanning after re-running the workflow                                          | `partialFingerprints` mismatch (e.g. `TARGET_ENV` changed between runs)                                      | Keep `TARGET_ENV` stable per category. The script fingerprints on `(migrationVersion, targetEnv)` — changing either creates a new finding.                                     |
 
 Still stuck? Run the diff CLI with `--json` and share the output — every
 failure mode is annotated with `target_env`, exit code, and the exact

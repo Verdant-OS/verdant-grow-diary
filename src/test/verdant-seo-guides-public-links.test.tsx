@@ -127,6 +127,14 @@ describe("/guides pages render publicly (no auth mounted)", () => {
     expect(screen.queryByTestId("app-shell")).toBeNull();
   });
 
+  it("/guides links to the public browser-local Grow Help Toolkit", () => {
+    renderGuides("/guides");
+    expect(screen.getByRole("link", { name: "Open the Grow Help Toolkit" })).toHaveAttribute(
+      "href",
+      "/tools/grow-help-toolkit",
+    );
+  });
+
   for (const slug of VERDANT_GUIDE_SLUGS) {
     it(`/guides/${slug} renders its guide content with no sign-in wall`, () => {
       renderGuides(`/guides/${slug}`);

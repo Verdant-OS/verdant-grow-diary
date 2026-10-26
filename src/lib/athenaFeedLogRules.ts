@@ -13,7 +13,7 @@ export const ATHENA_FEED_LOG_H1 = "Athena Feed Chart Log: Track What You Actuall
 export const ATHENA_FEED_LOG_DESCRIPTION =
   "Running the Athena feed chart? Log what you actually fed each week vs the Pro Line or Blended schedule, plus EC, pH and runoff. Free printable log." as const;
 
-export const ATHENA_FEED_LOG_CTA_HREF = "https://verdantgrowdiary.com/" as const;
+export const ATHENA_FEED_LOG_CTA_HREF = "/auth?mode=signup" as const;
 
 export const ATHENA_FEED_LOG_DISCLAIMER =
   "Athena, Athena Pro Line and Athena Blended are trademarks of their respective owners. Verdant Grow Diary is not affiliated with, sponsored by, or endorsed by Athena. Always follow the official feed schedule and product labels." as const;

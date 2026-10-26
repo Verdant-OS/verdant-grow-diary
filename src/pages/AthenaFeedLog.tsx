@@ -184,14 +184,14 @@ export default function AthenaFeedLog() {
   }
 
   const cta = (location: FeedLogCtaLocation) => (
-    <a
+    <Link
       className="inline-flex min-h-11 items-center rounded-md bg-emerald-900 px-4 text-sm font-semibold text-white"
-      href={ATHENA_FEED_LOG_CTA_HREF}
+      to={ATHENA_FEED_LOG_CTA_HREF}
       data-cta-location={location}
       onClick={() => onCta(location)}
     >
       Keep this log in Verdant&apos;s Quick Log →
-    </a>
+    </Link>
   );
 
   return (

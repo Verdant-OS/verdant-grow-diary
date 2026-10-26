@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { CRITICAL_READ_DEADLINE_MS } from "@/lib/boundedReadRules";
-import { GROW_READ_BUDGET_MS } from "@/lib/growsReadRetryRules";
+import { GROW_READ_BUDGET_MS, GROW_READ_RETRY_DELAYS_MS } from "@/lib/growsReadRetryRules";
 import { isDashboardSupplementalLoading } from "@/lib/dashboardSupplementalLoadingRules";
 import { resolveTimelineFetchScope } from "@/lib/timelinePageReadStateRules";
 
@@ -305,6 +305,14 @@ describe("plant list and environment trends", () => {
     const { result } = renderHook(() => useGrowPlants(), {
       wrapper: ({ children }) => wrap(children),
     });
+    expect(result.current.isPending).toBe(true);
+    // useGrowPlants retries a hung read. The first deadline plus the first
+    // backoff still leaves the query pending; the error lands after the next
+    // full deadline, which is what exhausts GROW_READ_BUDGET_MS.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS + GROW_READ_RETRY_DELAYS_MS[0]);
+    });
+    expect(result.current.isError).toBe(false);
     expect(result.current.isPending).toBe(true);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);

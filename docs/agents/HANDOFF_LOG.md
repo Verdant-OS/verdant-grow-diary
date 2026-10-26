@@ -80,9 +80,9 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/grower-dead-end-retries-4922 verdant-grow-diary && git switch cursor/grower-dead-end-retries-4922 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read the draft PR opened from this branch
 head_sha: read origin/cursor/grower-dead-end-retries-4922 after push
-state: implemented locally; hosted CI NOT_MEASURED until the push
-current_step: tent and plant critical reads use readTransientValue (same backoff as the grows list). Onboarding treats a null grows value as an empty list. Do not merge.
-next_action: Confirm 35/35 required checks at the pushed head. Keep the PR draft. No merge, auto-merge, or deploy.
+state: pushed draft; shards 4/32 and 21/32 failed at ede81a4c7a529c00d6a2a091c96cdb1f5618f615 because tests still expected a single plant attempt
+current_step: Stale pins updated. slow-loading plant hang waits through the first deadline plus the first backoff, then the second deadline. Tent plant-list call counts include the automatic retries plus the manual retry. Do not merge.
+next_action: Confirm 35/35 required checks at the new pushed head. Keep the PR draft. No merge, auto-merge, or deploy.
 post_merge_check: After merge, a signed-out check is NOT_APPLICABLE. On the next production deploy, confirm /onboarding renders for a new account and the dashboard does not stick on the unavailable card after one slow tent or plant read. Until that deploy, NOT_MEASURED.
 active_writer: Cursor Grok cloud agent
 decisions: Retry inside useGrowTents and useGrowPlants so the dashboard stays on the loading state until the bounded sequence finishes, then shows the existing Try again button. Do not retry permission or other non-retryable codes. Do not create a grow. Onboarding null-safety is local to the page because Sentry has no stack.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: Cursor cloud agent; no paused workflow
 claimed_by: Cursor Grok cloud agent, 2026-10-26
 owner: Cursor Grok cloud agent
-last_updated: 2026-10-26 11:10 CT, by Cursor Grok cloud agent
+last_updated: 2026-10-26 13:12 CT, by Cursor Grok cloud agent
 ```
 
 ### PR-2345-BASE-INTEGRATION

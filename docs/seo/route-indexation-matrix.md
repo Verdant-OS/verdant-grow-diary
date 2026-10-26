@@ -10,11 +10,11 @@
 - **Build artifacts** from `scripts/generate-seo-artifacts.ts` are `dist/seo-manifest.json` and per-route Open Graph PNGs. That script does not write per-route `index.html` files. There is no root `index.html` in this repository. `fileName` on each document is retained metadata.
 - **Client head** means `usePageSeo` (`src/hooks/usePageSeo.ts`). The default is `index, follow` and a self-canonical. `noindex: true` emits `noindex, follow`. It runs after hydration.
 - **Root shell** is `src/routes/__root.tsx`: `robots` `index, follow`, no canonical link, and sitewide Organization, WebSite, and SoftwareApplication JSON-LD. A route with no `head()` keeps that shell until a client head replaces it.
-- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (52 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
+- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (51 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
 - **robots.txt** crawl rules are separate from meta robots. `src/test/robots-private-route-coverage.test.ts` treats a rule as matching when the path equals it or starts with it. Whether a live crawler fetches a URL is **NOT_MEASURED**.
 - `vercel.json` redirects and the `/unsubscribe` `X-Robots-Tag` header are repository configuration. Whether the live host applies that file is **NOT_MEASURED**.
 
-`SITEMAP_ONLY_ROUTES` in `scripts/public-route-parity.config.mjs` still names `/`. `/` also has a static document and `staticRouteHead` in `src/routes/index.tsx`. `STATIC_ONLY_ROUTES` names only `/breeder-beta`.
+`SITEMAP_ONLY_ROUTES` in `scripts/public-route-parity.config.mjs` still names `/`. `/` also has a static document and `staticRouteHead` in `src/routes/index.tsx`. `STATIC_ONLY_ROUTES` names `/breeder-beta` and `/creator-beta`.
 
 ## Concrete static-document inventory
 
@@ -33,8 +33,8 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/ai-doctor-readiness-check` — robots `index, follow`; sitemap yes; canonical `/ai-doctor-readiness-check`
 - `/quick-log` — robots `index, follow`; sitemap yes; canonical `/quick-log`
 - `/glossary` — robots `index, follow`; sitemap yes; canonical `/glossary`
-- `/creator-beta` — robots `index, follow`; sitemap yes; canonical `/creator-beta`
-- `/breeder-beta` — robots `index, follow`; sitemap no; canonical `/creator-beta`
+- `/creator-beta` — robots `noindex, follow`; sitemap no; canonical `/creator-beta`
+- `/breeder-beta` — robots `noindex, follow`; sitemap no; canonical `/creator-beta`
 - `/pheno-comparison` — robots `index, follow`; sitemap yes; canonical `/pheno-comparison`
 - `/pheno-expression-showcase` — robots `index, follow`; sitemap yes; canonical `/pheno-expression-showcase`
 - `/privacy` — robots `index, follow`; sitemap yes; canonical `/privacy`
@@ -102,7 +102,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 
 `/docs/mcp-api` is in `public/sitemap.xml` and is not in `STATIC_ONLY_ROUTES`. A comment above that document in `src/lib/build/staticPublicSeoDocuments.ts` still says the route is static-only and absent from the sitemap. This inventory follows the document array, the allowlist, and `public/sitemap.xml`.
 
-`/breeder-beta` stays `index, follow` and points its canonical at `/creator-beta` (`crossCanonicalDocument` and `usePageSeo({ canonicalPath: "/creator-beta" })` in `src/pages/BreederBeta.tsx`). It is the only `STATIC_ONLY_ROUTES` entry, so it is not a sitemap URL.
+`/creator-beta` and `/breeder-beta` are `noindex, follow` (owner decision 2026-10-26: hide from search). `/breeder-beta` still points its canonical at `/creator-beta`. Both are `STATIC_ONLY_ROUTES`, so neither is a sitemap URL. `CreatorBeta.tsx` and `BreederBeta.tsx` pass `noindex: true` so hydration keeps `noindex, follow`.
 
 `/pheno-comparison` and `/pheno-expression-showcase` are `index, follow` static documents and sitemap URLs. Their pages call `usePageSeo` without `noindex`.
 

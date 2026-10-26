@@ -56,6 +56,8 @@ const INDEX_HTML_FIXTURE = `<!doctype html><html><head>
 <link rel="canonical" href="${VERDANT_SITE_ORIGIN}" />
 </head><body></body></html>`;
 
+const HIDDEN_FROM_SEARCH = new Set(["/creator-beta", "/breeder-beta"]);
+
 function tokenize(content: string): string[] {
   return content
     .split(",")
@@ -64,12 +66,21 @@ function tokenize(content: string): string[] {
 }
 
 describe("static social documents: no conflicting robots directives", () => {
+  it("keeps the owner-hidden beta routes on noindex, follow", () => {
+    for (const path of HIDDEN_FROM_SEARCH) {
+      const doc = STATIC_PUBLIC_SEO_DOCUMENTS.find((candidate) => candidate.path === path);
+      expect(doc, path).toBeTruthy();
+      expect(doc?.metadata.robots).toBe("noindex, follow");
+    }
+  });
+
   it("has documents to check", () => {
     expect(STATIC_PUBLIC_SEO_DOCUMENTS.length).toBeGreaterThan(0);
   });
 
   it("no document metadata declares a blocking robots directive", () => {
     for (const doc of STATIC_PUBLIC_SEO_DOCUMENTS) {
+      if (HIDDEN_FROM_SEARCH.has(doc.path)) continue;
       const declared = doc.metadata.robots;
       if (!declared) continue; // undefined → builder defaults to "index, follow"
       const tokens = tokenize(declared);
@@ -84,6 +95,7 @@ describe("static social documents: no conflicting robots directives", () => {
 
   it("built HTML for every document emits exactly one indexable robots meta and no blocking sibling directives", () => {
     for (const doc of STATIC_PUBLIC_SEO_DOCUMENTS) {
+      if (HIDDEN_FROM_SEARCH.has(doc.path)) continue;
       const html = buildStaticSocialRouteHtml(INDEX_HTML_FIXTURE, doc.metadata);
 
       // Exactly one <meta name="robots"> — duplicates let the most

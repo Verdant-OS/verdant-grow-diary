@@ -4,8 +4,8 @@
  * /breeder-beta and /creator-beta render the same <BetaLanding> component and
  * differ only in kicker, support copy, and meta description. Two self-canonical
  * near-duplicates would compete on the same queries, so /breeder-beta concedes
- * its ranking URL to /creator-beta while STAYING INDEXABLE for direct and paid
- * traffic.
+ * its ranking URL to /creator-beta. On 2026-10-26 the owner hid both URLs
+ * from search: noindex, follow, and neither loc is in the sitemap.
  *
  * That contract has three independently breakable halves, and a regression in
  * any one of them is silent — the page keeps rendering, and only the index
@@ -25,6 +25,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 
 import {
   STATIC_PUBLIC_SEO_DOCUMENTS,
@@ -37,8 +38,6 @@ const REPO = resolve(__dirname, "../..");
 const VARIANT = "/breeder-beta";
 const CANONICAL = "/creator-beta";
 const CANONICAL_URL = `${VERDANT_SITE_ORIGIN}${CANONICAL}`;
-
-const BLOCKING_DIRECTIVES = ["noindex", "nofollow", "none"] as const;
 
 /**
  * Minimal shell mirroring the tags staticSocialRouteHtml.ts rewrites, matching
@@ -102,20 +101,13 @@ describe("/breeder-beta → /creator-beta cross-canonical", () => {
     expect(variant.metadata.description.toLowerCase()).toContain("breeder");
   });
 
-  it("stays affirmatively indexable — a cross-canonical must not also be noindex", () => {
-    // noindex + cross-canonical are contradictory instructions about one URL.
+  it("is noindex, follow in the static HTML fallback", () => {
     const html = buildStaticSocialRouteHtml(INDEX_HTML_FIXTURE, documentFor(VARIANT).metadata);
     const robots = [
       ...html.matchAll(/<meta\s+name=["']robots["']\s+content=["']([^"']+)["']/gi),
     ].map((m) => m[1]);
     expect(robots, "expected exactly one robots meta").toHaveLength(1);
-    const tokens = robots[0].split(",").map((t) => t.trim().toLowerCase());
-    for (const blocking of BLOCKING_DIRECTIVES) {
-      expect(tokens, `robots="${robots[0]}" must not contain "${blocking}"`).not.toContain(
-        blocking,
-      );
-    }
-    expect(tokens).toContain("index");
+    expect(robots[0]).toBe("noindex, follow");
   });
 
   it("emits canonical and og:url in agreement, both on the canonical target", () => {
@@ -133,16 +125,11 @@ describe("/breeder-beta → /creator-beta cross-canonical", () => {
     expect(ogUrls[0], "og:url disagreeing with canonical sends two answers").toBe(canonicals[0]);
   });
 
-  it("the runtime page names the same canonical target as the build-time document", () => {
-    // The silent killer: usePageSeo runs after hydration and rewrites the head,
-    // so a self-canonical here defeats the pre-rendered one for Googlebot.
-    const source = readFileSync(resolve(REPO, "src/pages/BreederBeta.tsx"), "utf8");
-    const match = source.match(/canonicalPath:\s*"([^"]+)"/);
-    expect(match, "BreederBeta.tsx must pass canonicalPath to usePageSeo").toBeTruthy();
-    expect(match?.[1]).toBe(CANONICAL);
-    expect(match?.[1], "runtime and build-time canonical targets must agree").toBe(
-      (documentFor(VARIANT) as { canonicalPath?: string }).canonicalPath,
-    );
+  it("the route head for both beta URLs is noindex, follow", () => {
+    for (const path of [VARIANT, CANONICAL]) {
+      const robots = staticRouteHead(path).meta.find((entry) => entry.name === "robots");
+      expect(robots?.content).toBe("noindex, follow");
+    }
   });
 
   it("is excluded from the sitemap — never advertise a URL that disclaims itself", () => {
@@ -151,9 +138,10 @@ describe("/breeder-beta → /creator-beta cross-canonical", () => {
     expect(STATIC_ONLY_ROUTES as readonly string[]).toContain(VARIANT);
   });
 
-  it("the canonical target IS advertised — conceding only makes sense if one ranks", () => {
+  it("the canonical target is also hidden from the sitemap", () => {
     const sitemap = readFileSync(resolve(REPO, "public/sitemap.xml"), "utf8");
-    expect(sitemap).toContain(`<loc>${CANONICAL_URL}</loc>`);
-    expect(STATIC_ONLY_ROUTES as readonly string[]).not.toContain(CANONICAL);
+    expect(sitemap).not.toContain(`<loc>${CANONICAL_URL}</loc>`);
+    expect(STATIC_ONLY_ROUTES as readonly string[]).toContain(CANONICAL);
+    expect(documentFor(CANONICAL).metadata.robots).toBe("noindex, follow");
   });
 });

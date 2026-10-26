@@ -662,19 +662,17 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "Controlled beta for growers, breeders, and educators. Logs, photos, sensors, and phenotype notes become one plant history.",
     imageAlt: "Verdant Creator & Breeder Beta",
+    robots: "noindex, follow",
   }),
-  // Owner adjudication 2026-08-20: /breeder-beta keeps its breeder-oriented
-  // title and description and stays indexable, but concedes its ranking URL to
-  // /creator-beta. Both routes render the same <BetaLanding> component —
-  // measured 233 of ~237 shared unique visible tokens, identical h1 and every
-  // h2 — so two self-canonical URLs would compete on the same queries.
-  // It is intentionally absent from public/sitemap.xml: never advertise a URL
-  // whose canonical points somewhere else. See scripts/public-route-parity.config.mjs.
+  // Owner decision 2026-10-26: hide both beta URLs from search. /breeder-beta
+  // still canonicalises to /creator-beta and keeps its own title and
+  // description. Both are noindex, follow and stay out of the sitemap.
   crossCanonicalDocument("/breeder-beta", "/creator-beta", {
     title: "Verdant Breeder Beta | Verdant Grow Diary",
     description:
       "Controlled beta for breeders and pheno hunters. Lab evidence and sensory notes stay recorded. The breeder decides what advances.",
     imageAlt: "Verdant Breeder Beta",
+    robots: "noindex, follow",
   }),
   publicDocument("/pheno-comparison", {
     title: "Pheno Comparison Preview — Verdant Grow Diary",

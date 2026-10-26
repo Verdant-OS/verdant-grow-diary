@@ -81,8 +81,8 @@ checkout: git fetch origin cursor/public-seo-audit-fixes-0b51 verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2543 (draft)
 head_sha: read origin/cursor/public-seo-audit-fixes-0b51 after the pin-renegotiation push; implementation parent is ef9c6e3754e8cdac950a7ec31500a0f934ac2d6d
 state: implemented locally, draft after push
-current_step: Article JSON-LD is emitted for every VERDANT_SEO_GUIDES page and the grow-stage care guide. datePublished is included only when publishedOn exists. Organization logo on the root graph is an ImageObject. IndexNow is a public key file plus scripts/indexnow-submit.mjs, which does not call the network unless INDEXNOW_SUBMIT=1. /creator-beta stays in the sitemap and is not newly linked.
-next_action: Keep the PR draft. Do not merge, enqueue, or deploy. Enable IndexNow only after this commit is live by running INDEXNOW_SUBMIT=1 node scripts/indexnow-submit.mjs. Cheeko decides whether /creator-beta should gain an internal link or be noindexed.
+current_step: Article JSON-LD is emitted for every VERDANT_SEO_GUIDES page and the grow-stage care guide. /creator-beta and /breeder-beta are noindex, follow and absent from the sitemap (owner decision 2026-10-26).
+next_action: Keep the PR draft. Do not merge, enqueue, or deploy. Enable IndexNow only after this commit is live by running INDEXNOW_SUBMIT=1 node scripts/indexnow-submit.mjs.
 post_merge_check: After merge and publish, confirm a guide URL without publishedOn contains an Article script and that https://verdantgrowdiary.com/a7c3e91b4d8f2e6c0b5a19d47e83f012.txt returns the key. NOT_MEASURED until then.
 active_writer: Cursor Grok cloud agent
 decisions: Do not invent publication dates. Do not add sameAs; the repo has no public social profile URLs. Do not remove any noindex. Do not link /creator-beta; the 2026-08-20 sitemap comment already chose to advertise it. Renegotiated pins: scripts/validate-jsonld-rich-results.mjs (missing datePublished is a warning), src/test/verdant-guides-glossary-head-invariants.test.ts, src/test/static-public-seo-documents.test.ts, src/test/verdant-seo-guides-render.test.tsx (undated guides emit Article and omit dates), src/test/grow-stage-care-schema-ssr.test.tsx (one Article, still no dates).
@@ -91,7 +91,7 @@ commands: bunx vitest run src/test/public-seo-article-and-meta.test.tsx src/test
 files_touched: src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/routes/__root.tsx; src/hooks/usePageSeo.ts; src/constants/verdantSeoContent.ts; src/constants/publicQuickLogStarterCopy.ts; src/pages/GuidePage.tsx; src/pages/GuidesIndex.tsx; src/pages/PublicVpdCalculator.tsx; src/pages/HardwareIntegrations.tsx; src/pages/CreatorBeta.tsx; src/pages/BreederBeta.tsx; src/pages/PhenoExpressionShowcase.tsx; scripts/validate-jsonld-rich-results.mjs; scripts/indexnow-submit.mjs; public/a7c3e91b4d8f2e6c0b5a19d47e83f012.txt; src/test/public-seo-article-and-meta.test.tsx; src/test/verdant-guides-glossary-head-invariants.test.ts; src/test/static-public-seo-documents.test.ts; src/test/verdant-seo-guides-render.test.tsx; src/test/grow-stage-care-schema-ssr.test.tsx; docs/agents/HANDOFF_LOG.md
 files_remaining: none in this slice
 blockers: independent exact-head review not requested; PR stays draft
-open_questions: whether Cheeko wants /creator-beta linked or noindexed
+open_questions: none for creator-beta; Cheeko chose hide from search on 2026-10-26
 gotchas: A new head invalidates review. Do not run the IndexNow script with INDEXNOW_SUBMIT=1 from an agent session. Legal descriptions were already under 160 characters and were not edited.
 links: Ahrefs crawl 2026-10-21 01:33 UTC summarized in the task upload
 artifacts: src/test/public-seo-article-and-meta.test.tsx
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: Cursor cloud agent; draft only; no production ping
 claimed_by: Cursor Grok cloud agent, 2026-10-26 16:55 UTC
 owner: Cursor Grok cloud agent
-last_updated: 2026-10-26 13:20 CT, by Cursor Grok cloud agent
+last_updated: 2026-10-26 14:17 CT, by Cursor Grok cloud agent
 ```
 
 ### PR-2345-BASE-INTEGRATION

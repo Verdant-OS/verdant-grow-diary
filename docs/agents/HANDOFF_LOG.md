@@ -79,9 +79,9 @@ branch: cursor/cronk-nutrients-feed-log-26be
 base: verdant-grow-diary
 checkout: git fetch origin cursor/cronk-nutrients-feed-log-26be verdant-grow-diary && git switch cursor/cronk-nutrients-feed-log-26be
 pr: draft, created after the first push; see the PR for this branch
-head_sha: recorded in the follow-up handoff update on this branch after the implementation commit
-state: implemented locally; not pushed at the time this block was first written
-current_step: Unit tests for the feed log, sitemap custom URL, and static SEO documents passed. Draft PR is the next step.
+head_sha: de07d89686245c380fee1a975902ab2ac76c00e4 (implementation). This handoff line update follows in the next commit on the same branch.
+state: implemented and committed locally; push and draft PR follow
+current_step: Implementation commit de07d8968 passed the pre-commit typecheck, docs safety, and the feed-log vitest set. Draft PR is the next step.
 next_action: Push the branch and open one draft PR against verdant-grow-diary. Do not merge, publish, or enqueue.
 post_merge_check: After merge and publish, https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary serves the H1 "Cronk Nutrients Grow Diary: Log Your Feeding Chart, Planned vs Actual" and canonical /guides/cronk-nutrients-grow-diary. Until publish this is NOT_MEASURED.
 active_writer: Cursor cloud agent on cursor/cronk-nutrients-feed-log-26be (Grok session assigned this slice). Do not push claude/* branches.

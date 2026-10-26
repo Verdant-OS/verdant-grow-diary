@@ -75,18 +75,21 @@ active checkout has the branch open; inspect worktree ownership before selecting
 TASK SPEC-2503-VPD-CORRECTION-TENT-HISTORY-DEDUPE  priority: P2  status: OPEN
 goal: Specification only (Matthew approved writing it 2026-10-23) for the additive fix behind #2503: a VPD correction must not double a Plant Quick Log save in tent history. No migration written or applied.
 branch: claude/vibrant-heisenberg-njd6r3
-base: verdant-grow-diary at 65d9964e49eb4b95910bedc59d288d747461da79
+base: verdant-grow-diary; PR base SHA observed 2026-10-26: 37202b540d00cafd3d31848136225e7cd147d1d3
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (marked ready for review by its owner after 17:05 UTC 2026-10-24; this session left that owner decision in place)
-head_sha: 6fcc25f8dcb80877bc53b2b399b645947690502b (observed 2026-10-25 01:49 UTC, 35/35 required checks green there; descends from the 14:13 UTC claim head ab9c90a8 through review fixes and base merges listed on the PR, including the uncredited acceptance-text fix f05e0106). The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (draft restored and read back on 2026-10-26; stay draft pending required checks and independent acceptance)
+head_sha: 81a834c301e165058bfe061a844774e2ca51aa47 (observed 2026-10-26 before this documentation repair). This recording commit is on top of that parent; read the PR's resulting full remote head and repair receipt before resuming. The parent's checks and review do not establish readiness of the new head.
 state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
-next_action: Route an eligible independent review of the spec at its exact head. Matthew's option choice and the migration's per-PR decision remain his.
+current_step: Codex repaired the remaining documentation findings: fixed captured timestamps and two-run fixture repeatability; #2503 closure/precondition and separate apply authorization before production SQL; acceptance cross-references and complete contributor exclusions. No migration or client implementation is included.
+next_action: Verify the resulting full remote head and fresh required CI, then route one eligible non-contributing reviewer over both changed files. No acceptance request or PASS is implied by this repair. Matthew's migration implementation/per-PR/apply decisions remain separate.
 files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
-blockers: Slice 2 is blocked on its real-write-path fixture, which only the slice 1 harness can produce, and slice 1 (migration + harness) waits on Matthew's per-PR migration decision. #2504's code dependency is cleared (merged as 3ef43ee49). The migration is Matthew's per-PR decision; applying 20261014210000 stays blocked by #2503.
+blockers: New-head required CI and eligible independent acceptance remain pending. Slice 2 is blocked on its real-write-path fixture, which only the separately authorized slice 1 harness can produce. #2504's code dependency is cleared (merged as 3ef43ee49). Applying 20261014210000 stays blocked by #2503 and Matthew's separate production-apply authorization.
 artifacts: the spec file above
-reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3. Excluded: author Claude session 01QxMpAHgnpV65y3Yykv8CvE, and the Grok cloud review-fix session (commits 6a30b7ae, e29a451f, ab9c90a8, authored as Cursor Agent) as repairer
-claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-24 14:13 UTC (Matthew reassigned it; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6385243811)
-last_updated: 2026-10-25 01:52 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §4.3. Excluded: author Claude session 01QxMpAHgnpV65y3Yykv8CvE; the Grok cloud review-fix session (commits 6a30b7ae, e29a451f, ab9c90a8, authored as Cursor Agent); the unverified writer of f05e0106; Codex /root ChatGPT Work Mode documentation repair session of 2026-10-26; and any later repairer.
+review_request: blocked pending the repaired full head and fresh required CI; no duplicate request sent; reviewer unassigned; fallback transfers 0
+active_writer: Codex /root, ChatGPT Work Mode, for this bounded documentation repair only; no migration or client implementation claim
+claimed_by: Codex /root, 2026-10-26, following Matthew's direct "Fix" instruction; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6423583100. Prior Claude authorship/claim remains historical: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6385243811. No contributor may accept this repair.
+last_updated: 2026-10-26, by Codex /root (ChatGPT Work Mode); final validation and full head are recorded on the PR repair receipt
 ```
 
 ### PR-2345-BASE-INTEGRATION

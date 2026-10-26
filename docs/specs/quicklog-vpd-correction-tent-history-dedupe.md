@@ -318,8 +318,22 @@ harness. It contains:
 
 Normalisation is deterministic: UUIDs map to placeholders in order of first appearance, and each
 distinct `created_at` maps to a fixed ISO string that keeps its equality class and microsecond
-format. `occurred_at` is set by the harness, so it is real. **The test file must not build row
-shapes itself.**
+format. `occurred_at` is set by the harness, so it is real.
+
+Every real `quicklog_save_manual` call that contributes to the fixture must also supply a fixed,
+valid `p_details.logged_at` string with an explicit UTC offset, reused on exact retries. Without
+it, the wrapper uses `clock_timestamp()` (`20261013180000:286-297`) and persists that varying
+value in both `diary_entries.logged_at` and `details.logged_at` (`:421-425`). Read back both
+copies and the parent `grow_events.logged_at`: each must represent the supplied captured
+instant. S5's explicitly synthetic legacy row must likewise use fixed `logged_at` values in
+both its column and details. Do not replace `occurred_at` with `logged_at`, collapse distinct
+`created_at` equality classes, or discard microsecond precision to make the fixture stable.
+
+Generate the fixture twice from fresh disposable databases, with the same scenario inputs and
+normalisation, and require byte-identical output. Then require `--check` to pass against the
+committed fixture. These are implementation acceptance requirements; this specification PR
+does not implement or run the proposed harness. **The test file must not build row shapes
+itself.**
 
 New `src/test/tent-history-vpd-correction-write-path.test.ts`:
 
@@ -360,22 +374,37 @@ Slice 1 is the migration file and its harness together. The harness applies that
 does not ship ahead of the migration and it does not become required CI before Matthew's
 per-PR decision on the migration.
 
-Slice 2's test reads a fixture the harness writes. Commit that fixture from one disposable
-harness run inside the slice 1 change; do not hand-build it. Slice 2 is gated on that committed
-fixture, not on applying the migration in production. Slice 2's rule change may merge before
+Slice 2's test reads a fixture the harness writes. Commit that fixture inside the slice 1 change
+only after the two fresh runs and `--check` in §6.2 agree; do not hand-build it. Slice 2 is gated
+on that committed fixture, not on applying the migration in production. Slice 2's rule change may merge before
 that apply: a sibling with matching readings is claimed under either rule (T1, T4, T5); the
 only new claim is the VPD-corrected sibling the value rule refuses (T2); an independent save is
 never claimed (T3).
 
 ## 8. Release and apply order (Matthew's decisions)
 
-1. Merge slice 1 and slice 2. A merge applies nothing.
-2. In one apply session: `20261014210000`, then this migration. Run the read-back: P5's privilege
-   checks plus the new fingerprint.
-3. Then close #2503.
+Approval of this specification does not authorize writing a migration, merging a migration PR,
+publishing the client, applying production SQL, or changing production records.
 
-If step 2 is split, corrections made in between keep no mirror VPD (R2 unmet for those rows; R1
-still met by C).
+1. After separate implementation authorization, complete both slices and their regression
+   evidence. Merge only through the applicable exact-head review and CI gates; the migration
+   PR also requires Matthew's explicit decision. A merge applies nothing and proves no release.
+2. Attach the implementation and regression evidence to #2503 for review. Its existing
+   precondition must be satisfied and the issue closed before `20261014210000` is applied.
+   Do not close the issue merely because this specification is accepted. If the issue must
+   instead remain open through post-apply verification, stop: Matthew must explicitly revise
+   that precondition before any apply. This document does not revise or release the hold.
+3. Obtain Matthew's separate authorization for production apply, and verify the authorized
+   client release is live before applying SQL. Issue closure, a code merge, and documentation
+   acceptance are not production-apply authorization.
+4. Only after those gates, apply `20261014210000`, then the new additive migration, in one
+   authorized apply session. Run the read-back: P5's privilege checks plus the new fingerprint.
+5. Record post-apply read-back and the fixture-grow smoke result separately, linked to #2503.
+   Until performed, production behavior remains NOT_MEASURED; closing the precondition issue
+   does not establish runtime acceptance.
+
+If step 4 is split, corrections made in between keep no mirror VPD (R2 unmet for those rows; R1
+still met by C once the client change is live).
 
 ## 9. Known unknowns
 
@@ -402,12 +431,15 @@ still met by C).
       with `sensor_values: {"vpd_kpa": null}` and asserts `invalid_changes` with mirror `details`
       unchanged. P10 runs the step-5 postflight slice against the new body.
 - [ ] T1–T9 pass; all three negative gates shown failing, then restored.
+- [ ] Two fresh disposable harness runs produce byte-identical fixtures with the fixed
+      captured timestamps required by §6.2; `--check` passes against the committed fixture.
 - [ ] `config/local-supabase-replay-compatibility.json` unchanged; the `Published migration
 integrity` gate green; no merged migration edited.
 - [ ] No table, column, policy, grant or RLS change (diff check).
 - [ ] 35/35 required checks plus an eligible independent PASS at the exact head, per
       `AGENTS.md`. The migration PR also needs Matthew's explicit per-PR decision.
-- [ ] Production: after step 8.2, a smoke correction on the fixture grow only
+- [ ] Production: after the authorization and apply gates in §8 steps 2–4, a smoke correction
+      on the fixture grow only
       (`[smoke <timestamp>]`, per `docs/production-only-verification-runbook.md`) shows one card
       with the measured VPD. Until then: NOT_MEASURED.
 
@@ -435,6 +467,10 @@ did not write or repair this spec or either slice. Excluded from accepting the s
 
 - its author, Claude session `01QxMpAHgnpV65y3Yykv8CvE`;
 - the Grok cloud review-fix session that pushed `6a30b7ae`, `e29a451f` and `ab9c90a8` (authored
-  as Cursor Agent), as a repairer.
+  as Cursor Agent), as a repairer;
+- the writer of `f05e0106`, whose session identity has not been verified (Claude recorded the
+  exclusion in PR #2508 comment `6391624485`);
+- Codex /root in ChatGPT Work Mode, the documentation repairer assigned on 2026-10-26
+  (PR #2508 claim `6423583100`), and any later repairer.
 
 A non-contributing Grok or Claude session stays eligible.

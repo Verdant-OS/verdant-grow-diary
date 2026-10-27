@@ -69,6 +69,41 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ACTIONS-BACKLOG-CONCURRENCY
+
+```text
+TASK ACTIONS-BACKLOG-CONCURRENCY  priority: P2  status: OPEN
+goal: Cut the hosted-runner queue by cancelling superseded pull_request runs, skipping heavy jobs on draft PRs, and capping ci.yml shard parallelism at 8.
+why: The org cap is 20 concurrent Linux jobs and was full. ci.yml's 32 required shards alone exceed that cap on one push. Superseded heads were still occupying slots.
+branch: cursor/actions-backlog-concurrency-58cd
+base: verdant-grow-diary
+checkout: git fetch origin cursor/actions-backlog-concurrency-58cd verdant-grow-diary && git switch cursor/actions-backlog-concurrency-58cd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: draft PR URL is in the pull request for this branch
+head_sha: set after the push that contains this block
+state: pushed draft after this commit
+current_step: Workflow edits and pin updates are local until this commit is pushed.
+next_action: Read the draft PR, confirm it stays draft, and do not mark it ready, enqueue it, or merge it.
+post_merge_check: After a separately authorized merge, confirm a ready PR and a merge_group run still report all 35 required contexts from ci.yml, and that a draft PR skips the 32 shards. NOT_MEASURED until merged.
+active_writer: Grok cloud agent on cursor/actions-backlog-concurrency-58cd
+decisions: Do not reduce the 32 shard matrix. Those names are the ruleset required checks. Add max-parallel 8. Skip heavy jobs on draft with a job-level if so they report Skipped. Leave Preflight and test:legal-seo unconditional. Leave security-regression unconditional because mustBeGreen alwaysRuns treats a skip as a failure. Cancel in progress only when github.event_name == pull_request. Do not add paths filters to ci.yml.
+tried_and_rejected: Cutting the shard count was rejected because the ruleset expects Full test suite (shard N/32) for N=1..32. A missing name stays Expected and blocks the merge queue.
+commands: bunx vitest run src/test/ci-pr-concurrency.test.ts src/test/deployment-preview-status-classification.test.ts --reporter=dot; node scripts/scorer-lock.mjs --report --strict
+files_touched: .github/workflows listed in the PR; src/test/ci-pr-concurrency.test.ts; src/test/deployment-preview-status-classification.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned
+blockers: none for the draft. Independent exact-head review is not requested while the PR stays draft.
+open_questions: none
+gotchas: HOLD #1250 files migration-drift-probe.yml and money-migration-drift-alert.yml were not edited. Job-level skip on a draft reports Skipped, which branch protection treats as success. Ready PRs and merge_group still run the heavy jobs. max-parallel 8 also applies on the deploy branch push and merge_group.
+links: config/required-status-checks.json; deploy CI runs 40461983713, 40468073006, 40458653770
+artifacts: scorer unlock is gitignored at .claude/scorer-unlock.json
+reviewer_seat: not requested; this PR stays draft
+reviewer_sha: NOT_MEASURED
+session_state: no production action
+claimed_by: Grok, 2026-10-27 11:30 CT
+owner: Grok
+last_updated: 2026-10-27 11:30 CT, by Grok
+limits: Draft only. No repo settings, rulesets, secrets, runner config, force-push, or bun.lock change.
+```
+
 ### PR2511-REQUIRED-TRIGGER-GUARDS
 
 ```text

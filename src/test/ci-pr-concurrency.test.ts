@@ -8,7 +8,14 @@ type Workflow = {
   concurrency?: { group: string; "cancel-in-progress": boolean | string };
   jobs: Record<
     string,
-    { name?: string; if?: string; strategy?: { matrix?: { shard?: number[]; batch?: number[] } } }
+    {
+      name?: string;
+      if?: string;
+      strategy?: {
+        "max-parallel"?: number;
+        matrix?: { shard?: number[]; batch?: number[] };
+      };
+    }
   >;
 };
 
@@ -188,6 +195,19 @@ describe("resolved PR workflow concurrency", () => {
     }
   });
 
+  it("cancels superseded pull_request runs and no other event", () => {
+    const allowed = new Set([
+      cancelSupersededPr,
+      "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/verdant-grow-diary' && github.ref != 'refs/heads/main') }}",
+    ]);
+    const offenders = prWorkflows
+      .filter(({ workflow }) => !allowed.has(String(workflow.concurrency?.["cancel-in-progress"])))
+      .map(
+        ({ name, workflow }) => `${name}:${String(workflow.concurrency?.["cancel-in-progress"])}`,
+      );
+    expect(offenders).toEqual([]);
+  });
+
   it("cancels superseded feature-branch pushes of the non-required tsgo build", () => {
     expect(readWorkflow("typecheck-build-push.yml").concurrency).toEqual({
       group: "${{ github.workflow }}-${{ github.ref }}",
@@ -236,12 +256,21 @@ describe("resolved PR workflow concurrency", () => {
     expect(ci.jobs["full-suite"].strategy?.matrix?.shard).toEqual(
       Array.from({ length: 32 }, (_, index) => index + 1),
     );
+    expect(ci.jobs["full-suite"].strategy?.["max-parallel"]).toBe(8);
     expect(ci.jobs.test.name).toBe("Lint, typecheck, test, build");
     expect(ci.jobs["edge-shared-sync-preflight"].name).toBe(
       "Preflight — edge shared-lib mirror in sync",
     );
     expect(ci.jobs["legal-seo"].name).toBe("test:legal-seo");
-    for (const job of Object.values(ci.jobs)) expect(job.if).toBeUndefined();
+    const heavyDraftSkip =
+      "github.event_name != 'pull_request' || github.event.pull_request.draft == false";
+    // Heavy required jobs skip on drafts (Skipped satisfies the ruleset) and run
+    // when the PR is ready and on merge_group. Cheap required jobs stay unconditional.
+    expect(ci.jobs.test.if).toBe(heavyDraftSkip);
+    expect(ci.jobs["full-suite"].if).toBe(heavyDraftSkip);
+    expect(ci.jobs["quicklog-correction-measured-values"].if).toBe(heavyDraftSkip);
+    expect(ci.jobs["edge-shared-sync-preflight"].if).toBeUndefined();
+    expect(ci.jobs["legal-seo"].if).toBeUndefined();
     expect(readWorkflow("security-regression.yml").jobs["test-security-regression"].if).toBe(
       undefined,
     );

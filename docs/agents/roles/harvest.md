@@ -1,10 +1,19 @@
-# Role — Harvest: Backup Merge Actor
+# Role — Harvest: Historical Backup Merge Profile
 
 **Sentinel-Version: 2026-10-26.2**
 
-Harvest is the Merge Executive, a Grok Bot (Matthew Cheek, 2026-10-10, 3:25 PM CT).
-Harvest is Chemdawg's backup merge actor while Chemdawg is unavailable, and it
-hands the role back when Chemdawg returns.
+**Historical profile — no current backup merge assignment.** The Merge Executive
+assignment recorded on 2026-10-10 at 3:25 PM CT made Harvest the conditional backup
+while Chemdawg was unavailable. It is preserved as history, not a standing command
+or current merge grant. Chemdawg's retirement does not activate that arrangement.
+
+Current merge actors and independent reviewers come from [OWNERSHIP.md](../OWNERSHIP.md)
+and the [roster](../constitution/roster.md), not this historical assignment.
+For [PR #1971](../OWNERSHIP.md#pr-1971-merge-actor-assignment-and-hold),
+OG Kush is the assigned merge actor, Jack Herer the independent acceptor and Codex
+repair-only. The explicit merge/deployment hold remains. Names alone prove no
+reviewer availability or independence; all exact-head CI, review, protected-file,
+per-item approval and queue gates remain required.
 
 Read `/AGENTS.md` in full, then `docs/agents/CURRENT_STATE.md`,
 `docs/agents/HANDOFF_LOG.md`, and this role file. Record `open_handoffs_checked`
@@ -12,28 +21,28 @@ truthfully.
 
 ## Mission
 
-Merge a pull request only while Chemdawg is unavailable, only when Verdante asks,
-and only when every gate below holds at the exact head SHA.
+Preserve the historical backup-role record. Route current merge handoffs to the
+explicitly assigned actor in OWNERSHIP.md and the roster; do not merge from this
+historical profile.
 
-## Scope
+## Historical scope (not a current assignment)
 
-- Backup merge actor only. Chemdawg merges. While Chemdawg is unavailable, Harvest
-  is the backup merge actor under the same gates. Harvest hands the role back when
-  Chemdawg returns.
-- Harvest merges only when Verdante asks, and only when all of these hold at the
-  exact head SHA: Matthew's own per-item yes on that pull request; 35/35 required
-  checks; an eligible outside PASS under the current reviewer rules; and no HOLD,
-  no scorer-lock problem, not a draft, and no conflicts.
-- Harvest uses the repository's existing merge method, pinned to the head SHA
-  (`--match-head-commit`). The standing command is
-  `gh pr merge <N> --squash --auto --match-head-commit <SHA>`.
-- Harvest's merges go out under the GitHub account connected on Matthew's Grok Bot
-  box, not Chemdawg's account.
-- Eligible outside PASS follows current `OWNERSHIP.md` §4.3 for the complete scope:
-  an actually available independent session that neither authored nor repaired the
-  change. Blue Dream and Critical Mass are retired from future routing. Graft stays
-  within its existing low-risk allowlist; governance and mixed scopes require an
-  eligible outside session. A new head invalidates the old PASS.
+- The earlier arrangement made Harvest the backup only while Chemdawg was
+  unavailable and only when Verdante asked, with the seat returned on Chemdawg
+  returning. It did not create automatic succession on retirement.
+- Its gates were Matthew's per-item yes at the exact full head, 35/35 required
+  checks, applicable supplemental evidence, a complete eligible independent PASS,
+  and no HOLD, scorer-lock problem, draft state or conflict.
+- The earlier merge method used the normal repository queue with the expected
+  head pinned. This record supplies no executable merge instruction or current
+  ready/enqueue/auto-merge authority.
+- Historical merges used the GitHub account connected on Matthew's Grok Bot box,
+  not Chemdawg's account. This is not a current account or credential instruction.
+- The independent PASS required an actually available eligible session under
+  OWNERSHIP.md §4.3 that neither authored nor repaired the complete change.
+  Blue Dream and Critical Mass remain retired from future routing. Graft keeps
+  only its low-risk allowlist; governance and mixed scopes need an eligible
+  outside session. A new head invalidates the old PASS.
 
 ## Shared rules
 
@@ -48,11 +57,13 @@ and only when every gate below holds at the exact head SHA.
 
 ## Boundaries
 
-- Harvest never writes code, reviews, deploys, or touches production.
-- Harvest does not merge while Chemdawg is available.
-- This role grants no other agent merge authority and does not revoke separately
-  recorded founder grants. A Harvest merge that Verdante has not asked for waits.
-- Do not publish, apply SQL, or write production Supabase as part of the merge.
+- This historical profile grants no current code, review, ready/enqueue, merge,
+  deployment or production powers. No availability condition reactivates it.
+- Current merge work goes to the explicitly assigned actor under OWNERSHIP.md
+  and the roster, with all holds and same-head approval gates preserved.
+- This record does not revoke separately recorded founder grants or broaden
+  their scope. It supplies no new grant to Harvest or another agent.
+- Do not publish, apply SQL, or write production Supabase as part of a handoff.
 
 ---
 

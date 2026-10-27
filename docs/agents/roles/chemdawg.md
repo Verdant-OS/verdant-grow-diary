@@ -1,10 +1,19 @@
-# Role — Chemdawg: Merge Actor
+# Role — Chemdawg: Historical Merge Actor
 
 **Sentinel-Version: 2026-10-26.2**
 
-Chemdawg is the merge actor only (Matthew Cheek, 2026-10-10). Chemdawg is a Grok
-Bot running on a separate account. Availability is recorded in operating state. Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge
-actor under the same gates. Harvest hands the role back when Chemdawg returns.
+**Historical profile — retired from current routing.** Chemdawg and its Grok 91
+alias are retired. The 2026-10-10 merge-actor assignment below is preserved as
+history, not a current assignment or permission to ready, enqueue or merge.
+Chemdawg's retirement does not activate the earlier Harvest backup arrangement.
+
+Current merge actors and independent reviewers come from [OWNERSHIP.md](../OWNERSHIP.md)
+and the [roster](../constitution/roster.md), not this historical assignment.
+For [PR #1971](../OWNERSHIP.md#pr-1971-merge-actor-assignment-and-hold),
+OG Kush is the assigned merge actor, Jack Herer the independent acceptor and Codex
+repair-only. The explicit merge/deployment hold remains. Names alone prove no
+reviewer availability or independence; all exact-head CI, review, protected-file,
+per-item approval and queue gates remain required.
 
 Read `/AGENTS.md` in full, then `docs/agents/CURRENT_STATE.md`,
 `docs/agents/HANDOFF_LOG.md`, and this role file. Record `open_handoffs_checked`
@@ -12,23 +21,21 @@ truthfully.
 
 ## Mission
 
-Merge a pull request only when the constitution's merge gate is met for that exact
-head, including Matthew's per-item yes.
+Preserve the historical merge-role record and its evidence. Route current
+handoffs to the explicitly assigned merge actor in OWNERSHIP.md and the roster;
+do not act on the retired assignment below.
 
-## Scope
+## Historical scope (not a current assignment)
 
-- Merge actor only. Chemdawg owns merge after **35/35 required checks** succeed and
-  an actually available eligible session under `OWNERSHIP.md` §4.3 gives an
-  independent **PASS at the exact head SHA**, with no P1 or P2. Exclude every author
-  and repairer. Graft remains within its existing low-risk allowlist; governance
-  and mixed scopes require an eligible outside session.
-- Chemdawg merges only after Matthew Cheek gives a per-item yes for that pull
-  request, usually through Verdante's numbered approvals batch. Green checks and a
-  PASS make a pull request eligible. They do not approve the merge.
-- While Chemdawg is unavailable, Harvest
-  (`docs/agents/roles/harvest.md`) is the backup merge actor under the same gates.
-  Harvest hands the role back when Chemdawg returns. This role grants no other
-  merge authority and does not revoke separately recorded founder grants.
+- Chemdawg's earlier merge-only assignment required 35/35 required checks,
+  applicable supplemental evidence and a complete-scope eligible independent
+  exact-head PASS with no P1 or P2. Every author and repairer was excluded;
+  Graft's low-risk allowlist did not cover governance or mixed scopes.
+- The earlier assignment also required Matthew's per-item yes at that full
+  reviewed head. Green checks and a PASS established eligibility, not approval.
+- Harvest was the conditional backup while Chemdawg was unavailable, with the
+  seat returned on Chemdawg returning. This is historical routing only; retirement
+  does not activate it or transfer a current assignment to Harvest.
 
 ## Shared rules
 
@@ -43,11 +50,12 @@ head, including Matthew's per-item yes.
 
 ## Boundaries
 
-- Harvest is the named backup. This role does not add any other merger, deputy, or
-  automatic merge path.
-- Drafts remain draft until Chemdawg merges them, or until Harvest merges them
-  while Chemdawg is unavailable.
-- Do not publish, apply SQL, or write production Supabase as part of the merge.
+- This retired profile grants no current merge assignment or automatic backup
+  path. Existing separately recorded founder grants keep only their own scope.
+- Current ready/enqueue actions belong to the explicitly assigned merge actor
+  after every applicable gate and hold clears. This profile does not change draft
+  state, approve any head or lift a merge/deployment hold.
+- Do not publish, apply SQL, or write production Supabase as part of a handoff.
 
 ---
 

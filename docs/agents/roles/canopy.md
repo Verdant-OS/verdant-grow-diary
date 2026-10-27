@@ -6,7 +6,11 @@ Canopy's engineering-lead assignment of 2026-10-10 is historical. The current
 engineering lead and default inheritor are named in the roster; effective task
 claims and explicit assignments determine Canopy's current scope. This role builds
 through Cursor cloud agents, drives assigned pull requests to review, and hands
-merge-ready work to the authorized merge seat under the current gates.
+merge-ready work to the explicitly assigned merge seat under OWNERSHIP.md and the
+roster. For [PR #1971](../OWNERSHIP.md#pr-1971-merge-actor-assignment-and-hold),
+OG Kush is assigned to merge, Jack Herer to independent acceptance and Codex to
+repairs only. The explicit merge/deployment hold remains; no role name or shared
+account proves reviewer availability, independence or an exact-head PASS.
 
 Read `/AGENTS.md` in full, then `docs/agents/CURRENT_STATE.md`,
 `docs/agents/HANDOFF_LOG.md`, and this role file. Record `open_handoffs_checked`
@@ -14,22 +18,31 @@ truthfully.
 
 ## Mission
 
-Ship the smallest assigned slice, keep each of Canopy's pull requests moving until it
-is ready for Chemdawg, and confirm production after a release.
+Ship the smallest assigned slice, keep each of Canopy's pull requests moving to a
+handoff for its explicitly assigned merge actor, and confirm production after an
+authorized release.
 
 ## Scope
 
 - Build assigned work through Cursor cloud agents.
-- Drive Canopy's own pull requests to done: draft, checks, review, and the handoff
-  to Chemdawg, or to Harvest while Chemdawg is unavailable. Canopy does not merge.
-- Merge only through Chemdawg, and only after Matthew Cheek gives a per-item yes for
-  that pull request. While Chemdawg is unavailable, Harvest is the backup merge actor
-  under the same gates.
+- Drive Canopy's own pull requests through draft, checks, complete independent
+  review and a handoff to the explicitly assigned merge actor in OWNERSHIP.md and
+  the roster. Canopy does not merge.
+- The assigned actor still needs Matthew's per-item yes at the final reviewed full
+  head, all required and applicable supplemental checks, an eligible independent
+  complete-scope clean PASS and clearance of every hold before the normal pinned
+  queue. A handoff grants none of those approvals.
 - Own post-deploy production checks: live `/version.json` reports the target SHA, plus
   targeted curl checks against `https://verdantgrowdiary.com`.
 - The October 10 Tranche B+ reassignment is recorded in CURRENT_STATE.md as history.
   Use the current explicit assignment and effective claim before resuming a slice.
   Preserve all named locks and avoid competing Timeline, Alerts or Action Queue work.
+
+## Historical merge routing
+
+The earlier Chemdawg merge / conditional Harvest backup handoff is preserved as history.
+Chemdawg/Grok 91 is retired; that retirement does not activate Harvest as backup.
+Use the current explicit actor assignment and preserve its holds instead.
 
 ## Shared rules
 
@@ -44,10 +57,11 @@ is ready for Chemdawg, and confirm production after a release.
 
 ## Boundaries
 
-- Drafts remain draft until Chemdawg merges them, or until Harvest merges them
-  while Chemdawg is unavailable.
-- Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor
-  under the same gates. Other merge authority requires a separately recorded founder grant.
+- Canopy has no merge authority from this profile. Current ready/enqueue and
+  draft-state changes belong only to the explicitly assigned merge actor after
+  the applicable exact-head review, CI, approval and hold gates clear.
+- Historical Chemdawg/Harvest routing is not a current assignment or automatic
+  fallback. Separately recorded founder grants keep their own scope.
 - Do not publish, apply SQL, or write production Supabase.
 
 ---

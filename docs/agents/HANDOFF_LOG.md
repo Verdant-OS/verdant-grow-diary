@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-293-BROWSER-OAUTH-CLIENT-TESTS
+
+```text
+TASK VER-293-BROWSER-OAUTH-CLIENT-TESTS  priority: other  status: OPEN
+goal: Add focused deterministic unit coverage for src/lib/mcp/browserOAuthClient.ts and open a draft PR linked to VER-293.
+why: The module had no unit tests. Callback, PKCE, token storage, and same-origin redirect behavior need regression locks without network or real credentials.
+branch: cursor/mcp-browser-oauth-client-tests-fd0f
+base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
+checkout: git fetch origin cursor/mcp-browser-oauth-client-tests-fd0f verdant-grow-diary && git switch cursor/mcp-browser-oauth-client-tests-fd0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft; read the PR URL from GitHub after the first push
+head_sha: read origin/cursor/mcp-browser-oauth-client-tests-fd0f after push; this block is in the implementation commit
+state: tests written locally; behavior of browserOAuthClient.ts unchanged
+current_step: 11 focused tests pass. Scoped ESLint is clean. `NODE_OPTIONS=--max-old-space-size=6144 bun run typecheck` exited 0. Default heap OOM is a machine limit, not a type error.
+next_action: Read the draft PR head, confirm required CI, and route an eligible independent review that did not author this change. Keep the PR draft.
+post_merge_check: bunx vitest run src/test/mcp-browser-oauth-client.test.ts on the deploy head; a failure reopens this work with the same owner.
+active_writer: Cursor Grok session on cursor/mcp-browser-oauth-client-tests-fd0f
+decisions: Do not clear the pending PKCE record on state mismatch. BrowserConnectPanel.tsx explicitly keeps a genuine pending authorization when the callback state was not issued by this browser, and it does not call completeAuthorization in that case. Document that behavior. Also document that a network failure, malformed token JSON, or a 200 body without access_token does not store a token and does not clear PKCE, while a non-2xx token response does clear PKCE. No authorization, scope, endpoint, or UI change.
+tried_and_rejected: Clearing PKCE on state mismatch was rejected because the panel comment treats that clear as the wrong security outcome (it would abort a real in-flight authorization on a forged callback).
+commands: bunx vitest run src/test/mcp-browser-oauth-client.test.ts --reporter=verbose; bunx eslint src/test/mcp-browser-oauth-client.test.ts; bun run typecheck
+files_touched: src/test/mcp-browser-oauth-client.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned
+blockers: independent exact-head review not requested; hosted CI NOT_MEASURED until the draft PR runs
+open_questions: none for the documented current behavior
+gotchas: Module-level discovery cache is reset by vi.resetModules per test. Tokens are asserted absent from localStorage.setItem. javascript: and data: URLs fail sameOriginRedirect because their origin is not the page origin.
+links: https://linear.app/verdantgrowdiary/issue/VER-293
+artifacts: src/test/mcp-browser-oauth-client.test.ts
+reviewer_seat: an eligible independent session that did not author this PR
+reviewer_sha: NOT_MEASURED
+session_state: no review request, no production action
+claimed_by: Cursor Grok, 2026-10-27 09:28 CT
+owner: Cursor Grok VER-293 session
+last_updated: 2026-10-27 09:28 CT, by Cursor Grok
+```
+
 ### PR2511-REQUIRED-TRIGGER-GUARDS
 
 ```text

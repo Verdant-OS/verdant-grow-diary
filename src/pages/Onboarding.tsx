@@ -53,6 +53,7 @@ import {
   CSV_HISTORY_ONBOARDING_TITLE,
   readCsvHistoryOnboardingIntent,
 } from "@/lib/csvHistoryOnboardingIntentRules";
+import { retryOnboardingGrowsRead } from "@/lib/onboardingGrowsRetryRules";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
@@ -122,7 +123,7 @@ export default function Onboarding() {
           <Button
             type="button"
             onClick={() => {
-              void refreshGrows?.();
+              retryOnboardingGrowsRead(refreshGrows, () => window.location.reload());
             }}
           >
             Try again

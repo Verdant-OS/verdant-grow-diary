@@ -71,7 +71,7 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ### LIVE-CHECKOUT-2497-REBASE
 
-````text
+```text
 TASK LIVE-CHECKOUT-2497-REBASE  priority: P1  status: OPEN
 goal: Draft-only replay of closed PR #2497 onto current verdant-grow-diary, plus the seven live price names, seven sandbox copies, and a no-deploy checkout-disabled bundle receipt.
 why: Live checkout code existed only on the closed #2497 branch. The release hold stays until Cheeko approves secrets, deploys, webhook registration, merge, and one real purchase.
@@ -83,6 +83,7 @@ current_step: base 7f2f974aa merged; handoff conflict resolved by keeping both s
 next_action: Confirm origin head after the workflow push, then read required CI at that SHA. Pending is not a pass. Keep the PR draft. Release hold stays.
 files_touched: .github/workflows/checkout-disabled-rollback-artifact.yml; docs/agents/HANDOFF_LOG.md; plus the earlier live-checkout replay files
 last_updated: 2026-10-27 16:05 CT, by Cursor Grok cloud agent
+```
 
 ### ACTIONS-BACKLOG-CONCURRENCY
 
@@ -117,7 +118,7 @@ claimed_by: Grok, 2026-10-27 11:30 CT
 owner: Grok
 last_updated: 2026-10-27 15:05 CT, by Grok
 limits: No repo settings, rulesets, secrets, runner config, force-push, rebase, or bun.lock change. Do not convert #2555 to draft or toggle ready.
-````
+```
 
 ### AUTH-LOADING-SMOKE-TIMEOUT-25
 

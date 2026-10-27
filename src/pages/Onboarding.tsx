@@ -156,7 +156,7 @@ export default function Onboarding() {
       // in-memory handoff so the new grow/tent/plant can be selected and saved
       // immediately, without waiting for a focus refetch or page reload.
       await Promise.all([
-        refreshGrows(),
+        refreshGrows?.() ?? Promise.resolve(),
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);

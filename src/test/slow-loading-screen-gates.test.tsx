@@ -306,16 +306,18 @@ describe("plant list and environment trends", () => {
       wrapper: ({ children }) => wrap(children),
     });
     expect(result.current.isPending).toBe(true);
-    // useGrowPlants retries a hung read. The first deadline plus the first
-    // backoff still leaves the query pending; the error lands after the next
-    // full deadline, which is what exhausts GROW_READ_BUDGET_MS.
+    // A hung plant read retries inside GROW_READ_BUDGET_MS. The first 8s
+    // deadline plus the first backoff still leaves the query pending. The
+    // next attempt is capped at the time left, so the error is up by 12s.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS + GROW_READ_RETRY_DELAYS_MS[0]);
     });
     expect(result.current.isError).toBe(false);
     expect(result.current.isPending).toBe(true);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(
+        GROW_READ_BUDGET_MS - CRITICAL_READ_DEADLINE_MS - GROW_READ_RETRY_DELAYS_MS[0],
+      );
     });
     expect(result.current.isError).toBe(true);
     expect(result.current.isPending).toBe(false);

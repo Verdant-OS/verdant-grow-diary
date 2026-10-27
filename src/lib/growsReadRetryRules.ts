@@ -1,4 +1,8 @@
-import { CRITICAL_READ_DEADLINE_MS, CriticalReadDeadlineError } from "@/lib/boundedReadRules";
+import {
+  CRITICAL_READ_DEADLINE_MS,
+  CriticalReadDeadlineError,
+  withCriticalReadDeadline,
+} from "@/lib/boundedReadRules";
 
 /**
  * Two short waits after the first attempt. The first attempt keeps the full
@@ -209,10 +213,21 @@ export async function readTransientValue<T>(
   read: () => Promise<T>,
   controls: GrowRetryControls = {},
 ): Promise<T> {
+  const budgetMs = controls.budgetMs ?? GROW_READ_BUDGET_MS;
+  const now = controls.now ?? Date.now;
+  const startedAt = now();
+  let attempt = 0;
   let lastError: unknown = new Error("grow_read_failed");
   const outcome = await readWithGrowRetry(async () => {
+    const remaining = budgetMs - (now() - startedAt);
+    const deadline = growReadAttemptDeadlineMs(attempt, remaining);
+    attempt += 1;
+    if (deadline <= 0) {
+      lastError = new CriticalReadDeadlineError();
+      return { ok: false as const, failure: classifyGrowReadFailure(lastError) };
+    }
     try {
-      return { ok: true as const, value: await read() };
+      return { ok: true as const, value: await withCriticalReadDeadline(read(), deadline) };
     } catch (caught) {
       lastError = caught;
       return { ok: false as const, failure: classifyGrowReadFailure(caught) };

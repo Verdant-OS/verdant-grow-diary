@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   SERVED_BUILD_DEPLOY_REF,
   SERVED_BUILD_EXIT_CODES,
-  SERVED_BUILD_PREVIOUS_MISSING_HINT,
+  SERVED_BUILD_PREVIOUS_UNREADABLE_HINT,
   evaluateServedBuild,
+  formatRecordedBaselineSummary,
+  formatRecordedBaselineWarning,
   formatServedBuildSummary,
+  missingCheckpointNeedsWarning,
   runServedBuildCheck,
 } from "../../scripts/check-served-build-monotonic.mjs";
 
@@ -20,6 +23,53 @@ function decide(overrides: Partial<Parameters<typeof evaluateServedBuild>[0]>) {
     ...overrides,
   });
 }
+
+describe("served build compare cases", () => {
+  it("first run with no checkpoint records the served build", () => {
+    expect(
+      evaluateServedBuild({
+        servedSha: NEW,
+        previousSha: null,
+        servedOnDeployBranch: true,
+        previousIsAncestorOfServed: false,
+        initialize: false,
+      }),
+    ).toEqual({ status: "FAIL", reason: "baseline_recorded" });
+  });
+
+  it("same build passes and does not treat it as a rollback", () => {
+    expect(
+      evaluateServedBuild({
+        servedSha: NEW,
+        previousSha: NEW,
+        servedOnDeployBranch: true,
+        previousIsAncestorOfServed: false,
+      }),
+    ).toEqual({ status: "PASS", reason: "unchanged" });
+  });
+
+  it("newer build passes when the previous checkpoint is an ancestor", () => {
+    expect(
+      evaluateServedBuild({
+        servedSha: NEW,
+        previousSha: OLD,
+        servedOnDeployBranch: true,
+        previousIsAncestorOfServed: true,
+      }),
+    ).toEqual({ status: "PASS", reason: "moved_forward" });
+  });
+
+  it("older build fails when the served commit is not a descendant of the checkpoint", () => {
+    expect(
+      evaluateServedBuild({
+        servedSha: OLD,
+        previousSha: NEW,
+        servedOnDeployBranch: true,
+        previousIsAncestorOfServed: false,
+      }),
+    ).toEqual({ status: "FAIL", reason: "moved_backward_or_diverged" });
+  });
+});
 
 describe("evaluateServedBuild", () => {
   it("BLOCKS when the served SHA is unreadable", () => {
@@ -39,14 +89,14 @@ describe("evaluateServedBuild", () => {
     });
   });
 
-  it("BLOCKS on a missing previous checkpoint unless explicitly initialized", () => {
+  it("seeds a baseline on a missing previous checkpoint, including a scheduled run", () => {
     for (const previousSha of [null, undefined, ""]) {
       expect(decide({ previousSha, previousIsAncestorOfServed: false })).toEqual({
-        status: "BLOCKED",
-        reason: "previous_missing",
+        status: "FAIL",
+        reason: "baseline_recorded",
       });
       expect(decide({ previousSha, previousIsAncestorOfServed: false, initialize: false })).toEqual(
-        { status: "BLOCKED", reason: "previous_missing" },
+        { status: "FAIL", reason: "baseline_recorded" },
       );
     }
   });
@@ -54,7 +104,7 @@ describe("evaluateServedBuild", () => {
   it("PASSES an explicitly initialized run with no previous as a recorded baseline", () => {
     for (const previousSha of [null, undefined, ""]) {
       expect(decide({ previousSha, previousIsAncestorOfServed: false, initialize: true })).toEqual({
-        status: "PASS",
+        status: "FAIL",
         reason: "baseline_recorded",
       });
     }
@@ -66,9 +116,13 @@ describe("evaluateServedBuild", () => {
       reason: "moved_backward_or_diverged",
     });
     expect(decide({ initialize: true })).toEqual({ status: "PASS", reason: "moved_forward" });
-    expect(decide({ initialize: true, previousSha: "not-a-sha" })).toEqual({
+    expect(decide({ previousSha: "not-a-sha" })).toEqual({
       status: "BLOCKED",
       reason: "previous_unreadable",
+    });
+    expect(decide({ initialize: true, previousSha: "not-a-sha" })).toEqual({
+      status: "PASS",
+      reason: "baseline_recorded",
     });
   });
 
@@ -182,28 +236,60 @@ describe("runServedBuildCheck", () => {
     ]);
   });
 
-  it("BLOCKS with exit 2, no write and a re-initialize hint on a missing previous", async () => {
-    for (const previous of [null, "", "  \n"]) {
-      const { deps, writes, lines } = harness({ previous });
-      const outcome = await runServedBuildCheck(deps);
-      expect(outcome).toMatchObject({ status: "BLOCKED", reason: "previous_missing" });
-      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.BLOCKED);
-      expect(writes).toEqual([]);
-      expect(lines).toEqual([
-        `served-build-monotonic: BLOCKED (previous_missing) served=${NEW} previous=none`,
-        SERVED_BUILD_PREVIOUS_MISSING_HINT,
-      ]);
-      expect(SERVED_BUILD_PREVIOUS_MISSING_HINT).toContain("unavailable");
-      expect(SERVED_BUILD_PREVIOUS_MISSING_HINT).toContain("initialize=true");
+  it("records the served SHA and exits 1 when the checkpoint is missing", async () => {
+    for (const workflowRunNumber of [1, 41]) {
+      for (const previous of [null, "", "  \n"]) {
+        const warnings: string[] = [];
+        const { deps, writes, lines } = harness({ previous });
+        const outcome = await runServedBuildCheck({
+          ...deps,
+          workflowRunNumber,
+          warn: (line) => warnings.push(line),
+        });
+        expect(outcome).toMatchObject({ status: "FAIL", reason: "baseline_recorded" });
+        expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.FAIL);
+        expect(writes).toEqual([NEW]);
+        expect(lines[0]).toBe(
+          `served-build-monotonic: FAIL (baseline_recorded) served=${NEW} previous=none`,
+        );
+        expect(warnings[0]).toContain(NEW);
+      }
     }
   });
 
-  it("records the baseline on a missing previous only when initialized", async () => {
+  it("warns and names the recorded baseline when the checkpoint is missing after the first run", async () => {
+    expect(missingCheckpointNeedsWarning(1)).toBe(true);
+    expect(missingCheckpointNeedsWarning(36)).toBe(true);
+    expect(missingCheckpointNeedsWarning(null)).toBe(true);
+    const warnings: string[] = [];
+    const summaries: string[] = [];
+    const { deps, writes, lines } = harness({ previous: null });
+    const outcome = await runServedBuildCheck({
+      ...deps,
+      workflowRunNumber: 36,
+      warn: (line) => warnings.push(line),
+      appendSummary: (markdown) => summaries.push(markdown),
+    });
+    const notice = { servedSha: NEW, workflowRunNumber: 36, replacedUnreadable: false };
+    expect(outcome).toMatchObject({ status: "FAIL", reason: "baseline_recorded" });
+    expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.FAIL);
+    expect(writes).toEqual([NEW]);
+    expect(lines).toEqual([
+      `served-build-monotonic: FAIL (baseline_recorded) served=${NEW} previous=none`,
+    ]);
+    expect(warnings).toEqual([formatRecordedBaselineWarning(notice)]);
+    expect(warnings[0]).toContain(NEW);
+    expect(warnings[0]).toContain("workflow run 36");
+    expect(summaries).toEqual([formatRecordedBaselineSummary(notice)]);
+    expect(summaries[0]).toContain(`\`${NEW}\``);
+  });
+
+  it("records the served SHA when initialize is set and the checkpoint is missing", async () => {
     for (const previous of [null, "", "  \n"]) {
       const { deps, writes } = harness({ previous });
       const outcome = await runServedBuildCheck({ ...deps, initialize: true });
-      expect(outcome).toMatchObject({ status: "PASS", reason: "baseline_recorded" });
-      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.PASS);
+      expect(outcome).toMatchObject({ status: "FAIL", reason: "baseline_recorded" });
+      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.FAIL);
       expect(writes).toEqual([NEW]);
     }
   });
@@ -241,6 +327,16 @@ describe("runServedBuildCheck", () => {
     const outcome = await runServedBuildCheck(deps);
     expect(outcome.reason).toBe("served_not_on_deploy_branch");
     expect(writes).toEqual([]);
+  });
+
+  it("BLOCKS an unreadable checkpoint and names the initialize recovery", async () => {
+    const { deps, writes, lines } = harness({ previous: "not-a-sha" });
+    const outcome = await runServedBuildCheck(deps);
+    expect(outcome).toMatchObject({ status: "BLOCKED", reason: "previous_unreadable" });
+    expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.BLOCKED);
+    expect(writes).toEqual([]);
+    expect(lines[1]).toBe(SERVED_BUILD_PREVIOUS_UNREADABLE_HINT);
+    expect(SERVED_BUILD_PREVIOUS_UNREADABLE_HINT).toContain("initialize=true");
   });
 
   it("BLOCKS with exit 2 and no write on an unreadable, dirty or failed fetch", async () => {

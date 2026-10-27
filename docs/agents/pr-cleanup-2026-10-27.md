@@ -1,7 +1,6 @@
 # Open PR cleanup — Phase 1 inventory (2026-10-27)
 
-Status: **Phase 1 only. Nothing has been closed, commented on, pushed to another branch, merged, or queued.**
-Matthew approves the close list below before Phase 2 starts.
+Status: **Initial Phase 1 snapshot (2026-10-27, measured from 10:45 CT): no PR had been closed, commented on, pushed to another branch, merged, or queued at that point.** Later closures, Matthew's decisions and the remaining approval gates are in the Phase 2 log below; nothing else closes without Matthew's approval.
 
 - Repository: `Verdant-OS/verdant-grow-diary`. Base: `origin/verdant-grow-diary` at `a18cb8479c8dd150c6e3c9b1147bb82c75ebac24` (#2547), fetched 2026-10-27.
 - Open PRs measured: **127**. The 10:45 CT snapshot listed 126; #2555 (CI concurrency) has opened since. Hold #2535 is not open.

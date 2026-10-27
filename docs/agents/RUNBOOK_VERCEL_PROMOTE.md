@@ -1,5 +1,12 @@
 # Vercel production promotion and rollback
 
+Historical as of 2026-10-10 (Matthew Cheek). Production runs on Cloudflare Workers
+at https://verdantgrowdiary.com. Release evidence is live `/version.json` on that
+host. This runbook describes an earlier Vercel promotion path. Do not use it as the
+current deploy procedure. The Vercel "Account is blocked." status is an owner-side
+account issue. Do not investigate it, rerun it, re-trigger it, or work around it.
+Do not change deploy settings.
+
 Matthew owns the publish decision, promotion, rollback, credentials and Vercel
 configuration. Codex prepares repository fixes and exact-SHA evidence. This runbook
 does not authorize an agent to change production traffic.

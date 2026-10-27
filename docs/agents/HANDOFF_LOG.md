@@ -79,7 +79,7 @@ branch: cursor/setup-quicklog-draft-retry-8b19
 base: verdant-grow-diary
 checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-diary && git switch cursor/setup-quicklog-draft-retry-8b19 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
-head_sha: behavior change is the commit after parent bb54282818838544c0090493529a69f4274dd60d; read origin/cursor/setup-quicklog-draft-retry-8b19 for the full branch tip after the handoff update
+head_sha: 4c8b625c6db91502c161468608a4f241c869cc1e is the owner-switch repair. The branch tip is the handoff commit whose parent is that SHA; confirm with git rev-parse origin/cursor/setup-quicklog-draft-retry-8b19
 state: pushed draft
 current_step: Jack Herer review 5669691346 at bb54282818838544c0090493529a69f4274dd60d FAILed. The repair ignores a grow, tent, or plant save that finishes after the owner changes, and clears a tent or plant error when hydration falls back to the grow step. Quick Log was not changed.
 next_action: read the 35 required checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 at the post-repair head and do not merge. Review 5669691346 does not cover the new head.

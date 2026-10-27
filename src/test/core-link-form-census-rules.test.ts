@@ -76,9 +76,9 @@ describe("core link and form census rules", () => {
     const routes = Object.freeze(PUBLIC_CORE_CENSUS_ROUTES.slice(0, 8));
     const batches = batchCensusRoutes(routes, 3);
     expect(batches.map((batch) => batch.map((route) => route.path))).toEqual([
-      ["/welcome", "/auth", "/pricing"],
-      ["/founder", "/checkout/success", "/checkout/cancel"],
-      ["/contact", "/feedback"],
+      ["/auth", "/pricing", "/founder"],
+      ["/checkout/success", "/checkout/cancel", "/contact"],
+      ["/feedback", "/cultivars"],
     ]);
     expect(routes).toHaveLength(8);
     expect(batchCensusRoutes([], 3)).toEqual([]);

@@ -1292,7 +1292,7 @@ each checked by hash, and applies them to a copy inside a disposable workdir at 
 | Category                   | Entries | Hash check                                |
 | -------------------------- | ------: | ----------------------------------------- |
 | `compatibility_noops`      |      18 | `canonical_sha256` and `duplicate_sha256` |
-| `compatibility_patches`    |       4 | `source_sha256`                           |
+| `compatibility_patches`    |       5 | `source_sha256`                           |
 | `compatibility_injections` |       2 | `template_sha256`                         |
 
 Earlier versions named only the first two categories and attributed `source_sha256` to both. The committed file is never modified. Check this config **before** proposing

@@ -9,9 +9,9 @@ const ORIGIN = "https://verdantgrowdiary.com";
 
 const ROUTES = [
   {
-    path: "/welcome",
+    path: "/",
     expectTitle: /Grow Diary & Grow Room Tracking App/,
-    canonical: `${ORIGIN}/welcome`,
+    canonical: `${ORIGIN}/`,
   },
   {
     path: "/pricing",
@@ -125,7 +125,7 @@ for (const r of ROUTES) {
 // structured data can never silently drift from src/constants/pricing.ts.
 {
   const page = await browser.newPage();
-  await page.goto(BASE + "/welcome", { waitUntil: "networkidle" });
+  await page.goto(BASE + "/", { waitUntil: "networkidle" });
   const blocks = await page.$$eval('script[type="application/ld+json"]', (els) =>
     els.map((e) => e.textContent || ""),
   );

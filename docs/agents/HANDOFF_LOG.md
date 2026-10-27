@@ -69,26 +69,62 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-285-PRESERVE-MISSING-STAGE
+
+```text
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2537 (draft)
+head_sha: Read the full current head of draft #2537; this implementation commit cannot name itself. Parent is 1630600154a112d6bdbb4881e7fb408627660cd0.
+state: Implemented and locally validated: 104 tests pass, full TypeScript check passes, scoped ESLint/Prettier pass. Hosted checks and independent acceptance are NOT_MEASURED at this new head.
+current_step: The 19 new mounted regressions failed 17/19 against base (2 explicit-stage controls passed). Final focused suite: 9 files, 104 passed / 0 failed / 0 skipped.
+next_action: Read #2537 full head and required CI; after green, route one eligible independent non-contributing Claude/Grok review. Stay draft; no merge or deploy.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts src/test/timeline-stage-label-render.test.tsx src/test/timeline-chip-counts-match-list.test.tsx src/test/quicklog-corrections-static-safety.test.ts src/test/timeline-photo-edit-resign.test.ts src/test/timeline-photo-edit-signing-followups.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/eslint/bin/eslint.js src/components/EntryEditDialog.tsx src/test/entry-edit-stage-preservation.test.tsx; node scripts/scorer-lock.mjs --report --base 21b267a217f4d2d1b1a53a4ba77b85e9903cd418 --strict
+files_touched: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None planned; no new rules helper needed because the existing stage presentation helper is reused.
+blockers: Required CI and eligible independent exact-head acceptance remain pending. Local full test suite and build SKIPPED; required hosted CI must provide these gates. Default Node heap exhausted during initial tsc; 6144 MB rerun exposed four invalid test-query options, corrected before the final clean full tsc run. No production verification permitted in this task.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id. Tests serialize actual editor UPDATE payloads into a synthetic persistence store, then remount from a separate read; this is not a real DB or production readback receipt. Untouched null, empty, omitted, unknown, whitespace and legacy stage values are preserved. Clearing a stage explicitly writes null; the UI sentinel never reaches persistence. Existing details serialization is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: New mounted test file and PR validation summary. Existing linked-Quick-Log and zero-row guards pass unchanged. Lint/format/whitespace, scorer lock and docs-safety PASS. All 126 open PR file lists inspected, no editor or stage-helper overlap. VER-285 was unassigned at intake; Linear now shows assignee Verdant after draft linking, no competing writer comment observed.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
+```
+
 ### CLAUDE-WRITE-DENIAL-HARNESS-42501-001
 
 ```text
 TASK CLAUDE-WRITE-DENIAL-HARNESS-42501-001  priority: other  status: OPEN
 goal: Close the two post-merge bot findings on #1877: every write-denial INSERT check (S3, S9, F3, F11) requires SQLSTATE 42501, and an active sandbox subscription cannot be flipped to live by UPDATE or UPSERT (service_role read-back). Harness and spec only.
 branch: claude/founders-harness-env-flip-42501
-base: verdant-grow-diary at a22bdec653f63fcd7362ce40d5172789175aceee (normal base integration, 2026-10-26)
+base: verdant-grow-diary at c460712d3f59a15022d4d03b0dd371b424ff8e92 (normal base integration, 2026-10-27)
 checkout: git switch claude/founders-harness-env-flip-42501 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1925
-head_sha: Read the full published PR head after this integration commit. Source checkpoint 9b272ab7b9c15661e03450a785e81f8ddf5d12f6 was verified unchanged before editing; this commit cannot name its own SHA.
-state: Normal base integration of a22bdec6 into source 9b272ab7. The only conflict is this log; both complete task stacks and every incoming block are preserved. Protected harness blob 2bbab0d8b4ad76428f7e46e8580f166a247c85c3 and spec blob 89630bf4685cc93049bbe998060891d39911ab93 remain byte-for-byte unchanged from source. Current-tree local validation is pending below; older CI is historical.
-next_action: Root coordinates normal branch publication, fresh new-head required/security CI and one eligible non-contributing Claude or Grok complete-scope review. The hosted Security DB Local step Subscriptions + founders write denial must actually execute and report 32 passed / 0 failed at the new head/tested merged tree. Stay draft; no queue, PR merge or deployment.
+head_sha: Read the full published PR head after this normal integration commit. Source checkpoint 54a841d9ead527d74f8f414574699c4f5d433961 was verified unchanged before editing; this commit cannot name its own SHA.
+state: Normal base integration of c460712d into published source 54a841d9. The only conflict is this own log block; every unrelated incoming log/base byte is preserved. Protected harness blob 2bbab0d8b4ad76428f7e46e8580f166a247c85c3 and spec blob 89630bf4685cc93049bbe998060891d39911ab93 remain byte-for-byte unchanged from source 54. Current-tree local validation is recorded below; all previous CI/runtime and verdicts are historical for the new head.
+next_action: After this writer normal-pushes the existing branch, source STOP and root coordinates fresh exact-head required/applicable supplemental CI, actual hosted DB runtime proof and one eligible non-contributing Claude or Grok full-scope acceptance. The Security DB Local step Subscriptions + founders write denial must execute at the new head/tested merged tree and report actual 32 passed / 0 failed. Keep draft; no queue, PR merge or deployment.
 files: scripts/run-subscriptions-founders-write-denial-harness.ts; src/test/subscriptions-founders-write-denial-harness.test.ts; docs/agents/HANDOFF_LOG.md (this block)
-blockers: Fresh new-head 35/35 required checks, applicable must-green checks, actual disposable DB runtime proof and eligible outside exact-head PASS remain. Local DB runtime NOT_MEASURED: no Supabase CLI installed; no install or DB start attempted. Existing scoped scorer receipt 6223030735 is preserved; this integration authors no new scorer change or unlock.
-artifacts: Cloud scratch /workspace/scratch/claude-closeout-20261026/1925-integration-writer (commands, complete validation logs, protected hashes, tree and push receipts); PR #1925 current body is maintained by the root coordinator.
+blockers: Fresh new-head 35/35 required checks, all applicable supplemental checks (including beyond the seven configured contexts), actual DB runtime proof and eligible outside exact-head PASS remain. Local DB runtime NOT_MEASURED in this reintegration scope; no Docker/Supabase startup or installation is authorized or performed. Scoped scorer receipt 6223030735 remains; no new scorer change or unlock.
+artifacts: Cloud scratch /workspace/scratch/claude-closeout-20261026/1925-reintegration-20261027T0450Z (claim/head guards, normal merge/conflict, protected hashes, full checks/hooks and push receipts); previous integration evidence remains in /workspace/scratch/claude-closeout-20261026/1925-integration-writer. Root owns public PR metadata and reviewer routing.
 reviewer_seat: Eligible non-contributing Claude or Grok session, coordinated by root. Codex contributed this integration and cannot accept it; Claude implementation contributors are also excluded. Graft is ineligible for this mixed money/security scope; historical retired seats are not new routing.
 claimed_by: Codex closeout /root/preflight_1949, 2026-10-26 22:18 UTC (root-posted issuecomment-6428657858 under the current all-Claude closeout). Historical Claude Terminal [b6d701] transfer 6222437268 and earlier Canopy/Codex attribution remain recorded in PR history; no competing current published claim was found.
-last_updated: 2026-10-26 22:21 UTC, by Codex bounded integration writer
+last_updated: 2026-10-27 04:49 UTC, by Codex bounded integration writer
 historical_evidence: Original 18-case spec and four predicate/wiring mutations passed at c0866c4bc/c75aecf49; isolated S4b/S4c repair added the nineteenth case at 9b272ab7. Historical hosted run 38967359704/job117197045503 associated with 9b272ab7 executed test merge 482e73a89255054eaaba205d1ae65f1cda238db8 into c18492c1 and reported 32 passed / 0 failed. This does not prove the new integrated tree. Database-level grant-mutation RED remains NOT_MEASURED.
-local_validation: Integrated tree: existing spec 1 file / 19 PASS / 0 FAIL / 0 SKIP; canonical Bun 1.3.14 typecheck (tsc -p tsconfig.json --noEmit) exit 0; scoped ESLint 0 diagnostics; Prettier PASS; docs safety PASS; Sentinel parity PASS 2026-10-24.6 across all twelve files. Protected source blobs and all incoming log content verified unchanged. The scorer report still identifies the two approved historical source deltas as locked; no unlock/new scorer edit performed. Normal commit hooks and fresh hosted CI/DB evidence remain separate receipts.
+prior_54_integration: Normal base integration of a22bdec6 into source 9b272ab7. The only conflict is this log; both complete task stacks and every incoming block are preserved. Protected harness blob 2bbab0d8b4ad76428f7e46e8580f166a247c85c3 and spec blob 89630bf4685cc93049bbe998060891d39911ab93 remain byte-for-byte unchanged from source. Current-tree local validation is pending below; older CI is historical. Integrated tree: existing spec 1 file / 19 PASS / 0 FAIL / 0 SKIP; canonical Bun 1.3.14 typecheck (tsc -p tsconfig.json --noEmit) exit 0; scoped ESLint 0 diagnostics; Prettier PASS; docs safety PASS; Sentinel parity PASS 2026-10-24.6 across all twelve files. Protected source blobs and all incoming log content verified unchanged. The scorer report still identifies the two approved historical source deltas as locked; no unlock/new scorer edit performed. Normal commit hooks and fresh hosted CI/DB evidence remain separate receipts.
+historical_54_hosted_runtime: Root receipt issuecomment-6432319330 reports run40411854788/job121884277277 step16 executed the harness and showed 32 passed / 0 failed at 2026-10-27 01:08:19 UTC. Tested checkout3d0b81922f6bbedfa9b464cb7201d1381d058c13 and source54a841d9 share tree40af06dc40af9ca9354b27694e0901b5b1f2160e. This is historical and proves neither this new integrated head nor a database-level temporary-grant RED experiment.
+local_validation: Current integrated tree: existing spec 1 file / 19 PASS / 0 FAIL / 0 SKIP; canonical Bun1.3.14 typecheck (tsc -p tsconfig.json --noEmit) exit0; scoped ESLint0 diagnostics; docs safety PASS; Sentinel parity PASS 2026-10-24.6 across all twelve files. Exact source harness/test blobs and every unrelated incoming base byte are preserved. Initial format check exposed one added blank line in this own block only; corrected within this block. Final format/whitespace and normal hooks are recorded separately in the artifact receipts. No fresh hosted CI/runtime or outside acceptance is inherited.
 production_boundary: Disposable loopback lane only. No migration, RLS/ACL, backend, workflow, environment/secret, live Paddle, production DB, device or app behavior change. Release/live NOT_MEASURED.
 ```
 

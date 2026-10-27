@@ -167,6 +167,20 @@ chain (last bullet of step 1). Whether the owner's apply tool can leave that one
 a version-ordered push is NOT_MEASURED; if it cannot, do not run a version-ordered push while
 `20261013180000` is pending.
 
+**Correction, 2026-10-16 (tip `e136fa44f377cdbfa98c68289c2f05f7007a9a06`).** The list below
+restates #1894. It leaves out three earlier versions that are committed but have no apply
+record: the parked `20260916111000` (#1460) and `20260917183000` (#1545), and
+`20260925090000` (#1704). The parked pair sorts ahead of `20260924120000`: if either is
+pending in production, a version-ordered apply runs it before #1703, so "runs it first" below
+holds only after the owner has checked them. `20260925090000` sorts after #1703 and before
+#1831's `20260927002000`, so a version-ordered apply runs it between those two if it is
+pending. Their applied state is NOT_MEASURED:
+`CURRENT_STATE.md` records no apply for any of them and still lists #1460 and #1545 as
+parked. Before any version-ordered apply, the owner checks production migration history for
+all three. The parked pair is not applied without Matthew's decision. Draft #1901 documents
+`20260925090000` and the parked pair in `docs/release/merged-unshipped-server-changes-2026-10-03.md`.
+This paragraph is dated and leaves the restated list unchanged.
+
 Restated from #1894:
 
 1. Migrations:

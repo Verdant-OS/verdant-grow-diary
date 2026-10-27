@@ -234,7 +234,19 @@ export default function CreateTentDialog({
           return;
         }
       }
-      const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+      let result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+      if (result.status === "definitive_error" && uploadedPath) {
+        // A code-less error is classified definitive without a re-read. With a
+        // photo uploaded, re-read the exact row before deleting anything.
+        const reread = await reconcileHierarchyCreateAttempt(supabase, attempt);
+        if (reread.status === "confirmed") {
+          result = reread;
+        } else if (reread.status === "unavailable") {
+          result = { status: "unknown" };
+        } else {
+          await removeOwnerSubjectPhoto({ path: uploadedPath });
+        }
+      }
       if (result.status === "unknown") {
         recordUnknownCreateOutcome(attempt);
         toast.error(
@@ -243,12 +255,6 @@ export default function CreateTentDialog({
         return;
       }
       if (result.status === "definitive_error") {
-        // A code-less error is classified definitive without a re-read, so
-        // remove the object only once the exact row is confirmed absent.
-        if (uploadedPath) {
-          const reread = await reconcileHierarchyCreateAttempt(supabase, attempt);
-          if (reread.status === "not_found") await removeOwnerSubjectPhoto({ path: uploadedPath });
-        }
         toast.error(result.message);
         return;
       }

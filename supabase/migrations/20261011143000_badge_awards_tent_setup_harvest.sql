@@ -102,8 +102,7 @@ BEGIN
         OR NULLIF(btrim(tent.light_schedule), '') IS NOT NULL
         OR tent.light_wattage IS NOT NULL
         OR (
-          tent.hardware_config IS NOT NULL
-          AND tent.hardware_config <> 'null'::jsonb
+          jsonb_typeof(tent.hardware_config) = 'object'
           AND tent.hardware_config <> '{}'::jsonb
         )
       )

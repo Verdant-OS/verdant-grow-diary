@@ -318,9 +318,35 @@ describe("badge tent and harvest photo fields", () => {
     fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
     fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
     fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
-    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "Verdant could not confirm whether this tent was saved. Refresh before adding another.",
+      ),
+    );
     expect(uploadMock).toHaveBeenCalledTimes(1);
     expect(removeMock).not.toHaveBeenCalled();
+  });
+
+  it("create tent: a code-less error whose row re-reads as saved takes the success path", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    singleMock.mockResolvedValue({ data: null, error: { message: "Bad gateway" } });
+    tentReadMock.mockImplementation(async () => ({
+      data: {
+        id: (insertMock.mock.calls[0]?.[1] as { id: string }).id,
+        user_id: "user-1",
+        grow_id: "grow-1",
+        name: "Tent #1",
+      },
+      error: null,
+    }));
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() => expect(tentReadMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByPlaceholderText("Tent #1")).toBeNull());
+    expect(removeMock).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 
   it("edit tent: an invalid size is rejected before any photo upload", async () => {

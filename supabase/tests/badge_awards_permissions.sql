@@ -1,5 +1,13 @@
 -- Owner badge awards: permissions, kill switch, and First Diary Entry lifecycle.
--- Local or disposable database only. Rolls back every row it creates.
+-- The first plan rolls back every row it creates. The two-session plan
+-- (ok 2) commits, so it runs only on a disposable local database named
+-- badge_pgtap_<12 hex>. It refuses dbname=postgres and any public host.
+-- The committing case also requires a runner-issued token: the session GUC
+-- badge_pgtap.token must equal the database comment. A 172.16/12 address is
+-- accepted only after that token matches. The database must contain no rows
+-- in auth.users, diary_entries, or badge_awards before the fixture writes.
+-- scripts/run-badge-pgtap-disposable.sh creates that database, loads the
+-- migrated schema, sets the token, runs this file, and always drops it.
 -- Run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/badge_awards_permissions.sql
 
 \set ON_ERROR_STOP on
@@ -122,6 +130,11 @@ DECLARE
   v_batch_n int;
   v_batch_first int;
   v_batch_second int;
+  v_cursor_max uuid;
+  v_fail_owner uuid;
+  v_next_owner uuid;
+  v_fail_grow uuid;
+  v_next_grow uuid;
 BEGIN
   INSERT INTO auth.users (
     id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
@@ -548,10 +561,105 @@ BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
   PERFORM set_config('role', 'authenticated', true);
   SELECT count(*) INTO v_count FROM public.badge_awards;
-  ASSERT v_count = 0, 'another account must not see this award';
+  ASSERT v_count = 1, format('the second signed-in account sees exactly 1 active award, got %s', v_count);
   SELECT count(*) INTO v_count FROM public.badge_evidence;
   ASSERT v_count = 0, 'another account must not see this evidence';
   RESET role;
+
+  -- Member-read additions. The assertion above is the active award.
+  -- These checks put hidden_at and revoked_at back before the switch tests.
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claims', '{}', true);
+  PERFORM set_config('role', 'anon', true);
+  v_count := -1;
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.badge_awards;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_count := 0;
+  END;
+  ASSERT v_count = 0, format('anon must see 0 awards, got %s', v_count);
+  v_count := -1;
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.badge_evidence;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_count := 0;
+  END;
+  ASSERT v_count = 0, format('anon must see 0 evidence rows, got %s', v_count);
+  RESET role;
+
+  UPDATE public.badge_awards
+     SET hidden_at = clock_timestamp()
+   WHERE id = v_award;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 0, 'a signed-in member must not see a hidden award';
+  RESET role;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_owner)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 1, 'the owner must still see a hidden award';
+  RESET role;
+  UPDATE public.badge_awards SET hidden_at = NULL WHERE id = v_award;
+
+  UPDATE public.badge_awards
+     SET revoked_at = clock_timestamp()
+   WHERE id = v_award;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 0, 'a signed-in member must not see a revoked award';
+  RESET role;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_owner)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 1, 'the owner must still see a revoked award';
+  RESET role;
+  UPDATE public.badge_awards SET revoked_at = NULL WHERE id = v_award;
+
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_stranger, 'is_anonymous', true)::text,
+    true
+  );
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards;
+  ASSERT v_count = 0, format('an anonymous JWT must see 0 awards, got %s', v_count);
+  RESET role;
+
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_owner, 'is_anonymous', true)::text,
+    true
+  );
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards;
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  RESET role;
+  ASSERT v_count = 0
+    AND COALESCE(v_result->>'status', '') = 'not_authenticated'
+    AND (SELECT count(*) FROM public.badge_awards WHERE user_id = v_owner) = 1,
+    format(
+      'anonymous owner JWT must see 0 awards, return not_authenticated, and add no row; visible %s, status %s, rows %s',
+      v_count,
+      v_result->>'status',
+      (SELECT count(*) FROM public.badge_awards WHERE user_id = v_owner)
+    );
 
   UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
   PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
@@ -634,6 +742,195 @@ BEGIN
   ASSERT v_batch_second >= 1 AND v_batch_second <= 25,
     format('the next reconcile call must visit a later batch, got %s', v_batch_second);
 
+  -- One owner raises during reconcile. The cursor still moves, and the next
+  -- owner still receives an award.
+  SELECT owners.user_id
+    INTO v_cursor_max
+  FROM (
+    SELECT entry.user_id
+    FROM public.diary_entries AS entry
+    WHERE entry.user_id IS NOT NULL
+    UNION
+    SELECT award.user_id
+    FROM public.badge_awards AS award
+  ) AS owners
+  ORDER BY owners.user_id DESC
+  LIMIT 1;
+  -- Fixed high UUIDs. A version-4 id has 4 in the version nibble, so these
+  -- sort after every v4 and the draw cannot miss.
+  v_fail_owner := 'ffffffff-ffff-ffff-ffff-fffffffffffe';
+  v_next_owner := 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+  ASSERT v_cursor_max IS NULL OR (v_fail_owner > v_cursor_max AND v_next_owner > v_cursor_max),
+    format(
+      'fixed owners must sort after the reconcile cursor %, got % and %',
+      v_cursor_max, v_fail_owner, v_next_owner
+    );
+  ASSERT v_fail_owner < v_next_owner, 'the failing owner must sort before the next owner';
+  UPDATE public.badge_award_runtime
+     SET reconcile_after = v_cursor_max
+   WHERE id = 1;
+
+  CREATE TEMP TABLE badge_reconcile_skip (user_id uuid PRIMARY KEY) ON COMMIT DROP;
+  INSERT INTO badge_reconcile_skip (user_id) VALUES (v_fail_owner);
+  EXECUTE $failfn$
+    CREATE OR REPLACE FUNCTION public.badge_reconcile_fail_owner()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $fn$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_temp.badge_reconcile_skip AS skip
+        WHERE skip.user_id = NEW.user_id
+      ) THEN
+        RAISE EXCEPTION 'forced owner reconcile error';
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$;
+  $failfn$;
+  CREATE TRIGGER badge_reconcile_fail_owner
+    BEFORE INSERT ON public.badge_awards
+    FOR EACH ROW
+    EXECUTE FUNCTION public.badge_reconcile_fail_owner();
+
+  v_fail_grow := gen_random_uuid();
+  v_next_grow := gen_random_uuid();
+  INSERT INTO auth.users (
+    id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+    raw_app_meta_data, raw_user_meta_data, aud, role
+  ) VALUES
+    (
+      v_fail_owner,
+      'badge-reconcile-' || v_fail_owner::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+    ),
+    (
+      v_next_owner,
+      'badge-reconcile-' || v_next_owner::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+    );
+  INSERT INTO public.grows (id, user_id, name) VALUES
+    (v_fail_grow, v_fail_owner, 'badge reconcile grow'),
+    (v_next_grow, v_next_owner, 'badge reconcile grow');
+  INSERT INTO storage.objects (bucket_id, name, owner, owner_id) VALUES
+    (
+      'diary-photos',
+      v_fail_owner::text || '/diary/skip.jpg',
+      v_fail_owner,
+      v_fail_owner::text
+    ),
+    (
+      'diary-photos',
+      v_next_owner::text || '/diary/next.jpg',
+      v_next_owner,
+      v_next_owner::text
+    );
+  INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at) VALUES
+    (v_fail_owner, v_fail_grow, '', v_fail_owner::text || '/diary/skip.jpg', now()),
+    (v_next_owner, v_next_grow, '', v_next_owner::text || '/diary/next.jpg', now());
+
+  PERFORM set_config('role', 'service_role', true);
+  v_batch_first := public.badge_awards_reconcile();
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_fail_owner;
+  ASSERT v_count = 0, format('a reconcile error must skip that owner, got %s', v_count);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_next_owner;
+  ASSERT v_count = 1, format('the next owner must still reconcile, got %s', v_count);
+  ASSERT v_batch_first = 1, format('reconcile must count the successful owner only, got %s', v_batch_first);
+
+  DROP TRIGGER badge_reconcile_fail_owner ON public.badge_awards;
+  DROP FUNCTION public.badge_reconcile_fail_owner();
+  DELETE FROM auth.users WHERE id IN (v_fail_owner, v_next_owner);
+
+  -- The cursor stores the last owner visited, not the last success. Twenty-five
+  -- owners sit past the current max. The last one raises. A function that
+  -- advanced the cursor by successes would store owner 24.
+  SELECT owners.user_id
+    INTO v_cursor_max
+  FROM (
+    SELECT entry.user_id
+    FROM public.diary_entries AS entry
+    WHERE entry.user_id IS NOT NULL
+    UNION
+    SELECT award.user_id
+    FROM public.badge_awards AS award
+  ) AS owners
+  ORDER BY owners.user_id DESC
+  LIMIT 1;
+  UPDATE public.badge_award_runtime
+     SET reconcile_after = v_cursor_max
+   WHERE id = 1;
+  v_fail_owner := ('ffffffff-ffff-ffff-ffff-' || lpad(to_hex(25), 12, '0'))::uuid;
+  INSERT INTO badge_reconcile_skip (user_id) VALUES (v_fail_owner);
+  EXECUTE $failfn$
+    CREATE OR REPLACE FUNCTION public.badge_reconcile_fail_owner()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $fn$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_temp.badge_reconcile_skip AS skip
+        WHERE skip.user_id = NEW.user_id
+      ) THEN
+        RAISE EXCEPTION 'forced owner reconcile error';
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$;
+  $failfn$;
+  CREATE TRIGGER badge_reconcile_fail_owner
+    BEFORE INSERT ON public.badge_awards
+    FOR EACH ROW
+    EXECUTE FUNCTION public.badge_reconcile_fail_owner();
+  FOR v_batch_n IN 1..25 LOOP
+    v_batch_user := ('ffffffff-ffff-ffff-ffff-' || lpad(to_hex(v_batch_n), 12, '0'))::uuid;
+    v_batch_grow := gen_random_uuid();
+    INSERT INTO auth.users (
+      id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+      raw_app_meta_data, raw_user_meta_data, aud, role
+    ) VALUES (
+      v_batch_user,
+      'badge-cursor-' || v_batch_user::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+    );
+    INSERT INTO public.grows (id, user_id, name)
+    VALUES (v_batch_grow, v_batch_user, 'badge cursor grow');
+    INSERT INTO storage.objects (bucket_id, name, owner, owner_id) VALUES (
+      'diary-photos',
+      v_batch_user::text || '/diary/cursor.jpg',
+      v_batch_user,
+      v_batch_user::text
+    );
+    INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at)
+    VALUES (
+      v_batch_user,
+      v_batch_grow,
+      '',
+      v_batch_user::text || '/diary/cursor.jpg',
+      now()
+    );
+  END LOOP;
+  PERFORM set_config('role', 'service_role', true);
+  v_batch_first := public.badge_awards_reconcile();
+  RESET role;
+  ASSERT v_batch_first = 24,
+    format('reconcile must return successes while visiting 25 owners, got %s', v_batch_first);
+  ASSERT (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1) = v_fail_owner,
+    format(
+      'reconcile_after must be the last owner visited, got %s',
+      (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1)
+    );
+  DROP TRIGGER badge_reconcile_fail_owner ON public.badge_awards;
+  DROP FUNCTION public.badge_reconcile_fail_owner();
+  DELETE FROM auth.users WHERE email LIKE 'badge-cursor-%@verdant.test';
+
   DELETE FROM auth.users WHERE id = v_owner;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'deleting the account must cascade the award';
@@ -650,8 +947,64 @@ END $$;
 ROLLBACK;
 
 -- Petal test 23: two sessions evaluate the same owner at once.
--- The fixture commits so the second connection can see it, then this
--- session deletes it and turns the kill switch back off.
+-- The fixture commits, so this plan runs only when the connected database
+-- is a disposable local database named badge_pgtap_<12 hex>. dbname=postgres
+-- skips this plan and commits nothing. The runner token is the primary
+-- fence: badge_pgtap.token must equal the database comment before any write.
+-- A loopback or 172.16/12 TCP address is accepted only after that token matches.
+-- A connection without a server address or port is refused before any fixture commits.
+-- The database must be empty of users, diary entries, and awards. Session-2
+-- cleanup commits through dblink so a later RAISE cannot roll it back.
+SELECT CASE
+  WHEN current_database() ~ '^badge_pgtap_[0-9a-f]{12}$'
+   AND current_database() <> 'postgres'
+  THEN 1
+  ELSE 0
+END AS badge_pgtap_disposable
+\gset
+
+\if :badge_pgtap_disposable
+DO $$
+DECLARE
+  v_token text := NULLIF(btrim(current_setting('badge_pgtap.token', true)), '');
+  v_comment text;
+  v_users bigint;
+  v_entries bigint;
+  v_awards bigint;
+BEGIN
+  IF current_database() !~ '^badge_pgtap_[0-9a-f]{12}$'
+     OR current_database() = 'postgres' THEN
+    RAISE EXCEPTION 'two-session test refuses database %', current_database();
+  END IF;
+  IF v_token IS NULL THEN
+    RAISE EXCEPTION 'two-session test refuses a missing token';
+  END IF;
+  SELECT shobj_description(d.oid, 'pg_database')
+    INTO v_comment
+  FROM pg_database AS d
+  WHERE d.datname = current_database();
+  IF v_comment IS DISTINCT FROM v_token THEN
+    RAISE EXCEPTION 'two-session test refuses a token that does not match the database comment';
+  END IF;
+  IF inet_server_addr() IS NULL OR inet_server_port() IS NULL THEN
+    RAISE EXCEPTION 'two-session test refuses a connection without a loopback host and port';
+  END IF;
+  IF host(inet_server_addr()) NOT IN ('127.0.0.1', '::1', 'localhost')
+     AND NOT (
+       host(inet_server_addr())::inet << '172.16.0.0/12'::inet
+       AND inet_client_addr() IS NOT NULL
+       AND host(inet_client_addr())::inet << '172.16.0.0/12'::inet
+     ) THEN
+    RAISE EXCEPTION 'two-session test refuses host %', host(inet_server_addr());
+  END IF;
+  SELECT count(*) INTO v_users FROM auth.users;
+  SELECT count(*) INTO v_entries FROM public.diary_entries;
+  SELECT count(*) INTO v_awards FROM public.badge_awards;
+  IF v_users <> 0 OR v_entries <> 0 OR v_awards <> 0 THEN
+    RAISE EXCEPTION 'two-session test refuses a non-empty database';
+  END IF;
+END $$;
+
 CREATE EXTENSION IF NOT EXISTS dblink;
 
 BEGIN;
@@ -684,15 +1037,21 @@ DO $$
 DECLARE
   v_owner uuid;
   v_conn text;
+  v_cleanup_conn text;
   v_sql text;
   v_count int;
 BEGIN
+  IF current_database() !~ '^badge_pgtap_[0-9a-f]{12}$'
+     OR current_database() = 'postgres' THEN
+    RAISE EXCEPTION 'two-session test refuses database %', current_database();
+  END IF;
   SELECT owner INTO v_owner FROM badge_two_session;
-  SELECT format(
-    'host=%s port=%s dbname=postgres user=postgres password=postgres',
-    host(inet_server_addr()),
-    inet_server_port()
-  ) INTO v_conn;
+  v_conn := format(
+    'host=%s port=%s dbname=%s user=postgres password=postgres',
+    COALESCE(host(inet_server_addr()), '127.0.0.1'),
+    COALESCE(inet_server_port()::text, current_setting('port')),
+    current_database()
+  );
   v_sql := format($q$
     SELECT public.badge_awards_evaluate_owner('first_diary_entry')
     FROM (
@@ -705,6 +1064,9 @@ BEGIN
 
   PERFORM dblink_connect('badge_s1', v_conn);
   PERFORM dblink_connect('badge_s2', v_conn);
+  IF current_setting('badge_pgtap.force_session2_failure', true) = '1' THEN
+    RAISE EXCEPTION 'forced session-2 failure';
+  END IF;
   IF dblink_send_query('badge_s1', v_sql) <> 1 OR dblink_send_query('badge_s2', v_sql) <> 1 THEN
     RAISE EXCEPTION 'two-session queries were not sent';
   END IF;
@@ -721,6 +1083,15 @@ BEGIN
   WHERE award.user_id = v_owner;
   ASSERT v_count = 1, 'two sessions must leave one evidence row';
 
+  PERFORM set_config('storage.allow_delete_query', 'true', true);
+  DELETE FROM storage.objects
+  WHERE bucket_id = 'diary-photos'
+    AND name = v_owner::text || '/diary/two.jpg';
+  SELECT count(*) INTO v_count
+  FROM storage.objects
+  WHERE bucket_id = 'diary-photos'
+    AND name = v_owner::text || '/diary/two.jpg';
+  ASSERT v_count = 0, 'two-session cleanup must remove the photo';
   DELETE FROM auth.users WHERE id = v_owner;
   UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
   ASSERT (SELECT enabled FROM public.badge_award_runtime WHERE id = 1) IS FALSE,
@@ -736,9 +1107,337 @@ EXCEPTION WHEN OTHERS THEN
   EXCEPTION WHEN OTHERS THEN
     NULL;
   END;
-  UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
-  DELETE FROM auth.users WHERE email LIKE 'badge-two-session-%@verdant.test';
+  -- A RAISE below rolls this handler back. These writes commit in another
+  -- session, so a session-2 failure cannot leave the switch on or the photo.
+  -- A socket-only connection string cannot reach this database. Cleanup uses
+  -- the same explicit host and port as the session connection, and says so
+  -- when that connection cannot be built or used.
+  BEGIN
+    v_cleanup_conn := format(
+      'host=%s port=%s dbname=%s user=postgres password=postgres',
+      COALESCE(host(inet_server_addr()), '127.0.0.1'),
+      COALESCE(inet_server_port()::text, current_setting('port')),
+      current_database()
+    );
+    IF v_cleanup_conn !~ 'host=\S+' OR v_cleanup_conn !~ 'port=[0-9]+' THEN
+      RAISE NOTICE 'two-session cleanup skipped: connection has no host and port';
+    ELSE
+      PERFORM dblink_exec(
+        v_cleanup_conn,
+        $cleanup$
+          DO $inner$
+          BEGIN
+            PERFORM set_config('storage.allow_delete_query', 'true', true);
+            DELETE FROM storage.objects
+            WHERE bucket_id = 'diary-photos'
+              AND name LIKE '%/diary/two.jpg';
+          END
+          $inner$
+        $cleanup$
+      );
+      PERFORM dblink_exec(
+        v_cleanup_conn,
+        'UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1'
+      );
+      PERFORM dblink_exec(
+        v_cleanup_conn,
+        $cleanup$DELETE FROM auth.users WHERE email LIKE 'badge-two-session-%@verdant.test'$cleanup$
+      );
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'two-session cleanup skipped: %', SQLERRM;
+  END;
   RAISE;
 END $$;
 
+-- Kill switch versus a committed disable. The test holds the owner advisory
+-- lock, waits until the worker is blocked on it, commits enabled = false from
+-- a separate connection, then releases the lock. The worker must write nothing.
+-- Two cases: evaluate_owner inserting an award, and reconcile calling it.
+DO $ks$
+DECLARE
+  v_case text;
+  v_owner uuid;
+  v_key bigint;
+  v_conn text;
+  v_sql text;
+  v_photo text;
+  v_count int;
+  v_status text;
+  v_reconciled int;
+  v_deadline timestamptz;
+  v_waiting boolean;
+  v_result jsonb;
+  v_failures text := '';
+  v_error text;
+  v_activity text;
+  v_conn_name text;
+  v_busy int;
+BEGIN
+  IF inet_server_addr() IS NULL OR inet_server_port() IS NULL THEN
+    RAISE EXCEPTION 'kill-switch test refuses a connection without a loopback host and port';
+  END IF;
+
+  FOREACH v_case IN ARRAY ARRAY['evaluate', 'reconcile']
+  LOOP
+    v_owner := NULL;
+    v_key := NULL;
+    v_conn_name := NULL;
+    v_status := NULL;
+    v_reconciled := NULL;
+    BEGIN
+      v_owner := gen_random_uuid();
+      v_photo := v_owner::text || '/diary/ks-' || v_case || '.jpg';
+      v_conn_name := 'badge_ks_' || v_case;
+      v_conn := format(
+        'host=%s port=%s dbname=%s user=postgres password=postgres application_name=%s',
+        host(inet_server_addr()),
+        inet_server_port(),
+        current_database(),
+        v_conn_name
+      );
+      -- pg_stat_get_activity is stable for this transaction. A read taken
+      -- before the worker connects stays empty, so clear it before each look.
+      PERFORM pg_stat_clear_snapshot();
+      PERFORM pg_terminate_backend(activity.pid)
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+        AND activity.pid <> pg_backend_pid()
+        AND activity.application_name LIKE 'badge_ks_%';
+      PERFORM dblink_exec(v_conn, format($fix$
+        DO $inner$
+        BEGIN
+          INSERT INTO auth.users (
+            id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+            raw_app_meta_data, raw_user_meta_data, aud, role
+          ) VALUES (
+            %L::uuid,
+            %L,
+            crypt('harness-password', gen_salt('bf')),
+            now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+          );
+          INSERT INTO public.grows (id, user_id, name)
+          VALUES (gen_random_uuid(), %L::uuid, 'kill switch grow');
+          INSERT INTO storage.objects (bucket_id, name, owner, owner_id)
+          VALUES ('diary-photos', %L, %L::uuid, %L);
+          INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at)
+          SELECT %L::uuid, grow.id, 'Kill switch note', %L, now()
+          FROM public.grows AS grow
+          WHERE grow.user_id = %L::uuid;
+          UPDATE public.badge_award_runtime
+             SET enabled = true, reconcile_after = NULL
+           WHERE id = 1;
+        END
+        $inner$
+      $fix$,
+        v_owner,
+        'badge-ks-' || v_owner::text || '@verdant.test',
+        v_owner,
+        v_photo,
+        v_owner,
+        v_owner::text,
+        v_owner,
+        v_photo,
+        v_owner
+      ));
+
+      v_key := hashtextextended(v_owner::text || ':first_diary_entry', 0);
+      PERFORM pg_advisory_lock(v_key);
+
+      IF v_case = 'evaluate' THEN
+        v_sql := format($q$
+          SELECT public.badge_awards_evaluate_owner('first_diary_entry')
+          FROM (
+            SELECT
+              set_config('request.jwt.claim.sub', %L, false),
+              set_config('request.jwt.claims', %L, false),
+              set_config('role', 'authenticated', false)
+          ) AS session_cfg
+        $q$, v_owner::text, json_build_object('sub', v_owner)::text);
+      ELSE
+        v_sql := 'SELECT public.badge_awards_reconcile()';
+      END IF;
+
+      BEGIN
+        PERFORM dblink_disconnect(v_conn_name);
+      EXCEPTION WHEN OTHERS THEN
+        NULL;
+      END;
+      PERFORM dblink_connect(v_conn_name, v_conn);
+      IF dblink_send_query(v_conn_name, v_sql) <> 1 THEN
+        RAISE EXCEPTION 'kill-switch % query was not sent', v_case;
+      END IF;
+
+      v_deadline := clock_timestamp() + interval '5 seconds';
+      v_waiting := false;
+      v_busy := 1;
+      LOOP
+        v_busy := dblink_is_busy(v_conn_name);
+        IF v_busy = 0 THEN
+          EXIT;
+        END IF;
+        PERFORM pg_stat_clear_snapshot();
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_stat_activity AS activity
+          WHERE activity.datname = current_database()
+            AND activity.pid <> pg_backend_pid()
+            AND activity.application_name = v_conn_name
+            AND activity.wait_event_type = 'Lock'
+            AND activity.wait_event = 'advisory'
+        ) INTO v_waiting;
+        EXIT WHEN v_waiting OR clock_timestamp() > v_deadline;
+        PERFORM pg_sleep(0.05);
+      END LOOP;
+
+      IF NOT v_waiting THEN
+        PERFORM pg_stat_clear_snapshot();
+        SELECT string_agg(
+          COALESCE(activity.application_name, '-') || ' '
+            || COALESCE(activity.state, '-') || ' '
+            || COALESCE(activity.wait_event_type, '-') || '/'
+            || COALESCE(activity.wait_event, '-') || ' '
+            || COALESCE(left(activity.query, 120), '<no query>'),
+          ' || '
+        )
+          INTO v_activity
+        FROM pg_stat_activity AS activity
+        WHERE activity.pid <> pg_backend_pid()
+          AND (
+            activity.datname = current_database()
+            OR activity.application_name LIKE 'badge_ks_%'
+          );
+        IF v_busy = 0 THEN
+          BEGIN
+            IF v_case = 'evaluate' THEN
+              SELECT remote_result.result
+                INTO v_result
+              FROM dblink_get_result(v_conn_name) AS remote_result(result jsonb);
+              v_status := v_result->>'status';
+            ELSE
+              SELECT remote_result.result
+                INTO v_reconciled
+              FROM dblink_get_result(v_conn_name) AS remote_result(result integer);
+            END IF;
+          EXCEPTION WHEN OTHERS THEN
+            v_status := 'error:' || SQLERRM;
+          END;
+        END IF;
+        SELECT count(*) INTO v_count
+        FROM public.badge_awards
+        WHERE user_id = v_owner;
+        RAISE EXCEPTION
+          'kill-switch % did not reach the advisory wait: busy % rows % status % reconcile % activity %',
+          v_case, v_busy, v_count, v_status, v_reconciled, v_activity;
+      END IF;
+
+      PERFORM dblink_exec(
+        v_conn,
+        'UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1'
+      );
+      PERFORM pg_advisory_unlock(v_key);
+
+      IF v_case = 'evaluate' THEN
+        SELECT remote_result.result
+          INTO v_result
+        FROM dblink_get_result(v_conn_name) AS remote_result(result jsonb);
+        v_status := v_result->>'status';
+      ELSE
+        SELECT remote_result.result
+          INTO v_reconciled
+        FROM dblink_get_result(v_conn_name) AS remote_result(result integer);
+      END IF;
+      PERFORM dblink_disconnect(v_conn_name);
+
+      SELECT count(*) INTO v_count
+      FROM public.badge_awards
+      WHERE user_id = v_owner;
+      RAISE NOTICE 'kill-switch % rows % status % reconcile %',
+        v_case, v_count, v_status, v_reconciled;
+      IF v_case = 'evaluate' AND (v_count <> 0 OR v_status IS DISTINCT FROM 'disabled') THEN
+        RAISE EXCEPTION
+          'kill-switch evaluate wrote after disable: rows % status %',
+          v_count, v_status;
+      ELSIF v_case = 'reconcile' AND v_count <> 0 THEN
+        RAISE EXCEPTION
+          'kill-switch reconcile wrote after disable: rows % reconcile_result %',
+          v_count, v_reconciled;
+      END IF;
+
+      PERFORM dblink_exec(v_conn, format($fix$
+        DO $inner$
+        BEGIN
+          PERFORM set_config('storage.allow_delete_query', 'true', true);
+          DELETE FROM storage.objects
+          WHERE bucket_id = 'diary-photos'
+            AND name = %L;
+          DELETE FROM auth.users WHERE id = %L::uuid;
+          UPDATE public.badge_award_runtime
+             SET enabled = false, reconcile_after = NULL
+           WHERE id = 1;
+        END
+        $inner$
+      $fix$, v_photo, v_owner));
+      IF (SELECT enabled FROM public.badge_award_runtime WHERE id = 1) IS DISTINCT FROM FALSE THEN
+        RAISE EXCEPTION 'kill-switch % left the switch on', v_case;
+      END IF;
+      IF (SELECT count(*) FROM auth.users WHERE id = v_owner) <> 0 THEN
+        RAISE EXCEPTION 'kill-switch % left the fixture user', v_case;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS v_error = MESSAGE_TEXT;
+      IF v_conn_name IS NOT NULL THEN
+        BEGIN
+          PERFORM dblink_cancel_query(v_conn_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        BEGIN
+          PERFORM dblink_disconnect(v_conn_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+      END IF;
+      PERFORM pg_stat_clear_snapshot();
+      PERFORM pg_terminate_backend(activity.pid)
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+        AND activity.pid <> pg_backend_pid()
+        AND activity.application_name LIKE 'badge_ks_%';
+      IF v_key IS NOT NULL THEN
+        PERFORM pg_advisory_unlock(v_key);
+      END IF;
+      IF v_owner IS NOT NULL AND v_conn IS NOT NULL THEN
+        BEGIN
+          PERFORM dblink_exec(v_conn, format($fix$
+            DO $inner$
+            BEGIN
+              PERFORM set_config('storage.allow_delete_query', 'true', true);
+              DELETE FROM storage.objects
+              WHERE bucket_id = 'diary-photos'
+                AND name LIKE %L;
+              DELETE FROM auth.users WHERE id = %L::uuid;
+              UPDATE public.badge_award_runtime
+                 SET enabled = false, reconcile_after = NULL
+               WHERE id = 1;
+            END
+            $inner$
+          $fix$, '%/diary/ks-' || v_case || '.jpg', v_owner));
+        EXCEPTION WHEN OTHERS THEN
+          v_error := v_error || ' cleanup: ' || SQLERRM;
+        END;
+      END IF;
+      v_failures := v_failures || v_case || ': ' || v_error || E'\n';
+    END;
+  END LOOP;
+
+  IF btrim(v_failures) <> '' THEN
+    RAISE EXCEPTION 'kill-switch races failed:%', E'\n' || v_failures;
+  END IF;
+END
+$ks$;
+
 \echo ok 2 - two simultaneous sessions leave one award
+\else
+\echo ok 2 - two simultaneous sessions leave one award # SKIP disposable local database required
+\endif

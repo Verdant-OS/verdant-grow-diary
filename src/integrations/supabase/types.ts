@@ -626,16 +626,19 @@ export type Database = {
         Row: {
           enabled: boolean
           id: number
+          reconcile_after: string | null
           updated_at: string
         }
         Insert: {
           enabled?: boolean
           id: number
+          reconcile_after?: string | null
           updated_at?: string
         }
         Update: {
           enabled?: boolean
           id?: number
+          reconcile_after?: string | null
           updated_at?: string
         }
         Relationships: []

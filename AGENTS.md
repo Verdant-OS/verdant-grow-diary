@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-24.6**
+**Sentinel-Version: 2026-10-26.3**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -516,6 +516,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-10-26.3** — Corrected the two `CLAUDE.md` lockfile passages to record the 2026-10-03 retirement of `package-lock.json` and the existing `bun.lock`-only policy. Synchronized the current twelve-file Sentinel contract; no policy or checker change.
 - **2026-10-24.6** — The environment note names `docs/agents/CURRENT_STATE.md` as the file whose single-file edits need no version bump. Those precedents are commits `1ae167764` and `a0c30e565`.
 - **2026-10-24.5** — Operating state does not override `OWNERSHIP.md` on ownership and review routing; the start-here note in `docs/agents/CURRENT_STATE.md` now says the same thing. Extending the repair-all-defects rule and the do-not-integrate-your-own-work rule from the Codex seat to every branch holder is an intended change, recorded here; the Codex wording stays in the roster. Before editing a migration file, confirm it is new. Everything else runs without waiting on the founder. The integration branch is `main`. The deploy branch is `verdant-grow-diary`.
 - **2026-10-24.4** — Restored the render-body rule in its original words: keep transforms/selectors out of render bodies when possible.

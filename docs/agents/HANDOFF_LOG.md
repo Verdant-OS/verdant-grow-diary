@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-1876-LOCKFILE-RETIREMENT
+
+```text
+TASK CODEX-1876-LOCKFILE-RETIREMENT  priority: other  status: OPEN
+goal: Finish the two CLAUDE.md lockfile-retirement corrections while preserving the current twelve-file governance contract.
+why: The deploy branch still described package-lock.json as a synchronized compatibility lock in Repository operating facts and Daily commands after its retirement.
+branch: claude/claude-md-lockfile-retirement
+base: verdant-grow-diary integrated at 81f6aa728a46bb86b4acddcf2ffd7d7529ed1d9a during the 2026-10-27 bounded normal integration
+checkout: Fetch the existing branch and deploy base, verify the PR's current full head and the effective claim, then fast-forward only to that verified head before any further normal base merge. Preserve this branch name and all unrelated work.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1876
+head_sha: 30811d63c55e13d2320dc340063ed5538c7401f6, published source checkpoint before this normal base integration. The resulting pushed full head belongs in the PR and post-push receipt; no self-referential commit identity or inherited acceptance is claimed.
+state: Published bounded governance repair preserved byte-for-byte during a necessary normal base integration; fresh resulting-head hosted CI and outside acceptance remain pending.
+current_step: Current integration resolves only this own HANDOFF insertion against incoming VER-285. All twelve authored governance blobs, Sentinel 2026-10-26.3, the two CLAUDE.md passages and the twelve-file contract remain exactly at published source 30811d63c55e13d2320dc340063ed5538c7401f6. Historical repair resolved governance conflicts and avoided reusing #1971's then-published stamp; no new governance content or version is authored now.
+next_action: Verify the resulting remote head and fresh required/supplemental CI, then route one available eligible non-contributing Claude/Grok session for the complete resulting scope. Keep draft; no queue or merge from this writer.
+post_merge_check: Confirm the landed CLAUDE.md passages describe bun.lock as the only lockfile and preserve the current governance policy and twelve-file mirror/parity contract. No app deployment or live behavior claim follows from this docs repair.
+active_writer: Codex root delegates /root/preflight_1949 as the sole bounded base-integration writer after /root/reconcile_counts explicitly stopped/released at 2026-10-27 05:58 UTC; accepted successor recorded on the same claim 6428539978. This writer authors only this own HANDOFF block and stops after normal publication; original repair attribution remains /root/reconcile_counts.
+decisions: Preserve every other current deploy policy and checker. Use a normal merge because the existing branch genuinely conflicted. Do not reuse #1971's published 2026-10-26.2 stamp. Preserve #2086's remaining work and the recorded sequence placing #1876 first.
+tried_and_rejected: Whole-PR supersession was disproved by the two remaining deploy passages. Adopting #1971's twelve-to-eighteen-file contract, role/cloud-policy work, checker changes or inaccessible unpublished artifacts is outside scope. No fresh implementation-mirroring test was added for documentation wording.
+commands: node scripts/check-sentinel-version-parity.mjs 81f6aa728a46bb86b4acddcf2ffd7d7529ed1d9a; node --test scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; bunx vitest run src/test/sentinel-mirror-prettier-fence.test.ts src/test/assert-docs-safety-runner.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts src/test/loop-engineering-doc.test.ts --pool=forks --maxWorkers=1 --reporter=dot; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; bun run typecheck; git diff --check.
+files_touched: Current integration authors docs/agents/HANDOFF_LOG.md (this block only). Historical repair paths CLAUDE.md, AGENTS.md, GEMINI.md, .grok/rules/verdant-grok-role.md, docs/agents/README.md, docs/agents/HANDOFF_PROTOCOL.md and the six docs/agents/roles/*.md remain exact published source blobs. All unrelated incoming base files remain unchanged.
+files_remaining: None planned beyond verification and any scoped findings.
+blockers: Fresh resulting-head CI and independent outside acceptance remain pending. Codex repaired this PR and cannot accept it. Existing #1971/#2086 assignments and protected scopes remain unchanged.
+open_questions: Actual available outside reviewer pickup after the CI precheck.
+gotchas: The four prior P2s moved with shipped #1873; this PR does not fix or re-adjudicate those separate source findings. Current twelve-file parity applies; do not import another branch's eighteen-file contract. A new head invalidates historical CI and review receipts.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/1876#issuecomment-6428539978; original scoped authority https://github.com/Verdant-OS/verdant-grow-diary/pull/1876#issuecomment-6222637984; narrowed scope/sequencing https://github.com/Verdant-OS/verdant-grow-diary/pull/1876#issuecomment-6222808926
+artifacts: Historical repair receipt at source 30811d63c55e13d2320dc340063ed5538c7401f6: 31/31 Node governance tests; four focused Vitest files, 98/98 tests; full TypeScript exit 0; parity/mirror, scoped formatting, three docs-safety categories, nine-file release-docs safety, strict scorer report and lockfile policy PASS. Canonical frozen Bun 1.3.14 installed 918 packages with manifest/lock hashes unchanged. Scope verification found only the two CLAUDE.md passages, required version/changelog/mirror and this block; all unrelated base/handoff bytes are preserved. No failing factual regression test was manufactured. Current 2026-10-27 integration independently measured 31/31 Node governance and 98/98 focused docs tests, full TypeScript exit 0, parity/BUMP/mirror, docs/release safety, strict scorer zero, lock policy, thirteen-path format and whitespace PASS; frozen existing dependency hashes remain unchanged. Full application suite/build, resulting-head hosted CI and independent acceptance remain NOT_MEASURED. The PR and post-push receipt record the published full head; older CI and installation evidence stay historical.
+reviewer_seat: An actually available eligible non-contributing Claude/Grok session under OWNERSHIP.md 4.3; exclude the original Claude/Canopy contributors, this Codex repairer and any other implementation contributor. No request or acceptance is claimed by this block.
+reviewer_sha: NOT_MEASURED for the resulting integration head.
+session_state: One isolated cloud worktree; no background writer or routine. Current protected scopes, production controls and deployment/live NOT_MEASURED remain.
+claimed_by: Codex root via /root/preflight_1949, accepted successor 2026-10-27 05:59 UTC on existing PR claim 6428539978; original holder /root/reconcile_counts claimed 2026-10-26 22:12 UTC and explicitly stopped/released before this continuation.
+owner: Codex closeout coordinator for this bounded repair; normal outside review and merge ownership remain separate.
+last_updated: 2026-10-27 06:05 UTC, by Codex /root/preflight_1949 (bounded normal base integration)
+```
+
 ### VER-285-PRESERVE-MISSING-STAGE
 
 ```text

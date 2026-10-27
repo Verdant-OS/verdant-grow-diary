@@ -333,6 +333,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         links: [
           { label: "Understand sensor truth", to: "/guides/sensor-truth-grow-room" },
           { label: "Open the stage-aware VPD calculator", to: "/tools/vpd-calculator" },
+          { label: "VPD chart by growth stage", to: "/vpd-chart" },
         ],
       },
       {
@@ -756,6 +757,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           {
             label: "Use the stage-aware nutrient schedule method",
             to: "/guides/cannabis-nutrient-schedule",
+          },
+          {
+            label: "Log an Athena feed chart week by week",
+            to: "/guides/athena-feed-chart-log",
           },
         ],
       },

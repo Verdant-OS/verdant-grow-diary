@@ -1,12 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { staticRouteHead } from "@/lib/build/staticRouteHead";
-import Landing from "@/pages/Landing";
+import RouteAliasRedirect from "@/components/RouteAliasRedirect";
 
 export const Route = createFileRoute("/welcome")({
-  head: () => staticRouteHead("/welcome"),
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  return <Landing />;
+  return <RouteAliasRedirect to="/" />;
 }

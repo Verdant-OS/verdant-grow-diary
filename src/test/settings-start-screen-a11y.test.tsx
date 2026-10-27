@@ -40,7 +40,7 @@ describe("Settings start-screen — a11y", () => {
     expect(fieldset.tagName.toLowerCase()).toBe("fieldset");
     // sr-only legend + aria-label both supply a name
     expect(fieldset).toHaveAttribute("aria-label", expect.stringMatching(/start screen/i));
-    for (const key of ["quickLog", "timeline", "dashboard", "onboarding", "welcome"]) {
+    for (const key of ["quickLog", "timeline", "dashboard", "onboarding"]) {
       const radio = screen.getByTestId(`start-screen-option-${key}`);
       expect(radio).toHaveAttribute("type", "radio");
       expect(radio).toHaveAttribute("name", "start-screen");

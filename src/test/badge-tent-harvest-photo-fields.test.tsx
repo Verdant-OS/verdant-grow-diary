@@ -14,6 +14,8 @@ const updateMock = vi.fn(() => ({ eq: eqMock }));
 const insertMock = vi.fn();
 const singleMock = vi.fn();
 const rpcMock = vi.fn();
+const uploadMock = vi.fn();
+const growTypeMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -25,24 +27,34 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table === "tents") {
         return { update: updateMock, insert };
       }
+      if (table === "grows") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: growTypeMock }) }),
+        };
+      }
       return { insert };
     },
     rpc: (...args: unknown[]) => rpcMock(...args),
     storage: {
       from: () => ({
-        upload: vi.fn(),
+        upload: uploadMock,
         remove: vi.fn(),
       }),
     },
   },
 }));
 
+// One stable user object across renders, like the real auth store, so a
+// stale useCallback closure over harvestPhotoFile cannot hide behind
+// per-render identity churn.
+const authState = vi.hoisted(() => ({ user: { id: "user-1" }, loading: false }));
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
+  useAuth: () => authState,
 }));
 
+const toastError = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: toastError, success: vi.fn() },
 }));
 
 const growsState = vi.hoisted(() => ({
@@ -96,11 +108,19 @@ function withClient(node: ReactNode) {
 
 describe("badge tent and harvest photo fields", () => {
   beforeEach(() => {
+    // Pending-save recovery records persist in web storage between renders.
+    window.sessionStorage.clear();
+    window.localStorage.clear();
     eqMock.mockReset();
     updateMock.mockClear();
     insertMock.mockReset();
     singleMock.mockReset();
     rpcMock.mockReset();
+    uploadMock.mockReset();
+    growTypeMock.mockReset();
+    toastError.mockReset();
+    uploadMock.mockResolvedValue({ error: null });
+    growTypeMock.mockResolvedValue({ data: { grow_type: "outdoor" }, error: null });
     eqMock.mockResolvedValue({ error: null });
     singleMock.mockResolvedValue({
       data: { id: "tent-new", name: "Tent #1", grow_id: "grow-1" },
@@ -151,5 +171,111 @@ describe("badge tent and harvest photo fields", () => {
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
     await waitFor(() => expect(rpcMock).toHaveBeenCalled());
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  function renderHarvestSection() {
+    render(
+      withClient(
+        <QuickLogAllActivitiesSection
+          growId="grow-1"
+          tentId="tent-1"
+          plantId="plant-1"
+          plantStage="flower"
+        />,
+      ),
+    );
+  }
+
+  async function openHarvest() {
+    if (!screen.queryByTestId("quick-log-all-activities-picker-harvest")) {
+      fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+    }
+    fireEvent.click(await screen.findByTestId("quick-log-all-activities-picker-harvest"));
+    return (await screen.findByTestId(
+      "quick-log-all-activities-harvest-photo",
+    )) as HTMLInputElement;
+  }
+
+  const harvestInserts = () => insertMock.mock.calls.filter(([table]) => table === "harvests");
+
+  it("uploads a harvest photo once, then a second harvest save inserts no harvests row", async () => {
+    renderHarvestSection();
+    const input = await openHarvest();
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+      target: { value: "28" },
+    });
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(harvestInserts()).toHaveLength(1));
+    const row = harvestInserts()[0]?.[1] as Record<string, unknown>;
+    expect(row).toMatchObject({
+      user_id: "user-1",
+      grow_id: "grow-1",
+      grow_type: "outdoor",
+      yield_grams: 28,
+    });
+    expect(String(row.photo_url)).toMatch(/^storage:\/\/[^/]+\/user-1\/harvests\//);
+    expect(input.value).toBe("");
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-harvest-photo")).toBeNull(),
+    );
+
+    // Second harvest with the picker untouched: the activity saves, but the
+    // first photo must not be uploaded again or attached to a new row.
+    await openHarvest();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-harvest-photo")).toBeNull(),
+    );
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(harvestInserts()).toHaveLength(1);
+  });
+
+  it("keeps Save disabled until the harvest photo upload settles, so one click is one row", async () => {
+    let releaseUpload: (value: { error: null }) => void = () => {};
+    uploadMock.mockReturnValue(
+      new Promise((resolve) => {
+        releaseUpload = resolve;
+      }),
+    );
+    renderHarvestSection();
+    const input = await openHarvest();
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
+    });
+    const save = screen.getByTestId("quick-log-all-activities-save");
+    fireEvent.click(save);
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    // While the photo upload is pending, no control may start a second
+    // save: Save is either disabled or replaced by the pending-save panel,
+    // and that panel's retry is refused by the in-flight lock.
+    const visibleSave = screen.queryByTestId("quick-log-all-activities-save");
+    if (visibleSave) expect(visibleSave).toBeDisabled();
+    fireEvent.click(save);
+    const retry = screen.queryByTestId("quick-log-all-activities-retry-original");
+    if (retry) fireEvent.click(retry);
+    releaseUpload({ error: null });
+    await waitFor(() => expect(harvestInserts()).toHaveLength(1));
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes no harvests row when the parent grow type cannot be verified", async () => {
+    growTypeMock.mockResolvedValue({ data: null, error: null });
+    renderHarvestSection();
+    const input = await openHarvest();
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("The harvest photo was not saved."),
+    );
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(harvestInserts()).toHaveLength(0);
   });
 });

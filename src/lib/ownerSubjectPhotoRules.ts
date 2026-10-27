@@ -4,6 +4,7 @@
  * reference, never a signed URL.
  */
 import { PLANT_PROFILE_PHOTO_BUCKET } from "@/lib/plantProfilePhotoStorageRules";
+import { harvestWeightAsGrams } from "@/lib/harvestWeightUnitNormalization";
 
 export type OwnerSubjectPhotoKind = "tent" | "harvest";
 
@@ -22,4 +23,38 @@ export function buildOwnerSubjectPhotoObjectPath(input: {
 
 export function formatOwnerSubjectPhotoReference(path: string): string {
   return `storage://${PLANT_PROFILE_PHOTO_BUCKET}/${path}`;
+}
+
+/**
+ * Shape the `harvests` row a harvest photo attaches to. `grow_type` must
+ * come from the verified parent grow; with no verified type there is no
+ * row (never a hard-coded default). `yield_grams` is the dry weight in
+ * canonical grams, or null when no valid dry weight was entered.
+ */
+export function buildHarvestPhotoRow(input: {
+  harvestId: string;
+  userId: string;
+  growId: string;
+  growType: string | null | undefined;
+  dryWeight: string | null | undefined;
+  weightUnit: string | null | undefined;
+  photoReference: string;
+}): {
+  id: string;
+  user_id: string;
+  grow_id: string;
+  grow_type: string;
+  yield_grams: number | null;
+  photo_url: string;
+} | null {
+  const growType = typeof input.growType === "string" ? input.growType.trim() : "";
+  if (!growType) return null;
+  return {
+    id: input.harvestId,
+    user_id: input.userId,
+    grow_id: input.growId,
+    grow_type: growType,
+    yield_grams: harvestWeightAsGrams({ value: input.dryWeight, unit: input.weightUnit }),
+    photo_url: input.photoReference,
+  };
 }

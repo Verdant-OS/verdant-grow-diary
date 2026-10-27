@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
@@ -60,6 +60,13 @@ describe("public Cronk nutrients feed log page", () => {
       createObjectURL: vi.fn(() => "blob:feed-log"),
       revokeObjectURL: vi.fn(),
     });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("renders one disclaimer twice, three signup CTAs, and FAQ text that matches JSON-LD", () => {
@@ -118,6 +125,75 @@ describe("public Cronk nutrients feed log page", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
     expect(storage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("downloads the csv without cancelling the anchor click", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-27T12:00:00Z"));
+    vi.unstubAllGlobals();
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("sessionStorage", storage);
+    mockViewport(true);
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    let csv = "";
+    const RealBlob = Blob;
+    vi.spyOn(globalThis, "Blob").mockImplementation(function (parts, options) {
+      csv = String(parts?.[0] ?? "");
+      return new RealBlob(parts, options);
+    });
+    vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:cronk-csv");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      expect(this.download).toBe("cronk-feed-log-2026-10-27.csv");
+      expect(document.body.contains(this)).toBe(true);
+      const href = this.getAttribute("href");
+      this.removeAttribute("href");
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      this.dispatchEvent(event);
+      if (href) this.setAttribute("href", href);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Week 1, Product 1, actual"), {
+      target: { value: "2.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+
+    expect(click).toHaveBeenCalledOnce();
+    expect(csv).toContain("2.5");
+    expect(revoke).not.toHaveBeenCalled();
+    expect(trackFeedLogEvent).toHaveBeenCalledWith("feed_log_csv_exported", { row_count: 12 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(revoke).toHaveBeenCalledWith("blob:cronk-csv");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20);
+    });
+    expect(screen.getByRole("status").textContent).toBe(
+      "CSV downloaded. Nothing is saved in your browser.",
+    );
+    expect(document.body.querySelector("a[download]")).toBeNull();
+  });
+
+  it("does not announce a csv download when the object URL cannot be created", () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("sessionStorage", storage);
+    mockViewport(true);
+    vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+      throw new Error("blob failed");
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click");
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+    expect(click).not.toHaveBeenCalled();
+    expect(trackFeedLogEvent).not.toHaveBeenCalledWith("feed_log_csv_exported", expect.anything());
+    expect(
+      screen.queryByText("CSV downloaded. Nothing is saved in your browser."),
+    ).not.toBeInTheDocument();
   });
 
   it("uses stacked cards on a phone viewport and does not render the wide table", () => {

@@ -42,7 +42,8 @@ the constitution says that PASS counts.
 
 ## Boundaries
 
-- Graft does not merge. Chemdawg is the merge actor.
+- Graft does not merge. The current merge actor is explicitly assigned in
+  `docs/agents/OWNERSHIP.md` and `docs/agents/constitution/roster.md`.
 - Graft does not give the outside PASS on a pull request it authored or repaired.
 - Drafts remain draft.
 

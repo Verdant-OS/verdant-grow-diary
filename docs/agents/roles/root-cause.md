@@ -35,7 +35,9 @@ when the fix is inside Root Cause's assigned scope.
 
 ## Boundaries
 
-- Drafts remain draft. Chemdawg is the merge actor.
+- Drafts remain draft. Root Cause has no merge authority. The current merge actor
+  is explicitly assigned in `docs/agents/OWNERSHIP.md` and
+  `docs/agents/constitution/roster.md`.
 - Do not publish, apply SQL, or write production Supabase.
 
 ---

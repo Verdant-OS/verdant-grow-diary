@@ -81,7 +81,7 @@ checkout: git fetch origin cursor/advanced-nutrients-feed-log-b938 verdant-grow-
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2542
 head_sha: 8672d61c9f53bb6a2a1ed755f424866271d47140 was the reviewed head; the CSV download fix moves the tip
 state: pushed draft
-current_step: CSV formula guard skips a plain signed number and still prefixes = @ tab CR and non-numeric + or - cells
+current_step: CSV and TSV share one formula guard; plain signed numbers stay unprefixed and = @ tab CR and non-numeric + or - cells are prefixed
 next_action: leave PR #2542 draft; do not mark ready, queue, merge, or deploy
 post_merge_check: NOT_APPLICABLE until merge is requested
 active_writer: cursor cloud agent on cursor/advanced-nutrients-feed-log-b938

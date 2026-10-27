@@ -169,15 +169,25 @@ export function evaluateProductCell(
   return { plannedNum, actualNum, diffNum, diffFormatted, pctFormatted, flag };
 }
 
-const PLAIN_CSV_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+const PLAIN_SPREADSHEET_NUMBER = /^[+-]?\d+(\.\d+)?$/;
 
-export function escapeCsvField(value: unknown): string {
+/** Prefix formula-leading text. Plain signed numbers stay unchanged. */
+export function guardSpreadsheetFormula(value: unknown): string {
   if (value === null || value === undefined) return "";
   let str = String(value);
-  const leadingSignIsFormula = /^[+-]/.test(str) && !PLAIN_CSV_NUMBER.test(str);
+  const leadingSignIsFormula = /^[+-]/.test(str) && !PLAIN_SPREADSHEET_NUMBER.test(str);
   if (/^[=@\t\r]/.test(str) || leadingSignIsFormula) str = `'${str}`;
+  return str;
+}
+
+export function escapeCsvField(value: unknown): string {
+  const str = guardSpreadsheetFormula(value);
   if (/[",\r\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
   return str;
+}
+
+export function escapeTsvField(value: unknown): string {
+  return guardSpreadsheetFormula(value).replace(/[\t\r\n]+/g, " ");
 }
 
 export function parseCsvSingleField(escapedField: string): string {
@@ -371,7 +381,7 @@ export function buildFeedLogCsv(state: FeedLogState): string {
 
 export function buildFeedLogTsv(state: FeedLogState): string {
   return buildFeedLogExportMatrix(state)
-    .map((row) => row.map((cell) => String(cell ?? "").replace(/[\t\r\n]+/g, " ")).join("\t"))
+    .map((row) => row.map((cell) => escapeTsvField(cell)).join("\t"))
     .join("\n");
 }
 

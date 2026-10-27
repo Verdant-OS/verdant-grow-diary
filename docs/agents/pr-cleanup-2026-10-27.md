@@ -285,7 +285,7 @@ Open count after Phase 2: 119.
 
 Matthew, 2026-10-27: "keep the #2032 badge stack", then "approved, take over #2032 and port the fixes". Claude merged #1979's head `f219faf10` into #2032, which the 2026-10-22 peer observation on #2032 had required, and re-derived the two functions `20261011143000` replaces from #1979's current bodies.
 
-**Status: 3 local commits on #2032 are not pushed.** `node scripts/scorer-lock.mjs --report --strict` exits 2 because 8 tracked scorers changed, 7 of them carried in by the #1979 merge. Declaring the unlock was refused in this session, so the push waits on Matthew. Details are in the takeover report on #2032 once pushed.
+**Status: pushed.** On Matthew's approval ("approved, declare the scorer unlocks and push #2032"), the scorer unlocks were declared, and `scorer-lock --report --strict` passes (8 changed, 0 locked). #2032 is now at `06f4238c0d7f37843b1d7d6b165c0e46051a4aa3`, a fast-forward from `5fc40d16c`. Evidence, open items and the scorer list are in #2032's PR body (takeover section) and its resume-here comment. Stacked PRs #2343 and #2362 now trail their base; they belong to other holders and were not touched.
 
 ## Verified
 

@@ -82,7 +82,7 @@ pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2556 (draft)
 head_sha: 19d27e8c7bc4a541fe349a009740f90771c26449, observed on origin/claude/new-session-wp1j5i at 2026-10-27T17:44Z; the commit that records this line moves the head past it, so re-read the PR head before any current-head claim
 state: pushed draft (docs only)
 current_step: Phase 1 done. docs/agents/pr-cleanup-2026-10-27.md holds the per-PR table, the close list (14), the consolidation plan (29 folds) and Matthew's decision list.
-next_action: Phase 2 partly done: #2226 #2214 #2182 #1951 #1955 #1980 were closed as superseded on Matthew's approval (2026-10-27). #2372 #2299 were closed as stale on Matthew's approval. Matthew said to keep #1986 #2010 #2024 #2333 #1904 #1902 for now. Badge tree corrected: #2032 and #2342 are both stacked on #1979 (one tree, not rival stacks). Matthew approved the #2032 takeover and port; 3 local commits (merge of #1979 f219faf10, migration re-derivation, suite fixture fix plus anonymous-refusal assertion) are not pushed because scorer-lock --strict exits 2 and the unlock declaration was refused in-session. Waiting on the rest of the needs-Matthew list; then Phase 3.
+next_action: Phase 2 partly done: #2226 #2214 #2182 #1951 #1955 #1980 were closed as superseded on Matthew's approval (2026-10-27). #2372 #2299 were closed as stale on Matthew's approval. Matthew said to keep #1986 #2010 #2024 #2333 #1904 #1902 for now. Badge tree corrected: #2032 and #2342 are both stacked on #1979 (one tree, not rival stacks). Matthew approved the #2032 takeover and port; 3 commits pushed to #2032 at 06f4238c0d7f37843b1d7d6b165c0e46051a4aa3 after Matthew approved the scorer unlocks (strict passes, 8 changed / 0 locked). Open on #2032: wiring the harvest suite into CI (protected) and the 10-22 UI/type review threads. Waiting on the rest of the needs-Matthew list; then Phase 3.
 post_merge_check: NOT_APPLICABLE (inventory doc; not a feature)
 active_writer: Claude session session_017UoYKyHCyHbSMw6VpDj2mb
 decisions: Hands-off PRs (OG Kush) and holds (#2539 #2532 #2252) left untouched. Test-only follow-ups fold into area consolidation PRs, or into their still-open parent. Product fixes are never folded into test consolidations. Protected-scope PRs go to Matthew.
@@ -100,7 +100,7 @@ reviewer_sha: none yet
 session_state: Claude cloud session; no routines, no paused workflows; pending human decision: close-list approval
 claimed_by: Claude, 2026-10-27 12:13 CT (first commit of this block, e99de0741; session_017UoYKyHCyHbSMw6VpDj2mb)
 owner: Claude (default inheritor OG Kush)
-last_updated: 2026-10-27 12:44 CT, by Claude
+last_updated: 2026-10-27 13:09 CT, by Claude
 ```
 
 ### PR2511-REQUIRED-TRIGGER-GUARDS

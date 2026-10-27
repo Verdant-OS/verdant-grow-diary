@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ARCH-CONTRACT-RESTAMP-20261027
+
+```text
+TASK ARCH-CONTRACT-RESTAMP-20261027  priority: P2  status: OPEN
+goal: Source-grounded §15 re-verification of docs/architecture-contract.md at deploy tip 27991451a756d2521df08e26e504776a43c7bbb8 (#2283), carrying #2149's nine-P2 amendment, so the Current Architecture Contract describes the tree that ships. Docs only. The release topology specification is a separate slice (see open_questions).
+why: Matthew assigned Claude as owner of Verdant architecture/specification work (2026-10-27) and chose "restamp in place" over new documents after the collision audit found both target documents already on the deploy branch. AGENTS.md §9: one implementation; #2149 is merged into this branch rather than duplicated.
+branch: claude/amazing-darwin-km8ehw
+base: verdant-grow-diary at 27991451a756d2521df08e26e504776a43c7bbb8
+checkout: git fetch origin claude/amazing-darwin-km8ehw verdant-grow-diary && git switch claude/amazing-darwin-km8ehw && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564 (draft)
+head_sha: read origin/claude/amazing-darwin-km8ehw; the restamp commit is b37b588a038fe9a59294de02314bc91cd4df9b66, the prettier follow-up c2f711712b1fc46afa847c599c78413bae756ec4, and this block's commit follows them. This commit cannot name its own SHA.
+state: pushed draft; restamp complete; this block added
+current_step: Every path:line cite into the 27 cited files that changed since c8523adc was re-read by a session checker (compares line text at both trees, relocates moved lines by stamped text; not committed). Counts reproduced at c8523adc first, then measured at the tip: AC-3.2 610 files, 55/7 raw, 44/6 executable, 0, 2; AC-3.4 940 in 939 alias-only (943/942 full); AC-4.3 77/67, 70/61, 106/86; AC-10.2 zero. Substance recorded: zod 3 to 4 (#2505, AC-1.8); AC-1.5/T8 package cites re-read at start-server-core 1.169.39 / start-client-core 1.170.34; AC-1.1 health/withHostHeaders cites corrected (wrong since c8523adc); AC-9.2 patches row history. docs:assert-safety PASS; prettier clean.
+next_action: Independent exact-head review at the PR head by an available eligible non-contributing Grok or Codex session (OWNERSHIP.md §4.3). Decide ordering with #2149: merge #2149 first and rebase this, or merge this and close #2149 as superseded. Stay draft; no merge, enqueue or deploy.
+post_merge_check: The next contract restamp reproduces this stamp's AC-3.2 / AC-3.4 / AC-4.3 / AC-10.2 figures from 27991451 before measuring its own tip. NOT_MEASURED until then. No production behavior is measured by this task.
+active_writer: Claude session_017UoYKz1FZZdZu9afTV2RhP on claude/amazing-darwin-km8ehw
+decisions: Restamp in place, not a new document (Matthew, 2026-10-27). Merge origin/cursor/architecture-contract-p2s-37b4 (#2149) into this branch so its nine P2 fixes are carried once; HANDOFF_LOG conflict resolved by keeping both blocks. Stamp SHA is the deploy tip, not this branch's merge commit; the merge touches only the two docs, so every clause describes the tip tree (git diff --stat 27991451 HEAD: docs only). Package-internal cites re-read from exact-version tarballs in a scratch directory (bun add --exact), labelled as such.
+tried_and_rejected: Writing a second contract or topology spec (duplicates merged work). Treating #2149 as a blocker and waiting (it is a docs-only amendment of the same file; carrying it is the one-implementation path). Restamping the topology spec in this PR (separate slice by assignment; its drift is recorded below instead).
+commands: node scripts/assert-docs-safety.mjs; bunx prettier@3 --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; git diff --name-only c8523adc 27991451 | sort > changed; comm -12 cited changed (27 files); git log --first-parent --oneline c8523adc..27991451 | wc -l (174)
+files_touched: docs/architecture-contract.md; docs/agents/HANDOFF_LOG.md (FIX-2146 block carried from #2149; this block)
+files_remaining: none for this slice
+blockers: Hosted CI at the PR head and independent acceptance NOT_MEASURED. node_modules absent and bun install not authorized under the lockfile policy, so vitest was not run (no test file changed).
+open_questions: Release topology slice. Matthew gated it on #2555, #2553, #1971, #2221 and VER-288. As of 2026-10-27 21:50 UTC: #2555 merged (7f2f974a), #2553 merged, #1971 merged (1119c1d), #2538 (VER-288 baseline) merged; only #2221 is open and it touches payments-webhook only, not the spec. Read-only drift of docs/specs/release-topology-specification.md against c8523adc: 50 moved cites and 6 absent snippets, among them §6.1 row 5 "AI Doctor inference through the Lovable AI gateway: PASS" citing index.ts:65 GATEWAY_URL — at the tip index.ts:103-108 resolves lookupGeminiDirectRoute and GATEWAY_URL is that route's URL (generativelanguage.googleapis.com), so row 5 is stale and must become a correction, consistent with contract AC-5.1. Row 4 cites package-lock.json:4, retired by #1873. The topology restamp needs its own branch (this session is confined to claude/amazing-darwin-km8ehw) or a stacked commit after this PR lands; Matthew decides.
+gotchas: The contract's AC-10.2 pin on the spec's not-implemented row moves with every spec edit (now :948). AC-1.5 package cites hold only for the pinned versions named; a TanStack bump moves them. The 46 new *Rules.ts files are listed in AC-3.2 by convention; a future restamp may collapse the list. Prettier re-pads the §15.1 table on every row added.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2149 ; handoff-verdant-architecture-contract.md (#2336)
+artifacts: PR #2564 body (collision audit, counts, residual checker flags); contract header "This stamp" paragraph and §15.1 row dated 2026-10-27
+reviewer_seat: an available eligible non-contributing Grok or Codex session under OWNERSHIP.md §4.3; no request sent (GitHub comments need Matthew's approval). This session authored and cannot PASS.
+reviewer_sha: NOT_MEASURED
+session_state: PR #2564 subscribed for events by this session; no watcher, cron, comment, review request, ready-state change, merge, enqueue or production action.
+claimed_by: Claude session_017UoYKz1FZZdZu9afTV2RhP, 2026-10-27 (Matthew's direct assignment in chat; no GitHub claim comment posted)
+owner: Claude (this session) for the restamp; independent acceptance must come from a non-contributing session
+last_updated: 2026-10-27 22:05 UTC, by Claude session_017UoYKz1FZZdZu9afTV2RhP
+```
+
 ### FIX-2146-ARCHITECTURE-CONTRACT-P2S
 
 ```text

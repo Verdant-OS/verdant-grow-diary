@@ -1,17 +1,17 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `dfb1567ee8c42b3449ea3314976c6ed1d16a382d` (deploy branch
-`verdant-grow-diary`, `#2134`), 2026-10-15, by Grok (§15 amendment for the nine `#2146` P2s; see
-§15.1). **Every clause amended below was re-read on that tree.** It supersedes the `c8523adc`
-stamp for those clauses. The `c8523adc` re-verification record stays: `#1873` retired the npm
-lockfile, `#1857` rewrote the AI sensor-snapshot resolver and `#2070` gated the Gemini
-key-before-spend order. That earlier stamp superseded `22f8dfe8`, whose record stays in §15.1, and
-it removed the note that AC-8.1 and AC-1.8 were amended after the stamp: both describe the
-`c8523adc` tree. The re-read ran in two passes, from
-`22f8dfe8` to `ce1d281f` (`#2069`) and from `ce1d281f` to `c8523adc`, and a third step, the
-`#2146` amendment, ran from `c8523adc` to the stamped SHA; the first pass is described next, then
-the second, then the amendment.
+**Verified from source at:** `27991451a756d2521df08e26e504776a43c7bbb8` (deploy branch
+`verdant-grow-diary`, `#2283`), 2026-10-27, by Claude (§15 re-verification from the last full
+stamp `c8523adc`, carrying `#2149`'s nine-P2 amendment at `dfb1567e`; see §15.1). **Every clause
+describes that tree.** It supersedes the `dfb1567e` amendment stamp and the `c8523adc` full stamp;
+both records stay in §15.1. The `c8523adc` record: `#1873` retired the npm lockfile, `#1857`
+rewrote the AI sensor-snapshot resolver and `#2070` gated the Gemini key-before-spend order. That
+stamp superseded `22f8dfe8`, and it removed the note that AC-8.1 and AC-1.8 were amended after the
+stamp: both describe the `c8523adc` tree and still describe this one. The re-read ran in four
+steps, from `22f8dfe8` to `ce1d281f` (`#2069`), from `ce1d281f` to `c8523adc`, the `#2146`
+amendment from `c8523adc` to `dfb1567e`, and this stamp from `c8523adc` to the stamped SHA; the
+first pass is described next, then the second, then the amendment, then this stamp.
 **This stamp re-read every citation into a file that changed between `22f8dfe8` and the stamped
 SHA, and carried the rest by file identity.** `git diff --name-only 22f8dfe8 ce1d281f` names 84
 files across 12 first-parent merges (first `#2058`, last `#2069`), 30 of them under `src/test/`, and
@@ -75,6 +75,58 @@ not-implemented row is still `:943`, pinned in AC-10.2 to `#2072` head `c7838ccb
 alias-only census, re-measured on this tree, is 814 statements in 813 files. Every clause this
 amendment does not re-state is carried by file identity from `c8523adc` where its cited files are
 unchanged between the two trees.
+**This stamp, `c8523adc` to `27991451`, over the `dfb1567e` amendment.** `git diff --name-only
+c8523adc 27991451` names 952 files across 174 first-parent merges (first `#2099`, last `#2283`),
+465 of them under `src/test/`, and six migrations: `20261001160000_strain_reference_library_v1_1_parity.sql`
+(`#1827`), `20261014210000_quicklog_correction_editable_values.sql` (`#2118`), and four files
+`#2550` restored from the sandbox project as new additive files on this branch
+(`20260728230229_ai_doctor_receipts_server_only_deny_marker.sql`,
+`20260826020443_harden_secdef_rpc_grants_group_a_b.sql`,
+`20260826020533_add_covering_indexes_for_unindexed_fks.sql`,
+`20260826023525_restore_has_role_execute_to_authenticated.sql`); none of the six had a prior
+version on this branch, so AC-9.1 is not engaged, and whether any is applied anywhere is
+`NOT_MEASURED` (AC-9.3). No clause cites any of them. Twenty-seven cited files changed, and every
+line cite into them was re-read on the stamped tree by a script that compares the cited line text
+at both trees and relocates a moved line by its stamped text (`scripts/` holds no such runner; T1 in
+§11 is still proposed). Changed in substance, with the clauses amended: `#2505` moved `zod` from
+the 3 line to 4 (`^4.6.6`, resolved 4.6.7, an `overrides` pin and a lockfile floor), which AC-1.8
+now records, and the generated MCP bundle's five `npm:zod@` imports moved with it; `#2550` added the
+fifth `compatibility_patches` entry (AC-9.2's table now matches the file; the row read 5 at
+`c8523adc` when the file held 4); `#2023` made `/welcome` a redirect to `/` in
+`src/lib/appRouteManifest.ts` and `src/lib/cloudflareHostRoutingRules.ts` (route data; AC-1.3's
+cites hold); `#2555` added a draft guard and `max-parallel: 16` to the required shard matrix in
+`.github/workflows/ci.yml` and a new non-required job (the 35 required context names are unchanged;
+`config/required-status-checks.json` is byte-identical). AC-1.1's `healthResponseFor` and
+`withHostHeaders` cites were wrong at `c8523adc` (they named lines inside the redirect table) and
+are corrected to the function bodies. AC-1.5's package-internal cites were re-read against the
+versions `bun.lock` now pins (`@tanstack/start-server-core` 1.169.39, `@tanstack/start-client-core`
+1.170.34), installed by exact version from the public registry into a disposable directory, since
+this session had no `node_modules`; the fallback and warning-condition lines moved. Line moves only:
+`src/routes/__root.tsx:293-306` → `:302-315`, `:258-268` → `:267-277` (AC-1.7; `#2003`'s
+`RootErrorComponent` normaliser is above them); `package.json:65`, `:224`, `:323`, `:324`, `:370`
+→ `:66`, `:226`, `:327`, `:328`, `:374`; `scripts/check-bun-lockfile-policy.mjs:67-72`,
+`:180-191`, `:186-187` → `:75-80`, `:188-199`, `:194-195` (AC-8.1; `#2505` and `#2284` added
+floors above them); `src/pages/Dashboard.tsx:962` → `:1028` (AC-4.2); `src/pages/Pricing.tsx:311`
+→ `:316` and `src/pages/Settings.tsx:322-323`, `:324` → `:340`, `:342` (AC-6.2);
+`src/pages/GuidesIndex.tsx:57-68` → `:56-70` with `:60` and `:63` unchanged (AC-3.3);
+`.github/workflows/ci.yml:437-438` → `:438-439` (AC-5.1); `docs/codebase-map.md:469-470` →
+`:472-473`; `docs/specs/release-topology-specification.md:943` → `:948` and
+`.coderabbit.yaml:205-206` → `:206-207` (AC-10.2); `scripts/check-sentinel-version-parity.mjs:31-49`
+→ `:31-51` (§15, eight role files added by `#1971`). The other changed cited files hold, because
+they are cited by name or their cited lines are unchanged: `bun.lock`, `docs/agents/CURRENT_STATE.md`,
+`docs/agents/HANDOFF_LOG.md`, `docs/dependency-lockfile-transition-review-2026-10-03.md`,
+`src/components/TonightTentHomeCard.tsx`, `src/lib/appRouteManifest.ts` (`:44`, `:58`, `:75-94`),
+`src/lib/dashboardEnvironmentSnapshotViewModel.ts` (`:217,246`), `src/lib/quickLogPhotoDiaryEntry.ts`,
+`src/lib/react-router-compat.tsx`, `src/lib/writeQuickLogWateringTypedEvent.ts`,
+`src/pages/PlantDetail.tsx`, `src/routeTree.gen.ts`, `src/test/route-manifest-sync.test.ts` and
+`supabase/functions/mcp/index.ts` (all 28 cites). The same script reproduced every `c8523adc`
+figure first, then measured the stamped SHA: AC-3.2 610 `*Rules.ts` files, the 46 added moving no
+drift row (55/7 raw, 44/6 executable, 0 client importers, 2 type-only, and the same files in each
+set); AC-3.4 940 alias-only shim import statements in 939 files, 126 added since `dfb1567e`;
+AC-4.3's single-line figures unchanged (77 in 67, 70 in 61, 106 in 86); AC-10.2 zero hits over all
+seven roots. `docs/codebase-map.md:96-97` now carries a dated owner note that production runs on
+Cloudflare Workers; that is operating state, recorded there and in
+`docs/specs/release-topology-specification.md`, and §14 keeps it out of this file.
 Package-internal cites in AC-1.4, AC-1.5 and §14 are carried, not re-read: the only `node_modules`
 available to this session was resolved by npm against the public registry, not from `bun.lock`, so it
 is not the tree those cites describe. The pinned versions they name still match `bun.lock`. The AC-4.3
@@ -136,8 +188,8 @@ _Enforcement:_ build and typecheck — the app does not start without these entr
 The default export's `fetch` now does host routing before SSR, from
 `src/lib/cloudflareHostRoutingRules.ts`. A redirect is returned straight from `redirectResponseFor`
 (`src/server.ts:55-56`), which builds the response with the routing decision's host headers itself
-(`src/lib/cloudflareHostRoutingRules.ts:277-280`). The health path (`healthResponseFor`, `:58-59`) and
-every SSR response, error page included (`:64-73`), go through `withHostHeaders`. The invariant is that
+(`src/lib/cloudflareHostRoutingRules.ts:278-281`). The health path (`healthResponseFor`, `:252-263`) and
+every SSR response, error page included (`withHostHeaders`, `:284-300`), go through `withHostHeaders`. The invariant is that
 every response carries the host headers; only the non-redirect paths get them from the wrapper.
 That module ports `vercel.json`'s redirects and headers into the Worker (`#1943`), and its header
 comment says why (`src/lib/cloudflareHostRoutingRules.ts:7-17`). This is source fact about the
@@ -273,13 +325,16 @@ What follows:
 
 _Source:_ `src/start.ts:21-23` (comment), `:24-26` (`createCsrfMiddleware`), `:28-31`
 (`startInstance`, with `requestMiddleware: [errorMiddleware, csrfMiddleware]` at `:30`).
-`@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins under `@tanstack/react-start`
-1.168.34: `dist/esm/createStartHandler.js:21` (`defaultCsrfMiddleware`), `:238` (the fallback),
-`:45-68` (the warning), `:261` (its condition). `@tanstack/start-client-core@1.170.14`
+`@tanstack/start-server-core` 1.169.39, the version `bun.lock` pins under `@tanstack/react-start`
+1.168.60: `dist/esm/createStartHandler.js:21` (`defaultCsrfMiddleware`), `:302` (the fallback),
+`:45-68` (the warning), `:338` (its condition). `@tanstack/start-client-core@1.170.34`
 `dist/esm/createCsrfMiddleware.js:4,12`: the middleware is tagged with
 `Symbol.for("tanstack-start:csrf-middleware")`, and only when `NODE_ENV !== "production"`.
-`established fact`. The package cites in this block are not repository paths and cannot be opened
-at the stamped SHA, so T1 does not cover them; they hold only for the pinned versions named here.
+`established fact`, re-read at this stamp on the published tarballs of exactly those versions. At
+1.169.17 / 1.170.14 (through `dfb1567e`) the fallback was `:238` and the condition `:261`; the
+other lines are unchanged between the two. The package cites in this block are not repository
+paths and cannot be opened at the stamped SHA, so T1 does not cover them; they hold only for the
+pinned versions named here.
 _Enforcement:_ `convention only`, plus a warning that Start logs only outside production. A search
 of `src/test`, `scripts` and `e2e` for `createCsrfMiddleware`, `csrfMiddleware` or `src/start.ts`
 finds no hits. This is still the highest-value unguarded invariant in §1. T8 in §11 is the proposed
@@ -302,11 +357,11 @@ asserts a `text/html` 500. It runs in the required shards. An earlier stamp reco
 mount effects in JSX order and `Outlet`'s content is a sibling, not a descendant — placing the sink
 later loses mount-effect funnel events on cold loads. The reason is committed as a comment beside
 the code.
-_Source:_ `src/routes/__root.tsx:293-306`: the comment is at `:294-303`, followed by
-`<AnalyticsShell />` `:304`, `<FunnelEventDbSink />` `:305`, `<Outlet />` `:306`. `established fact`.
+_Source:_ `src/routes/__root.tsx:302-315`: the comment is at `:303-312`, followed by
+`<AnalyticsShell />` `:313`, `<FunnelEventDbSink />` `:314`, `<Outlet />` `:315`. `established fact`.
 The rule binds the application shell. The Grow Help Toolkit path (`isGrowHelpToolkitPath`, `:129-131`)
 is deliberately rendered without application providers: `RootComponent` returns
-`createElement(Outlet)` inside `RootDocument` with no analytics shell or sink (`:258-268`), so no
+`createElement(Outlet)` inside `RootDocument` with no analytics shell or sink (`:267-277`), so no
 funnel event is captured there by design. A page added to that branch must not rely on funnel
 tracking. `established fact`.
 _Enforcement:_ **gated, by source scan.** `src/test/funnel-event-db-sink.test.tsx:132-135` pins
@@ -329,11 +384,15 @@ major is an architecture change that needs its own reviewed slice, not a depende
   `src/components/ui/`.
 - **TanStack Query** 5 as a **direct** dependency: `@tanstack/react-query` `^5.101.1`, resolved
   5.101.4.
-- Build and server layers: Vite 8 (`^8.1.5`, resolved 8.2.0) and Nitro 3 beta (`3.0.260603-beta`,
+- Build and server layers: Vite 8 (`^8.3.3`, resolved 8.3.4) and Nitro 3 beta (`3.0.260603-beta`,
   exact), both declared as direct devDependencies and wired through the Lovable preset (AC-1.4),
-  which takes them as peers (Nitro optional). Router 1.170.18 and Start 1.168.34.
-- Validation is `zod` 3 (`^3.24.2`, resolved 3.25.76). The lockfile also carries a zod 4 copy, pulled
-  in only by build tooling and the MCP SDK. No non-test file under `src/` imports `zod/v4`.
+  which takes them as peers (Nitro optional). Router 1.170.41 and Start 1.168.60.
+- Validation is `zod` 4 (`^4.6.6`, resolved 4.6.7; `overrides` pins `zod` 4.6.7 and
+  `scripts/check-bun-lockfile-policy.mjs` floors it there). `#2505` moved it from the 3 line
+  (`^3.24.2`, resolved 3.25.76, through `dfb1567e`) as a security bump, not as a reviewed
+  architecture slice; the move is recorded here, not endorsed as precedent for the four major lines
+  this clause names. No non-test file under `src/` imports `zod/v3` or `zod/v4`. The generated
+  `supabase/functions/mcp/index.ts` bundle imports `npm:zod@^4.6.6` at its five import lines.
 
 _Source:_ `package.json` (declared versions); `bun.lock` (resolved versions; the only lockfile,
 AC-8.1); `components.json`; `src/styles.css:1`. `established fact` at the stamped SHA.
@@ -360,7 +419,7 @@ boundary in two different ways:
 
 Treating edge functions as the only trusted server layer would steer new work away from half of the
 boundary that already exists.
-_Source:_ `package.json:370` (`@supabase/ssr` declared); `src/test/auth-hardening-static-safety.test.ts:101-108`
+_Source:_ `package.json:374` (`@supabase/ssr` declared); `src/test/auth-hardening-static-safety.test.ts:101-108`
 (forbids the import); clients at `src/integrations/supabase/client.ts`, `client.server.ts` and
 `auth-middleware.ts`. `quicklog_save_manual`:
 `supabase/migrations/20261013180000_quicklog_manual_occurred_at_utc_hash.sql:35,51,55` (latest
@@ -421,8 +480,8 @@ stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 
 | Measure                                                       | Count | Files                                                                                                                                                                                                           |
 | ------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*Rules.ts` files                                             |   564 | —                                                                                                                                                                                                               |
-| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3`, `2ffe78cc1`, `7e024f93`, `22f8dfe8`, `ce1d281f` and `c8523adc`: 44 of the 55 call it on an executable line, 11 in comments only |
+| `*Rules.ts` files                                             |   610 | —                                                                                                                                                                                                               |
+| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3`, `2ffe78cc1`, `7e024f93`, `22f8dfe8`, `ce1d281f`, `c8523adc` and `27991451`: 44 of the 55 call it on an executable line, 11 in comments only |
 | contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"; 6 call it on an executable line, 1 mentions it in a comment only                                                                              |
 | import the Supabase client at runtime                         |     0 | —                                                                                                                                                                                                               |
 | type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`                                                                                                                                              |
@@ -455,6 +514,27 @@ The thirteen added since `2ffe78cc1` (`archivedGrowQuickLogRules.ts`, `cloudflar
 from a non-pure module: `quickLogFeedingRejectionRules.ts:1` from `writeFeedingTypedEvent.ts`, which
 does import the Supabase client, and `sandboxCheckoutTestModeNoteRules.ts:1` from
 `paddleEnvironment.ts`. A type import is erased at build, so neither is I/O.
+The 46 added between `c8523adc` and `27991451` (`actionEvidenceVerificationRules.ts`,
+`alertActiveStatusRules.ts`, `alertContextRefreshRules.ts`, `athenaFeedLogRules.ts`,
+`boundedReadRules.ts`, `communityAccessRules.ts`, `communityDigestRules.ts`,
+`communityProfileRules.ts`, `communityPublicationRules.ts`, `cultivarDatabaseParityRules.ts`,
+`cultivarDatabaseSeedPayloadRules.ts`, `cultivarReferenceSourceRules.ts`,
+`cursorCloudAgentEnvironmentRules.ts`, `dashboardSupplementalLoadingRules.ts`,
+`doctorGrowNextStepsRules.ts`, `growTargetsRetryRules.ts`, `growsReadRetryRules.ts`,
+`guidedGrowWalkPanelRules.ts`, `latestSensorSnapshotBatchRules.ts`, `localDateTimeDisplayRules.ts`,
+`plantFeedingDisplayRules.ts`, `plantManualEnvironmentEventRules.ts`,
+`plantQuickLogSensorInputRules.ts`, `plantStageFollowUpRules.ts`, `publicVpdChartRules.ts`,
+`quickLogFabClearanceRules.ts`, `quickLogPendingSectionPhotoRules.ts`,
+`quickLogPhotoContentRules.ts`, `quickLogSensorSnapshotGateRules.ts`,
+`quickLogStartScreenTargetRules.ts`, `quickLogTypedTemperatureRules.ts`,
+`quickLogUnreadableWaterRecoveryRules.ts`, `quickLogWaterVolumeWarningRules.ts`,
+`searchShortcutRules.ts`, `sensorCaptureRefRules.ts`, `supabasePublicReadKeyRules.ts`,
+`tentDetailBlankFieldRules.ts`, `tentDetailVpdRules.ts`, `tentManualEnvironmentEventRules.ts`,
+`tentsListVpdRules.ts`, `timelineChipCountRules.ts`, `timelineLinkedGrowEventVolumeRules.ts`,
+`timelineQuickLogLaneScopeRules.ts`, `timelineQuickLogPlaceholderDedupeRules.ts`,
+`timelineStagePresentationRules.ts`, `vpdStabilityInputRules.ts`) import neither React nor the
+Supabase client and call neither `Date.now()` nor `Math.random()`: the 55-file and 7-file sets are
+the same files at both stamps, so every drift row holds at `27991451`.
 The four added since `7e024f93` (`aiCoachPhotoFileRules.ts`, `errorReportingRules.ts`,
 `phenoEvidenceGoalSelectionRules.ts`, `quickLogHistoryReviewTargetRules.ts`) import only other pure
 `src/lib` modules, or nothing, and call neither `Date.now()` nor `Math.random()`, so every drift row
@@ -485,7 +565,7 @@ _Source:_ `AGENTS.md`; counts measured by `ls` and `grep -l` at the stamped SHA 
 glob (comments stripped only for the executable-line figures), the import rows
 over `from "@/integrations/supabase/client"`, `from "@supabase/supabase-js"` and
 `from "@/integrations/supabase/types"`. The narrative drift inventory is in `CLAUDE.md`.
-`docs/codebase-map.md` lists the two files at `:469-470`, and an earlier version wrongly pointed
+`docs/codebase-map.md` lists the two files at `:472-473`, and an earlier version wrongly pointed
 here for the `Date.now()` / `Math.random()` drift. `established fact`, except where labelled.
 _Enforcement:_ `convention only`.
 
@@ -500,7 +580,7 @@ boundary is purpose, not location: **copy a test pins, copy reused across surfac
 carries a safety or entitlement claim** belong in constants. One-off page prose may stay inline.
 
 **The earlier example was a poor one, and is recorded as drift instead.** Earlier versions offered
-`src/pages/GuidesIndex.tsx:57-68` as representative inline prose. That block inlines copy the clause
+`src/pages/GuidesIndex.tsx:56-70` as representative inline prose. That block inlines copy the clause
 says belongs in constants:
 
 - `:60` inlines the pinned positioning tagline, which lives at
@@ -515,13 +595,15 @@ _Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:60,63`; `src/constants/ve
 directly.**
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 surface on TanStack Router.
 The census is **alias-only**: it counts static `from "@/lib/react-router-compat"` import
-statements and no other specifier. Measured at the stamped SHA, that census is **814** statements
-in **813** files; `src/pages/PlantDetail.tsx` imports it twice. By directory: 578 under `src/test`,
-134 under `src/components`, 94 statements in 93 files elsewhere under `src/pages`, 1 under
-`src/pages/support/__tests__`, and 7 under `src/hooks`. One static import is outside the census:
-`src/test/react-router-compat-navigate-real.test.tsx:28-39` imports `../lib/react-router-compat`
-on purpose (`#740`). With that statement the full static-import totals are **815** statements in
-**814** files. **Zero** files under
+statements and no other specifier. Measured at the stamped SHA, that census is **940** statements
+in **939** files; `src/pages/PlantDetail.tsx` imports it twice. By directory: 701 under `src/test`,
+135 under `src/components`, 96 statements in 95 files elsewhere under `src/pages`, 1 under
+`src/pages/support/__tests__`, and 7 under `src/hooks`. Three static imports are outside the
+census, each a `../lib/react-router-compat` specifier used on purpose so a test can compare the
+product module with the alias: `src/test/react-router-compat-navigate-real.test.tsx:28-39`
+(`#740`), `src/test/react-router-compat-search-params-scroll.test.tsx:21` and
+`src/test/search-param-scroll-anchor.test.tsx:20` (the `#2348` review). With those statements the
+full static-import totals are **943** statements in **942** files. **Zero** files under
 `src/components/` or `src/pages/` mention `@tanstack/react-router` at all. Vitest aliases the shim to
 a real MemoryRouter, so idiomatic TanStack hooks in a component look correct and fail in tests.
 _Source:_ `src/lib/react-router-compat.tsx`; the Vitest alias is at `vitest.config.ts:50-52`. The count
@@ -539,8 +621,12 @@ ten of the eleven added under `src/test/` (nine in new files) and one in the exi
 `src/test/` files; 792 in 791 at `ce1d281f`, the one added in the existing
 `src/components/grow-help/GrowHelpAboutPanel.tsx` (`#1851`); 813 in 812 at `c8523adc`, all 21
 added in new `src/test/` files, alias-only, the same relative-specifier exception excluded; 814 in
-813 at `dfb1567e`, the one added in the new `src/test/create-plant-case-variant-tent.test.tsx`. The
-shim's `useNavigate` now returns the navigate promise, which does not affect this clause.
+813 at `dfb1567e`, the one added in the new `src/test/create-plant-case-variant-tent.test.tsx`;
+940 in 939 at `27991451`, the 126 added being 123 in new `src/test/` files, two in the new pages
+`src/pages/AthenaFeedLog.tsx` (`#2545`) and `src/pages/PublicVpdChart.tsx` (`#2533`), and one in
+the new `src/components/AlertRowActionQueueButton.tsx`. The
+shim's `useNavigate` now returns the navigate promise, and its `useSearchParams` now keeps the
+scroll position unless the caller opts out (`#2348`); neither affects this clause.
 `established fact`.
 _Enforcement:_ `convention only`, plus the test-time alias.
 
@@ -667,7 +753,7 @@ must not appear as the Source label. **Known gap, recorded rather than fixed her
 `resolveSensorSourceLabel` relabels a `live` reading whose vendor is `ecowitt` as `"Ecowitt"`
 (`src/lib/sensorSourceLabelRules.ts:80-81`, `vendorPromoted: true`), and
 `src/lib/dashboardEnvironmentSnapshotViewModel.ts:217,246` feeds that label to the Dashboard Source
-line (`src/pages/Dashboard.tsx:962`). Trust is not widened, because only `live` is relabelled, but a
+line (`src/pages/Dashboard.tsx:1028`). Trust is not widened, because only `live` is relabelled, but a
 vendor name does appear as the Source label there. What a rendered Dashboard shows is
 `NOT_MEASURED`. The display module does not widen the canonical set, change
 ingest write paths, or alter trust-live membership. Collapsing a vendor name into Source would be
@@ -782,7 +868,7 @@ figures:
 - **77 lines in 67 files** when at least one label of the pair is `live`, `manual`, `csv` or `demo`;
 - 70 lines in 61 files when both labels must be among those four;
 - 106 lines in 86 files when a `"stale" | "invalid"` pair also counts, which catches quality unions.
-  Each figure was 76/66, 69/60 and 105/85 through `22f8dfe8`, and is unchanged at `c8523adc`; the added line is `#1857`'s
+  Each figure was 76/66, 69/60 and 105/85 through `22f8dfe8`, and is unchanged at `c8523adc` and at `27991451`; the added line is `#1857`'s
   `QuickLogAiSensorSource` union (`src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts:172`),
   which is exactly the six;
 - multi-line unions add 12 matching lines in 6 files. This figure is a `source claim`: its pattern
@@ -882,13 +968,13 @@ every required context, so a violation cannot block a merge by that route. It ru
   checker runs only when the script's Vitest suite and the job's earlier steps pass:
   - `.github/workflows/ai-doctor-golden-cases.yml:5-7` (`pull_request:`), whose step at
     `.github/workflows/ai-doctor-golden-cases.yml:46` (`bun run test:ai-doctor-phase1`) runs
-    `package.json:323` (`&& node scripts/sensor-safety-check.mjs`);
+    `package.json:327` (`&& node scripts/sensor-safety-check.mjs`);
   - `.github/workflows/ai-doctor-readiness-ui.yml:5-7` (`pull_request:`), whose step at
     `.github/workflows/ai-doctor-readiness-ui.yml:49` (`bun run test:ai-doctor-readiness-ui`) runs
-    `package.json:324` (`&& node scripts/sensor-safety-check.mjs`);
+    `package.json:328` (`&& node scripts/sensor-safety-check.mjs`);
   - `.github/workflows/contextual-pheno-comparison-v0.yml:6-8` (`pull_request:`), whose step at
     `.github/workflows/contextual-pheno-comparison-v0.yml:67`
-    (`bun run test:contextual-pheno-comparison-v0`) runs `package.json:65`
+    (`bun run test:contextual-pheno-comparison-v0`) runs `package.json:66`
     (`&& node scripts/sensor-safety-check.mjs`).
 
   None of the three jobs is one of the 35 required contexts;
@@ -953,7 +1039,7 @@ spend at `:474-475`), `:595-611` (request and fetch); `supabase/functions/ai-coa
 (`GEMINI_INLINE_IMAGE_MAX_BYTES`); `supabase/functions/ai-cultivar-qa/index.ts:73,91`; the wider
 key readers by grep over `supabase/functions/`. `established fact`.
 _Enforcement:_ **partially gated**, in the required `Lint, typecheck, test, build` job
-(`.github/workflows/ci.yml:437-438`). `supabase/functions/_shared/geminiDirectChat.test.ts:27-45`
+(`.github/workflows/ci.yml:438-439`). `supabase/functions/_shared/geminiDirectChat.test.ts:27-45`
 resolves both routes and asserts the provider, endpoint and model ids on the returned objects;
 `:62-99` asserts that a missing or blank key fails closed without calling `fetch`; `:177-202` scans
 both function sources for the helper call and for the absence of the gateway URL and of
@@ -1196,8 +1282,8 @@ Prefer `canUseCapability(entitlement, "advancedExports")` over `if (plan === "pr
 not belong in JSX.
 _Source:_ `src/lib/entitlements/capabilities.ts`, `src/lib/entitlements/capabilityAccess.ts:13-18`
 (`canUseCapability`), `src/lib/entitlements/planCatalog.ts`. `established fact`. Examples of
-display-only `founder_lifetime` comparisons exist in pages (`src/pages/Pricing.tsx:311`,
-`src/pages/Settings.tsx:324`). `Settings.tsx:322-323` also compares `planId` with `free`, so those
+display-only `founder_lifetime` comparisons exist in pages (`src/pages/Pricing.tsx:316`,
+`src/pages/Settings.tsx:342`). `Settings.tsx:340` also compares `planId` with `free`, so those
 two `founder_lifetime` lines are examples, not a complete plan-id count. The `founder_lifetime`
 examples predate the first stamp, and neither is a capability gate. They are drift, not precedent.
 
@@ -1272,8 +1358,8 @@ and `supabase/functions/ai-cultivar-qa/index.ts:14` (no queue writes);
 `yarn.lock` and `pnpm-lock.yaml` are forbidden. **There is no `bun.lockb`.** Governance prose that
 calls `bun.lockb` authoritative, or `package-lock.json` a synchronized compatibility lock, is stale.
 _Source:_ `scripts/check-bun-lockfile-policy.mjs:5` ("Bun and bun.lock are canonical, and bun.lock
-is the only lockfile"), `:24` (`REQUIRED_LOCKFILES`), `:67-72` (`FORBIDDEN_LOCKFILES`), `:180-191`
-(the schema-2 transition config check; the canonical check and throw at `:186-187`);
+is the only lockfile"), `:24` (`REQUIRED_LOCKFILES`), `:75-80` (`FORBIDDEN_LOCKFILES`), `:188-199`
+(the schema-2 transition config check; the canonical check and throw at `:194-195`);
 `config/dependency-lockfile-transition.json`; `bunfig.toml`;
 `docs/dependency-lockfile-transition-review-2026-10-03.md`. `established fact` at the stamped SHA.
 _Enforcement:_ **gated.** `src/test/check-bun-lockfile-policy.test.ts:537` runs the checker against
@@ -1335,7 +1421,7 @@ each checked by hash, and applies them to a copy inside a disposable workdir at 
 | Category                   | Entries | Hash check                                |
 | -------------------------- | ------: | ----------------------------------------- |
 | `compatibility_noops`      |      18 | `canonical_sha256` and `duplicate_sha256` |
-| `compatibility_patches`    |       5 | `source_sha256`                           |
+| `compatibility_patches`    |       5 | `source_sha256` (4 through `c8523adc`; `#2550` added the fifth) |
 | `compatibility_injections` |       2 | `template_sha256`                         |
 
 Earlier versions named only the first two categories and attributed `source_sha256` to both. The committed file is never modified. Check this config **before** proposing
@@ -1368,7 +1454,7 @@ its appendices hold dated results, later `docs/agents/CURRENT_STATE.md` stamps r
 An earlier draft said publishing "ships frontend and edge functions". No repository evidence supports
 an automatic joint ship, and a release operator relying on it could publish a frontend expecting
 newer edge code while the backend stays stale.
-_Source:_ `package.json:21-22` (`deploy:functions`, `deploy:functions:all`) and `:224`
+_Source:_ `package.json:21-22` (`deploy:functions`, `deploy:functions:all`) and `:226`
 (`sb:functions:deploy`). The Actions absence was established by grep over `.github/workflows/` at the
 stamped SHA for `functions deploy`, `supabase functions`, `supabase link` and `db push`: only comments
 and help text match. The eight workflows that install the Supabase CLI run local stacks only.
@@ -1410,12 +1496,11 @@ Case-insensitive search across `src/` and `supabase/` at the stamped SHA returns
 `nelson`, `modified z`, `modifiedZ`, `median absolute deviation`, `\bMAD\b`, `z-?score`, `zscore`
 or `robust ?z`, and the same at `2ffe78cc1` and `7e024f93` over `scripts/`, `e2e/`, `tools/`, `plugins/` and
 `spikes/`. Outside this contract, Nelson is mentioned only as not-implemented guidance: the
-2026-08-21 adjudication, `docs/specs/release-topology-specification.md:943` at `#2072` head
-`c7838ccb42f14e8f00dc4be5d8a8e629433897a6` (the not-implemented row; the same line on this stamp,
-re-read after `#2072` merged), and the review rule at
-`.coderabbit.yaml:205-206`. The `#2073` PR body named a prospective `:936` for that row. Merged PR
-bodies are not edited. A later integration that moves the row must revalidate this citation. The
-header's `:831` → `:853` move is the line on the `c8523adc` tree and stays that historical cite.
+2026-08-21 adjudication, `docs/specs/release-topology-specification.md:948` (the not-implemented
+row at this stamp; `:943` at `dfb1567e`, `:853` at `c8523adc`, `:831` before `#2072`), and the review
+rule at `.coderabbit.yaml:206-207`. The `#2073` PR body named a prospective `:936` for that row.
+Merged PR bodies are not edited. A later integration that moves the row must revalidate this
+citation; each stamp above did.
 _Source:_ measured at the stamped SHA; `docs/audits/architecture-audit-adjudication-2026-08-21.md`
 §4.1. `established fact`.
 
@@ -1518,7 +1603,7 @@ AC-6.4.
 | T5   | **source scan**                                | Proving a token is **absent** is exactly what scanning is good for                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | T6   | **resolved import**                            | Both are exported runtime numbers; assert the values and one hand-computed EWMA step so a default change fails loudly                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | T7   | **route-tree traversal**                       | Access group is a property of the mounted layout, so the check must walk the tree, not the manifest alone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| T8   | **resolved import + execution**                | Presence alone proves nothing: the filter is a closure the middleware object does not expose, so `filter: () => false` would still carry the symbol. Import `startInstance` and resolve `getOptions()` (the call Start makes, `start-server-core@1.169.17` `createStartHandler.js:229`). Locate the middleware by `Symbol.for("tanstack-start:csrf-middleware")`, which Start attaches only when `NODE_ENV !== "production"`, so this works under Vitest and not in a production-mode probe. Then **execute** its `options.server` handler (`start-client-core@1.170.14` `createMiddleware.js:13-14,23-24`) with a stub `next`, **twice, on the identical request carrying `Sec-Fetch-Site: cross-site`, varying only `handlerType`**. With `"serverFn"` it must return the 403 failure response (`createCsrfMiddleware.js:56-58`); with any other handler type it must reach `next` (`:8`). Holding the request constant isolates the filter: a same-origin request would pass CSRF validation whatever the filter does, and prove nothing. Whether `src/start.ts` imports cleanly under Vitest is `NOT_MEASURED`; if it does not, the fallback is a declared `@source-scan-justified` AST check that the registered filter compares `handlerType` with `"serverFn"` |
+| T8   | **resolved import + execution**                | Presence alone proves nothing: the filter is a closure the middleware object does not expose, so `filter: () => false` would still carry the symbol. Import `startInstance` and resolve `getOptions()` (the call Start makes, `start-server-core@1.169.39` `createStartHandler.js:290`). Locate the middleware by `Symbol.for("tanstack-start:csrf-middleware")`, which Start attaches only when `NODE_ENV !== "production"`, so this works under Vitest and not in a production-mode probe. Then **execute** its `options.server` handler (`start-client-core@1.170.14` `createMiddleware.js:13-14,23-24`) with a stub `next`, **twice, on the identical request carrying `Sec-Fetch-Site: cross-site`, varying only `handlerType`**. With `"serverFn"` it must return the 403 failure response (`createCsrfMiddleware.js:56-58`); with any other handler type it must reach `next` (`:8`). Holding the request constant isolates the filter: a same-origin request would pass CSRF validation whatever the filter does, and prove nothing. Whether `src/start.ts` imports cleanly under Vitest is `NOT_MEASURED`; if it does not, the fallback is a declared `@source-scan-justified` AST check that the registered filter compares `handlerType` with `"serverFn"` |
 
 **`scripts/check-contract-test-resolution.mjs` does not apply to any of these.** It flags two
 shapes of test: one that reads the source of `playwright.config` or `vitest.config` without
@@ -1526,8 +1611,8 @@ importing it (`CONFIG_FILES = ["playwright.config", "vitest.config"]`, `:53`), a
 one that reads `package.json` as raw text and asserts on that text instead of the parsed object
 (`JSON_CONFIG_FILES = ["package.json"]`, `:68`). T2–T8 read no config, so neither shape is any
 of them. T1 is the one exception: it opens every cited file and matches a snippet on the named
-line, and this document cites `package.json` at seven places (`:9`, `:21-22`, `:65`, `:224`,
-`:323`, `:324`, `:370`). That is citation integrity, not verification of effective configuration,
+line, and this document cites `package.json` at seven places (`:9`, `:21-22`, `:66`, `:226`,
+`:327`, `:328`, `:374`). That is citation integrity, not verification of effective configuration,
 which is the only thing the checker guards; it is the "proving a string is present or absent" use
 `AGENTS.md` keeps for source scans. A T1 runner placed anywhere the checker scans therefore
 declares `@source-scan-justified: citation integrity` rather than importing `package.json`. Citing
@@ -1672,7 +1757,7 @@ stale every time the operating picture moved. Only the durable rules stay:
    alone requires no parity bump.
 
    **Why, stated correctly.** `scripts/check-sentinel-version-parity.mjs` iterates a fixed
-   `ALL = [CANONICAL, ...MIRRORS]` array naming exactly those eighteen files (`:31-49`), so adding a
+   `ALL = [CANONICAL, ...MIRRORS]` array naming exactly those eighteen files (`:31-51`), so adding a
    version header here would **not**, on its own, pull this file into the parity gate — an earlier
    draft claimed it would, and that was factually wrong. The reason to leave the header off is
    different and weaker: a `Sentinel-Version` line signals governance-file status this document does
@@ -1706,6 +1791,7 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-10-14 | `ce1d281fa3c39bfd54afd5dab7270a1b232c1014` | Claude | §15 re-verification, first pass, at the then deploy tip (`#2069`; this stamp was never merged on its own and is superseded by the `c8523adc` row below), on the owner's instruction (a `source claim`: given in chat, not recorded in the repository) after CodeRabbit flagged on `#1873` that AC-1.8 claimed the bun-only rule at a stamp that still had `package-lock.json`. Supersedes the `22f8dfe8` stamp. 84 files across 12 merges since `22f8dfe8` (first `#2058`, last `#2069`; 30 in `src/test/`; one migration, `#1872`'s `convert_referral` replacement, `service_role` only); 17 cited files changed, and every cite into them was re-read against both trees. Substance: AC-8.1 and AC-1.8 now describe the stamped tree, so the after-the-stamp note is gone; AC-4.2's AI-context-path gap is replaced by the fixed resolver (`#1857`), gated by `quick-log-sensor-snapshot-ai-allowlist.test.ts`, as §15.2 required; AC-1.7 records the Grow Help Toolkit branch that renders `<Outlet />` without the sink (`#1851`). Counts: AC-3.2 unchanged (559; 55/7, 44/6, 0, 2); AC-3.4 792 in 791; AC-4.3 77/67, 70/61, 106/86; AC-10.2 zero. Line moves are listed in the header.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 2026-10-14 | `c8523adccc81f18e0cf7118a69dc31493d273c4c` | Claude | §15 re-verification, second pass, at the deploy tip (`#2079`), completing `#2073` after Critical Mass's FAIL at `023ba0df` (P1: AC-5.1 still described the pre-`#2070` order check). The owner reassigned `#2073` to this session in chat (a `source claim`, recorded as the `claimed_by` comment on `#2073`). Supersedes the `22f8dfe8` stamp and the `ce1d281f` first pass above. 134 files across 33 merges since `ce1d281f` (`#1968` to `#2105`; 65 in `src/test/`; no migration; `required-status-checks.json` and `ci.yml` unchanged); 13 cited files changed (the row originally said 12; `#2146` P2-1), and every cite into them was re-read on the stamped tree. Substance: AC-5.1 now records fail-before-spend as gated by `#2070`'s call-level order scan and keyless handler tests, with `ai-cultivar-qa` still unenforced, and its §11 row says so. Counts, after the script first reproduced every `ce1d281f` figure: AC-3.2 564 files, drift rows unchanged (55/7, 44/6, 0, 2); AC-3.4 813 in 812 alias-only; AC-4.3 77/67, 70/61, 106/86 unchanged; AC-10.2 zero. Line moves are listed in the header.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 2026-10-15 | `dfb1567ee8c42b3449ea3314976c6ed1d16a382d` | Grok   | `#2146` amendment. Nine Codex P2s from the retrospective review of `#2073` (comment 6196768751). Docs only. 13 files changed since `c8523adc`; the amended clauses were re-read, and the rest are carried by file identity where the cited file is unchanged. P2-1: the second-pass cited-file count is 13. P2-2: AC-10.2 pins the not-implemented row at `:943` on `#2072` head `c7838ccb`; the merged `#2073` body is not edited. P2-3: §14 states that a build target does not establish the serving target. P2-4: AC-5.3 describes an idempotent refund attempt with confirmed and `result_pending` outcomes kept separate. P2-5: AC-4.4 limits the `pi_bridge` exception to the transport alias and names the `sensor` / `realtime` trust-label aliases. P2-6: AC-4.1 states the prototype-key and badge coverages separately. P2-7: `#1373` is described as `public.founders` client-UPDATE / RLS hardening, separate from the `#1374` / `#1398` refund migrations. P2-8: AC-6.2 calls the `founder_lifetime` page comparisons examples and notes `Settings.tsx:322-323` compares `planId` with `free`. P2-9: AC-3.4 is alias-only, 814 statements in 813 files, with the `#740` relative import disclosed (full static totals 815 / 814).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |     |
+| 2026-10-27 | `27991451a756d2521df08e26e504776a43c7bbb8` | Claude | §15 re-verification at the deploy tip (`#2283`), from the last full stamp `c8523adc`, carrying `#2149`'s `dfb1567e` amendment (merged into the restamp branch rather than re-done). Supersedes both stamps. 952 files across 174 merges since `c8523adc` (first `#2099`, last `#2283`; 465 in `src/test/`; six migrations, none cited and none with a prior version on this branch); 27 cited files changed, and every cite into them was re-read on the stamped tree by a script comparing line text at both trees. Substance: AC-1.8 records `zod` 4 (`#2505`); AC-1.5's package cites re-read at `start-server-core` 1.169.39 / `start-client-core` 1.170.34 (fallback `:302`, condition `:338`; T8's `getOptions` call `:290`); AC-1.1's `healthResponseFor` / `withHostHeaders` cites corrected to the function bodies (wrong since `c8523adc`); AC-9.2's `compatibility_patches` row now matches the file (5, after `#2550`). Counts, after the script first reproduced every `c8523adc` figure: AC-3.2 610 files, drift rows unchanged (55/7, 44/6, 0, 2; same file sets); AC-3.4 940 in 939 alias-only (943 in 942 with three relative-specifier test imports); AC-4.3 77/67, 70/61, 106/86 unchanged; AC-10.2 zero. Line moves are listed in the header. Production remains `NOT_MEASURED`. |
 
 ### 15.2 Evidence status at deploy tip `e0bb3930` — 2026-10-07, dated
 

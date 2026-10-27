@@ -61,7 +61,7 @@ Several residual tests look like source-regex pins: #2495, #2487 and #2383 (infe
 
 ## Decisions that need Matthew
 
-1. **Badge stacks (withdrawn as a choice, 2026-10-27):** the "pick one line, close the other" request is withdrawn. The badge PRs are one tree, not rival stacks, nothing in it is superseded, and Matthew approved the #2032 takeover (see [Badge stack decision (corrected)](#badge-stack-decision-corrected)). Close nothing in the tree on the strength of the old wording. Still open for Matthew on #2032: re-timestamp migration `20261011143000` (it sorts before the live latest `20261014210000`), confirm the harvest pgTAP CI wiring pushed in `b79785ff1` by another session, and say which session holds #2032 from here.
+1. **Badge stacks (withdrawn as a choice, 2026-10-27):** the "pick one line, close the other" request is withdrawn. The badge PRs are one tree, not rival stacks, nothing in it is superseded, and Matthew approved the #2032 takeover (see [Badge stack decision (corrected)](#badge-stack-decision-corrected)). Close nothing in the tree on the strength of the old wording. The open #2032 decisions (migration re-timestamp, the harvest CI wiring and scorer unlock another session reports he approved, generated types, the regression-test deferral, and who holds the branch) are listed in full in the `open_questions` field of the PR-CLEANUP-2026-10-27-INVENTORY block in `docs/agents/HANDOFF_LOG.md`.
 2. **Migrations:** #1846 (Quick Log event-hash UTC), #2067 + #2189 (referral cap; failed review), #2140. #2140 adds a second plants.health default migration on top of `20260924120000`, which CURRENT_STATE records as applied in production on 2026-10-15 (a source claim). #2140 looks redundant.
 3. **CI / workflows / lockfile:** #2555, #2512, #2526, #1984, #2320, #1879. #2555, #2512 and #2526 collide on `ci.yml`, `bun.lock` and `package.json` and need an order.
 4. **Governance:** #1876 (all 12 Sentinel files), #2086 (governance + CI + skills; recommend splitting by scope), #2133, #2057.
@@ -285,7 +285,7 @@ Open count after Phase 2: 119.
 
 Matthew, 2026-10-27: "keep the #2032 badge stack", then "approved, take over #2032 and port the fixes". Claude merged #1979's head `f219faf10` into #2032, which the 2026-10-22 peer observation on #2032 had required, and re-derived the two functions `20261011143000` replaces from #1979's current bodies.
 
-**Status: pushed.** On Matthew's approval ("approved, declare the scorer unlocks and push #2032"), the scorer unlocks were declared, and `scorer-lock --report --strict` passes (8 changed, 0 locked). #2032 is now at `06f4238c0d7f37843b1d7d6b165c0e46051a4aa3`, a fast-forward from `5fc40d16c`. Evidence, open items and the scorer list are in #2032's PR body (takeover section) and its resume-here comment. Stacked PRs #2343 and #2362 now trail their base; they belong to other holders and were not touched.
+**Status: pushed.** On Matthew's approval ("approved, declare the scorer unlocks and push #2032"), the scorer unlocks were declared, and `scorer-lock --report --strict` passes (8 changed, 0 locked). That push put #2032 at `06f4238c0d7f37843b1d7d6b165c0e46051a4aa3` (historical: a fast-forward from `5fc40d16c`). Later pushes moved it on; at 2026-10-27T23:40Z its head was `e69de87b23863de95874628f27ddf23e58757629`. Re-read the PR head before resuming. Evidence, open items and the scorer list are in #2032's PR body (takeover section) and its resume-here comment. Stacked PRs #2343 and #2362 now trail their base; they belong to other holders and were not touched.
 
 ## Verified
 

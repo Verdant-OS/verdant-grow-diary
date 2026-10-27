@@ -116,16 +116,27 @@ export default function PublicFeedLog() {
   }
 
   function downloadCsv() {
-    const csv = buildFeedLogCsv(state);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "planned-vs-actual-feed-log.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-    trackFeedLogEvent("feed_log_csv_exported", { row_count: state.weeks.length });
-    announce("CSV downloaded to this device. This page did not store the log.");
+    let url: string | null = null;
+    let link: HTMLAnchorElement | null = null;
+    try {
+      const csv = buildFeedLogCsv(state);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      url = URL.createObjectURL(blob);
+      link = document.createElement("a");
+      link.href = url;
+      link.download = "planned-vs-actual-feed-log.csv";
+      document.body.appendChild(link);
+      link.click();
+      const objectUrl = url;
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      trackFeedLogEvent("feed_log_csv_exported", { row_count: state.weeks.length });
+      announce("CSV downloaded to this device. This page did not store the log.");
+    } catch {
+      if (url) URL.revokeObjectURL(url);
+      announce("CSV export unavailable in this browser.");
+    } finally {
+      link?.remove();
+    }
   }
 
   async function copyLog() {

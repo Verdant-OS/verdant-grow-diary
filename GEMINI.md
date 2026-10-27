@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-26.2**
+**Sentinel-Version: 2026-10-27.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-26.2**
+**Sentinel-Version: 2026-10-27.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -545,6 +545,9 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-10-27.1** — `CLAUDE.md` now carries the post-compaction "Session Recovery" block
+  that the context-recovery hook appends, committed on Matthew's explicit approval
+  (2026-10-27). No rule changed; the other governance files only take the version bump.
 - **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants
   in the per-item merge rule, matching the roster and ownership policy. No new merge
   authority, review waiver or production permission is created.

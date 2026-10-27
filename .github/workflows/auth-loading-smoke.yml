@@ -43,11 +43,8 @@ jobs:
   auth-loading-smoke:
     name: Auth loading smoke (mocked / non-destructive)
     runs-on: ubuntu-latest
-    # Job 121694865057 (head 2559c4a5) was canceled at this 15-minute cap.
-    # `playwright install chromium --with-deps` took about 11.5 minutes on
-    # ubuntu-latest after a browser-cache hit, and every Playwright test that
-    # had logged had passed. 30 minutes is wall clock for apt plus the sweep.
-    timeout-minutes: 30
+    # Chromium --with-deps install took ~10m on runs 40523498143 (#2545) and 40469789527 (#2526), leaving too little of the 15m cap, and the test step was cancelled ~4.5m in. Worst case is about 16.5m, so 25m leaves headroom.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout

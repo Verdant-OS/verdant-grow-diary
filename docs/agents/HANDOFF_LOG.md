@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### AUTH-LOADING-SMOKE-TIMEOUT-25
+
+```text
+TASK AUTH-LOADING-SMOKE-TIMEOUT-25  priority: P2  status: OPEN
+goal: Raise the auth-loading-smoke job timeout from 15 to 25 minutes and keep the YAML comment accurate.
+why: Runs 40523498143 (#2545) and 40469789527 (#2526) spent about 10 minutes on Chromium --with-deps apt install, then the test step was cancelled about 4.5 minutes in by the 15-minute cap. Worst case is about 16.5 minutes, so 25 minutes leaves headroom.
+branch: cursor/auth-loading-smoke-timeout-618c
+base: verdant-grow-diary
+checkout: git fetch origin cursor/auth-loading-smoke-timeout-618c verdant-grow-diary && git switch cursor/auth-loading-smoke-timeout-618c && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553
+head_sha: read origin/cursor/auth-loading-smoke-timeout-618c after the merge of origin/verdant-grow-diary f39231c948942ce50a583f023a8b3481aca3ed94; comment-fix parent is 0c2bdbdfe2fb3ffdc953fc0cfa0ac9dd43ffc12a
+state: base merged; ready state left as found (isDraft false before this merge)
+current_step: Merged origin/verdant-grow-diary f39231c94. Only docs/agents/HANDOFF_LOG.md conflicted. Both the AUTH-LOADING-SMOKE-TIMEOUT-25 block and the incoming Open blocks are kept. Timeout stays 25. Sour Diesel review 5670229495 at 40591809 does not cover this head.
+next_action: Do not change draft or ready state. Do not enqueue, merge, or deploy. Obtain a fresh independent exact-head review at the merge head.
+post_merge_check: The next Auth loading smoke (mocked) run on verdant-grow-diary finishes without a 15-minute cancellation. NOT_MEASURED until merged.
+active_writer: Grok session on cursor/auth-loading-smoke-timeout-618c
+decisions: Timeout stays 25. Comment states the test step was cancelled about 4.5 minutes in. Founder approval is recorded as approved by the founder in chat 2026-10-27 in the PR body, not in the workflow file.
+tried_and_rejected: The first comment said the tests then passed in about 4.5 minutes. Sour Diesel P2: in those two runs the test step was cancelled by the 15-minute cap.
+commands: bunx vitest run src/test/auth-loading-ci-safety.test.ts --reporter=dot
+files_touched: .github/workflows/auth-loading-smoke.yml; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none
+blockers: exact-head review at the new head is NOT_MEASURED
+open_questions: none
+gotchas: Do not force-push. Do not change bun.lock. Do not change timeout-minutes. The scorer lock treats the workflow as an existing check; a branch-scoped unlock is local and gitignored.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553 ; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2553#pullrequestreview-5670229495
+artifacts: none
+reviewer_seat: Sour Diesel reviewed 40591809fcc13992f96f07eade03881604ff75a3; that verdict does not cover the new head
+reviewer_sha: 40591809fcc13992f96f07eade03881604ff75a3 (superseded)
+session_state: PR #2553 was not draft (isDraft false) before this base merge. Do not convert it to draft and do not toggle ready. No enqueue or deploy.
+claimed_by: Grok, 2026-10-27
+owner: Grok
+last_updated: 2026-10-27 14:10 CT, by Grok
+```
+
 ### PADDLE-WIRE-001-NORMALIZATION
 
 ```text
@@ -178,6 +212,40 @@ claimed_by: Codex by Matthew's direct task assignment and explicit follow-up dra
 owner: Codex PR2511 follow-up session; no retirement or transfer
 last_updated: 2026-10-26 21:44 CT, by Codex
 limits: Test and handoff PR delta only; normal base integration permitted. No GitHub comments, PR merge, ready/enqueue, publish/deploy, SQL/APPLY, secrets, dependency manifest/lockfile edits, auth, RLS, Edge, Action Queue or device changes.
+```
+
+### VER-288-SERVED-BUILD-BASELINE
+
+```text
+TASK VER-288  priority: P2  status: OPEN
+goal: Arm the served-build monotonic alert by seeding the Actions-cache baseline from the served SHA on the first run, and FAIL only when a later served commit moved backward or diverged.
+why: Every run since the workflow was added exited BLOCKED (previous_missing) before actions/cache/save, so no checkpoint was ever stored and a production rollback could not be detected.
+branch: cursor/served-build-monotonic-baseline-3a91
+base: verdant-grow-diary
+checkout: git fetch origin cursor/served-build-monotonic-baseline-3a91 verdant-grow-diary && git switch cursor/served-build-monotonic-baseline-3a91 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2538
+head_sha: read origin/cursor/served-build-monotonic-baseline-3a91 after the review-fix push
+state: review repair on the pull request; Sour Diesel 5669890731 at 7f0af6c61f549b9777d4968fcfc20db2c64fc45a
+current_step: A missing checkpoint records the served SHA and exits 1. github.run_number is already past 40, so the first seed after merge is that red run. The cache save uses if: always() && hashFiles('.served-build/previous.sha') != '' so the re-seeded file is stored and the next run can be green. A readable rollback still does not rewrite the file. initialize replaces only an unreadable checkpoint.
+next_action: After merge to verdant-grow-diary, confirm the next scheduled run is red with FAIL (baseline_recorded) and that the following run is green (unchanged or moved_forward). Do not add secrets or variables. Do not merge from this task.
+post_merge_check: Served build monotonic check on verdant-grow-diary. A continued BLOCKED (previous_missing) or a missing cache save reopens this work with the same owner.
+active_writer: Cursor cloud agent on cursor/served-build-monotonic-baseline-3a91
+decisions: Keep the baseline in the Actions cache. Do not commit a SHA, do not add an artifact, and do not add an Actions variable. public/version.json is a dirty build stamp, not a last-accepted served SHA, so it is not a second comparison source. A missing checkpoint records the served SHA and exits 1 so a scheduled run alerts; the save step still stores that file. Keep FAIL moved_backward_or_diverged and do not rewrite a readable checkpoint on that failure. initialize recovers only an unreadable checkpoint.
+tried_and_rejected: Requiring workflow_dispatch initialize=true never ran, so the alert stayed unarmed. A repo file or Actions variable would need a deploy-branch push or a settings change, both out of scope. A ::warning on a scheduled run notifies nobody. Failing without saving the file would leave the next run red as well.
+commands: bunx vitest run src/test/served-build-monotonic-rules.test.ts src/test/served-build-monotonic-workflow.test.ts --reporter=dot
+files_touched: scripts/check-served-build-monotonic.mjs; .github/workflows/served-build-monotonic.yml; src/test/served-build-monotonic-rules.test.ts; src/test/served-build-monotonic-workflow.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: The schedule checks out verdant-grow-diary, so the seed does not run until this change is merged. No merge is authorized here.
+open_questions: none
+gotchas: A cache miss records a new baseline and fails that one run. The following run compares against the saved SHA. A ::warning on a schedule does not notify anyone; exit 1 does. The checkpoint file is not rewritten on a readable rollback, and the save step persists whatever file is present. Scorer unlock for this branch is in gitignored .claude/scorer-unlock.json and must be renewed if these files are edited again after it expires.
+links: Linear VER-288; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2538#pullrequestreview-5669890731
+artifacts: src/test/served-build-monotonic-rules.test.ts
+reviewer_seat: Sour Diesel review 5669890731; a new head needs a fresh exact-head review
+reviewer_sha: 7f0af6c61f549b9777d4968fcfc20db2c64fc45a (the reviewed head, not this repair)
+session_state: Cursor cloud agent; no publish, no workflow dispatch, no production write
+claimed_by: Cursor cloud agent, 2026-10-26 11:02 CT
+owner: Cursor cloud agent for VER-288
+last_updated: 2026-10-27 14:15 CT, by Cursor cloud agent
 ```
 
 ### ATHENA-FEED-LOG-PUBLIC-GUIDE
@@ -340,7 +408,7 @@ tried_and_rejected: The unchanged 134a483f baseline independently reproduced the
 commands: bun run typecheck:tsgo; bunx vitest run src/test/public-vpd-chart-reference-context.test.tsx src/test/public-vpd-chart-rules.test.ts src/test/public-vpd-chart-page.test.tsx src/test/public-vpd-chart-estimate-safety.test.tsx src/test/route-indexation-matrix.test.ts src/test/route-manifest-sync.test.ts src/test/static-public-seo-documents.test.ts src/test/home-consolidation-2023-invariants.test.ts src/test/quick-log-structured-data-truth.test.tsx src/test/seo-contextual-internal-links.test.tsx src/test/manual-sensor-save-toast-temperature-unit.test.ts src/test/manual-sensor-card-toast-celsius.test.tsx src/test/vpd-stage-target-rules.test.ts src/test/public-vpd-calculator-rules.test.ts src/test/operator-route-mobile-coverage.test.ts src/test/derived-vpd-status-ui.test.tsx --reporter=dot --maxWorkers=1; bunx vitest run src/test/public-vpd-chart-page.test.tsx --reporter=dot --maxWorkers=1; E2E_BASE_URL=http://127.0.0.1:8353 PLAYWRIGHT_RETRIES=0 bunx playwright test e2e/public-vpd-chart.spec.ts e2e/auth-route-protection-mobile.spec.ts --project=chromium-mocked --project=webkit-mocked --workers=1 --grep "public VPD chart|mobile public /vpd-chart"; bun run build; node scripts/scorer-lock.mjs --report --base be6d009dcf0110b92901b85bc8212b560e45cf62 --strict
 files_touched: Current P2 adds src/test/public-vpd-chart-reference-context.test.tsx and changes only the explanatory helper in src/lib/publicVpdChartRules.ts, its rendering in src/pages/PublicVpdChart.tsx, the composite-test split in src/test/public-vpd-chart-page.test.tsx and this block. Conflicts resolved in docs/seo/route-indexation-matrix.md, src/lib/appRouteManifest.ts and src/lib/build/staticPublicSeoDocuments.ts. All 75 incoming base-file changes are preserved; unrelated auth, sensor, SEO and test files are not independently repaired here.
 files_remaining: none planned; later defects require a scoped repair and renewed validation.
-scorer_declarations: Inherited package.json browser-spec registration, eslint.config.js generated-route ignore, e2e/auth-route-protection-mobile.spec.ts /vpd-chart coverage and auth-loading-smoke.yml 30-minute job budget are retained. src/test/public-vpd-chart-page.test.tsx splits one baseline-timeout case into three without dropping its ten assertions or raising timeouts. All five edits were explicitly declared locally; the four tracked deltas versus be6d009d pass the strict report, while the page test is added relative to that base. No public PR-body or comment update is authorized.
+scorer_declarations: Inherited package.json browser-spec registration, eslint.config.js generated-route ignore, and e2e/auth-route-protection-mobile.spec.ts /vpd-chart coverage are retained. auth-loading-smoke.yml follows the merged 25-minute budget from #2553; this branch's earlier 30-minute cap is not retained. src/test/public-vpd-chart-page.test.tsx splits one baseline-timeout case into three without dropping its ten assertions or raising timeouts. All five edits were explicitly declared locally; the four tracked deltas versus be6d009d pass the strict report, while the page test is added relative to that base. No public PR-body or comment update is authorized.
 files: eslint.config.js; src/lib/publicVpdChartRules.ts; src/pages/PublicVpdChart.tsx; src/routes/vpd-chart.tsx; src/routeTree.gen.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/build/ogImageCard.ts; public/sitemap.xml; src/constants/verdantSeoContent.ts; src/pages/PublicVpdCalculator.tsx; src/test/public-vpd-chart-rules.test.ts; src/test/public-vpd-chart-page.test.tsx; scripts/seo-runtime-smoke.mjs; docs/agents/HANDOFF_LOG.md; docs/seo/route-indexation-matrix.md; e2e/auth-route-protection-mobile.spec.ts
 blockers: Historical 134a483f required CI was 35/35 and supplemental lanes 7/7 PASS; those results do not transfer. Fresh required CI, full 32-shard execution and eligible complete-scope acceptance at the resulting head remain NOT_MEASURED. Existing ruleset-ID/strictness drift is separate release infrastructure, not changed here. No publish, SQL, auth/schema repair, device control or production write.
 artifacts: C:/Users/G8/verdant-work/pr2533-repair-evidence/unit-validation-p2.log records 16 files/168 passes; e2e-validation-p2.log records 14 browser passes. The later page-only validation is 11/11. build-p2.log records the clean 7b1041dbf build and validators; build-final.log belongs to the earlier checkpoint. No original-HTML fidelity or live-production claim.
@@ -349,7 +417,8 @@ reviewer_sha: NOT_MEASURED
 session_state: Single implementation writer remains this Codex repair session. A fresh no-context child completed private advisory review of 134a483f with one P2; later read-only spot-checks found no issue in the three resolutions or explanation and caught the restored test transition. These are not release acceptance. Previous CI monitoring automation was deleted after 134a483f reached required/supplemental green. No workflows paused, comments posted or PR-body changes made. Task-owned fixture server stopped after browser validation.
 claimed_by: Codex repair session by Matthew's explicit 2026-10-26 instruction to finish e2e, fix failures and push; no merge/deploy. Historical author claim: Grok cloud session, 2026-10-24 20:10 UTC.
 base_merge_20261027_1413: Normal merge of origin/verdant-grow-diary f39231c948942ce50a583f023a8b3481aca3ed94 (#1971, #2544, #2545) after the queue ejection at 00255baba. Conflicts only in this file and docs/seo/route-indexation-matrix.md. Kept this entire VPD-CHART-PAGE block and the incoming FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY block. Dropped a duplicate HANDOFF-CONTINUITY-20261024 heading here because that block already exists later in this file. Public path list keeps both /guides/athena-feed-chart-log and /vpd-chart: 146 manifest routes, 43 public, 53 sitemap URLs. No rebase, force-push, draft conversion, or ready-state change.
-last_updated: 2026-10-27 14:13 CT, by Grok, merging origin/verdant-grow-diary f39231c94. Preserved Codex's 10:32 CT receipt and Grok's 09:17 CT nearest-cell fix. Both handoff entries kept. No PR merge or deploy.
+base_merge_20261027_1503: Normal merge of origin/verdant-grow-diary ecfa2b9115355349b17d9249989c1a49dc933e47 (#2553, #2538). The only conflict was .github/workflows/auth-loading-smoke.yml. Took the merged 25-minute timeout from #2553. This branch's earlier 30-minute cap was the same "do not cancel at 15 minutes" intent; #2553 is the deploy decision and its handoff says not to change timeout-minutes. bun.lock unchanged. No rebase, force-push, draft conversion, queue, or PR merge.
+last_updated: 2026-10-27 15:03 CT, by Grok, merging origin/verdant-grow-diary ecfa2b911. Preserved the 14:13 CT receipt. No PR merge or deploy.
 ```
 
 ### FIX-2171-PLANT-HEALTH-NOT-ASSESSED-DISPLAY

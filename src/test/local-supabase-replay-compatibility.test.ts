@@ -271,10 +271,38 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(report).toMatchObject({
       mode: "verify_only",
       compatibility_entry_count: 18,
-      compatibility_patch_count: 4,
+      compatibility_patch_count: 5,
       compatibility_injection_count: 2,
       source_migrations_unchanged: true,
     });
+  });
+
+  it("guards the recovered Verdant RLS statement when the scaffold table is absent", () => {
+    const manifest = JSON.parse(readFileSync(REAL_MANIFEST, "utf8")) as {
+      compatibility_patches: Array<{
+        source_path: string;
+        source_sha256: string;
+        patched_sha256: string;
+        replacements: Array<{ from: string; to: string }>;
+      }>;
+    };
+    const sourcePath = "supabase/migrations/20260826020443_harden_secdef_rpc_grants_group_a_b.sql";
+    const patch = manifest.compatibility_patches.find((entry) => entry.source_path === sourcePath);
+
+    expect(patch).toBeDefined();
+    expect(patch?.source_sha256).toBe(
+      "a922b0c13e15a969f5c6dbdd9a71a51aeb43469e2021726280f904c3610e14dd",
+    );
+    expect(patch?.patched_sha256).toBe(
+      "1464403b7472ad81e2b9a959464be35ead9e808b4f5032e6ddbd05d9d169597d",
+    );
+    expect(sha256(readFileSync(resolve(sourcePath), "utf8"))).toBe(patch?.source_sha256);
+    expect(patch?.replacements).toHaveLength(1);
+    expect(patch?.replacements[0]?.from).toBe(
+      'ALTER TABLE public."Verdant" ENABLE ROW LEVEL SECURITY;',
+    );
+    expect(patch?.replacements[0]?.to).toContain(`to_regclass(''public."Verdant"'')`);
+    expect(patch?.replacements[0]?.to).toContain("ENABLE ROW LEVEL SECURITY");
   });
 
   it("pins the immutable default-privilege replay repair to global and schema revokes", () => {

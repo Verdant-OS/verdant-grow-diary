@@ -37,7 +37,7 @@ describe("Demo page + route removal", () => {
   });
   it("/demo redirects to the public landing (no broken bookmark)", () => {
     expect(extractMountedAppRoutePaths()).toContain("/demo");
-    expect(getRouteAliasRedirectTarget("/demo")).toBe("/welcome");
+    expect(getRouteAliasRedirectTarget("/demo")).toBe("/");
   });
 });
 

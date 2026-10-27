@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-10-27.1**
+**Sentinel-Version: 2026-10-26.2**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -66,12 +66,12 @@ HISTORICAL — never active instructions
 
 ## Which files each agent loads
 
-| Agent         | Auto-loads                                | Must also read                                                                      |
-| ------------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
-| Codex         | `AGENTS.md`                               | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                  |
-| Claude        | `CLAUDE.md` (imports constitution + role) | `CURRENT_STATE.md`, `HANDOFF_LOG.md` — read before `SENTINEL_ACK`                   |
-| Grok          | `AGENTS.md`, `.grok/rules/*`              | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                   |
-| Gemini        | `GEMINI.md`                               | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                 |
+| Agent                    | Auto-loads                                  | Must also read                                                                                                                                         |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Codex                    | `AGENTS.md`                                 | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                     |
+| Claude                   | `CLAUDE.md` (imports constitution + role)   | `CURRENT_STATE.md`, `HANDOFF_LOG.md` — read before `SENTINEL_ACK`                                                                                      |
+| Grok                     | `AGENTS.md`, `.grok/rules/*`                | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                      |
+| Gemini                   | `GEMINI.md`                                 | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                    |
 | Additional role profiles | Platform-specific bootstrap, when available | `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, and the assigned `roles/{canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad,harvest}.md` |
 
 Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records

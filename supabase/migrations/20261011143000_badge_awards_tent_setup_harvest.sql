@@ -302,7 +302,7 @@ DECLARE
   was_hidden boolean;
   revoked_at timestamptz;
 BEGIN
-  -- Fast path only. The write barrier is the FOR UPDATE recheck after the
+  -- Fast path only. The write barrier is the FOR SHARE recheck after the
   -- advisory lock, immediately before any award or evidence mutation.
   SELECT runtime.enabled
     INTO runtime_enabled
@@ -522,6 +522,14 @@ DECLARE
   visited integer := 0;
   batch_limit constant integer := 25;
 BEGIN
+  -- One reconcile at a time. Each evaluate_owner leaves a FOR SHARE lock on
+  -- the runtime row for the rest of this transaction, and the cursor write
+  -- below upgrades it to FOR UPDATE. A second, overlapping run returns 0
+  -- instead of queueing behind this one or racing it for that upgrade.
+  IF NOT pg_try_advisory_xact_lock(hashtextextended('badge_awards_reconcile', 0)) THEN
+    RETURN 0;
+  END IF;
+
   -- Fast path only. Each owner is read again before evaluate_owner, and the
   -- cursor write rechecks under FOR UPDATE after that call returns.
   SELECT runtime.enabled, runtime.reconcile_after
@@ -555,9 +563,11 @@ BEGIN
     ORDER BY owners.user_id
     LIMIT batch_limit
   LOOP
-    -- Plain read, once per owner. Do not lock the runtime row across
-    -- evaluate_owner: that call waits on the owner advisory lock, and holding
-    -- the runtime row across that wait deadlocks a concurrent disable.
+    -- Plain read, once per owner. Do not take FOR UPDATE here: evaluate_owner
+    -- waits on the owner advisory lock, and an exclusive runtime lock held
+    -- across that wait deadlocks a user check. evaluate_owner's own recheck
+    -- leaves only FOR SHARE for the rest of this transaction, which a
+    -- concurrent disable waits on and which other evaluations share.
     SELECT runtime.enabled
       INTO runtime_enabled
     FROM public.badge_award_runtime AS runtime

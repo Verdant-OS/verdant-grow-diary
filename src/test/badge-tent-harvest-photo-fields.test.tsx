@@ -16,6 +16,7 @@ const singleMock = vi.fn();
 const rpcMock = vi.fn();
 const uploadMock = vi.fn();
 const removeMock = vi.fn();
+const tentReadMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -25,7 +26,8 @@ vi.mock("@/integrations/supabase/client", () => ({
         return { select: () => ({ single: singleMock }) };
       };
       if (table === "tents") {
-        return { update: updateMock, insert };
+        const read = { eq: () => read, maybeSingle: tentReadMock };
+        return { update: updateMock, insert, select: () => read };
       }
       return { insert };
     },
@@ -113,6 +115,8 @@ describe("badge tent and harvest photo fields", () => {
     rpcMock.mockReset();
     uploadMock.mockReset();
     removeMock.mockReset();
+    tentReadMock.mockReset();
+    tentReadMock.mockResolvedValue({ data: null, error: null });
     removeMock.mockResolvedValue({ data: [], error: null });
     toastError.mockReset();
     uploadMock.mockResolvedValue({ error: null });
@@ -304,6 +308,19 @@ describe("badge tent and harvest photo fields", () => {
     fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
     await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
     expect(removeMock).toHaveBeenCalledWith([tentPhotoPath()]);
+  });
+
+  it("create tent: keeps the uploaded photo when a code-less error leaves the row unconfirmed", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    singleMock.mockResolvedValue({ data: null, error: { message: "Bad gateway" } });
+    tentReadMock.mockResolvedValue({ data: null, error: { message: "unavailable" } });
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(removeMock).not.toHaveBeenCalled();
   });
 
   it("edit tent: an invalid size is rejected before any photo upload", async () => {

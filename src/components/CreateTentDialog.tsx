@@ -39,6 +39,7 @@ import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 import {
   newHierarchyCreateAttemptId,
   persistHierarchyCreateAttempt,
+  reconcileHierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
@@ -242,8 +243,12 @@ export default function CreateTentDialog({
         return;
       }
       if (result.status === "definitive_error") {
-        // Nothing references the uploaded object; a retry uploads anew.
-        if (uploadedPath) await removeOwnerSubjectPhoto({ path: uploadedPath });
+        // A code-less error is classified definitive without a re-read, so
+        // remove the object only once the exact row is confirmed absent.
+        if (uploadedPath) {
+          const reread = await reconcileHierarchyCreateAttempt(supabase, attempt);
+          if (reread.status === "not_found") await removeOwnerSubjectPhoto({ path: uploadedPath });
+        }
         toast.error(result.message);
         return;
       }

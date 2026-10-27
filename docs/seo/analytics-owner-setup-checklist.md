@@ -2,7 +2,7 @@
 
 **Last reconciled against production (UTC):** 2026-08-02T02:55:07.852Z
 
-**Production host:** `https://verdantgrowdiary.com`
+**Production host:** `https://verdantgrowdiary.com` on Cloudflare Workers (Matthew Cheek, 2026-10-10). Keep preview, Lovable, Vercel, and other alternate domains out of the production analytics stream.
 
 **Operating mode:** MODE A — ACCESS BLOCKED / READINESS WORK
 

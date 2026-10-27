@@ -13,13 +13,13 @@ permissions:
 
 concurrency:
   group: native-save-retrieve-local-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   native-save-retrieve-local:
     name: native save/retrieve (local backend)
     # Reuse the existing opt-in DB-lane setting; skipped is not acceptance proof.
-    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_DB_SECURITY_LANE == 'true'
+    if: (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (github.event_name == 'workflow_dispatch' || vars.ENABLE_DB_SECURITY_LANE == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

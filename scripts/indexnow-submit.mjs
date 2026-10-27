@@ -33,6 +33,8 @@ export async function submitIndexNow(env = process.env, fetchImpl = fetch, optio
   const response = await fetchImpl("https://api.indexnow.org/indexnow", {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
+    // Intended flow: only the public sitemap's <loc> URLs and IndexNow's public key are sent.
+    // codeql[js/file-access-to-http]
     body: JSON.stringify({
       host: HOST,
       key,

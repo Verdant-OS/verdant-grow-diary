@@ -85,7 +85,7 @@ current_step: awaiting CI and independent exact-head review
 next_action: route to an eligible non-author reviewer; when this or #2549 merges, close the other as superseded on the overlapping files
 post_merge_check: after Publish, curl -s https://verdantgrowdiary.com/creator-beta and /breeder-beta show robots noindex, follow; /sitemap.xml has no creator-beta loc. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-decisions: ported #2549's existing noindex implementation (no second implementation) minus its HANDOFF_LOG block and its src/routeTree.gen.ts header edit; kept #2543's shortened beta descriptions on the moved noindex documents; fixed two failures #2543 itself introduced (duplicate /guides -> /glossary link; no-account claim without "your browser").
+decisions: ported #2549's existing noindex implementation (no second implementation) minus its HANDOFF_LOG block and its src/routeTree.gen.ts header edit; kept #2543's shortened beta descriptions on the moved noindex documents; fixed two failures #2543 itself introduced (duplicate /guides -> /glossary link; no-account claim without "your browser"). CodeQL alert 287 (js/file-access-to-http, scripts/indexnow-submit.mjs): suppressed inline with a codeql[js/file-access-to-http] comment and reason (Matthew 2026-10-27: suppress); the flow is the public sitemap to IndexNow.
 tried_and_rejected: writing an independent noindex change (would duplicate #2549).
 commands: bunx vitest run src/test/creator-beta-noindex.test.tsx src/test/breeder-beta-cross-canonical.test.ts src/test/static-public-seo-documents.test.ts src/test/seo-contextual-internal-links.test.tsx src/test/search-to-first-value-guides.test.tsx
 files_touched: docs/seo/route-indexation-matrix.md; public/sitemap.xml; scripts/public-route-parity.config.mjs; src/lib/build/staticPublicSeoDocuments.ts; src/pages/CreatorBeta.tsx; src/pages/BreederBeta.tsx; src/pages/GuidesIndex.tsx; src/constants/verdantSeoContent.ts; src/test/breeder-beta-cross-canonical.test.ts; src/test/creator-beta-noindex.test.tsx; src/test/static-public-seo-documents.test.ts
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:45 CT (Matthew: separate PRs)
 owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-last_updated: 2026-10-27 16:45 CT, by Claude
+last_updated: 2026-10-27 18:25 CT, by Claude
 ```
 
 ### PUBLIC-SEO-AUDIT-20261026

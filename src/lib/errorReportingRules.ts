@@ -392,8 +392,9 @@ function boundaryDiagnosticTags(exception: unknown): Record<string, string> {
       frames.some((frame) => {
         const safe = scrubFrame(frame);
         if (!safe || typeof safe.lineno !== "number" || safe.lineno <= 0) return false;
-        const path = safe.filename ?? safe.abs_path;
-        return typeof path === "string" && /^(https?:\/\/|\/(?!\/))/.test(path);
+        return [safe.filename, safe.abs_path].some(
+          (path) => typeof path === "string" && /^(https?:\/\/|\/(?!\/))/.test(path),
+        );
       })
     ) {
       stackState = "location";

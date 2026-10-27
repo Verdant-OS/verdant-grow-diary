@@ -45,6 +45,26 @@ describe("privacy-safe boundary diagnostics", () => {
     ],
     [{ frames: [{ filename: "javascript:private@example.com", lineno: 1 }] }, "no_location"],
     [{ frames: [{ filename: "/assets/app.js", lineno: NaN }] }, "no_location"],
+    [
+      {
+        frames: [
+          { filename: "", abs_path: "https://verdantgrowdiary.com/assets/app.js", lineno: 12 },
+        ],
+      },
+      "location",
+    ],
+    [
+      {
+        frames: [
+          {
+            filename: "app.js",
+            abs_path: "https://verdantgrowdiary.com/assets/app.js",
+            lineno: 12,
+          },
+        ],
+      },
+      "location",
+    ],
     [{ frames: "private@example.com" }, "missing"],
   ])("reports actual stack availability for %j", (stack, state) => {
     expect(scrubEvent(boundaryEvent("message", stack)).tags).toMatchObject({ stack_state: state });

@@ -61,7 +61,7 @@ Several residual tests look like source-regex pins: #2495, #2487 and #2383 (infe
 
 ## Decisions that need Matthew
 
-1. **Badge stacks:** #1979 → #2342 → #2365, and #2032 → #2343 → #2362. These are two parallel stacks, and each carries its own divergent copy of migration `20261011120000_owner_badge_awards.sql`, so only one can land unchanged. Pick one line; the other closes as superseded.
+1. **Badge stacks (withdrawn as a choice, 2026-10-27):** the "pick one line, close the other" request is withdrawn. The badge PRs are one tree, not rival stacks, nothing in it is superseded, and Matthew approved the #2032 takeover (see [Badge stack decision (corrected)](#badge-stack-decision-corrected)). Close nothing in the tree on the strength of the old wording. Still open for Matthew on #2032: re-timestamp migration `20261011143000` (it sorts before the live latest `20261014210000`), confirm the harvest pgTAP CI wiring pushed in `b79785ff1` by another session, and say which session holds #2032 from here.
 2. **Migrations:** #1846 (Quick Log event-hash UTC), #2067 + #2189 (referral cap; failed review), #2140. #2140 adds a second plants.health default migration on top of `20260924120000`, which CURRENT_STATE records as applied in production on 2026-10-15 (a source claim). #2140 looks redundant.
 3. **CI / workflows / lockfile:** #2555, #2512, #2526, #1984, #2320, #1879. #2555, #2512 and #2526 collide on `ci.yml`, `bun.lock` and `package.json` and need an order.
 4. **Governance:** #1876 (all 12 Sentinel files), #2086 (governance + CI + skills; recommend splitting by scope), #2133, #2057.

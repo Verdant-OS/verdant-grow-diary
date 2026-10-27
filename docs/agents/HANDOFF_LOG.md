@@ -78,9 +78,9 @@ why: 127 open PRs (2026-10-27); many are superseded, stale, or test follow-ups w
 branch: claude/new-session-wp1j5i (the session-bound branch; the cleanup prompt named claude/pr-cleanup-inventory, and the session binding wins)
 base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
 checkout: git fetch origin claude/new-session-wp1j5i verdant-grow-diary && git switch claude/new-session-wp1j5i && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2556 (draft)
-head_sha: 322cfba77ceaacfb212f08144e5e090ef8009832, observed on origin/claude/new-session-wp1j5i at 2026-10-27T20:48Z; the commit that records this line moves the head past it, so re-read the PR head before any current-head claim
-state: pushed draft (docs plus the 2026-10-27.1 governance bump that commits the CLAUDE.md session-recovery block on Matthew's approval). The 32 shard checks skip while the PR is a draft, so the 35 required checks are NOT_MEASURED until it is marked ready; only Matthew marks it ready.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2556 (ready for review; Matthew marked it ready on 2026-10-27)
+head_sha: 53c23df12beedd8ea8e5f7615f42109d4d2456cf, observed on origin/claude/new-session-wp1j5i at 2026-10-27T23:35Z; the commit that records this line moves the head past it, so re-read the PR head before any current-head claim
+state: pushed, ready for review, docs only. The governance change (CLAUDE.md session-recovery block and the 2026-10-27.1 bump in 175cfbd15) was withdrawn on Matthew's approval in e35c49a0d and a79d0a1ae: all 18 governance files match base at 2026-10-26.2, and the PR changes only docs/agents/pr-cleanup-2026-10-27.md and this block. The context-recovery hook writes to ~/.claude/CLAUDE.md instead (a container-local patch, not durable).
 current_step: Phases 1 and 2 done. Phase 1: docs/agents/pr-cleanup-2026-10-27.md holds the per-PR table, the close list, the consolidation plan (29 folds) and the decision list. Phase 2: #2226 #2214 #2182 #1951 #1955 #1980 closed as superseded and #2372 #2299 closed as stale, each on Matthew's approval; Matthew kept #1986 #2010 #2024 #2333 #1904 #1902 for now. The #2032 takeover is done: Matthew approved the takeover, the port and the scorer unlocks; the harvest photo flow was reworked through the canonical quicklog_save_event save on his approval; #2032 head is 3f4c3f487a797e10e2b49e247dd8b70b924754e4.
 next_action: Do not repeat Phase 2 closes or the #2032 scorer push. Wait on the open needs-Matthew decisions below, then run Phase 3 (consolidations) only on his approval.
 post_merge_check: NOT_APPLICABLE (inventory doc; not a feature)
@@ -97,10 +97,10 @@ links: docs/agents/pr-cleanup-2026-10-27.md
 artifacts: docs/agents/pr-cleanup-2026-10-27.md
 reviewer_seat: an eligible independent session routed by OG Kush; not this session
 reviewer_sha: none yet
-session_state: Claude cloud session; one self check-in armed (trig_01YWTvT6ajTDJZr98SHwCa7C); no paused workflows; pending human decisions: the open_questions list
+session_state: Claude cloud session; one self check-in armed (trig_019FUfcDvCQpU9psDxuqoa3J, 2026-10-28T01:17Z); no paused workflows; pending human decisions: the open_questions list
 claimed_by: Claude, 2026-10-27 12:13 CT (first commit of this block, e99de0741; session_017UoYKyHCyHbSMw6VpDj2mb)
 owner: Claude (default inheritor OG Kush)
-last_updated: 2026-10-27 16:00 CT, by Claude
+last_updated: 2026-10-27 18:40 CT, by Claude
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL

@@ -76,31 +76,31 @@ TASK CODEX-2287-ALIAS-LOAD-CRAWL-BOUNDARIES  priority: P2  status: OPEN
 goal: Finish the three existing alias findings without changing private access, existing component redirects or other active branches.
 why: The private agent-integrations alias lacked crawl exclusions, the redirect prose count was stale, and help only redirected after a root app-shell render.
 branch: claude/legacy-route-aliases
-base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+base: verdant-grow-diary at be6d009dcf0110b92901b85bc8212b560e45cf62 (#2023 merged; normal base integration, not a change to its branch or queue).
 checkout: Fetch the existing branch and base; verify live full head and scoped writer claim before adopting in an isolated authorized cloud worktree. Normal merges and pushes only.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2287
-head_sha: 5a97cd1b4d8192551e27059c3ba88899c7e4c782 (source checkpoint verified before repair; resulting full head belongs in the current PR description).
-state: Local three-finding repair after clean normal current-base merge and unchanged canonical frozen install.
-current_step: New six-case suite RED6failed before repair. GREEN7focusedfiles82tests, including the original client-component alias tests. The real router now resolves help during load, preserving query/hash, without a React shell render.
-next_action: Finish scoped type/build/docs/scorer checks and normal hooks/push. Verify resulting full remote head, fresh required/supplemental CI and eligible non-contributing outside full-scope acceptance. Keep draft.
+head_sha: 4b9898a72754217f909cde3e178a61376e76ee24 (published pre-integration checkpoint; this receipt is recorded before its own commit/push. Read the resulting full PR head and publication receipt before validation, review or queueing).
+state: Current-base integration is resolved locally. Only the matrix conflict and this task block are authored changes beyond the automatic merge. All automatically merged application/test content is preserved. Actual publication must be verified from the resulting PR head/receipt, not inferred from this pre-push snapshot.
+current_step: Existing unchanged six-case boundary regression reproduced the merged-manifest mismatch: RED 1 failed / 5 passed (declared 21, actual 22); GREEN 6 passed / 0 failed after preserving welcome plus all three aliases. Nine focused suites, including home consolidation and contextual links: 100 passed / 0 failed / 0 skipped. Typecheck, scoped lint/format, strict scorer, docs/release safety and whitespace PASS. The full build/publication proof is measured separately at the resulting commit; required new-head hosted CI and outside acceptance remain NOT_MEASURED.
+next_action: Read the resulting full PR head and actual build/publication receipts first. If those receipts are missing, finish normal hooks, run the full build at the committed head and push normally only after a fresh remote-head check. Then obtain current required/supplemental CI and an actual eligible non-contributing outside full-scope review. This pre-push snapshot does not assert publication or acceptance. Keep draft; no ready, queue, auto-merge, merge or deploy.
 post_merge_check: Existing Codex closeout coordinator verifies served version includes the merge; actual hosted redirect/crawler behavior remains NOT_MEASURED until authorized read-only release checks.
-active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only robots exclusions, matrix count paragraph, help load hook, NEW boundary regression, this block and matching metadata. No #2023 source/queue mutation.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, continuing its existing scoped repair. Current manual scope is the matrix conflict and this task block only; normal base imports preserve incoming source/tests. No #2023 source-branch or queue mutation.
 decisions: Exclude agent-integrations in the three search-bot groups while preserving social preview policy; compare redirect prose with actual manifest count; add pre-render help redirect and retain existing component fallback/query/hash contract. No root-shell or auth change.
 tried_and_rejected: Counting a client-render redirect as a pre-provider boundary; assuming redirect aliases inherit destination crawl exclusions; changing existing locked tests; editing generated route content by hand; inferring independence from shared-account identity.
-commands: node node_modules/vitest/vitest.mjs run src/test/legacy-route-alias-load-and-crawl-boundaries.test.tsx src/test/legacy-route-aliases-2026-10-20.test.tsx src/test/route-manifest-sync.test.ts --pool=forks --maxWorkers=1; node node_modules/typescript/bin/tsc --noEmit; node scripts/scorer-lock.mjs --report --base e18e067af80fcb3eb32b37f1e046fa725bba8a9d --strict; node scripts/assert-docs-safety.mjs; git diff --check.
-files_touched: public/robots.txt; docs/seo/route-indexation-matrix.md (redirect count paragraph only); src/routes/help.tsx; src/test/legacy-route-alias-load-and-crawl-boundaries.test.tsx (NEW); docs/agents/HANDOFF_LOG.md (this block only). Original manifest/generated routes/other alias modules remain part of full PR scope.
+commands: node node_modules/vitest/vitest.mjs run src/test/legacy-route-alias-load-and-crawl-boundaries.test.tsx src/test/legacy-route-aliases-2026-10-20.test.tsx src/test/route-manifest-sync.test.ts --pool=forks --maxWorkers=1; node node_modules/typescript/bin/tsc --noEmit; node scripts/scorer-lock.mjs --report --base be6d009dcf0110b92901b85bc8212b560e45cf62 --strict; node scripts/assert-docs-safety.mjs; git diff --check.
+files_touched: Current reconciliation authors docs/seo/route-indexation-matrix.md and this HANDOFF block only. Existing PR scope still includes robots exclusions, help load hook, three alias modules, manifest/generated tree and tests; independent review must cover the whole resulting diff.
 files_remaining: No further repair planned after validation; regenerate any generated conflict only through canonical build tooling.
 blockers: Fresh full-head hosted CI and outside acceptance. Codex repaired the PR and cannot accept it. No production action is authorized.
 open_questions: Actual eligible outside reviewer pickup after current-head CI precheck; original Cursor contributor model/session provenance must be included in exclusions.
-gotchas: Queued #2023 also changes matrix/manifest. Preserve its reviewed canonical content during later normal base integration; stop on ambiguous hunks. Its branch and queue entry are untouched. Other-chat/private unpushed state is unavailable.
+gotchas: #2023 merged as be6d009dcf0110b92901b85bc8212b560e45cf62. Preserve its 41 public routes, welcome/features/demo home redirects and sitemap inventory together with the three existing aliases: 147 total routes and 22 redirects. The previous 4b9898 head and its CI/reviews are historical after integration; do not apply old acceptance or add an unnecessary base update. Other-chat/private unpublished coverage remains unavailable.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2287#discussion_r4354277826; https://github.com/Verdant-OS/verdant-grow-diary/pull/2287#discussion_r4354277840; https://github.com/Verdant-OS/verdant-grow-diary/pull/2287#discussion_r4354277844
-artifacts: New regression/current PR/checks; cloud RED/GREEN/static/build/commit/push receipts supplement repository evidence.
+artifacts: Existing historical P2 RED6/GREEN82 and full-build receipts remain preserved. Current base-count RED/GREEN, nine-suite 100-case, static/build/commit/push receipts and continuation claim6430524438 are in /workspace/scratch/claude-closeout-20261026. The current PR body/publication receipt supplies the resulting remote SHA.
 reviewer_seat: Actually available eligible non-contributing outside session, excluding original Claude, actual Cursor/base-integration contributors and this Codex repairer.
 reviewer_sha: NOT_MEASURED for repaired head; older source verdicts are historical.
 session_state: Isolated cloud writer, no desktop or local browser control. Release/live behavior NOT_MEASURED.
 claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 19:40 UTC.
 owner: Codex closeout coordinator for this bounded repair; outside acceptance and normal merge authority remain separate.
-last_updated: 2026-10-26 19:44 UTC, by Codex closeout coordinator
+last_updated: 2026-10-27 00:24 UTC, by Codex closeout coordinator
 ```
 
 ### PR-2345-BASE-INTEGRATION

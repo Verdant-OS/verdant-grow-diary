@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Create a uniquely named local database, load a schema-only dump of the
-# already-migrated local Supabase database, set a runner-issued token, run
-# supabase/tests/badge_awards_permissions.sql, and always drop the database.
+# already-migrated local Supabase database, set a runner-issued token, run one
+# allowlisted badge pgTAP file (see --sql below), and always drop the database.
 #
 # The dump is not a 272-file migration replay. It copies the local schema,
 # including grants, after the owner-badge migration is already applied.
@@ -17,9 +17,13 @@
 #   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --missing-token
 #   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --seed-nonempty
 #   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --force-session2-failure
+#   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_tent_setup_harvest.sql
 #
-# --sql accepts only supabase/tests/badge_awards_permissions.sql. Any other
-# path exits 2. Omitting --sql still runs that same file.
+# --sql accepts only supabase/tests/badge_awards_permissions.sql and
+# supabase/tests/badge_awards_tent_setup_harvest.sql. Any other path exits 2.
+# Omitting --sql still runs badge_awards_permissions.sql. The token modes are
+# fences of the permissions file's two-session test, so the tent/setup/harvest
+# file runs in happy mode only; pairing it with a token mode exits 2.
 #
 # BADGE_PGTAP_SCHEMA_FILE, when set, reuses that schema dump instead of
 # running pg_dump again. The database is still created and dropped here.
@@ -29,8 +33,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SQL_REL="supabase/tests/badge_awards_permissions.sql"
-SQL_FILE="$ROOT/$SQL_REL"
+PERMISSIONS_SQL_REL="supabase/tests/badge_awards_permissions.sql"
+HARVEST_SQL_REL="supabase/tests/badge_awards_tent_setup_harvest.sql"
+SQL_REL="$PERMISSIONS_SQL_REL"
 HOST="${PGHOST:-127.0.0.1}"
 PORT="${PGPORT:-54322}"
 PGUSER="${PGUSER:-postgres}"
@@ -55,10 +60,11 @@ while [[ $# -gt 0 ]]; do
         echo "missing path after --sql" >&2
         exit 2
       fi
-      if [[ "$2" != "$SQL_REL" ]]; then
+      if [[ "$2" != "$PERMISSIONS_SQL_REL" && "$2" != "$HARVEST_SQL_REL" ]]; then
         echo "refusing sql path $2" >&2
         exit 2
       fi
+      SQL_REL="$2"
       shift 2
       ;;
     --wrong-token) MODE="wrong-token"; shift ;;
@@ -71,6 +77,12 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$SQL_REL" == "$HARVEST_SQL_REL" && "$MODE" != "happy" ]]; then
+  echo "refusing mode $MODE for $SQL_REL: token modes apply only to $PERMISSIONS_SQL_REL" >&2
+  exit 2
+fi
+SQL_FILE="$ROOT/$SQL_REL"
 
 psql_admin() {
   psql -h "$HOST" -p "$PORT" -U "$PGUSER" -d postgres -v ON_ERROR_STOP=1 "$@"
@@ -120,7 +132,7 @@ if [[ ! "$candidate" =~ ^badge_pgtap_[0-9a-f]{12}$ ]]; then
   exit 2
 fi
 
-echo "badge pgTAP database ${candidate} mode ${MODE}"
+echo "badge pgTAP database ${candidate} mode ${MODE} file ${SQL_REL}"
 if ! psql_admin -c "CREATE DATABASE ${candidate} TEMPLATE template0;" >/dev/null; then
   echo "CREATE DATABASE ${candidate} failed; leaving any existing database in place" >&2
   exit 1
@@ -214,6 +226,20 @@ case "$MODE" in
   happy)
     if [[ "$status" -ne 0 ]]; then
       exit "$status"
+    fi
+    if [[ "$SQL_REL" == "$HARVEST_SQL_REL" ]]; then
+      # One DO block of ASSERTs inside BEGIN ... ROLLBACK. ON_ERROR_STOP turns
+      # any failed ASSERT into a non-zero exit above; these lines prove the
+      # block actually executed and the transaction rolled back.
+      if ! printf '%s\n' "$output" | grep -qx 'DO'; then
+        echo "tent/setup/harvest DO block did not run" >&2
+        exit 1
+      fi
+      if ! printf '%s\n' "$output" | grep -qx 'ROLLBACK'; then
+        echo "tent/setup/harvest file did not reach ROLLBACK" >&2
+        exit 1
+      fi
+      exit 0
     fi
     if ! printf '%s\n' "$output" | grep -qx 'ok 2 - two simultaneous sessions leave one award'; then
       echo "ok 2 did not run" >&2

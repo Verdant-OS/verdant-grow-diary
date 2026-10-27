@@ -227,6 +227,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/guides", access: "public", description: "Grower guides index." },
   { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
   {
+    path: "/guides/athena-feed-chart-log",
+    access: "public",
+    description: "Public planned-vs-actual Athena feed log. In-memory only.",
+  },
+  {
     path: "/guides/cronk-nutrients-grow-diary",
     access: "public",
     description: "Cronk Nutrients planned-vs-actual feed log. Stores nothing in the browser.",
@@ -544,6 +549,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/upgrade",
     access: "redirect",
     description: "→ /pricing with allowlisted plan, acquisition, and return intent.",
+  },
+  {
+    path: "/vpd-chart",
+    access: "public",
+    description: "Public VPD chart by growth stage with a leaf-offset calculator.",
   },
   { path: "/welcome", access: "redirect", description: "→ /" },
 ];

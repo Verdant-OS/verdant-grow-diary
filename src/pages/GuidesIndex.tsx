@@ -167,6 +167,15 @@ export default function GuidesIndex() {
             </li>
           ))}
           <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/athena-feed-chart-log" className="block">
+              <h3 className="font-semibold text-lg">Athena Feed Chart Log (Planned vs Actual)</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Log what you actually fed against the Athena Pro Line or Blended chart. Planned
+                amounts stay blank until you copy them from the official schedule.
+              </p>
+            </Link>
+          </li>
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
             <Link to="/guides/grow-stage-care-guide" className="block">
               <h3 className="font-semibold text-lg">
                 Grow-stage care guide: seedling, veg, and flower checklists

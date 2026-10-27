@@ -52,6 +52,7 @@ concurrency:
 
 jobs:
   ai-doctor-freshness-e2e:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: AI Doctor freshness gate e2e (mocked / non-destructive)
     runs-on: ubuntu-latest
     timeout-minutes: 15

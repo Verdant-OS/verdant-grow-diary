@@ -217,6 +217,7 @@ describe("/guides internal links resolve to known routes with one scoped diary h
     const guideLinks = internal.filter((h) => /^\/guides\/[^/]+$/.test(h));
     const CUSTOM_GUIDE_PATHS = [
       "/guides/grow-stage-care-guide",
+      "/guides/athena-feed-chart-log",
       "/guides/cronk-nutrients-grow-diary",
     ];
     expect(guideLinks.length).toBe(VERDANT_GUIDE_SLUGS.length + CUSTOM_GUIDE_PATHS.length);

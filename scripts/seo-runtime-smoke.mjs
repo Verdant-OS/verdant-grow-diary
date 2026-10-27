@@ -34,9 +34,19 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/grow-help-toolkit`,
   },
   {
+    path: "/guides/athena-feed-chart-log",
+    expectTitle: /Athena Feed Chart Log/,
+    canonical: `${ORIGIN}/guides/athena-feed-chart-log`,
+  },
+  {
     path: "/tools/vpd-calculator",
     expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
     canonical: `${ORIGIN}/tools/vpd-calculator`,
+  },
+  {
+    path: "/vpd-chart",
+    expectTitle: /VPD Chart by Growth Stage \+ Calculator/,
+    canonical: `${ORIGIN}/vpd-chart`,
   },
   {
     path: "/hardware-integrations",

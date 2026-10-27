@@ -98,6 +98,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/guides/:slug",
   "/guides/cronk-nutrients-grow-diary",
   "/guides/grow-stage-care-guide",
+  "/guides/athena-feed-chart-log",
   // Exact ID-free Customer Mode guide: static/noindex and must make no
   // private-table requests. Dynamic /customer/:shareId remains retired.
   "/customer/guide/oreoz-vs-gelonade-comparison",
@@ -140,6 +141,8 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/feedback",
   "/tools/grow-help-toolkit",
   "/tools/vpd-calculator",
+  // Public stage chart and leaf-offset calculator: static page, no Supabase.
+  "/vpd-chart",
   // Public per-stage target-band reference: renders static constants only,
   // no Supabase fetch — must render signed-out with zero private-table hits.
   "/tools/blueprint-targets",

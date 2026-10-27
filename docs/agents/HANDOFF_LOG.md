@@ -78,7 +78,7 @@ branch: claude/vibrant-heisenberg-njd6r3
 base: verdant-grow-diary; PR base SHA observed 2026-10-26: 37202b540d00cafd3d31848136225e7cd147d1d3
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (draft; returned to draft on Matthew's instruction 2026-10-27 18:23 UTC; stay draft pending required checks and independent acceptance)
-head_sha: 436dbec9354634253bc76f3ffad034e6ef27cb2b (observed 2026-10-27 21:28 UTC: 2/35 required checks passed; the other 33 skipped, not green, because #2555 skips them on draft PRs; last 35/35-green head was ce9258ec6). Base merges on top of the Codex repair head c739be13, adopted by the 18:16 UTC Claude claim. The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
+head_sha: b281ce0c85b08f4db4b708c45fda6f2f8e6c0d4b (observed 2026-10-27 22:35 UTC: 2/35 required checks passed, 33 skipped and not green because #2555 skips them on draft PRs, no check failed; last 35/35-green head was ce9258ec6). Base merges on top of the Codex repair head c739be13, adopted by the 18:16 UTC Claude claim. The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
 state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
 current_step: Codex repaired the remaining documentation findings: fixed captured timestamps and two-run fixture repeatability; #2503 closure/precondition and separate apply authorization before production SQL; acceptance cross-references and complete contributor exclusions. No migration or client implementation is included.
 next_action: Verify the resulting full remote head and fresh required CI, then route one eligible non-contributing reviewer over both changed files. No acceptance request or PASS is implied by this repair. Matthew's migration implementation/per-PR/apply decisions remain separate.
@@ -89,7 +89,41 @@ reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §
 review_request: blocked pending the repaired full head and fresh required CI; no duplicate request sent; reviewer unassigned; fallback transfers 0
 active_writer: Claude session 01QxMpAHgnpV65y3Yykv8CvE, retaken on Matthew's instruction 2026-10-27; spec documentation only, no migration or client implementation
 claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-27 18:16 UTC; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6450080975. Codex /root held the bounded repair claim of 2026-10-26 (#issuecomment-6423583100) and remains an excluded repairer.
-last_updated: 2026-10-27 21:54 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+last_updated: 2026-10-27 22:37 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+```
+
+### PLANT-TIMELINE-PHOTO-THUMBNAIL
+
+```text
+TASK PLANT-TIMELINE-PHOTO-THUMBNAIL  priority: P2  status: OPEN
+goal: show the photo on a Plant Detail Relative Timeline row; prod showed only the note for a Photo-only log (Hashato #1, 2026-10-27 ~3:55 PM CT) while the header and Recent photos showed it.
+why: the row's "Photo" badge came from the raw row, but PlantRelativeTimelineSection never signed or rendered photo_url. Blocks Lemon G's Photo Quick Log episode.
+branch: claude/new-session-6xw9g6
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-6xw9g6 verdant-grow-diary && git switch claude/new-session-6xw9g6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2559
+head_sha: eb075f7f942ce5f8653a1092b4fa146644017996 observed 2026-10-27 21:28 UTC (first push); the review-fix commit that adds this line follows it, so read the current head from the PR
+state: pushed; marked ready by Matthew 2026-10-27 21:48 UTC
+current_step: ready for review (Matthew, 21:48 UTC), auto-merge on; review fixes pushed; awaiting required CI and an independent exact-head PASS at the current head
+next_action: confirm 35/35 required checks at the PR head; route to an eligible reviewer who did not author it
+post_merge_check: after Publish, on verdantgrowdiary.com open the fixture plant's timeline with a Photo-only log; the row shows a thumbnail that opens full size. Until live /version.json reports the SHA: NOT_MEASURED.
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: sign through the existing owner-guarded useDiaryPhotoDisplayRows; keep projection on raw rows so a pending/failed signature never flips the Photo badge; reuse TimelinePhotoLightbox for tap-to-open; order lightbox by visible timeline items via new pure buildOrderedTimelinePhotoLightboxList.
+tried_and_rejected: signing rows before projection (would relabel photo rows as Note while signing is pending or failed).
+commands: bunx vitest run src/test/plant-relative-timeline-photo-thumbnail.test.tsx; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+files_touched: src/components/PlantRelativeTimelineSection.tsx; src/lib/timelinePhotoLightboxRules.ts; src/test/plant-relative-timeline-photo-thumbnail.test.tsx; src/test/relative-timeline-projection.test.tsx, src/test/plant-last-updated-local-date-2206.test.tsx, src/test/plant-last-updated-utc-midnight-2206.test.tsx (stub the signing hook: they render without a QueryClient)
+files_remaining: none
+blockers: none for repository work; Publish and the live check are Matthew's
+open_questions: none
+gotchas: relative-timeline-projection.test.tsx was already prettier-unclean on base (line 704); left as is
+links: handoff 2026-10-27 4:20 PM CT (OG Kush)
+artifacts: PR checks
+reviewer_seat: not yet assigned (OG Kush routes; Claude session_017UoYKzLzTv1RAhx1Cc7Pme is excluded as author)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:25 CT (Matthew's handoff prompt, item 1)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-27 16:25 CT, by Claude
 ```
 
 ### PR-2283-REMOVAL-PAGINATION-REPAIR

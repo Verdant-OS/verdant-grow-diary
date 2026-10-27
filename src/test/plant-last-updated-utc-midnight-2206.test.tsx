@@ -19,6 +19,18 @@ vi.mock("@/lib/react-router-compat", () => ({
   }) => React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
 }));
 
+// No QueryClient here: private photo signing stays unresolved (the pending
+// state). Thumbnail signing is covered in plant-relative-timeline-photo-thumbnail.
+vi.mock("@/hooks/useDiaryPhotoDisplayRows", () => ({
+  useDiaryPhotoDisplayRows: (rows: ReadonlyArray<Record<string, unknown>> | undefined) => ({
+    rows: (rows ?? []).map((row) => ({ ...row, photo_url: null })),
+    isResolvingPrivatePhotos: false,
+    isPrivatePhotoReadPaused: false,
+    hasPrivatePhotoError: false,
+    hasPhotoReference: false,
+    refetchPrivatePhotos: async () => {},
+  }),
+}));
 vi.mock("@/hooks/usePlantRelativeTimelineHistory", () => ({
   usePlantRelativeTimelineHistory: vi.fn(),
 }));

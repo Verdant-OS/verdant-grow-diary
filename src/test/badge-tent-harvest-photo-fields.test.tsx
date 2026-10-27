@@ -15,6 +15,7 @@ const insertMock = vi.fn();
 const singleMock = vi.fn();
 const rpcMock = vi.fn();
 const uploadMock = vi.fn();
+const removeMock = vi.fn();
 const growTypeMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -38,7 +39,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     storage: {
       from: () => ({
         upload: uploadMock,
-        remove: vi.fn(),
+        remove: removeMock,
       }),
     },
   },
@@ -117,6 +118,8 @@ describe("badge tent and harvest photo fields", () => {
     singleMock.mockReset();
     rpcMock.mockReset();
     uploadMock.mockReset();
+    removeMock.mockReset();
+    removeMock.mockResolvedValue({ data: [], error: null });
     growTypeMock.mockReset();
     toastError.mockReset();
     uploadMock.mockResolvedValue({ error: null });
@@ -277,5 +280,122 @@ describe("badge tent and harvest photo fields", () => {
     expect(rpcMock).toHaveBeenCalledTimes(1);
     expect(uploadMock).not.toHaveBeenCalled();
     expect(harvestInserts()).toHaveLength(0);
+  });
+
+  const photo = () => new File(["img"], "tent.jpg", { type: "image/jpeg" });
+
+  function deferredUpload() {
+    let release: (value: { error: null }) => void = () => {};
+    uploadMock.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    return () => release({ error: null });
+  }
+
+  function openEditTent() {
+    fireEvent.click(screen.getByTestId("edit-tent-trigger"));
+    return screen.getByTestId("edit-tent-photo") as HTMLInputElement;
+  }
+
+  const tentPhotoPath = () => String(uploadMock.mock.calls[0]?.[0]);
+
+  it("create tent: a double click during a pending photo upload creates one tent", async () => {
+    const releaseUpload = deferredUpload();
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    const submit = screen.getByRole("button", { name: /create tent|save/i });
+    fireEvent.click(submit);
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form") as HTMLFormElement);
+    releaseUpload();
+    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    const payload = insertMock.mock.calls[0]?.[1] as { photo_url?: string };
+    expect(payload.photo_url).toMatch(/^storage:\/\//);
+  });
+
+  it("create tent: a definitive insert error removes the uploaded photo", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    singleMock.mockResolvedValue({ data: null, error: { code: "23514", message: "rejected" } });
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    expect(removeMock).toHaveBeenCalledWith([tentPhotoPath()]);
+  });
+
+  it("edit tent: an invalid size is rejected before any photo upload", async () => {
+    render(withClient(<EditTentDialog tent={tent} />));
+    const input = openEditTent();
+    fireEvent.change(screen.getByTestId("edit-tent-size"), { target: { value: "4x-4" } });
+    fireEvent.change(input, { target: { files: [photo()] } });
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("edit tent: a photo picked then cancelled is not uploaded by the next edit", async () => {
+    render(withClient(<EditTentDialog tent={tent} />));
+    fireEvent.change(openEditTent(), { target: { files: [photo()] } });
+    fireEvent.keyDown(screen.getByTestId("edit-tent-dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("edit-tent-dialog")).toBeNull());
+    openEditTent();
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).not.toHaveBeenCalled();
+    const payload = (updateMock.mock.calls as unknown as Array<[{ photo_url?: string }]>)[0]?.[0];
+    expect(payload.photo_url).toBeUndefined();
+  });
+
+  it("edit tent: a saved photo is not uploaded again by a later text-only edit", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    render(withClient(<EditTentDialog tent={tent} />));
+    fireEvent.change(openEditTent(), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(screen.queryByTestId("edit-tent-dialog")).toBeNull());
+    openEditTent();
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(2));
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    const second = (updateMock.mock.calls as unknown as Array<[{ photo_url?: string }]>)[1]?.[0];
+    expect(second.photo_url).toBeUndefined();
+  });
+
+  it("edit tent: a double submit during a pending photo upload sends one update", async () => {
+    const releaseUpload = deferredUpload();
+    render(withClient(<EditTentDialog tent={tent} />));
+    fireEvent.change(openEditTent(), { target: { files: [photo()] } });
+    const submit = screen.getByTestId("edit-tent-submit");
+    fireEvent.click(submit);
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form") as HTMLFormElement);
+    releaseUpload();
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("edit tent: removes the uploaded photo only when the update definitively failed", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    eqMock.mockResolvedValueOnce({ error: { code: "42501", message: "denied" } });
+    eqMock.mockResolvedValueOnce({ error: { message: "Failed to fetch" } });
+    render(withClient(<EditTentDialog tent={tent} />));
+    const input = openEditTent();
+    fireEvent.change(input, { target: { files: [photo()] } });
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    expect(removeMock).toHaveBeenCalledWith([tentPhotoPath()]);
+
+    // Network loss may have committed the reference: keep the object.
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(2));
+    expect(uploadMock).toHaveBeenCalledTimes(2);
+    expect(removeMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -43,7 +43,7 @@ import {
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
-import { uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
+import { removeOwnerSubjectPhoto, uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
 
 export interface CreatedTent {
   id: string;
@@ -200,25 +200,10 @@ export default function CreateTentDialog({
       stage: form.stage,
       grow_id: targetGrowId,
     };
-    if (photoFile) {
-      const checked = validatePlantProfilePhotoFile(photoFile);
-      if (!checked.ok) {
-        toast.error(checked.message);
-        return;
-      }
-      try {
-        const uploaded = await uploadOwnerSubjectPhoto({
-          file: photoFile,
-          mime: checked.mime,
-          userId: user.id,
-          kind: "tent",
-          subjectId: tentId,
-        });
-        payload.photo_url = uploaded.reference;
-      } catch {
-        toast.error("The tent photo was not saved. The tent was not created.");
-        return;
-      }
+    const checkedPhoto = photoFile ? validatePlantProfilePhotoFile(photoFile) : null;
+    if (checkedPhoto && !checkedPhoto.ok) {
+      toast.error(checkedPhoto.message);
+      return;
     }
     const attempt = {
       entity: "tent" as const,
@@ -226,9 +211,28 @@ export default function CreateTentDialog({
       ownerId: user.id,
       growId: targetGrowId,
     };
+    // Lock before the upload: a second click while storage is pending must
+    // not start another attempt with a different tent id.
     createInFlightRef.current = true;
     setBusy(true);
     try {
+      let uploadedPath: string | null = null;
+      if (photoFile && checkedPhoto?.ok) {
+        try {
+          const uploaded = await uploadOwnerSubjectPhoto({
+            file: photoFile,
+            mime: checkedPhoto.mime,
+            userId: user.id,
+            kind: "tent",
+            subjectId: tentId,
+          });
+          uploadedPath = uploaded.path;
+          payload.photo_url = uploaded.reference;
+        } catch {
+          toast.error("The tent photo was not saved. The tent was not created.");
+          return;
+        }
+      }
       const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
       if (result.status === "unknown") {
         recordUnknownCreateOutcome(attempt);
@@ -238,6 +242,8 @@ export default function CreateTentDialog({
         return;
       }
       if (result.status === "definitive_error") {
+        // Nothing references the uploaded object; a retry uploads anew.
+        if (uploadedPath) await removeOwnerSubjectPhoto({ path: uploadedPath });
         toast.error(result.message);
         return;
       }
@@ -503,6 +509,7 @@ export default function CreateTentDialog({
                 data-testid="create-tent-photo"
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                disabled={busy}
                 onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
               />
               <p className="text-[11px] text-muted-foreground">

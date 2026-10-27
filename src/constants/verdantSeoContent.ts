@@ -940,7 +940,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Grow journal template you can use right now | Verdant Grow Diary",
     h1: "A grow journal template that fits in 30 seconds",
     description:
-      "A grow journal template: plant, entry type, stage, note, and one number when it matters. Use it in the browser, no account needed.",
+      "A grow journal template: plant, entry type, stage, note, and one number when it matters. Use it in your browser, no account needed.",
     targetKeyword: "grow journal template",
     intro:
       "Most grow journal template downloads are spreadsheets with twenty columns you will stop filling by Friday. A template earns its keep when it is small enough to complete every time: which plant, what kind of entry, what stage, one note, and one number when the entry type calls for it.",

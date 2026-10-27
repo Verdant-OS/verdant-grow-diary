@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEO-BETA-NOINDEX-SUPERSEDES-2543
+
+```text
+TASK SEO-BETA-NOINDEX-SUPERSEDES-2543  priority: P1  status: OPEN
+goal: supersede draft #2543 (public SEO audit fixes, head c82d243630e0e3b5c4ffcb42c83090097676a419) with its P1 fixed: /creator-beta and /breeder-beta noindex in page hooks and static SEO docs, /creator-beta out of public/sitemap.xml, SEO tests and indexation matrix updated.
+why: Jack Herer review 5674385352 FAIL, 1 P1. Matthew (2026-10-27, Cursor outage) asked for separate PRs instead of pushing the Cursor branches.
+branch: claude/seo-beta-noindex (created at c82d243630e0e3b5c4ffcb42c83090097676a419)
+base: verdant-grow-diary
+checkout: git fetch origin claude/seo-beta-noindex verdant-grow-diary && git switch claude/seo-beta-noindex && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: read from the PR
+state: pushed draft
+current_step: awaiting CI and independent exact-head review
+next_action: route to an eligible non-author reviewer; when this or #2549 merges, close the other as superseded on the overlapping files
+post_merge_check: after Publish, curl -s https://verdantgrowdiary.com/creator-beta and /breeder-beta show robots noindex, follow; /sitemap.xml has no creator-beta loc. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: ported #2549's existing noindex implementation (no second implementation) minus its HANDOFF_LOG block and its src/routeTree.gen.ts header edit; kept #2543's shortened beta descriptions on the moved noindex documents; fixed two failures #2543 itself introduced (duplicate /guides -> /glossary link; no-account claim without "your browser").
+tried_and_rejected: writing an independent noindex change (would duplicate #2549).
+commands: bunx vitest run src/test/creator-beta-noindex.test.tsx src/test/breeder-beta-cross-canonical.test.ts src/test/static-public-seo-documents.test.ts src/test/seo-contextual-internal-links.test.tsx src/test/search-to-first-value-guides.test.tsx
+files_touched: docs/seo/route-indexation-matrix.md; public/sitemap.xml; scripts/public-route-parity.config.mjs; src/lib/build/staticPublicSeoDocuments.ts; src/pages/CreatorBeta.tsx; src/pages/BreederBeta.tsx; src/pages/GuidesIndex.tsx; src/constants/verdantSeoContent.ts; src/test/breeder-beta-cross-canonical.test.ts; src/test/creator-beta-noindex.test.tsx; src/test/static-public-seo-documents.test.ts
+files_remaining: none
+blockers: none for repository work
+open_questions: whether to close #2543 and #2549 once this lands (Matthew / OG Kush)
+gotchas: #2549 (cursor/creator-beta-noindex-2708) overlaps the same files; not edited
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2543 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2549
+artifacts: PR checks
+reviewer_seat: not assigned (OG Kush routes; this session excluded as author)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:45 CT (Matthew: separate PRs)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-27 16:45 CT, by Claude
+```
+
 ### PUBLIC-SEO-AUDIT-20261026
 
 ```text

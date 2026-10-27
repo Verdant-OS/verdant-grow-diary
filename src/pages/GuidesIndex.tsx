@@ -209,10 +209,6 @@ export default function GuidesIndex() {
           <Link to="/pricing" className="underline hover:text-foreground">
             Verdant plans
           </Link>
-          , look up a term in the{" "}
-          <Link to="/glossary" className="underline hover:text-foreground">
-            cultivation glossary
-          </Link>
           , or read the{" "}
           <Link to="/docs/mcp-api" className="underline hover:text-foreground">
             MCP API reference

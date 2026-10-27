@@ -458,18 +458,18 @@ function aliasDocument(
 }
 
 /**
- * An INDEXABLE audience variant that concedes its ranking URL to another route.
+ * An audience variant that concedes its ranking URL to another route.
  *
  * Distinct from `aliasDocument` above, and the difference is the whole point:
  * `aliasDocument` builds a legacy redirect stub (`/strains/*`) that inherits the
  * target's title, description and JSON-LD wholesale and is marked
- * `noindex, follow`. This helper keeps the variant's OWN copy and leaves it
- * affirmatively indexable — only the canonical identity moves.
+ * `noindex, follow`. This helper keeps the variant's OWN copy. Robots is
+ * optional and owner-driven: omit it and the document stays `index, follow`;
+ * pass `robots: "noindex, follow"` when the owner hides that URL from search.
+ * The only caller today is /breeder-beta, hidden on 2026-10-26.
  *
- * Do not "simplify" this into `aliasDocument`. Pairing `noindex` with a
- * cross-canonical sends crawlers two contradictory instructions about the same
- * URL, and the variant would also lose the audience-specific title and
- * description that justify its existence.
+ * Do not "simplify" this into `aliasDocument`. The variant keeps its own
+ * title and description.
  *
  * `metadata.url` is the single source for `<link rel="canonical">`, `og:url`,
  * and the WebPage JSON-LD `@id`, so pointing it at the canonical target keeps
@@ -710,27 +710,6 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "Alphabetized reference of cannabis breeding, cultivation, and phenotype terms — searchable and category-filterable for serious growers.",
     imageAlt: "Verdant cultivation glossary",
   }),
-  // /creator-beta is declared FIRST so it is the primary in the manifest's
-  // duplicate-canonical report; /breeder-beta below points at it.
-  publicDocument("/creator-beta", {
-    title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
-    description:
-      "Controlled beta for growers, breeders, and educators. Logs, photos, sensors, and phenotype notes become one plant history.",
-    imageAlt: "Verdant Creator & Breeder Beta",
-  }),
-  // Owner adjudication 2026-08-20: /breeder-beta keeps its breeder-oriented
-  // title and description and stays indexable, but concedes its ranking URL to
-  // /creator-beta. Both routes render the same <BetaLanding> component —
-  // measured 233 of ~237 shared unique visible tokens, identical h1 and every
-  // h2 — so two self-canonical URLs would compete on the same queries.
-  // It is intentionally absent from public/sitemap.xml: never advertise a URL
-  // whose canonical points somewhere else. See scripts/public-route-parity.config.mjs.
-  crossCanonicalDocument("/breeder-beta", "/creator-beta", {
-    title: "Verdant Breeder Beta | Verdant Grow Diary",
-    description:
-      "Controlled beta for breeders and pheno hunters. Lab evidence and sensory notes stay recorded. The breeder decides what advances.",
-    imageAlt: "Verdant Breeder Beta",
-  }),
   publicDocument("/pheno-comparison", {
     title: "Pheno Comparison Preview — Verdant Grow Diary",
     description:
@@ -862,6 +841,22 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
       title: OREOZ_GELONADE_CUSTOMER_SEO.title,
       description: OREOZ_GELONADE_CUSTOMER_SEO.description,
       imageAlt: "Next Door Cannabis Oreoz and Gelonade comparison",
+      robots: "noindex, follow",
+    }),
+    // 2026-10-26, owner: hide /creator-beta from search. The page stays public.
+    // /breeder-beta still canonicalises here (2026-08-20) and is noindex too.
+    publicDocument("/creator-beta", {
+      title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
+      description:
+        "Controlled beta for growers, breeders, and educators. Logs, photos, sensors, and phenotype notes become one plant history.",
+      imageAlt: "Verdant Creator & Breeder Beta",
+      robots: "noindex, follow",
+    }),
+    crossCanonicalDocument("/breeder-beta", "/creator-beta", {
+      title: "Verdant Breeder Beta | Verdant Grow Diary",
+      description:
+        "Controlled beta for breeders and pheno hunters. Lab evidence and sensory notes stay recorded. The breeder decides what advances.",
+      imageAlt: "Verdant Breeder Beta",
       robots: "noindex, follow",
     }),
   ]);

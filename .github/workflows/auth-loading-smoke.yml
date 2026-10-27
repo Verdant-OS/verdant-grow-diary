@@ -43,7 +43,7 @@ jobs:
   auth-loading-smoke:
     name: Auth loading smoke (mocked / non-destructive)
     runs-on: ubuntu-latest
-    # Chromium --with-deps apt install took ~10m on runs 40523498143 (#2545) and 40469789527 (#2526); tests then passed in ~4.5m, so the 15m job cancelled before completion. Founder Cheeko approved 25m on 2026-10-27.
+    # Chromium --with-deps install took ~10m on runs 40523498143 (#2545) and 40469789527 (#2526), leaving too little of the 15m cap, and the test step was cancelled ~4.5m in. Worst case is about 16.5m, so 25m leaves headroom.
     timeout-minutes: 25
 
     steps:

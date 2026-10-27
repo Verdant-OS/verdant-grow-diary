@@ -34,6 +34,15 @@ describe("public VPD chart measurement safety", () => {
     expect(screen.getByRole("table")).toBeInTheDocument();
   });
 
+  it("does not announce a stage verdict on the heatmap cell nearest the entered values", () => {
+    renderChart();
+    const nearest = screen.getByRole("button", { name: /nearest current input/i });
+    expect(nearest).toHaveAccessibleName(/kPa, nearest current input/i);
+    expect(nearest).not.toHaveAccessibleName(
+      /target|very low|mold risk|very high|plant stress|within your|below your|above your/i,
+    );
+  });
+
   it.each(["0", "100"])(
     "cannot unlock target status with humidity %s or a different stage",
     (humidity) => {

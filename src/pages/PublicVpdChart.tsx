@@ -414,7 +414,11 @@ export default function PublicVpdChart() {
                               data-col-idx={columnIndex}
                               tabIndex={isFocus ? 0 : -1}
                               className={`flex min-h-11 w-full min-w-11 flex-col items-center justify-center px-1 py-1 ${BAND_CLASS[cellBand.cssClass] ?? ""} ${cellBand.matchesSelected ? "ring-1 ring-black" : "opacity-80"} ${isNearest ? "outline outline-2 outline-offset-[-2px] outline-black" : ""}`}
-                              aria-label={`${tempLabel}, ${columnRh}% RH: VPD ${cell.vpdFormatted} kPa (${cellBand.label})${isNearest ? ", nearest current input" : ""}`}
+                              aria-label={
+                                isNearest
+                                  ? `${tempLabel}, ${columnRh}% RH: VPD ${cell.vpdFormatted} kPa, nearest current input`
+                                  : `${tempLabel}, ${columnRh}% RH: VPD ${cell.vpdFormatted} kPa (${cellBand.label})`
+                              }
                               onClick={() => selectCell(rowTempF, columnRh)}
                               onKeyDown={(event) => {
                                 if (event.key !== "Enter" && event.key !== " ") return;

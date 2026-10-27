@@ -30,6 +30,7 @@
 
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS, type PaidPlanId } from "@/lib/paidPlanAllowlist";
+import { isFounderLifetimeCheckoutSku } from "@/lib/founderLifetimeCheckoutGuard";
 
 export type PlanIntentId = PaidPlanId;
 
@@ -38,6 +39,15 @@ export const PLAN_INTENT_IDS: readonly PlanIntentId[] = PAID_PLAN_IDS;
 
 export function isKnownPlanIntent(value: unknown): value is PlanIntentId {
   return typeof value === "string" && PAID_PLAN_ALLOWLIST.has(value);
+}
+
+/**
+ * A plan a checkout may resume: known and still for sale. Founder Lifetime
+ * is retired, so it never rides a return link or a saved intent; existing
+ * Founder entitlements are resolved elsewhere and are unaffected.
+ */
+function isResumablePlanIntent(value: unknown): value is PlanIntentId {
+  return isKnownPlanIntent(value) && !isFounderLifetimeCheckoutSku(value);
 }
 
 /**
@@ -59,7 +69,7 @@ export function buildCheckoutPlanReturnPath(input: {
   const safePath = queryIndex >= 0 ? safeCurrentPath.slice(0, queryIndex) : safeCurrentPath;
   const params = new URLSearchParams(queryIndex >= 0 ? safeCurrentPath.slice(queryIndex + 1) : "");
 
-  if (isKnownPlanIntent(input.plan)) params.set("plan", input.plan);
+  if (isResumablePlanIntent(input.plan)) params.set("plan", input.plan);
   else params.delete("plan");
 
   const query = params.toString();
@@ -107,7 +117,7 @@ export function savePlanIntent(
   plan: unknown,
   opts?: { storage?: PlanIntentStorage | null; now?: number },
 ): boolean {
-  if (!isKnownPlanIntent(plan)) return false;
+  if (!isResumablePlanIntent(plan)) return false;
   const storage = opts && "storage" in opts ? opts.storage : safeStorage();
   if (!storage) return false;
   const record: PlanIntentRecord = {
@@ -159,7 +169,7 @@ export function consumePlanIntent(opts?: {
   }
   if (!parsed || typeof parsed !== "object") return null;
   const record = parsed as Partial<PlanIntentRecord>;
-  if (!isKnownPlanIntent(record.plan)) return null;
+  if (!isResumablePlanIntent(record.plan)) return null;
   if (typeof record.savedAt !== "number" || !Number.isFinite(record.savedAt)) {
     return null;
   }
@@ -178,7 +188,7 @@ export function peekPlanIntent(opts?: { storage?: PlanIntentStorage | null }): P
     const raw = storage.getItem(CHECKOUT_PLAN_INTENT_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PlanIntentRecord>;
-    return isKnownPlanIntent(parsed?.plan) ? parsed.plan : null;
+    return isResumablePlanIntent(parsed?.plan) ? parsed.plan : null;
   } catch {
     return null;
   }

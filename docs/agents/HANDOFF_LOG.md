@@ -121,6 +121,38 @@ artifacts: GitHub issue #2146
 reviewer_seat: Graft or Critical Mass (docs-only). The author cannot give the independent PASS.
 claimed_by: Claude (close-out session), 2026-10-19 16:09 UTC, per VER-216 (Matthew, 2026-10-19); previously Grok, 2026-10-15 17:50 UTC
 last_updated: 2026-10-19 16:15 UTC, by Claude (close-out session)
+### PLANT-TIMELINE-PHOTO-THUMBNAIL
+
+```text
+TASK PLANT-TIMELINE-PHOTO-THUMBNAIL  priority: P2  status: OPEN
+goal: show the photo on a Plant Detail Relative Timeline row; prod showed only the note for a Photo-only log (Hashato #1, 2026-10-27 ~3:55 PM CT) while the header and Recent photos showed it.
+why: the row's "Photo" badge came from the raw row, but PlantRelativeTimelineSection never signed or rendered photo_url. Blocks Lemon G's Photo Quick Log episode.
+branch: claude/new-session-6xw9g6
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-6xw9g6 verdant-grow-diary && git switch claude/new-session-6xw9g6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2559
+head_sha: eb075f7f942ce5f8653a1092b4fa146644017996 observed 2026-10-27 21:28 UTC (first push); the review-fix commit that adds this line follows it, so read the current head from the PR
+state: pushed; marked ready by Matthew 2026-10-27 21:48 UTC
+current_step: ready for review (Matthew, 21:48 UTC), auto-merge on; review fixes pushed; awaiting required CI and an independent exact-head PASS at the current head
+next_action: confirm 35/35 required checks at the PR head; route to an eligible reviewer who did not author it
+post_merge_check: after Publish, on verdantgrowdiary.com open the fixture plant's timeline with a Photo-only log; the row shows a thumbnail that opens full size. Until live /version.json reports the SHA: NOT_MEASURED.
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: sign through the existing owner-guarded useDiaryPhotoDisplayRows; keep projection on raw rows so a pending/failed signature never flips the Photo badge; reuse TimelinePhotoLightbox for tap-to-open; order lightbox by visible timeline items via new pure buildOrderedTimelinePhotoLightboxList.
+tried_and_rejected: signing rows before projection (would relabel photo rows as Note while signing is pending or failed).
+commands: bunx vitest run src/test/plant-relative-timeline-photo-thumbnail.test.tsx; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+files_touched: src/components/PlantRelativeTimelineSection.tsx; src/lib/timelinePhotoLightboxRules.ts; src/test/plant-relative-timeline-photo-thumbnail.test.tsx; src/test/relative-timeline-projection.test.tsx, src/test/plant-last-updated-local-date-2206.test.tsx, src/test/plant-last-updated-utc-midnight-2206.test.tsx (stub the signing hook: they render without a QueryClient)
+files_remaining: none
+blockers: none for repository work; Publish and the live check are Matthew's
+open_questions: none
+gotchas: relative-timeline-projection.test.tsx was already prettier-unclean on base (line 704); left as is
+links: handoff 2026-10-27 4:20 PM CT (OG Kush)
+artifacts: PR checks
+reviewer_seat: not yet assigned (OG Kush routes; Claude session_017UoYKzLzTv1RAhx1Cc7Pme is excluded as author)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:25 CT (Matthew's handoff prompt, item 1)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-27 16:25 CT, by Claude
 ```
 
 ### PR-2283-REMOVAL-PAGINATION-REPAIR
@@ -801,6 +833,26 @@ artifacts: PR body
 reviewer_seat: Blue Dream (route layout .tsx) and Critical Mass (rules and tests)
 claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
+```
+
+### STOP-SELLING-FOUNDER-LIFETIME
+
+```text
+TASK STOP-SELLING-FOUNDER-LIFETIME  priority: P1  status: OPEN
+goal: Stop selling Founder Lifetime on public sales surfaces. Keep existing Founder entitlements until a separate PR and migration. Follow-up FOUNDER-BLUEPRINT-20261024 (Matthew, 2026-10-24 3:51 PM CT): existing-holder copy names the retained Pro Blueprint.
+branch: cursor/stop-selling-founder-lifetime-0628
+base: verdant-grow-diary
+checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (ready for review since 2026-10-27 21:28 UTC)
+head_sha: read the PR head after push; base 27991451 merged in 9472c1a3 (block moved to the end of Open to stop repeat conflicts); 87067552 logs the Founder refusal as stage plan_retired; this handoff commit cannot name itself
+state: PR ready for review (marked 2026-10-27 21:28 UTC at Matthew's instruction); base 27991451 merged 2026-10-27. All review threads resolved. At prior head 862ab201: 35/35 required checks green, Codex code + security review no findings; Paddle Founder price archived. The new merge head supersedes that CI, review and approval
+next_action: fix in-scope required-check failures at the head; fresh exact-head review; Matthew approves the exact head SHA before the merge owner queues it (payment PR)
+files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md, src/test/founder-blueprint-retained-copy.test.tsx
+blockers: none in this PR; entitlement removal is a later PR plus migration
+artifacts: .claude/scorer-unlock.json is gitignored and must not be committed
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing scope: Codex on non-Codex work, or a non-contributing Claude/Grok session); all contributors excluded
+claimed_by: Claude, 2026-10-27 18:17 UTC (renewal, PR comment 6450051931)
+last_updated: 2026-10-27 22:00 UTC, by Claude
 ```
 
 ## Closed

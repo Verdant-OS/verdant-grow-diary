@@ -2,7 +2,6 @@
 // Verifies (1) no uncaught/init-order errors from the manualChunks split and
 // (2) usePageSeo actually sets per-route <title> + self-canonical at runtime.
 import { chromium } from "playwright";
-import { readFile } from "node:fs/promises";
 
 const BASE = process.env.SMOKE_BASE ?? "http://localhost:4180";
 const ORIGIN = "https://verdantgrowdiary.com";
@@ -20,8 +19,8 @@ const ROUTES = [
   },
   {
     path: "/founder",
-    expectTitle: /Founder Lifetime — Support Verdant Early/,
-    canonical: `${ORIGIN}/founder`,
+    expectTitle: /Pricing — Free, Pro & Craft/,
+    canonical: `${ORIGIN}/pricing`,
   },
   {
     path: "/ai-doctor-readiness-check",
@@ -64,30 +63,6 @@ const ROUTES = [
 
 const browser = await chromium.launch();
 let failed = 0;
-
-// Filesystem-first production hosts serve this entry to non-JavaScript social
-// crawlers before the SPA fallback. Check the emitted document directly
-// because Vite preview does not reproduce every production host's routing.
-{
-  const html = await readFile(new URL("../dist/founder/index.html", import.meta.url), "utf8");
-  const expected = {
-    title: "Founder Lifetime — Support Verdant Early | Verdant Grow Diary",
-    url: `${ORIGIN}/founder`,
-  };
-  const problems = [];
-  if (!html.includes(`<title>${expected.title}</title>`)) problems.push("Founder title missing");
-  if (!html.includes(`property="og:url" content="${expected.url}"`))
-    problems.push("Founder og:url missing");
-  if (!html.includes(`name="twitter:title" content="${expected.title}"`))
-    problems.push("Founder twitter:title missing");
-  if (!html.includes(`rel="canonical" href="${expected.url}"`))
-    problems.push("Founder canonical missing");
-  if (!html.includes('id="root"')) problems.push("Founder app root missing");
-  const ok = problems.length === 0;
-  if (!ok) failed++;
-  console.log(`${ok ? "PASS" : "FAIL"} static /founder social entry`);
-  for (const problem of problems) console.log(`   ✗ ${problem}`);
-}
 
 for (const r of ROUTES) {
   const page = await browser.newPage();

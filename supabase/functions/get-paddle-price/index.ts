@@ -99,6 +99,7 @@ function logCatalogUnavailable(fields: {
     | "auth"
     | "method"
     | "allowlist"
+    | "plan_retired"
     | "entitlement"
     | "environment"
     | "founder_cap"
@@ -173,6 +174,17 @@ Deno.serve(async (req) => {
       // rejected input value (could be attacker-controlled or PII-shaped).
       logCatalogUnavailable({ plan: "(rejected)", reason: "unknown_plan", stage: "allowlist" });
       return json(400, { error: "unknown_plan" });
+    }
+
+    // 2.0 Founder Lifetime is no longer sold (#2028). Refuse it here, before
+    //     the slot lookup or any Paddle call, so a direct call to this
+    //     function cannot open a Founder checkout. Existing Founder rows are
+    //     still honoured by the webhook and entitlement resolution.
+    if (requested === "founder_lifetime") {
+      // Telemetry keeps the sanitized reason enum; the stage separates a
+      // Founder probe from a junk plan id at the allowlist above.
+      logCatalogUnavailable({ plan: requested, reason: "unknown_plan", stage: "plan_retired" });
+      return json(410, { error: "plan_retired" });
     }
 
     // 2a. Credit packs are merchandised as paid-plan top-ups. Already-owned

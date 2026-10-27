@@ -27,6 +27,10 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
 import { clearCheckoutStarted, markCheckoutStarted } from "@/lib/checkoutContextRules";
 import { CREDIT_PACKS } from "@/constants/pricing";
+import {
+  FOUNDER_LIFETIME_CHECKOUT_REFUSAL,
+  isFounderLifetimeCheckoutSku,
+} from "@/lib/founderLifetimeCheckoutGuard";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -140,6 +144,11 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
 
   const openCheckout = useCallback(
     async (options: OpenCheckoutOptions) => {
+      if (isFounderLifetimeCheckoutSku(options.priceId)) {
+        setBlockedReasonCode(null);
+        setBlockedReason(FOUNDER_LIFETIME_CHECKOUT_REFUSAL);
+        return;
+      }
       // Fail-closed gate BEFORE any auth redirect: if checkout cannot run
       // here, we must not detour the user to /auth and then dead-end.
       const env = resolvePaddleCheckout();

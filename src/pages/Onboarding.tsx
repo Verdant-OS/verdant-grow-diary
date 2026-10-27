@@ -54,9 +54,10 @@ import {
   readCsvHistoryOnboardingIntent,
 } from "@/lib/csvHistoryOnboardingIntentRules";
 import { retryOnboardingGrowsRead } from "@/lib/onboardingGrowsRetryRules";
+import { GROWS_READ_SESSION_EXPIRED } from "@/lib/growsReadRetryRules";
 
 export default function Onboarding() {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const growsState = useGrows();
   // A missing provider value or a null list is a failed shape, not an empty
   // account. Reading `.length` on null is the TypeError class Sentry recorded
@@ -111,6 +112,23 @@ export default function Onboarding() {
     );
   }
   if (!user) return <Navigate to="/auth" replace />;
+  if (growsError === GROWS_READ_SESSION_EXPIRED) {
+    // Signing out lets the `!user` branch above send the grower to /auth.
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div
+          role="alert"
+          data-testid="onboarding-grows-session-expired"
+          className="max-w-md space-y-3 text-sm"
+        >
+          <p>Your sign-in has expired. Sign in again to load your grows.</p>
+          <Button type="button" onClick={() => void signOut()}>
+            Sign in again
+          </Button>
+        </div>
+      </div>
+    );
+  }
   if (growsError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">

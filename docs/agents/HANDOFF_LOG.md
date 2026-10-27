@@ -81,17 +81,17 @@ checkout: git fetch origin claude/onboarding-grows-read-error verdant-grow-diary
 pr: opened as a draft from this branch; read URL and head from GitHub
 head_sha: read from the PR
 state: pushed draft
-current_step: awaiting CI, independent review, and Matthew's decision on PGRST301
+current_step: awaiting CI and an independent exact-head review
 next_action: get Matthew's call on PGRST301 routing (see open_questions); then route to an eligible non-author reviewer
 post_merge_check: NOT_APPLICABLE for production without a forced malformed read; covered by onboarding-null-grows-render.test.tsx
 active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-decisions: malformed settled list -> existing error state (sentinel growsError); Try again falls back to window.location.reload() via pure retryOnboardingGrowsRead; abort of timed-out attempts deferred (growRepo fetchTents/fetchPlants take no AbortSignal; reviewer rated it bounded).
+decisions: malformed settled list -> existing error state (sentinel growsError); Try again falls back to window.location.reload() via pure retryOnboardingGrowsRead; abort of timed-out attempts deferred (growRepo fetchTents/fetchPlants take no AbortSignal; reviewer rated it bounded). PGRST301 (Matthew 2026-10-27: yes): the store keeps retrying it, and only after retries run out reports error "session_expired" (pure growsReadErrorValue); Onboarding then shows "Sign in again", which calls signOut so the existing !user branch routes to /auth. Explicit button, not an automatic sign-out.
 tried_and_rejected: making PGRST301 non-retryable unilaterally (source comment says it is retried for the post-sign-in race).
-commands: bunx vitest run src/test/onboarding-null-grows-render.test.tsx src/test/onboarding-grows-retry-rules.test.ts src/test/starter-setup-onboarding.test.tsx
-files_touched: src/pages/Onboarding.tsx; src/lib/onboardingGrowsRetryRules.ts; src/test/onboarding-null-grows-render.test.tsx; src/test/onboarding-grows-retry-rules.test.ts; src/test/starter-setup-onboarding.test.tsx
+commands: bunx vitest run src/test/onboarding-null-grows-render.test.tsx src/test/onboarding-grows-retry-rules.test.ts src/test/starter-setup-onboarding.test.tsx src/test/onboarding-grows-session-expired.test.tsx
+files_touched: src/pages/Onboarding.tsx; src/lib/onboardingGrowsRetryRules.ts; src/test/onboarding-null-grows-render.test.tsx; src/test/onboarding-grows-retry-rules.test.ts; src/test/starter-setup-onboarding.test.tsx; src/lib/growsReadRetryRules.ts; src/store/grows.tsx; src/test/onboarding-grows-session-expired.test.tsx
 files_remaining: src/lib/growsReadRetryRules.ts (PGRST301, abort) pending decision
 blockers: PGRST301 design decision (Matthew)
-open_questions: PGRST301 — keep the retry for the post-sign-in race and route to sign-in only after retries are exhausted, or leave as is?
+open_questions: this PR modifies four scorer-locked tests relative to base (grow-data-deadline-late-meta, slow-loading-screen-gates, starter-setup-onboarding, tent-detail-plant-list-read-state); they need Matthew's OK or a revert before merge
 gotchas: starter-setup-onboarding mock now passes grows: [] explicitly (a missing list now reads as malformed)
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2540
 artifacts: PR checks
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 17:00 CT (Matthew: separate PRs)
 owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-last_updated: 2026-10-27 17:00 CT, by Claude
+last_updated: 2026-10-27 18:20 CT, by Claude
 ```
 
 ### GROWER-DEAD-ENDS-VER-287-VER-276

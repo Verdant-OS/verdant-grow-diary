@@ -108,6 +108,20 @@ export function classifyGrowReadFailure(error: unknown): GrowReadFailure {
   return { kind: "db", code: "unknown" };
 }
 
+/** Grows-store error value when the JWT is still rejected after every retry. */
+export const GROWS_READ_SESSION_EXPIRED = "session_expired";
+
+/**
+ * The grows store's `error` value for a failed read. An expired or invalid JWT
+ * that outlasts the retries gets its own value so pages can send the grower to
+ * sign in instead of offering a retry that cannot work.
+ */
+export function growsReadErrorValue(failure: GrowReadFailure): string {
+  if (failure.kind === "timeout") return "critical_read_deadline";
+  if (failure.code === "PGRST301") return GROWS_READ_SESSION_EXPIRED;
+  return "Unable to load grows";
+}
+
 export function isRetryableGrowReadFailure(failure: GrowReadFailure): boolean {
   if (failure.kind === "timeout" || failure.kind === "network") return true;
   if (failure.code === "unknown") return true;

@@ -172,6 +172,9 @@ jobs:
       - name: Run the previously unrun mocked specs
         run: bun run e2e:mocked-closure
 
+      - name: Run the Athena feed log CSV download
+        run: bunx playwright test e2e/athena-feed-chart-log-csv.spec.ts --project=chromium-mocked
+
       - name: Upload Playwright report
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

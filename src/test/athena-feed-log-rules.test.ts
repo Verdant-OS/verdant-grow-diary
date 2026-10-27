@@ -106,6 +106,16 @@ describe("athena feed log rules", () => {
     expect(csv).toContain(escaped);
   });
 
+  it("prefixes formula-like csv cells with a single quote", () => {
+    expect(escapeCsvField("=1+1")).toBe("'=1+1");
+    expect(escapeCsvField("+2")).toBe("'+2");
+    expect(escapeCsvField("-2")).toBe("'-2");
+    expect(escapeCsvField("@sum")).toBe("'@sum");
+    expect(escapeCsvField("\t=1")).toBe("'\t=1");
+    expect(escapeCsvField("\r=1")).toBe('"\'\r=1"');
+    expect(escapeCsvField("2.5")).toBe("2.5");
+  });
+
   it("adds and removes weeks and products without mutating the previous state", () => {
     const start = createDefaultFeedLogState();
     const addedWeek = addFeedLogWeek(start);

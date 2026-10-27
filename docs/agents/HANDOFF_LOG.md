@@ -106,7 +106,7 @@ limits: Test and handoff PR delta only; normal base integration permitted. No Gi
 
 ### ATHENA-FEED-LOG-PUBLIC-GUIDE
 
-````text
+```text
 TASK ATHENA-FEED-LOG-PUBLIC-GUIDE  priority: other  status: OPEN
 goal: Ship the public Athena planned-vs-actual feed log at /guides/athena-feed-chart-log as a draft PR. No merge and no deploy.
 why: The standalone HTML log needs the same public-route, sitemap, and consent-gated analytics pattern as the Advanced Nutrients feed log, with no browser or server storage and no invented Athena dosages.
@@ -116,14 +116,14 @@ checkout: git fetch origin cursor/athena-feed-chart-log-431f verdant-grow-diary 
 pr: opened as a draft from this branch; read the PR URL from GitHub after the first push
 head_sha: read origin/cursor/athena-feed-chart-log-431f after push; this block is in the first commit
 state: pushed draft once this commit is on the remote
-current_step: APP_ROUTES lists /guides/athena-feed-chart-log before /guides/grow-stage-care-guide so the path sort matches Array.sort. The latest verdant-grow-diary was merged with a normal merge.
+current_step: APP_ROUTES lists /guides/athena-feed-chart-log before /guides/grow-stage-care-guide so the path sort matches Array.sort. The CSV download appends the anchor, clicks it without preventDefault, and revokes the object URL on the next turn. escapeCsvField prefixes a cell that starts with = + - @ tab or CR with a single quote. e2e/athena-feed-chart-log-csv.spec.ts runs from .github/workflows/mocked-e2e-unwired-closure.yml. The latest verdant-grow-diary was merged with a normal merge.
 next_action: read required CI on the new head. The pheno-comparison-v0 failure at 07f3de95 was the same unsorted manifest, because that workflow path-filters src/lib/appRouteManifest.ts. Do not merge. Do not deploy.
 post_merge_check: NOT_APPLICABLE until merge is requested. After a future merge, confirm https://verdantgrowdiary.com/guides/athena-feed-chart-log returns the page and /version.json reports the merge SHA.
 active_writer: Cursor Grok cloud agent on cursor/athena-feed-chart-log-431f
 decisions: Planned amounts start blank. The page does not embed Athena dosages. Tolerance default is 10% and is labeled as the grower's setting. Analytics events are feed_log_* and fire only when readAnalyticsConsent() is granted. All three CTAs use Link to /auth?mode=signup, the same href and cta_location click tracking as draft #2542. The Advanced Nutrients reverse link is not on this base; it needs to land with or after draft #2542. /vpd-chart is not a route on this base, so the VPD chart label points at /guides/grow-room-vpd-tracker.
 tried_and_rejected: Reusing src/lib/publicFeedLogRules.ts from #2542 was rejected because that module is not on verdant-grow-diary. Athena-specific modules avoid a hard dependency and keep the shared SEO edits additive.
 commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/route-indexation-matrix.test.ts src/test/static-public-seo-documents.test.ts
-files_touched: src/lib/athenaFeedLogRules.ts src/lib/athenaFeedLogAnalytics.ts src/pages/AthenaFeedLog.tsx src/routes/guides.athena-feed-chart-log.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts public/sitemap.xml docs/seo/route-indexation-matrix.md src/pages/GuidesIndex.tsx src/constants/verdantSeoContent.ts scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/static-public-seo-documents.test.ts docs/agents/HANDOFF_LOG.md
+files_touched: src/lib/athenaFeedLogRules.ts src/lib/athenaFeedLogAnalytics.ts src/pages/AthenaFeedLog.tsx src/routes/guides.athena-feed-chart-log.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts public/sitemap.xml docs/seo/route-indexation-matrix.md src/pages/GuidesIndex.tsx src/constants/verdantSeoContent.ts scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts e2e/athena-feed-chart-log-csv.spec.ts .github/workflows/mocked-e2e-unwired-closure.yml src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/static-public-seo-documents.test.ts docs/agents/HANDOFF_LOG.md
 files_remaining: none for the draft
 blockers: required CI is NOT_MEASURED until the draft PR runs
 open_questions: Cheeko approval of the exact disclaimer wording before merge. Reverse link from /guides/advanced-nutrients-feeding-chart-log lands with #2542.
@@ -135,7 +135,8 @@ reviewer_sha: NOT_MEASURED
 session_state: Cursor Grok cloud agent implementing the public guide; no paused workflow
 claimed_by: Cursor Grok cloud agent, 2026-10-26
 owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
-last_updated: 2026-10-26 15:10 CT, by Cursor Grok cloud agent
+last_updated: 2026-10-27 10:22 CT, by Cursor Grok cloud agent
+```
 
 ### VER-285-PRESERVE-MISSING-STAGE
 
@@ -169,7 +170,7 @@ session_state: No subagents, review requests, production actions, or automations
 claimed_by: Codex VER-285, 2026-10-25 01:52 CT
 owner: Codex VER-285
 last_updated: 2026-10-25 01:52 CT, by Codex VER-285
-````
+```
 
 ### PR-2345-BASE-INTEGRATION
 

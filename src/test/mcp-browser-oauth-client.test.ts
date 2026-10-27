@@ -500,6 +500,9 @@ describe("browserOAuthClient", () => {
     expect(firstUrl.searchParams.get("code_challenge_method")).toBe("S256");
     expect(firstUrl.searchParams.get("state")).toBe(first.state);
     expect(firstUrl.searchParams.get("code_challenge")).toBe(await s256(first.verifier));
+    // PKCE: the verifier stays client-side until the token exchange.
+    expect(firstUrl.searchParams.has("code_verifier")).toBe(false);
+    expect(location.href).not.toContain(first.verifier);
     expect(first.redirect_uri).toBe(`${ORIGIN}/agent-integrations`);
     expect(sessionStorage.getItem(CLIENT_KEY)).toContain("dyn-client");
     expect(localSets).toEqual([]);

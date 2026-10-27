@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### MCP-OAUTH-VERIFIER-TEST-SUPERSEDES-2552
+
+```text
+TASK MCP-OAUTH-VERIFIER-TEST-SUPERSEDES-2552  priority: P2  status: OPEN
+goal: supersede draft #2552 (head 78c60a89f37996e66302789f61447f9ee7fffc15) with Sour Diesel review 5674361291's P2: assert code_verifier is not in the authorize URL.
+why: PKCE verifier must stay client-side until token exchange. Matthew (2026-10-27) asked for separate PRs while Cursor is down.
+branch: claude/mcp-oauth-verifier-test (created at 78c60a89f37996e66302789f61447f9ee7fffc15)
+base: verdant-grow-diary
+checkout: git fetch origin claude/mcp-oauth-verifier-test verdant-grow-diary && git switch claude/mcp-oauth-verifier-test && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: read from the PR
+state: pushed draft
+current_step: awaiting CI and independent review
+next_action: route to an eligible non-author reviewer
+post_merge_check: NOT_APPLICABLE (test-only)
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: assertion added to the existing startAuthorization test (param absent and verifier value absent from href); optional P3s not taken
+tried_and_rejected: none
+commands: bunx vitest run src/test/mcp-browser-oauth-client.test.ts
+files_touched: src/test/mcp-browser-oauth-client.test.ts
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: none
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2552
+artifacts: PR checks
+reviewer_seat: not assigned (OG Kush routes; this session excluded as author)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 17:10 CT (Matthew: separate PRs)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-27 17:10 CT, by Claude
+```
+
 ### ACTIONS-BACKLOG-CONCURRENCY
 
 ```text

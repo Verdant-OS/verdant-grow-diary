@@ -37,9 +37,10 @@ export interface SensorChartMetricMeta {
   /** Default decimal places for tick values. */
   tickDecimals: number;
   /**
-   * Decimal places for hover tooltips. Matches the Environment card
-   * (`buildTentSnapshotView`: temp 1, RH 1, VPD 2). Axis ticks stay on
-   * `tickDecimals` so the gutter does not grow. Display only.
+   * Decimal places for hover tooltips. Temperature, RH, and VPD use the
+   * same counts as the Environment card (1, 1, and 2). Soil moisture is
+   * one decimal on the chart only; the card does not render it. CO₂ and
+   * PPFD stay whole numbers. Axis ticks stay on `tickDecimals`. Display only.
    */
   displayDecimals: number;
   /** Reserved YAxis gutter width in px — sized to fit the widest tick label. */
@@ -84,7 +85,7 @@ export const SENSOR_CHART_METRIC_META: Record<SensorChartMetricKey, SensorChartM
     unit: "%",
     color: "hsl(var(--accent))",
     tickDecimals: 0,
-    displayDecimals: 0,
+    displayDecimals: 1,
     yAxisWidth: 44,
   },
   ppfd: {
@@ -155,15 +156,16 @@ export function formatSensorChartYTick(
 }
 
 /**
- * Display-only rounding shared with the Environment card. Does not change
- * the plotted or stored number.
+ * Display-only rounding. Does not change the plotted or stored number.
+ * A value that rounds to negative zero renders as unsigned zero.
  */
 export function formatSensorChartDisplayNumber(
   value: number,
   metric: SensorChartMetricKey,
 ): string {
   if (!Number.isFinite(value)) return "";
-  return value.toFixed(SENSOR_CHART_METRIC_META[metric].displayDecimals);
+  const shown = value.toFixed(SENSOR_CHART_METRIC_META[metric].displayDecimals);
+  return Object.is(Number(shown), -0) ? shown.slice(1) : shown;
 }
 
 /** Tooltip-side formatter — uses the long unit (legend-consistent). */

@@ -17,6 +17,14 @@ import {
   VERDANT_SEO_GUIDES,
 } from "../../constants/verdantSeoContent";
 import {
+  ATHENA_FEED_LOG_DESCRIPTION,
+  ATHENA_FEED_LOG_FAQ,
+  ATHENA_FEED_LOG_H1,
+  ATHENA_FEED_LOG_PATH,
+  ATHENA_FEED_LOG_TITLE,
+  athenaFeedLogWebApplicationJsonLd,
+} from "../athenaFeedLogRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -558,6 +566,41 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
           },
         ],
       }),
+    ],
+  }),
+  publicDocument(ATHENA_FEED_LOG_PATH, {
+    title: `${ATHENA_FEED_LOG_TITLE} | Verdant Grow Diary`,
+    description: ATHENA_FEED_LOG_DESCRIPTION,
+    imageAlt: "Blank Athena feed chart log, planned vs actual by week",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${ATHENA_FEED_LOG_TITLE} | Verdant Grow Diary`,
+        description: ATHENA_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: ATHENA_FEED_LOG_H1,
+        description: ATHENA_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+        datePublished: "2026-10-26",
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+        questions: ATHENA_FEED_LOG_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Athena Feed Chart Log",
+            url: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+          },
+        ],
+      }),
+      athenaFeedLogWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`),
     ],
   }),
   publicDocument("/tools/blueprint-targets", {

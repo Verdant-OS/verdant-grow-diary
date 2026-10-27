@@ -7,6 +7,8 @@
  * canonical VPD modules.
  */
 
+import { getVpdTargetBand } from "@/lib/vpdStageTargetRules";
+
 export const PUBLIC_VPD_CHART_PATH = "/vpd-chart" as const;
 export const PUBLIC_VPD_CHART_URL = "https://verdantgrowdiary.com/vpd-chart" as const;
 export const PUBLIC_VPD_CHART_TITLE =
@@ -78,6 +80,18 @@ export function publicVpdChartStageRangeKpa(stage: PublicVpdChartStage): string 
 
 export function publicVpdChartStageHeading(stage: PublicVpdChartStage): string {
   return `${stage.name} (${publicVpdChartStageRangeKpa(stage)})`;
+}
+
+/** Explain the two reference bands without changing the chart's math or classification. */
+export function publicVpdChartLateFlowerReferenceNote(): string {
+  const reference = publicVpdChartStageById("late_flower");
+  const canonical = getVpdTargetBand("late_flower");
+  const canonicalDescription =
+    canonical.min === null || canonical.max === null
+      ? "currently has no active late-flower target band"
+      : `uses its canonical ${canonical.min.toFixed(1)}–${canonical.max.toFixed(1)} kPa band`;
+
+  return `This chart preserves the cited sources' reference ranges. ${reference.name} is ${publicVpdChartStageRangeKpa(reference)} here; Verdant's stage-aware calculator ${canonicalDescription}. Reference bands for hypothetical values, not a verified target status for your plants.`;
 }
 
 function joinPublicVpdChartClauses(clauses: readonly string[]): string {

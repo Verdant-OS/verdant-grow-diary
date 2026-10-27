@@ -32,15 +32,13 @@ async function commitNumber(
 }
 
 describe("public VPD chart page", () => {
-  it("keeps multi-digit temperatures until blur or Enter, then matches the pinned cases", async () => {
+  it("keeps multi-digit temperatures until Enter and converts the committed draft", async () => {
     const user = userEvent.setup();
     renderPage();
 
     expect(screen.getByText("1.06 kPa")).toBeInTheDocument();
 
     const air = () => screen.getByLabelText(/Air temperature/);
-    const humidity = () => screen.getByLabelText(/Relative humidity/);
-    const offset = () => screen.getByLabelText(/Leaf temperature offset/);
 
     await user.clear(air());
     await user.type(air(), "8");
@@ -52,13 +50,30 @@ describe("public VPD chart page", () => {
     await commitNumber(user, air(), "25");
     expect(air()).toHaveValue(25);
     expect(screen.getByText("1.06 kPa")).toBeInTheDocument();
+  });
 
+  it("matches the 80 °F worked example after committing all three inputs", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const air = () => screen.getByLabelText(/Air temperature/);
+    const humidity = () => screen.getByLabelText(/Relative humidity/);
+    const offset = () => screen.getByLabelText(/Leaf temperature offset/);
+
+    await user.click(screen.getByRole("button", { name: "°C" }));
     await user.click(screen.getByRole("button", { name: "°F" }));
     await commitNumber(user, air(), "80");
     await commitNumber(user, humidity(), "55");
     await commitNumber(user, offset(), "-3");
     expect(air()).toHaveValue(80);
     expect(screen.getByText("1.24 kPa")).toBeInTheDocument();
+  });
+
+  it("matches the 72 °F worked example and restores its committed value after a blank", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const air = () => screen.getByLabelText(/Air temperature/);
+    const humidity = () => screen.getByLabelText(/Relative humidity/);
+    const offset = () => screen.getByLabelText(/Leaf temperature offset/);
 
     await commitNumber(user, air(), "72");
     await commitNumber(user, humidity(), "70");

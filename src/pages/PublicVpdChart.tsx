@@ -24,6 +24,7 @@ import {
   PUBLIC_VPD_CHART_TITLE,
   publicVpdChartAirTemperatureFromDisplay,
   publicVpdChartCommonTargetsSentence,
+  publicVpdChartLateFlowerReferenceNote,
   publicVpdChartSourcesSentence,
   publicVpdChartStageHeading,
   publicVpdChartClamp,
@@ -335,9 +336,7 @@ export default function PublicVpdChart() {
           <h2 id="chart-heading" className="text-2xl font-semibold">
             VPD chart by growth stage
           </h2>
-          <p className="mt-2 text-sm">
-            Reference bands for hypothetical values, not a verified target status for your plants.
-          </p>
+          <p className="mt-2 text-sm">{publicVpdChartLateFlowerReferenceNote()}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PUBLIC_VPD_CHART_STAGES.map((stage) => (
               <h3 key={stage.id} className="text-base font-semibold">

@@ -138,7 +138,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Authenticated Dashboard alias; preserves optional growId scope.",
   },
-  { path: "/demo", access: "redirect", description: "→ /welcome" },
+  { path: "/demo", access: "redirect", description: "→ /" },
   {
     path: "/demo/one-tent-live-proof",
     access: "operator",
@@ -189,7 +189,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
-  { path: "/features", access: "redirect", description: "→ /welcome" },
+  { path: "/features", access: "redirect", description: "→ /" },
   { path: "/feedback", access: "public", description: "Public support feedback page." },
   {
     path: "/founder",
@@ -545,7 +545,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Public VPD chart by growth stage with a leaf-offset calculator.",
   },
-  { path: "/welcome", access: "public" },
+  { path: "/welcome", access: "redirect", description: "→ /" },
 ];
 
 /** All manifest paths in the manifest's deterministic (path-ascending) order. */

@@ -73,7 +73,7 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK PR-CLEANUP-2026-10-27-INVENTORY  priority: other  status: OPEN
-goal: Phase 1 of Matthew's open-PR cleanup (zero open PRs): a read-only inventory of every open PR with a proposed disposition, then stop for Matthew's approval of the close list.
+goal: Matthew's open-PR cleanup, whose program goal is zero open PRs. Phase 1 (done) was a read-only inventory of every open PR with a proposed disposition. Each later phase (closes, consolidations, survivor repair) runs only on Matthew's approval.
 why: 127 open PRs (2026-10-27); many are superseded, stale, or test follow-ups whose parent merged.
 branch: claude/new-session-wp1j5i (the session-bound branch; the cleanup prompt named claude/pr-cleanup-inventory, and the session binding wins)
 base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24

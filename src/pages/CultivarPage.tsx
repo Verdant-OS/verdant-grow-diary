@@ -132,7 +132,7 @@ export default function CultivarPage() {
       className="min-h-screen bg-background text-foreground"
     >
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-5 sm:px-6">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex w-full items-center justify-between gap-4 text-sm sm:w-auto sm:justify-start">

@@ -25,10 +25,11 @@ const METRIC_DISPLAY_ORDER: ReadonlyArray<ManualReadingMetric["metric"]> = [
   "ppfd",
 ];
 
-function formatMetricChip(m: ManualReadingMetric): string | null {
+function formatMetricChip(m: ManualReadingMetric, temperatureUnit: "F" | "C"): string | null {
   if (!Number.isFinite(m.value)) return null;
   switch (m.metric) {
     case "temperature_c": {
+      if (temperatureUnit === "C") return `${Math.round(m.value)}°C`;
       const f = FAHRENHEIT_FROM_C(m.value);
       return `${f}°F`;
     }
@@ -54,12 +55,15 @@ function formatMetricChip(m: ManualReadingMetric): string | null {
  */
 export function buildManualSaveSuccessLine(args: {
   metrics: ReadonlyArray<ManualReadingMetric>;
+  /** The grower's display unit; °F when absent. */
+  temperatureUnit?: "F" | "C";
 }): string {
+  const temperatureUnit = args.temperatureUnit ?? "F";
   const ordered = [...args.metrics].sort(
     (a, b) => METRIC_DISPLAY_ORDER.indexOf(a.metric) - METRIC_DISPLAY_ORDER.indexOf(b.metric),
   );
   const chips = ordered
-    .map(formatMetricChip)
+    .map((metric) => formatMetricChip(metric, temperatureUnit))
     .filter((s): s is string => typeof s === "string" && s.length > 0);
   const head = chips.length > 0 ? chips.join(" · ") : "(no metrics)";
   return `Manual snapshot saved: ${head}. Source: Manual.`;

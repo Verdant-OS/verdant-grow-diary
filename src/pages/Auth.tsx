@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
+import { fetchPlants } from "@/hooks/use-plants";
+import { fetchTents } from "@/hooks/use-tents";
 import { Navigate, useNavigate, useSearchParams, Link } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +43,13 @@ import {
 } from "@/lib/signupAcquisitionRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import {
+  QUICK_LOG_START_ROOM_TIMEOUT_MS,
+  resolveReturningSignInRoute,
+  type QuickLogStartGrow,
+} from "@/lib/quickLogStartScreenTargetRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
+import { applyPostgrestAbortSignal, isSupabaseAbortError } from "@/lib/supabaseAbort";
 import {
   acceptancePayloadsForCurrentAgreements,
   recordOwnAgreementAcceptances,
@@ -173,9 +181,11 @@ export default function Auth() {
         return;
       }
       if (result.redirected) return; // browser redirects to Google
-      // Tokens returned and session set — route to intended destination.
+      // A session is already here, so the one-shot handoff is consumed now.
+      // An explicit safe return leaves immediately. The plant route waits
+      // until `user` is set and only applies when there is no explicit target.
       clearPendingOAuthPostAuthRedirect();
-      nav(postSignInTarget(), { replace: true });
+      if (explicitRedirect) nav(explicitRedirect, { replace: true });
     } catch {
       if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
       clearPendingOAuthPostAuthRedirect();
@@ -202,17 +212,84 @@ export default function Auth() {
   const signUpEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
-  function postSignInTarget(): string {
-    if (explicitRedirect) return explicitRedirect;
-    if (!user) return "/onboarding";
-    const saved = getStartScreenChoice(user.id);
-    return saved ? routeForStartScreen(saved) : "/onboarding";
-  }
+  const savedStartScreen = user ? getStartScreenChoice(user.id) : null;
+  const needsQuickLogPlant = !explicitRedirect && savedStartScreen === "quickLog";
+  const [quickLogRoom, setQuickLogRoom] = useState<{
+    userId: string;
+    plants: Awaited<ReturnType<typeof fetchPlants>>;
+    tents: Awaited<ReturnType<typeof fetchTents>>;
+    grows: QuickLogStartGrow[];
+  } | null>(null);
 
   useEffect(() => {
-    if (user) nav(postSignInTarget(), { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, nav]);
+    const userId = user?.id;
+    if (!needsQuickLogPlant || !userId) return;
+    let settled = false;
+    const emptyRoom = {
+      userId,
+      plants: [],
+      tents: [],
+      grows: [] as QuickLogStartGrow[],
+    };
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      controller.abort();
+      setQuickLogRoom(emptyRoom);
+    }, QUICK_LOG_START_ROOM_TIMEOUT_MS);
+    const growsQuery = applyPostgrestAbortSignal(
+      supabase.from("grows").select("id,is_archived"),
+      controller.signal,
+    );
+    void Promise.all([fetchPlants(controller.signal), fetchTents(controller.signal), growsQuery])
+      .then(([plants, tents, growsResult]) => {
+        if (settled) return;
+        if (growsResult.error) throw growsResult.error;
+        settled = true;
+        window.clearTimeout(timer);
+        setQuickLogRoom({
+          userId,
+          plants,
+          tents,
+          grows: growsResult.data ?? [],
+        });
+      })
+      .catch((error: unknown) => {
+        if (settled || isSupabaseAbortError(error)) return;
+        settled = true;
+        window.clearTimeout(timer);
+        setQuickLogRoom(emptyRoom);
+      });
+    return () => {
+      settled = true;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [needsQuickLogPlant, user?.id]);
+
+  const quickLogRoomForUser = quickLogRoom?.userId === user?.id ? quickLogRoom : null;
+
+  function postSignInTarget(): string | null {
+    if (explicitRedirect) return explicitRedirect;
+    if (!user) return null;
+    if (needsQuickLogPlant && !quickLogRoomForUser) return null;
+    if (savedStartScreen === "quickLog") {
+      return resolveReturningSignInRoute({
+        savedChoice: "quickLog",
+        plants: quickLogRoomForUser?.plants ?? [],
+        tents: quickLogRoomForUser?.tents ?? [],
+        grows: quickLogRoomForUser?.grows ?? [],
+      });
+    }
+    return savedStartScreen ? routeForStartScreen(savedStartScreen) : "/onboarding";
+  }
+
+  const signInTarget = user ? postSignInTarget() : null;
+
+  useEffect(() => {
+    if (user && signInTarget) nav(signInTarget, { replace: true });
+  }, [user, nav, signInTarget]);
 
   useEffect(() => {
     if (mode !== "signup") return;
@@ -254,7 +331,10 @@ export default function Auth() {
   // restoration after sign-in.
   if (!hydrated || loading) return null;
 
-  if (user) return <Navigate to={postSignInTarget()} replace />;
+  if (user) {
+    if (!signInTarget) return null;
+    return <Navigate to={signInTarget} replace />;
+  }
 
   const resendCooldownActive = !canResendVerification(
     resendNowTick,
@@ -347,7 +427,7 @@ export default function Auth() {
       signInEmailRef.current?.focus();
       return;
     }
-    nav(postSignInTarget(), { replace: true });
+    if (explicitRedirect) nav(explicitRedirect, { replace: true });
   }
 
   async function signUp(e: React.FormEvent) {
@@ -449,8 +529,11 @@ export default function Auth() {
       );
       return;
     }
+    if (explicitRedirect) {
+      nav(explicitRedirect, { replace: true });
+      return;
+    }
     setSignUpSuccess("Welcome to Verdant. Your account is ready.");
-    nav(postSignInTarget(), { replace: true });
   }
 
   async function sendMagicLink() {
@@ -552,7 +635,7 @@ export default function Auth() {
       <div className="w-full max-w-sm">
         <div className="mb-4">
           <Link
-            to="/welcome"
+            to="/"
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home

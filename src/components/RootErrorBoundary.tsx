@@ -100,7 +100,7 @@ export default class RootErrorBoundary extends Component<Props, State> {
             Reload page
           </button>
           <a
-            href="/welcome"
+            href="/"
             style={{
               display: "inline-flex",
               alignItems: "center",

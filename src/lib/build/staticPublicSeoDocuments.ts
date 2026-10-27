@@ -44,9 +44,9 @@ import {
   buildBreadcrumbListJsonLd,
   buildCultivarCollectionJsonLd,
   buildFaqPageJsonLd,
-  buildSoftwareApplicationJsonLd,
   buildWebPageJsonLd,
 } from "../seoStructuredData";
+import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
@@ -223,7 +223,7 @@ function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]
           `<li><a href="/guides/${escapeStaticHtml(candidate.slug)}">${escapeStaticHtml(candidate.h1)}</a></li>`,
       ),
     '<li><a href="/guides">All grower guides</a></li>',
-    '<li><a href="/welcome">See how Verdant works</a></li>',
+    '<li><a href="/">See how Verdant works</a></li>',
     '<li><a href="/pricing">Compare Free and Pro pricing</a></li>',
   ].join("");
 
@@ -231,7 +231,7 @@ function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]
   const standardCallsToAction = [
     `<nav aria-label="Keep reading"><h2>Keep reading</h2><ul>${relatedLinks}</ul></nav>`,
     `<section><h2>Log your first grow note in 30 seconds — no account needed</h2><p>Try the public Quick Log starter: nickname a plant, jot one note, and the draft stays on your device until you decide to keep it.</p><p><a href="${escapeStaticHtml(starterHref)}">Try the 30-second Quick Log</a></p></section>`,
-    '<section><h2>See a real One-Tent Loop before signing up</h2><p>Walk through how Verdant connects a grow, tent, plant, Quick Log, timeline, sensor snapshot, cautious AI review, and grower-approved action queue.</p><p><a href="/welcome">Explore the public demo</a></p></section>',
+    '<section><h2>See a real One-Tent Loop before signing up</h2><p>Walk through how Verdant connects a grow, tent, plant, Quick Log, timeline, sensor snapshot, cautious AI review, and grower-approved action queue.</p><p><a href="/">Explore the public demo</a></p></section>',
   ].join("");
 
   return [
@@ -272,12 +272,13 @@ function buildStaticGuideHubBodyFallback(): string {
     '<main id="static-guide-fallback"><article data-guide-directory="true">',
     "<h1>The Verdant grower guide</h1>",
     "<p>Plant memory. Sensor truth. Grower-approved decisions. These guides cover diary practice, lighting, sensor context, and cautious troubleshooting. Verdant suggests; the grower decides. Verdant cannot touch your equipment.</p>",
+    '<p>New to a term like VPD, PPFD, or EC? Check the <a href="/glossary">Cultivation glossary</a>.</p>',
     "<section><h2>Grower guides</h2><ul>",
     guideLinks,
     '</ul></section><section><h2>Stage-aware care checklist</h2><p>Use a stage-based reference for watering, nutrients, environment, and harvest tasks. Cultivars move at different speeds, so the checklist follows the plant rather than a calendar.</p><p><a href="/guides/grow-stage-care-guide">Open the grow-stage care guide</a></p></section>',
     '<section><h2>Free cannabis VPD calculator</h2><p>Calculate air VPD from manual temperature and humidity inputs. Nothing is uploaded, saved, or treated as live telemetry.</p><p><a href="/tools/vpd-calculator">Open the free VPD calculator</a></p></section>',
     `<section><h2>Common grower questions</h2>${faq}</section>`,
-    '<p>Ready to start? See <a href="/welcome">what Verdant does</a>, or compare <a href="/pricing">Verdant plans</a>.</p>',
+    '<p>Ready to start? See <a href="/">what Verdant does</a>, or compare <a href="/pricing">Verdant plans</a>.</p>',
     "</article></main>",
   ].join("");
 }
@@ -323,8 +324,8 @@ function buildStaticGrowStageCareBodyFallback(): string {
     "<p>A stage-based reference for seedling, vegetative, and flower care. Cultivars move at different speeds, so compare the plant's current stage and response instead of following a fixed calendar.</p>",
     sections,
     `<section><h2>Common questions</h2>${faq}</section>`,
-    '<nav aria-label="Related guides"><h2>Keep reading</h2><ul><li><a href="/guides/cannabis-plant-care">Cannabis plant care FAQ</a></li><li><a href="/guides/grow-room-vpd-tracker">How to track VPD in a grow room</a></li><li><a href="/guides">All grower guides</a></li><li><a href="/welcome">See how Verdant works</a></li><li><a href="/pricing">Compare Free and Pro pricing</a></li></ul></nav>',
-    '<section><h2>See a real One-Tent Loop before signing up</h2><p>Walk through how Verdant connects a grow, tent, plant, Quick Log, timeline, sensor snapshot, cautious AI review, and grower-approved action queue.</p><p><a href="/welcome">Explore the public demo</a></p></section>',
+    '<nav aria-label="Related guides"><h2>Keep reading</h2><ul><li><a href="/guides/cannabis-plant-care">Cannabis plant care FAQ</a></li><li><a href="/guides/grow-room-vpd-tracker">How to track VPD in a grow room</a></li><li><a href="/guides">All grower guides</a></li><li><a href="/">See how Verdant works</a></li><li><a href="/pricing">Compare Free and Pro pricing</a></li></ul></nav>',
+    '<section><h2>See a real One-Tent Loop before signing up</h2><p>Walk through how Verdant connects a grow, tent, plant, Quick Log, timeline, sensor snapshot, cautious AI review, and grower-approved action queue.</p><p><a href="/">Explore the public demo</a></p></section>',
     "</article></main>",
   ].join("");
 }
@@ -516,12 +517,6 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
     imageAlt: "Verdant Grow Diary",
   }),
-  publicDocument("/welcome", {
-    title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
-    description:
-      "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
-    imageAlt: "Verdant Grow Diary",
-  }),
   publicDocument("/pricing", {
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
     description:
@@ -630,11 +625,8 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
         description: PUBLIC_QUICK_LOG_STARTER_COPY.seoDescription,
         url: `${VERDANT_SITE_ORIGIN}/quick-log`,
       }),
-      buildSoftwareApplicationJsonLd({
-        name: "Verdant Grow Diary",
-        description: PUBLIC_QUICK_LOG_STARTER_COPY.seoDescription,
-        url: `${VERDANT_SITE_ORIGIN}/quick-log`,
-      }),
+      // The sitewide app node, not a second offer-less "Verdant Grow Diary".
+      SITE_SOFTWARE_APPLICATION_JSON_LD,
       buildFaqPageJsonLd({
         pageUrl: `${VERDANT_SITE_ORIGIN}/quick-log`,
         questions: PUBLIC_QUICK_LOG_STARTER_COPY.faq,

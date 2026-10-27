@@ -79,9 +79,9 @@ branch: cursor/actions-backlog-concurrency-58cd
 base: verdant-grow-diary
 checkout: git fetch origin cursor/actions-backlog-concurrency-58cd verdant-grow-diary && git switch cursor/actions-backlog-concurrency-58cd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 pr: draft PR URL is in the pull request for this branch
-head_sha: set after the push that contains this block
-state: pushed draft after this commit
-current_step: Workflow edits and pin updates are local until this commit is pushed.
+head_sha: implementation a5e0dd832ec05d6e6d72a2327a550298b1599d96; branch head is the commit that updates this line
+state: pushed draft
+current_step: Implementation is committed. This line records that commit before push.
 next_action: Read the draft PR, confirm it stays draft, and do not mark it ready, enqueue it, or merge it.
 post_merge_check: After a separately authorized merge, confirm a ready PR and a merge_group run still report all 35 required contexts from ci.yml, and that a draft PR skips the 32 shards. NOT_MEASURED until merged.
 active_writer: Grok cloud agent on cursor/actions-backlog-concurrency-58cd

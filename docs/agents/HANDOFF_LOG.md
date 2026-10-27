@@ -103,6 +103,74 @@ owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
 last_updated: 2026-10-27 17:10 CT, by Claude
 ```
 
+### VER-293-BROWSER-OAUTH-CLIENT-TESTS
+
+```text
+TASK VER-293-BROWSER-OAUTH-CLIENT-TESTS  priority: other  status: OPEN
+goal: Add focused deterministic unit coverage for src/lib/mcp/browserOAuthClient.ts and open a draft PR linked to VER-293.
+why: The module had no unit tests. Callback, PKCE, token storage, and same-origin redirect behavior need regression locks without network or real credentials.
+branch: cursor/mcp-browser-oauth-client-tests-fd0f
+base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
+checkout: git fetch origin cursor/mcp-browser-oauth-client-tests-fd0f verdant-grow-diary && git switch cursor/mcp-browser-oauth-client-tests-fd0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2552 (draft)
+head_sha: read origin/cursor/mcp-browser-oauth-client-tests-fd0f after the Jack Herer follow-up push; parent is d4e98ae40fad58741d13fdb61a5007d82d487669
+state: tests only; browserOAuthClient.ts unchanged
+current_step: Merged origin/verdant-grow-diary 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae. The only conflict was HANDOFF_LOG.md: incoming Open blocks and this block are both kept. Jack Herer 5670094164 at d4e98ae40 was PASS-pending-CI 0/0/4 plus one UNVERIFIED storage-spy concern. Follow-up spies setItem on getLocalStorageMethodOwnerForTest and records only when this is localStorage. RED check: a temporary localStorage.setItem in the client failed sends code_verifier with localSets ["verdant.mcp.oauth.token.v1"]; that edit was reverted and is not in the commit. Added token-endpoint fetch rejection, RFC 7636 Appendix B vector, SyntaxError message for malformed JSON, and fake timers for the expiry boundary.
+next_action: Read the new draft head and required CI. Jack Herer's verdict was for d4e98ae40 and does not cover this head. Keep the PR draft.
+post_merge_check: bunx vitest run src/test/mcp-browser-oauth-client.test.ts on the deploy head; a failure reopens this work with the same owner.
+active_writer: Cursor Grok session on cursor/mcp-browser-oauth-client-tests-fd0f
+decisions: Do not clear the pending PKCE record on state mismatch. BrowserConnectPanel.tsx explicitly keeps a genuine pending authorization when the callback state was not issued by this browser, and it does not call completeAuthorization in that case. Document that behavior. Also document that a network failure, malformed token JSON, or a 200 body without access_token does not store a token and does not clear PKCE, while a non-2xx token response does clear PKCE. No authorization, scope, endpoint, or UI change.
+tried_and_rejected: Clearing PKCE on state mismatch was rejected because the panel comment treats that clear as the wrong security outcome (it would abort a real in-flight authorization on a forged callback).
+commands: bunx vitest run src/test/mcp-browser-oauth-client.test.ts --reporter=verbose; bunx eslint src/test/mcp-browser-oauth-client.test.ts; bun run typecheck
+files_touched: src/test/mcp-browser-oauth-client.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned
+blockers: independent exact-head review not requested; hosted CI NOT_MEASURED until the draft PR runs
+open_questions: none for the documented current behavior
+gotchas: Module-level discovery cache is reset by vi.resetModules per test. Tokens are asserted absent from localStorage.setItem. javascript: and data: URLs fail sameOriginRedirect because their origin is not the page origin.
+links: https://linear.app/verdantgrowdiary/issue/VER-293
+artifacts: src/test/mcp-browser-oauth-client.test.ts
+reviewer_seat: an eligible independent session that did not author this PR
+reviewer_sha: Jack Herer review 5670094164 covers d4e98ae40fad58741d13fdb61a5007d82d487669 only (PASS-pending-CI 0/0/4). It does not cover the follow-up head.
+session_state: no new review request; product file restored after the local RED check
+claimed_by: Cursor Grok, 2026-10-27 09:28 CT
+owner: Cursor Grok VER-293 session
+last_updated: 2026-10-27 16:10 CT, by Cursor Grok
+```
+
+### PR-2283-REMOVAL-PAGINATION-REPAIR
+
+```text
+TASK PR-2283-REMOVAL-PAGINATION-REPAIR  priority: P2  status: OPEN
+goal: Reconcile a confirmed Timeline deletion after a same-scope refresh, preserving cross-scope, duplicate-completion and pagination safeguards; push the focused repair to the existing draft PR.
+why: The user explicitly assigned the same-scope refresh P2 at a27c667f. A refresh can commit the soon-to-be-deleted row/count before deletion succeeds, or finish later with a stale snapshot. Keep draft and auto-merge off; no rerun, merge, queue entry, deployment or production operation.
+branch: claude/timeline-remove-log-count
+base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24 (current PR base after another actor integrated the base during validation; this task preserved that existing update)
+checkout: git fetch origin claude/timeline-remove-log-count verdant-grow-diary; git switch claude/timeline-remove-log-count; git merge --ff-only origin/claude/timeline-remove-log-count
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283
+head_sha: 55713732e809ac2c8d9b4fa39aeb216f50d2b761 (verified hosted source checkpoint adopted after concurrent base integration and receipt-test/documentation cleanup; the same-scope generation guard remained unchanged; read the PR for the resulting repair head before resuming)
+state: Implemented: after a confirmed removal crosses a read generation but the non-null owner/grow/date read key still matches, reload the current scope. This authoritative read reconciles both stale-row and already-reflected totals and supersedes pending older reads. Different scopes still return untouched. Same-generation functional filtering, loaded-id/immediate snapshot duplicate suppression, count, owner-read, linked Quick Log refusal and delete-receipt safeguards remain unchanged.
+current_step: Valid RED on unchanged a27c667f runtime: new mounted file 3 failed/2 passed/0 skipped. Both event refreshes finishing before deletion left the deleted row visible; a pending stale refresh could resurrect it. GREEN after the reload branch: 5 passed/0 failed/0 skipped. After preserving concurrent base/receipt updates through 55713732, final related coverage is 14 files/141 passed/0 failed/0 skipped, including its two new null-key helper cases and unchanged receipt assertions. Canonical tsc PASS with zero diagnostics on this combined tree; native tsgo PASS with zero diagnostics before the final comment/test-only update. Scoped ESLint PASS with zero errors/warnings.
+next_action: Verify the resulting hosted full head and fresh CI; a27c667f's 35/35 is historical after the push. Independent acceptance of the new head remains NOT_MEASURED; leave reviewer routing waiting for capacity without probing or requesting review. Keep draft and auto-merge off; no rerun, merge, queue entry or deployment.
+post_merge_check: NOT_MEASURED; once the repaired exact SHA is deployed, overlapping Load older and Remove log must retain the appended rows, remove only the confirmed row, and decrement the total once. This task authorizes no live write.
+active_writer: Codex coordinator chat 01a1795a-4ecf-7b83-8a6e-56a3fc444b8b, explicitly assigned the same-scope P2 repair by the user; preserves the existing claude/timeline-remove-log-count branch and prior Codex holder continuity. No competing implementation or branch transfer is created.
+decisions: Keep the original strict generation helper and cross-scope guard. On generation mismatch within the same non-null read key, call load() after confirmed deletion instead of optimistically decrementing a total that may already reflect it. The new request ID supersedes pending stale refreshes. Same-generation functional filtering and immediate duplicate-suppression snapshot are unchanged. Preserve #2094 hidden-mirror count setters and all removal authorization/receipt safeguards.
+tried_and_rejected: Rejected dropping the request-ID guard or blindly decrementing a newer refreshed total. The additive mounted regression uses the real removal hook, a delete-start barrier and a mock database that changes only on confirmed deletion. Existing tracked tests/assertions and the pure helper were not modified. Prior pagination RED 2 failed/1 passed, GREEN 3 passed and focused 134 passed remain historical author evidence; author-team QA is not independent acceptance.
+commands: node node_modules/vitest/vitest.mjs run src/test/timeline-removal-refresh-reconciliation.test.tsx src/test/timeline-removal-pagination-interleaving.test.tsx src/test/timeline-removal-completion-generation.test.tsx src/test/timeline-remove-log-total-count.test.ts src/test/diary-entry-remove-button.test.tsx src/test/diary-entry-removal-rules.test.ts src/test/diary-entry-removal-static-safety.test.ts src/test/timeline-page-read-state.test.tsx src/test/timeline-blank-quicklog-dedupe.test.ts src/test/timeline-quicklog-page-boundary-dedupe.test.ts src/test/timeline-quicklog-photo-link-dedupe.test.tsx src/test/timeline-quicklog-dedupe-pagination.test.tsx src/test/timeline-directory-sensor-refresh.test.tsx --reporter=dot; node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/@typescript/native-preview/bin/tsgo --noEmit
+files_touched: src/pages/Timeline.tsx (nine-line same-scope reload branch); src/test/timeline-removal-refresh-reconciliation.test.tsx (new additive five-case regression); docs/agents/HANDOFF_LOG.md (this block only).
+files_remaining: No additional implementation files planned.
+blockers: Resulting-head required CI and eligible independent acceptance remain NOT_MEASURED. The fix and author regressions do not constitute outside acceptance. No merge or deployment is authorized.
+open_questions: Resulting-head required/supplemental CI and independent acceptance require fresh evidence. No production behavior is measured here.
+gotchas: New head invalidates old CI/review receipts. Existing installed Vitest 4.1.12 is run through Node because Bun is not on PATH; no install or lockfile edit. Preserve all other handoff blocks.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283#issuecomment-6423223632 ; prior writer receipt: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283#issuecomment-6422817526
+artifacts: src/test/timeline-removal-refresh-reconciliation.test.tsx and resulting commit/check URLs; local supplemental logs C:/Users/G8/verdant-work/pr2283-refresh-race-evidence/refresh-reconciliation-red.log, refresh-reconciliation-green.log, related-tests-delivery.log, tsc-delivery.log and eslint-delivery.json. Final 14-file/141-test, canonical tsc, scoped ESLint, Prettier, docs safety, Sentinel parity, strict scorer and whitespace checks PASS; tsgo-final.log records the passing pre-55713732 native compiler run. Existing read-state tests emit React act warnings without failures. Full suite, build and live verification NOT_MEASURED. Existing a27c667f CI and review packet is historical for the resulting head.
+reviewer_seat: Available eligible independent non-contributing session under OWNERSHIP.md section 4.3; no request sent by this task. Exclude original author, all repair contributors and this author/test team.
+reviewer_sha: NOT_MEASURED for the resulting repair head; no new independent acceptance is claimed and private review results remain chat-only.
+session_state: refresh_race_regression authored only the new mounted test and valid RED; parent owns runtime, handoff, final GREEN/related validation and branch delivery. No new watcher, external message/comment/review, reviewer probe/request, ready-state change, rerun, cancellation, queue action or production operation. Previous completed CI heartbeat remains deleted. Separate local Supabase startup diagnostics patch is untouched.
+claimed_by: Codex coordinator by explicit current user assignment on 2026-10-27; no public claim comment is asserted.
+owner: Codex for the user-assigned same-scope repair and existing PR branch update; future acceptance must be independent.
+last_updated: 2026-10-27 10:49 CT, by Codex same-scope refresh repair session
+```
+
 ### ACTIONS-BACKLOG-CONCURRENCY
 
 ```text
@@ -170,6 +238,40 @@ session_state: PR #2553 was not draft (isDraft false) before this base merge. Do
 claimed_by: Grok, 2026-10-27
 owner: Grok
 last_updated: 2026-10-27 14:10 CT, by Grok
+```
+
+### PR-2554-CHART-TOOLTIP-ROUNDING
+
+```text
+TASK PR-2554-CHART-TOOLTIP-ROUNDING  priority: P2  status: OPEN
+goal: Round Environment chart tooltip display strings so they agree with the card, including soil at one decimal and unsigned zero.
+why: Hover showed the raw °C-to-°F float. Jack Herer PASS-pending-CI listed P3s; Cheeko set soil tooltip decimals to 1.
+branch: cursor/env-chart-tooltip-rounding-3fe4
+base: verdant-grow-diary
+checkout: git fetch origin cursor/env-chart-tooltip-rounding-3fe4 verdant-grow-diary && git switch cursor/env-chart-tooltip-rounding-3fe4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2554
+head_sha: read origin/cursor/env-chart-tooltip-rounding-3fe4 after the follow-up push
+state: pushed draft
+current_step: Soil displayDecimals is 1, negative zero is unsigned, fractional tooltip cases live in a new test file.
+next_action: Confirm the PR head and that the draft stays unqueued. Do not mark ready, merge, or deploy.
+post_merge_check: Environment chart tooltip on a Fahrenheit tent shows 75.0°F and soil 40.46 as 40.5%. NOT_MEASURED until after merge.
+active_writer: Grok cloud session on cursor/env-chart-tooltip-rounding-3fe4
+decisions: Soil tooltip is one decimal even though the Environment card does not render soil. New cases stay in a new test file so tracked pins are not edited again.
+tried_and_rejected: none on this follow-up
+commands: bunx vitest run src/test/sensor-chart-tooltip-fractional-display.test.ts src/test/sensor-chart-tooltip-display-rounding.test.ts --reporter=verbose
+files_touched: src/lib/sensorChartAxisRules.ts; src/test/sensor-chart-tooltip-fractional-display.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none planned
+blockers: none
+open_questions: none
+gotchas: displayDecimals is not tickDecimals. Card still does not show soil.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2554#pullrequestreview-5669825201
+artifacts: src/test/sensor-chart-tooltip-fractional-display.test.ts
+reviewer_seat: Jack Herer review 5669825201 was PASS-pending-CI at 1b260ffd40591e4671017e2e2f2281454c28b096 and does not cover the follow-up head
+reviewer_sha: NOT_MEASURED for the follow-up head
+session_state: follow-up on draft #2554; no merge, queue, or deploy
+claimed_by: Grok, 2026-10-27
+owner: Grok cloud session
+last_updated: 2026-10-27 10:35 CT, by Grok
 ```
 
 ### PADDLE-WIRE-001-NORMALIZATION
@@ -246,40 +348,6 @@ session_state: Current assignment: Codex alone repairs the remaining Graft/Root 
 claimed_by: Codex, 2026-10-27 10:13 CT, explicit current user assignment as sole repairer
 owner: This Codex chat for the bounded repair, validation, CI and evidence only; OG Kush is the assigned merge actor and Jack Herer the independent acceptor. Merge and deployment remain held pending Matthew's later exact-head decision.
 last_updated: 2026-10-27 10:13 CT, by Codex
-```
-
-### VER-293-BROWSER-OAUTH-CLIENT-TESTS
-
-```text
-TASK VER-293-BROWSER-OAUTH-CLIENT-TESTS  priority: other  status: OPEN
-goal: Add focused deterministic unit coverage for src/lib/mcp/browserOAuthClient.ts and open a draft PR linked to VER-293.
-why: The module had no unit tests. Callback, PKCE, token storage, and same-origin redirect behavior need regression locks without network or real credentials.
-branch: cursor/mcp-browser-oauth-client-tests-fd0f
-base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
-checkout: git fetch origin cursor/mcp-browser-oauth-client-tests-fd0f verdant-grow-diary && git switch cursor/mcp-browser-oauth-client-tests-fd0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2552 (draft)
-head_sha: read origin/cursor/mcp-browser-oauth-client-tests-fd0f after the Jack Herer follow-up push; parent is d4e98ae40fad58741d13fdb61a5007d82d487669
-state: tests only; browserOAuthClient.ts unchanged
-current_step: Merged origin/verdant-grow-diary 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae. The only conflict was HANDOFF_LOG.md: incoming Open blocks and this block are both kept. Jack Herer 5670094164 at d4e98ae40 was PASS-pending-CI 0/0/4 plus one UNVERIFIED storage-spy concern. Follow-up spies setItem on getLocalStorageMethodOwnerForTest and records only when this is localStorage. RED check: a temporary localStorage.setItem in the client failed sends code_verifier with localSets ["verdant.mcp.oauth.token.v1"]; that edit was reverted and is not in the commit. Added token-endpoint fetch rejection, RFC 7636 Appendix B vector, SyntaxError message for malformed JSON, and fake timers for the expiry boundary.
-next_action: Read the new draft head and required CI. Jack Herer's verdict was for d4e98ae40 and does not cover this head. Keep the PR draft.
-post_merge_check: bunx vitest run src/test/mcp-browser-oauth-client.test.ts on the deploy head; a failure reopens this work with the same owner.
-active_writer: Cursor Grok session on cursor/mcp-browser-oauth-client-tests-fd0f
-decisions: Do not clear the pending PKCE record on state mismatch. BrowserConnectPanel.tsx explicitly keeps a genuine pending authorization when the callback state was not issued by this browser, and it does not call completeAuthorization in that case. Document that behavior. Also document that a network failure, malformed token JSON, or a 200 body without access_token does not store a token and does not clear PKCE, while a non-2xx token response does clear PKCE. No authorization, scope, endpoint, or UI change.
-tried_and_rejected: Clearing PKCE on state mismatch was rejected because the panel comment treats that clear as the wrong security outcome (it would abort a real in-flight authorization on a forged callback).
-commands: bunx vitest run src/test/mcp-browser-oauth-client.test.ts --reporter=verbose; bunx eslint src/test/mcp-browser-oauth-client.test.ts; bun run typecheck
-files_touched: src/test/mcp-browser-oauth-client.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
-files_remaining: none planned
-blockers: independent exact-head review not requested; hosted CI NOT_MEASURED until the draft PR runs
-open_questions: none for the documented current behavior
-gotchas: Module-level discovery cache is reset by vi.resetModules per test. Tokens are asserted absent from localStorage.setItem. javascript: and data: URLs fail sameOriginRedirect because their origin is not the page origin.
-links: https://linear.app/verdantgrowdiary/issue/VER-293
-artifacts: src/test/mcp-browser-oauth-client.test.ts
-reviewer_seat: an eligible independent session that did not author this PR
-reviewer_sha: Jack Herer review 5670094164 covers d4e98ae40fad58741d13fdb61a5007d82d487669 only (PASS-pending-CI 0/0/4). It does not cover the follow-up head.
-session_state: no new review request; product file restored after the local RED check
-claimed_by: Cursor Grok, 2026-10-27 09:28 CT
-owner: Cursor Grok VER-293 session
-last_updated: 2026-10-27 16:10 CT, by Cursor Grok
 ```
 
 ### PR2511-REQUIRED-TRIGGER-GUARDS

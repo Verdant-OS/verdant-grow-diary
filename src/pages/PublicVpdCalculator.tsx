@@ -230,7 +230,7 @@ export default function PublicVpdCalculator() {
       data-testid="public-vpd-calculator-page"
     >
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
@@ -692,6 +692,17 @@ export default function PublicVpdCalculator() {
               grow-room VPD tracking guide
             </Link>
             .
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Planning nutrients, canopy light, and cycle costs too? Open the{" "}
+            <Link
+              to="/tools/grow-help-toolkit"
+              className="underline hover:text-foreground"
+              data-testid="vpd-grow-help-toolkit-link"
+            >
+              browser-local Grow Help Toolkit
+            </Link>
+            . Inputs are not transferred between tools.
           </p>
         </section>
 

@@ -1,5 +1,6 @@
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { QuickLogResolvedTarget } from "./quickLogTargetIntegrityRules";
+import { storedQuickLogVolumeMatches } from "./quickLogTypedReusedReceiptRules";
 import { isUuid } from "./isUuid";
 
 type WaterEvent = {
@@ -75,7 +76,11 @@ function matchesWaterChild(
   eventId: string,
   child: WaterChild | null | undefined,
 ): boolean {
-  return !!child && child.event_id === eventId && child.volume_ml === payload.p_volume_ml;
+  return (
+    !!child &&
+    child.event_id === eventId &&
+    storedQuickLogVolumeMatches(child.volume_ml, payload.p_volume_ml)
+  );
 }
 
 /** The Watering child must belong to that exact event and retain its submitted volume. */

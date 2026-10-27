@@ -11,16 +11,46 @@ The shared box skill `code-review-and-quality` (on the agents' box at `/home/box
 
 ## Roles
 
-| Role                                    | Who                                                                          | Does                                                                                                                                                                                                                                                                      | Never                                               |
-| --------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Merge-queue owner                       | Grok 91 (older docs and other bots may still call this role Chemdawg or GDP) | Routes PRs to reviewers, sends findings back to authors, and merges under section 4                                                                                                                                                                                       | Reviews its own work                                |
-| Code reviewer                           | Blue Dream, Durban Poison (peers)                                            | Returns one verdict on one exact SHA for `.tsx`/UI, auth, RLS, DB and Edge changes                                                                                                                                                                                        | Writes code, pushes, merges, publishes, applies SQL |
-| Lib / logic / test / docs / QA reviewer | Critical Mass                                                                | Returns one verdict on one exact SHA for lib and logic, tests, docs-only, QA, accessibility, search and content changes (lane per [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) line 74), plus CI, build and dependency PRs that no other reviewer covers (see below) | Same as above                                       |
-| Author                                  | Claude, Codex, Grok 91 (when the owner writes or fixes a change)             | Writes the change and fixes findings                                                                                                                                                                                                                                      | Reviews its own change                              |
+| Role                            | Who                                                                                                                                                                                                                               | Does                                                                                | Never                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Merge-queue owner               | Grok 91 (older docs and other bots may still call this role Chemdawg or GDP)                                                                                                                                                      | Routes PRs to reviewers, sends findings back to authors, and merges under section 4 | Reviews its own work                                                                                            |
+| Independent acceptance reviewer | Actually available eligible session under OWNERSHIP.md §4.3: Codex on non-Codex-authored work Codex did not repair; non-contributing Claude/Grok review sessions, including for Codex-authored work; Durban Poison when available | Reviews the complete scope and required evidence at one full head SHA               | Writes or repairs while serving as independent reviewer; accepts its own work; merges, publishes or applies SQL |
+| Low-risk reviewer               | Graft, only within the existing OWNERSHIP.md allowlist                                                                                                                                                                            | Exact-head PASS on allowlisted work Graft neither authored nor repaired             | Accepts governance, protected or mixed scopes outside its lane                                                  |
+| Author                          | Claude, Codex, Grok, or another assigned implementation session                                                                                                                                                                   | One active writer implements and fixes findings under a valid claim                 | Accepts its own work                                                                                            |
 
-Every PR type has a reviewer. A PR that spans both lanes (for example a `.tsx` change plus a `*Rules.ts` helper) goes to Blue Dream or Durban Poison, and the owner may also ask Critical Mass for the lib or docs part. OWNERSHIP.md line 75 gives Codex _technical_ review of another author's CI or build infrastructure, which does not replace the independent verdict; until OWNERSHIP.md assigns that seat, CI, build and dependency PRs get their independent verdict from Critical Mass (or from Blue Dream or Durban Poison when they touch auth, RLS, DB or Edge). Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. GDP retired on 2026-09-29. Where [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) still gives GDP routing or "Chemdawg only" merges, this skill and the "Start here" section of `docs/agents/CURRENT_STATE.md` describe current practice until OWNERSHIP.md is updated (pending).
+Blue Dream and Critical Mass are retired from future routing. Keep historical receipts
+with their original reviewer, scope, SHA and verdict. Eligible outside sessions review
+all of a PR's scope, including `.tsx`/UI, lib/logic, docs, CI and protected work as
+applicable. Migrations, billing, workflows, security/auth, dependencies, lockfiles,
+locked scorers and all other protected paths retain their gates and supplemental evidence.
+Graft's low-risk allowlist is unchanged. Missing availability, independence or scope
+coverage is BLOCKED. Reviewer eligibility changes no merge-actor assignment or powers.
 
-The owner of a change can't review it. Each slice has one owner and a different reviewer.
+Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. GDP retired on 2026-09-29. Where [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) still gives GDP routing or "Chemdawg only" merges, this skill and the "Start here" section of `docs/agents/CURRENT_STATE.md` describe current practice until OWNERSHIP.md is updated (pending).
+
+Ownership is temporary accountability, not permanent dibs. Keep one active implementation
+writer with explicit claim/release safeguards under AGENTS.md. Preserve fresh claims,
+named locks and explicit assignments; reviewer fallback never transfers implementation.
+An author or repairer remains excluded after a task transfer. Record reviewer session
+and role, contributor exclusions and how checked, full 40-character head SHA, complete
+scope, evidence and verdict. A shared GitHub identity alone is not evidence of independence.
+
+### One current request per PR/full head
+
+Before pinging, read the existing request and receipt and verify the current full head.
+Preserve a still-valid independent PASS and avoid duplicate requests. Use one canonical
+ledger entry per PR/full head under OWNERSHIP.md §4.3: request owner, reviewer session/role,
+contributor exclusions, scope, evidence, request/receipt permalinks, timestamps,
+fallback-transfer count and `requested`, `running`, `blocked`, `verdict`, or `superseded`.
+A missing authorized transport/permalink is BLOCKED, not successful delivery.
+
+If the reviewer declines, is unavailable or is silent for 60 minutes, supersede that
+assignment and transfer the existing request once to an actually available eligible
+fallback. Recheck head and exclusions first; never keep parallel active requests. If no
+eligible fallback is available, or it becomes unavailable, record BLOCKED and its owner.
+A new head supersedes the old request and invalidates its verdict; fully review the new
+head. Pending requests, acknowledgments and silence are not PASS. Review claims are
+separate from the implementation writer's claim; the latter is not released by a push.
 
 ## 1. Exact SHA or BLOCKED
 
@@ -95,7 +125,12 @@ These stand until Matthew lifts them. The live list is kept on the agents' share
 ## Verdict template
 
 ```text
-[VERDICT] <reviewer>: #<N> @ <full SHA>: <PASS|PASS-with-P2|FAIL|BLOCKED|NOT_MEASURED>, <n> P1, <n> P2. Required checks <x>/35. Head unchanged start and end; draft=<true|false>.
+[VERDICT] <reviewer session/role>: #<N> @ <full 40-character SHA>: <PASS|PASS-with-P2|FAIL|BLOCKED|NOT_MEASURED>, <n> P1, <n> P2. Required checks <x>/35. Head unchanged start and end; draft=<true|false>.
+Reviewer session/role: <identity and role; shared GitHub identity alone is insufficient>
+Contributor exclusions: <authors/repairers; how independence checked>
+Scope: <complete changed scope; protected gates and supplemental evidence>
+Request: <owner; permalink; state; fallback-transfer count>
+Receipt: <verdict evidence permalink; BLOCKED if unavailable>
 P1: <file:line> <evidence> <fix>
 P2-1: <file:line> <evidence> <fix>
 Re-review triggers: <list>

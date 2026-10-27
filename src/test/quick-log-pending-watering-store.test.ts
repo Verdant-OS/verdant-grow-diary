@@ -255,7 +255,7 @@ describe("tab-scoped pending Water Quick Log ownership", () => {
   it("accepts the canonical numeric boundaries without normalizing the payload", async () => {
     const pending = record();
     Object.assign(pending.payload, {
-      volume_ml: 1_000_000,
+      volume_ml: 50_000,
       ph: 0,
       ec_ms_cm: 10,
       runoff_ml: 0,
@@ -348,7 +348,13 @@ describe("fail-closed pending Water validation", () => {
     [
       "excessive volume",
       (r) => {
-        r.payload.volume_ml = 1_000_001;
+        r.payload.volume_ml = 50_001;
+      },
+    ],
+    [
+      "pre-ceiling journal volume",
+      (r) => {
+        r.payload.volume_ml = 1_000_000;
       },
     ],
     ["string number", (r) => Object.assign(r.payload, { ph: "6.3" })],
@@ -851,4 +857,98 @@ describe("Water history-review marker fallback when the full record cannot be re
     expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
   });
+});
+
+describe("moved-receipt review target on a pending Water", () => {
+  const target = { growId, tentId: "66666666-6666-4666-8666-666666666666", plantId: null };
+
+  it("persists the verified destination with receipt_target_moved across reads", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const marked = {
+      ...record(),
+      historyCheckReason: "receipt_target_moved" as const,
+      historyReviewTarget: target,
+    };
+    await expect(
+      markPendingQuickLogWateringHistoryCheck(original, "receipt_target_moved", target),
+    ).resolves.toEqual({ status: "marked", record: marked });
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: marked });
+    await expect(reconcilePendingQuickLogWateringHistoryDiscard(original)).resolves.toEqual({
+      status: "cleared",
+    });
+  });
+
+  it("refuses a review target with any reason other than receipt_target_moved", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const raw = window.sessionStorage.getItem(key());
+    await expect(
+      markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted", target),
+    ).resolves.toEqual({ status: "blocked" });
+    expect(window.sessionStorage.getItem(key())).toBe(raw);
+  });
+
+  it.each([
+    ["a target without the moved reason", { historyCheckReason: "idempotency_key_conflict" }],
+    ["a target with no reason", {}],
+    ["a malformed target", { historyCheckReason: "receipt_target_moved", bad: true }],
+  ])("fails closed on a stored record with %s", (_case, extra) => {
+    const { bad, ...rest } = extra as Record<string, unknown>;
+    const historyReviewTarget = bad ? { growId: 42, tentId: null, plantId: null } : target;
+    window.sessionStorage.setItem(
+      key(),
+      JSON.stringify({ ...record(), ...rest, historyReviewTarget }),
+    );
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+  });
+
+  it.each(["throw", "ignore"] as const)(
+    "keeps the verified destination in the key-scoped fallback marker when the marked write %ss",
+    async (mode) => {
+      const original = record();
+      await claimPendingQuickLogWatering(original);
+      const unmarkedRaw = window.sessionStorage.getItem(key());
+      const spy = refuseMarkedWateringRewrite(mode);
+      const marked = {
+        ...record(),
+        historyCheckReason: "receipt_target_moved" as const,
+        historyReviewTarget: target,
+      };
+      await expect(
+        markPendingQuickLogWateringHistoryCheck(original, "receipt_target_moved", target),
+      ).resolves.toEqual({ status: "marked", record: marked });
+      spy.mockRestore();
+      expect(window.sessionStorage.getItem(key())).toBe(unmarkedRaw);
+      expect(JSON.parse(window.sessionStorage.getItem(waterHistoryKey())!)).toEqual({
+        version: 1,
+        idempotencyKey: "watering-save-12345678",
+        historyCheckReason: "receipt_target_moved",
+        historyReviewTarget: target,
+      });
+      expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: marked });
+      await expect(clearPendingQuickLogWatering(marked)).resolves.toBe(true);
+      expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
+    },
+  );
+
+  it.each([
+    ["a target beside another reason", "idempotency_key_retracted", target],
+    ["a malformed target", "receipt_target_moved", { growId: 42, tentId: null, plantId: null }],
+  ])(
+    "fails closed on a fallback marker carrying %s",
+    async (_case, reason, historyReviewTarget) => {
+      await claimPendingQuickLogWatering(record());
+      window.sessionStorage.setItem(
+        waterHistoryKey(),
+        JSON.stringify({
+          version: 1,
+          idempotencyKey: "watering-save-12345678",
+          historyCheckReason: reason,
+          historyReviewTarget,
+        }),
+      );
+      expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+    },
+  );
 });

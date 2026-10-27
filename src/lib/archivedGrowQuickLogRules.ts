@@ -22,6 +22,26 @@ export const ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY = QUICK_LOG_TARGET_BLOCKED_COP
 
 export const GROW_RESTORE_FAILED_COPY = "Unable to restore this grow. Please try again." as const;
 
+export const GROW_ARCHIVE_CONFIRM_COPY = "Archive this grow? Entries stay saved." as const;
+export const GROW_ARCHIVE_FAILED_COPY = "Unable to archive this grow. Please try again." as const;
+
+/**
+ * Computes the next stored activeGrowId after a grow is archived.
+ * If the archived grow was not the active grow, activeGrowId is unchanged.
+ * Otherwise selects the first remaining active grow, or null when none remain.
+ */
+export function nextActiveGrowIdAfterArchive(input: {
+  archivedGrowId: string;
+  activeGrowId: string | null;
+  activeGrows: ReadonlyArray<{ id: string }>;
+}): string | null {
+  if (input.activeGrowId !== input.archivedGrowId) {
+    return input.activeGrowId;
+  }
+  const remaining = input.activeGrows.find((g) => g.id !== input.archivedGrowId);
+  return remaining?.id ?? null;
+}
+
 const FREE_ACTIVE_GROW_LIMIT_REACHED = "free_active_grow_limit_reached";
 
 const NOTE_EVENT_TYPES = new Set(["observation", "note", "photo"]);

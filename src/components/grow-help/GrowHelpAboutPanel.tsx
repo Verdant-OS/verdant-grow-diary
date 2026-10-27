@@ -1,108 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-
-interface SourceReference {
-  label: string;
-  url: string;
-  note?: string;
-}
-
-interface SourceGroup {
-  title: string;
-  sources: readonly SourceReference[];
-}
-
-const SOURCE_GROUPS: readonly SourceGroup[] = [
-  {
-    title: "Nutrient references",
-    sources: [
-      {
-        label: "Hydrobuilder nutrient mixing and dilution calculator",
-        url: "https://hydrobuilder.com/pages/nutrient-mixing-dilution-calculator",
-      },
-      {
-        label: "Gera Tools hydroponic nutrient solution calculator",
-        url: "https://geratools.com/hydroponics-nutrient-solution-calculator",
-      },
-      {
-        label: "MistCulture hydroponic nutrient calculator",
-        url: "https://mistculture.com/tools-and-resources/hydroponic-nutrient-calculator/",
-      },
-      {
-        label: "SpeedCalcs hydroponic nutrient PPM calculator",
-        url: "https://www.speedcalcs.com/p/hydroponic-nutrient-ppm-calculator.html",
-      },
-      {
-        label: "HydroGreenSpace hydroponic nutrient calculator",
-        url: "https://www.hydrogreenspace.com/hydroponic-nutrient-calculator/",
-      },
-      {
-        label: "Jacks Nutrients fertilizer calculators",
-        url: "https://www.jacksnutrients.com/fertilizer-calculators",
-      },
-      {
-        label: "Jacks Nutrients 3-2-1 mixing guide",
-        url: "https://www.jacksnutrients.com/post/how-do-i-mix-jack-s-321",
-        note: "Cited only for the documented 3.6 g / 1.1 g / 2.4 g per gallon preset and mix order.",
-      },
-    ],
-  },
-  {
-    title: "Light references",
-    sources: [
-      {
-        label: "Hydrobuilder grow-light coverage and PPFD calculator",
-        url: "https://hydrobuilder.com/pages/grow-light-coverage-ppfd-calculator",
-      },
-      {
-        label: "LumenCalculator hanging-height and PPFD calculator (original reference)",
-        url: "https://lumencalculator.com/grow-light-hanging-height-ppfd-calculator/",
-        note: "This original page was unavailable during the 2026 source review.",
-      },
-      {
-        label: "LumenCalculator grow-light coverage calculator (available replacement page)",
-        url: "https://lumencalculator.com/grow-light-coverage-calculator/",
-      },
-      {
-        label: "Grow With Hydroponics grow-light calculator",
-        url: "https://growwithhydroponics.com/grow-light-calculator/",
-      },
-      {
-        label: "MistCulture grow-light PPFD and DLI calculator",
-        url: "https://mistculture.com/tools-and-resources/grow-light-ppfd-dli-calculator/",
-      },
-    ],
-  },
-  {
-    title: "Expense references",
-    sources: [
-      {
-        label: "Hydrobuilder grow-room electricity calculator",
-        url: "https://hydrobuilder.com/pages/grow-room-electricity-calculator",
-      },
-      {
-        label: "HydroGreenSpace hydroponic electricity cost calculator",
-        url: "https://www.hydrogreenspace.com/hydroponic-electricity-cost-calculator/",
-      },
-      {
-        label: "Grow Weed Easy electricity cost calculator",
-        url: "https://www.growweedeasy.com/electricity-cost-calculator-for-growing-cannabis",
-      },
-      {
-        label: "Hydro Oasis calculator suite",
-        url: "https://www.hydrooasis.com.au/pages/calculators",
-        note: "Used as a calculator-suite reference; its current page did not expose an ROI calculator during review.",
-      },
-      {
-        label: "CannaCalc cost-per-gram calculator",
-        url: "https://www.cannacalc.app/tools/cost-per-gram",
-      },
-      {
-        label: "MistCulture hydroponic cost calculator",
-        url: "https://mistculture.com/tools-and-resources/hydroponic-cost-calculator/",
-      },
-    ],
-  },
-] as const;
+import {
+  GROW_HELP_REFERENCE_GROUPS,
+  GROW_HELP_RELATED_RESOURCES,
+} from "@/constants/growHelpToolkitReferences";
+import { Link } from "@/lib/react-router-compat";
 
 export default function GrowHelpAboutPanel() {
   return (
@@ -125,7 +26,8 @@ export default function GrowHelpAboutPanel() {
               <dt className="font-semibold text-foreground">Local and private</dt>
               <dd className="mt-1 leading-6 text-muted-foreground">
                 The toolkit saves its last inputs in this browser&apos;s localStorage. It has no
-                backend, account, analytics, grow-data upload, live-reading, or device-control path.
+                backend, account, grow-data upload, live-reading, or device-control path. Calculator
+                inputs are not sent to analytics.
               </dd>
             </div>
 
@@ -177,7 +79,7 @@ export default function GrowHelpAboutPanel() {
               </p>
 
               <div className="space-y-4" data-testid="grow-help-source-list">
-                {SOURCE_GROUPS.map((group) => (
+                {GROW_HELP_REFERENCE_GROUPS.map((group) => (
                   <div key={group.title}>
                     <h3 className="font-semibold text-foreground">{group.title}</h3>
                     <ol className="mt-1 list-decimal space-y-1.5 pl-5">
@@ -192,6 +94,7 @@ export default function GrowHelpAboutPanel() {
                           >
                             {source.url}
                           </a>
+                          <span> — {source.method}</span>
                           {source.note ? <span> — {source.note}</span> : null}
                         </li>
                       ))}
@@ -208,6 +111,28 @@ export default function GrowHelpAboutPanel() {
               </p>
             </div>
           </details>
+
+          <nav aria-labelledby="grow-help-related-title" data-testid="grow-help-related-resources">
+            <h3 id="grow-help-related-title" className="font-display text-lg font-semibold">
+              Continue planning with Verdant
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              These public references are separate tools. They do not receive or change this
+              browser-local plan.
+            </p>
+            <ul className="mt-3 grid gap-3 md:grid-cols-3">
+              {GROW_HELP_RELATED_RESOURCES.map((resource) => (
+                <li key={resource.path} className="rounded-lg border border-border/60 p-4">
+                  <Link to={resource.path} className="font-semibold text-primary hover:underline">
+                    {resource.title}
+                  </Link>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {resource.description}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </CardContent>
       </Card>
     </section>

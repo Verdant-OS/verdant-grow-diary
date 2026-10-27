@@ -127,6 +127,14 @@ describe("/guides pages render publicly (no auth mounted)", () => {
     expect(screen.queryByTestId("app-shell")).toBeNull();
   });
 
+  it("/guides links to the public browser-local Grow Help Toolkit", () => {
+    renderGuides("/guides");
+    expect(screen.getByRole("link", { name: "Open the Grow Help Toolkit" })).toHaveAttribute(
+      "href",
+      "/tools/grow-help-toolkit",
+    );
+  });
+
   for (const slug of VERDANT_GUIDE_SLUGS) {
     it(`/guides/${slug} renders its guide content with no sign-in wall`, () => {
       renderGuides(`/guides/${slug}`);
@@ -243,13 +251,13 @@ describe("/guides click-through stays on public content", () => {
     expect(await screen.findByTestId("guides-index-page")).toBeInTheDocument();
   });
 
-  it("clicking /welcome navigates to /welcome — never to /auth", async () => {
+  it("clicking home navigates to / — never to /auth", async () => {
     const user = userEvent.setup();
     const { container } = renderGuides("/guides");
-    const link = container.querySelector<HTMLAnchorElement>('a[href="/welcome"]');
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/"]');
     expect(link).toBeTruthy();
     await user.click(link!);
-    expect(await screen.findByTestId("location-probe")).toHaveTextContent("/welcome");
+    expect(await screen.findByTestId("location-probe")).toHaveTextContent(/^\/$/);
   });
 
   for (const path of ALL_GUIDE_PATHS.filter((path) => path !== OREOZ_GELONADE_GUIDE_PATH)) {
@@ -274,7 +282,7 @@ describe("/guides click-through stays on public content", () => {
   });
 
   it("preserves real public routes and only the scoped static Customer Mode route", () => {
-    expect(manifestEntryFor("/welcome")?.access).toBe("public");
+    expect(manifestEntryFor("/welcome")?.access).toBe("redirect");
     expect(manifestEntryFor("/pricing")?.access).toBe("public");
     expect(APP_ROUTES.filter((route) => route.path.startsWith("/customer/"))).toEqual([
       expect.objectContaining({

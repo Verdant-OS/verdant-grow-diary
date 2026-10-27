@@ -20,6 +20,14 @@ import type { LatestManualReading, ManualSensorMetric } from "@/lib/manualSensor
 import { MANUAL_SENSOR_METRICS } from "@/lib/manualSensorFreshnessRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import { MANUAL_SOURCE } from "@/lib/manualSensorChronologyDeltaRules";
+import {
+  PLANT_MANUAL_ENV_EVENT_LIMIT,
+  PLANT_MANUAL_ENV_EVENT_SELECT,
+  PLANT_MANUAL_ENV_EVENT_SOURCE,
+  latestManualReadingsFromEnvironmentEvents,
+  mergeLatestManualReadings,
+  type PlantManualEnvEventRow,
+} from "@/lib/plantManualEnvironmentEventRules";
 
 export const PLANT_MANUAL_SENSOR_HISTORY_LIMIT = 30;
 
@@ -110,13 +118,41 @@ export async function fetchPlantManualSensorDiaryRows(plantId: string): Promise<
   return (data ?? []) as DiaryRow[];
 }
 
+/** Quick Log manual environment readings for one plant (environment_events). */
+async function fetchPlantManualEnvironmentEvents(
+  plantId: string,
+): Promise<PlantManualEnvEventRow[]> {
+  const { data, error } = await supabase
+    .from("grow_events")
+    .select(PLANT_MANUAL_ENV_EVENT_SELECT)
+    .eq("plant_id", plantId)
+    .eq("source", PLANT_MANUAL_ENV_EVENT_SOURCE)
+    .eq("is_deleted", false)
+    .eq("event_type", "environment")
+    .order("occurred_at", { ascending: false })
+    .limit(PLANT_MANUAL_ENV_EVENT_LIMIT);
+  if (error) throw error;
+  return (data ?? []) as PlantManualEnvEventRow[];
+}
+
 export function usePlantManualSensorHistory(plantId: string | null | undefined) {
   return useQuery({
     queryKey: ["plant_manual_sensor_history", plantId ?? null],
     enabled: !!plantId,
     queryFn: async (): Promise<PlantManualSensorHistory> => {
-      const rows = await fetchPlantManualSensorDiaryRows(plantId as string);
-      return deriveLatestManualReadings(rows);
+      // The grow_events read is supplemental: when it fails, keep the
+      // diary-backed readings instead of rejecting the whole query and
+      // showing every metric as never logged. A diary failure still throws.
+      const [rows, events] = await Promise.all([
+        fetchPlantManualSensorDiaryRows(plantId as string),
+        fetchPlantManualEnvironmentEvents(plantId as string).catch(() => null),
+      ]);
+      const diaryReadings = deriveLatestManualReadings(rows);
+      if (events === null) return diaryReadings;
+      return mergeLatestManualReadings(
+        diaryReadings,
+        latestManualReadingsFromEnvironmentEvents(events),
+      );
     },
   });
 }

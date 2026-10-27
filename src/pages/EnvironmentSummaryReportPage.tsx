@@ -301,7 +301,7 @@ export default function EnvironmentSummaryReportPage() {
 
   if (showLocked) {
     const vm = buildPaywallCtaViewModel({
-      featureTitle: "Unlock Environment Summary Reports",
+      featureTitle: "An Environment Summary report",
       requiredPlanLabel: "Pro",
       unlockBullets: [
         "Aggregated environment checks across a date range",

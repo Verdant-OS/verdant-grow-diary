@@ -2389,7 +2389,7 @@ describe("Timeline mounted filter reset (QOL-09)", () => {
     expect(screen.getByText("Flowering stage log")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /Vegetative/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Vegetative/i }));
     expect(await screen.findByText("Vegetative stage log")).toBeInTheDocument();
     expect(screen.queryByText("Flowering stage log")).not.toBeInTheDocument();
     expect(screen.getByTestId("timeline-results-count")).toHaveTextContent("showing 1 of 2");

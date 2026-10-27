@@ -8,10 +8,13 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
+import SearchShortcutHint from "@/components/SearchShortcutHint";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useSearchShortcut } from "@/hooks/useSearchShortcut";
+import { usePublishedCultivars } from "@/hooks/usePublishedCultivars";
+import { cultivarReferenceSourceNotice } from "@/constants/cultivarReferenceSourceCopy";
 import {
-  VERDANT_CULTIVARS,
   formatVerificationStatus,
   type CultivarDifficulty,
   type CultivarLifeCycle,
@@ -55,7 +58,13 @@ function validOption<T extends string>(
 export default function CultivarsIndex() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchOpen, setSearchOpen] = useState(false);
+  useSearchShortcut(setSearchOpen);
   usePageSeo(buildCultivarsIndexSeo(searchParams));
+  // V1.1: bundled library unless the default-off database read flag is on;
+  // the resolved source state is explicit and never silent.
+  const referenceSource = usePublishedCultivars();
+  const profiles = referenceSource.catalog.profiles;
+  const sourceNotice = cultivarReferenceSourceNotice(referenceSource.reason);
 
   const query = searchParams.get("q") ?? "";
   const difficulty = validOption(
@@ -79,13 +88,13 @@ export default function CultivarsIndex() {
 
   const filtered = useMemo(
     () =>
-      filterCultivarReferenceProfiles(VERDANT_CULTIVARS, {
+      filterCultivarReferenceProfiles(profiles, {
         query,
         difficulty,
         lifeCycle,
         verificationStatus,
       }),
-    [difficulty, lifeCycle, query, verificationStatus],
+    [difficulty, lifeCycle, profiles, query, verificationStatus],
   );
 
   const hasFilters =
@@ -95,13 +104,17 @@ export default function CultivarsIndex() {
     verificationStatus !== "all";
 
   return (
-    <main data-testid="cultivars-index-page" className="min-h-screen bg-background text-foreground">
+    <main
+      data-testid="cultivars-index-page"
+      data-cultivar-source-state={referenceSource.state}
+      className="min-h-screen bg-background text-foreground"
+    >
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-5 sm:px-6">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex w-full items-center justify-between gap-4 text-sm sm:w-auto sm:justify-start">
-          <Link to="/welcome" className="text-muted-foreground hover:text-foreground">
+          <Link to="/" className="text-muted-foreground hover:text-foreground">
             Home
           </Link>
           <Link to="/guides" className="text-muted-foreground hover:text-foreground">
@@ -137,6 +150,14 @@ export default function CultivarsIndex() {
             equipment, creates alerts, or overrides the grower&apos;s plant history.
           </p>
         </div>
+        {sourceNotice ? (
+          <p
+            data-testid="cultivar-reference-source-notice"
+            className="mt-3 text-xs text-muted-foreground"
+          >
+            {sourceNotice}
+          </p>
+        ) : null}
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
@@ -152,7 +173,7 @@ export default function CultivarsIndex() {
               Search cultivars, your grows, tents, and plants…
             </span>
             <kbd className="hidden shrink-0 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-              ⌘K
+              <SearchShortcutHint />
             </kbd>
           </button>
           {query ? (
@@ -254,9 +275,9 @@ export default function CultivarsIndex() {
           aria-live="polite"
           data-testid="cultivars-index-result-count"
         >
-          {filtered.length === VERDANT_CULTIVARS.length
-            ? `Showing all ${VERDANT_CULTIVARS.length} reference profiles`
-            : `Showing ${filtered.length} of ${VERDANT_CULTIVARS.length} reference profiles`}
+          {filtered.length === profiles.length
+            ? `Showing all ${profiles.length} reference profiles`
+            : `Showing ${filtered.length} of ${profiles.length} reference profiles`}
         </p>
 
         {filtered.length === 0 ? (

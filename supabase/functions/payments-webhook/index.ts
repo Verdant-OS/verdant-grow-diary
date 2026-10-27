@@ -51,10 +51,21 @@ function safeParseJson(s: string): unknown {
   }
 }
 
-/**
- * Map raw Paddle notification JSON (snake_case) to the EventLike shape the
- * pure processor expects (camelCase eventId/eventType). Only after HMAC verify.
- */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Alias only named provider fields; never recursively rewrite custom_data. */
+function aliasProviderFields(value: unknown, aliases: Record<string, string>): unknown {
+  if (!isRecord(value)) return value;
+  const result = { ...value };
+  for (const [wire, sdk] of Object.entries(aliases)) {
+    if (Object.prototype.hasOwnProperty.call(value, wire)) result[sdk] = value[wire];
+  }
+  return result;
+}
+
+/** Map verified Paddle wire fields to the processor's SDK-style shape. */
 function normalizeVerifiedPaddleEvent(raw: unknown): EventLikeWithId | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -71,11 +82,54 @@ function normalizeVerifiedPaddleEvent(raw: unknown): EventLikeWithId | null {
         ? o.event_type
         : undefined;
   if (!eventType) return null;
+  const data = aliasProviderFields(o.data, {
+    customer_id: "customerId",
+    subscription_id: "subscriptionId",
+    custom_data: "customData",
+    current_billing_period: "currentBillingPeriod",
+    scheduled_change: "scheduledChange",
+    currency_code: "currencyCode",
+  });
+  if (isRecord(data)) {
+    data.currentBillingPeriod = aliasProviderFields(data.currentBillingPeriod, {
+      starts_at: "startsAt",
+      ends_at: "endsAt",
+    });
+    data.scheduledChange = aliasProviderFields(data.scheduledChange, {
+      effective_at: "effectiveAt",
+    });
+    if (Array.isArray(data.items)) {
+      data.items = data.items.map((item) => {
+        if (!isRecord(item)) return item;
+        const normalized = { ...item };
+        for (const key of ["price", "product"]) {
+          const resource = aliasProviderFields(item[key], { import_meta: "importMeta" });
+          if (isRecord(resource)) {
+            resource.importMeta = aliasProviderFields(resource.importMeta, {
+              external_id: "externalId",
+            });
+          }
+          normalized[key] = resource;
+        }
+        return normalized;
+      });
+    }
+    // The existing confirmation helper also consumes SDK-style monetary fields.
+    if (isRecord(data.details)) {
+      data.details = {
+        ...data.details,
+        totals: aliasProviderFields(data.details.totals, {
+          grand_total: "grandTotal",
+          currency_code: "currencyCode",
+        }),
+      };
+    }
+  }
   return {
     ...(o as object),
     eventId,
     eventType,
-    data: o.data,
+    data,
   } as EventLikeWithId;
 }
 
@@ -270,6 +324,26 @@ function buildDeps(): Deps {
       }
       if (failures.length > 0) return { ok: false, error: failures.join("; ") };
       return { ok: true, canceled };
+    },
+    async clawbackCreditPack({ paddle_transaction_id, environment }) {
+      // Grant-path audit (2026-10-03): reverse a credit-pack grant on an
+      // approved refund/chargeback. Service-role-only, idempotent, and a
+      // no-op ('no_grant') for transactions that were not a pack purchase.
+      const { data, error } = await sb.rpc("clawback_lovable_credit_pack", {
+        p_paddle_transaction_id: paddle_transaction_id,
+        p_environment: environment,
+      });
+      if (error) return { ok: false, error: `rpc_error:${error.message}` };
+      const payload = (data ?? {}) as { ok?: boolean; reason?: string };
+      if (
+        payload.ok === true &&
+        (payload.reason === "clawed_back" ||
+          payload.reason === "idempotent" ||
+          payload.reason === "no_grant")
+      ) {
+        return { ok: true, reason: payload.reason };
+      }
+      return { ok: false, error: `rpc_rejected:${payload.reason ?? "unknown"}` };
     },
     async revokeFounderLifetime({ paddle_transaction_id, environment, now }) {
       // Turn B refund-retire: single atomic RPC call that flips both the

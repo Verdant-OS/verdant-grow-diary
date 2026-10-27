@@ -3,7 +3,7 @@
   "canonicalPackageManager": "bun",
   "canonicalLockfile": "bun.lock",
   "owner": "Verdant dependency security",
-  "reason": "The npm compatibility lock (package-lock.json) is retired in PR #1873, explicitly approved by Matthew on 2026-10-04. This branch carries the frozen Bun SEO install from #1870, which remains unmerged and must land first. bun.lock is the only lockfile and package-lock.json is forbidden. The two references below are an exact allowlist of npm command text in documentation; the historical preview install command is unpinned without an npm lock and is not a supported setup path. Local setup uses bun install --frozen-lockfile. See docs/dependency-lockfile-transition-review-2026-10-03.md. vercel.json pins Bun install/build.",
+  "reason": "The npm compatibility lock (package-lock.json) is retired in PR #1873, explicitly approved by Matthew on 2026-10-04. The frozen Bun SEO install from #1870 is on the deploy branch (merged as 22f8dfe8). bun.lock is the only lockfile and package-lock.json is forbidden. The two references below are an exact allowlist of npm command text in documentation; the historical preview install command is unpinned without an npm lock and is not a supported setup path. Local setup uses bun install --frozen-lockfile. See docs/dependency-lockfile-transition-review-2026-10-03.md. vercel.json pins Bun install/build.",
   "consumerContracts": [
     {
       "path": "README.md",

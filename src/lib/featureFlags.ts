@@ -24,8 +24,24 @@
  */
 export const typedWateringWriteEnabled = false as const;
 
-export type FeatureFlagName = "typedWateringWriteEnabled";
+/**
+ * Enables database-backed reads for the public `/cultivars` and
+ * `/cultivars/:slug` pages (Strain Reference Library V1.1, issue #419).
+ *
+ * MUST stay `false` until the V1.1 parity migration is applied and the strict
+ * anon parity receipt (`bun run audit:cultivar-db-parity -- --source=supabase
+ * --strict`) is green against production. Verdant is production only: there is
+ * no preview step. Follow docs/product/strain-reference-library-v1-1-db-cutover.md.
+ *
+ * While `false`, the pages render the bundled sample/reference library and issue
+ * no database request. When `true`, any read or mapping failure falls back,
+ * visibly, to the bundled library. Rollback is flipping this back to `false`.
+ */
+export const cultivarDatabaseReadsEnabled = false as const;
+
+export type FeatureFlagName = "typedWateringWriteEnabled" | "cultivarDatabaseReadsEnabled";
 
 export const featureFlags = Object.freeze({
   typedWateringWriteEnabled,
+  cultivarDatabaseReadsEnabled,
 });

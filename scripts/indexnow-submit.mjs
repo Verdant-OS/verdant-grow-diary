@@ -1,51 +1,66 @@
-#!/usr/bin/env node
 /**
- * IndexNow submission for production sitemap URLs.
- *
- * Not wired to CI, the merge queue, or any post-deploy hook. Run it yourself
- * after a production deploy of verdant-grow-diary is live:
- *
+ * Manual IndexNow submission. Not wired to CI or postbuild.
+ * Run only after a production deploy is confirmed:
  *   INDEXNOW_SUBMIT=1 node scripts/indexnow-submit.mjs
- *
- * The key file is public/a7c3e91b4d8f2e6c0b5a19d47e83f012.txt and must be
- * reachable at https://verdantgrowdiary.com/a7c3e91b4d8f2e6c0b5a19d47e83f012.txt
- * before a search engine will accept the ping. This process exits without
- * a network call unless INDEXNOW_SUBMIT=1.
+ * The key file is public by IndexNow's design.
  */
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const KEY = "a7c3e91b4d8f2e6c0b5a19d47e83f012";
 const HOST = "verdantgrowdiary.com";
 const KEY_LOCATION = `https://${HOST}/${KEY}.txt`;
-const ENDPOINT = "https://api.indexnow.org/indexnow";
+const SITEMAP = new URL("../public/sitemap.xml", import.meta.url);
 
-if (process.env.INDEXNOW_SUBMIT !== "1") {
-  console.log(
-    "IndexNow submit is disabled. After the production deploy is live, run: INDEXNOW_SUBMIT=1 node scripts/indexnow-submit.mjs",
-  );
-  process.exit(0);
+export function indexNowSubmitEnabled(env = process.env) {
+  return env.INDEXNOW_SUBMIT === "1";
 }
 
-const sitemap = readFileSync(resolve("public/sitemap.xml"), "utf8");
-const urlList = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1].trim());
-const body = {
-  host: HOST,
-  key: KEY,
-  keyLocation: KEY_LOCATION,
-  urlList,
-};
-
-const response = await fetch(ENDPOINT, {
-  method: "POST",
-  headers: { "content-type": "application/json; charset=utf-8" },
-  body: JSON.stringify(body),
-});
-
-if (!response.ok) {
-  const text = await response.text();
-  console.error(`IndexNow responded ${response.status}: ${text.slice(0, 500)}`);
-  process.exit(1);
+export function sitemapLocs(xml) {
+  return [...String(xml).matchAll(/<loc>([^<]+)<\/loc>/g)]
+    .map((match) => match[1].trim())
+    .filter((loc) => loc.length > 0);
 }
 
-console.log(`IndexNow accepted ${urlList.length} sitemap URLs (${response.status}).`);
+export async function submitIndexNow(env = process.env, fetchImpl = fetch) {
+  if (!indexNowSubmitEnabled(env)) {
+    console.log("IndexNow submit skipped. Set INDEXNOW_SUBMIT=1 after a production deploy.");
+    return { submitted: false, count: 0 };
+  }
+  const xml = readFileSync(SITEMAP, "utf8");
+  const urlList = sitemapLocs(xml);
+  const response = await fetchImpl("https://api.indexnow.org/indexnow", {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({
+      host: HOST,
+      key: KEY,
+      keyLocation: KEY_LOCATION,
+      urlList,
+    }),
+  });
+  const body = await response.text();
+  console.log(`IndexNow ${response.status} ${urlList.length} urls`);
+  if (!response.ok) {
+    console.error(body.slice(0, 500));
+    throw new Error(`IndexNow submit failed: ${response.status}`);
+  }
+  return { submitted: true, count: urlList.length };
+}
+
+function isDirectRun() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return import.meta.url === pathToFileURL(entry).href;
+}
+
+if (isDirectRun()) {
+  submitIndexNow()
+    .then((result) => {
+      if (!result.submitted) process.exit(0);
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
+}

@@ -73,34 +73,34 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK ACTIONS-BACKLOG-CONCURRENCY  priority: P2  status: OPEN
-goal: Cut the hosted-runner queue by cancelling superseded pull_request runs, skipping heavy jobs on draft PRs, and capping ci.yml shard parallelism at 8.
-why: The org cap is 20 concurrent Linux jobs and was full. ci.yml's 32 required shards alone exceed that cap on one push. Superseded heads were still occupying slots.
+goal: Cut the hosted-runner queue by cancelling superseded pull_request runs, skipping heavy jobs on draft PRs, and capping ci.yml shard parallelism at 16.
+why: Sour Diesel review 5670841287 failed c20c42a76. The irrigation draft guard broke two folded if blocks. A skipped matrix does not post the 32 required shard names. GitHub Team allows 60 concurrent jobs.
 branch: cursor/actions-backlog-concurrency-58cd
 base: verdant-grow-diary
 checkout: git fetch origin cursor/actions-backlog-concurrency-58cd verdant-grow-diary && git switch cursor/actions-backlog-concurrency-58cd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
-pr: draft PR URL is in the pull request for this branch
-head_sha: implementation a5e0dd832ec05d6e6d72a2327a550298b1599d96; branch head is the commit that updates this line
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2555 (draft; keep draft)
+head_sha: repair of review 5670841287; the commit that contains this revised block is the branch head
 state: pushed draft
-current_step: Implementation is committed. This line records that commit before push.
+current_step: Irrigation if expressions are folded blocks again. max-parallel is 16. The pin test rejects a bare >- inside any workflow if.
 next_action: Read the draft PR, confirm it stays draft, and do not mark it ready, enqueue it, or merge it.
-post_merge_check: After a separately authorized merge, confirm a ready PR and a merge_group run still report all 35 required contexts from ci.yml, and that a draft PR skips the 32 shards. NOT_MEASURED until merged.
+post_merge_check: After a separately authorized merge, confirm a ready PR and a merge_group run still report all 35 required contexts from ci.yml. A draft does not post those 32 shard names. NOT_MEASURED until merged.
 active_writer: Grok cloud agent on cursor/actions-backlog-concurrency-58cd
-decisions: Do not reduce the 32 shard matrix. Those names are the ruleset required checks. Add max-parallel 8. Skip heavy jobs on draft with a job-level if so they report Skipped. Leave Preflight and test:legal-seo unconditional. Leave security-regression unconditional because mustBeGreen alwaysRuns treats a skip as a failure. Cancel in progress only when github.event_name == pull_request. Do not add paths filters to ci.yml.
+decisions: Do not reduce the 32 shard matrix. Those names are the ruleset required checks. max-parallel is 16 under the Team plan's 60-job pool. A draft skip on the shard matrix does not emit the 32 context names; they stay Expected until ready_for_review or merge_group. Lint/typecheck/test/build does report Skipped on a draft. Irrigation draft guards use if: >- so the fold marker is the YAML syntax, not part of the expression. Leave Preflight and test:legal-seo unconditional. Leave security-regression unconditional. Cancel in progress only when github.event_name == pull_request.
 tried_and_rejected: Cutting the shard count was rejected because the ruleset expects Full test suite (shard N/32) for N=1..32. A missing name stays Expected and blocks the merge queue.
 commands: bunx vitest run src/test/ci-pr-concurrency.test.ts src/test/deployment-preview-status-classification.test.ts --reporter=dot; node scripts/scorer-lock.mjs --report --strict
 files_touched: .github/workflows listed in the PR; src/test/ci-pr-concurrency.test.ts; src/test/deployment-preview-status-classification.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
 files_remaining: none planned
 blockers: none for the draft. Independent exact-head review is not requested while the PR stays draft.
 open_questions: none
-gotchas: HOLD #1250 files migration-drift-probe.yml and money-migration-drift-alert.yml were not edited. Job-level skip on a draft reports Skipped, which branch protection treats as success. Ready PRs and merge_group still run the heavy jobs. max-parallel 8 also applies on the deploy branch push and merge_group.
+gotchas: HOLD #1250 files were not edited. A matrix job skipped by if does not report one check per shard. If ready_for_review never runs, the 32 shard contexts stay Expected and the merge queue stays blocked. Lint/typecheck/test/build Skipped on a draft is not the same as those shard contexts passing. max-parallel 16 also applies on deploy pushes and merge_group.
 links: config/required-status-checks.json; deploy CI runs 40461983713, 40468073006, 40458653770
 artifacts: scorer unlock is gitignored at .claude/scorer-unlock.json
-reviewer_seat: not requested; this PR stays draft
-reviewer_sha: NOT_MEASURED
+reviewer_seat: Sour Diesel review 5670841287 at c20c42a76de7bd3271e6f03232d43c9ec7750218 was FAIL 1/1/2. That verdict does not cover the repair head.
+reviewer_sha: NOT_MEASURED for the repair head
 session_state: no production action
 claimed_by: Grok, 2026-10-27 11:30 CT
 owner: Grok
-last_updated: 2026-10-27 11:30 CT, by Grok
+last_updated: 2026-10-27 11:40 CT, by Grok
 limits: Draft only. No repo settings, rulesets, secrets, runner config, force-push, or bun.lock change.
 ```
 

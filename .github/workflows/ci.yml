@@ -732,13 +732,13 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      # One ready PR or merge-queue run used to request all 32 shards at once,
-      # which is more than the org's 20 hosted Linux runners. Keep all 32
-      # required context names. Cap how many of this matrix run together.
+      # GitHub Team allows 60 concurrent Linux jobs. One ready PR or
+      # merge-queue run must not request all 32 shards at once. Keep all 32
+      # required context names and run at most 16 of this matrix together.
       # Measured 2026-10-27 on deploy run 40461983713 (head 36b7204faab3):
-      # 32/32 shards, runner time min 91s, median 130s, max 160s. Eight at a
-      # time is four short waves and leaves slots for the other CI jobs.
-      max-parallel: 8
+      # 32/32 shards, runner time min 91s, median 130s, max 160s. Sixteen at
+      # a time is two short waves and leaves room in the 60-job pool.
+      max-parallel: 16
       matrix:
         shard:
           [

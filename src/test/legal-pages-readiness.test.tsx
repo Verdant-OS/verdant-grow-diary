@@ -155,9 +155,9 @@ describe("/refund disclosures", () => {
     expect(REFUND_SRC).toMatch(/Merchant of Record/);
   });
 
-  it("explains cancellation vs refund and covers Founder Lifetime consistently", () => {
+  it("explains cancellation vs refund without selling Founder Lifetime", () => {
     expect(REFUND_SRC).toMatch(/Subscription cancellation/i);
-    expect(REFUND_SRC).toMatch(/Founder Lifetime/);
+    expect(REFUND_SRC).not.toMatch(/Founder Lifetime/);
     expect(REFUND_SRC).toMatch(/within the 30-day window/i);
   });
 
@@ -234,8 +234,8 @@ describe("sitemap + robots discoverability", () => {
     expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/refund</loc>");
   });
 
-  it("sitemap keeps /welcome and /pricing discoverable", () => {
-    expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/welcome</loc>");
+  it("sitemap keeps /pricing discoverable and omits the retired /welcome alias", () => {
+    expect(SITEMAP).not.toContain("<loc>https://verdantgrowdiary.com/welcome</loc>");
     expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/pricing</loc>");
   });
 

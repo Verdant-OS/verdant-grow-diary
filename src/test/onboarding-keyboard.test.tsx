@@ -59,10 +59,10 @@ describe("Onboarding page", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("radiogroup")).toBeInTheDocument();
     const radios = screen.getAllByRole("radio");
-    // Mirrors START_SCREEN_OPTIONS: quickLog, timeline, dashboard, onboarding, welcome.
-    expect(radios).toHaveLength(5);
+    // Mirrors START_SCREEN_OPTIONS: quickLog, timeline, dashboard, onboarding.
+    expect(radios).toHaveLength(4);
     const values = radios.map((r) => (r as HTMLInputElement).value).sort();
-    expect(values).toEqual(["dashboard", "onboarding", "quickLog", "timeline", "welcome"].sort());
+    expect(values).toEqual(["dashboard", "onboarding", "quickLog", "timeline"].sort());
     // Quick Log is default and marked recommended
     const quickLog = radios.find(
       (r) => (r as HTMLInputElement).value === "quickLog",

@@ -1,0 +1,21 @@
+-- Restore EXECUTE on public.has_role to the authenticated role.
+--
+-- Regression introduced by 20260815054645 (revoke_public_and_anon_execute_on_definer_functions),
+-- which revoked EXECUTE from every role. PostgreSQL checks EXECUTE on functions called inside RLS
+-- policy expressions against the QUERYING role, so all 12 tables whose policies call has_role()
+-- began returning 42501 "permission denied for function has_role" for signed-in users:
+--   diary_entries, environment_events, feeding_events, grow_events, lead_events, leads,
+--   observation_events, pheno_hunts, photo_events, training_events, user_roles, watering_events
+--
+-- has_role is SECURITY DEFINER over public.user_roles and returns boolean. Granting EXECUTE to
+-- authenticated matches the configuration public.has_pheno_tracker_entitlement already uses
+-- (postgres | authenticated | service_role | anon), which is why that helper never broke.
+--
+-- Deliberately NOT granted to anon: that would let unauthenticated callers probe whether a given
+-- uuid holds a role. Residual: the two pheno_hunts policies apply to PUBLIC rather than
+-- authenticated, so anon SELECTs on pheno_hunts still raise 42501. Scoping those two policies to
+-- the authenticated role is Pheno Hunt work and is left for its owner.
+--
+-- Rollback: REVOKE EXECUTE ON FUNCTION public.has_role(uuid, app_role) FROM authenticated;
+
+GRANT EXECUTE ON FUNCTION public.has_role(_user_id uuid, _role app_role) TO authenticated;;

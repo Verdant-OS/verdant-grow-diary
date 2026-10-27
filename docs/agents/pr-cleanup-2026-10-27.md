@@ -244,6 +244,27 @@ None of them has a current exact-head review. Every one needs a base merge first
 | #2532 | fix(plants): confirm the plant save before stage follow-up | cheekhimself | ready | `314cdf84e697` | 2026-10-25 | 23     | yes      | -                         | 7: HANDOFF_LOG.md; EditPlantDialog.tsx; plant-edit-health-preservation.test.tsx +4                                          | 8% of added lines | 35/35 success            | **parked**  | Hold: held for Codex.                                                                  |
 | #2252 | feat(payments): env-gated direct Paddle sandbox transport  | cheekhimself | ready | `9600693962c5` | 2026-10-23 | 59     | no       | edge, payments            | 13: get-paddle-price-direct-mode.test.ts; paddle-direct-sandbox-override.test.ts; paddle-direct-transport-rules.test.ts +10 | 2% of added lines | 35/35 success            | **parked**  | Hold: Paddle sandbox transport stays for Matthew.                                      |
 
+## Phase 2 log
+
+Matthew, 2026-10-27: "Approved, close the superseded six; keep #1986 #2010 #2024".
+
+Closed 2026-10-27. For each PR, I first re-checked that it was still open with an unchanged head, and that the superseding commit is an ancestor of `origin/verdant-grow-diary`. Each got one comment, and its branch is kept (confirmed with `git ls-remote`).
+
+| PR    | Head at close  | Superseded by                            | Comment                 |
+| ----- | -------------- | ---------------------------------------- | ----------------------- |
+| #2226 | `1b0bfce98537` | #2112 (`7614fa28d`)                      | issuecomment-6448545360 |
+| #2214 | `889af44f22f0` | #2211 (`330e69a70`), #2531 (`3d207af90`) | issuecomment-6448546188 |
+| #2182 | `11b9737300e2` | #2083 (`ec233259e`)                      | issuecomment-6448547192 |
+| #1951 | `3735e35a3018` | #2181 (`1f185f52c`)                      | issuecomment-6448547772 |
+| #1955 | `d82f857bbf44` | #2181 (`1f185f52c`)                      | issuecomment-6448548703 |
+| #1980 | `c98d49905812` | #2181 (`1f185f52c`)                      | issuecomment-6448549264 |
+
+Kept open on Matthew's instruction, so no longer close candidates: #1986, #2010, #2024. Each still needs an owner to revive it. Its table row below shows the original Phase 1 proposal.
+
+Not closed yet, waiting on an explicit decision: the remaining stale proposals #2372, #2299, #2333 (closing it waits on the 98f48c08a check), #1904 and #1902.
+
+Open count after Phase 2: 121.
+
 ## Verified
 
 Verified: open PR count (127), the head SHA of every PR, behind/conflict per PR (`git merge-tree`), touched files and protected-path tags, the share of each PR's added lines present on base, the base commits named as superseding, and required-check status at each current head (read 2026-10-27 via `gh api`).

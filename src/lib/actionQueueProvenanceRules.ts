@@ -27,9 +27,38 @@ export interface SourceLabelInput {
   source?: string | null;
 }
 
-const ALERT_TOKEN_RE = /\[alert:([A-Za-z0-9_-]{1,64})\]/;
-const SESSION_TOKEN_RE = /\[session:([A-Za-z0-9_-]{1,64})\]/;
-const EVENT_TOKEN_RE = /\[event:([A-Za-z0-9_-]{1,64})\]/;
+const ALERT_TOKEN_RE = /\[alert:([A-Za-z0-9_-]{1,64})\]/g;
+const SESSION_TOKEN_RE = /\[session:([A-Za-z0-9_-]{1,64})\]/g;
+const EVENT_TOKEN_RE = /\[event:([A-Za-z0-9_-]{1,64})\]/g;
+
+function extractLastProvenanceTokenId(
+  reason: string,
+  tokenRe: RegExp,
+): string | null {
+  let lastId: string | null = null;
+  for (const m of reason.matchAll(tokenRe)) {
+    const id = m[1];
+    if (id && id.length >= 1 && id.length <= 64) {
+      lastId = id;
+    }
+  }
+  return lastId;
+}
+
+/**
+ * Remove every `[kind:…]` back-pointer token of one kind from model-derived
+ * text before appending the trusted token. Prevents echoed/forged tokens from
+ * winning when extractors read the trailing authoritative pointer.
+ */
+export function stripProvenanceTokensOfKind(
+  reason: string,
+  kind: "alert" | "session" | "event",
+): string {
+  return reason
+    .replace(new RegExp(`\\s*\\[${kind}:[^\\]]*\\]`, "g"), " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 /**
  * Extracts the alert id embedded in an action's reason via `[alert:<id>]`.
@@ -37,11 +66,7 @@ const EVENT_TOKEN_RE = /\[event:([A-Za-z0-9_-]{1,64})\]/;
  */
 export function extractSourceAlertId(reason: string | null | undefined): string | null {
   if (typeof reason !== "string") return null;
-  const m = reason.match(ALERT_TOKEN_RE);
-  if (!m) return null;
-  const id = m[1];
-  if (!id || id.length < 1 || id.length > 64) return null;
-  return id;
+  return extractLastProvenanceTokenId(reason, ALERT_TOKEN_RE);
 }
 
 /**
@@ -52,11 +77,7 @@ export function extractSourceAlertId(reason: string | null | undefined): string 
  */
 export function extractSourceAiDoctorSessionId(reason: string | null | undefined): string | null {
   if (typeof reason !== "string") return null;
-  const m = reason.match(SESSION_TOKEN_RE);
-  if (!m) return null;
-  const id = m[1];
-  if (!id || id.length < 1 || id.length > 64) return null;
-  return id;
+  return extractLastProvenanceTokenId(reason, SESSION_TOKEN_RE);
 }
 
 /**
@@ -68,11 +89,7 @@ export function extractSourceAiDoctorSessionId(reason: string | null | undefined
  */
 export function extractSourceBreedingEventId(reason: string | null | undefined): string | null {
   if (typeof reason !== "string") return null;
-  const m = reason.match(EVENT_TOKEN_RE);
-  if (!m) return null;
-  const id = m[1];
-  if (!id || id.length < 1 || id.length > 64) return null;
-  return id;
+  return extractLastProvenanceTokenId(reason, EVENT_TOKEN_RE);
 }
 
 /**

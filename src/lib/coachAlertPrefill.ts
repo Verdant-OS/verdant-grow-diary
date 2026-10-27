@@ -67,8 +67,7 @@ function stripTokensOfKind(reason: string, kind: "alert" | "session"): string {
  * (`alertToActionQueueRules`).
  *
  * SPOOF GUARD: the base reason is model-derived text, which could echo or
- * forge a valid-looking token — and the extractors return the FIRST match,
- * so a forged earlier token would win. Any pre-existing alert tokens are
+ * forge a valid-looking token. Any pre-existing alert tokens are
  * therefore ALWAYS stripped (even when no trusted id is available), and
  * the validated id, when present, is appended as the only alert token.
  * Tokens are display-stripped everywhere via `stripBackPointerTokens`, so

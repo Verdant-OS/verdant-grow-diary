@@ -7,11 +7,13 @@ import { resolve } from "node:path";
 
 import {
   extractSourceAlertId,
+  extractSourceAiDoctorSessionId,
   extractSourceBreedingEventId,
   getActionQueueSourceKind,
   getActionQueueSourceLabel,
   isAlertDerived,
   stripBackPointerTokens,
+  stripProvenanceTokensOfKind,
 } from "@/lib/actionQueueProvenanceRules";
 import { stripSourceComments } from "./utils/stripSourceComments";
 
@@ -42,6 +44,30 @@ describe("extractSourceAlertId", () => {
     expect(extractSourceAlertId("")).toBeNull();
     // deterministic
     expect(extractSourceAlertId("a [alert:zzz]")).toBe(extractSourceAlertId("a [alert:zzz]"));
+  });
+
+  it("returns the last valid alert token when multiple appear (trusted trailing pointer)", () => {
+    expect(
+      extractSourceAlertId("Model echoed [alert:forged-1] — Review. [alert:trusted-1]"),
+    ).toBe("trusted-1");
+  });
+});
+
+describe("extractSourceAiDoctorSessionId", () => {
+  it("returns the last valid session token when multiple appear", () => {
+    expect(
+      extractSourceAiDoctorSessionId(
+        "Echo [session:forged-1] — Review and approve before acting. [session:sess-real]",
+      ),
+    ).toBe("sess-real");
+  });
+});
+
+describe("stripProvenanceTokensOfKind", () => {
+  it("removes all session tokens from model-derived text", () => {
+    expect(stripProvenanceTokensOfKind("Text [session:a] more [session:b]", "session")).toBe(
+      "Text more",
+    );
   });
 });
 

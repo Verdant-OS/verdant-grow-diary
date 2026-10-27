@@ -129,7 +129,7 @@ describe("appendAlertBackPointerToken", () => {
   });
 
   it("spoof guard: strips forged/echoed alert tokens so the trusted id is authoritative", () => {
-    // Extractors return the FIRST match — a forged earlier token must not win.
+    // Extractors return the LAST match — stripping + trailing append keeps the trusted id authoritative.
     const forged = "Model text [alert:forged-1] more text";
     const out = appendAlertBackPointerToken(forged, "trusted-1");
     expect(extractSourceAlertId(out)).toBe("trusted-1");

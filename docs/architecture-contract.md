@@ -71,7 +71,7 @@ behaviour keep their own labels and dates. Production behaviour (what is deploye
 is `NOT_MEASURED` by this stamp. That includes whether production runs the Gemini-direct build of
 either function and whether `GEMINI_API_KEY` is set there. First
 verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
-**Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
+**Carries no `Sentinel-Version`.** This is not one of the eighteen governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 
 The stamped SHA above is **verification provenance, not an operating claim**. It records the tree
@@ -1618,16 +1618,16 @@ stale every time the operating picture moved. Only the durable rules stay:
    amendment — it needs a test.
 4. Removing a clause requires stating what replaced it. A clause that is merely inconvenient is not
    obsolete.
-5. This file carries no `Sentinel-Version` and is not one of the twelve governance files. Editing it
+5. This file carries no `Sentinel-Version` and is not one of the eighteen governance files. Editing it
    alone requires no parity bump.
 
    **Why, stated correctly.** `scripts/check-sentinel-version-parity.mjs` iterates a fixed
-   `ALL = [CANONICAL, ...MIRRORS]` array naming exactly those twelve files (`:31-45`), so adding a
+   `ALL = [CANONICAL, ...MIRRORS]` array naming exactly those eighteen files (`:31-49`), so adding a
    version header here would **not**, on its own, pull this file into the parity gate — an earlier
    draft claimed it would, and that was factually wrong. The reason to leave the header off is
    different and weaker: a `Sentinel-Version` line signals governance-file status this document does
    not have, and invites a future editor to add it to `MIRRORS` and turn every amendment into a
-   twelve-file change. Adding this file to that list is a deliberate decision for Cheek, not a side
+   nineteen-file change. Adding this file to that list is a deliberate decision for Cheek, not a side
    effect of a header.
 
 ### 15.1 Amendment record

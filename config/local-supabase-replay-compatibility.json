@@ -197,6 +197,18 @@
         }
       ],
       "reason": "PostgreSQL schema-specific default privileges add to global defaults and cannot revoke the global PUBLIC function EXECUTE grant. The disposable replay copy adds the missing global revokes before the immutable migration's effective-privilege self-test; the published migration remains byte-for-byte unchanged."
+    },
+    {
+      "source_path": "supabase/migrations/20260826020443_harden_secdef_rpc_grants_group_a_b.sql",
+      "source_sha256": "a922b0c13e15a969f5c6dbdd9a71a51aeb43469e2021726280f904c3610e14dd",
+      "patched_sha256": "1464403b7472ad81e2b9a959464be35ead9e808b4f5032e6ddbd05d9d169597d",
+      "replacements": [
+        {
+          "from": "ALTER TABLE public.\"Verdant\" ENABLE ROW LEVEL SECURITY;",
+          "to": "DO 'BEGIN\n  IF to_regclass(''public.\"Verdant\"'') IS NOT NULL THEN\n    ALTER TABLE public.\"Verdant\" ENABLE ROW LEVEL SECURITY;\n  END IF;\nEND'"
+        }
+      ],
+      "reason": "A fresh local reset fails this migration with SQLSTATE 42P01 because no committed migration creates public.\"Verdant\". The disposable replay copy guards that one ENABLE ROW LEVEL SECURITY with to_regclass; the recovered history file stays byte-for-byte unchanged."
     }
   ],
   "compatibility_injections": [

@@ -169,10 +169,13 @@ export function evaluateProductCell(
   return { plannedNum, actualNum, diffNum, diffFormatted, pctFormatted, flag };
 }
 
+const PLAIN_CSV_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+
 export function escapeCsvField(value: unknown): string {
   if (value === null || value === undefined) return "";
   let str = String(value);
-  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+  const leadingSignIsFormula = /^[+-]/.test(str) && !PLAIN_CSV_NUMBER.test(str);
+  if (/^[=@\t\r]/.test(str) || leadingSignIsFormula) str = `'${str}`;
   if (/[",\r\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
   return str;
 }

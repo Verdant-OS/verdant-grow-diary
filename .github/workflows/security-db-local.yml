@@ -29,6 +29,7 @@ concurrency:
 
 jobs:
   test-security-db-local:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: test:security-db-local
     runs-on: ubuntu-latest
     timeout-minutes: 25

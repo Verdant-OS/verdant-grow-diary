@@ -35,7 +35,14 @@ describe("served-build-monotonic workflow", () => {
 
   it("offers an explicit initialize dispatch input that defaults to false", () => {
     expect(workflow.on.workflow_dispatch).toMatchObject({
-      inputs: { initialize: { type: "boolean", default: false } },
+      inputs: {
+        initialize: {
+          type: "boolean",
+          default: false,
+          description:
+            "Replace an unreadable checkpoint with the served SHA. A missing checkpoint already records a baseline. A readable checkpoint is still compared.",
+        },
+      },
     });
   });
 
@@ -60,6 +67,7 @@ describe("served-build-monotonic workflow", () => {
     expect(runs).toHaveLength(1);
     expect(runs[0].run).toContain("--previous-file .served-build/previous.sha");
     expect(runs[0].run).toContain("--write-file .served-build/previous.sha");
+    expect(runs[0].run).toContain("--run-number ${{ github.run_number }}");
     expect(runs[0].if).toBeUndefined();
     // --initialize is passed only on a manual dispatch that asked for it.
     expect(runs[0].run).toContain(
@@ -80,8 +88,9 @@ describe("served-build-monotonic workflow", () => {
       path: ".served-build/previous.sha",
       key: "served-build-sha-${{ github.run_id }}-${{ github.run_attempt }}",
     });
-    // Saving only after a successful check: a FAIL must not overwrite the accepted SHA.
-    expect(save.if).toBeUndefined();
+    // A red seed still has to be saved. A rollback does not rewrite the file, so
+    // saving whatever checkpoint is on disk keeps the last accepted SHA.
+    expect(save.if).toBe("always() && hashFiles('.served-build/previous.sha') != ''");
     const order = [restore, steps.find((s) => s.run?.includes("check-served")), save].map((s) =>
       steps.indexOf(s as Step),
     );

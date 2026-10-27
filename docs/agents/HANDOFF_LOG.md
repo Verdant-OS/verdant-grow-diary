@@ -79,7 +79,7 @@ branch: cursor/actions-backlog-concurrency-58cd
 base: verdant-grow-diary
 checkout: git fetch origin cursor/actions-backlog-concurrency-58cd verdant-grow-diary && git switch cursor/actions-backlog-concurrency-58cd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2555 (draft; keep draft)
-head_sha: repair of review 5670841287; the commit that contains this revised block is the branch head
+head_sha: 34c3d05b64b1b11c4bc99b118305edfd6b450aeb is the repair. The commit that records this SHA is the branch head after push.
 state: pushed draft
 current_step: Irrigation if expressions are folded blocks again. max-parallel is 16. The pin test rejects a bare >- inside any workflow if.
 next_action: Read the draft PR, confirm it stays draft, and do not mark it ready, enqueue it, or merge it.

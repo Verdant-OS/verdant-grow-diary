@@ -33,6 +33,21 @@ export function readQuickLogObservationIdempotencyKey(value: unknown): string | 
 export const QUICK_LOG_OBSERVATION_SAVE_ERROR =
   "Verdant could not save this observation. Your note is still here. Retry saves it once.";
 
+export const QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY =
+  "Restored your unsaved entry for this target.";
+
+/**
+ * A stored draft is restored only into the target it was typed for. Target
+ * selection stays explicit or route-derived: a draft never picks a target.
+ */
+export function restorableQuickLogObservationDraft(
+  stored: QuickLogObservationDraft | null,
+  defaultTargetKey: string | null | undefined,
+): QuickLogObservationDraft | null {
+  if (!stored || isQuickLogObservationDraftEmpty(stored.form)) return null;
+  return stored.form.selectedKey === (defaultTargetKey ?? null) ? stored : null;
+}
+
 export function parseQuickLogObservationDraft(value: unknown): QuickLogObservationDraft | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const wrapper = value as Record<string, unknown>;

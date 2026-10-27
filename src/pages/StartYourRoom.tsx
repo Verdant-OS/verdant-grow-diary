@@ -60,7 +60,8 @@ import {
   START_YOUR_ROOM_DRAFT_FORM_ID,
   START_YOUR_ROOM_SAVE_RETRY_COPY,
   parseStartYourRoomDraft,
-  plainStartRoomSaveError,
+  adoptablePendingGrowId,
+  startRoomSaveErrorWithReason,
   startYourRoomDraftForm,
   type StartYourRoomPendingRowIds,
 } from "@/lib/startYourRoomDraftRules";
@@ -169,6 +170,25 @@ export default function StartYourRoom() {
     }
     setDraftOwnerReady(ownerId);
   }, [ownerId, grows, growsLoading]);
+
+  // A grow whose create outcome was unknown before a reload may already exist
+  // under the pending row id. Adopt it (the same steps a confirmed save takes).
+  useEffect(() => {
+    if (!ownerId || draftOwnerReady !== ownerId || growsLoading) return;
+    const adoptId = adoptablePendingGrowId({
+      step,
+      growId: ids.growId,
+      pendingGrowId: pendingRowIds.grow,
+      ownedGrowIds: grows.map((grow) => grow.id),
+    });
+    if (!adoptId) return;
+    releaseRowId("grow");
+    setActiveGrowId(adoptId);
+    setIds((prev) => ({ ...prev, growId: adoptId }));
+    setError(null);
+    setStep(nextStepAfter("grow"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- releaseRowId/setActiveGrowId are stable for this owner
+  }, [ownerId, draftOwnerReady, growsLoading, step, ids.growId, pendingRowIds.grow, grows]);
 
   useEffect(() => {
     if (!ownerId || draftHydratedFor.current !== ownerId || draftOwnerReady !== ownerId) return;
@@ -383,7 +403,7 @@ export default function StartYourRoom() {
       );
       return null;
     }
-    setError(plainStartRoomSaveError(attempt.entity));
+    setError(startRoomSaveErrorWithReason(attempt.entity, result.message));
     return null;
   }
 

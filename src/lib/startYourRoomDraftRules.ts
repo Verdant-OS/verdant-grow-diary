@@ -103,3 +103,35 @@ export function startYourRoomDraftForm(
 export function plainStartRoomSaveError(entity: "grow" | "tent" | "plant"): string {
   return `Verdant could not save this ${entity}. Your typing is still here. Retry saves this same ${entity} once.`;
 }
+
+const GENERIC_PERSISTENCE_FALLBACK = "Could not create record";
+const SAVE_REASON_MAX = 200;
+
+/**
+ * A definitive save rejection keeps the server's reason (plan limit, row-level
+ * security, a constraint) so the grower is not left guessing at a retry.
+ */
+export function startRoomSaveErrorWithReason(
+  entity: "grow" | "tent" | "plant",
+  reason: string | null | undefined,
+): string {
+  const plain = plainStartRoomSaveError(entity);
+  const detail = typeof reason === "string" ? reason.trim().slice(0, SAVE_REASON_MAX) : "";
+  if (!detail || detail === GENERIC_PERSISTENCE_FALLBACK) return plain;
+  return `${plain} Reason: ${detail}`;
+}
+
+/**
+ * After a reload, the grow step's preallocated row id may already be a saved
+ * grow (the earlier outcome was unknown). Adopt it instead of retrying into a
+ * duplicate-key loop. Returns the id to adopt, or null.
+ */
+export function adoptablePendingGrowId(input: {
+  step: string;
+  growId: string | null;
+  pendingGrowId: string | null;
+  ownedGrowIds: ReadonlyArray<string>;
+}): string | null {
+  if (input.step !== "grow" || input.growId != null || !input.pendingGrowId) return null;
+  return input.ownedGrowIds.includes(input.pendingGrowId) ? input.pendingGrowId : null;
+}

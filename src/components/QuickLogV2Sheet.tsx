@@ -5,7 +5,9 @@ import {
   isQuickLogObservationDraftEmpty,
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+  QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY,
   QUICK_LOG_OBSERVATION_SAVE_ERROR,
+  restorableQuickLogObservationDraft,
 } from "@/lib/quickLogObservationDraftRules";
 import {
   clearBrowserSessionFormDraft,
@@ -629,6 +631,7 @@ function QuickLogV2SheetForOwner({
   const saveInFlightRef = useRef(false);
   const observationDraftSuppressedRef = useRef(false);
   const observationUnconfirmedRef = useRef(false);
+  const [observationDraftRestored, setObservationDraftRestored] = useState(false);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
   // previous saved-summary state. Bumped whenever the grower starts
   // a new logical submission from the same open sheet.
@@ -1141,8 +1144,10 @@ function QuickLogV2SheetForOwner({
             QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
             parseQuickLogObservationDraft,
           );
-      const restoredDraft =
-        storedDraft && !isQuickLogObservationDraftEmpty(storedDraft.form) ? storedDraft.form : null;
+      // Only the draft typed for this same target comes back (never another plant's).
+      const restorable = restorableQuickLogObservationDraft(storedDraft, defaultTargetKey);
+      const restoredDraft = restorable ? restorable.form : null;
+      setObservationDraftRestored(Boolean(restorable));
       setForm({
         ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
         selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
@@ -1161,7 +1166,7 @@ function QuickLogV2SheetForOwner({
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
-      setLocalError(storedDraft?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
+      setLocalError(restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
@@ -1180,9 +1185,9 @@ function QuickLogV2SheetForOwner({
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
-      observationUnconfirmedRef.current = Boolean(storedDraft?.saveFailed);
-      if (storedDraft?.saveFailed && storedDraft.idempotencyKey) {
-        saveIdempotencyKeyRef.current = storedDraft.idempotencyKey;
+      observationUnconfirmedRef.current = Boolean(restorable?.saveFailed);
+      if (restorable?.saveFailed && restorable.idempotencyKey) {
+        saveIdempotencyKeyRef.current = restorable.idempotencyKey;
       }
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
@@ -2467,6 +2472,10 @@ function QuickLogV2SheetForOwner({
       }
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
+      // Ambiguous outcomes stay with the durable Note/Watering recovery, which
+      // keeps the original key until history is checked. Persisting that key in
+      // this draft would resurrect it for a deliberate new entry afterwards
+      // (quick-log-v2-exact-recovery "verified but subsequently edited").
       observationUnconfirmedRef.current =
         !quickLogSaveRequiresHistoryCheck(reason) &&
         reason !== "receipt_mismatch" &&
@@ -2540,6 +2549,7 @@ function QuickLogV2SheetForOwner({
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     observationDraftSuppressedRef.current = true;
     observationUnconfirmedRef.current = false;
+    setObservationDraftRestored(false);
 
     // The log row is committed from here on. Companion-media failures are
     // PARTIAL SUCCESS: the grower's entry is saved and must be presented as
@@ -3642,6 +3652,11 @@ function QuickLogV2SheetForOwner({
 
           {form.action !== "feed" && (
             <div>
+              {observationDraftRestored ? (
+                <p className="text-xs text-muted-foreground" data-testid="qlv2-draft-restored">
+                  {QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY}
+                </p>
+              ) : null}
               <Label htmlFor="qlv2-note">Note (optional)</Label>
               <Textarea
                 id="qlv2-note"

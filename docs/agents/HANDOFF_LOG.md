@@ -783,6 +783,26 @@ claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
 ```
 
+### STOP-SELLING-FOUNDER-LIFETIME
+
+```text
+TASK STOP-SELLING-FOUNDER-LIFETIME  priority: P1  status: OPEN
+goal: Stop selling Founder Lifetime on public sales surfaces. Keep existing Founder entitlements until a separate PR and migration. Follow-up FOUNDER-BLUEPRINT-20261024 (Matthew, 2026-10-24 3:51 PM CT): existing-holder copy names the retained Pro Blueprint.
+branch: cursor/stop-selling-founder-lifetime-0628
+base: verdant-grow-diary
+checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (ready for review since 2026-10-27 21:28 UTC)
+head_sha: read the PR head after push; base 27991451 merged in 9472c1a3 (block moved to the end of Open to stop repeat conflicts); 87067552 logs the Founder refusal as stage plan_retired; this handoff commit cannot name itself
+state: PR ready for review (marked 2026-10-27 21:28 UTC at Matthew's instruction); base 27991451 merged 2026-10-27. All review threads resolved. At prior head 862ab201: 35/35 required checks green, Codex code + security review no findings; Paddle Founder price archived. The new merge head supersedes that CI, review and approval
+next_action: fix in-scope required-check failures at the head; fresh exact-head review; Matthew approves the exact head SHA before the merge owner queues it (payment PR)
+files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md, src/test/founder-blueprint-retained-copy.test.tsx
+blockers: none in this PR; entitlement removal is a later PR plus migration
+artifacts: .claude/scorer-unlock.json is gitignored and must not be committed
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing scope: Codex on non-Codex work, or a non-contributing Claude/Grok session); all contributors excluded
+claimed_by: Claude, 2026-10-27 18:17 UTC (renewal, PR comment 6450051931)
+last_updated: 2026-10-27 22:00 UTC, by Claude
+```
+
 ## Closed
 
 ### CHEM-RELEASE-001

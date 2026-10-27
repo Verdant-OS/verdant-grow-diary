@@ -12,18 +12,18 @@ describe("resolveLegacyPlanSlug", () => {
   it("maps hyphenated legacy slugs to canonical PlanIds", () => {
     expect(resolveLegacyPlanSlug("pro-monthly")).toBe("pro_monthly");
     expect(resolveLegacyPlanSlug("pro-annual")).toBe("pro_annual");
-    expect(resolveLegacyPlanSlug("founder-lifetime")).toBe("founder_lifetime");
+    expect(resolveLegacyPlanSlug("founder-lifetime")).toBeNull();
   });
 
   it("passes canonical underscore ids through", () => {
     expect(resolveLegacyPlanSlug("pro_monthly")).toBe("pro_monthly");
     expect(resolveLegacyPlanSlug("pro_annual")).toBe("pro_annual");
-    expect(resolveLegacyPlanSlug("founder_lifetime")).toBe("founder_lifetime");
+    expect(resolveLegacyPlanSlug("founder_lifetime")).toBeNull();
   });
 
   it("normalizes case", () => {
     expect(resolveLegacyPlanSlug("Pro-Monthly")).toBe("pro_monthly");
-    expect(resolveLegacyPlanSlug("FOUNDER-LIFETIME")).toBe("founder_lifetime");
+    expect(resolveLegacyPlanSlug("FOUNDER-LIFETIME")).toBeNull();
   });
 
   it("returns null for unknown, empty, or non-string input", () => {
@@ -43,9 +43,7 @@ describe("buildLegacyBillingRedirect", () => {
       "/pricing?plan=pro_monthly",
     );
     expect(buildLegacyBillingRedirect({ planSlug: "pro-annual" })).toBe("/pricing?plan=pro_annual");
-    expect(buildLegacyBillingRedirect({ planSlug: "founder-lifetime" })).toBe(
-      "/pricing?plan=founder_lifetime",
-    );
+    expect(buildLegacyBillingRedirect({ planSlug: "founder-lifetime" })).toBe("/pricing");
   });
 
   it("returns bare /pricing when the slug is unknown or missing", () => {
@@ -118,9 +116,7 @@ describe("buildLegacyUpgradeRedirect", () => {
     expect(buildLegacyUpgradeRedirect({ search: "plan=pro-annual" })).toBe(
       "/pricing?plan=pro_annual",
     );
-    expect(buildLegacyUpgradeRedirect({ search: "plan=founder_lifetime" })).toBe(
-      "/pricing?plan=founder_lifetime",
-    );
+    expect(buildLegacyUpgradeRedirect({ search: "plan=founder_lifetime" })).toBe("/pricing");
   });
 
   it("preserves only a safe same-origin return path", () => {
@@ -146,7 +142,7 @@ describe("buildLegacyUpgradeRedirect", () => {
           "plan=founder-lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=/dashboard",
       }),
     ).toBe(
-      "/pricing?plan=founder_lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=%2Fdashboard",
+      "/pricing?utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=%2Fdashboard",
     );
   });
 

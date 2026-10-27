@@ -108,7 +108,6 @@ describe("Public SEO route surface", () => {
    */
   const PUBLIC_SEO_PATH_PATTERNS: ReadonlyArray<RegExp> = [
     /^\/guides(\/.*)?$/,
-    /^\/founder$/,
     /^\/pricing$/,
     /^\/hardware-integrations$/,
     /^\/partners\/csv-preview$/,
@@ -127,6 +126,11 @@ describe("Public SEO route surface", () => {
     const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
     const missing = mounted.filter(isPublicSeoPath).filter((p) => !manifestSet.has(p));
     expect(missing).toEqual([]);
+  });
+
+  it("/founder is a redirect, not a public sales document", () => {
+    const entry = APP_ROUTES.find((r) => r.path === "/founder");
+    expect(entry?.access).toBe("redirect");
   });
 
   it("every public SEO route in the manifest is access: public", () => {

@@ -322,9 +322,11 @@ export default function PlantRelativeTimelineSection({
   const photoDisplay = useDiaryPhotoDisplayRows(
     history.data as ReadonlyArray<DiaryPhotoDisplayRow> | undefined,
   );
+  const groups = groupRelativeTimelineByStage(visibleItems);
+  // Lightbox prev/next follows the rows as rendered (stage groups), not chronology.
   const photoItems = buildOrderedTimelinePhotoLightboxList(
     photoDisplay.rows as unknown as TimelinePhotoSourceRow[],
-    visibleItems.map((i) => i.id),
+    groups.flatMap((group) => group.items.map((item) => item.id)),
   );
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const lightboxIndex = findTimelinePhotoIndexById(photoItems, lightboxPhotoId);
@@ -336,7 +338,6 @@ export default function PlantRelativeTimelineSection({
     items.length,
     visibleItems.length,
   );
-  const groups = groupRelativeTimelineByStage(visibleItems);
   const filterDef =
     RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filter) ?? RELATIVE_TIMELINE_FILTERS[0];
   const categorySections = buildDiaryTimelineSections(visibleItems);

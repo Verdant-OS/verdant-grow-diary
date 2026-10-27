@@ -134,6 +134,33 @@ describe("Plant Relative Timeline photo thumbnail", () => {
     );
   });
 
+  it("orders lightbox navigation by the rendered stage groups", async () => {
+    const OLDER_FLOWER = "00000000-0000-0000-0000-000000000003";
+    const NEWER_VEG = "00000000-0000-0000-0000-000000000004";
+    fixture.rows = [
+      { ...photoRow(NEWER_VEG, "https://cdn.example/veg.jpg"), stage: "vegetation" },
+      {
+        ...photoRow(OLDER_FLOWER, "https://cdn.example/flower.jpg"),
+        stage: "flower",
+        entry_at: "2026-10-20T12:00:00.000Z",
+      },
+    ];
+    renderSection();
+    const rendered = await waitFor(() => {
+      const ids = screen
+        .getAllByTestId("relative-timeline-item")
+        .map((el) => el.getAttribute("data-item-id"));
+      expect(ids).toHaveLength(2);
+      return ids;
+    });
+    expect(rendered).toEqual([NEWER_VEG, OLDER_FLOWER]);
+    const firstRow = await findRow(NEWER_VEG);
+    fireEvent.click(
+      await waitFor(() => within(firstRow).getByTestId("relative-timeline-photo-open")),
+    );
+    expect(screen.getByTestId("timeline-photo-lightbox-counter").textContent).toMatch(/1\D+2/);
+  });
+
   it("keeps legacy http(s) photo rows working without a signing request", async () => {
     fixture.rows = [photoRow(ID_PHOTO, "https://cdn.example/legacy.jpg")];
     renderSection();
@@ -167,7 +194,9 @@ describe("Plant Relative Timeline photo thumbnail", () => {
     fixture.rows = [photoRow(ID_PHOTO, OWNED_PATH)];
     renderSection();
     const row = await findRow(ID_PHOTO);
-    await waitFor(() => expect(fixture.signCalls.length).toBeGreaterThan(0));
+    // The hook retries once (retry: 1); the second rejected call is the settled failure.
+    await waitFor(() => expect(fixture.signCalls.length).toBe(2), { timeout: 4000 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(within(row).queryByTestId("relative-timeline-photo")).toBeNull();
     expect(
       within(row).getByTestId("relative-timeline-source-badge").getAttribute("data-source-label"),

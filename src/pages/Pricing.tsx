@@ -597,10 +597,10 @@ export default function Pricing() {
       data-preselected-billing={preselect.billing ?? ""}
     >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <Link to="/welcome" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <BrandLogo size="md" showText />
         </Link>
-        <Link to="/welcome">
+        <Link to="/">
           <Button variant="outline" size="sm">
             Back to home
           </Button>

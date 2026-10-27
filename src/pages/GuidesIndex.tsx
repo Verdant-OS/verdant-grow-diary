@@ -36,11 +36,11 @@ export default function GuidesIndex() {
   return (
     <main data-testid="guides-index-page" className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
-          <Link to="/welcome" className="text-muted-foreground hover:text-foreground">
+          <Link to="/" className="text-muted-foreground hover:text-foreground">
             Home
           </Link>
           <Link to="/pricing" className="text-muted-foreground hover:text-foreground">
@@ -61,6 +61,13 @@ export default function GuidesIndex() {
           turns the gear you already own — AC Infinity, Spider Farmer, TrolMaster, EcoWitt, and more
           — into one plant timeline with source-labeled sensor snapshots and cautious AI support.
           Verdant suggests; the grower decides. Verdant cannot touch your equipment.
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          New to a term like VPD, PPFD, or EC? Check the{" "}
+          <Link to="/glossary" className="font-medium text-primary hover:underline">
+            Cultivation glossary
+          </Link>
+          .
         </p>
       </section>
 
@@ -186,7 +193,7 @@ export default function GuidesIndex() {
 
         <p className="mt-8 text-sm text-muted-foreground">
           Ready to start? See{" "}
-          <Link to="/welcome" className="underline hover:text-foreground">
+          <Link to="/" className="underline hover:text-foreground">
             what Verdant does
           </Link>
           , or compare{" "}

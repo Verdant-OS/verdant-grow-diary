@@ -508,9 +508,9 @@ describe("sitemap", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/pricing");
   });
 
-  it("still includes apex, /welcome, and /hardware-integrations", () => {
+  it("still includes apex and /hardware-integrations, and omits the retired /welcome alias", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/");
-    expect(SITEMAP).toContain("https://verdantgrowdiary.com/welcome");
+    expect(SITEMAP).not.toContain("https://verdantgrowdiary.com/welcome");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/hardware-integrations");
   });
 
@@ -558,7 +558,7 @@ describe("Pricing manifest snapshot (narrow)", () => {
       },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
-      { path: "/welcome", access: "public" },
+      { path: "/welcome", access: "redirect", description: "→ /" },
     ]);
   });
 });

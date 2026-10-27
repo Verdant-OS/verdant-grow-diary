@@ -108,7 +108,6 @@ describe("Public SEO route surface", () => {
    */
   const PUBLIC_SEO_PATH_PATTERNS: ReadonlyArray<RegExp> = [
     /^\/guides(\/.*)?$/,
-    /^\/welcome$/,
     /^\/pricing$/,
     /^\/hardware-integrations$/,
     /^\/partners\/csv-preview$/,

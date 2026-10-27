@@ -31,8 +31,9 @@ const replacedGroups = [
   "core-link-form-census.yml",
   "irrigation-evidence-gate.yml",
   "google-analytics-e2e.yml",
-  "typecheck-build-push.yml",
 ] as const;
+
+const docsOnlySkip = ["**/*.md", "docs/**"];
 
 // Non-required, non-security PR workflows that wait for ready_for_review instead of
 // running on every draft push. ci.yml, security-regression.yml and the mustBeGreen
@@ -51,6 +52,96 @@ const draftSkippedWorkflows = [
   "typecheck-build-push.yml",
   "typecheck.yml",
 ] as const;
+
+const requiredWorkflows = ["ci.yml", "security-regression.yml"] as const;
+type RequiredWorkflow = (typeof requiredWorkflows)[number];
+type RequiredTrigger = "push" | "pull_request" | "merge_group";
+const prActivityTypes = ["opened", "synchronize", "reopened"];
+
+function assertRequiredTriggerPolicy(
+  name: RequiredWorkflow,
+  trigger: RequiredTrigger,
+  config: unknown,
+) {
+  const options = config ?? {};
+  expect(typeof options === "object" && !Array.isArray(options), `${name} ${trigger}`).toBe(true);
+  expect(options, `${name} ${trigger}`).not.toHaveProperty("paths");
+  expect(options, `${name} ${trigger}`).not.toHaveProperty("paths-ignore");
+  expect(options, `${name} ${trigger}`).not.toHaveProperty("branches-ignore");
+
+  // Pin the reviewed branch policy rather than partially interpreting ordered
+  // glob/negation rules. Security PRs must stay unfiltered for stacked bases.
+  const branchFiltered = trigger === "push" || (name === "ci.yml" && trigger === "pull_request");
+  const resolved = options as Record<string, unknown>;
+  expect(resolved.branches, `${name} ${trigger} branches`).toEqual(
+    branchFiltered ? ["main", "verdant-grow-diary"] : undefined,
+  );
+
+  // Omitting types uses GitHub's defaults: the three PR activities below, or
+  // checks_requested for merge groups. Explicit filters must retain them.
+  if (trigger === "push") {
+    expect(options, `${name} push`).not.toHaveProperty("types");
+  } else if (resolved.types !== undefined) {
+    expect(resolved.types, `${name} ${trigger} types`).toEqual(
+      expect.arrayContaining(trigger === "pull_request" ? prActivityTypes : ["checks_requested"]),
+    );
+  }
+}
+
+const triggerFilterMutations: {
+  label: string;
+  trigger: RequiredTrigger;
+  patch: Record<string, unknown>;
+}[] = [
+  ...(["push", "pull_request", "merge_group"] as const).flatMap((trigger) => [
+    { label: `${trigger} main-only branches`, trigger, patch: { branches: ["main"] } },
+    {
+      label: `${trigger} negated deploy branch`,
+      trigger,
+      patch: { branches: ["main", "verdant-grow-diary", "!verdant-grow-diary"] },
+    },
+    {
+      label: `${trigger} ignored deploy branch`,
+      trigger,
+      patch: { "branches-ignore": ["verdant-grow-diary"] },
+    },
+  ]),
+  ...prActivityTypes.map((missing) => ({
+    label: `pull_request without ${missing}`,
+    trigger: "pull_request" as const,
+    patch: {
+      types: [...prActivityTypes.filter((activity) => activity !== missing), "ready_for_review"],
+    },
+  })),
+  { label: "merge_group empty types", trigger: "merge_group", patch: { types: [] } },
+  {
+    label: "merge_group without checks_requested",
+    trigger: "merge_group",
+    patch: { types: ["ready_for_review"] },
+  },
+  { label: "merge_group invalid null types", trigger: "merge_group", patch: { types: null } },
+  { label: "push unsupported types", trigger: "push", patch: { types: ["opened"] } },
+];
+
+describe.each(requiredWorkflows)("%s required-trigger regression fences", (name) => {
+  it.each(triggerFilterMutations)("rejects $label", ({ trigger, patch }) => {
+    const resolvedConfig = readWorkflow(name).on[trigger] ?? {};
+    const candidate: Record<string, unknown> = { ...resolvedConfig, ...patch };
+    // GitHub permits either branches or branches-ignore, never both.
+    if (Object.hasOwn(patch, "branches-ignore")) delete candidate.branches;
+    expect(() => assertRequiredTriggerPolicy(name, trigger, candidate)).toThrow();
+  });
+
+  it.each([null, { types: ["checks_requested"] }])("accepts merge_group default %j", (config) => {
+    expect(() => assertRequiredTriggerPolicy(name, "merge_group", config)).not.toThrow();
+  });
+
+  it("accepts the default pull_request activity types", () => {
+    const config = { ...readWorkflow(name).on.pull_request };
+    delete config.types;
+    expect(() => assertRequiredTriggerPolicy(name, "pull_request", config)).not.toThrow();
+  });
+});
 
 describe("resolved PR workflow concurrency", () => {
   it("gives every PR workflow a concurrency group", () => {
@@ -96,6 +187,49 @@ describe("resolved PR workflow concurrency", () => {
       for (const job of Object.values(readWorkflow(name).jobs)) expect(job.if).toBe(skipDraftPr);
     }
   });
+
+  it("cancels superseded feature-branch pushes of the non-required tsgo build", () => {
+    expect(readWorkflow("typecheck-build-push.yml").concurrency).toEqual({
+      group: "${{ github.workflow }}-${{ github.ref }}",
+      "cancel-in-progress":
+        "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/verdant-grow-diary' && github.ref != 'refs/heads/main') }}",
+    });
+  });
+
+  it("skips docs-only diffs on duplicate non-required workflows", () => {
+    for (const name of [
+      "lint.yml",
+      "typecheck.yml",
+      "typecheck-build-push.yml",
+      "dependency-security-ci.yml",
+      "vitest-full-suite-pr-gate.yml",
+    ]) {
+      const text = readFileSync(resolve(workflowsDir, name), "utf8");
+      const workflow = load(text) as {
+        on: Record<string, { "paths-ignore"?: string[] } | null>;
+      };
+      for (const trigger of ["pull_request", "push"] as const) {
+        if (!Object.hasOwn(workflow.on, trigger)) continue;
+        expect(workflow.on[trigger]?.["paths-ignore"], `${name} ${trigger}`).toEqual(docsOnlySkip);
+      }
+      if (Object.hasOwn(workflow.on, "merge_group")) {
+        const config = workflow.on.merge_group ?? {};
+        expect(config, name).not.toHaveProperty("paths");
+        expect(config, name).not.toHaveProperty("paths-ignore");
+      }
+    }
+  });
+
+  it.each(requiredWorkflows)(
+    "keeps the required triggers in %s live and free of path filters",
+    (name) => {
+      const workflow = readWorkflow(name);
+      for (const trigger of ["pull_request", "push", "merge_group"] as const) {
+        expect(workflow.on, name).toHaveProperty(trigger);
+        assertRequiredTriggerPolicy(name, trigger, workflow.on[trigger]);
+      }
+    },
+  );
 
   it("preserves all required CI contexts and their draft execution", () => {
     const ci = readWorkflow("ci.yml");

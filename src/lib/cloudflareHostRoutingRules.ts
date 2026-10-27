@@ -54,8 +54,9 @@ export const SEO_SNAPSHOT_HEADER_VALUE = "1";
 
 const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/strains": "/cultivars",
-  "/features": "/welcome",
-  "/demo": "/welcome",
+  "/welcome": "/",
+  "/features": "/",
+  "/demo": "/",
   "/refunds": "/refund",
   "/refund-policy": "/refund",
   "/terms-of-service": "/terms",

@@ -33,7 +33,6 @@ describe("static public SEO documents", () => {
 
     for (const required of [
       "/",
-      "/welcome",
       "/pricing",
       "/guides",
       "/guides/grow-stage-care-guide",

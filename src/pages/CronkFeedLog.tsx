@@ -202,11 +202,11 @@ export default function CronkFeedLog() {
     >
       <header className="border-b border-emerald-900/10 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
-          <Link to="/welcome" aria-label="Verdant Grow Diary home">
+          <Link to="/" aria-label="Verdant Grow Diary home">
             <BrandLogo />
           </Link>
           <nav aria-label="Breadcrumb" className="text-sm">
-            <Link className="underline" to="/welcome">
+            <Link className="underline" to="/">
               Home
             </Link>
             {" / "}

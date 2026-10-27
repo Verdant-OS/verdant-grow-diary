@@ -127,7 +127,7 @@ export default function AiDoctorContextCheck() {
       data-testid="ai-doctor-context-check-page"
     >
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-3 text-sm">

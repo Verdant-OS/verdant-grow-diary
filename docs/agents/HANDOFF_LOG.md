@@ -69,6 +69,75 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-285-PRESERVE-MISSING-STAGE
+
+```text
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2537 (draft)
+head_sha: Read the full current head of draft #2537; this implementation commit cannot name itself. Parent is 1630600154a112d6bdbb4881e7fb408627660cd0.
+state: Implemented and locally validated: 104 tests pass, full TypeScript check passes, scoped ESLint/Prettier pass. Hosted checks and independent acceptance are NOT_MEASURED at this new head.
+current_step: The 19 new mounted regressions failed 17/19 against base (2 explicit-stage controls passed). Final focused suite: 9 files, 104 passed / 0 failed / 0 skipped.
+next_action: Read #2537 full head and required CI; after green, route one eligible independent non-contributing Claude/Grok review. Stay draft; no merge or deploy.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts src/test/timeline-stage-label-render.test.tsx src/test/timeline-chip-counts-match-list.test.tsx src/test/quicklog-corrections-static-safety.test.ts src/test/timeline-photo-edit-resign.test.ts src/test/timeline-photo-edit-signing-followups.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/eslint/bin/eslint.js src/components/EntryEditDialog.tsx src/test/entry-edit-stage-preservation.test.tsx; node scripts/scorer-lock.mjs --report --base 21b267a217f4d2d1b1a53a4ba77b85e9903cd418 --strict
+files_touched: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None planned; no new rules helper needed because the existing stage presentation helper is reused.
+blockers: Required CI and eligible independent exact-head acceptance remain pending. Local full test suite and build SKIPPED; required hosted CI must provide these gates. Default Node heap exhausted during initial tsc; 6144 MB rerun exposed four invalid test-query options, corrected before the final clean full tsc run. No production verification permitted in this task.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id. Tests serialize actual editor UPDATE payloads into a synthetic persistence store, then remount from a separate read; this is not a real DB or production readback receipt. Untouched null, empty, omitted, unknown, whitespace and legacy stage values are preserved. Clearing a stage explicitly writes null; the UI sentinel never reaches persistence. Existing details serialization is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: New mounted test file and PR validation summary. Existing linked-Quick-Log and zero-row guards pass unchanged. Lint/format/whitespace, scorer lock and docs-safety PASS. All 126 open PR file lists inspected, no editor or stage-helper overlap. VER-285 was unassigned at intake; Linear now shows assignee Verdant after draft linking, no competing writer comment observed.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
+```
+
+### PR2511-REQUIRED-TRIGGER-GUARDS
+
+```text
+TASK PR2511-REQUIRED-TRIGGER-GUARDS  priority: P2  status: OPEN
+goal: Strengthen the workflow contract left by merged #2511: required push, pull_request and merge_group triggers forbid parsed path filters, preserve reviewed branch coverage and required activity types, and handle bare merge_group declarations.
+why: The original text-only guard missed a paths filter on required workflows; the follow-up prevents required checks silently disappearing without changing workflow policy.
+branch: codex/pr2511-required-trigger-guards
+base: verdant-grow-diary at cbdd6acb0e22cfaef381f3704a0c33394f54cd26 (#2537 integration); original #2511 merge was 234a215990e64fd1db7b025c9336ff2baac8840c
+checkout: git fetch origin refs/heads/codex/pr2511-required-trigger-guards:refs/remotes/origin/codex/pr2511-required-trigger-guards refs/heads/verdant-grow-diary:refs/remotes/origin/verdant-grow-diary && git switch codex/pr2511-required-trigger-guards && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2547 (draft; explicitly authorized by Matthew on 2026-10-26; keep draft)
+head_sha: 3647f9d2a8c600bdd2f894e698c35b870192e096 (pushed pre-integration checkpoint). Read #2547 for the resulting full integration head; verify this checkpoint and base cbdd6acb0e22cfaef381f3704a0c33394f54cd26 are ancestors before resuming.
+state: Necessary normal base integration after #2537 produced only a HANDOFF_LOG conflict; resolved by preserving the complete incoming base log and this complete task block, then refreshing this block only. The upcoming merge head supersedes prior CI/review.
+current_step: P2 guard repair from 3647 is preserved byte-for-byte (Git blob f65f2f10829cd029fc9348cf7096c72dbe30259b; filesystem SHA256 790417B77936CD9D91DB23DD44F3B8C9BFF8E4EC8345AD26DACC6DEF30A8FC20). Incoming VER-285 and all other base handoffs remain intact. No manual product, workflow, config, dependency, scorer or ownership edit.
+next_action: Verify the published integration head, fresh required/supplemental CI and relevant base drift. After green, obtain Sour Diesel's complete full-head re-review under the existing named assignment; inspect the ledger before pinging. Keep draft; no PR merge, ready/enqueue or deploy.
+post_merge_check: Run src/test/ci-pr-concurrency.test.ts on the resulting deploy head; any regression reopens this work with Codex. NOT_MEASURED until merged.
+active_writer: Codex PR2511 follow-up coordinator, directly assigned by Matthew; no claim on another branch or workstream
+decisions: Preserve all workflow behavior and the complete P2 test repair. Integrate verified cbdd normally because the shared handoff conflicted; reconstruct the log as the untouched incoming base plus this task block, never choose one side wholesale. Exact branch/activity policy and default semantics remain unchanged. No new scorer unlock.
+tried_and_rejected: The original regex guard passed four injected paths filters. The initial shared dependencies had router 1.170.18 below required ^1.170.41 and produced two getSsrStatus type errors; replaced only the isolated checkout's dependency junction with a successful frozen Bun 1.3.14 install. No manifest or lockfile changed. Interrupted full typecheck runs have no final receipt. npm's npx launcher rejected the existing zod override (EOVERRIDE); the unchanged hook now uses the exact installed lint-staged CLI through an external task-local launcher, with all checks retained. A bunx executable alias supplies the hook's missing Windows launcher.
+commands: bun run typecheck:tsgo; bun x vitest run src/test/ci-pr-concurrency.test.ts src/test/dependency-security-ci-workflow.test.ts src/test/full-suite-pr-gate-workflow.test.ts src/test/workflow-branch-filter-liveness.test.ts src/test/knowledge-library-ci-wiring.test.ts src/test/v0-operating-loop-contract.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts src/test/entry-edit-stage-preservation.test.tsx --reporter=dot; git diff --check; node scripts/scorer-lock.mjs --status
+files_touched: src/test/ci-pr-concurrency.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: Normal merge commit/hooks and push, then fresh hosted CI and full review; no additional source change planned. This is the pre-commit editing checkpoint; final hook/push receipts belong in the PR body and exact-head ledger.
+blockers: Integration-head required/supplemental CI and eligible full review NOT_MEASURED until push and completion. Prior 3647 CI remained queued; 4e71's private P2 correction is not acceptance. Public resume/claim comments remain outside authorized transport.
+open_questions: Fresh integration-head CI and Sour Diesel's complete full-scope re-review after green
+gotchas: Preserve #2086's separate 35-to-36-context work. Fresh 130-open census: only #2086 also edits this guard, on separate context assertions; no open incoming-editor/stage-test overlap. Fifty-two other open PRs share HANDOFF_LOG; all their patches were not inspected. New be6-to-cbdd delta is exactly VER-285 handoff, EntryEditDialog and its new stage test. Merge is necessary, not gratuitous. Do not recreate #2511's retired branch.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2547 ; predecessor https://github.com/Verdant-OS/verdant-grow-diary/pull/2511
+artifacts: Integration preservation PASS: removing this complete block reproduces the incoming base log byte-for-byte, all 63 incoming blocks retained, no conflict markers, PR delta only two files, guard bytes/hash match 3647, no new scorer unlock. Merged-tree validation PASS: eight focused files 181 passed/0 failed/0 skipped, including 53 guard and 19 incoming stage-preservation cases; tsgo exit 0/no diagnostics; scoped ESLint, Prettier, whitespace and contract resolution PASS. Normal merge-commit hook NOT_MEASURED at this editing checkpoint; final receipt goes in PR body/ledger after commit. Prior 3647 evidence: 32 RED branch/type cases then 53/53 guard GREEN; its seven-file 162/0/0 and hook tsc exit 0 are historical. Older 4e71 hosted native browser 23/0/0 is historical only. Full local suite/build and production smoke NOT_MEASURED.
+reviewer_seat: Sour Diesel, independent review-only Grok Bot agent 48794c65-be1c-45f8-97e0-a89952916747; non-contribution reconfirmed privately. Codex/Verdant authored/repaired this work and is excluded, including after base integration. Matthew/OG Kush's named assignment is preserved; no fallback or duplicate request.
+reviewer_sha: Prior 4e71d7c2248de7e5dbda7c9acb77820c9636307a receipt https://github.com/Verdant-OS/verdant-grow-diary/pull/2547#pullrequestreview-5660910757 reported PASS, corrected privately at 19:41:15 CT to PASS-with-P2 (0/1/1). It is not current acceptance. New-head full review pending after green.
+session_state: Codex remains sole writer; only read-only preservation audit assistance. Existing owner-chat heartbeat finish-pr-2547-ci-and-review checks every ten minutes; update its head/base after push, never create another. No long-lived CI watch, deployment, paused workflow or pending human permission. New-head review request follows green only.
+claimed_by: Codex by Matthew's direct task assignment and explicit follow-up draft authorization on 2026-10-26; no public claim comment posted
+owner: Codex PR2511 follow-up session; no retirement or transfer
+last_updated: 2026-10-26 21:44 CT, by Codex
+limits: Test and handoff PR delta only; normal base integration permitted. No GitHub comments, PR merge, ready/enqueue, publish/deploy, SQL/APPLY, secrets, dependency manifest/lockfile edits, auth, RLS, Edge, Action Queue or device changes.
+```
+
 ### CRONK-FEED-LOG-IN-PLACE
 
 ```text
@@ -79,13 +148,13 @@ branch: cursor/cronk-nutrients-feed-log-26be
 base: verdant-grow-diary
 checkout: git fetch origin cursor/cronk-nutrients-feed-log-26be verdant-grow-diary && git switch cursor/cronk-nutrients-feed-log-26be
 pr: draft, created after the first push; see the PR for this branch
-head_sha: de07d89686245c380fee1a975902ab2ac76c00e4 (implementation). This handoff line update follows in the next commit on the same branch.
-state: implemented and committed locally; push and draft PR follow
-current_step: Implementation commit de07d8968 passed the pre-commit typecheck, docs safety, and the feed-log vitest set. Draft PR is the next step.
-next_action: Push the branch and open one draft PR against verdant-grow-diary. Do not merge, publish, or enqueue.
+head_sha: recorded after the CSV fix and base merge push
+state: draft PR #2546; CSV download fix merged with origin/verdant-grow-diary
+current_step: CSV export no longer calls preventDefault. Base merge keeps both handoff logs.
+next_action: Push the merge. Stay draft. Do not mark ready or merge the PR.
 post_merge_check: After merge and publish, https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary serves the H1 "Cronk Nutrients Grow Diary: Log Your Feeding Chart, Planned vs Actual" and canonical /guides/cronk-nutrients-grow-diary. Until publish this is NOT_MEASURED.
 active_writer: Cursor cloud agent on cursor/cronk-nutrients-feed-log-26be (Grok session assigned this slice). Do not push claude/* branches.
-decisions: CTA href /auth?mode=signup with no UTM params, matching Athena draft #2545. Breadcrumb Home is https://verdantgrowdiary.com/welcome (VERDANT_GUIDES_BREADCRUMB_ITEMS), Grower Guides is /guides. datePublished 2026-07-16 from commit 137241b75377c8cc2beef0651e62abaf25172db9 and the prior sitemap lastmod. dateModified 2026-10-26. VPD links are /guides/grow-room-vpd-tracker and /tools/vpd-calculator. JSON-LD is WebPage plus Article, FAQPage, WebApplication, and BreadcrumbList once; the generic slug document was removed so the old graph is not also emitted. Analytics uses readAnalyticsConsent then verdant:analytics and window.gtag event only. No page gtag loader and no second page_view. Related logs point at /guides/advanced-nutrients-feeding-chart-log and /guides/athena-feed-chart-log; reverse links wait on #2542 and #2545.
+decisions: CTA href /auth?mode=signup with no UTM params, matching Athena draft #2545. Breadcrumb Home follows VERDANT_GUIDES_BREADCRUMB_ITEMS, which the 2026-10-27 base sets to https://verdantgrowdiary.com/ (visible Home is /). Grower Guides is /guides. datePublished 2026-07-16 from commit 137241b75377c8cc2beef0651e62abaf25172db9 and the prior sitemap lastmod. dateModified 2026-10-26. VPD links are /guides/grow-room-vpd-tracker and /tools/vpd-calculator. JSON-LD is WebPage plus Article, FAQPage, WebApplication, and BreadcrumbList once; the generic slug document was removed so the old graph is not also emitted. Analytics uses readAnalyticsConsent then verdant:analytics and window.gtag event only. No page gtag loader and no second page_view. Related logs point at /guides/advanced-nutrients-feeding-chart-log and /guides/athena-feed-chart-log; reverse links wait on #2542 and #2545.
 tried_and_rejected: Copying the HTML gtag snippet and UTM query onto signup CTAs. Rendering the wide table at phone width. Linking /vpd-chart, which is not on this base.
 commands: bunx vitest run src/test/cronk-feed-log-rules.test.ts src/test/cronk-feed-log-analytics.test.ts src/test/cronk-feed-log-page.test.tsx src/test/cronk-nutrient-priority.test.ts src/test/verdant-seo-guides.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/route-indexation-matrix.test.ts src/test/static-public-seo-documents.test.ts src/test/sitemap-public-route-parity.test.ts src/test/operator-route-mobile-coverage.test.ts src/test/root-canonical-seo.test.ts src/test/core-link-form-census-rules.test.ts --reporter=dot
 files_touched: src/pages/CronkFeedLog.tsx; src/routes/guides.cronk-nutrients-grow-diary.tsx; src/lib/cronkFeedLogRules.ts; src/lib/cronkFeedLogAnalytics.ts; src/test/cronk-feed-log-*.ts; src/test/cronk-feed-log-page.test.tsx; src/constants/verdantSeoContent.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/appRouteManifest.ts; src/pages/GuidesIndex.tsx; src/routeTree.gen.ts; public/sitemap.xml; docs/seo/route-indexation-matrix.md; scripts/seo-runtime-smoke.mjs; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-guides-public-links.test.tsx; src/test/verdant-seo-sitemap-robots.test.ts; src/test/cronk-nutrient-priority.test.ts; e2e/auth-route-protection-mobile.spec.ts
@@ -93,7 +162,8 @@ files_remaining: none for this slice
 blockers: none for the draft
 open_questions: required CI at the pushed head is NOT_MEASURED until the checks finish
 gotchas: routeTree.gen.ts was patched by hand because the generator was not run. Shared-file edits stay additive with #2542 and #2545: cronk document is the last core acquisition document; the guides index card is after the grow-stage card; the manifest entry is after /guides/:slug. Scorer unlocks are gitignored. Disclaimer stays on the page.
-resume_here: draft PR against verdant-grow-diary; do not merge
+resume_here: draft PR https://github.com/Verdant-OS/verdant-grow-diary/pull/2546 ; do not merge
+last_updated: 2026-10-27, CSV download fix and base merge
 ```
 
 ### PR-2345-BASE-INTEGRATION

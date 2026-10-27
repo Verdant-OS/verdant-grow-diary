@@ -82,7 +82,7 @@ describe("public Cronk nutrients feed log page", () => {
       CRONK_FEED_LOG_CTA_HREF,
       CRONK_FEED_LOG_CTA_HREF,
     ]);
-    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/welcome");
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
     expect(
       screen.getByRole("link", { name: "Advanced Nutrients feeding chart log" }),
     ).toHaveAttribute("href", "/guides/advanced-nutrients-feeding-chart-log");
@@ -96,7 +96,7 @@ describe("public Cronk nutrients feed log page", () => {
     expect(types).toEqual(["WebPage", "Article", "FAQPage", "BreadcrumbList", "WebApplication"]);
     expect(blocks[1].datePublished).toBe("2026-07-16");
     expect(blocks[1].dateModified).toBe("2026-10-26");
-    expect(blocks[3].itemListElement[0].item).toBe("https://verdantgrowdiary.com/welcome");
+    expect(blocks[3].itemListElement[0].item).toBe("https://verdantgrowdiary.com/");
     const faq = blocks[2].mainEntity.map(
       (entry: { name: string; acceptedAnswer: { text: string } }) => ({
         question: entry.name,

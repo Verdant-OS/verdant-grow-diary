@@ -230,39 +230,92 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "grow-log-app-vs-grow-journal",
-    title: "Grow log app vs grow journal | Verdant Grow Diary",
-    h1: "Grow log app vs grow journal: what serious growers actually need",
+    title: "Grow Log App vs Paper Journal vs Spreadsheet | Verdant",
+    h1: "Grow log app, paper journal or spreadsheet: which fits your routine?",
     description:
-      "A grow log app captures structured, timestamped, plant-scoped data. A grow journal captures notes. Here is what serious growers actually need — and why plant memory beats loose pages.",
+      "Compare a grow log app, paper journal and spreadsheet for notes, photos and recordkeeping. Learn what Verdant's no-account draft does before you sign up.",
     targetKeyword: "grow log app",
     intro:
-      "A grow journal is a notebook. A grow log app is a structured, timestamped, plant-scoped record. Both can be useful, but only one of them survives multiple runs and helps you diagnose problems fast. Here is the difference — and why plant memory is the outcome that matters.",
+      "A grow journal can be a notebook, a spreadsheet or an app. A grow log usually emphasizes dated entries, but any of these formats can hold structured records and freeform notes. Choose the one you will keep using and can look back through easily. Here are the practical trade-offs, including what you can try in Verdant without an account.",
+    cta: {
+      label: "Try a local Quick Log draft",
+      to: "/quick-log?utm_source=organic_guide&utm_medium=owned&utm_campaign=search_to_first_value&utm_content=grow-log-app-vs-grow-journal",
+      heading: "Try one note before choosing your journal",
+      description:
+        "No account is needed to draft a plant note. The public starter keeps it only in this browser, even if you are signed in. Saving it to your diary requires an account and a separate review and save.",
+      prompts: [
+        "Give the plant a nickname",
+        "Write one observation",
+        "Save the draft to this device",
+      ],
+    },
     sections: [
       {
-        heading: "Structure beats prose",
-        body: "A grow log app captures the same fields the same way every time: what you did, when, to which plant, and with what inputs. That structure is what lets you filter, compare runs, and hand context to an AI grow doctor. A journal cannot do that.",
+        heading: "Paper journal: flexible notes with a simple setup",
+        body: "Paper works well if you prefer handwriting, sketches and a record that needs no battery or login. Repeating the same headings can make a notebook just as structured as an app. Finding a particular entry or comparing dates takes manual indexing, and digital photos need a filename or other reference. Keep a separate copy if losing the notebook would mean losing your only record.",
+        links: [{ label: "Use a grow journal template", to: "/guides/grow-journal-template" }],
       },
       {
-        heading: "Plant memory across runs",
-        body: "Verdant is a grow log app designed for plant memory across cycles. Strains, phenos, tents, and outcomes carry forward so you can see what to repeat and what to avoid next run.",
+        heading: "Spreadsheet: custom fields and side-by-side comparisons",
+        body: "A spreadsheet suits people who want their own columns, sorting and formulas. Start with date, plant identifier, entry type, note and photo reference. Consistent units and names make later comparisons easier. The trade-off is maintaining the sheet yourself, especially when adding photos or entering notes on a phone. Offline access, collaboration and backup depend on the spreadsheet tool and how you configure it.",
       },
       {
-        heading: "Sensor context on every entry",
-        body: "A note that says 'humidity felt high' is worth less than a source-labeled snapshot showing 68% RH captured live at 14:02. Verdant attaches sensor snapshots to diary entries with source, captured_at, and confidence preserved.",
+        heading: "Grow log app: a defined workflow for repeat entries",
+        body: "An app can reduce repeated setup by providing fields and a place for entries, but its workflow has to fit yours. Verdant's full diary includes plant-linked notes, photos and optional source-labeled sensor context. Sensors are not required to start. Before choosing any app, check how saving works, how you can retrieve your records and which features need an account. Do not assume every app offers the same access, export or offline behavior.",
+        links: [
+          { label: "Explore Verdant's grow diary", to: "/guides/grow-diary-app" },
+          { label: "Understand sensor source labels", to: "/guides/sensor-truth-grow-room" },
+        ],
       },
       {
-        heading: "Still forgiving for freeform notes",
-        body: "Structure does not mean rigidity. Verdant keeps freeform note fields on every entry so observations that do not fit a schema still land on the timeline.",
+        heading: "Understand Verdant's local draft and account save",
+        body: "You can open the public Quick Log starter without an account, nickname a plant and save one draft to this browser. It is not synced or backed up to an account, and clearing browser data deletes it. This remains true when you are signed in. To put the note in your diary, create an account or log in, set up a grow, tent and plant if needed, then review the note and complete the authenticated Quick Log save. An eligible recent draft can appear in the dashboard's 'Continue your Quick Log' card; opening that card is not a save. If the card is unavailable, copy the note from the starter into Quick Log yourself.",
+        links: [
+          {
+            label: "Read the no-account draft guide",
+            to: "/guides/grow-journal-app-without-account",
+          },
+        ],
+      },
+      {
+        heading: "Try one ordinary record in each format, then choose",
+        body: "Example entry: '19 October, 09:15 — Plant A — Observation: took a reference photo from the front; file plant-a-2026-10-19.jpg. No measurements recorded.' On paper, use a dated heading and write the filename. In a spreadsheet, put each field in its own column. In an app, select the plant and add the observation; attach the photo where supported. In Verdant's public starter, put the date and photo reference in the note itself. The starter does not upload the photo. This example records what happened without guessing missing measurements or prescribing plant care. Choose paper if handwriting makes it easiest to keep notes. Choose a spreadsheet if custom columns and your own comparisons matter most. Try an app if a consistent entry flow and plant-linked records would reduce the work. You can combine formats, but decide which holds the complete record so entries do not become scattered. Test each option with a few ordinary observations before moving a larger history.",
+        links: [
+          {
+            label: "Plan what to include in a grow journal",
+            to: "/guides/what-to-log-in-a-grow-journal",
+          },
+        ],
       },
     ],
     faq: [
       {
         question: "What is the difference between a grow log and a grow journal?",
         answer:
-          "A grow journal is unstructured prose. A grow log is structured, timestamped, plant-scoped data — waterings, feedings, symptoms, and sensor snapshots — that can be filtered, compared, and reasoned about. Verdant is a grow log app that still keeps room for grower notes.",
+          "The terms overlap. A log often means dated entries, while a journal may include longer observations. Either can be structured and can live on paper, in a spreadsheet or in an app. Consistent dates, plant identifiers and notes matter more than the label.",
+      },
+      {
+        question: "Is a grow log app better than a spreadsheet?",
+        answer:
+          "It depends on your routine. A spreadsheet gives you control over columns and formulas; an app provides a defined workflow. Compare the effort of making an entry, finding older records and keeping photos connected before choosing.",
+      },
+      {
+        question: "Can I try Verdant without creating an account?",
+        answer:
+          "Yes. The public Quick Log starter lets you save one draft in this browser without an account. It is not an account-backed diary entry, even when you are signed in. Clearing browser data deletes it.",
+      },
+      {
+        question: "Does signing in automatically save my draft to my diary?",
+        answer:
+          "No. You need a grow, tent and plant, then you must review the note and complete the authenticated Quick Log save. A recent eligible draft may be offered for review on your dashboard, but the handoff itself does not save it.",
       },
     ],
-    related: ["grow-diary-app", "ai-grow-doctor"],
+    related: [
+      "grow-journal-template",
+      "grow-journal-app-without-account",
+      "what-to-log-in-a-grow-journal",
+      "grow-diary-app",
+    ],
   },
   {
     slug: "grow-room-vpd-tracker",
@@ -2020,7 +2073,7 @@ export const VERDANT_GUIDES_BREADCRUMB_ITEMS: ReadonlyArray<{
   name: string;
   url: string;
 }> = [
-  { name: "Home", url: `${VERDANT_SITE_ORIGIN}/welcome` },
+  { name: "Home", url: `${VERDANT_SITE_ORIGIN}/` },
   { name: "Grower Guides", url: `${VERDANT_SITE_ORIGIN}/guides` },
 ];
 

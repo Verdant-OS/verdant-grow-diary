@@ -69,6 +69,43 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-290-GROUNDING-REGEX
+
+```text
+TASK VER-290-GROUNDING-REGEX  priority: P2  status: OPEN
+goal: Remove exponential backtracking from AI Doctor's direct-prohibition matcher without weakening grounding rules.
+why: Repeated only tokens followed by an invalid modifier make the previous overlapping alternatives explore exponentially many paths on model output.
+branch: codex/ver-290-grounding-regex
+base: verdant-grow-diary at be6d009dcf0110b92901b85bc8212b560e45cf62
+pr: Resolve the open draft by head branch codex/ver-290-grounding-regex; creation follows this commit.
+head_sha: This handoff travels in the implementation commit. Resolve and verify the draft's full remote head before resuming; no old-head verdict carries forward.
+state: Implemented and locally validated; draft publication and hosted CI pending at this checkpoint.
+active_writer: Codex Work session /root in /workspace/scratch/79e419f0febb, explicitly assigned VER-290 by Matthew.
+current_step: Prepare the five-file correction as one draft PR. Keep all release gates held.
+next_action: Verify the draft head, hosted checks and review request state; obtain an eligible non-contributing Claude/Grok acceptance review of the complete exact head. Do not merge or deploy.
+post_merge_check: After separately authorized deployment, confirm the deployed source identity and rerun the adversarial grounding cases in the Edge runtime. Production and Deno performance are NOT_MEASURED here.
+decisions: Remove only the redundant only alternative, already matched by [a-z]+ly. Remaining word alternatives are disjoint and separated by whitespace, so the anchored matcher scans in linear time. No arbitrary length cap, broader exemption, or rewritten output.
+tried_and_rejected: No tokenizer or new dependency needed. Do not hand-edit generated mirrors. Do not count an author review or a second Codex session as the required outside acceptance for Codex-authored security/Edge work.
+commands: node node_modules/vitest/vitest.mjs run src/test/ai-doctor-grounding-redos.test.ts src/test/ai-doctor-review-grounding-rules.test.ts src/test/ai-doctor-review-grounding-edge-static.test.ts src/test/ai-doctor-live-review-static-safety.test.ts src/test/ai-credit-replay-provider-boundary.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot
+commands: node scripts/sync-edge-shared.mjs --check; node scripts/verify-edge-shared-in-sync.mjs --check-only; node scripts/check-no-src-lib-imports.mjs
+commands: node node_modules/eslint/bin/eslint.js src/lib/aiDoctorReviewGroundingRules.ts src/test/ai-doctor-grounding-redos.test.ts
+files_touched: src/lib/aiDoctorReviewGroundingRules.ts; supabase/functions/_shared/lib/lib/aiDoctorReviewGroundingRules.ts; supabase/functions/_shared/lib/.sync-manifest.json; src/test/ai-doctor-grounding-redos.test.ts; docs/agents/HANDOFF_LOG.md.
+files_remaining: None planned. supabase/functions/_shared/aiDoctorReviewGroundingRules.ts is an unchanged re-export shim; runtime identity is tested.
+evidence: Before fix: new regression 2 FAIL (both executable modules hit the 3000 ms subprocess deadline), 100 PASS. After fix: focused 6 files / 224 PASS / 0 FAIL / 0 SKIP. Mirror checks: 106 files in sync, no forbidden Edge imports. ESLint and Prettier clean. All existing tests unchanged.
+evidence: Differential experiment against the parent matcher: 46,137 short input comparisons, zero mismatches. Node 24.22.1 rejected 8,192 repeated only tokens plus invalid suffix in about 0.15 ms per call (100-call mean). Timing is local evidence, not an Edge SLA.
+scorer_receipt: The owner-authorized synchronized correction regenerates one manifest hash for src/lib/aiDoctorReviewGroundingRules.ts. No other pin changes. scripts/scorer-lock.mjs --unlock supabase/functions/_shared/lib/.sync-manifest.json records this narrow reason; strict report: 1 changed scorer, 0 still locked. No existing test changes or weakened gates.
+blockers: Hosted CI and eligible independent acceptance are pending. No authenticated Claude/Grok runtime or routing transport is exposed in this environment. A supplemental non-contributing Codex review cannot satisfy OWNERSHIP.md's outside acceptance gate for this Codex-authored slice. GitHub comments retain their owner-approval gate; use the draft body and this handoff as evidence, not an unauthorized comment.
+open_questions: None about the implementation scope. No merge, deploy, or production authorization is requested or assumed.
+gotchas: Killable subprocesses make the regression terminate even if catastrophic backtracking returns. Node dependencies are reused from an existing provisioned checkout with the identical bun.lock SHA-256 ad9ae28f5b24aa9efc8af9535749c85257b4d1e9320e26e3fd636b8dbde5d570; no install or lockfile edit. Full suite/build and production checks were not run.
+links: https://linear.app/verdantgrowdiary/issue/VER-290/security-exponential-time-regex-in-ai-doctor-grounding-rules-code
+reviewer_seat: BLOCKED pending an actually available non-contributing Claude/Grok or other eligible outside session under OWNERSHIP.md section 4.3.
+reviewer_sha: NOT_MEASURED; no acceptance verdict.
+session_state: No production writes, deployments, queue actions, external messages, or reviewer requests sent at this checkpoint.
+claimed_by: Codex Work /root, 2026-10-26 CT, explicit owner assignment; this branch only.
+owner: Codex VER-290 implementation session.
+last_updated: 2026-10-26 CT, by Codex.
+```
+
 ### PR-2345-BASE-INTEGRATION
 
 ```text

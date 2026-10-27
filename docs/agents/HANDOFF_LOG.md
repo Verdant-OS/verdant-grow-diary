@@ -69,34 +69,38 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY
+### VER-285-PRESERVE-MISSING-STAGE
 
 ```text
-TASK CLAUDE-1723-DEPLOY-TIP-DEPENDENCY-AUDIT-VERIFY  priority: P2  status: OPEN
-goal: Preserve the dated root dependency-audit receipt after #1343 and finish the separate Cursor spike verification required by #1723. Documentation/verification only; not a reopen or revert of #1543.
-why: The root and nested spike have separate manifests and lockfiles. Root audit success does not establish nested audit coverage.
-branch: claude/verify-deploy-tip-dependency-audits
-base: verdant-grow-diary
-checkout: Fetch this existing branch, verify its current full PR head, and use an isolated cloud worktree. Do not resume from the historical audit SHA as if it were the current source head.
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2299
-head_sha: earlier checkpoint 6aa56724cf2010057bacbd15f3b9fd94d2e2a30e, not the current PR head (the resulting full head is in the PR body). Historical Initial plan b07c85ba7ad6b1031dea713d4ec4dd020ee6f8cc was over audited deploy parent 05f5138d08c943921df0ce224af8d9c0837c09d9 (#2296).
-state: Historical root gate PASS at 05f5138d08c943921df0ce224af8d9c0837c09d9, measured 2026-10-21: Dependency & Security CI run 39571694293 and job 119127189913 succeeded, including lockfile policy, check:deps, dependency contract tests, typecheck, build and Playwright. The four historical blocked Hono/js-yaml IDs no longer blocked that root gate; config/dependency-security-exceptions.json had exceptions: []. This is dated root evidence, not current-tip or nested-spike acceptance.
-decisions: #1343 (7266acd6886b22b92bfdf405d04ffa8f05a4edee) raised Hono to 4.13.5, js-yaml to 4.3.2 and Vitest to ^4.1.11. Hono 4.13.7 came in #1832 (5fbaa96beeff863f4da3083807df189eb6a16cfa); Hono 4.13.11 came later in #2274 (5b3d56bc3cf5cc337045c42573bb65a01d2d9d1d); Vitest ^4.1.12 came in #2294 (ac8c20fa14abe6f2d522b2988ed40d914d404887). The dated root run used those later repairs in ancestry.
-current_step: Documentation scope and provenance corrected; fresh repaired-head CI and outside review are pending. Cursor spike GHSA-82fw-gwwq-j7x9 coverage remains NOT_MEASURED: its separate manifest pinned Vitest 4.1.11 at 05f5138d08c943921df0ce224af8d9c0837c09d9. From 6aa56724cf2010057bacbd15f3b9fd94d2e2a30e onward, including the current base, the pin is 4.1.12, and the audit of that current 4.1.12 pin is NOT_MEASURED. Workflow 334730604 had zero deploy-branch runs when checked; that is expected because .github/workflows/cursor-sdk-local-orchestration.yml has no push trigger and its lines 4-5 are pull_request only (workflow_dispatch is also declared). No nested vulnerability or remediation outcome is inferred from a missing run.
-next_action: Verify the resulting PR head and required CI; obtain an eligible non-contributing outside review. For #1723, separately pin the audited current tip and obtain its root and nested audit/version-range receipts, or preserve an explicit scoped follow-up for an unresolved finding. Do not close #1723 from root evidence alone.
-post_merge_check: Confirm the landed handoff retains the dated audit SHA and separate nested NOT_MEASURED state. This docs-only receipt grants no deployment or production verification action.
-active_writer: Every writer that committed on this branch: anthropic-code-agent[bot] (b07c85ba7ad6b1031dea713d4ec4dd020ee6f8cc, ee76c9ac87122e59118c8269cb71ed1f49d4b96e); Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd (388cde42b67f4d152e3e0016659634a816ab6acd, 6198f8f5b636ddff24a947b116c9fdaeeb0c46f9); Cursor Agent cloud repair session dispatched by OG Kush (Grok Bot) (57d22e140e71e2a16660fdb9c2fa7620b20ef552, and this attribution correction). Base merge: Verdant 6aa56724cf2010057bacbd15f3b9fd94d2e2a30e. Scope remains this handoff block only.
-tried_and_rejected: Treating root bun audit as a full-tree nested proof, attributing later versions to #1343, or marking the whole verification CLOSED without the nested evidence.
-commands: node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 3bc6b346f25249db408ca9cb9d2d94c33b3a442b --strict; git diff --check. See the PR body for actual results, not assumed passes.
-files_touched: docs/agents/HANDOFF_LOG.md (this block only; moved from Closed to Open)
-files_remaining: none planned for the documentation repair; missing audit evidence remains explicit in #1723.
-blockers: Nested/current-tip audit coverage remains NOT_MEASURED. Fresh repaired-head CI and eligible outside acceptance are pending. Codex now contributes this repair and cannot independently accept it. Local Bun/node_modules were unavailable at repair startup.
-artifacts: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293; https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/39571694293/job/119127189913; https://github.com/Verdant-OS/verdant-grow-diary/issues/1723
-reviewer_seat: An actually available eligible non-contributing outside session under current OWNERSHIP.md; all receipt authors and repairers are excluded, including this Codex writer. No new review request has been sent by this record.
-reviewer_sha: NOT_MEASURED for the repaired head; earlier reviews are historical.
-historical_metadata: Original receipt claimed_by Claude, 2026-10-21 (time/zone not recorded); its historical reviewer suggestions included Codex, Blue Dream, Critical Mass and Durban Poison. This preserves history and routes no new request to retired seats.
-claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 15:57:06 UTC (matching PR ownership record)
-last_updated: 2026-10-26 21:01 UTC, by the Cursor Agent cloud repair session dispatched by OG Kush (Grok Bot). Commit 57d22e140e71e2a16660fdb9c2fa7620b20ef552 was authored by Cursor Agent; this line replaces the earlier "Grok repair" credit for that commit.
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2537 (draft)
+head_sha: Read the full current head of draft #2537; this implementation commit cannot name itself. Parent is 1630600154a112d6bdbb4881e7fb408627660cd0.
+state: Implemented and locally validated: 104 tests pass, full TypeScript check passes, scoped ESLint/Prettier pass. Hosted checks and independent acceptance are NOT_MEASURED at this new head.
+current_step: The 19 new mounted regressions failed 17/19 against base (2 explicit-stage controls passed). Final focused suite: 9 files, 104 passed / 0 failed / 0 skipped.
+next_action: Read #2537 full head and required CI; after green, route one eligible independent non-contributing Claude/Grok review. Stay draft; no merge or deploy.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts src/test/timeline-stage-label-render.test.tsx src/test/timeline-chip-counts-match-list.test.tsx src/test/quicklog-corrections-static-safety.test.ts src/test/timeline-photo-edit-resign.test.ts src/test/timeline-photo-edit-signing-followups.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/eslint/bin/eslint.js src/components/EntryEditDialog.tsx src/test/entry-edit-stage-preservation.test.tsx; node scripts/scorer-lock.mjs --report --base 21b267a217f4d2d1b1a53a4ba77b85e9903cd418 --strict
+files_touched: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None planned; no new rules helper needed because the existing stage presentation helper is reused.
+blockers: Required CI and eligible independent exact-head acceptance remain pending. Local full test suite and build SKIPPED; required hosted CI must provide these gates. Default Node heap exhausted during initial tsc; 6144 MB rerun exposed four invalid test-query options, corrected before the final clean full tsc run. No production verification permitted in this task.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id. Tests serialize actual editor UPDATE payloads into a synthetic persistence store, then remount from a separate read; this is not a real DB or production readback receipt. Untouched null, empty, omitted, unknown, whitespace and legacy stage values are preserved. Clearing a stage explicitly writes null; the UI sentinel never reaches persistence. Existing details serialization is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: New mounted test file and PR validation summary. Existing linked-Quick-Log and zero-row guards pass unchanged. Lint/format/whitespace, scorer lock and docs-safety PASS. All 126 open PR file lists inspected, no editor or stage-helper overlap. VER-285 was unassigned at intake; Linear now shows assignee Verdant after draft linking, no competing writer comment observed.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
 ```
 
 ### PR-2345-BASE-INTEGRATION

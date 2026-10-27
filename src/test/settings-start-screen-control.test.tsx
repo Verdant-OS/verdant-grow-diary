@@ -48,7 +48,7 @@ describe("Settings start-screen control", () => {
     expect(screen.getByText(/choose where verdant opens after sign-in/i)).toBeInTheDocument();
     expect(screen.getByTestId("start-screen-option-quickLog")).toBeInTheDocument();
     expect(screen.getByTestId("start-screen-option-onboarding")).toBeInTheDocument();
-    expect(screen.getByTestId("start-screen-option-welcome")).toBeInTheDocument();
+    expect(screen.queryByTestId("start-screen-option-welcome")).toBeNull();
   });
 
   it("defaults to diary-first when nothing is saved", () => {
@@ -95,11 +95,11 @@ describe("Settings start-screen control", () => {
     expect(getStartScreenChoice("user-settings-1")).toBe("timeline");
   });
 
-  it("welcome option stores safe internal value", () => {
+  it("a legacy welcome preference migrates to Dashboard", () => {
+    setLocalStorageItemForTest("verdant:startScreen:user-settings-1", "welcome");
     renderSettings();
-    fireEvent.click(screen.getByTestId("start-screen-option-welcome"));
-    fireEvent.click(screen.getByTestId("start-screen-save"));
-    expect(getStartScreenChoice("user-settings-1")).toBe("welcome");
+    expect(getStartScreenChoice("user-settings-1")).toBe("dashboard");
+    expect(screen.getByTestId("start-screen-option-dashboard")).toBeChecked();
   });
 
   it("reset button clears preference and re-selects diary-first", () => {

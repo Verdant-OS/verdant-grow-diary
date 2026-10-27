@@ -118,7 +118,7 @@ export function buildCultivarBreadcrumbItems(
 ): CultivarBreadcrumbItem[] {
   const origin = siteOrigin.replace(/\/$/, "");
   return [
-    { name: "Home", url: `${origin}/welcome` },
+    { name: "Home", url: `${origin}/` },
     { name: "Strain Reference Library", url: `${origin}/cultivars` },
     { name: cultivar.name, url: `${origin}/cultivars/${cultivar.slug}` },
   ];
@@ -159,7 +159,7 @@ export function buildCultivarBreadcrumbItemsSafe(
 ): CultivarBreadcrumbItem[] {
   const origin = siteOrigin.replace(/\/$/, "");
   const base: CultivarBreadcrumbItem[] = [
-    { name: "Home", url: `${origin}/welcome` },
+    { name: "Home", url: `${origin}/` },
     { name: "Strain Reference Library", url: `${origin}/cultivars` },
   ];
   if (cultivar && cultivar.name?.trim() && cultivar.slug?.trim()) {

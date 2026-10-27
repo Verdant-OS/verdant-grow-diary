@@ -42,11 +42,10 @@ describe("production domain", () => {
 });
 
 describe("public landing page", () => {
-  it("registers /welcome as a public route outside AppShell", () => {
+  it("registers /welcome as a redirect to / outside AppShell", () => {
     expect(extractMountedAppRoutePaths()).toContain("/welcome");
-    // TanStack file route: src/routes/welcome.tsx → Landing page component
-    expect(APP).toMatch(/Landing/);
     expect(APP).toMatch(/createFileRoute\(["']\/welcome["']\)/);
+    expect(APP).toMatch(/RouteAliasRedirect to="\/"/);
   });
 
   it("registers the apex through a session-aware public entry boundary", () => {

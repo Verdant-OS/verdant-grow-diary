@@ -36,7 +36,7 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
 import Onboarding from "@/pages/Onboarding";
 
 describe("Onboarding with a null grows list", () => {
-  it("renders the start-screen choice instead of throwing", () => {
+  it("renders the grows read error with retry, never the start-screen choice", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -51,8 +51,10 @@ describe("Onboarding with a null grows list", () => {
         </QueryClientProvider>,
       ),
     ).not.toThrow();
+    expect(screen.getByTestId("onboarding-grows-error")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /or choose where to open first/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: /or choose where to open first/i }),
+    ).not.toBeInTheDocument();
   });
 });

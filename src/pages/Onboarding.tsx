@@ -62,7 +62,15 @@ export default function Onboarding() {
   // on this route (VERDANT-WEB-1; message and stack were redacted).
   const grows = Array.isArray(growsState?.grows) ? growsState.grows : [];
   const growsLoading = growsState?.loading === true;
-  const growsError = typeof growsState?.error === "string" ? growsState.error : null;
+  // A settled read whose list is not an array must never take the empty-account
+  // path (start screen -> StartYourRoom -> grow creation); show the read error.
+  const growsShapeFailed = !growsLoading && !Array.isArray(growsState?.grows);
+  const growsError =
+    typeof growsState?.error === "string" && growsState.error
+      ? growsState.error
+      : growsShapeFailed
+        ? "grows-read-malformed"
+        : null;
   const refreshGrows = growsState?.refresh;
   const {
     loading: entitlementLoading,

@@ -399,6 +399,22 @@ export default function GuidePage() {
               </Link>
             </li>
             <li>
+              <Link
+                to="/glossary"
+                className="underline hover:text-foreground text-muted-foreground"
+              >
+                Cultivation glossary
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/docs/mcp-api"
+                className="underline hover:text-foreground text-muted-foreground"
+              >
+                MCP API reference
+              </Link>
+            </li>
+            <li>
               <Link to="/pricing" className="underline hover:text-foreground text-muted-foreground">
                 Compare Free and Pro pricing
               </Link>

@@ -26,7 +26,7 @@ export default function HardwareIntegrations() {
   usePageSeo({
     title: "Sensor & Hardware Integrations | Verdant Grow Diary",
     description:
-      "Hardware-neutral Grow OS. Connect Ecowitt, ESP32, MQTT, webhook, or Raspberry Pi sensors read-only, or import CSVs. Bring your own gear — the grower stays in control.",
+      "Hardware-neutral Grow OS. Read Ecowitt, ESP32, MQTT, webhook, or Raspberry Pi sensors, or import CSVs. You stay in control.",
     path: "/hardware-integrations",
   });
 

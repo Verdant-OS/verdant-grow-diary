@@ -15,6 +15,9 @@ import {
 } from "@/lib/vpdStageTargetRules";
 
 export const PUBLIC_VPD_CALCULATOR_PATH = "/tools/vpd-calculator" as const;
+
+export const PUBLIC_VPD_CALCULATOR_PAGE_DESCRIPTION =
+  "Calculate air VPD with measured leaf temperature and calibration evidence, then compare stage-aware leaf VPD. No upload or device control.";
 export const PUBLIC_VPD_GUIDE_PATH = "/guides/grow-room-vpd-tracker" as const;
 export const PUBLIC_VPD_CALCULATOR_URL =
   "https://verdantgrowdiary.com/tools/vpd-calculator" as const;

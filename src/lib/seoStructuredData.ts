@@ -259,20 +259,26 @@ export interface ArticleJsonLd {
   readonly description: string;
   readonly url: string;
   readonly image?: string;
-  readonly datePublished: string;
+  readonly datePublished?: string;
   readonly dateModified?: string;
-  readonly author: {
+  readonly publisher: {
     readonly "@type": "Organization";
     readonly name: string;
     readonly url?: string;
+    readonly logo: {
+      readonly "@type": "ImageObject";
+      readonly url: string;
+    };
   };
-  readonly publisher: {
+  readonly author: {
     readonly "@type": "Organization";
     readonly name: string;
     readonly url?: string;
   };
   readonly mainEntityOfPage: { readonly "@type": "WebPage"; readonly "@id": string };
 }
+
+const PUBLISHER_LOGO_URL = "https://verdantgrowdiary.com/brand/verdant-logo-512.png";
 
 /**
  * Build a schema.org Article JSON-LD document for editorial pages
@@ -289,24 +295,31 @@ export function buildArticleJsonLd({
   authorName = "Verdant Grow Diary",
   publisherName = "Verdant Grow Diary",
   siteUrl,
+  publisherLogoUrl = PUBLISHER_LOGO_URL,
 }: {
   headline: string;
   description: string;
   url: string;
-  datePublished: string;
+  datePublished?: string;
   dateModified?: string;
   image?: string;
   authorName?: string;
   publisherName?: string;
   siteUrl?: string;
+  publisherLogoUrl?: string;
 }): ArticleJsonLd {
   if (!headline.trim()) throw new Error("buildArticleJsonLd: headline required");
   if (!description.trim()) throw new Error("buildArticleJsonLd: description required");
   if (!/^https?:\/\//i.test(url)) {
     throw new Error(`buildArticleJsonLd: url must be absolute (got "${url}")`);
   }
-  if (!/^\d{4}-\d{2}-\d{2}/.test(datePublished)) {
+  if (datePublished && !/^\d{4}-\d{2}-\d{2}/.test(datePublished)) {
     throw new Error(`buildArticleJsonLd: datePublished must be ISO-8601 (got "${datePublished}")`);
+  }
+  if (publisherLogoUrl && !/^https?:\/\//i.test(publisherLogoUrl)) {
+    throw new Error(
+      `buildArticleJsonLd: publisher logo must be absolute (got "${publisherLogoUrl}")`,
+    );
   }
   if (dateModified && !/^\d{4}-\d{2}-\d{2}/.test(dateModified)) {
     throw new Error(`buildArticleJsonLd: dateModified must be ISO-8601 (got "${dateModified}")`);
@@ -318,13 +331,14 @@ export function buildArticleJsonLd({
     description,
     url,
     ...(image ? { image } : {}),
-    datePublished,
+    ...(datePublished ? { datePublished } : {}),
     ...(dateModified ? { dateModified } : {}),
     author: { "@type": "Organization", name: authorName, ...(siteUrl ? { url: siteUrl } : {}) },
     publisher: {
       "@type": "Organization",
       name: publisherName,
       ...(siteUrl ? { url: siteUrl } : {}),
+      logo: { "@type": "ImageObject", url: publisherLogoUrl },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
   };

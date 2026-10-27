@@ -53,6 +53,12 @@ import {
   buildFaqPageJsonLd,
   buildWebPageJsonLd,
 } from "../seoStructuredData";
+import {
+  PUBLIC_VPD_CHART_DESCRIPTION,
+  PUBLIC_VPD_CHART_FAQ,
+  PUBLIC_VPD_CHART_TITLE,
+  PUBLIC_VPD_CHART_WEB_APPLICATION_JSON_LD,
+} from "../publicVpdChartRules";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
@@ -637,6 +643,20 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "Calculate air VPD from manual temperature and humidity inputs, then compare it with a conservative stage-aware range. No upload, live telemetry, diagnosis, or device control.",
     imageAlt: "Verdant VPD calculator",
+  }),
+  publicDocument("/vpd-chart", {
+    title: PUBLIC_VPD_CHART_TITLE,
+    description: PUBLIC_VPD_CHART_DESCRIPTION,
+    imageAlt: "Verdant VPD chart by growth stage",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: PUBLIC_VPD_CHART_TITLE,
+        description: PUBLIC_VPD_CHART_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}/vpd-chart`,
+      }),
+      PUBLIC_VPD_CHART_WEB_APPLICATION_JSON_LD,
+      buildFaqPageJsonLd({ questions: PUBLIC_VPD_CHART_FAQ }),
+    ],
   }),
   publicDocument("/hardware-integrations", {
     title: "Sensor & Hardware Integrations | Verdant Grow Diary",

@@ -43,6 +43,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/vpd-calculator`,
   },
   {
+    path: "/vpd-chart",
+    expectTitle: /VPD Chart by Growth Stage \+ Calculator/,
+    canonical: `${ORIGIN}/vpd-chart`,
+  },
+  {
     path: "/hardware-integrations",
     expectTitle: /Sensor & Hardware Integrations/,
     canonical: `${ORIGIN}/hardware-integrations`,

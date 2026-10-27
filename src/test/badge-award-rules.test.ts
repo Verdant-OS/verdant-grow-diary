@@ -29,7 +29,7 @@ describe("badge award display rules", () => {
     expect(BADGE_AWARD_COPY.firstDiaryEntry).toBe("You saved a diary entry with a photo attached.");
     expect(BADGE_AWARD_COPY.firstDiaryEntry.toLowerCase()).not.toContain("relevant photo");
     const migration = readFileSync(
-      "supabase/migrations/20261011120000_owner_badge_awards.sql",
+      "supabase/migrations/20261027235000_owner_badge_awards.sql",
       "utf8",
     );
     expect(migration).toContain("added later to that same entry qualifies on the next evaluation");

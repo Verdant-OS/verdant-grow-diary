@@ -6,17 +6,19 @@ name: Served build monotonic check
 # secrets. The baseline is an Actions cache entry (.served-build/previous.sha), not a
 # repo file, artifact or Actions variable. A missing checkpoint seeds that file from
 # the served SHA and this job saves the cache only after the check exits 0, so the
-# first successful run arms the alert. A later FAIL (served build moved backward or
-# diverged) fails this job — that failure is the alert — and does not save a new
-# checkpoint. The initialize dispatch input remains, and it does not skip a comparison
-# when a checkpoint already exists.
+# first successful run arms the alert. Workflow run 1 records that baseline quietly.
+# A later missing checkpoint still records the served SHA, and the check emits a
+# ::warning plus a job summary that name it. The repo has no second last-served SHA
+# to compare against. A later FAIL (served build moved backward or diverged) fails
+# this job — that failure is the alert — and does not save a new checkpoint.
+# initialize replaces only an unreadable checkpoint.
 on:
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       initialize:
-        description: "Record the served SHA as the baseline when no checkpoint exists"
+        description: "Replace an unreadable checkpoint with the served SHA. A missing checkpoint already records a baseline. A readable checkpoint is still compared."
         type: boolean
         default: false
 
@@ -57,6 +59,7 @@ jobs:
           node scripts/check-served-build-monotonic.mjs
           --previous-file .served-build/previous.sha
           --write-file .served-build/previous.sha
+          --run-number ${{ github.run_number }}
           ${{ github.event_name == 'workflow_dispatch' && inputs.initialize && '--initialize' || '' }}
 
       - name: Save the accepted served SHA

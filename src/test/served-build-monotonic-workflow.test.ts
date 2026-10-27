@@ -35,7 +35,14 @@ describe("served-build-monotonic workflow", () => {
 
   it("offers an explicit initialize dispatch input that defaults to false", () => {
     expect(workflow.on.workflow_dispatch).toMatchObject({
-      inputs: { initialize: { type: "boolean", default: false } },
+      inputs: {
+        initialize: {
+          type: "boolean",
+          default: false,
+          description:
+            "Replace an unreadable checkpoint with the served SHA. A missing checkpoint already records a baseline. A readable checkpoint is still compared.",
+        },
+      },
     });
   });
 
@@ -60,6 +67,7 @@ describe("served-build-monotonic workflow", () => {
     expect(runs).toHaveLength(1);
     expect(runs[0].run).toContain("--previous-file .served-build/previous.sha");
     expect(runs[0].run).toContain("--write-file .served-build/previous.sha");
+    expect(runs[0].run).toContain("--run-number ${{ github.run_number }}");
     expect(runs[0].if).toBeUndefined();
     // --initialize is passed only on a manual dispatch that asked for it.
     expect(runs[0].run).toContain(

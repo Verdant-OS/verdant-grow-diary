@@ -113,29 +113,29 @@ why: Every run since the workflow was added exited BLOCKED (previous_missing) be
 branch: cursor/served-build-monotonic-baseline-3a91
 base: verdant-grow-diary
 checkout: git fetch origin cursor/served-build-monotonic-baseline-3a91 verdant-grow-diary && git switch cursor/served-build-monotonic-baseline-3a91 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft PR opened from this branch; read the URL from GitHub after the first push
-head_sha: read origin/cursor/served-build-monotonic-baseline-3a91 after push
-state: local implementation before the first push
-current_step: Missing checkpoint now returns PASS baseline_recorded and writes .served-build/previous.sha. An existing checkpoint is still compared. The cache key stays per run id with restore-keys prefix served-build-sha-.
-next_action: After merge to verdant-grow-diary, confirm the next scheduled "Served build monotonic check" run logs PASS (baseline_recorded) and that the following run logs PASS (unchanged) or PASS (moved_forward). Do not dispatch initialize and do not add secrets or variables. Do not merge from this task.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2538
+head_sha: read origin/cursor/served-build-monotonic-baseline-3a91 after the review-fix push
+state: review repair on the draft; Sour Diesel P2 and P3 at 1e16aeaa26cce3cf6fa3d61563c43348fcd550d3
+current_step: Workflow run 1 still seeds quietly. A later missing checkpoint still records the served SHA and emits ::warning plus a job summary that name that SHA. initialize replaces only an unreadable checkpoint and the BLOCKED path logs the recovery hint. A readable checkpoint is still compared.
+next_action: After merge to verdant-grow-diary, confirm the next scheduled "Served build monotonic check" run logs PASS (baseline_recorded) and a warning that names the recorded baseline, and that the following run logs PASS (unchanged) or PASS (moved_forward) with no warning. Do not add secrets or variables. Do not merge from this task.
 post_merge_check: Served build monotonic check on verdant-grow-diary. A continued BLOCKED (previous_missing) or a missing cache save reopens this work with the same owner.
 active_writer: Cursor cloud agent on cursor/served-build-monotonic-baseline-3a91
-decisions: Keep the baseline in the Actions cache (the workflow already restores and saves .served-build/previous.sha). Do not commit a SHA, do not add an artifact, and do not add an Actions variable. Seed on a missing checkpoint because the save step only runs after exit 0, which is why 35 runs never stored a baseline. Keep FAIL moved_backward_or_diverged and do not write the checkpoint on FAIL. Leave --initialize in place; it does not skip a comparison when a checkpoint exists.
-tried_and_rejected: Requiring workflow_dispatch initialize=true never ran, so the alert stayed unarmed. A repo file or Actions variable would need a deploy-branch push or a settings change, both out of scope.
+decisions: Keep the baseline in the Actions cache. Do not commit a SHA, do not add an artifact, and do not add an Actions variable. public/version.json is a dirty build stamp, not a last-accepted served SHA, so it is not a second comparison source. Seed on a missing checkpoint so the save step can arm the alert, and warn whenever that seed is not workflow run 1. Keep FAIL moved_backward_or_diverged and do not write over a readable checkpoint on FAIL. initialize recovers only an unreadable checkpoint.
+tried_and_rejected: Requiring workflow_dispatch initialize=true never ran, so the alert stayed unarmed. A repo file or Actions variable would need a deploy-branch push or a settings change, both out of scope. Failing the job on a missing checkpoint would skip actions/cache/save and leave the alert unarmed.
 commands: bunx vitest run src/test/served-build-monotonic-rules.test.ts src/test/served-build-monotonic-workflow.test.ts --reporter=dot
 files_touched: scripts/check-served-build-monotonic.mjs; .github/workflows/served-build-monotonic.yml; src/test/served-build-monotonic-rules.test.ts; docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: The schedule checks out verdant-grow-diary, so the seed does not run until this change is merged. No merge is authorized here.
 open_questions: none
-gotchas: A cache eviction looks like a first run and records a new baseline instead of alerting. The checkpoint is not overwritten on FAIL. Scorer unlock for this branch is in gitignored .claude/scorer-unlock.json and must be renewed if these files are edited again after it expires.
-links: Linear VER-288
+gotchas: A cache eviction on a run after the first still records a new baseline. The warning names that SHA; it does not fail the job, because a failure skips the cache save. The checkpoint is not overwritten on FAIL. Scorer unlock for this branch is in gitignored .claude/scorer-unlock.json and must be renewed if these files are edited again after it expires.
+links: Linear VER-288; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2538#pullrequestreview-5669780142
 artifacts: src/test/served-build-monotonic-rules.test.ts
-reviewer_seat: not requested; draft stays draft
-reviewer_sha: NOT_MEASURED
+reviewer_seat: Sour Diesel review 5669780142; a new head needs a fresh exact-head review
+reviewer_sha: 1e16aeaa26cce3cf6fa3d61563c43348fcd550d3 (the reviewed head, not this repair)
 session_state: Cursor cloud agent; no publish, no workflow dispatch, no production write
 claimed_by: Cursor cloud agent, 2026-10-26 11:02 CT
 owner: Cursor cloud agent for VER-288
-last_updated: 2026-10-26 11:02 CT, by Cursor cloud agent
+last_updated: 2026-10-27 10:35 CT, by Cursor cloud agent
 ```
 
 ### VER-285-PRESERVE-MISSING-STAGE

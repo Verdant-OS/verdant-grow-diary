@@ -6,13 +6,16 @@
 // Reads public build metadata only. It never deploys, never writes to production and
 // uses no secrets or tokens. The only write is the local state file (--write-file),
 // and only on PASS, so a FAIL keeps alerting until production moves forward again.
-// A missing checkpoint (first run, cache miss or eviction) records the served SHA as
-// the baseline and exits 0. Later runs compare against that checkpoint. A rollback or
-// a diverged served SHA FAILs and does not overwrite it. --initialize is accepted and
-// does not skip a comparison when a checkpoint is already present.
+// A missing checkpoint records the served SHA and exits 0 so the cache save can arm
+// the alert. Workflow run 1 is the only silent seed. Any later missing checkpoint
+// (cache miss or eviction) still records that SHA, and also emits a warning plus a
+// job summary that name it. The repository has no second record of the last accepted
+// served SHA (public/version.json is a build stamp, not that checkpoint). A rollback
+// or a diverged served SHA FAILs and does not overwrite a readable checkpoint.
+// --initialize replaces only an unreadable checkpoint. A readable one is still compared.
 // Exit 0 PASS, 1 FAIL, 2 BLOCKED.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -38,16 +41,18 @@ export function evaluateServedBuild({
   if (!isSha(servedSha)) return { status: "BLOCKED", reason: "served_unreadable" };
   if (servedOnDeployBranch !== true)
     return { status: "FAIL", reason: "served_not_on_deploy_branch" };
-  // No checkpoint yet: seed from the served SHA. A scheduled run can arm the alert
-  // without a manual dispatch. initialize is accepted and does not change this
-  // outcome. An existing checkpoint is still compared below, including when
-  // initialize is set.
+  // No checkpoint yet: seed from the served SHA so the cache save can arm the alert.
+  // Visibility for a non-first run is handled by the caller, which warns.
   if (previousSha === null || previousSha === undefined || previousSha === "") {
-    void initialize;
     return { status: "PASS", reason: "baseline_recorded" };
   }
-  // A recorded state that is not a commit SHA cannot be compared; fail closed and keep it.
-  if (!isSha(previousSha)) return { status: "BLOCKED", reason: "previous_unreadable" };
+  // A recorded state that is not a commit SHA cannot be compared. initialize is the
+  // only recovery: it replaces that unreadable value with the served SHA.
+  if (!isSha(previousSha)) {
+    return initialize === true
+      ? { status: "PASS", reason: "baseline_recorded" }
+      : { status: "BLOCKED", reason: "previous_unreadable" };
+  }
   if (servedSha === previousSha) return { status: "PASS", reason: "unchanged" };
   if (previousIsAncestorOfServed === true) return { status: "PASS", reason: "moved_forward" };
   return { status: "FAIL", reason: "moved_backward_or_diverged" };
@@ -60,6 +65,56 @@ export function formatServedBuildSummary({ status, reason }, { servedSha, previo
   );
 }
 
+export const SERVED_BUILD_PREVIOUS_UNREADABLE_HINT =
+  "served-build-monotonic: the checkpoint is not a commit SHA, so it cannot be compared. " +
+  "Dispatch the 'Served build monotonic check' workflow with initialize=true to replace " +
+  "that unreadable checkpoint with the served SHA. A readable checkpoint is still compared " +
+  "and is not replaced.";
+
+function workflowRunLabel(workflowRunNumber) {
+  return Number.isInteger(workflowRunNumber) ? String(workflowRunNumber) : "unknown";
+}
+
+/**
+ * Visible notice when a baseline is recorded without a comparable checkpoint.
+ * Names the SHA that will be stored. There is no second deployed-build record in
+ * the repo to compare against.
+ */
+export function formatRecordedBaselineWarning({
+  servedSha,
+  workflowRunNumber,
+  replacedUnreadable = false,
+}) {
+  const run = workflowRunLabel(workflowRunNumber);
+  if (replacedUnreadable) {
+    return (
+      `served-build-monotonic: unreadable checkpoint replaced on workflow run ${run}; ` +
+      `recorded baseline ${servedSha}.`
+    );
+  }
+  return (
+    `served-build-monotonic: checkpoint missing on workflow run ${run}; ` +
+    `recorded baseline ${servedSha}. No earlier checkpoint was available to compare, ` +
+    "so this served SHA is the new baseline."
+  );
+}
+
+export function formatRecordedBaselineSummary({
+  servedSha,
+  workflowRunNumber,
+  replacedUnreadable = false,
+}) {
+  const run = workflowRunLabel(workflowRunNumber);
+  const detail = replacedUnreadable
+    ? `An unreadable checkpoint was replaced on workflow run ${run}.`
+    : `The checkpoint was missing on workflow run ${run}. No earlier checkpoint was available to compare, so a rollback served at this moment is stored as this baseline.`;
+  return `### Served build monotonic\n\n${detail}\n\nRecorded baseline \`${servedSha}\`.\n`;
+}
+
+export function missingCheckpointNeedsWarning(workflowRunNumber) {
+  return workflowRunNumber !== 1;
+}
+
 /**
  * The I/O sequence with every effect injected, so the write-only-on-PASS rule is testable
  * without the network, git or the filesystem.
@@ -70,7 +125,10 @@ export async function runServedBuildCheck({
   readPrevious,
   writeServed,
   log,
+  warn = log,
+  appendSummary = () => {},
   initialize = false,
+  workflowRunNumber = null,
 }) {
   let servedSha = null;
   try {
@@ -99,6 +157,24 @@ export async function runServedBuildCheck({
   });
   if (result.status === "PASS") writeServed(servedSha);
   log(formatServedBuildSummary(result, { servedSha, previousSha }));
+  const replacedUnreadable = !isSha(previousSha) && previousSha != null && previousSha !== "";
+  const seedingWithoutCheckpoint =
+    result.reason === "baseline_recorded" &&
+    (previousSha == null || previousSha === "" || replacedUnreadable);
+  if (
+    seedingWithoutCheckpoint &&
+    isSha(servedSha) &&
+    (replacedUnreadable || missingCheckpointNeedsWarning(workflowRunNumber))
+  ) {
+    const notice = {
+      servedSha,
+      workflowRunNumber,
+      replacedUnreadable,
+    };
+    warn(formatRecordedBaselineWarning(notice));
+    appendSummary(formatRecordedBaselineSummary(notice));
+  }
+  if (result.reason === "previous_unreadable") log(SERVED_BUILD_PREVIOUS_UNREADABLE_HINT);
   return { ...result, servedSha, previousSha, exitCode: SERVED_BUILD_EXIT_CODES[result.status] };
 }
 
@@ -115,10 +191,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       "previous-file": { type: "string" },
       "write-file": { type: "string" },
       initialize: { type: "boolean", default: false },
+      "run-number": { type: "string" },
     },
   });
   const previousFile = values["previous-file"];
   const writeFile = values["write-file"];
+  const parsedRunNumber =
+    values["run-number"] == null || values["run-number"] === ""
+      ? null
+      : Number(values["run-number"]);
+  const workflowRunNumber = Number.isInteger(parsedRunNumber) ? parsedRunNumber : null;
   const outcome = await runServedBuildCheck({
     fetchImpl: fetch,
     isAncestor: gitIsAncestor,
@@ -130,7 +212,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       writeFileSync(writeFile, `${sha}\n`);
     },
     log: (line) => console.log(line),
+    warn: (line) => console.log(`::warning::${line}`),
+    appendSummary: (markdown) => {
+      if (!process.env.GITHUB_STEP_SUMMARY) return;
+      appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
+    },
     initialize: values.initialize === true,
+    workflowRunNumber,
   });
   process.exitCode = outcome.exitCode;
 }

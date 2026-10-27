@@ -2,7 +2,7 @@
 
 **Source of truth:** `src/lib/appRouteManifest.ts` in this commit, checked against the mounted route modules by `src/test/helpers/routeManifestSyncHarness.ts`.<br>
 **Live index status:** **NOT_MEASURED.** This file records repository metadata, `public/sitemap.xml`, and `public/robots.txt`. It is not a Search Console measurement and it does not claim what `https://verdantgrowdiary.com` returns.<br>
-**Coverage:** 146 of 146 manifest routes — 43 public, 46 authenticated, 32 operator, 6 internal, and 19 redirects.
+**Coverage:** 147 of 147 manifest routes — 44 public, 46 authenticated, 32 operator, 6 internal, and 19 redirects.
 
 ## Reading the matrix
 
@@ -44,6 +44,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/feedback` — robots `index, follow`; sitemap yes; canonical `/feedback`
 - `/contact` — robots `index, follow`; sitemap yes; canonical `/contact`
 - `/docs/mcp-api` — robots `index, follow`; sitemap yes; canonical `/docs/mcp-api`
+- `/guides/cronk-nutrients-grow-diary` — robots `index, follow`; sitemap yes; canonical `/guides/cronk-nutrients-grow-diary`
 - `/guides` — robots `index, follow`; sitemap yes; canonical `/guides`
 - `/guides/grow-diary-app` — robots `index, follow`; sitemap yes; canonical `/guides/grow-diary-app`
 - `/guides/grow-log-app-vs-grow-journal` — robots `index, follow`; sitemap yes; canonical `/guides/grow-log-app-vs-grow-journal`
@@ -59,7 +60,6 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/guides/plant-watering-log` — robots `index, follow`; sitemap yes; canonical `/guides/plant-watering-log`
 - `/guides/grow-journal-app-without-account` — robots `index, follow`; sitemap yes; canonical `/guides/grow-journal-app-without-account`
 - `/guides/daily-grow-log-checklist` — robots `index, follow`; sitemap yes; canonical `/guides/daily-grow-log-checklist`
-- `/guides/cronk-nutrients-grow-diary` — robots `index, follow`; sitemap yes; canonical `/guides/cronk-nutrients-grow-diary`
 - `/guides/athena-nutrients-grow-diary` — robots `index, follow`; sitemap yes; canonical `/guides/athena-nutrients-grow-diary`
 - `/guides/jacks-nutrients-grow-diary` — robots `index, follow`; sitemap yes; canonical `/guides/jacks-nutrients-grow-diary`
 - `/guides/house-and-garden-nutrients-grow-diary` — robots `index, follow`; sitemap yes; canonical `/guides/house-and-garden-nutrients-grow-diary`
@@ -111,7 +111,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 
 - Guide documents (`buildStaticGuideJsonLd`) emit WebPage, FAQPage, and BreadcrumbList. Article is added only when `publishedOn` is set. These 7 guides set it: `/guides/cannabis-grow-light-distance-and-schedule`, `/guides/cannabis-light-stress-light-burn-bleaching-or-heat`, `/guides/oreoz-vs-gelonade-comparison`, `/guides/cannabis-leaf-symptoms`, `/guides/cannabis-leaves-turning-yellow`, `/guides/cannabis-leaf-spots-lesions`, `/guides/cannabis-burnt-crispy-leaf-tips`.
 - No cultivar detail document is indexable today. `buildStaticCultivarJsonLd` still gives each `/cultivars/<slug>` document WebPage, a cultivar collection node, FAQPage, BreadcrumbList, and Article, but all ten are `noindex, follow` (see the inventory), so that schema is not on an indexable document. It would be once a slug reaches `reviewed` or `verified`. The `/cultivars` hub document is indexable and uses the default WebPage node.
-- `/guides` emits WebPage, FAQPage, and BreadcrumbList. `/guides/:slug` is the manifest pattern for `VERDANT_SEO_GUIDES` (28 slugs). `/guides/grow-stage-care-guide` is its own manifest route and its own document. `/guides/athena-feed-chart-log` emits WebPage, Article, FAQPage, BreadcrumbList, and WebApplication. It stores nothing.
+- `/guides` emits WebPage, FAQPage, and BreadcrumbList. `/guides/:slug` is the manifest pattern for `VERDANT_SEO_GUIDES` (27 slugs). `/guides/grow-stage-care-guide` and `/guides/cronk-nutrients-grow-diary` are their own manifest routes and documents. `/guides/athena-feed-chart-log` emits WebPage, Article, FAQPage, BreadcrumbList, and WebApplication. It stores nothing.
 - `/tools/blueprint-targets` emits WebPage, FAQPage, and BreadcrumbList. `/quick-log` emits WebPage, SoftwareApplication, and FAQPage. Other acquisition documents in the inventory use the default WebPage node unless the row above says otherwise.
 - `/cultivars` with a non-empty query string is a client `noindex, follow` variant (`buildCultivarsIndexSeo` in `src/lib/cultivarIndexSeoRules.ts`). The canonical stays `/cultivars`. Those query URLs are not sitemap locs. The clean `/cultivars` document stays `index, follow`.
 
@@ -140,9 +140,9 @@ These manifest paths are public and are not in `STATIC_PUBLIC_OUTPUT_DOCUMENTS`.
 
 Every public manifest path, with or without a static document. `/cultivars/:slug` and `/guides/:slug` are patterns; their concrete paths are inventory lines.
 
-Manifest paths (`access: "public"`, 43):
+Manifest paths (`access: "public"`, 44):
 
-`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/feedback`; `/founder`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/athena-feed-chart-log`; `/guides/grow-stage-care-guide`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/vpd-chart`.
+`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/feedback`; `/founder`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/athena-feed-chart-log`; `/guides/cronk-nutrients-grow-diary`; `/guides/grow-stage-care-guide`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/vpd-chart`.
 
 ## Authenticated routes — sitemap excluded, robots.txt disallowed
 

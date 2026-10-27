@@ -61,7 +61,6 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "plant-watering-log",
   "grow-journal-app-without-account",
   "daily-grow-log-checklist",
-  "cronk-nutrients-grow-diary",
   "athena-nutrients-grow-diary",
   "jacks-nutrients-grow-diary",
   "house-and-garden-nutrients-grow-diary",

@@ -186,6 +186,17 @@ export default function GuidesIndex() {
               </p>
             </Link>
           </li>
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/cronk-nutrients-grow-diary" className="block">
+              <h3 className="font-semibold text-lg">
+                Cronk Nutrients Grow Diary: Log Your Feeding Chart, Planned vs Actual
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Log what you actually fed against the Classic, Bonnie &amp; Clyde, or PuurOrganics
+                chart. Planned amounts stay blank until you copy them from the official chart.
+              </p>
+            </Link>
+          </li>
         </ul>
       </section>
 

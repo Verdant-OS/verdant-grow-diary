@@ -232,6 +232,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public planned-vs-actual Athena feed log. In-memory only.",
   },
   {
+    path: "/guides/cronk-nutrients-grow-diary",
+    access: "public",
+    description: "Cronk Nutrients planned-vs-actual feed log. Stores nothing in the browser.",
+  },
+  {
     path: "/guides/grow-stage-care-guide",
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",

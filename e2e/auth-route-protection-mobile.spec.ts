@@ -96,6 +96,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/hardware-integrations",
   "/guides",
   "/guides/:slug",
+  "/guides/cronk-nutrients-grow-diary",
   "/guides/grow-stage-care-guide",
   "/guides/athena-feed-chart-log",
   // Exact ID-free Customer Mode guide: static/noindex and must make no

@@ -55,7 +55,7 @@ const ROUTES = [
   },
   {
     path: "/guides/cronk-nutrients-grow-diary",
-    expectTitle: /Using Cronk Nutrients with a grow diary/,
+    expectTitle: /Cronk Nutrients Feeding Chart Log & Grow Diary/,
     canonical: `${ORIGIN}/guides/cronk-nutrients-grow-diary`,
   },
   // /pheno-comparison intentionally keeps the sitewide default title + no canonical.

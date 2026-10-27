@@ -62,6 +62,7 @@ const REQUIRED_GUIDE_URLS = [
 const CUSTOM_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
   "https://verdantgrowdiary.com/guides/athena-feed-chart-log",
+  "https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary",
 ];
 
 function manifestEntryFor(pathname: string) {

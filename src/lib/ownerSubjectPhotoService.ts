@@ -32,3 +32,20 @@ export async function uploadOwnerSubjectPhoto(input: {
   }
   return { path, reference: formatOwnerSubjectPhotoReference(path) };
 }
+
+/**
+ * Best-effort removal of an uploaded photo whose row write definitively
+ * failed. A failed removal leaves an unreferenced private object; it never
+ * surfaces as a save error.
+ */
+export async function removeOwnerSubjectPhoto(input: {
+  path: string;
+  storage?: Pick<typeof supabase, "storage">["storage"];
+}): Promise<void> {
+  const storage = input.storage ?? supabase.storage;
+  try {
+    await storage.from(PLANT_PROFILE_PHOTO_BUCKET).remove([input.path]);
+  } catch {
+    // Unreferenced object stays; nothing points at it.
+  }
+}

@@ -271,6 +271,13 @@ export default function QuickLogAllActivitiesSection({
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestPhotoFile, setHarvestPhotoFile] = useState<File | null>(null);
+  const harvestPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  // The file input is uncontrolled, so clearing state alone would leave the
+  // picker showing a file that will no longer upload. Clear both together.
+  const clearHarvestPhoto = useCallback(() => {
+    setHarvestPhotoFile(null);
+    if (harvestPhotoInputRef.current) harvestPhotoInputRef.current.value = "";
+  }, []);
   const [harvestDry, setHarvestDry] = useState("");
   const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
   // Generic per-activity structured detail values (e.g. training technique),
@@ -369,6 +376,10 @@ export default function QuickLogAllActivitiesSection({
   const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
+  // Mirrors localSaveInFlightRef for rendering: the activity save hook's
+  // `saving` drops before the harvest photo upload finishes, so Save must
+  // stay disabled for the whole handler, not just the RPC.
+  const [activitySaveInFlight, setActivitySaveInFlight] = useState(false);
   const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
   const [pendingActivity, setPendingActivity] = useState<PendingQuickLogActivity | null>(null);
   const [activityRecoveryBlocked, setActivityRecoveryBlocked] = useState(false);
@@ -540,13 +551,13 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
-    setHarvestPhotoFile(null);
+    clearHarvestPhoto();
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
     setRecoveryNotice(null);
     setSaved([]);
-  }, [currentTargetKey]);
+  }, [currentTargetKey, clearHarvestPhoto]);
 
   // Ordered after the target reset: an async target resolution must reset
   // old target-specific state first, then apply the requested editor and
@@ -573,7 +584,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
-    setHarvestPhotoFile(null);
+    clearHarvestPhoto();
     if (requestedActivityAvailability?.disabled) {
       setSelectedDraft(null);
       return;
@@ -586,6 +597,7 @@ export default function QuickLogAllActivitiesSection({
     setSelectedDraft(bindQuickLogActivityDraft(requestedActivity, currentTarget));
     setNote(requestedNote ?? "");
   }, [
+    clearHarvestPhoto,
     currentTarget,
     openStructuredWater,
     requestedActivity,
@@ -704,9 +716,9 @@ export default function QuickLogAllActivitiesSection({
       setDetailValues({});
       envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
-      setHarvestPhotoFile(null);
+      clearHarvestPhoto();
     },
-    [currentTarget, isMutationBlocked, openStructuredWater],
+    [currentTarget, isMutationBlocked, openStructuredWater, clearHarvestPhoto],
   );
 
   const handleStartSymptomCheck = useCallback(() => {
@@ -782,7 +794,7 @@ export default function QuickLogAllActivitiesSection({
         if (record.input.activityId === "harvest" && harvestPhotoFile) {
           toast.error(HARVEST_PHOTO_NOT_SAVED);
         }
-        setHarvestPhotoFile(null);
+        clearHarvestPhoto();
         setErrorReason(null);
         setErrorForActivity(null);
       } else if (stillSameRecoveryScope) {
@@ -803,7 +815,7 @@ export default function QuickLogAllActivitiesSection({
         // The confirmed write remains successful if parent cleanup fails.
       }
     },
-    [harvestPhotoFile, onSaveSuccess],
+    [clearHarvestPhoto, harvestPhotoFile, onSaveSuccess],
   );
 
   const handleRetryPendingActivity = useCallback(async () => {
@@ -1135,6 +1147,7 @@ export default function QuickLogAllActivitiesSection({
     const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
     if (!acquired) return;
     localSaveInFlightRef.current = true;
+    setActivitySaveInFlight(true);
 
     try {
       const activityInput = {
@@ -1389,7 +1402,7 @@ export default function QuickLogAllActivitiesSection({
           }
           // The attempt is over and reported; a later recovery must not
           // report this photo again.
-          setHarvestPhotoFile(null);
+          clearHarvestPhoto();
         }
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);
@@ -1453,13 +1466,14 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
         setPhotoFile(null);
-        setHarvestPhotoFile(null);
+        clearHarvestPhoto();
         setSelectedDraft(null);
         setErrorReason(null);
         setErrorForActivity(null);
       }
     } finally {
       localSaveInFlightRef.current = false;
+      setActivitySaveInFlight(false);
       if (onSaveStart) onSaveEnd?.();
     }
   }, [
@@ -1477,6 +1491,8 @@ export default function QuickLogAllActivitiesSection({
     harvestWet,
     harvestDry,
     harvestUnit,
+    harvestPhotoFile,
+    clearHarvestPhoto,
     harvestWeightsInvalid,
     harvestWetValidation,
     harvestDryValidation,
@@ -1485,7 +1501,6 @@ export default function QuickLogAllActivitiesSection({
     firstDetailNumberError,
     user,
     photoFile,
-    harvestPhotoFile,
     photoAttachmentUncertain,
     markPhotoAttachmentUncertain,
     onSaveStart,
@@ -2012,9 +2027,10 @@ export default function QuickLogAllActivitiesSection({
                     <Input
                       id={`${testIdPrefix}-harvest-photo`}
                       data-testid={`${testIdPrefix}-harvest-photo`}
+                      ref={harvestPhotoInputRef}
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-                      disabled={mutationBlocked}
+                      disabled={mutationBlocked || activitySaveInFlight}
                       onChange={(e) => {
                         if (isMutationBlocked()) return;
                         const file = e.target.files?.[0] ?? null;
@@ -2088,6 +2104,7 @@ export default function QuickLogAllActivitiesSection({
                   onClick={handleSave}
                   disabled={
                     mutationBlocked ||
+                    activitySaveInFlight ||
                     !!activityPersistenceBlockReason(selected.id) ||
                     noContext ||
                     (selected.id === "photo" && photoAttachmentUncertain) ||
@@ -2107,7 +2124,7 @@ export default function QuickLogAllActivitiesSection({
                   }
                   data-testid={`${testIdPrefix}-save`}
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {saving || activitySaveInFlight ? "Saving…" : "Save"}
                 </Button>
                 <Button
                   type="button"
@@ -2117,6 +2134,7 @@ export default function QuickLogAllActivitiesSection({
                     if (isMutationBlocked()) return;
                     setSelectedDraft(null);
                     setNote("");
+                    clearHarvestPhoto();
                     setGuidedSymptomCheck(false);
                     setGuidedSymptomStage(null);
                     setGuidedSymptomStageConfirmed(false);

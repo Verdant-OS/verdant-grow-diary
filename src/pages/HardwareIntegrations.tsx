@@ -37,10 +37,10 @@ export default function HardwareIntegrations() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <Link to="/welcome" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <BrandLogo size="md" showText />
         </Link>
-        <Link to="/welcome">
+        <Link to="/">
           <Button variant="outline" size="sm">
             Back to home
           </Button>
@@ -151,6 +151,13 @@ export default function HardwareIntegrations() {
             </div>
           ))}
         </div>
+        <p className="mt-6 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
+          For assistant access to your own grow records,{" "}
+          <Link to="/docs/mcp-api" className="font-medium text-primary hover:underline">
+            read the read-only MCP API reference
+          </Link>
+          .
+        </p>
       </section>
 
       <section id="csv-history" className="px-6 py-12 max-w-5xl mx-auto">

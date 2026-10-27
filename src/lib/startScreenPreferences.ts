@@ -12,7 +12,10 @@
  */
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 
-export type StartScreenChoice = "quickLog" | "timeline" | "dashboard" | "onboarding" | "welcome";
+export type StartScreenChoice = "quickLog" | "timeline" | "dashboard" | "onboarding";
+
+/** Retired choice. A stored value reads back as Dashboard; new writes reject it. */
+const LEGACY_WELCOME_CHOICE = "welcome";
 
 export const DEFAULT_START_SCREEN: StartScreenChoice = "quickLog";
 
@@ -34,7 +37,6 @@ export const START_SCREEN_OPTIONS: ReadonlyArray<{
   { key: "timeline", label: "Timeline", description: "Open the diary timeline first." },
   { key: "dashboard", label: "Dashboard", description: "Open the main dashboard first." },
   { key: "onboarding", label: "Onboarding", description: "Re-open the onboarding walkthrough." },
-  { key: "welcome", label: "Welcome", description: "Open the welcome / landing page." },
 ];
 
 // Internal routes only. All values must pass sanitizeAuthRedirect.
@@ -43,7 +45,6 @@ const ROUTE_FOR: Record<StartScreenChoice, string> = {
   timeline: "/timeline",
   dashboard: "/",
   onboarding: "/onboarding",
-  welcome: "/welcome",
 };
 
 export function routeForStartScreen(choice: StartScreenChoice): string {
@@ -91,11 +92,7 @@ function safeStorage(): Storage | null {
 
 function isValid(value: unknown): value is StartScreenChoice {
   return (
-    value === "quickLog" ||
-    value === "timeline" ||
-    value === "dashboard" ||
-    value === "onboarding" ||
-    value === "welcome"
+    value === "quickLog" || value === "timeline" || value === "dashboard" || value === "onboarding"
   );
 }
 
@@ -105,6 +102,7 @@ export function getStartScreenChoice(userId: string): StartScreenChoice | null {
   if (!key || !s) return null;
   try {
     const v = s.getItem(key);
+    if (v === LEGACY_WELCOME_CHOICE) return "dashboard";
     return isValid(v) ? v : null;
   } catch {
     return null;

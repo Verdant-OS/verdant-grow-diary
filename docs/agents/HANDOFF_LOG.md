@@ -115,27 +115,27 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/served-build-monotonic-baseline-3a91 verdant-grow-diary && git switch cursor/served-build-monotonic-baseline-3a91 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2538
 head_sha: read origin/cursor/served-build-monotonic-baseline-3a91 after the review-fix push
-state: review repair on the draft; Sour Diesel P2 and P3 at 1e16aeaa26cce3cf6fa3d61563c43348fcd550d3
-current_step: Workflow run 1 still seeds quietly. A later missing checkpoint still records the served SHA and emits ::warning plus a job summary that name that SHA. initialize replaces only an unreadable checkpoint and the BLOCKED path logs the recovery hint. A readable checkpoint is still compared.
-next_action: After merge to verdant-grow-diary, confirm the next scheduled "Served build monotonic check" run logs PASS (baseline_recorded) and a warning that names the recorded baseline, and that the following run logs PASS (unchanged) or PASS (moved_forward) with no warning. Do not add secrets or variables. Do not merge from this task.
+state: review repair on the pull request; Sour Diesel 5669890731 at 7f0af6c61f549b9777d4968fcfc20db2c64fc45a
+current_step: A missing checkpoint records the served SHA and exits 1. github.run_number is already past 40, so the first seed after merge is that red run. The cache save uses if: always() && hashFiles('.served-build/previous.sha') != '' so the re-seeded file is stored and the next run can be green. A readable rollback still does not rewrite the file. initialize replaces only an unreadable checkpoint.
+next_action: After merge to verdant-grow-diary, confirm the next scheduled run is red with FAIL (baseline_recorded) and that the following run is green (unchanged or moved_forward). Do not add secrets or variables. Do not merge from this task.
 post_merge_check: Served build monotonic check on verdant-grow-diary. A continued BLOCKED (previous_missing) or a missing cache save reopens this work with the same owner.
 active_writer: Cursor cloud agent on cursor/served-build-monotonic-baseline-3a91
-decisions: Keep the baseline in the Actions cache. Do not commit a SHA, do not add an artifact, and do not add an Actions variable. public/version.json is a dirty build stamp, not a last-accepted served SHA, so it is not a second comparison source. Seed on a missing checkpoint so the save step can arm the alert, and warn whenever that seed is not workflow run 1. Keep FAIL moved_backward_or_diverged and do not write over a readable checkpoint on FAIL. initialize recovers only an unreadable checkpoint.
-tried_and_rejected: Requiring workflow_dispatch initialize=true never ran, so the alert stayed unarmed. A repo file or Actions variable would need a deploy-branch push or a settings change, both out of scope. Failing the job on a missing checkpoint would skip actions/cache/save and leave the alert unarmed.
+decisions: Keep the baseline in the Actions cache. Do not commit a SHA, do not add an artifact, and do not add an Actions variable. public/version.json is a dirty build stamp, not a last-accepted served SHA, so it is not a second comparison source. A missing checkpoint records the served SHA and exits 1 so a scheduled run alerts; the save step still stores that file. Keep FAIL moved_backward_or_diverged and do not rewrite a readable checkpoint on that failure. initialize recovers only an unreadable checkpoint.
+tried_and_rejected: Requiring workflow_dispatch initialize=true never ran, so the alert stayed unarmed. A repo file or Actions variable would need a deploy-branch push or a settings change, both out of scope. A ::warning on a scheduled run notifies nobody. Failing without saving the file would leave the next run red as well.
 commands: bunx vitest run src/test/served-build-monotonic-rules.test.ts src/test/served-build-monotonic-workflow.test.ts --reporter=dot
-files_touched: scripts/check-served-build-monotonic.mjs; .github/workflows/served-build-monotonic.yml; src/test/served-build-monotonic-rules.test.ts; docs/agents/HANDOFF_LOG.md
+files_touched: scripts/check-served-build-monotonic.mjs; .github/workflows/served-build-monotonic.yml; src/test/served-build-monotonic-rules.test.ts; src/test/served-build-monotonic-workflow.test.ts; docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: The schedule checks out verdant-grow-diary, so the seed does not run until this change is merged. No merge is authorized here.
 open_questions: none
-gotchas: A cache eviction on a run after the first still records a new baseline. The warning names that SHA; it does not fail the job, because a failure skips the cache save. The checkpoint is not overwritten on FAIL. Scorer unlock for this branch is in gitignored .claude/scorer-unlock.json and must be renewed if these files are edited again after it expires.
-links: Linear VER-288; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2538#pullrequestreview-5669780142
+gotchas: A cache miss records a new baseline and fails that one run. The following run compares against the saved SHA. A ::warning on a schedule does not notify anyone; exit 1 does. The checkpoint file is not rewritten on a readable rollback, and the save step persists whatever file is present. Scorer unlock for this branch is in gitignored .claude/scorer-unlock.json and must be renewed if these files are edited again after it expires.
+links: Linear VER-288; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2538#pullrequestreview-5669890731
 artifacts: src/test/served-build-monotonic-rules.test.ts
-reviewer_seat: Sour Diesel review 5669780142; a new head needs a fresh exact-head review
-reviewer_sha: 1e16aeaa26cce3cf6fa3d61563c43348fcd550d3 (the reviewed head, not this repair)
+reviewer_seat: Sour Diesel review 5669890731; a new head needs a fresh exact-head review
+reviewer_sha: 7f0af6c61f549b9777d4968fcfc20db2c64fc45a (the reviewed head, not this repair)
 session_state: Cursor cloud agent; no publish, no workflow dispatch, no production write
 claimed_by: Cursor cloud agent, 2026-10-26 11:02 CT
 owner: Cursor cloud agent for VER-288
-last_updated: 2026-10-27 10:35 CT, by Cursor cloud agent
+last_updated: 2026-10-27 10:40 CT, by Cursor cloud agent
 ```
 
 ### VER-285-PRESERVE-MISSING-STAGE

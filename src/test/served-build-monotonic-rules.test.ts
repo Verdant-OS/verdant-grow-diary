@@ -34,7 +34,7 @@ describe("served build compare cases", () => {
         previousIsAncestorOfServed: false,
         initialize: false,
       }),
-    ).toEqual({ status: "PASS", reason: "baseline_recorded" });
+    ).toEqual({ status: "FAIL", reason: "baseline_recorded" });
   });
 
   it("same build passes and does not treat it as a rollback", () => {
@@ -92,11 +92,11 @@ describe("evaluateServedBuild", () => {
   it("seeds a baseline on a missing previous checkpoint, including a scheduled run", () => {
     for (const previousSha of [null, undefined, ""]) {
       expect(decide({ previousSha, previousIsAncestorOfServed: false })).toEqual({
-        status: "PASS",
+        status: "FAIL",
         reason: "baseline_recorded",
       });
       expect(decide({ previousSha, previousIsAncestorOfServed: false, initialize: false })).toEqual(
-        { status: "PASS", reason: "baseline_recorded" },
+        { status: "FAIL", reason: "baseline_recorded" },
       );
     }
   });
@@ -104,7 +104,7 @@ describe("evaluateServedBuild", () => {
   it("PASSES an explicitly initialized run with no previous as a recorded baseline", () => {
     for (const previousSha of [null, undefined, ""]) {
       expect(decide({ previousSha, previousIsAncestorOfServed: false, initialize: true })).toEqual({
-        status: "PASS",
+        status: "FAIL",
         reason: "baseline_recorded",
       });
     }
@@ -236,21 +236,29 @@ describe("runServedBuildCheck", () => {
     ]);
   });
 
-  it("seeds the served SHA with exit 0 on a missing previous (first run)", async () => {
-    for (const previous of [null, "", "  \n"]) {
-      const { deps, writes, lines } = harness({ previous });
-      const outcome = await runServedBuildCheck({ ...deps, workflowRunNumber: 1 });
-      expect(outcome).toMatchObject({ status: "PASS", reason: "baseline_recorded" });
-      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.PASS);
-      expect(writes).toEqual([NEW]);
-      expect(lines).toEqual([
-        `served-build-monotonic: PASS (baseline_recorded) served=${NEW} previous=none`,
-      ]);
+  it("records the served SHA and exits 1 when the checkpoint is missing", async () => {
+    for (const workflowRunNumber of [1, 41]) {
+      for (const previous of [null, "", "  \n"]) {
+        const warnings: string[] = [];
+        const { deps, writes, lines } = harness({ previous });
+        const outcome = await runServedBuildCheck({
+          ...deps,
+          workflowRunNumber,
+          warn: (line) => warnings.push(line),
+        });
+        expect(outcome).toMatchObject({ status: "FAIL", reason: "baseline_recorded" });
+        expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.FAIL);
+        expect(writes).toEqual([NEW]);
+        expect(lines[0]).toBe(
+          `served-build-monotonic: FAIL (baseline_recorded) served=${NEW} previous=none`,
+        );
+        expect(warnings[0]).toContain(NEW);
+      }
     }
   });
 
   it("warns and names the recorded baseline when the checkpoint is missing after the first run", async () => {
-    expect(missingCheckpointNeedsWarning(1)).toBe(false);
+    expect(missingCheckpointNeedsWarning(1)).toBe(true);
     expect(missingCheckpointNeedsWarning(36)).toBe(true);
     expect(missingCheckpointNeedsWarning(null)).toBe(true);
     const warnings: string[] = [];
@@ -263,11 +271,11 @@ describe("runServedBuildCheck", () => {
       appendSummary: (markdown) => summaries.push(markdown),
     });
     const notice = { servedSha: NEW, workflowRunNumber: 36, replacedUnreadable: false };
-    expect(outcome).toMatchObject({ status: "PASS", reason: "baseline_recorded" });
-    expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.PASS);
+    expect(outcome).toMatchObject({ status: "FAIL", reason: "baseline_recorded" });
+    expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.FAIL);
     expect(writes).toEqual([NEW]);
     expect(lines).toEqual([
-      `served-build-monotonic: PASS (baseline_recorded) served=${NEW} previous=none`,
+      `served-build-monotonic: FAIL (baseline_recorded) served=${NEW} previous=none`,
     ]);
     expect(warnings).toEqual([formatRecordedBaselineWarning(notice)]);
     expect(warnings[0]).toContain(NEW);
@@ -280,8 +288,8 @@ describe("runServedBuildCheck", () => {
     for (const previous of [null, "", "  \n"]) {
       const { deps, writes } = harness({ previous });
       const outcome = await runServedBuildCheck({ ...deps, initialize: true });
-      expect(outcome).toMatchObject({ status: "PASS", reason: "baseline_recorded" });
-      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.PASS);
+      expect(outcome).toMatchObject({ status: "FAIL", reason: "baseline_recorded" });
+      expect(outcome.exitCode).toBe(SERVED_BUILD_EXIT_CODES.FAIL);
       expect(writes).toEqual([NEW]);
     }
   });

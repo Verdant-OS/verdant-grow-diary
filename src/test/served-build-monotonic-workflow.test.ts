@@ -88,8 +88,9 @@ describe("served-build-monotonic workflow", () => {
       path: ".served-build/previous.sha",
       key: "served-build-sha-${{ github.run_id }}-${{ github.run_attempt }}",
     });
-    // Saving only after a successful check: a FAIL must not overwrite the accepted SHA.
-    expect(save.if).toBeUndefined();
+    // A red seed still has to be saved. A rollback does not rewrite the file, so
+    // saving whatever checkpoint is on disk keeps the last accepted SHA.
+    expect(save.if).toBe("always() && hashFiles('.served-build/previous.sha') != ''");
     const order = [restore, steps.find((s) => s.run?.includes("check-served")), save].map((s) =>
       steps.indexOf(s as Step),
     );

@@ -5,12 +5,12 @@
 // last commit this check accepted, using git ancestry on the deploy branch.
 // Reads public build metadata only. It never deploys, never writes to production and
 // uses no secrets or tokens. The only write is the local state file (--write-file),
-// and only on PASS, so a FAIL keeps alerting until production moves forward again.
-// A missing checkpoint records the served SHA and exits 0 so the cache save can arm
-// the alert. Workflow run 1 is the only silent seed. Any later missing checkpoint
-// (cache miss or eviction) still records that SHA, and also emits a warning plus a
-// job summary that name it. The repository has no second record of the last accepted
-// served SHA (public/version.json is a build stamp, not that checkpoint). A rollback
+// A readable rollback FAILs without rewriting the checkpoint, so it keeps alerting.
+// A missing checkpoint still records the served SHA, then exits 1. This workflow's
+// run number is already past 40, so the first seed after merge is one of those runs:
+// it goes red once, the cache save still stores the file, and the next run is green.
+// The repository has no second record of the last accepted served SHA
+// (public/version.json is a build stamp, not that checkpoint). A rollback
 // or a diverged served SHA FAILs and does not overwrite a readable checkpoint.
 // --initialize replaces only an unreadable checkpoint. A readable one is still compared.
 // Exit 0 PASS, 1 FAIL, 2 BLOCKED.
@@ -41,10 +41,11 @@ export function evaluateServedBuild({
   if (!isSha(servedSha)) return { status: "BLOCKED", reason: "served_unreadable" };
   if (servedOnDeployBranch !== true)
     return { status: "FAIL", reason: "served_not_on_deploy_branch" };
-  // No checkpoint yet: seed from the served SHA so the cache save can arm the alert.
-  // Visibility for a non-first run is handled by the caller, which warns.
+  // No checkpoint. Record the served SHA and fail the run so a scheduled loss of
+  // the cache alerts once. github.run_number for this workflow is already past 40,
+  // so this includes the first seed after the fix lands.
   if (previousSha === null || previousSha === undefined || previousSha === "") {
-    return { status: "PASS", reason: "baseline_recorded" };
+    return { status: "FAIL", reason: "baseline_recorded" };
   }
   // A recorded state that is not a commit SHA cannot be compared. initialize is the
   // only recovery: it replaces that unreadable value with the served SHA.
@@ -112,7 +113,8 @@ export function formatRecordedBaselineSummary({
 }
 
 export function missingCheckpointNeedsWarning(workflowRunNumber) {
-  return workflowRunNumber !== 1;
+  void workflowRunNumber;
+  return true;
 }
 
 /**
@@ -155,7 +157,10 @@ export async function runServedBuildCheck({
     previousIsAncestorOfServed,
     initialize,
   });
-  if (result.status === "PASS") writeServed(servedSha);
+  const checkpointMissing = previousSha == null || previousSha === "";
+  if (result.status === "PASS" || (result.reason === "baseline_recorded" && checkpointMissing)) {
+    writeServed(servedSha);
+  }
   log(formatServedBuildSummary(result, { servedSha, previousSha }));
   const replacedUnreadable = !isSha(previousSha) && previousSha != null && previousSha !== "";
   const seedingWithoutCheckpoint =

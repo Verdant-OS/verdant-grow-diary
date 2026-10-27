@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-10-24.6**
+**Sentinel-Version: 2026-10-26.2**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -370,9 +370,9 @@ Environment and install gotchas are owned by
 - `src/integrations/supabase/client.ts` is header-marked "generated, do not edit" but carries
   a deliberate hardening — `storage: window.sessionStorage`, not `localStorage`. If you
   regenerate it, re-apply that line.
-- **Editing any of the twelve governance files bumps all twelve.** `AGENTS.md`, `CLAUDE.md`,
+- **Editing any of the eighteen governance files bumps all eighteen.** `AGENTS.md`, `CLAUDE.md`,
   `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`,
-  `docs/agents/HANDOFF_PROTOCOL.md` and the six `docs/agents/roles/*.md` must share one
+  `docs/agents/HANDOFF_PROTOCOL.md` and the twelve `docs/agents/roles/*.md` must share one
   `Sentinel-Version`, and `GEMINI.md`'s `SENTINEL-CORE` block must stay byte-equivalent to
   `AGENTS.md`. Do it with `node scripts/sync-sentinel-mirror.mjs --set-version=YYYY-MM-DD.N`,
   then verify with `node scripts/check-sentinel-version-parity.mjs <base>`.

@@ -1,5 +1,10 @@
 # Go-live run sequence for when the Vercel 402 clears
 
+Historical as of 2026-10-10 (Matthew Cheek). Production runs on Cloudflare Workers
+at https://verdantgrowdiary.com. This sequence describes an earlier Vercel-hosted
+period. Do not use it as the current deploy procedure. The Vercel "Account is
+blocked." status is an owner-side account issue. Do not investigate it.
+
 Status: a plan only. Nothing here was dispatched, published, applied or written to
 production when it was drafted. Every trigger below is an owner action (Matthew), or runs
 under the owner's account where the workflow requires it. Handoff item 5. Owner: Grok.

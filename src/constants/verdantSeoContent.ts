@@ -757,6 +757,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
             label: "Use the stage-aware nutrient schedule method",
             to: "/guides/cannabis-nutrient-schedule",
           },
+          {
+            label: "Log an Athena feed chart week by week",
+            to: "/guides/athena-feed-chart-log",
+          },
         ],
       },
       {

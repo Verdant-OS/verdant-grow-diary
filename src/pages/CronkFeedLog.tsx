@@ -132,22 +132,24 @@ export default function CronkFeedLog() {
 
   function downloadCsv() {
     let url: string | null = null;
+    let link: HTMLAnchorElement | null = null;
     try {
       const csv = buildFeedLogCsv(state);
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      link = document.createElement("a");
       link.href = url;
       link.download = feedLogCsvFilename(new Date());
       document.body.appendChild(link);
       link.click();
-      link.remove();
       const objectUrl = url;
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
       trackFeedLogEvent("feed_log_csv_exported", { row_count: state.weeks.length });
       announce("CSV downloaded. Nothing is saved in your browser.");
     } catch {
       if (url) URL.revokeObjectURL(url);
+    } finally {
+      link?.remove();
     }
   }
 

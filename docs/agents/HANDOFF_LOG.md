@@ -76,31 +76,65 @@ TASK CODEX-2286-FOOTER-DISPLAY-PREFERENCE  priority: P2  status: OPEN
 goal: Make the Daily Check footer explicitly describe the saved display preference while the form may temporarily use another entry unit.
 why: The real manual-reading card can toggle Celsius/Fahrenheit locally without changing the preference hook used by the footer, so an unlabeled unit sentence contradicts the form.
 branch: claude/daily-check-footer-temperature-unit
-base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+base: verdant-grow-diary at 59fd56421f57b23366258d1a9ed907699054103b
 checkout: Fetch the existing branch and base; verify the live full head and writer before adopting it in an isolated authorized cloud worktree. Use normal base merges and pushes only.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2286
-head_sha: 7da357e1d502713164abdd1a203d986594fc5e5a (source checkpoint verified before repair; the resulting full head belongs in the current PR packet).
-state: Local one-line footer clarification, new rendered regression and normal current-base integration; hosted CI and outside acceptance remain pending.
-current_step: Real DailyCheck/ManualSensorReadingCard toggle regression failed both directions before repair; after repair 79 focused Daily Check/manual-sensor files and 906 tests passed.
-next_action: Verify the published full head, all required/supplemental checks and an eligible non-contributing full-scope outside review. Preserve draft until the owner-authorized readiness/queue gates pass.
+head_sha: d3ce46f7125e37b64a711789b8f0269e649d6c7e (published source checkpoint verified before this normal conflict-only base integration; the resulting full head belongs in the coordinator PR packet).
+state: Footer repair was published at the source checkpoint. Sour Diesel review 5661894683 reports only a merge-conflict P1, zero P2 and two nonblocking P3s. Normal base integration resolves only this own handoff conflict; runtime and test blobs are preserved.
+current_step: Current-base integration validation passed 82 existing Daily Check/manual-sensor/unit-preference files, 929 tests, zero failures/skips; full TypeScript passed. Docs safety (three categories), nine-file release docs, phenotyping docs, own-block formatting and whitespace pass. Historical rendered RED/GREEN remains dated evidence; no new behavior/assertion change.
+next_action: Existing coordinator verifies the published resulting full head in the PR packet, obtains fresh required/supplemental CI and a fresh complete-scope verdict through the existing eligible Sour Diesel route. Keep draft; no readiness, queue or merge action in this source slice.
 post_merge_check: Existing Codex closeout coordinator verifies served version includes the merge; authenticated footer/input-toggle behavior is NOT_MEASURED until authorized QA records it.
-active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only the DailyCheck footer paragraph, NEW rendered regression, this block and matching metadata. No ManualSensorReadingCard or #2251 submit-guard edits.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd delegates only this normal conflict-only integration to /root/reconcile_counts within the same task. Only this block is edited manually; no runtime/test edit, protected unlock, ManualSensorReadingCard or #2251 guard change.
 decisions: Prefix the original helper output with Saved display preference; preserve its existing pure tests, the manual/not-live label, input conversion, persistence and source truth.
 tried_and_rejected: Treating a saved display preference as the local entry-unit override; modifying the shared form or locked scorers for a copy-only repair; assuming writer tests are outside acceptance.
-commands: node node_modules/vitest/vitest.mjs run src/test/daily-check-footer-display-preference.test.tsx --pool=forks --maxWorkers=1; node node_modules/typescript/bin/tsc --noEmit; node scripts/assert-docs-safety.mjs; git diff --check.
-files_touched: src/pages/DailyCheck.tsx (footer paragraph only); src/test/daily-check-footer-display-preference.test.tsx (NEW); docs/agents/HANDOFF_LOG.md (this block only). Normal merge inherits current canonical base without dependency authoring.
+commands: Canonical Bun 1.3.14 install --frozen-lockfile (manifest/lock unchanged); node node_modules/vitest/vitest.mjs run [79 existing Daily Check/manual-sensor paths plus temperature-unit-preference, manual-sensor-save-toast-temperature-unit and manual-sensor-card-toast-celsius tests] --pool=forks --maxWorkers=1 --reporter=json (exact 82-path command in focused-receipt.json); node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit --pretty false; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/assert-automated-phenotyping-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 59fd56421f57b23366258d1a9ed907699054103b --strict (expected historical exit 2); git diff --check; normal commit hooks and guarded non-force push.
+files_touched: This integration manually changes only docs/agents/HANDOFF_LOG.md (this block). Five authored nonlog source/test blobs remain exact d3ce46f7125e37b64a711789b8f0269e649d6c7e. Every unrelated base byte/block is adopted intact; no dependency authoring.
 files_remaining: None planned for this bounded repair; respond to fresh findings within current permission fences.
-blockers: Fresh hosted exact-head CI and eligible outside acceptance; Codex repaired the PR and cannot accept it. No deployment or production operation authorized.
+blockers: The new integration head needs fresh hosted required/supplemental CI and eligible complete-scope outside acceptance. All Codex authors/repairers are excluded. Sour's stale helper-docstring and whitespace-regex P3s remain unchanged, open and unwaived; no accepted deferral is claimed. No deployment or production operation authorized.
 open_questions: Actual available eligible outside reviewer pickup after current-head precheck.
-gotchas: Original daily-grow-check.test.ts renegotiation is historical and preserved byte-for-byte; this repair does not edit or unlock it. #2266 shared card and #2251 guards remain separate writers/scopes.
+gotchas: Strict vs current base exits 2 for the historical daily-grow-check.test.ts pin, exact original 7da357e1 and d3ce bytes. Strict vs d3ce exits 2 for 26 protected changes, each exact incoming-base bytes. Neither report is green; this integration edits/unlocks no scorer. #2266 card and #2251 guards remain separate. Full local suite/build and production behavior NOT_MEASURED in this slice; old CI/reviews do not accept a new head.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2286
-artifacts: Current PR body and hosted checks; cloud RED/GREEN/static/push receipts supplement repository evidence.
-reviewer_seat: Actually available eligible non-contributing outside session, excluding all original Claude authors/repairers, shared-account contributors and this Codex writer/integrator.
-reviewer_sha: NOT_MEASURED for the repaired full head; old-head receipts remain historical.
-session_state: Isolated cloud writer; release/live behavior NOT_MEASURED.
+artifacts: Coordinator PR packet and hosted checks; cloud 2286-required-base-integration compact receipts bind exact source/base/tree, preservation, tests, normal hooks and push readback. Historical RED/GREEN receipts remain dated history.
+reviewer_seat: Existing non-contributing Sour Diesel Grok route, actual session 48794c65; coordinator verifies current availability before one fresh full-scope request. Exclude original Claude session 016Ym79BwSvGTrmSyMeN9zsA, every actual shared-account contributor and all Codex authors/repairers including /root/reconcile_counts.
+reviewer_sha: 5661894683 is FAIL at d3ce46f7125e37b64a711789b8f0269e649d6c7e (conflict P1 only); fresh acceptance at the resulting head is NOT_MEASURED.
+session_state: Sole delegated isolated cloud integrator; no other source lane or review request started. Source writes stop after handoff. Release/live behavior NOT_MEASURED.
 claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 19:06 UTC (matching PR claim).
 owner: Codex closeout coordinator for this bounded repair; outside acceptance and merge authority remain separate.
-last_updated: 2026-10-26 19:09 UTC, by Codex closeout coordinator
+last_updated: 2026-10-27 03:54 UTC, by delegated Codex closeout integrator /root/reconcile_counts
+```
+
+### VER-285-PRESERVE-MISSING-STAGE
+
+```text
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2537 (draft)
+head_sha: Read the full current head of draft #2537; this implementation commit cannot name itself. Parent is 1630600154a112d6bdbb4881e7fb408627660cd0.
+state: Implemented and locally validated: 104 tests pass, full TypeScript check passes, scoped ESLint/Prettier pass. Hosted checks and independent acceptance are NOT_MEASURED at this new head.
+current_step: The 19 new mounted regressions failed 17/19 against base (2 explicit-stage controls passed). Final focused suite: 9 files, 104 passed / 0 failed / 0 skipped.
+next_action: Read #2537 full head and required CI; after green, route one eligible independent non-contributing Claude/Grok review. Stay draft; no merge or deploy.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts src/test/timeline-stage-label-render.test.tsx src/test/timeline-chip-counts-match-list.test.tsx src/test/quicklog-corrections-static-safety.test.ts src/test/timeline-photo-edit-resign.test.ts src/test/timeline-photo-edit-signing-followups.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/eslint/bin/eslint.js src/components/EntryEditDialog.tsx src/test/entry-edit-stage-preservation.test.tsx; node scripts/scorer-lock.mjs --report --base 21b267a217f4d2d1b1a53a4ba77b85e9903cd418 --strict
+files_touched: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None planned; no new rules helper needed because the existing stage presentation helper is reused.
+blockers: Required CI and eligible independent exact-head acceptance remain pending. Local full test suite and build SKIPPED; required hosted CI must provide these gates. Default Node heap exhausted during initial tsc; 6144 MB rerun exposed four invalid test-query options, corrected before the final clean full tsc run. No production verification permitted in this task.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id. Tests serialize actual editor UPDATE payloads into a synthetic persistence store, then remount from a separate read; this is not a real DB or production readback receipt. Untouched null, empty, omitted, unknown, whitespace and legacy stage values are preserved. Clearing a stage explicitly writes null; the UI sentinel never reaches persistence. Existing details serialization is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: New mounted test file and PR validation summary. Existing linked-Quick-Log and zero-row guards pass unchanged. Lint/format/whitespace, scorer lock and docs-safety PASS. All 126 open PR file lists inspected, no editor or stage-helper overlap. VER-285 was unassigned at intake; Linear now shows assignee Verdant after draft linking, no competing writer comment observed.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
 ```
 
 ### PR-2345-BASE-INTEGRATION

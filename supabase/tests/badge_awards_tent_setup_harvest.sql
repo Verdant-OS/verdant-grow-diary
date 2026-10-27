@@ -53,10 +53,14 @@ BEGIN
     (v_both, 'badge-tent-both-' || v_both::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'),
     (v_stolen, 'badge-tent-stolen-' || v_stolen::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated');
 
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
   INSERT INTO public.grows (id, user_id, name)
   VALUES
     (v_grow, v_owner, 'badge tent harness'),
     (v_both_grow, v_both, 'both badges grow');
+  RESET role;
 
   v_photo := v_owner::text || '/tents/owned.jpg';
   v_stranger_photo := v_stranger::text || '/tents/other.jpg';
@@ -67,16 +71,24 @@ BEGIN
     ('diary-photos', v_stranger_photo),
     ('diary-photos', v_both_photo);
 
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
   INSERT INTO public.tents (id, user_id, grow_id, name, stage, light_on, created_at)
   VALUES (
     v_first_tent, v_owner, v_grow, 'First tent', 'seedling', true, '2026-10-01T00:00:00Z'
   );
+  RESET role;
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
   INSERT INTO public.tents (
     id, user_id, grow_id, name, stage, light_on, brand, photo_url, created_at
   ) VALUES (
     v_later_tent, v_owner, v_grow, 'Later tent', 'veg', true, 'Gorilla',
     'storage://diary-photos/' || v_photo, '2026-10-02T00:00:00Z'
   );
+  RESET role;
 
   PERFORM set_config('role', 'service_role', true);
   UPDATE public.badge_award_runtime SET enabled = true WHERE id = 1;
@@ -121,11 +133,15 @@ BEGIN
   ASSERT v_result->>'status' = 'restored', 'returning the owned photo restores First Tent';
 
   RESET role;
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
   INSERT INTO public.tents (id, user_id, grow_id, name, stage, light_on, photo_url, created_at)
   VALUES (
     v_name_only, v_stranger, v_grow, 'Name only', 'seedling', true,
     'storage://diary-photos/' || v_stranger_photo, '2026-10-03T00:00:00Z'
   );
+  RESET role;
   PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
   PERFORM set_config('role', 'authenticated', true);
@@ -171,12 +187,32 @@ BEGIN
 
   RESET role;
   -- One save: a single tent row with an owned photo and a brand earns both tent badges.
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
   INSERT INTO public.tents (
     id, user_id, grow_id, name, stage, light_on, brand, photo_url, created_at
   ) VALUES (
     v_both_tent, v_both, v_both_grow, 'Both badges', 'flower', true, 'Gorilla',
     'storage://diary-photos/' || v_both_photo, '2026-10-06T00:00:00Z'
   );
+  RESET role;
+  -- An anonymous session is refused before the photo-subject evaluator runs,
+  -- even when its tent would qualify (#1979 aadcd1f6e, carried onto this stack).
+  PERFORM set_config('request.jwt.claim.sub', v_both::text, true);
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_both, 'is_anonymous', true)::text,
+    true
+  );
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_tent');
+  ASSERT v_result->>'status' = 'not_authenticated',
+    'an anonymous session must not earn First Tent';
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_both;
+  ASSERT v_count = 0, 'an anonymous session writes no award';
+  RESET role;
+
   PERFORM set_config('request.jwt.claim.sub', v_both::text, true);
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_both)::text, true);
   PERFORM set_config('role', 'authenticated', true);
@@ -194,12 +230,16 @@ BEGIN
 
   RESET role;
   -- Another user's photo, with no owned photo, earns nothing and writes nothing.
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
   INSERT INTO public.tents (
     id, user_id, grow_id, name, stage, light_on, photo_url, created_at
   ) VALUES (
     v_stolen_tent, v_stolen, v_both_grow, 'Stolen photo', 'veg', true,
     'storage://diary-photos/' || v_both_photo, '2026-10-07T00:00:00Z'
   );
+  RESET role;
   PERFORM set_config('request.jwt.claim.sub', v_stolen::text, true);
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stolen)::text, true);
   PERFORM set_config('role', 'authenticated', true);

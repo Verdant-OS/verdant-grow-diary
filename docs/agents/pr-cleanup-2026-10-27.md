@@ -40,7 +40,7 @@ Each PR would get one comment, `Closing during repo cleanup: <reason>. … Branc
 | #2182 | close-superseded | Superseded by #2083 (`ec233259e`).                                                                                                                                                                       |
 | #1951 | close-superseded | Superseded by #2181 (`1f185f52c`).                                                                                                                                                                       |
 | #1955 | close-superseded | Superseded by #2181 (`1f185f52c`).                                                                                                                                                                       |
-| #1980 | close-superseded | Superseded by #2181 (`1f185f52c`). Its npm install path also conflicts with AGENTS.md §16.                                                                                                               |
+| #1980 | close-superseded | Superseded by #2181 (`1f185f52c`). Its non-Bun install path also conflicts with AGENTS.md §16.                                                                                                           |
 
 Matthew, the three **bold** rows are the only copy of their change. Say "keep" on any of them and it moves to merge-candidate or needs-Matthew instead of closing. #2026 and #2029 were last touched on 2026-10-13, exactly 14 days ago. They are small and green, so they are listed as merge-candidates, not stale closes.
 

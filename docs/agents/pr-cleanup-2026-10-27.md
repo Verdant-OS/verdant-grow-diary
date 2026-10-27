@@ -272,6 +272,26 @@ Kept open "for now" on Matthew's instruction: #2333, #1904, #1902 (and #1986, #2
 
 Open count after Phase 2: 119.
 
+### Badge stack decision
+
+Matthew, 2026-10-27: "keep the #2032 badge stack". That means #2032 → #2343 → #2362 is the line that lands. Nothing on the #1979 line is closed yet, because that line holds work the #2032 line lacks.
+
+- **Migration `20261011120000_owner_badge_awards.sql` differs between the lines.** It is blob `9df0827b` on #1979/#2342 and blob `2ef43a3f` on #2032/#2343; the diff is +88/−18 lines. Only #1979's copy refuses anonymous sessions in RLS (`auth.jwt() ->> 'is_anonymous'`) and adds a `badge_awards_member_select` policy that hides revoked awards.
+- **#1979 has these commits that #2032 lacks:**
+  - `aadcd1f6e`: refuse anonymous owner badge access.
+  - `cbdb77fd2`: recheck the kill switch before award writes.
+  - `614016a0f`: scope the owner shelf to the signed-in user.
+  - `268abe40d`: let signed-in members read active awards.
+  - `647ba5694`, `b26fa2fa0`, `4f716369e`, `c0925a7de`: pgTAP isolation and reconcile fixes.
+  - `f219faf10`: run the badge pgTAP on every PR (a protected workflow plus a required-checks change).
+- **#2342 adds Cut 001 AC7:** the member-visible grower badge profile (`20ba27ce4`, `38c6650cf`). It exists only on the #1979 line. **#2365** adds its tests (`9f9339578`).
+
+Closing #1979, #2342 and #2365 now would drop the RLS hardening and AC7. The proposed order:
+
+1. Port #1979's migration and RLS hardening into #2032 as new commits on #2032's branch, without rewriting history. This is migration and RLS scope, so it needs Matthew's explicit go-ahead, and the #2032 branch holder must do it or hand the branch over.
+2. Re-cut #2342's AC7 and #2365's tests onto #2032 as a new stacked PR.
+3. Then close #1979, #2342 and #2365 as superseded, naming the commits that carried their content.
+
 ## Verified
 
 Verified: open PR count (127), the head SHA of every PR, behind/conflict per PR (`git merge-tree`), touched files and protected-path tags, the share of each PR's added lines present on base, the base commits named as superseding, and required-check status at each current head (read 2026-10-27 via `gh api`).

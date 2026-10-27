@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-CLEANUP-2026-10-27-INVENTORY
+
+```text
+TASK PR-CLEANUP-2026-10-27-INVENTORY  priority: other  status: OPEN
+goal: Phase 1 of Matthew's open-PR cleanup (zero open PRs): a read-only inventory of every open PR with a proposed disposition, then stop for Matthew's approval of the close list.
+why: 127 open PRs (2026-10-27); many are superseded, stale, or test follow-ups whose parent merged.
+branch: claude/new-session-wp1j5i (the session-bound branch; the cleanup prompt named claude/pr-cleanup-inventory, and the session binding wins)
+base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
+checkout: git fetch origin claude/new-session-wp1j5i verdant-grow-diary && git switch claude/new-session-wp1j5i && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: the draft PR opened from claude/new-session-wp1j5i (read the URL on GitHub; a commit cannot name the PR created after it)
+head_sha: read from the PR; this commit cannot name itself
+state: pushed draft (docs only)
+current_step: Phase 1 done. docs/agents/pr-cleanup-2026-10-27.md holds the per-PR table, the close list (14), the consolidation plan (29 folds) and Matthew's decision list.
+next_action: Wait for Matthew's approval of the close list. Phase 2 closes only the approved PRs, one comment each, branches kept. No PR is closed, commented on or pushed to before then.
+post_merge_check: NOT_APPLICABLE (inventory doc; not a feature)
+active_writer: Claude session session_017UoYKyHCyHbSMw6VpDj2mb
+decisions: Hands-off PRs (OG Kush) and holds (#2539 #2532 #2252) left untouched. Test-only follow-ups fold into area consolidation PRs, or into their still-open parent. Product fixes are never folded into test consolidations. Protected-scope PRs go to Matthew.
+tried_and_rejected: gh pr list (GH_TOKEN reported invalid for gh auth, though gh api reads worked); metadata came from the GitHub MCP instead. Single-agent semantic review of all PRs was rejected for context size; batched read-only subagents plus git evidence were used.
+commands: git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'; git merge-tree --write-tree origin/verdant-grow-diary refs/remotes/pr/<n>; gh api repos/Verdant-OS/verdant-grow-diary/commits/<sha>/check-runs?per_page=100&page=<k>
+files_touched: docs/agents/pr-cleanup-2026-10-27.md; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: Phase 5 report appended to docs/agents/pr-cleanup-2026-10-27.md
+blockers: Matthew's approval of the close list and the decisions in that file
+open_questions: badge stack choice (#1979 line vs #2032 line); whether #2140 is redundant with applied migration 20260924120000
+gotchas: A green 35/35 at a head 100+ commits behind base is not current; the strict up-to-date policy re-runs CI after a base merge. #2333 carries a product security commit (98f48c08a) that must be checked before closing.
+links: docs/agents/pr-cleanup-2026-10-27.md
+artifacts: docs/agents/pr-cleanup-2026-10-27.md
+reviewer_seat: an eligible independent session routed by OG Kush; not this session
+reviewer_sha: none yet
+session_state: Claude cloud session; no routines, no paused workflows; pending human decision: close-list approval
+claimed_by: Claude, 2026-10-27 CT (session_017UoYKyHCyHbSMw6VpDj2mb)
+owner: Claude (default inheritor OG Kush)
+last_updated: 2026-10-27, by Claude
+```
+
 ### PR2511-REQUIRED-TRIGGER-GUARDS
 
 ```text

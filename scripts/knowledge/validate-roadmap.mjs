@@ -617,6 +617,7 @@ export function collectCurrentRegistryPaths(rootDir = root) {
     (match) => match[1],
   );
   guideSlugs.push("grow-stage-care-guide");
+  guideSlugs.push("cronk-nutrients-grow-diary");
   const cultivarSlugs = [...cultivarSource.matchAll(/\{\s*slug:\s*"([^"]+)"/g)].map(
     (match) => match[1],
   );

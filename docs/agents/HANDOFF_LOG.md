@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-2283-REMOVAL-PAGINATION-REPAIR
+
+```text
+TASK PR-2283-REMOVAL-PAGINATION-REPAIR  priority: P2  status: OPEN
+goal: Fix the Timeline pagination/removal replacement race, prove the focused regression, and push to the existing draft PR.
+why: The user explicitly assigned the remaining P2 repair after conflict integration; keep draft, no merge, queue entry, deployment or production operation.
+branch: claude/timeline-remove-log-count
+base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+checkout: git fetch origin claude/timeline-remove-log-count verdant-grow-diary; git switch claude/timeline-remove-log-count; git merge --ff-only origin/claude/timeline-remove-log-count
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283
+head_sha: 92c7511c7180ac3dd62f7e24ea6ef2a239909d01 (verified remote source checkpoint before this repair; read the PR for the resulting full repair head before resuming)
+state: Implemented: removal now filters current queued state instead of replacing it from the snapshot. Read-key/request-ID, loaded-id, immediate duplicate-suppression snapshot, count, owner-read, linked Quick Log refusal and delete-receipt safeguards remain. Prior conflict integration at the source checkpoint preserved both refs.
+current_step: Valid RED on unchanged source checkpoint: new mounted file 2 failed/1 passed/0 skipped, both append-first cases lost older rows. GREEN after the functional-filter patch: 3 passed/0 failed/0 skipped. Existing focused set: 11 files/131 passed/0 failed. Combined disjoint coverage: 12 files/134 passed/0 failed/0 skipped.
+next_action: Verify the resulting hosted full head and fresh CI, then obtain one eligible independent exact-head acceptance. Keep draft; no merge, queue entry or deployment is authorized.
+post_merge_check: NOT_MEASURED; once the repaired exact SHA is deployed, overlapping Load older and Remove log must retain the appended rows, remove only the confirmed row, and decrement the total once. This task authorizes no live write.
+active_writer: Codex pagination repair session, explicitly assigned by the user after the prior conflict-only task. This supersedes the earlier Cursor implementation-writer record for this bounded repair.
+decisions: Filter React's current queued rows; keep the read-key/request-ID guard, loaded-id check, immediate snapshot advance and count decrement outside the updater. Preserve #2094 hidden-mirror count setters and all removal authorization/receipt safeguards.
+tried_and_rejected: An initial new-harness timeout came from an unrecorded in() filter; corrected before valid RED and not counted as product-failure evidence. Initial tsc found one new-harness tuple typing error; query mock now has an explicit signature, with no casts or assertion changes; its three cases pass again. Rejected stale snapshot replacement and updater side effects. Existing tests and server/hidden-mirror totals remain unchanged; author-team QA is not independent acceptance.
+commands: node node_modules/vitest/vitest.mjs run src/test/timeline-removal-pagination-interleaving.test.tsx src/test/timeline-removal-completion-generation.test.tsx src/test/timeline-remove-log-total-count.test.ts src/test/diary-entry-remove-button.test.tsx src/test/diary-entry-removal-rules.test.ts src/test/diary-entry-removal-static-safety.test.ts src/test/timeline-page-read-state.test.tsx src/test/timeline-blank-quicklog-dedupe.test.ts src/test/timeline-quicklog-page-boundary-dedupe.test.ts src/test/timeline-quicklog-photo-link-dedupe.test.tsx src/test/timeline-quicklog-dedupe-pagination.test.tsx src/test/timeline-directory-sensor-refresh.test.tsx --reporter=dot
+files_touched: src/pages/Timeline.tsx; src/test/timeline-removal-pagination-interleaving.test.tsx (new additive regression); docs/agents/HANDOFF_LOG.md (this block).
+files_remaining: No additional implementation files planned.
+blockers: Fresh full-head CI and eligible independent acceptance remain NOT_MEASURED. No merge or deployment is authorized.
+open_questions: New-head required CI and independent acceptance remain NOT_MEASURED. Corrected canonical tsc and native tsgo both PASS with zero diagnostics.
+gotchas: New head invalidates old CI/review receipts. Existing installed Vitest 4.1.12 is run through Node because Bun is not on PATH; no install or lockfile edit. Preserve all other handoff blocks.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283#issuecomment-6423223632 ; prior writer receipt: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283#issuecomment-6422817526
+artifacts: New mounted regression and resulting commit/check URLs. Canonical tsc, native tsgo (both zero diagnostics), scoped ESLint, Prettier, scorer-lock, Sentinel parity, docs safety and whitespace PASS. Existing read-state tests emitted the same React act warnings without failures. Full suite, build and live verification NOT_MEASURED.
+reviewer_seat: Available eligible independent non-contributing session under OWNERSHIP.md section 4.3; no request sent by this task. Exclude original author, all repair contributors and this author/test team.
+reviewer_sha: NOT_MEASURED; no independent acceptance of the resulting head is claimed.
+session_state: Test author subagent pagination_regression completed the additive tests and RED/GREEN; parent owns runtime/handoff and delivery. No automation, external messages, review request, PR state change, queue action or production operation created. Public claim/resume comments are outside this task's authorization.
+claimed_by: Codex pagination repair session by explicit current user assignment; no public claim comment is asserted.
+owner: Codex for the user-assigned pagination repair and branch update; future acceptance must be independent.
+last_updated: 2026-10-26 13:27 CT, by Codex pagination repair session
+```
+
 ### PR2511-REQUIRED-TRIGGER-GUARDS
 
 ```text
@@ -106,7 +140,7 @@ limits: Test and handoff PR delta only; normal base integration permitted. No Gi
 
 ### VER-285-PRESERVE-MISSING-STAGE
 
-````text
+```text
 TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
 goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
 why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
@@ -136,40 +170,7 @@ session_state: No subagents, review requests, production actions, or automations
 claimed_by: Codex VER-285, 2026-10-25 01:52 CT
 owner: Codex VER-285
 last_updated: 2026-10-25 01:52 CT, by Codex VER-285
-
-### PR-2283-REMOVAL-PAGINATION-REPAIR
-
-```text
-TASK PR-2283-REMOVAL-PAGINATION-REPAIR  priority: P2  status: OPEN
-goal: Fix the Timeline pagination/removal replacement race, prove the focused regression, and push to the existing draft PR.
-why: The user explicitly assigned the remaining P2 repair after conflict integration; keep draft, no merge, queue entry, deployment or production operation.
-branch: claude/timeline-remove-log-count
-base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
-checkout: git fetch origin claude/timeline-remove-log-count verdant-grow-diary; git switch claude/timeline-remove-log-count; git merge --ff-only origin/claude/timeline-remove-log-count
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283
-head_sha: 92c7511c7180ac3dd62f7e24ea6ef2a239909d01 (verified remote source checkpoint before this repair; read the PR for the resulting full repair head before resuming)
-state: Implemented: removal now filters current queued state instead of replacing it from the snapshot. Read-key/request-ID, loaded-id, immediate duplicate-suppression snapshot, count, owner-read, linked Quick Log refusal and delete-receipt safeguards remain. Prior conflict integration at the source checkpoint preserved both refs.
-current_step: Valid RED on unchanged source checkpoint: new mounted file 2 failed/1 passed/0 skipped, both append-first cases lost older rows. GREEN after the functional-filter patch: 3 passed/0 failed/0 skipped. Existing focused set: 11 files/131 passed/0 failed. Combined disjoint coverage: 12 files/134 passed/0 failed/0 skipped.
-next_action: Verify the resulting hosted full head and fresh CI, then obtain one eligible independent exact-head acceptance. Keep draft; no merge, queue entry or deployment is authorized.
-post_merge_check: NOT_MEASURED; once the repaired exact SHA is deployed, overlapping Load older and Remove log must retain the appended rows, remove only the confirmed row, and decrement the total once. This task authorizes no live write.
-active_writer: Codex pagination repair session, explicitly assigned by the user after the prior conflict-only task. This supersedes the earlier Cursor implementation-writer record for this bounded repair.
-decisions: Filter React's current queued rows; keep the read-key/request-ID guard, loaded-id check, immediate snapshot advance and count decrement outside the updater. Preserve #2094 hidden-mirror count setters and all removal authorization/receipt safeguards.
-tried_and_rejected: An initial new-harness timeout came from an unrecorded in() filter; corrected before valid RED and not counted as product-failure evidence. Initial tsc found one new-harness tuple typing error; query mock now has an explicit signature, with no casts or assertion changes; its three cases pass again. Rejected stale snapshot replacement and updater side effects. Existing tests and server/hidden-mirror totals remain unchanged; author-team QA is not independent acceptance.
-commands: node node_modules/vitest/vitest.mjs run src/test/timeline-removal-pagination-interleaving.test.tsx src/test/timeline-removal-completion-generation.test.tsx src/test/timeline-remove-log-total-count.test.ts src/test/diary-entry-remove-button.test.tsx src/test/diary-entry-removal-rules.test.ts src/test/diary-entry-removal-static-safety.test.ts src/test/timeline-page-read-state.test.tsx src/test/timeline-blank-quicklog-dedupe.test.ts src/test/timeline-quicklog-page-boundary-dedupe.test.ts src/test/timeline-quicklog-photo-link-dedupe.test.tsx src/test/timeline-quicklog-dedupe-pagination.test.tsx src/test/timeline-directory-sensor-refresh.test.tsx --reporter=dot
-files_touched: src/pages/Timeline.tsx; src/test/timeline-removal-pagination-interleaving.test.tsx (new additive regression); docs/agents/HANDOFF_LOG.md (this block).
-files_remaining: No additional implementation files planned.
-blockers: Fresh full-head CI and eligible independent acceptance remain NOT_MEASURED. No merge or deployment is authorized.
-open_questions: New-head required CI and independent acceptance remain NOT_MEASURED. Corrected canonical tsc and native tsgo both PASS with zero diagnostics.
-gotchas: New head invalidates old CI/review receipts. Existing installed Vitest 4.1.12 is run through Node because Bun is not on PATH; no install or lockfile edit. Preserve all other handoff blocks.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283#issuecomment-6423223632 ; prior writer receipt: https://github.com/Verdant-OS/verdant-grow-diary/pull/2283#issuecomment-6422817526
-artifacts: New mounted regression and resulting commit/check URLs. Canonical tsc, native tsgo (both zero diagnostics), scoped ESLint, Prettier, scorer-lock, Sentinel parity, docs safety and whitespace PASS. Existing read-state tests emitted the same React act warnings without failures. Full suite, build and live verification NOT_MEASURED.
-reviewer_seat: Available eligible independent non-contributing session under OWNERSHIP.md section 4.3; no request sent by this task. Exclude original author, all repair contributors and this author/test team.
-reviewer_sha: NOT_MEASURED; no independent acceptance of the resulting head is claimed.
-session_state: Test author subagent pagination_regression completed the additive tests and RED/GREEN; parent owns runtime/handoff and delivery. No automation, external messages, review request, PR state change, queue action or production operation created. Public claim/resume comments are outside this task's authorization.
-claimed_by: Codex pagination repair session by explicit current user assignment; no public claim comment is asserted.
-owner: Codex for the user-assigned pagination repair and branch update; future acceptance must be independent.
-last_updated: 2026-10-26 13:27 CT, by Codex pagination repair session
-````
+```
 
 ### PR-2345-BASE-INTEGRATION
 

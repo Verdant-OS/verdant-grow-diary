@@ -3231,8 +3231,10 @@ export default function Timeline() {
                                           const rows = entriesSnapshotRef.current;
                                           if (!rows.some((row) => row.id === removedId)) return;
                                           const next = rows.filter((row) => row.id !== removedId);
+                                          // Snapshot of the rows this completion already counted, so a
+                                          // second completion of the same read sees the id as gone.
+                                          // It is not the list React renders.
                                           entriesSnapshotRef.current = next;
-                                          // Preserve pagination or photo updates queued before this removal.
                                           setEntries((current) =>
                                             current.filter((row) => row.id !== removedId),
                                           );

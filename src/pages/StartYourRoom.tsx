@@ -131,6 +131,8 @@ export default function StartYourRoom() {
   }, [step]);
 
   const ownerId = user?.id ?? null;
+  const ownerIdRef = useRef<string | null>(ownerId);
+  ownerIdRef.current = ownerId;
 
   useEffect(() => {
     if (!ownerId || growsLoading || draftHydratedFor.current === ownerId) return;
@@ -152,7 +154,7 @@ export default function StartYourRoom() {
     const growStillHere =
       draft.ids.growId != null && grows.some((grow) => grow.id === draft.ids.growId);
     setForm(draft.form);
-    setError(draft.saveError);
+    setError(growStillHere || draft.step === "grow" ? draft.saveError : null);
     if (draft.step === "grow" || growStillHere) {
       setPendingRowIds(draft.pendingRowIds);
     } else {
@@ -370,7 +372,9 @@ export default function StartYourRoom() {
     attempt: HierarchyCreateAttempt,
     payload: Record<string, unknown>,
   ) {
+    const saveOwnerId = ownerIdRef.current;
     const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+    if (ownerIdRef.current !== saveOwnerId) return null;
     if (result.status === "confirmed") return result.confirmed;
     if (result.status === "unknown") {
       recordUnknownCreateOutcome(attempt);
@@ -423,6 +427,7 @@ export default function StartYourRoom() {
       return;
     }
     const attempt = { entity: "grow" as const, rowId: growId, ownerId: user.id };
+    const saveOwnerId = user.id;
     createInFlightRef.current = true;
     setBusy(true);
     setError(null);
@@ -432,6 +437,7 @@ export default function StartYourRoom() {
         user_id: user.id,
         ...payload,
       });
+      if (ownerIdRef.current !== saveOwnerId) return;
       if (!confirmed) return;
       releaseRowId("grow");
       setActiveGrowId(confirmed.row.id);
@@ -440,6 +446,7 @@ export default function StartYourRoom() {
       setStep(nextStepAfter("grow"));
       try {
         await refresh();
+        if (ownerIdRef.current !== saveOwnerId) return;
       } catch {
         // The grow is already confirmed and the wizard is terminal for this
         // stage. Advance rather than leave the grow form ready to duplicate.
@@ -481,6 +488,7 @@ export default function StartYourRoom() {
       ownerId: user.id,
       growId: payload.grow_id,
     };
+    const saveOwnerId = user.id;
     createInFlightRef.current = true;
     setBusy(true);
     setError(null);
@@ -490,6 +498,7 @@ export default function StartYourRoom() {
         user_id: user.id,
         ...payload,
       });
+      if (ownerIdRef.current !== saveOwnerId) return;
       if (!confirmed) return;
       releaseRowId("tent");
       setIds((prev) => ({
@@ -535,6 +544,7 @@ export default function StartYourRoom() {
       growId: payload.grow_id,
       tentId: payload.tent_id,
     };
+    const saveOwnerId = user.id;
     createInFlightRef.current = true;
     setBusy(true);
     setError(null);
@@ -544,6 +554,7 @@ export default function StartYourRoom() {
         user_id: user.id,
         ...payload,
       });
+      if (ownerIdRef.current !== saveOwnerId) return;
       if (!confirmed) return;
       releaseRowId("plant");
       // Fail closed if binding somehow dropped (should never happen with payload).
@@ -562,6 +573,7 @@ export default function StartYourRoom() {
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);
+      if (ownerIdRef.current !== saveOwnerId) return;
       setIds((prev) => ({
         growId: prev.growId ?? shownIds.growId,
         tentId: prev.tentId ?? shownIds.tentId,

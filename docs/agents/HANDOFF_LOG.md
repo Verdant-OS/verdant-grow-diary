@@ -79,7 +79,7 @@ branch: cursor/creator-beta-noindex-2708
 base: verdant-grow-diary
 checkout: git fetch origin cursor/creator-beta-noindex-2708 verdant-grow-diary && git switch cursor/creator-beta-noindex-2708 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2549 (draft)
-head_sha: 0b28e14937f0433ae963d10dbbbfe3a7af5bcc73 before the comment fix; read origin after the next push
+head_sha: 70d3eb131840248666d729c077acb694253a9682 is the parent of this handoff edit; read origin/cursor/creator-beta-noindex-2708 after the push for the new head
 state: draft #2549; Sour Diesel review 5669767054 at that head raised one P2 on the crossCanonicalDocument comment
 current_step: Reword crossCanonicalDocument so robots is optional and owner-driven. Add the scorer-lock report and the #2543 overlap note to the PR body.
 next_action: Fresh independent exact-head review of the new head. Do not merge, mark ready, or deploy. Whichever of #2549 and #2543 lands second must re-integrate.
@@ -95,12 +95,12 @@ open_questions: none
 gotchas: A new commit invalidates review. Draft stays draft. No production smoke write. scorer-lock required an unlock for the parity allowlist and the renegotiated tests; the unlock file is git-ignored.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2549
 artifacts: this block
-reviewer_seat: Sour Diesel reviewed 0b28e14937f0433ae963d10dbbbfe3a7af5bcc73 (review 5669767054) and is excluded from accepting the repair. A different eligible session must review the new head.
+reviewer_seat: Any independent reviewer who did not author or repair the PR may accept the new head, Sour Diesel included. Raising a finding does not make a reviewer a contributor (OWNERSHIP.md §4.3). Review 5669870588 covers 70d3eb131840248666d729c077acb694253a9682 only.
 reviewer_sha: 0b28e14937f0433ae963d10dbbbfe3a7af5bcc73 (not the repair head)
 session_state: Cursor cloud agent; no paused workflow
 claimed_by: Cursor Grok cloud agent, 2026-10-26 19:20 UTC
 owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
-last_updated: 2026-10-27 10:30 CT, by Cursor Grok cloud agent
+last_updated: 2026-10-27 10:40 CT, by Cursor Grok cloud agent
 ```
 
 ### PR2511-REQUIRED-TRIGGER-GUARDS

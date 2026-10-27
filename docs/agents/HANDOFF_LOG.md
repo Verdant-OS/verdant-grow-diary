@@ -78,9 +78,9 @@ why: A first-time user test on build a1b9cd976581 saw those flashes. TanStack Ro
 branch: cursor/timeline-route-skeleton-8805
 base: verdant-grow-diary
 checkout: git fetch origin cursor/timeline-route-skeleton-8805 verdant-grow-diary && git switch cursor/timeline-route-skeleton-8805 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft PR exists; read the PR for this branch
-head_sha: read origin/cursor/timeline-route-skeleton-8805 after push; this commit cannot name its own SHA
-state: local implementation, draft PR intended
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2558 (draft; do not mark ready)
+head_sha: parent implementation is bbb3bf3599f376a20b36a76e19f2b805d2dd5526; read origin/cursor/timeline-route-skeleton-8805 for the head after this handoff update
+state: pushed draft
 current_step: Router pending delays are 0. Timeline has its own pending skeleton. AppShell, root Suspense, and the apex loader use RouteTransitionSkeleton. Grow-load error UI is untouched.
 next_action: Leave the PR draft. Do not enqueue, merge, or deploy. Obtain an independent exact-head review after CI.
 post_merge_check: A signed-in navigation to /timeline on https://verdantgrowdiary.com paints Timeline or the Timeline skeleton and does not paint the Dashboard first. NOT_MEASURED until merged and live.

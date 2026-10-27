@@ -76,13 +76,13 @@ TASK CODEX-2291-EVIDENCE-READINESS  priority: P2  status: OPEN
 goal: Hold the welcome onboarding count until its connected sensor and activation-evidence reads settle, preserving the original grow/tent/plant gate.
 why: Pending evidence reads produced a premature step count even after the three graph reads had completed.
 branch: claude/onboarding-count-consistency
-base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+base: verdant-grow-diary at cbdd6acb0e22cfaef381f3704a0c33394f54cd26
 checkout: Fetch this existing branch and base; verify the live PR full head and writer claim before adopting it in an isolated cloud worktree. Preserve child #2384 and use normal merges and pushes.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2291
-head_sha: a832255292cbd5c3e9e573419360e183fa6c3d90 (published initial repair, verified before this review follow-up; resulting full head and observation time belong in the current PR description).
-state: Local scoped repair and normal base integration; no hosted-CI or outside acceptance is inferred.
-current_step: Initial evidence-readiness repair is published at a8322552 with 27 files / 270 passes. Review follow-up uses REAL core query hooks and offline onlineManager: new suite RED 3 failed / 1 passed; core pending fix leaves only the polite-status case failing; combined GREEN is 28 focused files / 274 tests passed. All existing tracked tests and child #2384 remain unchanged by this follow-up.
-next_action: Verify the resulting remote head, fresh named required/supplemental checks, and one eligible non-contributing outside full-scope review; preserve draft until owner-authorized readiness and queue gates are satisfied.
+head_sha: 3cac4d2fafeb79900099edc2be20a252b167e5c9 (published source checkpoint before required base integration; resulting full head is recorded in the current PR description after normal publication)
+state: Locally validated required base-integration checkpoint. The resulting published full head and current GitHub/CI/review state are recorded in the current PR description; this log snapshot is not acceptance.
+current_step: At 2026-10-27T02:50:09.920498+00:00 the cbdd6acb normal integration passed the same28 focused files /274 tests, complete TypeScript and scoped ESLint. Only this own HANDOFF block needed manual conflict resolution; all three bridge-test files are byte-identical to3cac4d2f. Earlier real-hook RED/GREEN evidence remains historical. Documentation/normal-hook checks and fresh resulting-head CI/review remain separate gates.
+next_action: After normal validation/publication, verify the exact resulting remote head, fresh required/supplemental checks and the existing non-contributing Sour full-scope review. Preserve draft, child2384 parent-first ordering and the two unchanged locked-test P3s; no new scorer edit or deferral is authorized.
 post_merge_check: Verify the served version includes the merge and confirm the loading-to-exact-count transition using authorized QA; live authenticated behavior remains NOT_MEASURED until separately measured.
 active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only the bridge, readiness helper, new rendered regression, this block and matching PR metadata. No child #2384, ManualSensorReadingCard, Timeline, or unrelated writer scope.
 decisions: Always-enabled tent/plant reads wait for isPending or isLoading, including an offline first read. Sensor pending/loading matters only for a queryable connected tent; disabled queries must not hang a no-tent graph. Activation evidence loading is unresolved. Preserve loading-flag fallback for mocks. Keep one persistent role=status, polite atomic region for loading and settled count.
@@ -100,7 +100,41 @@ reviewer_sha: NOT_MEASURED for the repaired head; old-head receipts remain histo
 session_state: Codex writer in isolated authorized cloud worktree; release and live behavior NOT_MEASURED.
 claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 18:32:05 UTC (matching PR claim).
 owner: Codex closeout coordinator for this bounded repair; outside reviewer and normal merge gates remain separate.
-last_updated: 2026-10-26 19:28 UTC, by Codex closeout coordinator
+last_updated: 2026-10-27T02:50:09.920498+00:00 by existing Codex closeout session01a16de3-1885-74b8-8142-25b4c333d0cd; normal base-conflict integration checkpoint.
+```
+
+### VER-285-PRESERVE-MISSING-STAGE
+
+```text
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2537 (draft)
+head_sha: Read the full current head of draft #2537; this implementation commit cannot name itself. Parent is 1630600154a112d6bdbb4881e7fb408627660cd0.
+state: Implemented and locally validated: 104 tests pass, full TypeScript check passes, scoped ESLint/Prettier pass. Hosted checks and independent acceptance are NOT_MEASURED at this new head.
+current_step: The 19 new mounted regressions failed 17/19 against base (2 explicit-stage controls passed). Final focused suite: 9 files, 104 passed / 0 failed / 0 skipped.
+next_action: Read #2537 full head and required CI; after green, route one eligible independent non-contributing Claude/Grok review. Stay draft; no merge or deploy.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts src/test/timeline-stage-label-render.test.tsx src/test/timeline-chip-counts-match-list.test.tsx src/test/quicklog-corrections-static-safety.test.ts src/test/timeline-photo-edit-resign.test.ts src/test/timeline-photo-edit-signing-followups.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/eslint/bin/eslint.js src/components/EntryEditDialog.tsx src/test/entry-edit-stage-preservation.test.tsx; node scripts/scorer-lock.mjs --report --base 21b267a217f4d2d1b1a53a4ba77b85e9903cd418 --strict
+files_touched: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None planned; no new rules helper needed because the existing stage presentation helper is reused.
+blockers: Required CI and eligible independent exact-head acceptance remain pending. Local full test suite and build SKIPPED; required hosted CI must provide these gates. Default Node heap exhausted during initial tsc; 6144 MB rerun exposed four invalid test-query options, corrected before the final clean full tsc run. No production verification permitted in this task.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id. Tests serialize actual editor UPDATE payloads into a synthetic persistence store, then remount from a separate read; this is not a real DB or production readback receipt. Untouched null, empty, omitted, unknown, whitespace and legacy stage values are preserved. Clearing a stage explicitly writes null; the UI sentinel never reaches persistence. Existing details serialization is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: New mounted test file and PR validation summary. Existing linked-Quick-Log and zero-row guards pass unchanged. Lint/format/whitespace, scorer lock and docs-safety PASS. All 126 open PR file lists inspected, no editor or stage-helper overlap. VER-285 was unassigned at intake; Linear now shows assignee Verdant after draft linking, no competing writer comment observed.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
 ```
 
 ### PR-2345-BASE-INTEGRATION

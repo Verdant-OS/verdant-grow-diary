@@ -23,6 +23,10 @@ DECLARE
   v_harvest_event uuid := gen_random_uuid();
   v_unlinked_entry uuid := gen_random_uuid();
   v_linked_entry uuid := gen_random_uuid();
+  v_hw uuid := gen_random_uuid();
+  v_hw_grow uuid := gen_random_uuid();
+  v_hw_tent uuid := gen_random_uuid();
+  v_hw_photo text;
   v_photo text;
   v_both_photo text;
   v_stranger_photo text;
@@ -307,6 +311,48 @@ BEGIN
     ORDER BY evidence.created_at DESC
     LIMIT 1
   ) = v_harvest_event, 'the evidence names the harvest event';
+
+  RESET role;
+  -- Hardware config documents a setup only as a non-empty JSON object.
+  INSERT INTO auth.users (
+    id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+    raw_app_meta_data, raw_user_meta_data, aud, role
+  ) VALUES (
+    v_hw, 'badge-tent-hw-' || v_hw::text || '@verdant.test', crypt('harness-password', gen_salt('bf')),
+    now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+  );
+  v_hw_photo := v_hw::text || '/tents/hw.jpg';
+  INSERT INTO storage.objects (bucket_id, name) VALUES ('diary-photos', v_hw_photo);
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
+  INSERT INTO public.grows (id, user_id, name) VALUES (v_hw_grow, v_hw, 'hardware grow');
+  INSERT INTO public.tents (
+    id, user_id, grow_id, name, stage, light_on, hardware_config, photo_url, created_at
+  ) VALUES (
+    v_hw_tent, v_hw, v_hw_grow, 'Array hardware', 'veg', true, '[]'::jsonb,
+    'storage://diary-photos/' || v_hw_photo, '2026-10-09T00:00:00Z'
+  );
+  RESET role;
+  PERFORM set_config('request.jwt.claim.sub', v_hw::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_hw)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('setup_documented');
+  ASSERT v_result->>'status' = 'unchanged', 'an empty array does not document hardware';
+  RESET role;
+  PERFORM set_config('role', 'service_role', true);
+  UPDATE public.tents SET hardware_config = 'false'::jsonb WHERE id = v_hw_tent;
+  RESET role;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('setup_documented');
+  ASSERT v_result->>'status' = 'unchanged', 'a scalar does not document hardware';
+  RESET role;
+  PERFORM set_config('role', 'service_role', true);
+  UPDATE public.tents SET hardware_config = '{"fan": "6in"}'::jsonb WHERE id = v_hw_tent;
+  RESET role;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('setup_documented');
+  ASSERT v_result->>'status' = 'qualified', 'a non-empty hardware object documents a setup';
 
   RESET role;
   PERFORM set_config('role', 'service_role', true);

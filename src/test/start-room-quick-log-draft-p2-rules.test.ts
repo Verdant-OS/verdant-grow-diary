@@ -5,6 +5,7 @@ import {
 } from "@/lib/quickLogObservationDraftRules";
 import {
   adoptablePendingGrowId,
+  isStartRoomRetryableSaveError,
   plainStartRoomSaveError,
   startRoomSaveErrorWithReason,
 } from "@/lib/startYourRoomDraftRules";
@@ -42,6 +43,23 @@ describe("startRoomSaveErrorWithReason", () => {
   it("caps a long reason", () => {
     const out = startRoomSaveErrorWithReason("plant", "x".repeat(500));
     expect(out.length).toBe(`${plainStartRoomSaveError("plant")} Reason: `.length + 200);
+  });
+});
+
+describe("isStartRoomRetryableSaveError", () => {
+  it("accepts definitive save rejections, with or without a reason", () => {
+    expect(isStartRoomRetryableSaveError(plainStartRoomSaveError("grow"))).toBe(true);
+    expect(isStartRoomRetryableSaveError(startRoomSaveErrorWithReason("plant", "rls"))).toBe(true);
+  });
+  it("rejects errors that never attempted a save, and empty input", () => {
+    expect(isStartRoomRetryableSaveError("Enter a grow name to continue.")).toBe(false);
+    expect(
+      isStartRoomRetryableSaveError(
+        "Verdant could not confirm whether this grow was saved. Refresh before adding another.",
+      ),
+    ).toBe(false);
+    expect(isStartRoomRetryableSaveError(`${plainStartRoomSaveError("tent")} extra`)).toBe(false);
+    expect(isStartRoomRetryableSaveError(null)).toBe(false);
   });
 });
 

@@ -59,6 +59,7 @@ import {
   EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS,
   START_YOUR_ROOM_DRAFT_FORM_ID,
   START_YOUR_ROOM_SAVE_RETRY_COPY,
+  isStartRoomRetryableSaveError,
   parseStartYourRoomDraft,
   adoptablePendingGrowId,
   startRoomSaveErrorWithReason,
@@ -899,19 +900,21 @@ export default function StartYourRoom() {
             >
               {error}
             </p>
-            {!createOutcomeUnknown ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={retryCurrentSave}
-                disabled={busy}
-                data-testid="start-room-save-retry"
-              >
-                {busy ? "Saving…" : "Retry"}
-              </Button>
+            {!createOutcomeUnknown && isStartRoomRetryableSaveError(error) ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={retryCurrentSave}
+                  disabled={busy}
+                  data-testid="start-room-save-retry"
+                >
+                  {busy ? "Saving…" : "Retry"}
+                </Button>
+                <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_SAVE_RETRY_COPY}</p>
+              </>
             ) : null}
-            <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_SAVE_RETRY_COPY}</p>
           </div>
         ) : null}
       </div>

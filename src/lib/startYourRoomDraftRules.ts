@@ -122,6 +122,20 @@ export function startRoomSaveErrorWithReason(
 }
 
 /**
+ * Retry is offered only for a definitive save rejection (the copy above, with
+ * or without a reason). Validation, plan-limit gates, safe-save-start failures
+ * and unknown outcomes never attempted a save, so "Retry saves this same step"
+ * would be false for them.
+ */
+export function isStartRoomRetryableSaveError(error: string | null | undefined): boolean {
+  if (typeof error !== "string") return false;
+  return (["grow", "tent", "plant"] as const).some((entity) => {
+    const plain = plainStartRoomSaveError(entity);
+    return error === plain || error.startsWith(`${plain} Reason: `);
+  });
+}
+
+/**
  * After a reload, the grow step's preallocated row id may already be a saved
  * grow (the earlier outcome was unknown). Adopt it instead of retrying into a
  * duplicate-key loop. Returns the id to adopt, or null.

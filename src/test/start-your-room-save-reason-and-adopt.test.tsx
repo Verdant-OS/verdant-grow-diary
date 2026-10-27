@@ -119,6 +119,26 @@ describe("Start your room save reason and pending-grow adoption (#2541 P2s)", ()
     const error = await screen.findByTestId("start-your-room-error");
     expect(error).toHaveTextContent("Verdant could not save this grow");
     expect(error).toHaveTextContent("Reason: relation exploded");
+    expect(screen.getByTestId("start-room-save-retry")).toBeInTheDocument();
+  });
+
+  it("offers no Retry for an error that never attempted a save", async () => {
+    // Every error is persisted to the draft, so a validation message can come back.
+    writeBrowserSessionFormDraft("user-1", START_YOUR_ROOM_DRAFT_FORM_ID, {
+      step: "grow",
+      form: { growName: "", tentName: "", plantName: "", plantStage: "" },
+      ids: { growId: null, tentId: null, plantId: null },
+      pendingRowIds: { grow: null, tent: null, plant: null },
+      saveError: "Enter a grow name to continue.",
+    });
+    renderPage();
+    expect(await screen.findByTestId("start-your-room-error")).toHaveTextContent(
+      "Enter a grow name to continue.",
+    );
+    expect(screen.queryByTestId("start-room-save-retry")).toBeNull();
+    expect(screen.getByTestId("start-your-room-error-block")).not.toHaveTextContent(
+      "Retry saves this same step once",
+    );
   });
 
   it("adopts an already-saved pending grow after a reload instead of retrying it", async () => {

@@ -105,9 +105,9 @@ describe("public/demo copy safety scanner (Requirement 9)", () => {
 });
 
 describe("intentional /demo redirect is preserved", () => {
-  it("File routes redirect /demo → /welcome while preserving URL context", () => {
+  it("File routes redirect /demo → / while preserving URL context", () => {
     const app = readAllRouteModuleSources();
     expect(extractMountedAppRoutePaths()).toContain("/demo");
-    expect(getRouteAliasRedirectTarget("/demo")).toBe("/welcome");
+    expect(getRouteAliasRedirectTarget("/demo")).toBe("/");
   });
 });

@@ -4,7 +4,7 @@ import { LEGAL_FOOTER_LINKS } from "@/components/LegalFooterLinks";
 import { cn } from "@/lib/utils";
 
 const PUBLIC_PAGE_RECOVERY_LINKS = [
-  { to: "/welcome", label: "Home" },
+  { to: "/", label: "Home" },
   ...LEGAL_FOOTER_LINKS.filter(({ to }) => to === "/terms" || to === "/privacy"),
 ] as const;
 

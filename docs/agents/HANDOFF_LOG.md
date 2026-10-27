@@ -74,28 +74,66 @@ TASK CODEX-1933-RECEIPT-STACK-CLOSEOUT  priority: P2  status: OPEN
 goal: Preserve the complete #1730/#1731/#1921/#1930 receipt stack and canonical #1927 closure without rewriting unrelated handoff history.
 why: Prior log-only branches omitted full1730/1731 records, retained stale closed-task actions and conflicted with newer1927 history; preserve lineage rather than implying fresh implementation or acceptance.
 branch: claude/handoff-log-quicklog-receipt-stack
-base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+base: verdant-grow-diary at 81f6aa728a46bb86b4acddcf2ffd7d7529ed1d9a (necessary normal integration,2026-10-27).
 checkout: git fetch origin claude/handoff-log-quicklog-receipt-stack verdant-grow-diary; verify the current full PR head before checkout or normal base integration
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1933
-head_sha: 0bdd2d6362e220dd0334f969c17506c24437bd38 (verified published source checkpoint before this repair; read the PR for the resulting commit SHA)
-state: Documentation repair in progress; source checkpoint CI/reviews do not cover the resulting changed head.
-next_action: Verify resulting remote head, complete focused docs/scorer/parity checks and fresh CI, then obtain eligible non-contributing outside review. Keep draft; no queue/merge/deploy from this receipt.
-active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd; sole writer for #1933, serialized before #1934 HANDOFF edits
+head_sha: Published source checkpoint c87c7c1346e73901e0a97bd3f9b6b8dc70544f3e was verified unchanged before this integration. Read resulting full PR head and normal publication receipt; a commit cannot name itself.
+state: Normal base integration resolves only own receipt insertion against an unrelated incoming VER-285 block, which is kept verbatim. Complete1730/1731/1921/1930 lineage and canonical1927closure remain preserved; all4canonicalclosed source payloads are unchanged fromc87 and all unrelated current deployTASKpayloads/nonlogbytes remain exact. No historicalsource branch is reopened or claimed.
+current_step: Existing4doc suites measured100PASS/0FAIL/0SKIP via canonicalBunx --no-install/defaultNode; docs/release safety,strictscorer0,Sentinel parity2026-10-24.6,scopedformat/whitespace PASS. Canonical4closed payloads exactsourcec87;1930existingclosed exactbase;64unrelated current deployTASKpayloads and all nonlog bytes preserved. Actual normalhooks/publication and fresh hostedCI/outside review remain separate receipts.
+next_action: Normally commit/push this log-only integration after fresh SOURCE guard and actual livebase compatibility check, then sourceSTOP. Root alone updates current body/head and retargets existing canonical outside request6432385672 after fresh required/applicable CI. Keep draft; no ready/queue/merge/deploy.
+active_writer: Codex bounded /root/preflight_1949 under root current claim6427062090 and explicit serialized continuation. This is the sole1933writer;1934andotherHANDOFF edits wait for sourceSTOP. Historical originalClaude/Canopy/currentroot attribution remains.
 claimed_by: Codex, 2026-10-26 20:52 UTC; accepted Matthew handoff and Claude cessation at 20:50 UTC
-files_touched: docs/agents/HANDOFF_LOG.md only (authored delta); all unrelated incoming deploy files preserved
+files_touched: docs/agents/HANDOFF_LOG.md only; every incoming nonlog base blob is preserved, no code/test/scorer/governance edit.
 files_remaining: none planned; new findings require scoped follow-through
 decisions: Use deploy as the unchanged union; retain complete October7/October9 snapshots as explicitly prefixed historical fields; no active holder is assigned to a merged task.
 tried_and_rejected: Do not replace newer deploy history with the older branch, blank historical Canopy attribution, fabricate PASS/CI receipts, or reopen closed implementations.
-commands: bunx vitest run src/test/loop-engineering-doc.test.ts src/test/assert-docs-safety-runner.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts src/test/release-docs-safety-scanner.test.ts --reporter=dot; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base e18e067af80fcb3eb32b37f1e046fa725bba8a9d --strict; node scripts/check-sentinel-version-parity.mjs e18e067af80fcb3eb32b37f1e046fa725bba8a9d
-open_questions: Fresh hosted required/supplemental gate results and eligible outside availability at the resulting head.
+commands: Existingfourdocsuites via canonicalBun1.3.14 x --no-install vitest (defaultNode); docs/release safety, strictscorer against81f6, Sentinel parity, scopedHANDOFFformat and whitespace; normal hooks with actualselectedpaths. Exact commands/output in currentartifact directory. No install or broadimportedformatpreflight.
+open_questions: Fresh exact-head hosted required/applicable checks and eligible noncontributing outside review after publication; oldheadverdicts/checks remainhistory.
 gotchas: Closed implementation records are evidence, not permission to resume historical commands; a changed PR head invalidates old review/check receipts. #1934 owns its separate1844 closure.
-session_state: Saved cloud writer active; no production/browser/desktop session or alternate PR.
-blockers: Fresh resulting-head CI and eligible outside review pending; private/unpushed coverage not available. CLI queue watcher stopped at HTTP401 without credential changes.
-artifacts: #1933 claim issuecomment-6427062090; verified merge/ancestor facts and historical source238f26a8 retained in the closed receipt blocks
-reviewer_seat: Available eligible non-contributing outside session; Codex repaired this PR and cannot accept it. No new request or PASS implied.
+session_state: Cloudonly boundedwriter; no browser/desktop/production or alternatePR. Existing1936/aux2312read-only reader remains one separate previouslyauthorizedprocess, no newmonitor.
+blockers: Fresh newheadCI and independent acceptance remainNOT_MEASURED; privatefleet/unpublished coverage unavailable. NormalexistingGitaccess is currentlymeasured successful; earlier401 observation is preservedashistory, noauth/settings change.
+artifacts: /workspace/scratch/claude-closeout-20261026/1933-reintegration-20261027T0540Z contains currentclaim/head/conflict/payload/blob proofs, actualchecks/hooks/push receipts. Original1933receipts/ancestorfacts/source238f26a8 remainpreserved; rootowns currentpublicmetadata.
+reviewer_seat: Root coordinates actuallyavailable eligible noncontributing outside session underOWNERSHIP4.3 over completeHANDOFFscope; originalClaude/Canopy,rootCodexandthisrepairer arecontributors and excluded. No newrequest or PASS bythiswriter.
 post_merge_check: Confirm all five canonical receipt blocks are Closed with final heads/merge links and unrelated history preserved. Deployment/live NOT_MEASURED.
 owner: Codex bounded documentation closeout; original Claude/Canopy contributions remain excluded from independent acceptance
-last_updated: 2026-10-26 15:55 CT, by Codex closeout
+last_updated: 2026-10-27 05:47 UTC, by Codex bounded integration writer under rootclaim6427062090.
+historical_c87_head_sha: 0bdd2d6362e220dd0334f969c17506c24437bd38 (verified published source checkpoint before this repair; read the PR for the resulting commit SHA)
+historical_c87_state: Documentation repair in progress; source checkpoint CI/reviews do not cover the resulting changed head.
+historical_c87_blockers: Fresh resulting-head CI and eligible outside review pending; private/unpushed coverage not available. CLI queue watcher stopped at HTTP401 without credential changes.
+```
+
+### VER-285-PRESERVE-MISSING-STAGE
+
+```text
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2537 (draft)
+head_sha: Read the full current head of draft #2537; this implementation commit cannot name itself. Parent is 1630600154a112d6bdbb4881e7fb408627660cd0.
+state: Implemented and locally validated: 104 tests pass, full TypeScript check passes, scoped ESLint/Prettier pass. Hosted checks and independent acceptance are NOT_MEASURED at this new head.
+current_step: The 19 new mounted regressions failed 17/19 against base (2 explicit-stage controls passed). Final focused suite: 9 files, 104 passed / 0 failed / 0 skipped.
+next_action: Read #2537 full head and required CI; after green, route one eligible independent non-contributing Claude/Grok review. Stay draft; no merge or deploy.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts src/test/timeline-stage-label-render.test.tsx src/test/timeline-chip-counts-match-list.test.tsx src/test/quicklog-corrections-static-safety.test.ts src/test/timeline-photo-edit-resign.test.ts src/test/timeline-photo-edit-signing-followups.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/eslint/bin/eslint.js src/components/EntryEditDialog.tsx src/test/entry-edit-stage-preservation.test.tsx; node scripts/scorer-lock.mjs --report --base 21b267a217f4d2d1b1a53a4ba77b85e9903cd418 --strict
+files_touched: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None planned; no new rules helper needed because the existing stage presentation helper is reused.
+blockers: Required CI and eligible independent exact-head acceptance remain pending. Local full test suite and build SKIPPED; required hosted CI must provide these gates. Default Node heap exhausted during initial tsc; 6144 MB rerun exposed four invalid test-query options, corrected before the final clean full tsc run. No production verification permitted in this task.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id. Tests serialize actual editor UPDATE payloads into a synthetic persistence store, then remount from a separate read; this is not a real DB or production readback receipt. Untouched null, empty, omitted, unknown, whitespace and legacy stage values are preserved. Clearing a stage explicitly writes null; the UI sentinel never reaches persistence. Existing details serialization is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: New mounted test file and PR validation summary. Existing linked-Quick-Log and zero-row guards pass unchanged. Lint/format/whitespace, scorer lock and docs-safety PASS. All 126 open PR file lists inspected, no editor or stage-helper overlap. VER-285 was unassigned at intake; Linear now shows assignee Verdant after draft linking, no competing writer comment observed.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
 ```
 
 ### PR-2345-BASE-INTEGRATION

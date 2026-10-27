@@ -118,9 +118,9 @@ next_action: required checks and an independent exact-head review. Stay draft. N
 files: docs/architecture-contract.md; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change
 artifacts: GitHub issue #2146
-reviewer_seat: Graft or Critical Mass (docs-only). The author cannot give the independent PASS.
+reviewer_seat: an available eligible non-contributing Claude, Grok or Codex session under OWNERSHIP.md §4.3 (Graft keeps its docs-only low-risk allowlist). Critical Mass was named here before the 2026-10-22 routing change and is retired from future routing; kept as history only. The author cannot give the independent PASS.
 claimed_by: Claude (close-out session), 2026-10-19 16:09 UTC, per VER-216 (Matthew, 2026-10-19); previously Grok, 2026-10-15 17:50 UTC
-last_updated: 2026-10-19 16:15 UTC, by Claude (close-out session)
+last_updated: 2026-10-27 23:40 UTC, by Claude session_017UoYKz1FZZdZu9afTV2RhP (reviewer_seat re-routed per roster.md:54 after a Codex P2 on #2564; block otherwise as carried from #2149)
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL

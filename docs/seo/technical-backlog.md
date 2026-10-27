@@ -3,6 +3,10 @@
 **Baseline:** 2026-07-30, repository commit `1c40c21f2`.<br>
 Priority means user-data and crawl risk first; it does not imply a live Search Console verdict.
 
+Hosting note (2026-10-10, Matthew Cheek): production runs on Cloudflare Workers at
+https://verdantgrowdiary.com. The `vercel.json` contract-test row below is a dated
+repository proof, not current host evidence.
+
 ## P0 — confirmed blockers
 
 No confirmed P0 issue was found in the static audit. Protected paths are covered by robots-prefix tests and are excluded from the sitemap. Live Search Console verification remains **NO_BASELINE**.

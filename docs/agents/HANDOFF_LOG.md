@@ -78,18 +78,18 @@ why: White Widow reports three redacted events, latest /welcome on 2026-10-26 17
 branch: codex/ver-276-private-diagnostics
 base: verdant-grow-diary at 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae
 checkout: git fetch origin codex/ver-276-private-diagnostics && git switch codex/ver-276-private-diagnostics && git merge --ff-only origin/codex/ver-276-private-diagnostics
-pr: pending creation before implementation
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2557 (draft)
 head_sha: Read current remote branch; this initial checkpoint precedes implementation.
-state: Investigation checkpoint; no production fix claimed.
-current_step: Add failing tests for bounded TypeError categories and stack availability before message redaction.
-next_action: Implement narrowly in errorReportingRules.ts, verify focused reporting tests, and obtain eligible independent exact-head review.
+state: Draft implementation; 46 focused tests pass. Original production cause is still unknown.
+current_step: beforeSend derives fixed error_message_kind and stack_state tags for React and route boundaries before erasing message text. No free-text field is restored.
+next_action: Remeasure hosted checks at the final full head; obtain eligible independent exact-head acceptance; access Sentry event JSON to determine where the original stack was lost.
 active_writer: Codex /root session (2026-10-27)
-files_touched: docs/agents/HANDOFF_LOG.md (this block only)
-files_remaining: src/lib/errorReportingRules.ts; src/test/error-reporting-diagnostics.test.ts
+files_touched: src/lib/errorReportingRules.ts; src/test/error-reporting-diagnostics.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned; diagnostic acceptance and raw-event inspection remain
 ownership: PR #2540 at 397c9c27b6027f053e9f552d67229ac4db07578c owns Onboarding null guards and grow read retries; those paths are excluded.
 decisions: No guessed crash fix, no unredaction, no source-map upload credentials or deployment changes. /welcome rendered Landing at event release 3bc6b346f252; current route redirects to /.
 tried_and_rejected: Treating null grows as the established production cause; no original frame or message supports that conclusion. Missing maps alone do not explain absent raw frames.
-commands: bun install --frozen-lockfile (running); focused Vitest command to be recorded after test creation.
+commands: bun install --frozen-lockfile PASS (bun 1.3.14); bunx vitest run src/test/error-reporting-diagnostics.test.ts src/test/error-reporting-minimal.test.ts src/test/error-reporting-caught-payload.test.ts src/test/root-error-component-null-proto.test.tsx src/test/privacy-policy-error-reporting-copy.test.tsx --reporter=dot: 46 PASS / 0 FAIL; eslint on both changed source/test files PASS after prettier. New suite RED before implementation: 17 FAIL from absent diagnostic tags. SDK expectation corrected to include its real in_app flag. Strict scorer-lock and diff-check PASS. Typecheck/build results follow in PR body.
 blockers: Direct Sentry event JSON/settings/artifacts require sign-in; Linear field-note tool unavailable. Eligible non-contributing Claude/Grok or Durban Poison session not exposed here. No review PASS claimed.
 reviewer_seat: BLOCKED pending actually available eligible independent session; Codex author excluded.
 reviewer_sha: NOT_MEASURED

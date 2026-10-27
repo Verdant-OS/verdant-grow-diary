@@ -99,6 +99,7 @@ function logCatalogUnavailable(fields: {
     | "auth"
     | "method"
     | "allowlist"
+    | "plan_retired"
     | "entitlement"
     | "environment"
     | "founder_cap"
@@ -180,8 +181,9 @@ Deno.serve(async (req) => {
     //     function cannot open a Founder checkout. Existing Founder rows are
     //     still honoured by the webhook and entitlement resolution.
     if (requested === "founder_lifetime") {
-      // Telemetry keeps the sanitized reason enum: no longer a sellable plan.
-      logCatalogUnavailable({ plan: requested, reason: "unknown_plan", stage: "allowlist" });
+      // Telemetry keeps the sanitized reason enum; the stage separates a
+      // Founder probe from a junk plan id at the allowlist above.
+      logCatalogUnavailable({ plan: requested, reason: "unknown_plan", stage: "plan_retired" });
       return json(410, { error: "plan_retired" });
     }
 

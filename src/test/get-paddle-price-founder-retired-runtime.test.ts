@@ -17,6 +17,7 @@ type Row = Record<string, unknown>;
 function loadHandler() {
   const rpcCalls: string[] = [];
   const gatewayCalls: string[] = [];
+  const warnings: string[] = [];
   const env = new Map([
     ["SUPABASE_URL", "https://fixture.invalid"],
     ["SUPABASE_ANON_KEY", "fixture-only-key"],
@@ -36,7 +37,7 @@ function loadHandler() {
     Response,
     URL,
     JSON,
-    console: { log() {}, error() {}, warn() {} },
+    console: { log() {}, error() {}, warn: (line: string) => warnings.push(line) },
     Deno: {
       env: { get: (key: string) => env.get(key) },
       serve: (fn: typeof handler) => {
@@ -86,7 +87,7 @@ function loadHandler() {
     );
     return { status: res.status, body: (await res.json()) as Row };
   }
-  return { request, rpcCalls, gatewayCalls };
+  return { request, rpcCalls, gatewayCalls, warnings };
 }
 
 describe("get-paddle-price refuses the retired Founder Lifetime plan", () => {
@@ -96,6 +97,10 @@ describe("get-paddle-price refuses the retired Founder Lifetime plan", () => {
     expect(res).toEqual({ status: 410, body: { error: "plan_retired" } });
     expect(h.rpcCalls).toEqual([]);
     expect(h.gatewayCalls).toEqual([]);
+    // Telemetry tells a Founder probe apart from a junk plan id (Sour Diesel nit).
+    expect(h.warnings.map((line) => JSON.parse(line))).toEqual([
+      expect.objectContaining({ plan: "founder_lifetime", stage: "plan_retired" }),
+    ]);
   });
 
   it("still resolves a sellable plan through the same handler", async () => {

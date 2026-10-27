@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Manual IndexNow submission. Not wired to CI or postbuild.
  * Run only after a production deploy is confirmed:
@@ -9,7 +10,6 @@ import { pathToFileURL } from "node:url";
 
 const KEY = "a7c3e91b4d8f2e6c0b5a19d47e83f012";
 const HOST = "verdantgrowdiary.com";
-const KEY_LOCATION = `https://${HOST}/${KEY}.txt`;
 const SITEMAP = new URL("../public/sitemap.xml", import.meta.url);
 
 export function indexNowSubmitEnabled(env = process.env) {
@@ -22,20 +22,21 @@ export function sitemapLocs(xml) {
     .filter((loc) => loc.length > 0);
 }
 
-export async function submitIndexNow(env = process.env, fetchImpl = fetch) {
+export async function submitIndexNow(env = process.env, fetchImpl = fetch, options = {}) {
   if (!indexNowSubmitEnabled(env)) {
     console.log("IndexNow submit skipped. Set INDEXNOW_SUBMIT=1 after a production deploy.");
     return { submitted: false, count: 0 };
   }
-  const xml = readFileSync(SITEMAP, "utf8");
+  const xml = options.sitemapXml ?? readFileSync(SITEMAP, "utf8");
+  const key = options.key ?? KEY;
   const urlList = sitemapLocs(xml);
   const response = await fetchImpl("https://api.indexnow.org/indexnow", {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       host: HOST,
-      key: KEY,
-      keyLocation: KEY_LOCATION,
+      key,
+      keyLocation: `https://${HOST}/${key}.txt`,
       urlList,
     }),
   });

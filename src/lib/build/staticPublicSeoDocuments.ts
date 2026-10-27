@@ -26,6 +26,7 @@ import {
   type GrowStage,
 } from "../../constants/growStageCareGuide";
 import { PUBLIC_QUICK_LOG_STARTER_COPY } from "../../constants/publicQuickLogStarterCopy";
+import { PUBLIC_VPD_CALCULATOR_PAGE_DESCRIPTION } from "../publicVpdCalculatorRules";
 import { FOUNDER_SOCIAL_META } from "../../constants/founderSocialMeta";
 import {
   NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
@@ -600,8 +601,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   }),
   publicDocument("/tools/vpd-calculator", {
     title: "Free Cannabis VPD Calculator by Growth Stage | Verdant",
-    description:
-      "Calculate air VPD from manual temperature and humidity, then compare a conservative stage range. No upload or device control.",
+    description: PUBLIC_VPD_CALCULATOR_PAGE_DESCRIPTION,
     imageAlt: "Verdant VPD calculator",
   }),
   publicDocument("/hardware-integrations", {

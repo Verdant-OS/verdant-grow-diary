@@ -105,7 +105,7 @@ last_updated: 2026-10-27 22:50 UTC, by Claude session_017UoYKz1FZZdZu9afTV2RhP
 
 ### FIX-2146-ARCHITECTURE-CONTRACT-P2S
 
-```text
+````text
 TASK FIX-2146-ARCHITECTURE-CONTRACT-P2S  priority: P2  status: OPEN
 goal: Fix the nine Codex P2s from #2073's retrospective review (GitHub #2146, comment 6196768751) in docs/architecture-contract.md. Docs only. Do not edit the merged #2073 body.
 branch: cursor/architecture-contract-p2s-37b4
@@ -153,7 +153,7 @@ session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:25 CT (Matthew's handoff prompt, item 1)
 owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
 last_updated: 2026-10-27 16:25 CT, by Claude
-```
+````
 
 ### PR-2283-REMOVAL-PAGINATION-REPAIR
 

@@ -34,6 +34,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/grow-help-toolkit`,
   },
   {
+    path: "/guides/advanced-nutrients-feeding-chart-log",
+    expectTitle: /Advanced Nutrients Feeding Chart Log/,
+    canonical: `${ORIGIN}/guides/advanced-nutrients-feeding-chart-log`,
+  },
+  {
     path: "/tools/vpd-calculator",
     expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
     canonical: `${ORIGIN}/tools/vpd-calculator`,

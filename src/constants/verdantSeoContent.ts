@@ -757,6 +757,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
             label: "Use the stage-aware nutrient schedule method",
             to: "/guides/cannabis-nutrient-schedule",
           },
+          {
+            label: "Log a feeding chart week by week",
+            to: "/guides/advanced-nutrients-feeding-chart-log",
+          },
         ],
       },
       {

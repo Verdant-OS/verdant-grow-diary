@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 
 // @ts-nocheck
 
@@ -77,6 +77,7 @@ import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
 import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
+import { Route as GuidesAdvancedNutrientsFeedingChartLogRouteImport } from './routes/guides.advanced-nutrients-feeding-chart-log'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
 import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
@@ -494,6 +495,12 @@ const GuidesGrowStageCareGuideRoute =
   GuidesGrowStageCareGuideRouteImport.update({
     id: '/guides/grow-stage-care-guide',
     path: '/guides/grow-stage-care-guide',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const GuidesAdvancedNutrientsFeedingChartLogRoute =
+  GuidesAdvancedNutrientsFeedingChartLogRouteImport.update({
+    id: '/guides/advanced-nutrients-feeding-chart-log',
+    path: '/guides/advanced-nutrients-feeding-chart-log',
     getParentRoute: () => rootRouteImport,
   } as any)
 const InternalContextualPhenoComparisonDemoRoute =
@@ -1000,6 +1007,7 @@ export interface FileRoutesByFullPath {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/advanced-nutrients-feeding-chart-log': typeof GuidesAdvancedNutrientsFeedingChartLogRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1146,6 +1154,7 @@ export interface FileRoutesByTo {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/advanced-nutrients-feeding-chart-log': typeof GuidesAdvancedNutrientsFeedingChartLogRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1296,6 +1305,7 @@ export interface FileRoutesById {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/advanced-nutrients-feeding-chart-log': typeof GuidesAdvancedNutrientsFeedingChartLogRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1445,6 +1455,7 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/grow-stage-care-guide'
+    | '/guides/advanced-nutrients-feeding-chart-log'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1591,6 +1602,7 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/grow-stage-care-guide'
+    | '/guides/advanced-nutrients-feeding-chart-log'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1740,6 +1752,7 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/grow-stage-care-guide'
+    | '/guides/advanced-nutrients-feeding-chart-log'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1864,6 +1877,7 @@ export interface RootRouteChildren {
   DocsMcpApiRoute: typeof DocsMcpApiRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
+  GuidesAdvancedNutrientsFeedingChartLogRoute: typeof GuidesAdvancedNutrientsFeedingChartLogRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
   InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute
@@ -2358,6 +2372,13 @@ declare module '@tanstack/react-router' {
       path: '/guides/grow-stage-care-guide'
       fullPath: '/guides/grow-stage-care-guide'
       preLoaderRoute: typeof GuidesGrowStageCareGuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/advanced-nutrients-feeding-chart-log': {
+      id: '/guides/advanced-nutrients-feeding-chart-log'
+      path: '/guides/advanced-nutrients-feeding-chart-log'
+      fullPath: '/guides/advanced-nutrients-feeding-chart-log'
+      preLoaderRoute: typeof GuidesAdvancedNutrientsFeedingChartLogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/internal/contextual-pheno-comparison-demo': {
@@ -3189,6 +3210,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsMcpApiRoute: DocsMcpApiRoute,
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
+  GuidesAdvancedNutrientsFeedingChartLogRoute: GuidesAdvancedNutrientsFeedingChartLogRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,
   InternalDemoProofWalkthroughRoute: InternalDemoProofWalkthroughRoute,

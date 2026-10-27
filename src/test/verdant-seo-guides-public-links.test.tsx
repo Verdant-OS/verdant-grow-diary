@@ -215,7 +215,10 @@ describe("/guides internal links resolve to known routes with one scoped diary h
     const { container } = renderGuides("/guides");
     const { internal } = collectLinks(container);
     const guideLinks = internal.filter((h) => /^\/guides\/[^/]+$/.test(h));
-    const CUSTOM_GUIDE_PATHS = ["/guides/grow-stage-care-guide"];
+    const CUSTOM_GUIDE_PATHS = [
+      "/guides/grow-stage-care-guide",
+      "/guides/advanced-nutrients-feeding-chart-log",
+    ];
     expect(guideLinks.length).toBe(VERDANT_GUIDE_SLUGS.length + CUSTOM_GUIDE_PATHS.length);
     for (const href of guideLinks) {
       if (CUSTOM_GUIDE_PATHS.includes(href)) continue;

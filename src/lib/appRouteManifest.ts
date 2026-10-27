@@ -227,6 +227,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/guides", access: "public", description: "Grower guides index." },
   { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
   {
+    path: "/guides/advanced-nutrients-feeding-chart-log",
+    access: "public",
+    description: "Public planned-vs-actual Advanced Nutrients feeding log. In-memory only.",
+  },
+  {
     path: "/guides/grow-stage-care-guide",
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",

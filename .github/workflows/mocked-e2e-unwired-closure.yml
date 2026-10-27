@@ -75,7 +75,7 @@ permissions:
 
 concurrency:
   group: mocked-e2e-unwired-closure-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # #1702 repairs and wires the Timeline date proof. Keep it on its own runner: no
@@ -84,6 +84,7 @@ jobs:
   # visit (#1715) pays the dev server's one-time cold compile before the scenarios
   # run, so this lane proves the local-day bounds, not cold-start latency.
   timeline-local-day:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Timeline local-day date filter (mocked)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -142,6 +143,7 @@ jobs:
           if-no-files-found: error
 
   mocked-e2e-closure:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Mocked E2E closure (15 previously unrun specs)
     runs-on: ubuntu-latest
     timeout-minutes: 25

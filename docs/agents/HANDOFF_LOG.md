@@ -78,7 +78,7 @@ branch: claude/vibrant-heisenberg-njd6r3
 base: verdant-grow-diary; PR base SHA observed 2026-10-26: 37202b540d00cafd3d31848136225e7cd147d1d3
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (draft; returned to draft on Matthew's instruction 2026-10-27 18:23 UTC; stay draft pending required checks and independent acceptance)
-head_sha: 146a26e31195a49128a83313b59e3acda09fa2d6 (observed 2026-10-27 19:15 UTC; base merge on top of the Codex repair head c739be13, adopted by the 18:16 UTC Claude claim). The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
+head_sha: 07aec59f167883fa3265cdac6bd806cb9d971e3c (observed 2026-10-27 20:05 UTC with 35/35 required checks green; base merges on top of the Codex repair head c739be13, adopted by the 18:16 UTC Claude claim). The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
 state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
 current_step: Codex repaired the remaining documentation findings: fixed captured timestamps and two-run fixture repeatability; #2503 closure/precondition and separate apply authorization before production SQL; acceptance cross-references and complete contributor exclusions. No migration or client implementation is included.
 next_action: Verify the resulting full remote head and fresh required CI, then route one eligible non-contributing reviewer over both changed files. No acceptance request or PASS is implied by this repair. Matthew's migration implementation/per-PR/apply decisions remain separate.
@@ -89,7 +89,41 @@ reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §
 review_request: blocked pending the repaired full head and fresh required CI; no duplicate request sent; reviewer unassigned; fallback transfers 0
 active_writer: Claude session 01QxMpAHgnpV65y3Yykv8CvE, retaken on Matthew's instruction 2026-10-27; spec documentation only, no migration or client implementation
 claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-27 18:16 UTC; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6450080975. Codex /root held the bounded repair claim of 2026-10-26 (#issuecomment-6423583100) and remains an excluded repairer.
-last_updated: 2026-10-27 19:18 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+last_updated: 2026-10-27 20:08 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+```
+
+### AUTH-LOADING-SMOKE-TIMEOUT-25
+
+```text
+TASK AUTH-LOADING-SMOKE-TIMEOUT-25  priority: P2  status: OPEN
+goal: Raise the auth-loading-smoke job timeout from 15 to 25 minutes and keep the YAML comment accurate.
+why: Runs 40523498143 (#2545) and 40469789527 (#2526) spent about 10 minutes on Chromium --with-deps apt install, then the test step was cancelled about 4.5 minutes in by the 15-minute cap. Worst case is about 16.5 minutes, so 25 minutes leaves headroom.
+branch: cursor/auth-loading-smoke-timeout-618c
+base: verdant-grow-diary
+checkout: git fetch origin cursor/auth-loading-smoke-timeout-618c verdant-grow-diary && git switch cursor/auth-loading-smoke-timeout-618c && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553
+head_sha: read origin/cursor/auth-loading-smoke-timeout-618c after the merge of origin/verdant-grow-diary f39231c948942ce50a583f023a8b3481aca3ed94; comment-fix parent is 0c2bdbdfe2fb3ffdc953fc0cfa0ac9dd43ffc12a
+state: base merged; ready state left as found (isDraft false before this merge)
+current_step: Merged origin/verdant-grow-diary f39231c94. Only docs/agents/HANDOFF_LOG.md conflicted. Both the AUTH-LOADING-SMOKE-TIMEOUT-25 block and the incoming Open blocks are kept. Timeout stays 25. Sour Diesel review 5670229495 at 40591809 does not cover this head.
+next_action: Do not change draft or ready state. Do not enqueue, merge, or deploy. Obtain a fresh independent exact-head review at the merge head.
+post_merge_check: The next Auth loading smoke (mocked) run on verdant-grow-diary finishes without a 15-minute cancellation. NOT_MEASURED until merged.
+active_writer: Grok session on cursor/auth-loading-smoke-timeout-618c
+decisions: Timeout stays 25. Comment states the test step was cancelled about 4.5 minutes in. Founder approval is recorded as approved by the founder in chat 2026-10-27 in the PR body, not in the workflow file.
+tried_and_rejected: The first comment said the tests then passed in about 4.5 minutes. Sour Diesel P2: in those two runs the test step was cancelled by the 15-minute cap.
+commands: bunx vitest run src/test/auth-loading-ci-safety.test.ts --reporter=dot
+files_touched: .github/workflows/auth-loading-smoke.yml; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none
+blockers: exact-head review at the new head is NOT_MEASURED
+open_questions: none
+gotchas: Do not force-push. Do not change bun.lock. Do not change timeout-minutes. The scorer lock treats the workflow as an existing check; a branch-scoped unlock is local and gitignored.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553 ; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2553#pullrequestreview-5670229495
+artifacts: none
+reviewer_seat: Sour Diesel reviewed 40591809fcc13992f96f07eade03881604ff75a3; that verdict does not cover the new head
+reviewer_sha: 40591809fcc13992f96f07eade03881604ff75a3 (superseded)
+session_state: PR #2553 was not draft (isDraft false) before this base merge. Do not convert it to draft and do not toggle ready. No enqueue or deploy.
+claimed_by: Grok, 2026-10-27
+owner: Grok
+last_updated: 2026-10-27 14:10 CT, by Grok
 ```
 
 ### PADDLE-WIRE-001-NORMALIZATION
@@ -201,6 +235,40 @@ claimed_by: Codex by Matthew's direct task assignment and explicit follow-up dra
 owner: Codex PR2511 follow-up session; no retirement or transfer
 last_updated: 2026-10-26 21:44 CT, by Codex
 limits: Test and handoff PR delta only; normal base integration permitted. No GitHub comments, PR merge, ready/enqueue, publish/deploy, SQL/APPLY, secrets, dependency manifest/lockfile edits, auth, RLS, Edge, Action Queue or device changes.
+```
+
+### VER-288-SERVED-BUILD-BASELINE
+
+```text
+TASK VER-288  priority: P2  status: OPEN
+goal: Arm the served-build monotonic alert by seeding the Actions-cache baseline from the served SHA on the first run, and FAIL only when a later served commit moved backward or diverged.
+why: Every run since the workflow was added exited BLOCKED (previous_missing) before actions/cache/save, so no checkpoint was ever stored and a production rollback could not be detected.
+branch: cursor/served-build-monotonic-baseline-3a91
+base: verdant-grow-diary
+checkout: git fetch origin cursor/served-build-monotonic-baseline-3a91 verdant-grow-diary && git switch cursor/served-build-monotonic-baseline-3a91 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2538
+head_sha: read origin/cursor/served-build-monotonic-baseline-3a91 after the review-fix push
+state: review repair on the pull request; Sour Diesel 5669890731 at 7f0af6c61f549b9777d4968fcfc20db2c64fc45a
+current_step: A missing checkpoint records the served SHA and exits 1. github.run_number is already past 40, so the first seed after merge is that red run. The cache save uses if: always() && hashFiles('.served-build/previous.sha') != '' so the re-seeded file is stored and the next run can be green. A readable rollback still does not rewrite the file. initialize replaces only an unreadable checkpoint.
+next_action: After merge to verdant-grow-diary, confirm the next scheduled run is red with FAIL (baseline_recorded) and that the following run is green (unchanged or moved_forward). Do not add secrets or variables. Do not merge from this task.
+post_merge_check: Served build monotonic check on verdant-grow-diary. A continued BLOCKED (previous_missing) or a missing cache save reopens this work with the same owner.
+active_writer: Cursor cloud agent on cursor/served-build-monotonic-baseline-3a91
+decisions: Keep the baseline in the Actions cache. Do not commit a SHA, do not add an artifact, and do not add an Actions variable. public/version.json is a dirty build stamp, not a last-accepted served SHA, so it is not a second comparison source. A missing checkpoint records the served SHA and exits 1 so a scheduled run alerts; the save step still stores that file. Keep FAIL moved_backward_or_diverged and do not rewrite a readable checkpoint on that failure. initialize recovers only an unreadable checkpoint.
+tried_and_rejected: Requiring workflow_dispatch initialize=true never ran, so the alert stayed unarmed. A repo file or Actions variable would need a deploy-branch push or a settings change, both out of scope. A ::warning on a scheduled run notifies nobody. Failing without saving the file would leave the next run red as well.
+commands: bunx vitest run src/test/served-build-monotonic-rules.test.ts src/test/served-build-monotonic-workflow.test.ts --reporter=dot
+files_touched: scripts/check-served-build-monotonic.mjs; .github/workflows/served-build-monotonic.yml; src/test/served-build-monotonic-rules.test.ts; src/test/served-build-monotonic-workflow.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: The schedule checks out verdant-grow-diary, so the seed does not run until this change is merged. No merge is authorized here.
+open_questions: none
+gotchas: A cache miss records a new baseline and fails that one run. The following run compares against the saved SHA. A ::warning on a schedule does not notify anyone; exit 1 does. The checkpoint file is not rewritten on a readable rollback, and the save step persists whatever file is present. Scorer unlock for this branch is in gitignored .claude/scorer-unlock.json and must be renewed if these files are edited again after it expires.
+links: Linear VER-288; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2538#pullrequestreview-5669890731
+artifacts: src/test/served-build-monotonic-rules.test.ts
+reviewer_seat: Sour Diesel review 5669890731; a new head needs a fresh exact-head review
+reviewer_sha: 7f0af6c61f549b9777d4968fcfc20db2c64fc45a (the reviewed head, not this repair)
+session_state: Cursor cloud agent; no publish, no workflow dispatch, no production write
+claimed_by: Cursor cloud agent, 2026-10-26 11:02 CT
+owner: Cursor cloud agent for VER-288
+last_updated: 2026-10-27 14:15 CT, by Cursor cloud agent
 ```
 
 ### ATHENA-FEED-LOG-PUBLIC-GUIDE

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
@@ -23,6 +23,7 @@ import {
   ATHENA_FEED_LOG_DISCLAIMER,
   ATHENA_FEED_LOG_FAQ,
   ATHENA_FEED_LOG_H1,
+  feedLogCsvFilename,
 } from "@/lib/athenaFeedLogRules";
 import AthenaFeedLog from "@/pages/AthenaFeedLog";
 
@@ -113,11 +114,79 @@ describe("public Athena feed chart log page", () => {
     expect(screen.queryByLabelText("Measuring method")).not.toBeInTheDocument();
     expect(trackFeedLogEvent).toHaveBeenCalledWith("feed_log_line_changed", { line: "blended" });
 
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+    click.mockRestore();
     fireEvent.click(screen.getByRole("button", { name: "Copy log" }));
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(trackFeedLogEvent).toHaveBeenCalledWith("feed_log_csv_exported", expect.any(Object));
     expect(JSON.stringify(vi.mocked(trackFeedLogEvent).mock.calls)).not.toMatch(/2\.5/);
+  });
+
+  it("triggers a csv download without cancelling the click", async () => {
+    const blobs: Blob[] = [];
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn((blob: Blob) => {
+        blobs.push(blob);
+        return "blob:feed-log";
+      }),
+      revokeObjectURL: revoke,
+    });
+    const clicks: { event: MouseEvent; anchor: HTMLAnchorElement }[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function click(
+      this: HTMLAnchorElement,
+    ) {
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      this.dispatchEvent(event);
+      clicks.push({ event, anchor: this });
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Week 1, Product 1, planned"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Week 1, Product 1, actual"), {
+      target: { value: "2.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+
+    expect(clicks).toHaveLength(1);
+    expect(clicks[0].event.defaultPrevented).toBe(false);
+    expect(clicks[0].anchor.download).toBe(feedLogCsvFilename(new Date()));
+    expect(clicks[0].anchor.isConnected).toBe(true);
+    expect(revoke).not.toHaveBeenCalled();
+    expect(trackFeedLogEvent).toHaveBeenCalledWith("feed_log_csv_exported", { row_count: 12 });
+    const csvText = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(blobs[0]);
+    });
+    expect(csvText).toContain("2.5");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(clicks[0].anchor.isConnected).toBe(false);
+    expect(revoke).toHaveBeenCalledWith("blob:feed-log");
+    expect(
+      screen.getByText("CSV downloaded. Nothing is saved in your browser."),
+    ).toBeInTheDocument();
+
+    vi.mocked(trackFeedLogEvent).mockClear();
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => {
+        throw new Error("blob failed");
+      }),
+      revokeObjectURL: revoke,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(trackFeedLogEvent).not.toHaveBeenCalledWith("feed_log_csv_exported", expect.anything());
+    expect(screen.getByText("CSV download is unavailable in this browser.")).toBeInTheDocument();
+    click.mockRestore();
   });
 
   it("adds a week and uses the phone layout query", () => {

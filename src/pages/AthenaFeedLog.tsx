@@ -140,15 +140,29 @@ export default function AthenaFeedLog() {
   }
 
   function downloadCsv() {
-    const csv = buildFeedLogCsv(state);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = feedLogCsvFilename(new Date());
-    link.addEventListener("click", (event) => event.preventDefault());
-    link.click();
-    URL.revokeObjectURL(url);
+    let url: string | null = null;
+    let link: HTMLAnchorElement | null = null;
+    try {
+      const csv = buildFeedLogCsv(state);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      url = URL.createObjectURL(blob);
+      link = document.createElement("a");
+      link.href = url;
+      link.download = feedLogCsvFilename(new Date());
+      document.body.appendChild(link);
+      link.click();
+    } catch {
+      link?.remove();
+      if (url) URL.revokeObjectURL(url);
+      announce("CSV download is unavailable in this browser.");
+      return;
+    }
+    const objectUrl = url;
+    const anchor = link;
+    window.setTimeout(() => {
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    }, 0);
     trackFeedLogEvent("feed_log_csv_exported", { row_count: state.weeks.length });
     announce("CSV downloaded. Nothing is saved in your browser.");
   }

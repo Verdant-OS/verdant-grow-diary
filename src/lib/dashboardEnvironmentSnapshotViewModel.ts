@@ -26,6 +26,7 @@ import {
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
 import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/stageAwareVpdTargets";
+import { formatSensorChartDisplayNumber } from "@/lib/sensorChartAxisRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { SensorReadingSource } from "@/mock";
@@ -176,9 +177,9 @@ function resolveCapturedAt(
   return null;
 }
 
-function formatNumber(v: number | null, digits: number): string {
+function formatNumber(v: number | null, metric: "temp" | "rh" | "vpd"): string {
   if (v === null || !Number.isFinite(v)) return "—";
-  return v.toFixed(digits);
+  return formatSensorChartDisplayNumber(v, metric);
 }
 
 export interface BuildTentSnapshotViewOptions {
@@ -306,7 +307,7 @@ function ownCaptureVpdMetric(
   return {
     key: "vpd",
     label: "VPD",
-    display: formatNumber(canonical.kpa, 2),
+    display: formatNumber(canonical.kpa, "vpd"),
     unit: " kPa",
     chipStatus:
       status === "invalid"
@@ -463,7 +464,6 @@ export function buildTentSnapshotView(
     unit: string,
     chipStatus: "ok" | "warn" | "bad",
     suspiciousKey: string,
-    digits: number,
   ): MetricView => {
     // Explicit intake flag on the row that contributed this metric (same
     // first-match-at-latest-ts selection as snapshotFromReadings).
@@ -507,7 +507,7 @@ export function buildTentSnapshotView(
     return {
       key,
       label,
-      display: formatNumber(value, digits),
+      display: formatNumber(value, key),
       unit,
       chipStatus: cappedChipStatus,
       status,
@@ -523,7 +523,6 @@ export function buildTentSnapshotView(
       tempUnitSymbol,
       environmentMetricChipStatus(classifyTempAgainstStage(snap.temp ?? null, { stage })),
       "temp",
-      1,
     ),
     mkMetric(
       "rh",
@@ -532,7 +531,6 @@ export function buildTentSnapshotView(
       "%",
       environmentMetricChipStatus(classifyRhAgainstStage(snap.rh ?? null, { stage })),
       "rh",
-      1,
     ),
     mkMetric(
       "vpd",
@@ -541,7 +539,6 @@ export function buildTentSnapshotView(
       " kPa",
       vpdMetricChipStatus(classifyVpdAgainstStage({ value: vpdShownKpa ?? null, stage })),
       "vpd",
-      2,
     ),
   ];
 
@@ -568,7 +565,7 @@ export function buildTentSnapshotView(
     metrics[2] = {
       key: "vpd",
       label: "VPD",
-      display: formatNumber(null, 2),
+      display: formatNumber(null, "vpd"),
       unit: " kPa",
       chipStatus: "bad",
       status: "invalid",

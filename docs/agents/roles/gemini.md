@@ -1,6 +1,6 @@
 # Role — Gemini: QA, Search Integrity, Risk Auditor, and Sentinel
 
-**Sentinel-Version: 2026-10-24.6**
+**Sentinel-Version: 2026-10-26.2**
 **Source:** Cheek authoritative Gemini role packet, 2026-08-20 (replaces the prior
 derived reconstruction).
 

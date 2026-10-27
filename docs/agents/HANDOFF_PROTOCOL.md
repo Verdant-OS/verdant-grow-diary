@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-10-24.6**
+**Sentinel-Version: 2026-10-26.2**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -69,9 +69,7 @@ when assigned):
 Grok      product intelligence, research, live-app audit, implement, test, independent review
   -> Claude    architecture / specs (and any peer power when holding the slice)
   -> Codex     build / integration (often; not exclusive) + peer powers when holding
-  -> Security  review trust boundaries, exposure, secrets, infrastructure risk
-  -> Gemini    independently audit quality, scope, evidence, safety, release readiness
-  -> Council   resolve disagreements, give Cheek one recommendation
+  -> QA        independently audit quality, scope, trust boundaries, evidence and safety
   -> Cheek     approve what ships
 ```
 
@@ -137,7 +135,7 @@ for the complete scope: Codex on work Codex neither authored nor repaired, or a
 non-contributing Claude/Grok review session (including for Codex-authored work), or
 available Durban Poison. Graft retains only its existing low-risk allowlist; governance,
 protected and mixed scopes require an eligible outside reviewer. Keep all supplemental
-evidence and protected-file gates. Security/Gemini observations alone are not acceptance.
+evidence and protected-file gates. QA observations alone are not acceptance.
 Use one current review request per PR/full head and check existing receipts before
 pinging. Record the request owner, permalink and state; transfer an unavailable reviewer
 once to an eligible fallback, otherwise BLOCKED. A new head supersedes the old request
@@ -191,4 +189,4 @@ instructions conflict.
 Conflicts follow `AGENTS.md` §0.1. Report the conflict; do not silently pick one.
 
 Who may approve a ship is the founder seat in `docs/agents/constitution/roster.md`.
-The Council Chair recommends; it does not release.
+The assigned QA reviewer reports evidence; it does not authorize release.

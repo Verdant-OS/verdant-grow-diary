@@ -443,17 +443,18 @@ function aliasDocument(
 }
 
 /**
- * An INDEXABLE audience variant that concedes its ranking URL to another route.
+ * An audience variant that concedes its ranking URL to another route.
  *
  * Distinct from `aliasDocument` above, and the difference is the whole point:
  * `aliasDocument` builds a legacy redirect stub (`/strains/*`) that inherits the
  * target's title, description and JSON-LD wholesale and is marked
- * `noindex, follow`. This helper keeps the variant's OWN copy and leaves it
- * affirmatively indexable — only the canonical identity moves.
+ * `noindex, follow`. This helper keeps the variant's OWN copy. Robots is
+ * optional and owner-driven: omit it and the document stays `index, follow`;
+ * pass `robots: "noindex, follow"` when the owner hides that URL from search.
+ * The only caller today is /breeder-beta, hidden on 2026-10-26.
  *
  * Do not "simplify" this into `aliasDocument`. The variant keeps its own
- * title and description. Pass `robots: "noindex, follow"` only when an owner
- * decision hides that URL from search, as with /breeder-beta on 2026-10-26.
+ * title and description.
  *
  * `metadata.url` is the single source for `<link rel="canonical">`, `og:url`,
  * and the WebPage JSON-LD `@id`, so pointing it at the canonical target keeps

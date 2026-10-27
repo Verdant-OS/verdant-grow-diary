@@ -78,11 +78,11 @@ why: Cheeko, 2026-10-26, hide /creator-beta from search and ship it live as soon
 branch: cursor/creator-beta-noindex-2708
 base: verdant-grow-diary
 checkout: git fetch origin cursor/creator-beta-noindex-2708 verdant-grow-diary && git switch cursor/creator-beta-noindex-2708 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft against verdant-grow-diary; read the PR URL from GitHub after the first push
-head_sha: read origin/cursor/creator-beta-noindex-2708 after push
-state: pushed draft #2549, then merged origin/verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
-current_step: noindex, follow kept. Base also removed /welcome from the sitemap, so the merged sitemap count is 50. HANDOFF_LOG kept this block and the incoming blocks.
-next_action: Confirm the draft PR head, hosted CI, and an independent exact-head review. Do not merge, mark ready, or deploy.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2549 (draft)
+head_sha: 0b28e14937f0433ae963d10dbbbfe3a7af5bcc73 before the comment fix; read origin after the next push
+state: draft #2549; Sour Diesel review 5669767054 at that head raised one P2 on the crossCanonicalDocument comment
+current_step: Reword crossCanonicalDocument so robots is optional and owner-driven. Add the scorer-lock report and the #2543 overlap note to the PR body.
+next_action: Fresh independent exact-head review of the new head. Do not merge, mark ready, or deploy. Whichever of #2549 and #2543 lands second must re-integrate.
 post_merge_check: After merge and publish, confirm live HTML for /creator-beta and /breeder-beta returns robots noindex, follow and that public/sitemap.xml on verdantgrowdiary.com omits both locs. NOT_MEASURED until then.
 active_writer: Cursor Grok cloud agent (this session)
 decisions: Same noindex, follow path as other hidden public documents (STATIC_PUBLIC_NOINDEX_DOCUMENTS plus usePageSeo noindex). Keep the 2026-08-20 cross-canonical. Renegotiated scripts/public-route-parity.config.mjs and the SEO tests that required these URLs to stay indexable.
@@ -95,12 +95,12 @@ open_questions: none
 gotchas: A new commit invalidates review. Draft stays draft. No production smoke write. scorer-lock required an unlock for the parity allowlist and the renegotiated tests; the unlock file is git-ignored.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2549
 artifacts: this block
-reviewer_seat: an eligible independent session that did not author this PR
-reviewer_sha: none
+reviewer_seat: Sour Diesel reviewed 0b28e14937f0433ae963d10dbbbfe3a7af5bcc73 (review 5669767054) and is excluded from accepting the repair. A different eligible session must review the new head.
+reviewer_sha: 0b28e14937f0433ae963d10dbbbfe3a7af5bcc73 (not the repair head)
 session_state: Cursor cloud agent; no paused workflow
 claimed_by: Cursor Grok cloud agent, 2026-10-26 19:20 UTC
 owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
-last_updated: 2026-10-27 10:25 CT, by Cursor Grok cloud agent
+last_updated: 2026-10-27 10:30 CT, by Cursor Grok cloud agent
 ```
 
 ### PR2511-REQUIRED-TRIGGER-GUARDS

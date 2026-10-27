@@ -5414,7 +5414,7 @@ export type Database = {
           light_schedule: string | null
           light_wattage: number | null
           name: string
-          photo_url?: string | null
+          photo_url: string | null
           schema_version: number
           size: string | null
           stage: string

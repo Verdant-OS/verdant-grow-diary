@@ -14,6 +14,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePlantRelativeTimelineHistory } from "@/hooks/usePlantRelativeTimelineHistory";
+import {
+  useDiaryPhotoDisplayRows,
+  type DiaryPhotoDisplayRow,
+} from "@/hooks/useDiaryPhotoDisplayRows";
+import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import {
+  buildOrderedTimelinePhotoLightboxList,
+  buildTimelinePhotoAltText,
+  findTimelinePhotoIndexById,
+  type TimelinePhotoLightboxItem,
+  type TimelinePhotoSourceRow,
+} from "@/lib/timelinePhotoLightboxRules";
 import { buildPlantHistoryReadView } from "@/lib/plantRelativeTimelineHistoryRules";
 import {
   buildRelativeTimelineFilterChips,
@@ -135,9 +147,14 @@ function SourceIcon({ source }: { source: RelativeTimelineItem["source"] }) {
 function TimelineRow({
   item,
   context,
+  photo,
+  onOpenPhoto,
 }: {
   item: RelativeTimelineItem;
   context: RelativeTimelineEntryContext;
+  /** Signed or legacy display URL for this row; null while pending, failed or absent. */
+  photo?: TimelinePhotoLightboxItem | null;
+  onOpenPhoto?: (entryId: string) => void;
 }) {
   const detail = formatRelativeTimelineEntryDetail(item, context)!;
   if (item.eventType === "harvest") {
@@ -225,6 +242,23 @@ function TimelineRow({
       >
         {detail.summary}
       </p>
+      {photo && (
+        <button
+          type="button"
+          onClick={() => onOpenPhoto?.(item.id)}
+          aria-label={`Open photo: ${buildTimelinePhotoAltText(photo)}`}
+          data-testid="relative-timeline-photo-open"
+          className="mt-2 block overflow-hidden rounded-md border focus:outline-hidden focus:ring-2 focus:ring-primary/60"
+        >
+          <img
+            src={photo.photoUrl}
+            alt={buildTimelinePhotoAltText(photo)}
+            loading="lazy"
+            className="h-28 w-28 object-cover sm:h-32 sm:w-32"
+            data-testid="relative-timeline-photo"
+          />
+        </button>
+      )}
       {detail.hasContext && (
         <p
           className="mt-1 text-xs text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5"
@@ -282,6 +316,21 @@ export default function PlantRelativeTimelineSection({
     stageStartedAt: stageStartedAt ?? null,
   });
   const visibleItems = filterRelativeTimelineItems(items, filter);
+  // Signed copies are for the thumbnail only. The projection above keeps the
+  // raw rows, so a pending or failed signature never changes a row's badge.
+  const photoDisplay = useDiaryPhotoDisplayRows(
+    history.data as ReadonlyArray<DiaryPhotoDisplayRow> | undefined,
+  );
+  const photoItems = buildOrderedTimelinePhotoLightboxList(
+    photoDisplay.rows as unknown as TimelinePhotoSourceRow[],
+    visibleItems.map((i) => i.id),
+  );
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
+  const lightboxIndex = findTimelinePhotoIndexById(photoItems, lightboxPhotoId);
+  const photoFor = (id: string) => {
+    const idx = findTimelinePhotoIndexById(photoItems, id);
+    return idx >= 0 ? photoItems[idx] : null;
+  };
   const historyView = buildPlantHistoryReadView(
     history,
     plantId,
@@ -576,7 +625,13 @@ export default function PlantRelativeTimelineSection({
 
                     <ol className="space-y-2">
                       {group.items.map((item) => (
-                        <TimelineRow key={item.id} item={item} context={entryContext} />
+                        <TimelineRow
+                          key={item.id}
+                          item={item}
+                          context={entryContext}
+                          photo={photoFor(item.id)}
+                          onOpenPhoto={setLightboxPhotoId}
+                        />
                       ))}
                     </ol>
                   </section>
@@ -677,6 +732,14 @@ export default function PlantRelativeTimelineSection({
           >
             {historyView.loadMoreLabel}
           </Button>
+        )}
+        {lightboxIndex >= 0 && (
+          <TimelinePhotoLightbox
+            items={photoItems}
+            activeIndex={lightboxIndex}
+            onClose={() => setLightboxPhotoId(null)}
+            onNavigate={(i) => setLightboxPhotoId(photoItems[i]?.id ?? null)}
+          />
         )}
       </CardContent>
     </Card>

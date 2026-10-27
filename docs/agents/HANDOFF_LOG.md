@@ -114,7 +114,7 @@ branch: cursor/athena-feed-chart-log-431f
 base: verdant-grow-diary
 checkout: git fetch origin cursor/athena-feed-chart-log-431f verdant-grow-diary && git switch cursor/athena-feed-chart-log-431f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: opened as a draft from this branch; read the PR URL from GitHub after the first push
-head_sha: read origin/cursor/athena-feed-chart-log-431f after push; this block is in the first commit
+head_sha: 2db14d480136d50737460569b2e7d62e9a496023, the formula-guard commit and the parent of the commit that records this line. Read origin/cursor/athena-feed-chart-log-431f for the exact PR head.
 state: pushed draft once this commit is on the remote
 current_step: APP_ROUTES lists /guides/athena-feed-chart-log before /guides/grow-stage-care-guide so the path sort matches Array.sort. The CSV download appends the anchor, clicks it without preventDefault, and revokes the object URL on the next turn. escapeCsvField prefixes a cell that starts with = + - @ tab or CR with a single quote. e2e/athena-feed-chart-log-csv.spec.ts runs from .github/workflows/mocked-e2e-unwired-closure.yml. The latest verdant-grow-diary was merged with a normal merge.
 next_action: read required CI on the new head. The pheno-comparison-v0 failure at 07f3de95 was the same unsorted manifest, because that workflow path-filters src/lib/appRouteManifest.ts. Do not merge. Do not deploy.

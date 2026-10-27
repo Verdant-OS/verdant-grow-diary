@@ -112,8 +112,9 @@ BEGIN
   ELSE
     -- The account's earliest harvest, not the earliest harvest that has a photo.
     -- A harvest is a harvests row or a live Quick Log harvest event. An
-    -- event's photo is the owned, unretracted diary photo attached to that
-    -- exact event id, never one matched by time.
+    -- event's photo is the owned photo on its unretracted linked diary
+    -- companion (written by quicklog_save_event's p_photo_url), matched by
+    -- the exact event id, never by time.
     SELECT candidate.subject_id, candidate.photo_name, candidate.grow_id
       INTO subject_id, photo_name, grow_id
     FROM (
@@ -129,14 +130,20 @@ BEGIN
       UNION ALL
       SELECT event.id,
              (
-               SELECT public.badge_awards_owned_diary_photo_name(entry.photo_url, uid)
+               SELECT public.badge_awards_owned_diary_photo_name(
+                        coalesce(entry.photo_url, entry.details ->> 'photo_url'), uid
+                      )
                FROM public.diary_entries AS entry
                WHERE entry.user_id = uid
                  AND entry.grow_id = event.grow_id
                  AND entry.retracted_at IS NULL
-                 AND entry.details ->> 'attached_to_action' = 'harvest'
-                 AND entry.details ->> 'grow_event_id' = event.id::text
-                 AND public.badge_awards_owned_diary_photo_name(entry.photo_url, uid) IS NOT NULL
+                 AND event.id::text IN (
+                   entry.details ->> 'linked_grow_event_id',
+                   entry.details ->> 'grow_event_id'
+                 )
+                 AND public.badge_awards_owned_diary_photo_name(
+                       coalesce(entry.photo_url, entry.details ->> 'photo_url'), uid
+                     ) IS NOT NULL
                ORDER BY entry.entry_at ASC, entry.id ASC
                LIMIT 1
              ),

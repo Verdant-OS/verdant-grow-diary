@@ -1,7 +1,7 @@
 /**
- * The optional Quick Log harvest photo attaches to the confirmed harvest
- * event through the existing photo-diary path. It never writes a separate
- * `harvests` row, and it never carries over to another target.
+ * The optional Quick Log harvest photo rides the canonical save as
+ * p_photo_url: uploaded first, replayed unchanged on a retry, never written
+ * as a separate client diary row, and never carried over to another target.
  */
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,27 +9,35 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
+import { HARVEST_PHOTO_UPLOAD_FAILED } from "@/constants/quickLogHarvestPhotoCopy";
 
 const GROW_EVENT_ID = "77777777-7777-4777-8777-000000000200";
 
 const insertMock = vi.fn();
+const updateMock = vi.fn();
 const rpcMock = vi.fn();
 const uploadMock = vi.fn();
 const removeMock = vi.fn();
-const toastError = vi.hoisted(() => vi.fn());
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (table: string) => {
-      const owned = {
-        eq: () => owned,
-        maybeSingle: async () => ({ data: null, error: null }),
-      };
-      return {
-        insert: (...args: unknown[]) => insertMock(table, ...args),
-        select: () => owned,
-      };
-    },
+    from: (table: string) => ({
+      insert: (...args: unknown[]) => insertMock(table, ...args),
+      update: (values: unknown) => {
+        const filters: unknown[][] = [];
+        const chain = {
+          filter: (...args: unknown[]) => {
+            filters.push(args);
+            return chain;
+          },
+          select: async () => {
+            updateMock(table, values, filters);
+            return { data: [{ id: "diary-1" }], error: null };
+          },
+        };
+        return chain;
+      },
+    }),
     rpc: (...args: unknown[]) => rpcMock(...args),
     storage: {
       from: (bucket: string) => ({
@@ -40,12 +48,13 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+const authState = vi.hoisted(() => ({ user: { id: "user-1" }, loading: false }));
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
+  useAuth: () => authState,
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: toastError, success: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
 
 function withClient(node: ReactNode) {
@@ -82,45 +91,43 @@ function chooseHarvestPhoto() {
   });
 }
 
-describe("Quick Log harvest photo attachment", () => {
+const saveEventCalls = () => rpcMock.mock.calls.filter(([fn]) => fn === "quicklog_save_event");
+const photoArg = (call: unknown[]) => (call[1] as { p_photo_url: string | null }).p_photo_url;
+
+describe("Quick Log harvest photo through the canonical save", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
+    window.localStorage.clear();
     insertMock.mockReset();
+    updateMock.mockReset();
     rpcMock.mockReset();
     uploadMock.mockReset();
     removeMock.mockReset();
-    toastError.mockReset();
     rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: GROW_EVENT_ID }, error: null });
     uploadMock.mockResolvedValue({ error: null });
     removeMock.mockResolvedValue({ error: null });
     insertMock.mockResolvedValue({ error: null });
   });
 
-  it("attaches the photo to the confirmed harvest event and writes no harvests row", async () => {
+  it("uploads first, passes the path as p_photo_url and writes no client diary row", async () => {
     render(section("plant-1"));
     openHarvest();
     chooseHarvestPhoto();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
-    await waitFor(() => expect(insertMock).toHaveBeenCalled());
-    expect(rpcMock).toHaveBeenCalled();
+    await waitFor(() => expect(saveEventCalls()).toHaveLength(1));
     expect(uploadMock).toHaveBeenCalledTimes(1);
     expect(uploadMock.mock.calls[0][0]).toBe("diary-photos");
-    expect(String(uploadMock.mock.calls[0][1])).toMatch(/^user-1\/grow-1\//);
-    expect(insertMock.mock.calls.map((call) => call[0])).toEqual(["diary_entries"]);
-    const row = insertMock.mock.calls[0][1] as {
-      plant_id: string;
-      tent_id: string;
-      photo_url: string;
-      details: Record<string, string>;
-    };
-    expect(row.plant_id).toBe("plant-1");
-    expect(row.tent_id).toBe("tent-1");
-    expect(row.photo_url).toBe(uploadMock.mock.calls[0][1]);
-    expect(row.details).toMatchObject({
-      event_type: "quicklog_photo_attachment",
-      attached_to_action: "harvest",
-      grow_event_id: GROW_EVENT_ID,
-    });
+    const path = String(uploadMock.mock.calls[0][1]);
+    expect(path).toMatch(/^user-1\/grow-1\//);
+    expect(photoArg(saveEventCalls()[0])).toBe(path);
+    expect(insertMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+    expect(updateMock.mock.calls[0][0]).toBe("diary_entries");
+    expect(updateMock.mock.calls[0][1]).toEqual({ photo_url: path });
+    expect(updateMock.mock.calls[0][2]).toEqual([
+      ["details->>linked_grow_event_id", "eq", GROW_EVENT_ID],
+    ]);
   });
 
   it("drops a chosen harvest photo when the target changes", async () => {
@@ -131,23 +138,39 @@ describe("Quick Log harvest photo attachment", () => {
     openHarvest();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
-    await waitFor(() => expect(rpcMock).toHaveBeenCalled());
+    await waitFor(() => expect(saveEventCalls()).toHaveLength(1));
     expect(uploadMock).not.toHaveBeenCalled();
-    expect(insertMock).not.toHaveBeenCalled();
+    expect(photoArg(saveEventCalls()[0])).toBeNull();
   });
 
-  it("removes the uploaded object and says so when the diary row is refused", async () => {
-    insertMock.mockResolvedValue({ error: { message: "denied", code: "42501" } });
+  it("saves nothing when the photo upload fails", async () => {
+    uploadMock.mockResolvedValue({ error: { message: "storage down" } });
     render(section("plant-1"));
     openHarvest();
     chooseHarvestPhoto();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
-    await waitFor(() => expect(removeMock).toHaveBeenCalled());
-    expect(removeMock.mock.calls[0][0]).toBe("diary-photos");
-    expect(removeMock.mock.calls[0][1]).toEqual([uploadMock.mock.calls[0][1]]);
-    expect(toastError).toHaveBeenCalledWith(
-      "The harvest was saved, but its photo was not. Add it with the Photo activity.",
+    expect(await screen.findByText(HARVEST_PHOTO_UPLOAD_FAILED)).toBeInTheDocument();
+    expect(saveEventCalls()).toHaveLength(0);
+  });
+
+  it("replays the same photo and key when an unconfirmed save is retried", async () => {
+    rpcMock.mockResolvedValueOnce({ data: null, error: { message: "Failed to fetch" } });
+    render(section("plant-1"));
+    openHarvest();
+    chooseHarvestPhoto();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    const retry = await screen.findByTestId("quick-log-all-activities-retry-original");
+    expect(removeMock).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+    await waitFor(() => expect(saveEventCalls()).toHaveLength(2));
+    const [first, second] = saveEventCalls();
+    expect(photoArg(second)).toBe(photoArg(first));
+    expect(photoArg(first)).toBe(String(uploadMock.mock.calls[0][1]));
+    expect((second[1] as { p_idempotency_key: string }).p_idempotency_key).toBe(
+      (first[1] as { p_idempotency_key: string }).p_idempotency_key,
     );
+    expect(uploadMock).toHaveBeenCalledTimes(1);
   });
 });

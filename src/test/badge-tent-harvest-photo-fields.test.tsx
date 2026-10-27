@@ -198,6 +198,10 @@ describe("badge tent and harvest photo fields", () => {
   const harvestInserts = () => insertMock.mock.calls.filter(([table]) => table === "harvests");
   const photoDiaryInserts = () =>
     insertMock.mock.calls.filter(([table]) => table === "diary_entries");
+  const savedPhotoUrls = () =>
+    rpcMock.mock.calls
+      .filter(([fn]) => fn === "quicklog_save_event")
+      .map(([, args]) => (args as { p_photo_url: string | null }).p_photo_url);
 
   it("attaches a harvest photo once, then a second harvest save attaches nothing", async () => {
     renderHarvestSection();
@@ -209,13 +213,8 @@ describe("badge tent and harvest photo fields", () => {
       target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
     });
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
-    await waitFor(() => expect(photoDiaryInserts()).toHaveLength(1));
-    const row = photoDiaryInserts()[0]?.[1] as { photo_url: string; details: object };
-    expect(row.details).toMatchObject({
-      attached_to_action: "harvest",
-      grow_event_id: "77777777-7777-4777-8777-000000000200",
-    });
-    expect(row.photo_url).toMatch(/^user-1\/grow-1\//);
+    await waitFor(() => expect(savedPhotoUrls()).toHaveLength(1));
+    expect(savedPhotoUrls()[0]).toMatch(/^user-1\/grow-1\//);
     expect(input.value).toBe("");
     await waitFor(() =>
       expect(screen.queryByTestId("quick-log-all-activities-harvest-photo")).toBeNull(),
@@ -230,7 +229,8 @@ describe("badge tent and harvest photo fields", () => {
       expect(screen.queryByTestId("quick-log-all-activities-harvest-photo")).toBeNull(),
     );
     expect(uploadMock).toHaveBeenCalledTimes(1);
-    expect(photoDiaryInserts()).toHaveLength(1);
+    expect(savedPhotoUrls()).toEqual([savedPhotoUrls()[0], null]);
+    expect(photoDiaryInserts()).toHaveLength(0);
     expect(harvestInserts()).toHaveLength(0);
   });
 
@@ -249,16 +249,14 @@ describe("badge tent and harvest photo fields", () => {
     const save = screen.getByTestId("quick-log-all-activities-save");
     fireEvent.click(save);
     await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
-    // While the photo upload is pending, no control may start a second
-    // save: Save is either disabled or replaced by the pending-save panel,
-    // and that panel's retry is refused by the in-flight lock.
-    const visibleSave = screen.queryByTestId("quick-log-all-activities-save");
-    if (visibleSave) expect(visibleSave).toBeDisabled();
+    // The upload runs before any save is claimed, so Save stays on screen
+    // and disabled until it settles; a second click starts nothing.
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    expect(screen.queryByTestId("quick-log-all-activities-retry-original")).toBeNull();
     fireEvent.click(save);
-    const retry = screen.queryByTestId("quick-log-all-activities-retry-original");
-    if (retry) fireEvent.click(retry);
     releaseUpload({ error: null });
-    await waitFor(() => expect(photoDiaryInserts()).toHaveLength(1));
+    await waitFor(() => expect(savedPhotoUrls()).toHaveLength(1));
+    expect(photoDiaryInserts()).toHaveLength(0);
     expect(harvestInserts()).toHaveLength(0);
     expect(rpcMock).toHaveBeenCalledTimes(1);
     expect(uploadMock).toHaveBeenCalledTimes(1);

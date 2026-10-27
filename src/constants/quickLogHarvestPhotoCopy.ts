@@ -1,6 +1,3 @@
 /** Pinned copy for the optional Quick Log harvest photo. */
-export const HARVEST_PHOTO_NOT_SAVED =
-  "The harvest was saved, but its photo was not. Add it with the Photo activity." as const;
-
-export const HARVEST_PHOTO_UNCONFIRMED =
-  "The harvest was saved, but Verdant could not confirm its photo. Check Timeline before adding it again." as const;
+export const HARVEST_PHOTO_UPLOAD_FAILED =
+  "The harvest photo could not be uploaded, so nothing was saved. Try again, or remove the photo and save without it." as const;

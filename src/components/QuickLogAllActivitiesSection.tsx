@@ -37,10 +37,7 @@ import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
-import {
-  HARVEST_PHOTO_NOT_SAVED,
-  HARVEST_PHOTO_UNCONFIRMED,
-} from "@/constants/quickLogHarvestPhotoCopy";
+import { HARVEST_PHOTO_UPLOAD_FAILED } from "@/constants/quickLogHarvestPhotoCopy";
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -789,11 +786,6 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomStageConfirmed(false);
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
-        // A recovered save never re-uploads: the photo was not attached, so
-        // say so rather than dropping the chosen file silently.
-        if (record.input.activityId === "harvest" && harvestPhotoFile) {
-          toast.error(HARVEST_PHOTO_NOT_SAVED);
-        }
         clearHarvestPhoto();
         setErrorReason(null);
         setErrorForActivity(null);
@@ -815,7 +807,7 @@ export default function QuickLogAllActivitiesSection({
         // The confirmed write remains successful if parent cleanup fails.
       }
     },
-    [clearHarvestPhoto, harvestPhotoFile, onSaveSuccess],
+    [clearHarvestPhoto, onSaveSuccess],
   );
 
   const handleRetryPendingActivity = useCallback(async () => {
@@ -1284,18 +1276,58 @@ export default function QuickLogAllActivitiesSection({
         // Fresh activities use the server's occurrence time. Keep the local
         // claim time for recovery metadata, not as an unbounded RPC timestamp.
         const createdAt = new Date().toISOString();
+        // The harvest photo rides the canonical save as p_photo_url, so the
+        // server writes it onto the linked diary companion in the same
+        // transaction. Upload first; a failed upload saves nothing.
+        let harvestPhotoPath: string | null = null;
+        if (selected.id === "harvest" && harvestPhotoFile && user?.id) {
+          const ext = (harvestPhotoFile.name.split(".").pop() || "jpg").toLowerCase();
+          const path = `${user.id}/${capturedTarget.growId}/${Date.now()}.${ext}`;
+          let uploadFailed = true;
+          try {
+            const { error: uploadError } = await supabase.storage
+              .from("diary-photos")
+              .upload(path, harvestPhotoFile, {
+                contentType: harvestPhotoFile.type,
+                upsert: false,
+              });
+            uploadFailed = Boolean(uploadError);
+          } catch {
+            uploadFailed = true;
+          }
+          if (uploadFailed) {
+            setErrorReason(HARVEST_PHOTO_UPLOAD_FAILED);
+            setErrorForActivity(selected.id);
+            return;
+          }
+          harvestPhotoPath = path;
+        }
+        const removeUnreferencedHarvestPhoto = async () => {
+          if (!harvestPhotoPath) return;
+          try {
+            await supabase.storage.from("diary-photos").remove([harvestPhotoPath]);
+          } catch {
+            // Best-effort: nothing references this object.
+          }
+        };
         const claim = claimPendingQuickLogActivity({
           version: 1,
           ownerId: user?.id ?? "",
           createdAt,
           ...(reviewedStarterHandoffKey ? { reviewedStarterHandoffKey } : {}),
-          input: { ...activityInput, occurredAt: null, idempotencyKey },
+          input: {
+            ...activityInput,
+            occurredAt: null,
+            idempotencyKey,
+            ...(harvestPhotoPath ? { photoUrl: harvestPhotoPath } : {}),
+          },
           receipt: {
             symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
             harvestDetails: harvestDetailsForBreakdown,
           },
         });
         if (claim.status !== "claimed") {
+          await removeUnreferencedHarvestPhoto();
           if (claim.status === "pending") {
             setPendingActivity(claim.record);
             setSelectedDraft(
@@ -1321,6 +1353,8 @@ export default function QuickLogAllActivitiesSection({
 
         if (!result.ok) {
           if (result.reason !== "save_failed") {
+            // A definitive refusal of this first attempt wrote nothing.
+            await removeUnreferencedHarvestPhoto();
             if (clearPendingQuickLogActivity(claim.record)) {
               if (stillCurrent) setPendingActivity(null);
             } else {
@@ -1343,66 +1377,19 @@ export default function QuickLogAllActivitiesSection({
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
-        if (selected.id === "harvest" && harvestPhotoFile && user?.id) {
-          // Attach through the same photo-diary path as the Photo activity,
-          // linked to the confirmed harvest event. No second write path.
-          const ownerId = user.id;
-          const harvestPhotoEntryId = newPhotoDiaryEntryId();
-          if (!savedGrowEventId || !harvestPhotoEntryId || photoAttachmentUncertain) {
-            toast.error(HARVEST_PHOTO_NOT_SAVED);
-          } else {
-            const ext = (harvestPhotoFile.name.split(".").pop() || "jpg").toLowerCase();
-            const path = `${ownerId}/${capturedTarget.growId}/${Date.now()}.${ext}`;
-            let uploaded = false;
-            try {
-              const { error: uploadError } = await supabase.storage
-                .from("diary-photos")
-                .upload(path, harvestPhotoFile, {
-                  contentType: harvestPhotoFile.type,
-                  upsert: false,
-                });
-              if (uploadError) {
-                toast.error(HARVEST_PHOTO_NOT_SAVED);
-              } else {
-                uploaded = true;
-                const attached = await createQuickLogPhotoDiaryEntry({
-                  ownerId,
-                  growId: capturedTarget.growId,
-                  tentId: capturedTarget.tentId,
-                  plantId: capturedTarget.plantId,
-                  photoPath: path,
-                  noteRaw: "",
-                  action: "harvest",
-                  extraDetails: { grow_event_id: savedGrowEventId },
-                  entryId: harvestPhotoEntryId,
-                });
-                if (!attached.ok) {
-                  const failure = attached as { ok: false; ambiguous?: boolean };
-                  if (failure.ambiguous) {
-                    markPhotoAttachmentUncertain(ownerId, capturedTarget, harvestPhotoEntryId);
-                    toast.error(HARVEST_PHOTO_UNCONFIRMED);
-                  } else {
-                    try {
-                      await supabase.storage.from("diary-photos").remove([path]);
-                    } catch {
-                      // Best-effort only after a definitive non-commit.
-                    }
-                    toast.error(HARVEST_PHOTO_NOT_SAVED);
-                  }
-                }
-              }
-            } catch {
-              if (uploaded) {
-                markPhotoAttachmentUncertain(ownerId, capturedTarget, harvestPhotoEntryId);
-                toast.error(HARVEST_PHOTO_UNCONFIRMED);
-              } else {
-                toast.error(HARVEST_PHOTO_NOT_SAVED);
-              }
-            }
+        if (harvestPhotoPath && savedGrowEventId) {
+          // The save already persisted details.photo_url. Filling the legacy
+          // column is the one client write the linked-diary fence allows; a
+          // failure leaves readers on details.photo_url.
+          try {
+            await supabase
+              .from("diary_entries")
+              .update({ photo_url: harvestPhotoPath })
+              .filter("details->>linked_grow_event_id", "eq", savedGrowEventId)
+              .select("id");
+          } catch {
+            // Best-effort normalization only.
           }
-          // The attempt is over and reported; a later recovery must not
-          // report this photo again.
-          clearHarvestPhoto();
         }
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);

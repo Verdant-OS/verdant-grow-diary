@@ -20,9 +20,10 @@ DECLARE
   v_both_tent uuid := gen_random_uuid();
   v_stolen uuid := gen_random_uuid();
   v_stolen_tent uuid := gen_random_uuid();
-  v_harvest_event uuid := gen_random_uuid();
-  v_unlinked_entry uuid := gen_random_uuid();
-  v_linked_entry uuid := gen_random_uuid();
+  v_harvest_event uuid;
+  v_harvest_plant uuid := gen_random_uuid();
+  v_linked_entry uuid;
+  v_refused boolean;
   v_hw uuid := gen_random_uuid();
   v_hw_grow uuid := gen_random_uuid();
   v_hw_tent uuid := gen_random_uuid();
@@ -258,41 +259,65 @@ BEGIN
   ASSERT v_count = 0, 'another user photo writes no award';
 
   RESET role;
-  -- A Quick Log harvest event earns First Recorded Harvest only through the
-  -- owned, unretracted diary photo attached to that exact event id.
+  -- A Quick Log harvest earns First Recorded Harvest through the photo the
+  -- canonical save writes onto its linked diary companion (p_photo_url),
+  -- called as the signed-in grower with RLS in force.
   -- Fixture insert: service_role is the only free-cap fixture bypass
   -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
   PERFORM set_config('role', 'service_role', true);
-  INSERT INTO public.grow_events (id, user_id, grow_id, event_type, occurred_at, source)
-  VALUES (v_harvest_event, v_both, v_both_grow, 'harvest', '2026-10-08T00:00:00Z', 'manual');
-  INSERT INTO public.diary_entries (id, user_id, grow_id, note, photo_url, entry_at, details)
-  VALUES (
-    v_unlinked_entry, v_both, v_both_grow, 'unlinked', v_both_photo, '2026-10-08T00:00:01Z',
-    jsonb_build_object(
-      'event_type', 'quicklog_photo_attachment',
-      'source', 'manual',
-      'attached_to_action', 'harvest'
-    )
-  );
-  INSERT INTO public.diary_entries (
-    id, user_id, grow_id, note, photo_url, entry_at, details, retracted_at
-  ) VALUES (
-    v_linked_entry, v_both, v_both_grow, 'linked', v_both_photo, '2026-10-08T00:00:02Z',
-    jsonb_build_object(
-      'event_type', 'quicklog_photo_attachment',
-      'source', 'manual',
-      'attached_to_action', 'harvest',
-      'grow_event_id', v_harvest_event::text
-    ),
-    '2026-10-09T00:00:00Z'
-  );
+  INSERT INTO public.plants (id, user_id, grow_id, tent_id, name, stage)
+  VALUES (v_harvest_plant, v_both, v_both_grow, v_both_tent, 'Harvest plant', 'flower');
   RESET role;
   PERFORM set_config('request.jwt.claim.sub', v_both::text, true);
-  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_both)::text, true);
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_both, 'role', 'authenticated')::text,
+    true
+  );
+  PERFORM set_config('role', 'authenticated', true);
+
+  -- An owned photo that is not linked to the event (the Photo activity) earns nothing.
+  INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at, details)
+  VALUES (
+    v_both, v_both_grow, 'unlinked', v_both_photo, '2026-10-08T00:00:01Z',
+    jsonb_build_object('event_type', 'photo', 'source', 'manual', 'attached_to_action', 'photo')
+  );
+  -- A client may not write a linked companion itself.
+  v_refused := false;
+  BEGIN
+    INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at, details)
+    VALUES (
+      v_both, v_both_grow, 'forged', v_both_photo, now(),
+      jsonb_build_object('grow_event_id', gen_random_uuid()::text)
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_refused := true;
+  END;
+  ASSERT v_refused, 'a client-written linked diary row is refused by RLS';
+
+  v_result := public.quicklog_save_event(
+    'badge-harvest-photo-0001', v_both_grow, 'harvest', v_both_tent, v_harvest_plant,
+    'cut down', v_both_photo, NULL, NULL, '{"event_type": "harvest"}'::jsonb
+  );
+  ASSERT (v_result->>'ok')::boolean, 'the canonical harvest save succeeds as the grower';
+  v_harvest_event := (v_result->>'grow_event_id')::uuid;
+  SELECT entry.id INTO v_linked_entry
+  FROM public.diary_entries AS entry
+  WHERE entry.user_id = v_both
+    AND entry.details ->> 'linked_grow_event_id' = v_harvest_event::text;
+  ASSERT v_linked_entry IS NOT NULL, 'the save writes a linked companion';
+  ASSERT (
+    SELECT entry.details ->> 'photo_url' FROM public.diary_entries AS entry WHERE entry.id = v_linked_entry
+  ) = v_both_photo, 'the companion carries the photo path';
+
+  RESET role;
+  PERFORM set_config('role', 'service_role', true);
+  UPDATE public.diary_entries SET retracted_at = now() WHERE id = v_linked_entry;
+  RESET role;
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
   ASSERT v_result->>'status' = 'unchanged',
-    'a harvest photo not linked to the event, or retracted, earns nothing';
+    'an unlinked photo, or a retracted companion photo, earns nothing';
 
   RESET role;
   PERFORM set_config('role', 'service_role', true);
@@ -301,7 +326,7 @@ BEGIN
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
   ASSERT v_result->>'status' = 'qualified',
-    'an owned photo linked to the Quick Log harvest event earns First Recorded Harvest';
+    'the photo saved with the Quick Log harvest earns First Recorded Harvest';
   RESET role;
   ASSERT (
     SELECT evidence.harvest_id

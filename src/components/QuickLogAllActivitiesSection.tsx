@@ -35,7 +35,6 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import { HARVEST_PHOTO_UPLOAD_FAILED } from "@/constants/quickLogHarvestPhotoCopy";
 import {
@@ -1283,7 +1282,7 @@ export default function QuickLogAllActivitiesSection({
         if (selected.id === "harvest" && harvestPhotoFile && user?.id) {
           const ext = (harvestPhotoFile.name.split(".").pop() || "jpg").toLowerCase();
           const path = `${user.id}/${capturedTarget.growId}/${Date.now()}.${ext}`;
-          let uploadFailed = true;
+          let uploadFailed: boolean;
           try {
             const { error: uploadError } = await supabase.storage
               .from("diary-photos")

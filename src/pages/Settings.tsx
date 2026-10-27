@@ -25,6 +25,7 @@ import {
 } from "@/lib/accountDeletion";
 import { createAccountDeletionContinuation } from "@/lib/accountDeletionContinuationRules";
 import { useAuth } from "@/store/auth";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
 import { PRICING_TIERS } from "@/config/pricing";
@@ -194,10 +195,16 @@ function StartScreenTile({ userId }: { userId: string }) {
 
 function TemperatureUnitTile() {
   const [choice, setChoice] = useState<TemperatureUnitPreference>(DEFAULT_TEMPERATURE_UNIT);
+  // What this device has stored, tracked apart from the unsaved radio choice so
+  // Reset stays available while a non-default override is still persisted. The
+  // shared hook follows saves in other tabs as well as this one (Codex P2 on
+  // #2345 at f752598a); the unsaved choice is never overwritten.
+  const stored = useTemperatureUnitPreference();
   const [feedback, setFeedback] = useState<PreferenceFeedback | null>(null);
 
   useEffect(() => {
-    setChoice(loadTemperatureUnitPreference());
+    const loaded = loadTemperatureUnitPreference();
+    setChoice(loaded);
   }, []);
 
   function onSave() {
@@ -271,8 +278,14 @@ function TemperatureUnitTile() {
         >
           Save
         </Button>
-        <Button size="sm" variant="outline" onClick={onReset} data-testid="temperature-unit-reset">
-          Use Fahrenheit default
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onReset}
+          disabled={choice === DEFAULT_TEMPERATURE_UNIT && stored === DEFAULT_TEMPERATURE_UNIT}
+          data-testid="temperature-unit-reset"
+        >
+          Reset to default
         </Button>
       </div>
       {feedback ? (

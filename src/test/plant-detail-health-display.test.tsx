@@ -116,7 +116,7 @@ function healthValue() {
   const label = screen.getByText("Health");
   const row = label.parentElement;
   expect(row).not.toBeNull();
-  const value = row!.querySelector(".capitalize");
+  const value = row!.querySelector('[data-testid="plant-detail-health"]');
   expect(value).not.toBeNull();
   return value!.textContent ?? "";
 }
@@ -151,8 +151,11 @@ describe("Plant Detail profile health row after #1bb696006", () => {
     async (health) => {
       renderPlantDetail(health);
       await waitFor(() => expect(screen.getByText("Aurora")).toBeInTheDocument());
-      expect(healthValue()).toBe("unknown");
-      expect(healthValue()).not.toBe("healthy");
+      // #2171: never assessed reads "Not assessed yet", not "Unknown".
+      expect(healthValue()).toBe("Not assessed yet");
+      expect(screen.queryByText(/^unknown$/i)).toBeNull();
+      // Sentence-case copy stays as written: no title-casing class.
+      expect(screen.getByTestId("plant-detail-health")).not.toHaveClass("capitalize");
     },
   );
 
@@ -162,6 +165,7 @@ describe("Plant Detail profile health row after #1bb696006", () => {
       renderPlantDetail(health);
       await waitFor(() => expect(screen.getByText("Aurora")).toBeInTheDocument());
       expect(healthValue()).toBe(health);
+      expect(screen.getByTestId("plant-detail-health")).toHaveClass("capitalize");
     },
   );
 });

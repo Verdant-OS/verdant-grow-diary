@@ -166,6 +166,38 @@ describe("buildTonightTentMetrics — per-metric provenance", () => {
     expect(temp.state).toBe("missing");
   });
 
+  it("does not let a rejected CO2 or soil sibling blank the air readings (Copilot on #2303 at b49c32ae)", () => {
+    const metrics = buildTonightTentMetrics({
+      rows: [
+        row({ metric: "temperature_c", value: 24 }),
+        row({ metric: "humidity_pct", value: 60 }),
+        row({ metric: "vpd_kpa", value: 1.2 }),
+        row({ metric: "co2_ppm", value: 9999, quality: "error" }),
+        row({ metric: "soil_moisture_pct", value: 100, quality: "error" }),
+      ],
+      rowsRead: OK_ROWS,
+      snapshot: NO_SNAPSHOT,
+      now: NOW,
+    });
+    for (const m of metrics) {
+      expect(m.source).toBe("live");
+      expect(m.state).not.toBe("invalid");
+    }
+  });
+
+  it("still withholds the capture when a climate sibling is rejected", () => {
+    const [temp] = buildTonightTentMetrics({
+      rows: [
+        row({ metric: "temperature_c", value: 24 }),
+        row({ metric: "humidity_pct", value: 0, quality: "error" }),
+      ],
+      rowsRead: OK_ROWS,
+      snapshot: NO_SNAPSHOT,
+      now: NOW,
+    });
+    expect(temp.source).toBe("invalid");
+  });
+
   it("labels an old live reading as stale, never live", () => {
     const old = new Date(NOW.getTime() - LIVE_CURRENT_STATE_STALE_MS - 60_000).toISOString();
     const [temp] = buildTonightTentMetrics({

@@ -180,12 +180,15 @@ BEGIN
 
   -- Same write barrier as badge_awards_evaluate_owner (#1979, cbdb77fd2):
   -- recheck the kill switch under a row lock after the advisory lock and
-  -- immediately before any award or evidence write.
+  -- immediately before any award or evidence write. FOR SHARE still blocks a
+  -- concurrent `UPDATE ... enabled = false`, but two evaluations never block
+  -- each other: reconcile keeps this lock for its whole batch, and an
+  -- exclusive lock there deadlocks a user check that holds its owner lock.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
   WHERE runtime.id = 1
-  FOR UPDATE;
+  FOR SHARE;
 
   IF runtime_enabled IS NOT TRUE THEN
     RETURN jsonb_build_object('status', 'disabled');
@@ -407,12 +410,14 @@ BEGIN
   -- Recheck under a row lock after the advisory lock and immediately before
   -- any award or evidence write, so a committed enabled = false is a write
   -- barrier. This lock stays after the advisory wait: taking it earlier
-  -- deadlocks a concurrent disable that is waiting to commit.
+  -- deadlocks a concurrent disable that is waiting to commit. It is FOR SHARE
+  -- so reconcile, which keeps it for its whole batch, cannot deadlock a user
+  -- check that holds its own owner advisory lock.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
   WHERE runtime.id = 1
-  FOR UPDATE;
+  FOR SHARE;
 
   IF runtime_enabled IS NOT TRUE THEN
     RETURN jsonb_build_object('status', 'disabled');

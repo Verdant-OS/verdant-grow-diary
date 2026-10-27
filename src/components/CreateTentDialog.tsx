@@ -147,6 +147,12 @@ export default function CreateTentDialog({
     setForm(EMPTY_TENT_FORM);
   }, [writeBlocked]);
 
+  // The file input is uncontrolled and unmounts with the form, so a picked
+  // photo must not outlive the form being on screen.
+  useEffect(() => {
+    if (!open || formBlocked) setPhotoFile(null);
+  }, [open, formBlocked]);
+
   function handleOpenChange(next: boolean) {
     if (next && (writeBlocked || createOutcomeUnknown)) return;
     setOpen(next);

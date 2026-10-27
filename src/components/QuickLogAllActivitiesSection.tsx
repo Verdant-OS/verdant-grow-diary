@@ -2024,11 +2024,13 @@ export default function QuickLogAllActivitiesSection({
                         const check = file ? validatePlantProfilePhotoFile(file) : null;
                         if (check && !check.ok) {
                           const failure = check as { ok: false; message: string };
-                          setHarvestPhotoFile(null);
+                          clearHarvestPhoto();
                           setErrorReason(failure.message);
                           setErrorForActivity("harvest");
                           return;
                         }
+                        setErrorReason(null);
+                        setErrorForActivity(null);
                         setHarvestPhotoFile(file);
                       }}
                     />

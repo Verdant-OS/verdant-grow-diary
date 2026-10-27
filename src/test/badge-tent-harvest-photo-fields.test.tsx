@@ -325,6 +325,39 @@ describe("badge tent and harvest photo fields", () => {
     expect(removeMock).not.toHaveBeenCalled();
   });
 
+  it("create tent: a photo picked before the form is hidden is not uploaded after it returns", async () => {
+    const view = render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    view.rerender(
+      withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" writeBlocked />),
+    );
+    view.rerender(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.click(screen.getByRole("button", { name: /new tent/i }));
+    fireEvent.change(await screen.findByPlaceholderText("Tent #1"), {
+      target: { value: "Tent #1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).not.toHaveBeenCalled();
+  });
+
+  it("harvest: a rejected photo leaves the picker empty and a valid pick clears its error", async () => {
+    renderHarvestSection();
+    const input = await openHarvest();
+    fireEvent.change(input, {
+      target: { files: [new File(["x"], "notes.txt", { type: "text/plain" })] },
+    });
+    const error = await screen.findByTestId("quick-log-all-activities-error");
+    const message = error.textContent;
+    expect(input.value).toBe("");
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText(message ?? "__none__", { exact: false })).toBeNull(),
+    );
+  });
+
   it("create tent: a code-less error whose row re-reads as saved takes the success path", async () => {
     uploadMock.mockResolvedValue({ error: null });
     singleMock.mockResolvedValue({ data: null, error: { message: "Bad gateway" } });

@@ -5,7 +5,11 @@
  * @source-scan-justified: not used — assertions call the module.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  ensureLocalStorageForTest,
+  getLocalStorageMethodOwnerForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const TOKEN_KEY = "verdant.mcp.oauth.token.v1";
 const PKCE_KEY = "verdant.mcp.oauth.pkce.v1";
@@ -73,12 +77,21 @@ describe("browserOAuthClient", () => {
     clearLocalStorageForTest();
     installLocation();
     localSets = [];
-    vi.spyOn(localStorage, "setItem").mockImplementation((key: string) => {
-      localSets.push(key);
+    const storage = ensureLocalStorageForTest();
+    const owner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = owner.setItem;
+    vi.spyOn(owner, "setItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
+      if (this === storage) localSets.push(String(key));
+      return originalSetItem.call(this, key, value);
     });
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
@@ -261,11 +274,47 @@ describe("browserOAuthClient", () => {
     );
     await expect(
       client.completeAuthorization(malformedIssuer, { code: "auth-code", state: "issued-state" }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(SyntaxError);
+    await expect(
+      client.completeAuthorization(malformedIssuer, { code: "auth-code", state: "issued-state" }),
+    ).rejects.toThrow("Unexpected token 'o', \"not-json\" is not valid JSON");
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
     expect(client.hasStoredToken()).toBe(false);
     // Current contract clears PKCE only after a non-2xx response or a stored access token.
     expect(client.hasPendingAuthorization()).toBe(true);
+    expect(localSets).toEqual([]);
+  });
+
+  it("rejects a token-endpoint fetch failure and does not store a token", async () => {
+    const issuer = "https://issuer-token-reject.test";
+    const { completeAuthorization, hasPendingAuthorization, hasStoredToken } = await loadClient();
+    sessionStorage.setItem(
+      PKCE_KEY,
+      JSON.stringify({
+        verifier: "verifier-token-reject",
+        state: "issued-state",
+        redirect_uri: `${ORIGIN}/agent`,
+        client_id: "client-token-reject",
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("oauth-authorization-server")) return jsonResponse(discoveryDoc(issuer));
+        throw new TypeError("token endpoint unreachable");
+      }),
+    );
+
+    await expect(
+      completeAuthorization(issuer, { code: "auth-code", state: "issued-state" }),
+    ).rejects.toThrow(TypeError);
+    await expect(
+      completeAuthorization(issuer, { code: "auth-code", state: "issued-state" }),
+    ).rejects.toThrow("token endpoint unreachable");
+    expect(hasStoredToken()).toBe(false);
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(hasPendingAuthorization()).toBe(true);
     expect(localSets).toEqual([]);
   });
 
@@ -320,41 +369,31 @@ describe("browserOAuthClient", () => {
   });
 
   it("keeps tokens in sessionStorage only; hasStoredToken and disconnect follow expiry", async () => {
+    vi.useFakeTimers();
+    const t0 = new Date("2026-06-01T00:00:00.000Z");
+    vi.setSystemTime(t0);
     const { disconnect, hasStoredToken } = await loadClient();
     sessionStorage.setItem(
       TOKEN_KEY,
-      JSON.stringify({ access_token: "live", obtained_at: Date.now(), expires_in: 3600 }),
+      JSON.stringify({ access_token: "live", obtained_at: t0.getTime(), expires_in: 3600 }),
     );
     sessionStorage.setItem(PKCE_KEY, JSON.stringify({ state: "pending" }));
     sessionStorage.setItem(CLIENT_KEY, JSON.stringify({ client_id: "c", redirect_uri: ORIGIN }));
     expect(hasStoredToken()).toBe(true);
 
-    sessionStorage.setItem(
-      TOKEN_KEY,
-      JSON.stringify({
-        access_token: "stale",
-        obtained_at: Date.now() - 3570 * 1000,
-        expires_in: 3600,
-      }),
-    );
+    vi.setSystemTime(t0.getTime() + 3570 * 1000);
     expect(hasStoredToken()).toBe(false);
 
-    sessionStorage.setItem(
-      TOKEN_KEY,
-      JSON.stringify({
-        access_token: "inside-skew",
-        obtained_at: Date.now() - 3569 * 1000,
-        expires_in: 3600,
-      }),
-    );
+    vi.setSystemTime(t0.getTime() + 3569 * 1000);
     expect(hasStoredToken()).toBe(true);
 
     sessionStorage.setItem(TOKEN_KEY, "{");
     expect(hasStoredToken()).toBe(false);
 
+    vi.setSystemTime(t0);
     sessionStorage.setItem(
       TOKEN_KEY,
-      JSON.stringify({ access_token: "live", obtained_at: Date.now(), expires_in: 3600 }),
+      JSON.stringify({ access_token: "live", obtained_at: t0.getTime(), expires_in: 3600 }),
     );
     disconnect();
     expect(hasStoredToken()).toBe(false);
@@ -387,6 +426,46 @@ describe("browserOAuthClient", () => {
     expect(first.authorization_endpoint).toBe(`${issuer}/authorize`);
     expect(second).toBe(first);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the RFC 7636 appendix B S256 challenge for that verifier", async () => {
+    const issuer = "https://issuer-pkce-vector.test";
+    const rfcVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+    const rfcChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+    expect(await s256(rfcVerifier)).toBe(rfcChallenge);
+
+    const padded = rfcVerifier.replace(/-/g, "+").replace(/_/g, "/");
+    const verifierBytes = Uint8Array.from(
+      atob(padded + "=".repeat((4 - (padded.length % 4)) % 4)),
+      (c) => c.charCodeAt(0),
+    );
+    expect(verifierBytes).toHaveLength(32);
+    vi.spyOn(crypto, "getRandomValues").mockImplementation((array) => {
+      const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+      if (bytes.length === 32) bytes.set(verifierBytes);
+      else bytes.fill(9);
+      return array;
+    });
+
+    const location = installLocation();
+    const { startAuthorization } = await loadClient();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("oauth-authorization-server")) return jsonResponse(discoveryDoc(issuer));
+        if (url.endsWith("/register")) return jsonResponse({ client_id: "dyn-client" });
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+
+    await startAuthorization(issuer, "/agent-integrations");
+    const pending = JSON.parse(sessionStorage.getItem(PKCE_KEY)!) as { verifier: string };
+    const url = new URL(location.href);
+    expect(pending.verifier).toBe(rfcVerifier);
+    expect(url.searchParams.get("code_challenge")).toBe(rfcChallenge);
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(localSets).toEqual([]);
   });
 
   it("startAuthorization stores a random state and a valid S256 challenge", async () => {

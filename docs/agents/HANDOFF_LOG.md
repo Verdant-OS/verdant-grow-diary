@@ -71,7 +71,7 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ### PR-CLEANUP-2026-10-27-INVENTORY
 
-```text
+````text
 TASK PR-CLEANUP-2026-10-27-INVENTORY  priority: other  status: OPEN
 goal: Matthew's open-PR cleanup, whose program goal is zero open PRs. Phase 1 (done) was a read-only inventory of every open PR with a proposed disposition. Each later phase (closes, consolidations, survivor repair) runs only on Matthew's approval.
 why: 127 open PRs (2026-10-27); many are superseded, stale, or test follow-ups whose parent merged.
@@ -79,10 +79,10 @@ branch: claude/new-session-wp1j5i (the session-bound branch; the cleanup prompt 
 base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
 checkout: git fetch origin claude/new-session-wp1j5i verdant-grow-diary && git switch claude/new-session-wp1j5i && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2556 (draft)
-head_sha: 19d27e8c7bc4a541fe349a009740f90771c26449, observed on origin/claude/new-session-wp1j5i at 2026-10-27T17:44Z; the commit that records this line moves the head past it, so re-read the PR head before any current-head claim
-state: pushed draft (docs only)
-current_step: Phase 1 done. docs/agents/pr-cleanup-2026-10-27.md holds the per-PR table, the close list (14), the consolidation plan (29 folds) and Matthew's decision list.
-next_action: Phase 2 partly done: #2226 #2214 #2182 #1951 #1955 #1980 were closed as superseded on Matthew's approval (2026-10-27). #2372 #2299 were closed as stale on Matthew's approval. Matthew said to keep #1986 #2010 #2024 #2333 #1904 #1902 for now. Badge tree corrected: #2032 and #2342 are both stacked on #1979 (one tree, not rival stacks). Matthew approved the #2032 takeover and port; 3 commits pushed to #2032 at 06f4238c0d7f37843b1d7d6b165c0e46051a4aa3 after Matthew approved the scorer unlocks (strict passes, 8 changed / 0 locked). Open on #2032: wiring the harvest suite into CI (protected) and the 10-22 UI/type review threads. Waiting on the rest of the needs-Matthew list; then Phase 3.
+head_sha: 322cfba77ceaacfb212f08144e5e090ef8009832, observed on origin/claude/new-session-wp1j5i at 2026-10-27T20:48Z; the commit that records this line moves the head past it, so re-read the PR head before any current-head claim
+state: pushed draft (docs plus the 2026-10-27.1 governance bump that commits the CLAUDE.md session-recovery block on Matthew's approval). The 32 shard checks skip while the PR is a draft, so the 35 required checks are NOT_MEASURED until it is marked ready; only Matthew marks it ready.
+current_step: Phases 1 and 2 done. Phase 1: docs/agents/pr-cleanup-2026-10-27.md holds the per-PR table, the close list, the consolidation plan (29 folds) and the decision list. Phase 2: #2226 #2214 #2182 #1951 #1955 #1980 closed as superseded and #2372 #2299 closed as stale, each on Matthew's approval; Matthew kept #1986 #2010 #2024 #2333 #1904 #1902 for now. The #2032 takeover is done: Matthew approved the takeover, the port and the scorer unlocks; the harvest photo flow was reworked through the canonical quicklog_save_event save on his approval; #2032 head is 3f4c3f487a797e10e2b49e247dd8b70b924754e4.
+next_action: Do not repeat Phase 2 closes or the #2032 scorer push. Wait on the open needs-Matthew decisions below, then run Phase 3 (consolidations) only on his approval.
 post_merge_check: NOT_APPLICABLE (inventory doc; not a feature)
 active_writer: Claude session session_017UoYKyHCyHbSMw6VpDj2mb
 decisions: Hands-off PRs (OG Kush) and holds (#2539 #2532 #2252) left untouched. Test-only follow-ups fold into area consolidation PRs, or into their still-open parent. Product fixes are never folded into test consolidations. Protected-scope PRs go to Matthew.
@@ -90,17 +90,17 @@ tried_and_rejected: gh pr list (GH_TOKEN reported invalid for gh auth, though gh
 commands: git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'; git merge-tree --write-tree origin/verdant-grow-diary refs/remotes/pr/<n>; gh api repos/Verdant-OS/verdant-grow-diary/commits/<sha>/check-runs?per_page=100&page=<k>
 files_touched: docs/agents/pr-cleanup-2026-10-27.md; docs/agents/HANDOFF_LOG.md (this block only)
 files_remaining: Phase 5 report appended to docs/agents/pr-cleanup-2026-10-27.md
-blockers: Matthew's approval of the close list and the decisions in that file
-open_questions: whether #2140 is redundant with applied migration 20260924120000; Matthew's call on the scorer-lock unlock for the #2032 takeover push (8 locked scorers, 7 carried in by the #1979 merge) and on wiring supabase/tests/badge_awards_tent_setup_harvest.sql into a CI runner (protected workflow + runner change). The badge-stack question is resolved: #2032 and #2342 are both stacked on #1979; Matthew approved the #2032 takeover and port on 2026-10-27.
+blockers: #2032 protected CI work: wiring supabase/tests/badge_awards_tent_setup_harvest.sql into a CI runner (workflow and runner change, needs Matthew). The 35 required checks on #2032 do not run while its base is #1979's branch.
+open_questions: Needs Matthew: (1) retimestamp migration 20261011143000, which sorts before the live latest 20261014210000; (2) the harvest pgTAP CI wiring above; (3) confirm the scorer unlocks for growAdapters.test.ts and vpd-stage-missing-badge-gates.test.ts that another session reports he approved (unverified here); (4) confirm the two-session regression-test deferral that another session reports he accepted (unverified here); (5) regenerated Supabase types for badge_evidence.harvest_id; (6) whether #2140 is redundant with applied migration 20260924120000.
 gotchas: A green 35/35 at a head 100+ commits behind base is not current; the strict up-to-date policy re-runs CI after a base merge. #2333 carries a product security commit (98f48c08a) that must be checked before closing.
 links: docs/agents/pr-cleanup-2026-10-27.md
 artifacts: docs/agents/pr-cleanup-2026-10-27.md
 reviewer_seat: an eligible independent session routed by OG Kush; not this session
 reviewer_sha: none yet
-session_state: Claude cloud session; no routines, no paused workflows; pending human decision: close-list approval
+session_state: Claude cloud session; one self check-in armed (trig_01YWTvT6ajTDJZr98SHwCa7C); no paused workflows; pending human decisions: the open_questions list
 claimed_by: Claude, 2026-10-27 12:13 CT (first commit of this block, e99de0741; session_017UoYKyHCyHbSMw6VpDj2mb)
 owner: Claude (default inheritor OG Kush)
-last_updated: 2026-10-27 13:09 CT, by Claude
+last_updated: 2026-10-27 16:00 CT, by Claude
 
 ### ACTIONS-BACKLOG-CONCURRENCY
 
@@ -135,7 +135,7 @@ claimed_by: Grok, 2026-10-27 11:30 CT
 owner: Grok
 last_updated: 2026-10-27 15:05 CT, by Grok
 limits: No repo settings, rulesets, secrets, runner config, force-push, rebase, or bun.lock change. Do not convert #2555 to draft or toggle ready.
-```
+````
 
 ### AUTH-LOADING-SMOKE-TIMEOUT-25
 

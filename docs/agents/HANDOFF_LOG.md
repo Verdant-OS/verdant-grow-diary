@@ -76,31 +76,67 @@ TASK CODEX-2057-SPEC-INHERITED-ENVIRONMENT  priority: P2  status: OPEN
 goal: Close the two remaining specification gaps: inherited workflow environment coverage and current prospective implementation-review routing.
 why: A verifier's exact step env does not rule out inherited workflow-level secret bindings; the prospective route also named retired seats.
 branch: claude/proof-expected-sha-spec
-base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+base: verdant-grow-diary at 59fd56421f57b23366258d1a9ed907699054103b (fresh remote tip verified 2026-10-27 UTC).
 checkout: Fetch the existing branch and base; verify current full PR head and scoped writer claim before adopting it in an isolated authorized cloud worktree. Use normal merges and pushes only.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2057
-head_sha: 05c8cda015a42ba95c7a41959696344f03da2c90 (source checkpoint before this repair; resulting full head is in the current PR body).
-state: Documentation-only repair and normal base integration; this spec implements no executable workflow or dispatch behavior.
-current_step: B.2 now requires workflow/job env checks plus resolved pre-verifier inheritance; B.6 requires a local synthetic top-level inheritance mutation for each future implementation workflow. Existing job-level checks remain valid, and the older overstated job-level example is not repeated.
-next_action: Verify published head, fresh required/supplemental CI and eligible non-contributing outside acceptance of the entire spec and body. Preserve draft and the historical Graft exception; do not automatically requeue.
+head_sha: 656b5a3fbec8d26996972b4d69834425e439c75c is the verified source parent. This normal base-integration commit cannot name its own SHA; read the resulting full head from draft #2057 before checking CI/review.
+state: Documentation-only specification retained byte-for-byte from source 656b5a3fbec8d26996972b4d69834425e439c75c. One normal base merge resolves only this log insertion conflict and preserves every incoming base byte outside this own block. Hosted CI and independent acceptance must be fresh at the resulting head.
+current_step: Fresh previously uninvolved writer reproduced the HANDOFF_LOG-only conflict with merge-tree, merged the current deploy tip normally and retained the complete incoming log. Local validation PASS: 4 contract files/337 tests/0 failures/0 skips; all 3 docs-safety categories; 9 release docs; 2-file format; 12-file Sentinel parity with 0 governance edits; base-relative whitespace and strict scorer checks. Normal hooks run at commit; no executable proof implementation is added.
+next_action: Coordinator verifies the published resulting full head and fresh required/supplemental CI, then returns the complete resulting spec/log/body to the existing non-contributing Sour Diesel session 48794c65-be1c-45f8-97e0-a89952916747 for another review. Preserve draft; no duplicate review request, automatic requeue, ready, merge or production action.
 post_merge_check: Confirm the landed spec retains the inheritance mutation requirement, dated exception and explicit protected implementation gates. Production proof execution remains NOT_MEASURED and requires separate authorization.
-active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only docs/specs/proof-dispatch-expected-sha.md, this own handoff block and matching metadata.
+active_writer: Fresh Codex PR #2057 conflict writer, delegated by the closeout coordinator under Matthew's 2026-10-27 03:57 UTC instruction for a previously uninvolved writer. Sole source writer for this bounded base merge; after verified push, explicitly STOP and hand source back to the coordinator before metadata publication.
 decisions: Preserve dated citations and the one-time Graft exception; prospective implementation review uses actual available eligible independent sessions and excludes contributors. Review eligibility does not unlock workflows/scorers or authorize production.
 tried_and_rejected: Treating an exact step mapping as proof of no inherited secret; claiming existing job-env checks are absent; rejecting accurate dated citations solely due to age; assigning retired reviewers or accepting our own repair.
-commands: node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base e18e067af80fcb3eb32b37f1e046fa725bba8a9d --strict; node node_modules/vitest/vitest.mjs run src/test/actions-production-readonly-proof.test.ts src/test/settings-account-production-proof.test.ts src/test/signed-in-readonly-proof.test.ts src/test/one-tent-authenticated-proof-workflow.test.ts --pool=forks --maxWorkers=1; git diff --check.
-files_touched: docs/specs/proof-dispatch-expected-sha.md; docs/agents/HANDOFF_LOG.md (this block only). Normal merge inherits existing canonical base without authoring it.
+commands: PATH=/workspace/scratch/claude-closeout-20261026/tools/bun-1.3.14:$PATH; git merge-tree --write-tree 656b5a3fbec8d26996972b4d69834425e439c75c 59fd56421f57b23366258d1a9ed907699054103b; git merge --no-commit --no-ff 59fd56421f57b23366258d1a9ed907699054103b; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 59fd56421f57b23366258d1a9ed907699054103b --strict; node scripts/check-sentinel-version-parity.mjs 59fd56421f57b23366258d1a9ed907699054103b; node node_modules/vitest/vitest.mjs run src/test/actions-production-readonly-proof.test.ts src/test/settings-account-production-proof.test.ts src/test/signed-in-readonly-proof.test.ts src/test/one-tent-authenticated-proof-workflow.test.ts --pool=forks --maxWorkers=1; node node_modules/prettier/bin/prettier.cjs --check docs/specs/proof-dispatch-expected-sha.md docs/agents/HANDOFF_LOG.md; git diff --check 59fd56421f57b23366258d1a9ed907699054103b.
+validation_scope: Canonical Bun1.3.14; existing own-worktree dependencies reused only after package.json and bun.lock hashes matched the successful 918-package frozen-install receipt and incoming base. Source-relative strict scorer exits2 with 26 locked scorer imports; each and all 78 imported nonlog paths are exactly the deploy-base blob, so no authored scorer change or new unlock is claimed. Full app suite/build and production proof remain NOT_MEASURED; fresh hosted CI and independent acceptance remain required.
+files_touched: Manual change: docs/agents/HANDOFF_LOG.md, this own block only. docs/specs/proof-dispatch-expected-sha.md stays exactly the source blob. Normal merge imports unrelated incoming base files without authoring or altering them.
 files_remaining: None planned for this specification repair; future protected workflow/script/test implementation is outside this slice.
-blockers: Fresh full-head hosted CI and outside acceptance; Codex repaired the spec and cannot accept it. Production behavior and future mutation execution are NOT_MEASURED.
-open_questions: Actual available eligible independent specification-review seat after current-head precheck; historical Graft assignment is not silently transferred by this repair.
+blockers: Sour Diesel final FAIL review 5661894793 at 656b5a3fbec8d26996972b4d69834425e439c75c found only the merge conflict (P1:1/P2:0/P3:0). This repair requires fresh resulting-head CI and full independent re-review; neither an old review nor local success is acceptance. Future implementation mutation execution and production behavior remain NOT_MEASURED.
+open_questions: None for the bounded conflict repair; coordinator owns current-head CI/review follow-through. Shared live-session registry is unavailable; explicit sole-writer delegation and supplied holds control this slice.
 gotchas: Prior queue entry was normally removed and verified at 2026-10-26 18:23:51 UTC. No repeat dequeue, automatic requeue, real secret access or production dispatch.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2057#issuecomment-6421533419; https://github.com/Verdant-OS/verdant-grow-diary/pull/2057#discussion_r4380374686
-artifacts: Current PR description and hosted checks; authorized cloud documentation/contract/commit/push receipts supplement them.
-reviewer_seat: Historical Graft exception preserved; current acceptance still needs an actually available eligible non-contributor under current ownership, with all original Claude and Codex repair contributors excluded.
-reviewer_sha: NOT_MEASURED for the repaired head; old-head verdicts are historical.
-session_state: Isolated cloud documentation writer. No workflow, scorer, credential, dispatch or production mutation.
-claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 19:16 UTC.
-owner: Codex closeout coordinator for this bounded specification repair; outside acceptance and normal merge authority remain separate.
-last_updated: 2026-10-26 19:18 UTC, by Codex closeout coordinator
+artifacts: Current PR description and hosted checks; compact local source/merge/validation/push receipts in /workspace/scratch/claude-closeout-20261026/2057-fresh-required-base-integration/. Older 2057 receipts are dated history.
+reviewer_seat: Existing non-contributing Sour Diesel Grok session 48794c65-be1c-45f8-97e0-a89952916747. Exclude original Claude contributors, every actual author/repairer and all Codex sessions including this fresh conflict writer. Historical one-time Graft specification exception remains history; future protected implementation needs separate authorization and eligible acceptance.
+reviewer_sha: NOT_MEASURED for the resulting merge head. Sour Diesel FAIL 5661894793 binds only to source 656b5a3fbec8d26996972b4d69834425e439c75c and remains historical evidence until fresh review.
+session_state: Fresh isolated conflict writer; no prior involvement in #2057. No external comment/body/review request, workflow dispatch, secret read, scorer unlock, queue or production operation. Coordinator handles metadata only after explicit source STOP/handoff.
+ownership_history: Earlier Codex claim 01a16de3-1885-74b8-8142-25b4c333d0cd at 2026-10-26 19:16 UTC prematurely treated the October16 named Claude transfer (receipt6222263704) as expired ordinary coverage; that was not a released holder. Matthew explicitly accepted retaining the already-published two-file repair under Codex at 2026-10-26 20:50 UTC and confirmed Claude stopped. This resolves the current assignment; it does not retroactively authorize or erase the earlier mistake. Historical premature-claim correction and actual handoff stay in the PR body.
+claimed_by: Fresh Codex #2057 conflict writer, 2026-10-27 UTC, under the explicit coordinator delegation of Matthew's 03:57 UTC instruction; earlier Codex claim and accepted handoff preserved in ownership_history.
+owner: Codex closeout coordinator; sole source repair delegated to this fresh writer until explicit STOP/handoff. Independent acceptance and normal merge authority remain separate.
+last_updated: 2026-10-27 04:05 UTC, by fresh Codex #2057 conflict writer
+```
+
+### VER-285-PRESERVE-MISSING-STAGE
+
+```text
+TASK VER-285-PRESERVE-MISSING-STAGE  priority: P2  status: OPEN
+goal: Preserve an absent historical stage when editing unrelated Timeline fields; save deliberate stage changes only.
+why: EntryEditDialog initializes falsy stages to veg and includes stage in every update, silently creating historical data.
+branch: codex/ver-285-preserve-missing-stage
+base: verdant-grow-diary at 21b267a217f4d2d1b1a53a4ba77b85e9903cd418
+checkout: git fetch origin codex/ver-285-preserve-missing-stage verdant-grow-diary && git switch codex/ver-285-preserve-missing-stage
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2537 (draft)
+head_sha: Read the full current head of draft #2537; this implementation commit cannot name itself. Parent is 1630600154a112d6bdbb4881e7fb408627660cd0.
+state: Implemented and locally validated: 104 tests pass, full TypeScript check passes, scoped ESLint/Prettier pass. Hosted checks and independent acceptance are NOT_MEASURED at this new head.
+current_step: The 19 new mounted regressions failed 17/19 against base (2 explicit-stage controls passed). Final focused suite: 9 files, 104 passed / 0 failed / 0 skipped.
+next_action: Read #2537 full head and required CI; after green, route one eligible independent non-contributing Claude/Grok review. Stay draft; no merge or deploy.
+post_merge_check: After separately authorized release, verify a note-only edit keeps an unrecorded stage and stage counts unchanged after reload. No production write is authorized by this task.
+active_writer: Codex VER-285 session; Matthew explicitly requested the narrow correction and authorized draft workflow.
+decisions: Use an explicit unrecorded UI state; omit stage from UPDATE and callback unless the grower changes it. Preserve raw absent/legacy values on unrelated edits. Keep new tests separate from locked existing tests.
+tried_and_rejected: No plant-stage lookup exists here; current-stage attribution was coincidental. Do not backfill rows or change Timeline filters, creation defaults, schema, or linked Quick Log revision paths.
+commands: node node_modules/vitest/vitest.mjs run src/test/entry-edit-stage-preservation.test.tsx src/test/entry-edit-linked-quicklog-guard.test.tsx src/test/timeline-stage-not-recorded.test.ts src/test/timeline-stage-label-render.test.tsx src/test/timeline-chip-counts-match-list.test.tsx src/test/quicklog-corrections-static-safety.test.ts src/test/timeline-photo-edit-resign.test.ts src/test/timeline-photo-edit-signing-followups.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node node_modules/eslint/bin/eslint.js src/components/EntryEditDialog.tsx src/test/entry-edit-stage-preservation.test.tsx; node scripts/scorer-lock.mjs --report --base 21b267a217f4d2d1b1a53a4ba77b85e9903cd418 --strict
+files_touched: src/components/EntryEditDialog.tsx; src/test/entry-edit-stage-preservation.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None planned; no new rules helper needed because the existing stage presentation helper is reused.
+blockers: Required CI and eligible independent exact-head acceptance remain pending. Local full test suite and build SKIPPED; required hosted CI must provide these gates. Default Node heap exhausted during initial tsc; 6144 MB rerun exposed four invalid test-query options, corrected before the final clean full tsc run. No production verification permitted in this task.
+open_questions: None for historical-stage behavior.
+gotchas: Supabase update returns only id. Tests serialize actual editor UPDATE payloads into a synthetic persistence store, then remount from a separate read; this is not a real DB or production readback receipt. Untouched null, empty, omitted, unknown, whitespace and legacy stage values are preserved. Clearing a stage explicitly writes null; the UI sentinel never reaches persistence. Existing details serialization is outside scope.
+links: https://linear.app/verdantgrowdiary/issue/VER-285/editing-a-timeline-entry-with-no-stage-silently-saves-the-stage-the
+artifacts: New mounted test file and PR validation summary. Existing linked-Quick-Log and zero-row guards pass unchanged. Lint/format/whitespace, scorer lock and docs-safety PASS. All 126 open PR file lists inspected, no editor or stage-helper overlap. VER-285 was unassigned at intake; Linear now shows assignee Verdant after draft linking, no competing writer comment observed.
+reviewer_seat: An actually available independent non-contributing Claude or Grok session; this Codex author is excluded. No request sent.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, review requests, production actions, or automations started. Public claim is in this draft handoff/body; no separate PR comments authorized.
+claimed_by: Codex VER-285, 2026-10-25 01:52 CT
+owner: Codex VER-285
+last_updated: 2026-10-25 01:52 CT, by Codex VER-285
 ```
 
 ### PR-2345-BASE-INTEGRATION

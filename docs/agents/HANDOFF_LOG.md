@@ -82,7 +82,7 @@ pr: the draft PR opened from claude/new-session-wp1j5i (read the URL on GitHub; 
 head_sha: read from the PR; this commit cannot name itself
 state: pushed draft (docs only)
 current_step: Phase 1 done. docs/agents/pr-cleanup-2026-10-27.md holds the per-PR table, the close list (14), the consolidation plan (29 folds) and Matthew's decision list.
-next_action: Phase 2 partly done: #2226 #2214 #2182 #1951 #1955 #1980 were closed as superseded on Matthew's approval (2026-10-27). Matthew said to keep #1986 #2010 #2024. Still waiting on an explicit decision for #2372 #2299 #2333 #1904 #1902 and on the needs-Matthew list; then Phase 3 consolidation PRs.
+next_action: Phase 2 partly done: #2226 #2214 #2182 #1951 #1955 #1980 were closed as superseded on Matthew's approval (2026-10-27). #2372 #2299 were closed as stale on Matthew's approval. Matthew said to keep #1986 #2010 #2024 #2333 #1904 #1902 for now. Waiting on the needs-Matthew list (badge stack first); then Phase 3 consolidation PRs.
 post_merge_check: NOT_APPLICABLE (inventory doc; not a feature)
 active_writer: Claude session session_017UoYKyHCyHbSMw6VpDj2mb
 decisions: Hands-off PRs (OG Kush) and holds (#2539 #2532 #2252) left untouched. Test-only follow-ups fold into area consolidation PRs, or into their still-open parent. Product fixes are never folded into test consolidations. Protected-scope PRs go to Matthew.

@@ -261,9 +261,16 @@ Closed 2026-10-27. For each PR, I first re-checked that it was still open with a
 
 Kept open on Matthew's instruction, so no longer close candidates: #1986, #2010, #2024. Each still needs an owner to revive it. Its table row below shows the original Phase 1 proposal.
 
-Not closed yet, waiting on an explicit decision: the remaining stale proposals #2372, #2299, #2333 (closing it waits on the 98f48c08a check), #1904 and #1902.
+Matthew, 2026-10-27: "close #2372 and #2299, keep the rest for now". Before closing, both were re-checked: still open, head unchanged, and adding nothing when merged into base.
 
-Open count after Phase 2: 121.
+| PR    | Head at close  | Reason                                                                   | Comment                 |
+| ----- | -------------- | ------------------------------------------------------------------------ | ----------------------- |
+| #2372 | `5afe43714f89` | Stale, empty: its only commit of its own (`4f260089d`) changes no files  | issuecomment-6448617477 |
+| #2299 | `8ae4e3485c7d` | Stale, net-empty: base merge `8ae4e3485` dropped its #1723 receipt block | issuecomment-6448618399 |
+
+Kept open "for now" on Matthew's instruction: #2333, #1904, #1902 (and #1986, #2010, #2024 above).
+
+Open count after Phase 2: 119.
 
 ## Verified
 

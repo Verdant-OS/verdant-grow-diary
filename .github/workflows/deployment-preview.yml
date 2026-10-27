@@ -32,12 +32,13 @@ concurrency:
   # One preview build per PR — cancel superseded runs so the PR comment
   # always reflects the latest commit, not a stale in-flight build.
   group: deployment-preview-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Stage 1 — cheap gate. Fails in <1 min if the edge shared-lib mirror
   # is out of sync, so the expensive build stage never starts.
   preflight:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Preflight — edge shared-lib mirror
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -73,6 +74,7 @@ jobs:
   # via `bun run build`). A green here proves this tree builds in CI. It
   # does not measure what a publisher's preview serves; nothing here does.
   build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Production build (preview-bound)
     needs: preflight
     runs-on: ubuntu-latest
@@ -142,7 +144,7 @@ jobs:
   publish-preview-status:
     name: Publish preview status to PR
     needs: [preflight, build]
-    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (!cancelled() && github.event_name == 'pull_request') }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:

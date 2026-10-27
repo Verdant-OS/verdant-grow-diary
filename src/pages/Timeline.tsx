@@ -3226,6 +3226,15 @@ export default function Timeline() {
                                               readKey: activeReadKeyRef.current,
                                             })
                                           ) {
+                                            if (
+                                              origin.readKey !== null &&
+                                              origin.readKey === activeReadKeyRef.current
+                                            ) {
+                                              // A same-scope refresh may still include this deletion
+                                              // or already count it. Reload after confirmation instead
+                                              // of guessing, superseding any older in-flight read.
+                                              void load();
+                                            }
                                             return;
                                           }
                                           const rows = entriesSnapshotRef.current;

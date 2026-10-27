@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-24.7**
+**Sentinel-Version: 2026-10-27.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-24.7**
+**Sentinel-Version: 2026-10-27.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -61,10 +61,10 @@ rule or OWNERSHIP.md on ownership and review routing.
 ### 0.2 Amendment
 
 Change this constitution only by a reviewed pull request. Bump `Sentinel-Version`
-on all twelve governed files in that same change, and record the change in §17.
+on all eighteen governed files in that same change, and record the change in §17.
 Hooks and agents do not edit instruction files except inside that pull request.
-The twelve are this file, its platform mirrors, the handoff protocol, the agents
-readme, and the role files. `docs/agents/CURRENT_STATE.md` is not one of them.
+The eighteen are this file, its platform mirrors, the handoff protocol, the agents
+readme, and the twelve role files. `docs/agents/CURRENT_STATE.md` is not one of them.
 
 ### 0.3 Periodic review
 
@@ -88,7 +88,7 @@ illustrative and labeled as such.
 | Owner | The accountable holder of a workstream. Ownership is temporary. |
 | Handoff | The written block a cold agent uses to resume. Chat is not a handoff. |
 | Gate | A condition that must be true at one head SHA before merge, publish, or spend. |
-| Founder | The seat that keeps the four release decisions. Named in the roster. Everything else runs without waiting on that seat. |
+| Founder | The seat that keeps the four release decisions. Named in the roster. Work outside the recorded per-item approval gates runs without waiting on that seat. |
 | Integration branch | `main`. It is not the deploy branch. Do not push it directly. |
 | Deploy branch | `verdant-grow-diary`. Live behavior is measured here. Do not push it directly. |
 | Roster | `docs/agents/constitution/roster.md`. Replaceable names for seats. |
@@ -121,8 +121,13 @@ Priority loop, and the limit on scope until that loop is clean, safe, and tested
 Grow -> Tent -> Plant -> Quick Log -> Timeline -> Sensor Snapshot -> AI Doctor -> Alert -> Approval-Required Action Queue
 ```
 
-Do not expand into community, competitions, public mode, broad enterprise
-features, heavy automation, or device control until that loop is ready.
+Do not expand into community, competitions, public profiles or feeds, broad enterprise
+features, heavy automation, or device control until that loop is ready. One narrow
+badge exception is design direction only; building it needs its own approval:
+earned badges and their linked photos may be visible to signed-in community members,
+never on the open web. This exception adds no follows, comments, feeds, leaderboards,
+or other community features. Once the community launches, users can make their badges
+private. Every badge needs a linked photo, except badges earned from text-only diary entries.
 
 Build, then audit, then fix, then CI, then publish, then measure on live, then fix.
 
@@ -137,6 +142,8 @@ Build, then audit, then fix, then CI, then publish, then measure on live, then f
 - Do not recommend aggressive nutrient, irrigation, or equipment changes from weak evidence.
 - Do not expose service role keys, bridge tokens, API keys, webhook secrets, private env values, or internal secrets.
 - Treat user data, sensor data, exports, bridge payloads, and model output as untrusted.
+- Show another user's photo or record only through an approved surface, after
+  stripping location and EXIF metadata from any shared photo.
 
 ## 5. Data, schema, and migrations
 
@@ -302,8 +309,15 @@ ran and what you skipped.
 - Payment, migration, and production pull requests stay out of the queue until
   a human approves that exact head SHA. Production database changes, spend,
   publish gates, and the publish decision remain with the founder. Everything
-  else runs without waiting on the founder. Repository work does not authorize
+  else outside the per-item approval gates runs without waiting on the founder.
+  Repository work does not authorize
   those operations.
+- Every merge also needs the founder's per-item yes at that exact head SHA.
+  Existing explicit founder grants keep their recorded scope; this rule does not
+  revoke them or broaden their authority. Review and green checks establish
+  eligibility, not approval to merge. Other
+  per-item approval actions are recorded in the roster. Low-risk repository work
+  outside those gates may proceed under its existing assignment.
 - Off-limits paths and named holds need an explicit reassignment. The current
   list is in operating state and the roster.
 - There is no shared working branch. Only the agent currently holding a branch,
@@ -378,7 +392,14 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
   work beyond the startup read, the seat reads its role file:
   `docs/agents/roles/codex.md`, `docs/agents/roles/grok.md`,
   `docs/agents/roles/claude.md`, `docs/agents/roles/gemini.md`,
-  `docs/agents/roles/security.md`, `docs/agents/roles/council-chair.md`.
+  `docs/agents/roles/canopy.md`,
+  `docs/agents/roles/graft.md`,
+  `docs/agents/roles/root-cause.md`,
+  `docs/agents/roles/trellis.md`,
+  `docs/agents/roles/verdante.md`,
+  `docs/agents/roles/chemdawg.md`,
+  `docs/agents/roles/golden-toad.md`,
+  `docs/agents/roles/harvest.md`.
 
 ## 14. Startup gate
 
@@ -508,15 +529,15 @@ snapshots can differ.
   `/welcome`, and `/internal/demo-proof-walkthrough`.
   These count as evidence only when live `/version.json` reports the SHA under test;
   otherwise report `NOT_MEASURED`.
-- **Governance edit gate.** If you change any of the **twelve versioned governance
+- **Governance edit gate.** If you change any of the **eighteen versioned governance
   files** — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`,
-  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the six
-  `docs/agents/roles/*.md` — you must bump `Sentinel-Version` in **all twelve** in the
+  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the twelve
+  `docs/agents/roles/*.md` — you must bump `Sentinel-Version` in **all eighteen** in the
   same commit. The `sentinel-version-parity` CI gate enforces PARITY (all versions
   equal), MIRROR (GEMINI.md's embedded constitution stays byte-equivalent to
   `AGENTS.md`), and BUMP (changed content requires a new version).
   **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
-  and is not one of the twelve: it is the changing shift report, revised several times a
+  and is not one of the eighteen: it is the changing shift report, revised several times a
   day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
   Editing `docs/agents/CURRENT_STATE.md` alone requires no bump. Single-file edits
   of `docs/agents/CURRENT_STATE.md` have merged with no version change
@@ -526,7 +547,15 @@ snapshots can differ.
 
 ## 17. Changelog
 
-- **2026-10-24.7** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.
+- **2026-10-27.1** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.
+- **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants
+  in the per-item merge rule, matching the roster and ownership policy. No new merge
+  authority, review waiver or production permission is created.
+- **2026-10-26.1** — Reconcile the pending role and badge amendment with the numbered
+  constitution and available-session independent review. Eighteen governed files;
+  Security and Council are retired, with safety and quality review retained in the
+  assigned QA/review scope. The roster records conditional backup merging and
+  per-item approval. No application feature or production action is enabled.
 - **2026-10-24.6** — The environment note names `docs/agents/CURRENT_STATE.md` as the file whose single-file edits need no version bump. Those precedents are commits `1ae167764` and `a0c30e565`.
 - **2026-10-24.5** — Operating state does not override `OWNERSHIP.md` on ownership and review routing; the start-here note in `docs/agents/CURRENT_STATE.md` now says the same thing. Extending the repair-all-defects rule and the do-not-integrate-your-own-work rule from the Codex seat to every branch holder is an intended change, recorded here; the Codex wording stays in the roster. Before editing a migration file, confirm it is new. Everything else runs without waiting on the founder. The integration branch is `main`. The deploy branch is `verdant-grow-diary`.
 - **2026-10-24.4** — Restored the render-body rule in its original words: keep transforms/selectors out of render bodies when possible.

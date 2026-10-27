@@ -78,9 +78,9 @@ why: the row's "Photo" badge came from the raw row, but PlantRelativeTimelineSec
 branch: claude/new-session-6xw9g6
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-6xw9g6 verdant-grow-diary && git switch claude/new-session-6xw9g6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read the PR URL and head from GitHub (a commit cannot name its own SHA)
-head_sha: read from the PR
-state: pushed draft
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2559
+head_sha: eb075f7f942ce5f8653a1092b4fa146644017996 observed 2026-10-27 21:28 UTC (first push); the review-fix commit that adds this line follows it, so read the current head from the PR
+state: pushed; marked ready by Matthew 2026-10-27 21:48 UTC
 current_step: draft PR open; awaiting CI and independent exact-head review routed by OG Kush
 next_action: confirm 35/35 required checks at the PR head; route to an eligible reviewer who did not author it
 post_merge_check: after Publish, on verdantgrowdiary.com open the fixture plant's timeline with a Photo-only log; the row shows a thumbnail that opens full size. Until live /version.json reports the SHA: NOT_MEASURED.

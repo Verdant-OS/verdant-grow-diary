@@ -7,6 +7,7 @@
  * control. No reminder scheduling. No calendar event tables.
  */
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "@/lib/react-router-compat";
 import { Camera, Gauge, ImageUp, NotebookPen, Sprout } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -327,10 +328,8 @@ export default function PlantRelativeTimelineSection({
   );
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const lightboxIndex = findTimelinePhotoIndexById(photoItems, lightboxPhotoId);
-  const photoFor = (id: string) => {
-    const idx = findTimelinePhotoIndexById(photoItems, id);
-    return idx >= 0 ? photoItems[idx] : null;
-  };
+  const photoById = new Map(photoItems.map((photo) => [photo.id, photo]));
+  const photoFor = (id: string) => photoById.get(id) ?? null;
   const historyView = buildPlantHistoryReadView(
     history,
     plantId,
@@ -733,14 +732,18 @@ export default function PlantRelativeTimelineSection({
             {historyView.loadMoreLabel}
           </Button>
         )}
-        {lightboxIndex >= 0 && (
-          <TimelinePhotoLightbox
-            items={photoItems}
-            activeIndex={lightboxIndex}
-            onClose={() => setLightboxPhotoId(null)}
-            onNavigate={(i) => setLightboxPhotoId(photoItems[i]?.id ?? null)}
-          />
-        )}
+        {/* Portal: Plant Detail can mount this section inside `.glass`, whose
+            backdrop-filter would make the fixed overlay cover only that column. */}
+        {lightboxIndex >= 0 &&
+          createPortal(
+            <TimelinePhotoLightbox
+              items={photoItems}
+              activeIndex={lightboxIndex}
+              onClose={() => setLightboxPhotoId(null)}
+              onNavigate={(i) => setLightboxPhotoId(photoItems[i]?.id ?? null)}
+            />,
+            document.body,
+          )}
       </CardContent>
     </Card>
   );

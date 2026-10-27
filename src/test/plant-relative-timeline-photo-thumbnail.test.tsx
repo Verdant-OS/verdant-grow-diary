@@ -127,6 +127,8 @@ describe("Plant Relative Timeline photo thumbnail", () => {
 
     fireEvent.click(within(row).getByTestId("relative-timeline-photo-open"));
     const lightbox = screen.getByTestId("timeline-photo-lightbox");
+    // Portaled to body so a `.glass` (backdrop-filter) ancestor cannot clip it.
+    expect(lightbox.parentElement).toBe(document.body);
     expect(within(lightbox).getByTestId("timeline-photo-lightbox-image").getAttribute("src")).toBe(
       `https://signed.example/${OWNED_PATH}?token=t`,
     );

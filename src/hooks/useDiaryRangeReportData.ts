@@ -18,6 +18,7 @@ import type {
   DiaryRangeHarvestRow,
   DiaryRangeSensorReadingRow,
 } from "@/lib/diaryRangeReportRules";
+import { diaryRowDetailsPhotoPath } from "@/lib/diaryRangeReportRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import {
   EFFECTIVE_SENSOR_QUERY_VERSION,
@@ -73,15 +74,25 @@ async function signPhotoUrls(rows: DiaryRangeDiaryRow[]): Promise<DiaryRangeDiar
   const paths = rows
     .map((r) => r.photo_url)
     .filter((p): p is string => !!p && !p.startsWith("http"));
-  if (paths.length === 0) return rows;
-  const { data, error } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
+  // A photo kept only in details.photo_url (a recovered save, or a failed
+  // column normalization). Unlike a column photo, one that cannot be signed
+  // is dropped rather than failing the report, so a stale path on an old row
+  // cannot take down a report that rendered before this fallback existed.
+  const fallbackPaths = rows.map(diaryRowDetailsPhotoPath).filter((p): p is string => p !== null);
+  if (paths.length === 0 && fallbackPaths.length === 0) return rows;
+  const { data, error } = await supabase.storage
+    .from("diary-photos")
+    .createSignedUrls([...new Set([...paths, ...fallbackPaths])], 3600);
   if (error || !Array.isArray(data)) throw new Error("Diary report photos unavailable.");
   const map = new Map(data.map((s) => [s.path as string, s.signedUrl]));
   if (paths.some((path) => !map.get(path)?.trim()))
     throw new Error("Diary report photos unavailable.");
-  return rows.map((r) =>
-    r.photo_url && map.has(r.photo_url) ? { ...r, photo_url: map.get(r.photo_url)! } : r,
-  );
+  return rows.map((r) => {
+    if (r.photo_url && map.has(r.photo_url)) return { ...r, photo_url: map.get(r.photo_url)! };
+    const fallback = diaryRowDetailsPhotoPath(r);
+    const signed = fallback ? map.get(fallback)?.trim() : undefined;
+    return signed ? { ...r, photo_url: signed } : r;
+  });
 }
 
 export function useDiaryRangeReportData(

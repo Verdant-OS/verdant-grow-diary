@@ -21,11 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useHydrated } from "@/hooks/useHydrated";
-import {
-  buildFaqPageJsonLd,
-  buildSoftwareApplicationJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
 import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
 import { STAGES } from "@/lib/grow";
 import { UNKNOWN_STAGE } from "@/lib/quickLogStageDefaultRules";
@@ -69,24 +65,14 @@ export default function QuickLogStarter() {
   });
 
   useEffect(() => {
-    const app = buildSoftwareApplicationJsonLd({
-      name: "Verdant Grow Diary",
-      description: COPY.seoDescription,
-      url: PAGE_URL,
-    });
+    // The root route already emits the sitewide SoftwareApplication node.
     const faq = buildFaqPageJsonLd({ pageUrl: PAGE_URL, questions: COPY.faq });
-    const appScript = document.createElement("script");
-    appScript.type = "application/ld+json";
-    appScript.setAttribute("data-page-ldjson", "quick-log-starter-app");
-    appScript.text = safeJsonLdStringify(app);
-    document.head.appendChild(appScript);
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
     faqScript.setAttribute("data-page-ldjson", "quick-log-starter-faq");
     faqScript.text = safeJsonLdStringify(faq);
     document.head.appendChild(faqScript);
     return () => {
-      appScript.remove();
       faqScript.remove();
     };
   }, []);

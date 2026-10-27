@@ -148,7 +148,9 @@ describe("AI credit packs (top-up surface)", () => {
     // Still the canonical checkout hook with the pack SKU, now carrying an
     // explicit successUrl — the shared default forwards `returnTo`, which
     // /checkout/success auto-redirects on before a pack grant has landed.
-    expect(PAGE).toMatch(/openCheckout\(\{ priceId: sku, successUrl: packSuccessUrlFor\(sku\) \}\)/);
+    expect(PAGE).toMatch(
+      /openCheckout\(\{ priceId: sku, successUrl: packSuccessUrlFor\(sku\) \}\)/,
+    );
     expect(PAGE).toMatch(/pricing_cta_credit_pack_clicked/);
     expect(ANALYTICS).toMatch(/pricing_cta_credit_pack_clicked/);
   });
@@ -499,9 +501,9 @@ describe("sitemap", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/pricing");
   });
 
-  it("still includes apex, /welcome, and /hardware-integrations", () => {
+  it("still includes apex and /hardware-integrations, and omits the retired /welcome alias", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/");
-    expect(SITEMAP).toContain("https://verdantgrowdiary.com/welcome");
+    expect(SITEMAP).not.toContain("https://verdantgrowdiary.com/welcome");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/hardware-integrations");
   });
 
@@ -549,7 +551,7 @@ describe("Pricing manifest snapshot (narrow)", () => {
       },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
-      { path: "/welcome", access: "public" },
+      { path: "/welcome", access: "redirect", description: "→ /" },
     ]);
   });
 });

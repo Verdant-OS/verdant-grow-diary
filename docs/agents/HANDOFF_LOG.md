@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### TIMELINE-ROUTE-SKELETON
+
+```text
+TASK TIMELINE-ROUTE-SKELETON  priority: P2  status: OPEN
+goal: Stop 1-2s blank or "Loading…" flashes between screens, and stop /timeline from painting the Dashboard while the next route is pending.
+why: A first-time user test on build a1b9cd976581 saw those flashes. TanStack Router keeps the previous match mounted until defaultPendingMs (1000), so Timeline navigation kept the Dashboard. The auth gate and root Suspense fallback replaced the page with a bare loading line.
+branch: cursor/timeline-route-skeleton-8805
+base: verdant-grow-diary
+checkout: git fetch origin cursor/timeline-route-skeleton-8805 verdant-grow-diary && git switch cursor/timeline-route-skeleton-8805 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until the draft PR exists; read the PR for this branch
+head_sha: read origin/cursor/timeline-route-skeleton-8805 after push; this commit cannot name its own SHA
+state: local implementation, draft PR intended
+current_step: Router pending delays are 0. Timeline has its own pending skeleton. AppShell, root Suspense, and the apex loader use RouteTransitionSkeleton. Grow-load error UI is untouched.
+next_action: Leave the PR draft. Do not enqueue, merge, or deploy. Obtain an independent exact-head review after CI.
+post_merge_check: A signed-in navigation to /timeline on https://verdantgrowdiary.com paints Timeline or the Timeline skeleton and does not paint the Dashboard first. NOT_MEASURED until merged and live.
+active_writer: Grok cloud agent on cursor/timeline-route-skeleton-8805
+decisions: defaultPendingMs and defaultPendingMinMs are 0 so the previous match unmounts immediately. Skeletons keep the exact sr-only "Loading…" string because existing auth-gate tests assert it. VER-287 grow-load error copy and GrowDataLoadError stay unchanged.
+tried_and_rejected: Leaving the router default of 1000ms was rejected because it is the window that keeps the Dashboard mounted.
+commands: bunx vitest run src/test/timeline-route-skips-dashboard.test.tsx src/test/slow-loading-screen-gates.test.tsx src/test/app-shell-auth-revalidation-gate.test.ts src/test/authenticated-deep-link-runtime-matching.test.ts --reporter=dot
+files_touched: src/lib/routeTransitionRules.ts; src/components/RouteTransitionSkeleton.tsx; src/router.tsx; src/routes/_app/timeline.tsx; src/components/AppShell.tsx; src/routes/__root.tsx; src/components/RootEntry.tsx; src/test/timeline-route-skips-dashboard.test.tsx; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned
+blockers: exact-head review is NOT_MEASURED
+open_questions: none
+gotchas: Do not force-push. Do not change bun.lock, workflows, migrations, or protected files. Do not mark the PR ready. The sr-only "Loading…" string is load-bearing for auth-gate tests.
+links: build under test was a1b9cd976581 (source claim from the task)
+artifacts: src/test/timeline-route-skips-dashboard.test.tsx
+reviewer_seat: NOT_MEASURED
+reviewer_sha: NOT_MEASURED
+session_state: draft only; no production action
+claimed_by: Grok, 2026-10-27 16:05 CT
+owner: Grok
+last_updated: 2026-10-27 16:05 CT, by Grok
+```
+
 ### ACTIONS-BACKLOG-CONCURRENCY
 
 ```text

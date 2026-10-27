@@ -36,6 +36,7 @@ import { initErrorReporter, reportErrorWhenReady } from "@/lib/errorReporter";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
+import RouteTransitionSkeleton from "@/components/RouteTransitionSkeleton";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
 import { OAUTH_HASH_EARLY_WIPE_SCRIPT } from "@/lib/oauthHashSessionConsumeRules";
 
@@ -205,20 +206,7 @@ function AnalyticsShell() {
 
 /** Minimal, dependency-free fallback shown while a route chunk loads. */
 function PageLoader() {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        minHeight: "60vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <span className="sr-only">Loading…</span>
-    </div>
-  );
+  return <RouteTransitionSkeleton label="Verdant" testId="root-route-skeleton" />;
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {

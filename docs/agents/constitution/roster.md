@@ -7,42 +7,44 @@ Numbered rules in the constitution do not name tools, vendors, or people.
 | --- | --- | --- |
 | Founder | Explicit current instructions outrank the constitution. Production database changes, spend, publish gates, and the publish decision remain with this seat. Repository work does not authorize those operations. | Matthew Cheek |
 | Engineering lead | Default inheritor when a workstream's holder retires and names no successor. | OG Kush |
-| Merge seat | Merges only after per-item approval at the exact head, every required check is green, and an independent exact-head review passes. Does not bypass the queue. | Matthew's current explicit assignment. Chemdawg/Grok 91 is retired; PR #1971 names the Codex coordinating session under the held exception below. No Harvest succession is inferred. |
+| Merge seat | Merges only after per-item approval at the exact head, every required check is green, and an independent exact-head review passes. Does not bypass the queue. | Matthew's current explicit assignment: OG Kush merges PR #1971; Jack Herer gives its independent PASS; Codex is repair-only. The hold below remains. Chemdawg/Grok 91 is retired; no Harvest succession is inferred. |
 | Peers | No peer outranks another. Assignment, named lock, and the coverage claim decide who writes. | Codex, Claude, Grok |
 | Independent reviewer | A session that did not author or repair the change. A shared account is not independence. | See eligibility below |
 | Default inheritor | See engineering lead. | OG Kush |
 
-## PR 1971 merge actor exception and hold
+## PR 1971 merge actor assignment and hold
 
-On 2026-10-26, Matthew retired Chemdawg and explicitly selected the Codex
-coordinating session for [PR #1971](https://github.com/Verdant-OS/verdant-grow-diary/pull/1971)
-as that PR's merge actor. This is a named exception for **PR #1971 only**, including
-its resulting repair heads. It overrides the general prohibitions on a contributing
-Codex session integrating its work and the older Chemdawg/Grok 91/conditional-Harvest
-routing in this roster, OWNERSHIP.md, AGENTS.md, role profiles and review-skill text
-for this PR. Under AGENTS.md §0.1, Matthew's current instruction controls; OWNERSHIP.md
-remains authoritative on routing. This grants no default self-integration power on
-other work and does not change any separately recorded founder grant.
+Matthew's latest direct instruction supersedes the earlier Codex merge-actor
+assignment for [PR #1971](https://github.com/Verdant-OS/verdant-grow-diary/pull/1971):
+**OG Kush merges #1971; Jack Herer gives the independent PASS; Codex is repair-only.**
+Codex may perform the assigned documentation repair, validate it, push normally
+and follow fresh CI. Codex must not mark ready, enqueue, enable auto-merge or merge
+this PR, including after checks turn green. There is no Codex author-integration
+exception for #1971. This assignment changes no separately recorded founder grant.
+Under AGENTS.md §0.1, Matthew's current instruction controls; OWNERSHIP.md
+remains authoritative on routing.
 
-**Current status: merge and deployment held.** Matthew's latest instruction authorizes
-the remaining merge-actor documentation repair, normal push and fresh CI, and says
-not to merge or deploy yet. The assigned session must not mark ready, enqueue,
-enable auto-merge or merge until Matthew later explicitly lifts this hold and gives
-his per-item yes at the final reviewed **full 40-character head SHA**.
+**Current status: merge and deployment held.** Matthew explicitly said not to
+merge or deploy yet. OG Kush may ready/enqueue this PR only after Matthew later
+explicitly lifts the hold and gives his per-item yes at the final reviewed
+**full 40-character head SHA**, after every gate below passes. Assignment, green
+checks and a review do not supply that approval.
 
-After that later approval, all gates must still hold at that same unchanged SHA:
-all 35 required contexts and applicable supplemental checks successful; a complete
-clean PASS with zero P1/P2 from an actually available, eligible, non-contributing
-outside reviewer under OWNERSHIP.md §4.3; no blocking finding, owner hold, scorer-lock
-issue, draft or conflict; and the normal merge queue with `expectedHeadOid` pinned.
-Every contributing Codex session, including the assigned actor and its subagents,
-remains excluded from independent acceptance. Actor assignment, green checks and a
-review are not founder approval. A new head needs fresh CI, full review and approval.
+At that same unchanged head, require all 35 required contexts and applicable
+supplemental checks successful; a complete clean PASS with zero P1/P2 from the
+assigned Jack Herer session, actually available, eligible and non-contributing
+under OWNERSHIP.md §4.3; verified session identity, contributor exclusions and a
+durable complete-scope receipt; no blocking finding, owner hold, scorer-lock
+issue, draft or conflict; and the normal merge queue with expectedHeadOid pinned.
+A role name or shared account is not availability or independence evidence.
+Every contributing Codex session and subagent remains excluded from independent
+acceptance. OG Kush's pre-check or merge role is separate from Jack Herer's
+acceptance. A new head needs fresh CI, complete review and same-head approval.
 
-No future #1971 work routes to retired Chemdawg or its Grok 91 alias. Harvest has not
-inherited this assignment. The historical Chemdawg/Harvest role profiles and their
-default routing below do not override this named exception. No production, publish,
-SQL, auth, secret, spend, settings or deployment authority is granted.
+No future #1971 work routes to retired Chemdawg or its Grok 91 alias. Harvest has
+not inherited this assignment. Historical role profiles and default routing below
+do not override this assignment. No production, publish, SQL, auth, secret, spend,
+settings or deployment authority is granted.
 
 ## Eligibility (illustrative of the current map)
 
@@ -61,15 +63,15 @@ Preserved from the constitution as it stood before names moved here:
 - New branches for the Codex seat use `codex/<task-id>-<slug>`. Other seats preserve the branch they were given.
 - Any agent with repository access may open its own draft pull request for its assigned slice. Preserve the one active writer, branch ownership and review gates.
 - Codex fixes every discovered defect in its assigned repository scope itself. New work arrives as `@codex` comments. A coverage record does not delegate implementation or grant new authority.
-- By default, Codex does not integrate its own work; the named PR #1971 founder exception above is the only exception recorded here and remains held.
-- Codex pushes are ordinary branch pushes only: no force-push, publish, SQL apply, or production database writes. Merge authority requires an existing explicit founder grant; the named PR #1971 exception above remains held until its hold is lifted and every exact-head gate passes. This creates no other grant. Drafts stay draft until an authorized ready/enqueue step.
+- Codex does not integrate its own work under this roster. For PR #1971, Codex is repair-only: OG Kush is the assigned merge actor and Jack Herer the assigned independent acceptor, subject to the hold and all gates above.
+- Codex pushes are ordinary branch pushes only: no force-push, publish, SQL apply, or production database writes. No #1971 ready/enqueue/auto-merge/merge authority is granted to Codex. Other explicit founder grants retain only their separately recorded scope. Drafts stay draft until an authorized ready/enqueue step by the assigned merge actor.
 
 ## Conditional backup merge seat
 
 The earlier arrangement made Harvest the conditional backup while Chemdawg was
 unavailable, only when Verdante asked, with the seat returned on Chemdawg's return.
 Chemdawg's retirement does not activate that arrangement or assign Harvest PR #1971;
-the current named exception above controls. Preserve this earlier role description
+the current named assignment above controls. Preserve this earlier role description
 as history, not a new merge grant. Its recorded gates were all at one exact head SHA:
 Matthew's per-item yes; 35/35 required checks; an eligible independent PASS under
 OWNERSHIP.md §4.3; no HOLD, scorer-lock problem, draft state, or merge conflict.

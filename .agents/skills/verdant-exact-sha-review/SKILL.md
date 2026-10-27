@@ -13,7 +13,7 @@ The shared box skill `code-review-and-quality` (on the agents' box at `/home/box
 
 | Role                            | Who                                                                                                                                                                                                                               | Does                                                                                | Never                                                                                                           |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Merge-queue owner               | Matthew's current explicit assignment under OWNERSHIP.md and the roster; PR #1971 names its Codex coordinator under the held founder exception                                                                                   | Routes PRs to reviewers, sends findings back to authors, and merges under section 4 only after all approvals and holds clear | Reviews its own work                                                                                            |
+| Merge-queue owner | Matthew's current explicit assignment under OWNERSHIP.md and the roster; OG Kush for PR #1971, with Codex repair-only and merge held | Routes PRs to reviewers, sends findings back to authors, and merges under section 4 only after all approvals and holds clear | Reviews its own work |
 | Independent acceptance reviewer | Actually available eligible session under OWNERSHIP.md §4.3: Codex on non-Codex-authored work Codex did not repair; non-contributing Claude/Grok review sessions, including for Codex-authored work; Durban Poison when available | Reviews the complete scope and required evidence at one full head SHA               | Writes or repairs while serving as independent reviewer; accepts its own work; merges, publishes or applies SQL |
 | Low-risk reviewer               | Graft, only within the existing OWNERSHIP.md allowlist                                                                                                                                                                            | Exact-head PASS on allowlisted work Graft neither authored nor repaired             | Accepts governance, protected or mixed scopes outside its lane                                                  |
 | Author                          | Claude, Codex, Grok, or another assigned implementation session                                                                                                                                                                   | One active writer implements and fixes findings under a valid claim                 | Accepts its own work                                                                                            |
@@ -27,14 +27,19 @@ Graft's low-risk allowlist is unchanged. Missing availability, independence or s
 coverage is BLOCKED. Reviewer eligibility changes no merge-actor assignment or powers.
 
 [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) controls routing and merge ownership.
-The [roster's named PR #1971 exception](../../../docs/agents/constitution/roster.md#pr-1971-merge-actor-exception-and-hold)
-records Matthew's assignment of that PR's Codex coordinator as merge actor after
-Chemdawg/Grok 91 retired. It explicitly overrides older actor and no-author-integration
-text for PR #1971 only, while all contributing Codex sessions remain excluded from
-independent acceptance. Harvest does not inherit the assignment. The current
-**do-not-merge-or-deploy hold** remains; no ready/enqueue/auto-merge/merge may occur
-until Matthew later lifts it and approves the final reviewed full SHA after all
-gates pass. This skill and operating state do not override that ownership or hold.
+The [roster's PR #1971 assignment](../../../docs/agents/constitution/roster.md#pr-1971-merge-actor-assignment-and-hold)
+records Matthew's latest direct instruction: **OG Kush merges #1971; Jack Herer
+gives the independent PASS; Codex is repair-only.** It supersedes the earlier
+Codex merge-actor exception. Codex must not ready, enqueue, enable auto-merge or
+merge this PR. Every contributing Codex session and subagent remains excluded
+from independent acceptance. Jack Herer must be an actually available, eligible
+non-contributing outside session with verified provenance and a complete-scope
+exact-head receipt; the name alone is not acceptance. OG Kush's pre-check does
+not supply Jack Herer's PASS. Chemdawg/Grok 91 is retired and Harvest does not
+inherit this assignment. The current **do-not-merge-or-deploy hold** remains:
+OG Kush needs Matthew's later explicit hold release and per-item yes at the
+final reviewed full SHA after all gates pass. This skill and operating state
+do not override that ownership or hold.
 
 Ownership is temporary accountability, not permanent dibs. Keep one active implementation
 writer with explicit claim/release safeguards under AGENTS.md. Preserve fresh claims,

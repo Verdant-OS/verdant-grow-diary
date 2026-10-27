@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### RETIRE-FOUNDER-SALES-MACHINERY
+
+```text
+TASK RETIRE-FOUNDER-SALES-MACHINERY  priority: P2  status: OPEN
+goal: PR A of two. Remove the code that existed only to sell Founder Lifetime: the public founder-slots-remaining edge function, the useFounderSlotsRemaining hook, the dead founder_lifetime slot block in get-paddle-price, and the tests and config that only cover them. No migration; PR B carries the SQL.
+why: #2028 (merged 0200d255) stopped selling Founder Lifetime. Matthew decided 2026-10-27 (session_01U9xQZcQhgrfTPEcjzgvjkb): existing holders keep access forever, the Founders Wall stays, a refund still revokes access, and a late pre-cutoff purchase event still grants.
+branch: claude/retire-founder-sales-machinery
+base: verdant-grow-diary
+checkout: git fetch origin claude/retire-founder-sales-machinery verdant-grow-diary && git switch claude/retire-founder-sales-machinery && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED (draft opened right after this commit)
+head_sha: read the PR head; this commit cannot name itself
+state: pushed draft, handoff block only; implementation not started
+current_step: open the draft PR, then implement PR A
+next_action: delete supabase/functions/founder-slots-remaining/ and src/hooks/useFounderSlotsRemaining.ts, remove the dead founder_cap block in supabase/functions/get-paddle-price/index.ts (keep the 410 plan_retired guard), then fix every reference (config.toml, config/edge-function-domain-reach.json, .lovable classification, census lists, test mocks)
+post_merge_check: Matthew deletes the deployed founder-slots-remaining function; GET .../functions/v1/founder-slots-remaining then returns 404
+active_writer: Claude (session_01U9xQZcQhgrfTPEcjzgvjkb)
+decisions: keep allocate_lovable_founder_lifetime and revoke_lovable_founder_lifetime_by_transaction (late grants and refund revocation stay); keep the founders table, founders_wall_public, the immutables trigger and founder_number; SQL drops and cap/slot body edits go to PR B (migration, Matthew's receipt). Matthew approved the scorer-lock unlocks listed in the PR body (2026-10-27).
+tried_and_rejected: one combined PR with the migration; rejected so the code slice is not held behind the migration receipt
+commands: bunx vitest run <touched tests> --reporter=dot; bun run typecheck; node scripts/verify-edge-shared-in-sync.mjs
+files_touched: docs/agents/HANDOFF_LOG.md
+files_remaining: see next_action and the PR body file list
+blockers: none for PR A; PR B needs Matthew's migration receipt
+open_questions: none
+gotchas: vi.mock of a deleted module path fails at import, so drop every useFounderSlotsRemaining mock with the hook; existing tests are scorer-locked, so edit only the unlocked list
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing and Edge scope); all contributors excluded
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-10-28 00:00 UTC
+owner: Claude
+last_updated: 2026-10-27 19:00 CT, by Claude
+```
+
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL
 
 ```text

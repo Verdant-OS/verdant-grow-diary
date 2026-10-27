@@ -33,8 +33,8 @@ ALTER TABLE public.badge_awards
   );
 
 -- Qualifies first_tent, setup_documented, and first_recorded_harvest.
--- Called only from badge_awards_evaluate_owner after the kill switch and
--- auth.uid() checks. Not granted to client roles.
+-- Called only from badge_awards_evaluate_owner after the kill switch,
+-- auth.uid() and anonymous-session checks. Not granted to client roles.
 CREATE OR REPLACE FUNCTION public.badge_awards_evaluate_photo_subject(
   badge_key text,
   uid uuid
@@ -59,6 +59,7 @@ DECLARE
   prior_photo text;
   prior_tent uuid;
   prior_harvest uuid;
+  runtime_enabled boolean;
 BEGIN
   IF badge_key = 'first_tent' THEN
     subject_kind := 'tent';
@@ -135,6 +136,19 @@ BEGIN
 
   IF revoked_at IS NOT NULL THEN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
+  END IF;
+
+  -- Same write barrier as badge_awards_evaluate_owner (#1979, cbdb77fd2):
+  -- recheck the kill switch under a row lock after the advisory lock and
+  -- immediately before any award or evidence write.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN jsonb_build_object('status', 'disabled');
   END IF;
 
   IF subject_id IS NULL THEN
@@ -245,6 +259,8 @@ DECLARE
   was_hidden boolean;
   revoked_at timestamptz;
 BEGIN
+  -- Fast path only. The write barrier is the FOR UPDATE recheck after the
+  -- advisory lock, immediately before any award or evidence mutation.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
@@ -256,6 +272,10 @@ BEGIN
 
   uid := auth.uid();
   IF uid IS NULL THEN
+    RETURN jsonb_build_object('status', 'not_authenticated');
+  END IF;
+
+  IF COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) THEN
     RETURN jsonb_build_object('status', 'not_authenticated');
   END IF;
 
@@ -342,6 +362,20 @@ BEGIN
 
   IF revoked_at IS NOT NULL THEN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
+  END IF;
+
+  -- Recheck under a row lock after the advisory lock and immediately before
+  -- any award or evidence write, so a committed enabled = false is a write
+  -- barrier. This lock stays after the advisory wait: taking it earlier
+  -- deadlocks a concurrent disable that is waiting to commit.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN jsonb_build_object('status', 'disabled');
   END IF;
 
   IF entry_id IS NULL THEN
@@ -440,8 +474,11 @@ DECLARE
   owner uuid;
   last_owner uuid;
   reconciled integer := 0;
+  visited integer := 0;
   batch_limit constant integer := 25;
 BEGIN
+  -- Fast path only. Each owner is read again before evaluate_owner, and the
+  -- cursor write rechecks under FOR UPDATE after that call returns.
   SELECT runtime.enabled, runtime.reconcile_after
     INTO runtime_enabled, cursor_after
   FROM public.badge_award_runtime AS runtime
@@ -473,20 +510,49 @@ BEGIN
     ORDER BY owners.user_id
     LIMIT batch_limit
   LOOP
-    PERFORM set_config('request.jwt.claim.sub', owner::text, true);
-    PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
-    PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
-    PERFORM public.badge_awards_evaluate_owner('first_tent');
-    PERFORM public.badge_awards_evaluate_owner('setup_documented');
-    PERFORM public.badge_awards_evaluate_owner('first_recorded_harvest');
-    reconciled := reconciled + 1;
+    -- Plain read, once per owner. Do not lock the runtime row across
+    -- evaluate_owner: that call waits on the owner advisory lock, and holding
+    -- the runtime row across that wait deadlocks a concurrent disable.
+    SELECT runtime.enabled
+      INTO runtime_enabled
+    FROM public.badge_award_runtime AS runtime
+    WHERE runtime.id = 1;
+
+    IF runtime_enabled IS NOT TRUE THEN
+      EXIT;
+    END IF;
+
+    BEGIN
+      PERFORM set_config('request.jwt.claim.sub', owner::text, true);
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
+      PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
+      PERFORM public.badge_awards_evaluate_owner('first_tent');
+      PERFORM public.badge_awards_evaluate_owner('setup_documented');
+      PERFORM public.badge_awards_evaluate_owner('first_recorded_harvest');
+      reconciled := reconciled + 1;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'badge_awards_reconcile skipped owner %: %', owner, SQLERRM;
+    END;
+    visited := visited + 1;
     last_owner := owner;
   END LOOP;
 
   PERFORM set_config('request.jwt.claim.sub', '', true);
   PERFORM set_config('request.jwt.claims', '{}', true);
 
-  IF reconciled < batch_limit THEN
+  -- Same write barrier as the evaluator. Skip the cursor update when the
+  -- switch is off. The row lock is taken only after evaluate_owner returns.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN reconciled;
+  END IF;
+
+  IF visited < batch_limit THEN
     UPDATE public.badge_award_runtime
        SET reconcile_after = NULL
      WHERE id = 1;

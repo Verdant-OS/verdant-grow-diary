@@ -79,13 +79,19 @@ describe("AI Doctor grounding ReDoS regression", () => {
       [
         "--input-type=commonjs",
         "-e",
-        `${outputText}
-        const { inputs, packet } = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+        `const { code, inputs, packet } = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+        const loaded = { exports: {} };
+        new Function("module", "exports", "require", code)(loaded, loaded.exports, require);
         process.stdout.write(JSON.stringify(inputs.map(input =>
-          exports.validateAiDoctorReviewGrounding(input, packet))));
+          loaded.exports.validateAiDoctorReviewGrounding(input, packet))));
       `,
       ],
-      { input: JSON.stringify({ inputs, packet }), encoding: "utf8", timeout: 3000 },
+      // Keep the command line short on Windows; source and fixtures travel on stdin.
+      {
+        input: JSON.stringify({ code: outputText, inputs, packet }),
+        encoding: "utf8",
+        timeout: 3000,
+      },
     );
     expect(
       child.error?.message,

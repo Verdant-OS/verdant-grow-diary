@@ -81,7 +81,7 @@ checkout: git fetch origin cursor/mcp-browser-oauth-client-tests-fd0f verdant-gr
 pr: draft; read the PR URL from GitHub after the first push
 head_sha: read origin/cursor/mcp-browser-oauth-client-tests-fd0f after push; this block is in the implementation commit
 state: tests written locally; behavior of browserOAuthClient.ts unchanged
-current_step: 11 focused tests pass. Scoped ESLint is clean. `NODE_OPTIONS=--max-old-space-size=6144 bun run typecheck` exited 0. Default heap OOM is a machine limit, not a type error.
+current_step: Replaced localStorage.clear() with clearLocalStorageForTest. assert-test-localstorage-helper-usage OK. Focused vitest 11 passed / 0 failed. Push a normal commit; PR stays draft.
 next_action: Read the draft PR head, confirm required CI, and route an eligible independent review that did not author this change. Keep the PR draft.
 post_merge_check: bunx vitest run src/test/mcp-browser-oauth-client.test.ts on the deploy head; a failure reopens this work with the same owner.
 active_writer: Cursor Grok session on cursor/mcp-browser-oauth-client-tests-fd0f
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no review request, no production action
 claimed_by: Cursor Grok, 2026-10-27 09:28 CT
 owner: Cursor Grok VER-293 session
-last_updated: 2026-10-27 09:28 CT, by Cursor Grok
+last_updated: 2026-10-27 10:45 CT, by Cursor Grok
 ```
 
 ### PR2511-REQUIRED-TRIGGER-GUARDS

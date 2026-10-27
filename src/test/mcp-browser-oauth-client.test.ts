@@ -5,6 +5,7 @@
  * @source-scan-justified: not used — assertions call the module.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 
 const TOKEN_KEY = "verdant.mcp.oauth.token.v1";
 const PKCE_KEY = "verdant.mcp.oauth.pkce.v1";
@@ -69,7 +70,7 @@ describe("browserOAuthClient", () => {
 
   beforeEach(() => {
     sessionStorage.clear();
-    localStorage.clear();
+    clearLocalStorageForTest();
     installLocation();
     localSets = [];
     vi.spyOn(localStorage, "setItem").mockImplementation((key: string) => {

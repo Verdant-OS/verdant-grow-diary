@@ -37,7 +37,10 @@ import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
-import { uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
+import {
+  HARVEST_PHOTO_NOT_SAVED,
+  HARVEST_PHOTO_UNCONFIRMED,
+} from "@/constants/quickLogHarvestPhotoCopy";
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -537,6 +540,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
+    setHarvestPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
@@ -569,6 +573,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
+    setHarvestPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
       setSelectedDraft(null);
       return;
@@ -699,6 +704,7 @@ export default function QuickLogAllActivitiesSection({
       setDetailValues({});
       envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
+      setHarvestPhotoFile(null);
     },
     [currentTarget, isMutationBlocked, openStructuredWater],
   );
@@ -771,6 +777,12 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomStageConfirmed(false);
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
+        // A recovered save never re-uploads: the photo was not attached, so
+        // say so rather than dropping the chosen file silently.
+        if (record.input.activityId === "harvest" && harvestPhotoFile) {
+          toast.error(HARVEST_PHOTO_NOT_SAVED);
+        }
+        setHarvestPhotoFile(null);
         setErrorReason(null);
         setErrorForActivity(null);
       } else if (stillSameRecoveryScope) {
@@ -791,7 +803,7 @@ export default function QuickLogAllActivitiesSection({
         // The confirmed write remains successful if parent cleanup fails.
       }
     },
-    [onSaveSuccess],
+    [harvestPhotoFile, onSaveSuccess],
   );
 
   const handleRetryPendingActivity = useCallback(async () => {
@@ -1318,34 +1330,66 @@ export default function QuickLogAllActivitiesSection({
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
-        if (selected.id === "harvest" && harvestPhotoFile && user?.id && growId) {
-          const checked = validatePlantProfilePhotoFile(harvestPhotoFile);
-          if (!checked.ok) {
-            toast.error(checked.message);
+        if (selected.id === "harvest" && harvestPhotoFile && user?.id) {
+          // Attach through the same photo-diary path as the Photo activity,
+          // linked to the confirmed harvest event. No second write path.
+          const ownerId = user.id;
+          const harvestPhotoEntryId = newPhotoDiaryEntryId();
+          if (!savedGrowEventId || !harvestPhotoEntryId || photoAttachmentUncertain) {
+            toast.error(HARVEST_PHOTO_NOT_SAVED);
           } else {
+            const ext = (harvestPhotoFile.name.split(".").pop() || "jpg").toLowerCase();
+            const path = `${ownerId}/${capturedTarget.growId}/${Date.now()}.${ext}`;
+            let uploaded = false;
             try {
-              const harvestId = crypto.randomUUID();
-              const uploaded = await uploadOwnerSubjectPhoto({
-                file: harvestPhotoFile,
-                mime: checked.mime,
-                userId: user.id,
-                kind: "harvest",
-                subjectId: harvestId,
-              });
-              const { error: harvestPhotoError } = await supabase.from("harvests").insert({
-                id: harvestId,
-                user_id: user.id,
-                grow_id: growId,
-                grow_type: "indoor",
-                photo_url: uploaded.reference,
-              });
-              if (harvestPhotoError) {
-                toast.error("The harvest photo was not saved.");
+              const { error: uploadError } = await supabase.storage
+                .from("diary-photos")
+                .upload(path, harvestPhotoFile, {
+                  contentType: harvestPhotoFile.type,
+                  upsert: false,
+                });
+              if (uploadError) {
+                toast.error(HARVEST_PHOTO_NOT_SAVED);
+              } else {
+                uploaded = true;
+                const attached = await createQuickLogPhotoDiaryEntry({
+                  ownerId,
+                  growId: capturedTarget.growId,
+                  tentId: capturedTarget.tentId,
+                  plantId: capturedTarget.plantId,
+                  photoPath: path,
+                  noteRaw: "",
+                  action: "harvest",
+                  extraDetails: { grow_event_id: savedGrowEventId },
+                  entryId: harvestPhotoEntryId,
+                });
+                if (!attached.ok) {
+                  const failure = attached as { ok: false; ambiguous?: boolean };
+                  if (failure.ambiguous) {
+                    markPhotoAttachmentUncertain(ownerId, capturedTarget, harvestPhotoEntryId);
+                    toast.error(HARVEST_PHOTO_UNCONFIRMED);
+                  } else {
+                    try {
+                      await supabase.storage.from("diary-photos").remove([path]);
+                    } catch {
+                      // Best-effort only after a definitive non-commit.
+                    }
+                    toast.error(HARVEST_PHOTO_NOT_SAVED);
+                  }
+                }
               }
             } catch {
-              toast.error("The harvest photo was not saved.");
+              if (uploaded) {
+                markPhotoAttachmentUncertain(ownerId, capturedTarget, harvestPhotoEntryId);
+                toast.error(HARVEST_PHOTO_UNCONFIRMED);
+              } else {
+                toast.error(HARVEST_PHOTO_NOT_SAVED);
+              }
             }
           }
+          // The attempt is over and reported; a later recovery must not
+          // report this photo again.
+          setHarvestPhotoFile(null);
         }
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);
@@ -1409,6 +1453,7 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
         setPhotoFile(null);
+        setHarvestPhotoFile(null);
         setSelectedDraft(null);
         setErrorReason(null);
         setErrorForActivity(null);
@@ -1440,6 +1485,7 @@ export default function QuickLogAllActivitiesSection({
     firstDetailNumberError,
     user,
     photoFile,
+    harvestPhotoFile,
     photoAttachmentUncertain,
     markPhotoAttachmentUncertain,
     onSaveStart,
@@ -1971,7 +2017,16 @@ export default function QuickLogAllActivitiesSection({
                       disabled={mutationBlocked}
                       onChange={(e) => {
                         if (isMutationBlocked()) return;
-                        setHarvestPhotoFile(e.target.files?.[0] ?? null);
+                        const file = e.target.files?.[0] ?? null;
+                        const check = file ? validatePlantProfilePhotoFile(file) : null;
+                        if (check && !check.ok) {
+                          const failure = check as { ok: false; message: string };
+                          setHarvestPhotoFile(null);
+                          setErrorReason(failure.message);
+                          setErrorForActivity("harvest");
+                          return;
+                        }
+                        setHarvestPhotoFile(file);
                       }}
                     />
                     <p className="text-[11px] text-muted-foreground">

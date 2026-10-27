@@ -20,6 +20,9 @@ COMMENT ON COLUMN public.harvests.photo_url IS
 ALTER TABLE public.badge_evidence
   ADD COLUMN IF NOT EXISTS harvest_id uuid;
 
+COMMENT ON COLUMN public.badge_evidence.harvest_id IS
+  'The qualifying harvest: a harvests row id or a Quick Log harvest grow_events id. No foreign key.';
+
 ALTER TABLE public.badge_awards DROP CONSTRAINT IF EXISTS badge_awards_badge_key_check;
 ALTER TABLE public.badge_awards
   ADD CONSTRAINT badge_awards_badge_key_check
@@ -109,16 +112,47 @@ BEGIN
     tent_id := subject_id;
   ELSE
     -- The account's earliest harvest, not the earliest harvest that has a photo.
-    SELECT harvest.id,
-           public.badge_awards_owned_diary_photo_name(harvest.photo_url, uid),
-           harvest.grow_id
+    -- A harvest is a harvests row or a live Quick Log harvest event. An
+    -- event's photo is the owned, unretracted diary photo attached to that
+    -- exact event id, never one matched by time.
+    SELECT candidate.subject_id, candidate.photo_name, candidate.grow_id
       INTO subject_id, photo_name, grow_id
-    FROM public.harvests AS harvest
-    JOIN public.grows AS grow
-      ON grow.id = harvest.grow_id
-     AND grow.user_id = uid
-    WHERE harvest.user_id = uid
-    ORDER BY harvest.harvested_at ASC, harvest.id ASC
+    FROM (
+      SELECT harvest.id AS subject_id,
+             public.badge_awards_owned_diary_photo_name(harvest.photo_url, uid) AS photo_name,
+             harvest.grow_id AS grow_id,
+             harvest.harvested_at::timestamptz AS happened_at
+      FROM public.harvests AS harvest
+      JOIN public.grows AS grow
+        ON grow.id = harvest.grow_id
+       AND grow.user_id = uid
+      WHERE harvest.user_id = uid
+      UNION ALL
+      SELECT event.id,
+             (
+               SELECT public.badge_awards_owned_diary_photo_name(entry.photo_url, uid)
+               FROM public.diary_entries AS entry
+               WHERE entry.user_id = uid
+                 AND entry.grow_id = event.grow_id
+                 AND entry.retracted_at IS NULL
+                 AND entry.details ->> 'attached_to_action' = 'harvest'
+                 AND entry.details ->> 'grow_event_id' = event.id::text
+                 AND public.badge_awards_owned_diary_photo_name(entry.photo_url, uid) IS NOT NULL
+               ORDER BY entry.entry_at ASC, entry.id ASC
+               LIMIT 1
+             ),
+             event.grow_id,
+             coalesce(event.occurred_at, event.created_at)
+      FROM public.grow_events AS event
+      JOIN public.grows AS grow
+        ON grow.id = event.grow_id
+       AND grow.user_id = uid
+      WHERE event.user_id = uid
+        AND event.event_type = 'harvest'
+        AND event.is_deleted IS NOT TRUE
+        AND event.deleted_at IS NULL
+    ) AS candidate
+    ORDER BY candidate.happened_at ASC, candidate.subject_id ASC
     LIMIT 1;
     IF photo_name IS NULL THEN
       subject_id := NULL;

@@ -20,6 +20,9 @@ DECLARE
   v_both_tent uuid := gen_random_uuid();
   v_stolen uuid := gen_random_uuid();
   v_stolen_tent uuid := gen_random_uuid();
+  v_harvest_event uuid := gen_random_uuid();
+  v_unlinked_entry uuid := gen_random_uuid();
+  v_linked_entry uuid := gen_random_uuid();
   v_photo text;
   v_both_photo text;
   v_stranger_photo text;
@@ -249,6 +252,61 @@ BEGIN
   ASSERT v_result->>'status' = 'unchanged', 'another user photo does not document a setup';
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_stolen;
   ASSERT v_count = 0, 'another user photo writes no award';
+
+  RESET role;
+  -- A Quick Log harvest event earns First Recorded Harvest only through the
+  -- owned, unretracted diary photo attached to that exact event id.
+  -- Fixture insert: service_role is the only free-cap fixture bypass
+  -- (enforce_free_creation_caps keeps bare postgres sessions cap-checked).
+  PERFORM set_config('role', 'service_role', true);
+  INSERT INTO public.grow_events (id, user_id, grow_id, event_type, occurred_at, source)
+  VALUES (v_harvest_event, v_both, v_both_grow, 'harvest', '2026-10-08T00:00:00Z', 'manual');
+  INSERT INTO public.diary_entries (id, user_id, grow_id, note, photo_url, entry_at, details)
+  VALUES (
+    v_unlinked_entry, v_both, v_both_grow, 'unlinked', v_both_photo, '2026-10-08T00:00:01Z',
+    jsonb_build_object(
+      'event_type', 'quicklog_photo_attachment',
+      'source', 'manual',
+      'attached_to_action', 'harvest'
+    )
+  );
+  INSERT INTO public.diary_entries (
+    id, user_id, grow_id, note, photo_url, entry_at, details, retracted_at
+  ) VALUES (
+    v_linked_entry, v_both, v_both_grow, 'linked', v_both_photo, '2026-10-08T00:00:02Z',
+    jsonb_build_object(
+      'event_type', 'quicklog_photo_attachment',
+      'source', 'manual',
+      'attached_to_action', 'harvest',
+      'grow_event_id', v_harvest_event::text
+    ),
+    '2026-10-09T00:00:00Z'
+  );
+  RESET role;
+  PERFORM set_config('request.jwt.claim.sub', v_both::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_both)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
+  ASSERT v_result->>'status' = 'unchanged',
+    'a harvest photo not linked to the event, or retracted, earns nothing';
+
+  RESET role;
+  PERFORM set_config('role', 'service_role', true);
+  UPDATE public.diary_entries SET retracted_at = NULL WHERE id = v_linked_entry;
+  RESET role;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
+  ASSERT v_result->>'status' = 'qualified',
+    'an owned photo linked to the Quick Log harvest event earns First Recorded Harvest';
+  RESET role;
+  ASSERT (
+    SELECT evidence.harvest_id
+    FROM public.badge_evidence AS evidence
+    JOIN public.badge_awards AS award ON award.id = evidence.award_id
+    WHERE award.user_id = v_both AND award.badge_key = 'first_recorded_harvest'
+    ORDER BY evidence.created_at DESC
+    LIMIT 1
+  ) = v_harvest_event, 'the evidence names the harvest event';
 
   RESET role;
   PERFORM set_config('role', 'service_role', true);

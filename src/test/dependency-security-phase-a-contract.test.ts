@@ -241,7 +241,7 @@ describe("dependency security Phase A resolution floors", () => {
   it("pins only same-major compatible overrides", () => {
     expect(packageJson.overrides).toMatchObject({
       esbuild: "0.28.1",
-      "fast-uri": "3.1.8",
+      "fast-uri": "3.1.9",
       "form-data": "4.0.6",
       "follow-redirects": "1.16.1",
       "@modelcontextprotocol/sdk": "1.32.0",

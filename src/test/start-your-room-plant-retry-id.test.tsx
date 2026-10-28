@@ -162,4 +162,26 @@ describe("Start Your Room plant retry id (Codex review)", () => {
     releaseRefresh();
     await waitFor(() => expect(navMock).toHaveBeenCalledTimes(1));
   });
+
+  it("clears the setup draft before leaving for the new plant (Copilot review)", async () => {
+    // Real routing unmounts the page with the navigation, so the "done" effect
+    // never runs; the draft must already be gone when navigation starts.
+    refreshMock.mockImplementation(async () => undefined);
+    let draftAtNavigation: string | null = "not navigated";
+    navMock.mockImplementation(() => {
+      draftAtNavigation = window.sessionStorage.getItem(draftKey);
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+
+    await waitFor(() => expect(navMock).toHaveBeenCalledTimes(1));
+    expect(draftAtNavigation).toBeNull();
+  });
 });

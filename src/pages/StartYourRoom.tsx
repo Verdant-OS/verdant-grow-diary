@@ -562,6 +562,9 @@ export default function StartYourRoom() {
       toast.success("Plant created and linked");
       // Persist diary-first start screen so next login skips empty onboarding.
       setStartScreenChoice(user.id, "quickLog");
+      // The page unmounts with this navigation, before the "done" effect that
+      // clears the draft can run, so clear it here.
+      clearBrowserSessionFormDraft(saveOwnerId, START_YOUR_ROOM_DRAFT_FORM_ID);
       nav(plantDetailQuickLogHref(plantId), { replace: true });
     } finally {
       createInFlightRef.current = false;

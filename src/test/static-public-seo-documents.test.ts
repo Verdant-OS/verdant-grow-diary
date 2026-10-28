@@ -112,9 +112,8 @@ describe("static public SEO documents", () => {
       }),
       expect.objectContaining({
         path: "/breeder-beta",
-        canonicalPath: "/creator-beta",
         metadata: expect.objectContaining({
-          url: `${VERDANT_SITE_ORIGIN}/creator-beta`,
+          url: `${VERDANT_SITE_ORIGIN}/breeder-beta`,
           robots: "noindex, follow",
         }),
       }),
@@ -151,8 +150,8 @@ describe("static public SEO documents", () => {
       expect(document.fileName).toBe(expectedFileName(document.path));
       // Self-canonical is the rule. The single sanctioned exception is a
       // document that DECLARES a `canonicalPath` — an indexable audience
-      // variant conceding its ranking URL to another route (see
-      // crossCanonicalDocument and src/test/breeder-beta-cross-canonical.test.ts).
+      // variant conceding its ranking URL to another route. None is in the
+      // indexable set today (/breeder-beta became self-canonical on 2026-10-28).
       // The fence is not loosened, only redirected: such a document must match
       // its declared target exactly, so a wrong URL still fails here and can
       // only be introduced deliberately.

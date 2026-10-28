@@ -75,7 +75,7 @@ describe("/creator-beta noindex", () => {
     expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(URL);
   });
 
-  it("the hydrated breeder page stays noindex and canonicalises to /creator-beta", () => {
+  it("the hydrated breeder page stays noindex and is self-canonical", () => {
     cleanup();
     render(
       <MemoryRouter>
@@ -85,7 +85,9 @@ describe("/creator-beta noindex", () => {
     expect(document.head.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
       "noindex, follow",
     );
-    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(URL);
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
+      `${VERDANT_SITE_ORIGIN}/breeder-beta`,
+    );
   });
 
   it("is absent from the sitemap", () => {

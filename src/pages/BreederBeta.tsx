@@ -8,11 +8,10 @@
  * yield claims, no medical claims.
  *
  * SEO: this route is a copy-only variant of /creator-beta (same <BetaLanding>
- * component). The 2026-08-20 adjudication still points its canonical at
- * /creator-beta. On 2026-10-26 the owner hid both URLs from search
- * (`noindex, follow`). The build-time half lives in staticPublicSeoDocuments.ts;
- * this hook runs after hydration and would overwrite the pre-rendered canonical
- * and robots if it did not name the same target.
+ * component). On 2026-10-26 the owner hid both URLs from search
+ * (`noindex, follow`), and on 2026-10-28 made /breeder-beta self-canonical. The
+ * build-time half lives in staticPublicSeoDocuments.ts; this hook runs after
+ * hydration and must name the same canonical and robots as the pre-rendered head.
  */
 import BetaLanding from "@/components/BetaLanding";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -23,7 +22,6 @@ export default function BreederBeta() {
     description:
       "Controlled beta for breeders and pheno hunters. Lab evidence and sensory notes stay recorded. The breeder decides what advances.",
     path: "/breeder-beta",
-    canonicalPath: "/creator-beta",
     noindex: true,
   });
 

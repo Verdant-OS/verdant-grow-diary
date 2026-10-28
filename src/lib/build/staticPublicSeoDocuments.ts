@@ -456,46 +456,6 @@ function aliasDocument(
   };
 }
 
-/**
- * An audience variant that concedes its ranking URL to another route.
- *
- * Distinct from `aliasDocument` above, and the difference is the whole point:
- * `aliasDocument` builds a legacy redirect stub (`/strains/*`) that inherits the
- * target's title, description and JSON-LD wholesale and is marked
- * `noindex, follow`. This helper keeps the variant's OWN copy. Robots is
- * optional and owner-driven: omit it and the document stays `index, follow`;
- * pass `robots: "noindex, follow"` when the owner hides that URL from search.
- * The only caller today is /breeder-beta, hidden on 2026-10-26.
- *
- * Do not "simplify" this into `aliasDocument`. The variant keeps its own
- * title and description.
- *
- * `metadata.url` is the single source for `<link rel="canonical">`, `og:url`,
- * and the WebPage JSON-LD `@id`, so pointing it at the canonical target keeps
- * all three in agreement — which is exactly what the postbuild
- * canonical/og-parity and JSON-LD `@id` validators assert.
- */
-function crossCanonicalDocument(
-  path: string,
-  canonicalPath: string,
-  metadata: Omit<StaticSocialRouteMetadata, "url" | "image"> & {
-    readonly image?: string;
-  },
-): StaticPublicAliasDocument {
-  const url = `${VERDANT_SITE_ORIGIN}${canonicalPath}`;
-  return {
-    path,
-    fileName: routeFileName(path),
-    canonicalPath,
-    metadata: {
-      ...metadata,
-      url,
-      image: metadata.image ?? DEFAULT_OG_IMAGE,
-      jsonLd: metadata.jsonLd ?? [buildStaticWebPageJsonLd({ ...metadata, url })],
-    },
-  };
-}
-
 const GUIDE_HUB = publicDocument("/guides", {
   title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
   description:
@@ -842,8 +802,9 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
       imageAlt: "Next Door Cannabis Oreoz and Gelonade comparison",
       robots: "noindex, follow",
     }),
-    // 2026-10-26, owner: hide /creator-beta from search. The page stays public.
-    // /breeder-beta still canonicalises here (2026-08-20) and is noindex too.
+    // 2026-10-26, owner: hide /creator-beta and /breeder-beta from search. The
+    // pages stay public. 2026-10-28, owner: /breeder-beta is self-canonical; the
+    // 2026-08-20 cross-canonical to /creator-beta is retired while both are noindex.
     publicDocument("/creator-beta", {
       title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
       description:
@@ -851,7 +812,7 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
       imageAlt: "Verdant Creator & Breeder Beta",
       robots: "noindex, follow",
     }),
-    crossCanonicalDocument("/breeder-beta", "/creator-beta", {
+    publicDocument("/breeder-beta", {
       title: "Verdant Breeder Beta | Verdant Grow Diary",
       description:
         "Controlled beta for breeders and pheno hunters. Lab evidence and sensory notes stay recorded. The breeder decides what advances.",

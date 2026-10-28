@@ -73,7 +73,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/cultivars` — robots `index, follow`; sitemap yes; canonical `/cultivars`
 - `/customer/guide/oreoz-vs-gelonade-comparison` — robots `noindex, follow`; sitemap no; canonical `/customer/guide/oreoz-vs-gelonade-comparison`
 - `/creator-beta` — robots `noindex, follow`; sitemap no; canonical `/creator-beta`
-- `/breeder-beta` — robots `noindex, follow`; sitemap no; canonical `/creator-beta`
+- `/breeder-beta` — robots `noindex, follow`; sitemap no; canonical self (`/breeder-beta`, since 2026-10-28)
 - `/cultivars/sour-diesel` — robots `noindex, follow`; sitemap no; canonical `/cultivars/sour-diesel`
 - `/cultivars/og-kush` — robots `noindex, follow`; sitemap no; canonical `/cultivars/og-kush`
 - `/cultivars/blue-dream` — robots `noindex, follow`; sitemap no; canonical `/cultivars/blue-dream`
@@ -102,7 +102,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 
 `/docs/mcp-api` is in `public/sitemap.xml` and is not in `STATIC_ONLY_ROUTES`. A comment above that document in `src/lib/build/staticPublicSeoDocuments.ts` still says the route is static-only and absent from the sitemap. This inventory follows the document array, the allowlist, and `public/sitemap.xml`.
 
-`/creator-beta` and `/breeder-beta` are `noindex, follow` (2026-10-26, owner: hide from search). `/breeder-beta` still points its canonical at `/creator-beta`. Neither URL is in the sitemap. `STATIC_ONLY_ROUTES` is empty.
+`/creator-beta` and `/breeder-beta` are `noindex, follow` (2026-10-26, owner: hide from search). Since 2026-10-28 `/breeder-beta` is self-canonical (owner); the 2026-08-20 cross-canonical to `/creator-beta` is retired while both are noindex. Neither URL is in the sitemap. `STATIC_ONLY_ROUTES` is empty.
 
 `/pheno-comparison` and `/pheno-expression-showcase` are `index, follow` static documents and sitemap URLs. Their pages call `usePageSeo` without `noindex`.
 

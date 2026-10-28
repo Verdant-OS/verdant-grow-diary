@@ -26,6 +26,10 @@ const ANCHOR_GROUPS = {
 
 export type PlantDetailKnownAnchorId = keyof typeof ANCHOR_GROUPS;
 
+export const PLANT_DETAIL_KNOWN_ANCHOR_IDS = Object.keys(
+  ANCHOR_GROUPS,
+) as PlantDetailKnownAnchorId[];
+
 export interface PlantDetailDisclosureTarget {
   anchorId: PlantDetailKnownAnchorId;
   group: PlantDetailDisclosureGroup | null;

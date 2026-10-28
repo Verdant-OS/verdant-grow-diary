@@ -286,9 +286,10 @@ describe("test execution manifest — every committed test runs, or says why not
   it("keeps the four lanes at or above their audited execution counts", () => {
     // Ratchet floors, not targets. The audit measured 10/31 deno, 35/60 playwright,
     // 23/41 harness and 2/9 pgTAP as executed at its pinned rev; P2(a)/P2(b) then wired
-    // 19 deno files and 14 specs. Regressing below today's counts fails.
+    // 19 deno files and 14 specs. Regressing below today's counts fails. #2570 lowered the
+    // deno floor 29 -> 26 when it deleted founder-slots-remaining and its 6 Deno tests.
     const byLabel = Object.fromEntries(audit.lanes.map((l: { label: string }) => [l.label, l]));
-    expect(byLabel["deno edge tests"].executed).toBeGreaterThanOrEqual(29);
+    expect(byLabel["deno edge tests"].executed).toBeGreaterThanOrEqual(26);
     expect(byLabel["playwright specs"].executed).toBeGreaterThanOrEqual(50);
     expect(byLabel["runtime harnesses"].executed).toBeGreaterThanOrEqual(23);
     expect(byLabel["pgTAP suites"].executed).toBeGreaterThanOrEqual(2);

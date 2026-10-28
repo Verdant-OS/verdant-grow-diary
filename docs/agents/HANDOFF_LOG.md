@@ -78,7 +78,7 @@ branch: claude/vibrant-heisenberg-njd6r3
 base: verdant-grow-diary; PR base SHA observed 2026-10-26: 37202b540d00cafd3d31848136225e7cd147d1d3
 checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (draft; returned to draft on Matthew's instruction 2026-10-27 18:23 UTC; stay draft pending required checks and independent acceptance)
-head_sha: b281ce0c85b08f4db4b708c45fda6f2f8e6c0d4b (observed 2026-10-27 22:35 UTC: 2/35 required checks passed, 33 skipped and not green because #2555 skips them on draft PRs, no check failed; last 35/35-green head was ce9258ec6). Base merges on top of the Codex repair head c739be13, adopted by the 18:16 UTC Claude claim. The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
+head_sha: 6dcef15d7fbe88f640622b78a229acc0995fd12b (observed 2026-10-28 01:07 UTC: 2/35 required checks passed, 33 skipped and not green because #2555 skips them on draft PRs, no check failed; last 35/35-green head was ce9258ec6). Base merges on top of the Codex repair head c739be13, adopted by the 18:16 UTC Claude claim. The commit that records this block is a base merge on top of it; compare against the PR's current head before resuming.
 state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
 current_step: Codex repaired the remaining documentation findings: fixed captured timestamps and two-run fixture repeatability; #2503 closure/precondition and separate apply authorization before production SQL; acceptance cross-references and complete contributor exclusions. No migration or client implementation is included.
 next_action: Verify the resulting full remote head and fresh required CI, then route one eligible non-contributing reviewer over both changed files. No acceptance request or PASS is implied by this repair. Matthew's migration implementation/per-PR/apply decisions remain separate.
@@ -89,7 +89,41 @@ reviewer_seat: unassigned; an eligible independent session under OWNERSHIP.md §
 review_request: blocked pending the repaired full head and fresh required CI; no duplicate request sent; reviewer unassigned; fallback transfers 0
 active_writer: Claude session 01QxMpAHgnpV65y3Yykv8CvE, retaken on Matthew's instruction 2026-10-27; spec documentation only, no migration or client implementation
 claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-27 18:16 UTC; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6450080975. Codex /root held the bounded repair claim of 2026-10-26 (#issuecomment-6423583100) and remains an excluded repairer.
-last_updated: 2026-10-27 22:37 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+last_updated: 2026-10-28 01:09 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+```
+
+### ARCH-CONTRACT-POST-MERGE-20261028
+
+```text
+TASK ARCH-CONTRACT-POST-MERGE-20261028  priority: other  status: OPEN
+goal: Record the post-merge verification of #2564 (contract restamp + topology fifth amendment) at deploy tip 604274a793b0b38320a09de246bd8c4d166089ad: reproduce the stamp's census figures, re-read the eight stack conclusions from source, correct the assignment text where source contradicts it, and hand the merged documents to a non-contributing Grok session for an independent read. Docs only; no competing contract or spec.
+why: Matthew's architecture/specification assignment (2026-10-27) was already delivered by #2564 before this session's collision audit ran; #2564's named post-merge check is the figure reproduction this task performs.
+branch: claude/new-session-u6kn52
+base: verdant-grow-diary at 604274a793b0b38320a09de246bd8c4d166089ad
+checkout: git fetch origin claude/new-session-u6kn52 verdant-grow-diary && git switch claude/new-session-u6kn52 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2572 (ready for review since 2026-10-28 ~00:15 UTC, on Matthew's instruction)
+head_sha: f2d3e09986cfe941084d69520e2d211f4e653d60, observed on origin/claude/new-session-u6kn52 and PR #2572 at 2026-10-28 00:29 UTC (last pushed head before this line; the commit that records it is a newer descendant, so re-read the PR head before any current-head claim)
+state: pushed, ready for review, docs only
+current_step: Receipt written: AC-3.2 610 at 27991451 -> 609 at the tip (#2028 deleted founderShareRules.ts); AC-3.4 941 statements / 940 files at the tip, reconciled to #2564's 940/939 by named files; AC-10.2 zero hits; eight stack rows re-read (rows "Lovable gateway", "npm compatibility may remain" and "billing_subscriptions" FAIL against source). Live M1/M2/M7/M10 BLOCKED on all three egress routes.
+next_action: Independent read by an available non-contributing Grok session per the receipt's section 13; then close this block. No merge, enqueue, publish or production action from this session.
+post_merge_check: NOT_APPLICABLE (receipt; the next contract restamp owns the 609 / 941-940 figures)
+active_writer: Claude session_017UoYKvojgRxESWUyQyGEmj on claude/new-session-u6kn52
+decisions: No second contract or spec (AGENTS.md section 9; #2564 merged 23:51 UTC). No closure edit of the ARCH-CONTRACT-RESTAMP / FIX-2146 blocks (#2571 already carries it). Contract and spec left untouched: the two merges past the stamp (#2559, #2028) are application changes whose moved cites #2564 re-read; the next restamp owns the census deltas.
+tried_and_rejected: Live /version.json read: curl blocked by the session bash safety hook; Firecrawl out of credits; fetch tool ENOTFOUND (host outside allowed domains). One attempt each; not routed around.
+commands: git ls-tree -r --name-only 604274a7 -- src/lib | grep -E '^src/lib/[^/]*Rules\.ts$' | wc -l; grep -rhoE 'from "@/lib/react-router-compat"' src --include=*.ts --include=*.tsx | wc -l; grep -rliE 'nelson|modified ?z|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' src supabase scripts e2e tools plugins spikes; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs
+files_touched: docs/audits/architecture-contract-post-merge-verification-2026-10-28.md (new); handoff-verdant-architecture-contract.md (rules 8 and 13, corrections log, Q2/Q4, lineage, the section 13 re-attach sentence and the audit footer count: the three assignment-text corrections on Matthew's instruction 2026-10-28, plus review follow-ups); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none
+blockers: Live apex reads BLOCKED (network policy). Grok review NOT_MEASURED until a session picks it up; no GitHub review request posted.
+open_questions: None. Matthew answered 2026-10-28: correct the assignment text with the three fixes; done in handoff-verdant-architecture-contract.md. The persona text outside the repository is his to update.
+gotchas: The contract's AC-3.2 / AC-3.4 figures now trail the tip by one each; do not "fix" them outside a restamp. The persona text names billing_subscriptions; the read is subscriptions (useMyEntitlements.ts:90).
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2571 ; handoff-verdant-architecture-contract.md (#2336)
+artifacts: the receipt file above
+reviewer_seat: an available non-contributing Grok session (OWNERSHIP.md section 4.3); excluded: this session, Claude session_017UoYKz1FZZdZu9afTV2RhP, the #2149 Grok session, the sour diesel session, connector bots
+reviewer_sha: NOT_MEASURED
+session_state: Claude cloud session; no cron, watcher, comment, review request, ready-state change, merge or production action
+claimed_by: Claude session_017UoYKvojgRxESWUyQyGEmj, 2026-10-28 00:20 UTC (Matthew's assignment prompt; no GitHub claim comment posted)
+owner: Claude (this session); default inheritor OG Kush
+last_updated: 2026-10-28 00:36 UTC, by Claude (recovery baseline SHA recorded; Copilot r4395736630)
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL
@@ -806,7 +840,83 @@ claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
 ```
 
+### STOP-SELLING-FOUNDER-LIFETIME
+
+```text
+TASK STOP-SELLING-FOUNDER-LIFETIME  priority: P1  status: OPEN
+goal: Stop selling Founder Lifetime on public sales surfaces. Keep existing Founder entitlements until a separate PR and migration. Follow-up FOUNDER-BLUEPRINT-20261024 (Matthew, 2026-10-24 3:51 PM CT): existing-holder copy names the retained Pro Blueprint.
+branch: cursor/stop-selling-founder-lifetime-0628
+base: verdant-grow-diary
+checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (ready for review since 2026-10-27 21:28 UTC)
+head_sha: read the PR head after push; base 27991451 merged in 9472c1a3 (block moved to the end of Open to stop repeat conflicts); 87067552 logs the Founder refusal as stage plan_retired; this handoff commit cannot name itself
+state: PR ready for review (marked 2026-10-27 21:28 UTC at Matthew's instruction); base 27991451 merged 2026-10-27. All review threads resolved. At prior head 862ab201: 35/35 required checks green, Codex code + security review no findings; Paddle Founder price archived. The new merge head supersedes that CI, review and approval
+next_action: fix in-scope required-check failures at the head; fresh exact-head review; Matthew approves the exact head SHA before the merge owner queues it (payment PR)
+files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md, src/test/founder-blueprint-retained-copy.test.tsx
+blockers: none in this PR; entitlement removal is a later PR plus migration
+artifacts: .claude/scorer-unlock.json is gitignored and must not be committed
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing scope: Codex on non-Codex work, or a non-contributing Claude/Grok session); all contributors excluded
+claimed_by: Claude, 2026-10-27 18:17 UTC (renewal, PR comment 6450051931)
+last_updated: 2026-10-27 22:00 UTC, by Claude
+```
+
 ## Closed
+
+### ARCH-CONTRACT-RESTAMP-20261027
+
+```text
+TASK ARCH-CONTRACT-RESTAMP-20261027  priority: P2  status: CLOSED
+goal: Source-grounded §15 re-verification of docs/architecture-contract.md at deploy tip 27991451a756d2521df08e26e504776a43c7bbb8 (#2283), carrying #2149's nine-P2 amendment, so the Current Architecture Contract describes the tree that ships; then, approved by Matthew on 2026-10-27 as a stacked commit on the same branch, the release topology specification's fifth amendment (§2.11, §6.3) re-verified from source at the same tip. Docs only.
+why: Matthew assigned Claude as owner of Verdant architecture/specification work (2026-10-27) and chose "restamp in place" over new documents after the collision audit found both target documents already on the deploy branch. AGENTS.md §9: one implementation; #2149 is merged into this branch rather than duplicated.
+branch: claude/amazing-darwin-km8ehw
+base: verdant-grow-diary at 27991451a756d2521df08e26e504776a43c7bbb8
+checkout: None; closed (merged). Historical: git fetch origin claude/amazing-darwin-km8ehw verdant-grow-diary && git switch claude/amazing-darwin-km8ehw
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564 (merged)
+head_sha: d410d0f5f65878adcc92aae4f1970e62654ccf9d (final PR head); merge commit 604274a793b0b38320a09de246bd8c4d166089ad on the deploy branch
+state: CLOSED (merged). Last recorded open state: ready for review; contract restamp, topology amendment §2.11/§6.3, base merge 8020003d, sour diesel rounds at 4ce69f5c (0/2/1) and db1eacc4 (0/0/0), Codex P2 at db1eacc4 fixed in d410d0f5
+current_step: Every path:line cite into the 27 cited files that changed since c8523adc was re-read by a session checker (compares line text at both trees, relocates moved lines by stamped text; not committed). Counts reproduced at c8523adc first, then measured at the tip: AC-3.2 610 files, 55/7 raw, 44/6 executable, 0, 2; AC-3.4 940 in 939 alias-only (943/942 full); AC-4.3 77/67, 70/61, 106/86; AC-10.2 zero. Substance recorded: zod 3 to 4 (#2505, AC-1.8); AC-1.5/T8 package cites re-read at start-server-core 1.169.39 / start-client-core 1.170.34; AC-1.1 health/withHostHeaders cites corrected (wrong since c8523adc); AC-9.2 patches row history. docs:assert-safety PASS; prettier clean.
+next_action: None; closed. Post-merge check stays with the next contract restamp (reproduce the 27991451 figures first) and the next topology stamp with apex egress (M1, M2, M7, M10).
+post_merge_check: The next contract restamp reproduces this stamp's AC-3.2 / AC-3.4 / AC-4.3 / AC-10.2 figures from 27991451 before measuring its own tip. NOT_MEASURED until then. No production behavior is measured by this task.
+active_writer: none; branch claude/amazing-darwin-km8ehw retired after merge
+decisions: Restamp in place, not a new document (Matthew, 2026-10-27). Merge origin/cursor/architecture-contract-p2s-37b4 (#2149) into this branch so its nine P2 fixes are carried once; HANDOFF_LOG conflict resolved by keeping both blocks. Stamp SHA is the deploy tip, not this branch's merge commit. The #2149 merge touched only the two docs; the later base merge 8020003d (#2559, #2028; 86 non-docs files past 27991451) moved five cited files, which were re-read on the merged tree and recorded in the contract header's post-stamp note and a §15.1 row. Every other clause describes 27991451. Package-internal cites re-read from exact-version tarballs in a scratch directory (bun add --exact), labelled as such.
+tried_and_rejected: Writing a second contract or topology spec (duplicates merged work). Treating #2149 as a blocker and waiting (it is a docs-only amendment of the same file; carrying it is the one-implementation path). Restamping the topology spec in this PR (separate slice by assignment; its drift is recorded below instead).
+commands: node scripts/assert-docs-safety.mjs; bunx prettier@3 --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; git diff --name-only c8523adc 27991451 | sort > changed; comm -12 cited changed (27 files); git log --first-parent --oneline c8523adc..27991451 | wc -l (174)
+files_touched: docs/architecture-contract.md; docs/specs/release-topology-specification.md (header, §2.11, §5 re-cites, §6.3, §10 row, §12 follow-up, §13 bullet, AT-18, §15.4); docs/agents/HANDOFF_LOG.md (FIX-2146 block carried from #2149; this block)
+files_remaining: none for this slice
+blockers: None for the repository change. Live apex reads (M1, M2 DNS, M7, M10) remained BLOCKED from the authoring session and are recorded so in the spec's §10.
+open_questions: None. Ordering decided by Matthew 2026-10-27: #2564 merged first; GitHub then marked #2149 merged because #2564's merge commit carries its head.
+gotchas: The contract's AC-10.2 pin on the spec's not-implemented row moves with every spec edit (now :1017 on this branch, with the §6.3 copy at :1064; :948 at 27991451). AC-1.5 package cites hold only for the pinned versions named; a TanStack bump moves them. The 46 new *Rules.ts files are listed in AC-3.2 by convention; a future restamp may collapse the list. Prettier re-pads the §15.1 table on every row added.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2149 ; handoff-verdant-architecture-contract.md (#2336)
+artifacts: PR #2564 body (collision audit, counts, residual checker flags); contract header "This stamp" paragraph and §15.1 row dated 2026-10-27
+reviewer_seat: sour diesel review session (login cheekhimself), review-only, neither authored nor repaired; recorded as the OWNERSHIP.md §4.3 independent acceptance on Matthew's instruction 2026-10-27 (PR body receipt and comment 6456448629). Excluded: Claude session_017UoYKz1FZZdZu9afTV2RhP (author/repairer), the Grok session behind #2149's dfb1567e, and the Codex/CodeRabbit connector passes.
+reviewer_sha: d410d0f5f65878adcc92aae4f1970e62654ccf9d, review 5675892210 (0/0/0) at 2026-10-27 23:39 UTC; PASS, no P1 or P2
+session_state: PR #2564 merged via the merge queue after Matthew's instruction; auto-merge (squash) enabled by this session on that instruction. No publish, production or Action Queue action.
+claimed_by: Claude session_017UoYKz1FZZdZu9afTV2RhP, 2026-10-27 (Matthew's direct assignment in chat; no GitHub claim comment posted)
+owner: Claude (this session) for the restamp; independent acceptance must come from a non-contributing session
+last_updated: 2026-10-27 23:51 UTC, by Claude session_017UoYKz1FZZdZu9afTV2RhP (closure)
+closure: #2564 merged as 604274a793b0b38320a09de246bd8c4d166089ad at 2026-10-27 23:51 UTC from final head d410d0f5f65878adcc92aae4f1970e62654ccf9d (merge queue; the queue produced a merge commit with parents 0200d2551b86d3df63e709651874ee85d9863fdc and d410d0f5f65878adcc92aae4f1970e62654ccf9d, not a squash). Matthew's per-item yes and merge instruction given in chat 2026-10-27; Matthew chose merge #2564 first and close #2149 as superseded; GitHub marked #2149 merged on its own because its head became reachable. Production delivery NOT_MEASURED here.
+```
+
+### FIX-2146-ARCHITECTURE-CONTRACT-P2S
+
+```text
+TASK FIX-2146-ARCHITECTURE-CONTRACT-P2S  priority: P2  status: CLOSED
+goal: Fix the nine Codex P2s from #2073's retrospective review (GitHub #2146, comment 6196768751) in docs/architecture-contract.md. Docs only. Do not edit the merged #2073 body.
+branch: cursor/architecture-contract-p2s-37b4
+base: verdant-grow-diary
+checkout: None; closed (merged via #2564). Historical: git fetch origin cursor/architecture-contract-p2s-37b4 verdant-grow-diary && git switch cursor/architecture-contract-p2s-37b4
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2149 (merged via #2564)
+head_sha: 998f04143ed11f3290114a7a77c008ec13aae136, remote observed 2026-10-19 16:09 UTC. A merge of the deploy branch (7225925277557742d03ebfcc78398541c38e027c) and the fix commit for the three Codex P2s at that head follow it; compare origin/cursor/architecture-contract-p2s-37b4 and the PR head before resuming.
+state: CLOSED (merged via #2564). The dfb1567e amendment landed through #2564, which merged origin/cursor/architecture-contract-p2s-37b4 into claude/amazing-darwin-km8ehw (authorship preserved); the #2564 merge commit makes this branch's head 41b809b70c6a5ece02c1159da07a8119cbd5a55c reachable from the deploy branch, so GitHub marked #2149 merged.
+next_action: None; closed.
+files: docs/architecture-contract.md; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change
+artifacts: GitHub issue #2146
+reviewer_seat: an available eligible non-contributing Claude, Grok or Codex session under OWNERSHIP.md §4.3 (Graft keeps its docs-only low-risk allowlist). Critical Mass was named here before the 2026-10-22 routing change and is retired from future routing; kept as history only. The author cannot give the independent PASS.
+claimed_by: Claude (close-out session), 2026-10-19 16:09 UTC, per VER-216 (Matthew, 2026-10-19); previously Grok, 2026-10-15 17:50 UTC
+last_updated: 2026-10-27 23:51 UTC, by Claude session_017UoYKz1FZZdZu9afTV2RhP (closure)
+closure: Landed through #2564, merged as 604274a793b0b38320a09de246bd8c4d166089ad at 2026-10-27 23:51 UTC, which carries this branch's commits by merge; GitHub marked #2149 merged at 2026-10-27 23:59 UTC. Matthew's ordering decision 2026-10-27: #2564 first. The branch cursor/architecture-contract-p2s-37b4 is preserved.
+```
 
 ### CHEM-RELEASE-001
 

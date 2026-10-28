@@ -8,6 +8,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const GROW_EVENT_ID = "77777777-7777-4777-8777-000000000201";
 
@@ -108,9 +109,10 @@ const save = () => screen.getByTestId("quick-log-all-activities-save");
 describe("Quick Log harvest photo picker PNG check", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     pngRead.hold = null;
     insertMock.mockReset();
+    updateMock.mockReset();
     rpcMock.mockReset();
     uploadMock.mockReset();
     removeMock.mockReset();

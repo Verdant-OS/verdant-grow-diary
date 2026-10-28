@@ -10,6 +10,7 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { HARVEST_PHOTO_UPLOAD_FAILED } from "@/constants/quickLogHarvestPhotoCopy";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const GROW_EVENT_ID = "77777777-7777-4777-8777-000000000200";
 
@@ -97,7 +98,7 @@ const photoArg = (call: unknown[]) => (call[1] as { p_photo_url: string | null }
 describe("Quick Log harvest photo through the canonical save", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     insertMock.mockReset();
     updateMock.mockReset();
     rpcMock.mockReset();

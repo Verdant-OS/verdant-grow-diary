@@ -84,6 +84,7 @@ vi.mock("@/lib/funnelAnalytics", () => ({
 
 import CreateTentDialog from "@/components/CreateTentDialog";
 import EditTentDialog from "@/components/EditTentDialog";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const tent = {
   id: "tent-1",
@@ -107,7 +108,7 @@ describe("badge tent and harvest photo fields", () => {
   beforeEach(() => {
     // Pending-save recovery records persist in web storage between renders.
     window.sessionStorage.clear();
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     eqMock.mockReset();
     updateMock.mockClear();
     insertMock.mockReset();

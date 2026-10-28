@@ -195,5 +195,8 @@ describe("public harvest window tracker page", () => {
     expect(trackHarvestTrackerEvent).toHaveBeenCalledWith("harvest_tracker_copy", {
       check_count: 0,
     });
+    // A changed log drops the stale snapshot instead of offering it for copying.
+    addCheck("2026-11-01", "26", "70", "4");
+    expect(screen.queryByLabelText(/Clipboard access was unavailable/)).not.toBeInTheDocument();
   });
 });

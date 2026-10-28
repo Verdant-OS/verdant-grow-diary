@@ -179,6 +179,7 @@ export default function HarvestWindowTracker() {
   function changeTarget(next: HarvestTarget) {
     if (next === target) return;
     setTarget(next);
+    setCopyFallback(null);
     announce(`Target window updated to ${HARVEST_TARGET_LABELS[next]}.`);
     trackHarvestTrackerEvent("harvest_tracker_target_changed", { target: next });
   }
@@ -188,6 +189,7 @@ export default function HarvestWindowTracker() {
       ...current,
       [rangeTarget]: { ...current[rangeTarget], [key]: value },
     }));
+    setCopyFallback(null);
   }
 
   function addCheck(event: FormEvent<HTMLFormElement>) {
@@ -217,6 +219,7 @@ export default function HarvestWindowTracker() {
     setNextId((id) => id + 1);
     setKnownPlants((current) => addKnownPlant(current, plantValue));
     setForm(EMPTY_FORM);
+    setCopyFallback(null);
     announce(`Added trichome check for ${plantValue} on ${dateValue}.`);
     trackHarvestTrackerEvent("harvest_tracker_check_added", {
       check_count: nextChecks.length,
@@ -227,6 +230,7 @@ export default function HarvestWindowTracker() {
   function removeCheck(item: HarvestCheck) {
     const remaining = checks.filter((entry) => entry.id !== item.id);
     setChecks(remaining);
+    setCopyFallback(null);
     announce(`Removed check for ${item.plant} on ${item.date}.`);
     trackHarvestTrackerEvent("harvest_tracker_check_removed", { check_count: remaining.length });
   }

@@ -79,7 +79,7 @@ branch: claude/youthful-franklin-n0mg0f
 base: verdant-grow-diary
 checkout: git fetch origin claude/youthful-franklin-n0mg0f verdant-grow-diary && git switch claude/youthful-franklin-n0mg0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/youthful-franklin-n0mg0f
-head_sha: read the current head from the PR
+head_sha: d4a76f7f6e6b69c58632565582ef6d125258fa5a observed on origin/claude/youthful-franklin-n0mg0f at 2026-10-28T09:58Z; the review-fix commit that records this line moves the head past it, so read the current head from the PR
 state: pushed, PR ready for review
 current_step: awaiting CI and an independent exact-head review
 next_action: independent exact-head review of the PR head (author: this Claude session; exclude it)

@@ -314,7 +314,10 @@ describe("plants, sorting and summaries", () => {
     expect(clampHarvestRangeValue("120", 30)).toBe(100);
     expect(clampHarvestRangeValue("-4", 30)).toBe(0);
     expect(clampHarvestRangeValue("abc", 30)).toBe(30);
-    expect(clampHarvestRangeValue("", 30)).toBe(0);
+    expect(clampHarvestRangeValue("", 30)).toBe(30);
+    expect(clampHarvestRangeValue("  ", 30)).toBe(30);
+    expect(clampHarvestRangeValue(null, 30)).toBe(30);
+    expect(clampHarvestRangeValue("0", 30)).toBe(0);
     expect(clampHarvestRangeValue("25", 30)).toBe(25);
   });
 

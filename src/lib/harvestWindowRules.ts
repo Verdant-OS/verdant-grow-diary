@@ -118,8 +118,9 @@ export function createDefaultHarvestRanges(): HarvestRanges {
   };
 }
 
-/** Range inputs clamp to 0–100; a non-number keeps the fallback. */
+/** Range inputs clamp to 0–100; a blank or non-number keeps the fallback. */
 export function clampHarvestRangeValue(raw: unknown, fallback: number): number {
+  if (isBlank(raw) || (typeof raw === "string" && raw.trim() === "")) return fallback;
   const n = Number(raw);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(0, Math.min(100, n));

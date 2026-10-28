@@ -451,7 +451,6 @@ export default function QuickLog({
     !growsLookupPending && typeof growsError === "string" && growsError.length > 0;
   const growsLookupEmpty = !growsLookupPending && !growsLookupFailed && grows.length === 0;
   const growsLookupBlocksSave = growsLookupPending || growsLookupFailed || growsLookupEmpty;
-  const [growsLookupAttempt, setGrowsLookupAttempt] = useState(0);
   const archivedGrowList = useMemo(() => archivedGrows ?? [], [archivedGrows]);
   const plantsQuery = usePlants();
   const tentsQuery = useTents();
@@ -1457,7 +1456,6 @@ export default function QuickLog({
   async function retryGrowsLookup() {
     if (typeof refreshGrows !== "function") return;
     await refreshGrows();
-    setGrowsLookupAttempt((attempt) => attempt + 1);
   }
 
   async function submit(e: React.FormEvent) {
@@ -2791,7 +2789,6 @@ export default function QuickLog({
                   role="status"
                   className="text-[11px] text-muted-foreground"
                   data-testid="quick-log-grows-lookup-loading"
-                  data-grows-lookup-attempt={growsLookupAttempt}
                 >
                   Loading grows…
                 </p>

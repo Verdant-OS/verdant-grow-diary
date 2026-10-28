@@ -231,12 +231,11 @@ describe("/alerts — archived and removed targets hidden by default", () => {
     await waitFor(() => expect(state.queue).toHaveBeenCalledTimes(1));
   });
 
-  it("the loop card never auto-queues while target names are still loading", async () => {
+  it("the loop card waits for target names: not shown, nothing queued, while they load", () => {
     state.alerts = ALERTS.slice(2, 3); // only an archived-tent alert
     state.namesStatus = "loading";
     renderAlerts();
-    fireEvent.click(screen.getByTestId("loop-card"));
-    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByTestId("loop-card")).toBeNull();
     expect(state.queue).not.toHaveBeenCalled();
   });
 });

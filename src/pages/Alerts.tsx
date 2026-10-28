@@ -231,6 +231,11 @@ export default function Alerts() {
       dismissed: listedAlerts.filter((a) => a.status === "dismissed"),
     };
   }, [listedAlerts]);
+  // VER-300: while target names or linked ids are still loading, an alert
+  // may yet prove to be on an archived/removed tent. The loop card waits,
+  // so it neither flashes nor auto-queues on an unverified target.
+  const targetsSettled =
+    targetNames.status !== "loading" && targetNames.status !== "idle" && !linkedTargets.idsLoading;
   // Loop next-step card only ever counts alerts on current targets.
   const currentOpenAlerts = useMemo(
     () => targetHistory.current.filter((a) => a.status === "open"),
@@ -270,13 +275,7 @@ export default function Alerts() {
     // alerts exist, navigate to /actions without guessing so the grower
     // chooses via the per-row "Add to Action Queue" buttons.
     if (!singleUnlinkedOpenAlert) return;
-    // VER-300: while target names or linked ids are still loading, the
-    // alert may yet prove to be on an archived/removed tent. Navigate
-    // without queuing rather than queue on an unverified target.
-    const targetsSettled =
-      targetNames.status !== "loading" &&
-      targetNames.status !== "idle" &&
-      !linkedTargets.idsLoading;
+    // Defense in depth: the card is not rendered until targets settle.
     if (!targetsSettled) return;
     const res = await queueOpenAlertToActionQueue(singleUnlinkedOpenAlert);
     if (!res.ok) return false;
@@ -357,7 +356,7 @@ export default function Alerts() {
         description="Persistent environment alerts. Read-only insights — no automation."
         icon={<Bell className="h-5 w-5" />}
       />
-      {showAlertsOneTentLoopNextStep(currentOpenAlerts.length) ? (
+      {targetsSettled && showAlertsOneTentLoopNextStep(currentOpenAlerts.length) ? (
         <OneTentLoopNextStepCard
           current="alert"
           ids={{ growId: loopCardGrowId }}

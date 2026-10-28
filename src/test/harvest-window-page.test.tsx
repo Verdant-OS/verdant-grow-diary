@@ -183,6 +183,7 @@ describe("public harvest window tracker page", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 28, 9));
     renderPage();
+    expect(screen.getByLabelText("Date")).toHaveAttribute("max", "2026-10-28");
     addCheck("2026-10-29", "26", "70", "4");
     expect(screen.getByText(HARVEST_FUTURE_DATE_MESSAGE)).toBeInTheDocument();
     expect(screen.queryByText("Plant A (1 check)")).not.toBeInTheDocument();

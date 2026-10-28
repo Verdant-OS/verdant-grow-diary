@@ -153,6 +153,8 @@ export default function HarvestWindowTracker() {
   const [knownPlants, setKnownPlants] = useState<string[]>([]);
   const [nextId, setNextId] = useState(1);
   const [date, setDate] = useState("");
+  // Set after mount, like the default date, so SSR and the first client render match.
+  const [maxDate, setMaxDate] = useState<string | undefined>(undefined);
   const [plant, setPlant] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
@@ -169,7 +171,9 @@ export default function HarvestWindowTracker() {
   });
 
   useEffect(() => {
-    setDate((current) => current || localIsoDate(new Date()));
+    const today = localIsoDate(new Date());
+    setDate((current) => current || today);
+    setMaxDate(today);
   }, []);
 
   const ranges = useMemo(() => draftsToRanges(rangeDrafts), [rangeDrafts]);
@@ -504,6 +508,7 @@ export default function HarvestWindowTracker() {
                     id="check-date"
                     type="date"
                     required
+                    max={maxDate}
                     className={inputClass}
                     value={date}
                     onChange={(event) => setDate(event.target.value)}

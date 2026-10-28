@@ -51,6 +51,23 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const unitState = vi.hoisted(() => ({ unit: "fahrenheit" as "fahrenheit" | "celsius" }));
+vi.mock("@/hooks/useTemperatureUnitPreference", () => ({
+  useTemperatureUnitPreference: () => unitState.unit,
+}));
+
+// Radix's Select relies on pointer-capture APIs jsdom does not implement.
+const elementPrototype = Element.prototype as Element & {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+};
+elementPrototype.hasPointerCapture ??= () => false;
+elementPrototype.setPointerCapture ??= () => {};
+elementPrototype.releasePointerCapture ??= () => {};
+elementPrototype.scrollIntoView ??= () => {};
+
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import {
   QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY,
@@ -69,6 +86,8 @@ function renderSheet(target: string | null) {
   );
 }
 
+const noteValue = (el: HTMLElement) => (el as HTMLTextAreaElement).value;
+
 async function failNoteOn(target: string, reason: string) {
   rpcMock.mockResolvedValue({ data: { ok: false, reason }, error: null });
   renderSheet(target);
@@ -84,6 +103,7 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
   beforeEach(() => {
     window.sessionStorage.clear();
     rpcMock.mockReset();
+    unitState.unit = "fahrenheit";
   });
 
   afterEach(() => {
@@ -141,6 +161,49 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     cleanup();
     renderSheet("plant:plant-1");
     expect(await screen.findByTestId("qlv2-note")).toHaveValue("First leaves look pale");
+  });
+
+  it("keeps a restored temperature in the unit it was typed in (Codex review)", async () => {
+    unitState.unit = "celsius";
+    renderSheet("plant:plant-1");
+    fireEvent.change(await screen.findByLabelText(/^Temp \(/), { target: { value: "25" } });
+    await waitFor(() => expect(window.sessionStorage.length).toBeGreaterThan(0));
+    cleanup();
+    unitState.unit = "fahrenheit";
+    renderSheet("plant:plant-1");
+    expect(await screen.findByLabelText(/^Temp \(/)).toHaveValue("25");
+    // Typed as 25 °C; the new Fahrenheit preference must not relabel it.
+    expect(screen.getByText(/^Temp \(/)).toHaveTextContent("°C");
+  });
+
+  it("keeps the chip's ownership of its response line across a restore (Codex review)", async () => {
+    renderSheet("plant:plant-1");
+    fireEvent.click(await screen.findByTestId("qlv2-response-chip-better"));
+    await waitFor(() => expect(window.sessionStorage.length).toBeGreaterThan(0));
+    cleanup();
+    renderSheet("plant:plant-1");
+    expect(noteValue(await screen.findByTestId("qlv2-note"))).toContain("Response check:");
+    fireEvent.click(screen.getByLabelText("Target"));
+    fireEvent.click(await screen.findByRole("option", { name: /QA Two/ }));
+    // Plant 1's response must not ride the retarget onto plant 2.
+    await waitFor(() =>
+      expect(noteValue(screen.getByTestId("qlv2-note"))).not.toContain("Response check:"),
+    );
+  });
+
+  it("drops a chip's response line when the draft returns with no target", async () => {
+    renderSheet("plant:plant-1");
+    fireEvent.click(await screen.findByTestId("qlv2-response-chip-better"));
+    const typed = await screen.findByTestId("qlv2-note");
+    fireEvent.change(typed, { target: { value: `${noteValue(typed)}\nLeaves look pale` } });
+    await waitFor(() => expect(window.sessionStorage.length).toBeGreaterThan(0));
+    cleanup();
+    renderSheet(null);
+    const note = await screen.findByTestId("qlv2-note");
+    // Positive control: the draft did come back, just without the chip's line.
+    expect(screen.getByTestId("qlv2-draft-restored")).toBeInTheDocument();
+    expect(noteValue(note)).toContain("Leaves look pale");
+    expect(noteValue(note)).not.toContain("Response check:");
   });
 
   it("pins: an ambiguous outcome keeps its key through a reload (durable recovery owns it)", async () => {

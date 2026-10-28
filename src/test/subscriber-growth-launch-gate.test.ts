@@ -1,18 +1,21 @@
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
   buildSubscriberGrowthReleaseReceipt,
   evaluateSubscriberGrowthLaunchGate,
-  founderCounterPassed,
   formatSubscriberGrowthLaunchGate,
   migrationContractPassed,
   SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT,
-  SUBSCRIBER_GROWTH_FOUNDER_TOTAL,
   SUBSCRIBER_GROWTH_RECEIPT_VERSION,
 } from "../../scripts/releases/subscriber-growth-launch-gate-rules.mjs";
 import { SUBSCRIBER_GROWTH_MIGRATION_CONTRACT } from "../../scripts/releases/subscriber-growth-migration-contract.mjs";
 import {
   buildChangedE2eCommandArgs,
+  collectSubscriberGrowthReleaseScope,
   buildTargetedTestCommandArgs,
   formattableChangedFiles,
   parseGitPorcelainPaths,
@@ -84,24 +87,9 @@ const localParity = {
   capabilitiesTotal: 5,
 };
 
-const founderCounter = {
-  kind: "public_founder_counter_live_check",
-  attempted: true,
-  ok: true,
-  optionsStatus: 200,
-  postStatus: 200,
-  corsVerified: true,
-  payloadVerified: true,
-  remaining: 42,
-  total: SUBSCRIBER_GROWTH_FOUNDER_TOTAL,
-  error: null,
-  errors: [],
-};
-
 const liveParity = {
   ...localParity,
   deploymentId: "deployment-123",
-  founderCounter,
 };
 
 const backendRemoteVerification = {
@@ -121,8 +109,9 @@ describe("subscriber growth launch gate", () => {
     );
   });
 
-  it("uses receipt schema v3 so v2 evidence cannot stand in for the Founder live guard", () => {
-    expect(SUBSCRIBER_GROWTH_RECEIPT_VERSION).toBe(3);
+  it("uses receipt schema v4 for the release contract after Founder sales retirement", () => {
+    expect(SUBSCRIBER_GROWTH_RECEIPT_VERSION).toBe(4);
+    expect(parseSubscriberGrowthGateArgs([]).out).toMatch(/launch-gate\.v4\.json$/);
   });
 
   it("fails closed instead of accepting an empty migration contract as 0/0", () => {
@@ -359,42 +348,17 @@ describe("subscriber growth launch gate", () => {
     });
   });
 
-  it("requires complete bounded Founder counter evidence before LIVE_VERIFIED", () => {
-    expect(founderCounterPassed(founderCounter)).toBe(true);
-
-    const missing = evaluateSubscriberGrowthLaunchGate({
+  it("verifies the remaining live contract without retired Founder counter evidence", () => {
+    expect(liveParity).not.toHaveProperty("founderCounter");
+    const verified = evaluateSubscriberGrowthLaunchGate({
       source,
       commands,
       localParity,
-      liveParity: { ...localParity, deploymentId: "deployment-123" },
+      liveParity,
       backendRemoteVerification,
       liveRequired: true,
     });
-    expect(missing.status).toBe("HOLD");
-    expect(missing.problems).toContain("public Founder counter is not verified in production");
-
-    for (const invalidEvidence of [
-      { ...founderCounter, ok: false },
-      { ...founderCounter, corsVerified: false },
-      { ...founderCounter, payloadVerified: false },
-      { ...founderCounter, remaining: -1 },
-      { ...founderCounter, remaining: SUBSCRIBER_GROWTH_FOUNDER_TOTAL + 1 },
-      { ...founderCounter, total: SUBSCRIBER_GROWTH_FOUNDER_TOTAL - 1 },
-      { ...founderCounter, total: 75 },
-      { ...founderCounter, errors: ["unexpected"] },
-    ]) {
-      expect(founderCounterPassed(invalidEvidence)).toBe(false);
-      expect(
-        evaluateSubscriberGrowthLaunchGate({
-          source,
-          commands,
-          localParity,
-          liveParity: { ...liveParity, founderCounter: invalidEvidence },
-          backendRemoteVerification,
-          liveRequired: true,
-        }).status,
-      ).toBe("HOLD");
-    }
+    expect(verified).toMatchObject({ status: "LIVE_VERIFIED", problems: [] });
   });
 
   it("requires the full gate base to be the canonical release commit's first parent", () => {
@@ -473,7 +437,9 @@ describe("subscriber growth launch gate", () => {
     expect(receipt.decision.note).toContain("never authorizes");
     expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Authorization: NONE");
     expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Subscriber goal verified: NO");
-    expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Founder counter: verified");
+    expect(receipt.schemaVersion).toBe(4);
+    expect(receipt.liveParity).not.toHaveProperty("founderCounter");
+    expect(formatSubscriberGrowthLaunchGate(receipt)).not.toMatch(/founder/i);
   });
 
   it("parses CLI boundaries and exact Vitest totals deterministically", () => {
@@ -533,6 +499,76 @@ describe("subscriber growth launch gate", () => {
       functionSourceVerified: false,
       verified: false,
     });
+  });
+
+  it("keeps deletions in source evidence but excludes them from executable validation", () => {
+    const root = mkdtempSync(join(tmpdir(), "subscriber-growth-diff-"));
+    const runGit = (args: string[]) =>
+      execFileSync("git", args, {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }).trim();
+    const write = (file: string, text: string) => {
+      mkdirSync(dirname(join(root, file)), { recursive: true });
+      writeFileSync(join(root, file), text);
+    };
+    const commit = (message: string) => {
+      runGit(["add", "."]);
+      runGit([
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-qm",
+        message,
+      ]);
+    };
+    const deleted = [
+      "docs/founder-slots-remaining-response.md",
+      "docs/schemas/founder-slots-remaining.response.schema.json",
+      "src/test/retired.test.ts",
+      "e2e/retired.spec.ts",
+    ];
+    try {
+      runGit(["init", "--quiet"]);
+      for (const file of deleted) write(file, "retired fixture\n");
+      write("src/old.ts", "export const retained = true;\n");
+      write("docs/retained.md", "Before\n");
+      commit("base fixture");
+      const base = runGit(["rev-parse", "HEAD"]);
+      for (const file of deleted) rmSync(join(root, file));
+      renameSync(join(root, "src/old.ts"), join(root, "src/renamed.ts"));
+      write("docs/retained.md", "After\n");
+      write("src/test/current.test.ts", "// current fixture\n");
+      write("e2e/current.spec.ts", "// current fixture\n");
+      commit("release fixture");
+
+      const scope = collectSubscriberGrowthReleaseScope(base, runGit);
+      expect(scope.files).toEqual(expect.arrayContaining(deleted));
+      expect(scope.tests).toEqual(["src/test/current.test.ts"]);
+      expect(scope.e2eSpecs).toEqual(["e2e/current.spec.ts"]);
+      expect(scope.lintable).toEqual([
+        "e2e/current.spec.ts",
+        "src/renamed.ts",
+        "src/test/current.test.ts",
+      ]);
+      expect(scope.formattable).toEqual([
+        "docs/retained.md",
+        "e2e/current.spec.ts",
+        "src/renamed.ts",
+        "src/test/current.test.ts",
+      ]);
+      // An unexpected missing file must still reach the validators and fail;
+      // only committed deletions are removed from their input, not missing paths.
+      rmSync(join(root, "docs/retained.md"));
+      expect(collectSubscriberGrowthReleaseScope(base, runGit).formattable).toContain(
+        "docs/retained.md",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("format-checks the complete base-relative release diff instead of only the tip commit", () => {

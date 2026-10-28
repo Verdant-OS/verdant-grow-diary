@@ -175,13 +175,6 @@ async function installOneTentNetworkBoundary(
       await route.abort("blockedbyclient");
       return;
     }
-    if (/\/functions\/v1\/founder-slots-remaining(?:\?|$)/i.test(url)) {
-      // Despite its read-shaped response, the function persists request
-      // metrics. Abort it so observing Paddle sandbox copy adds no unrelated
-      // database write and cannot be mistaken for checkout success.
-      await route.abort("blockedbyclient");
-      return;
-    }
     await route.continue();
   });
 }

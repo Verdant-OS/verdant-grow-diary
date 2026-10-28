@@ -19,7 +19,7 @@ import { auditSubscriberGrowthMigrationContract } from "./subscriber-growth-migr
 const EXPECTED_REMOTE = "https://github.com/Verdant-OS/verdant-grow-diary.git";
 const DEFAULT_BASE_REF = "origin/verdant-grow-diary";
 const DEFAULT_OUT = path.resolve(
-  "artifacts/release-readiness/subscriber-growth/launch-gate.v3.json",
+  "artifacts/release-readiness/subscriber-growth/launch-gate.v4.json",
 );
 const DEFAULT_PORT = 4187;
 const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
@@ -103,9 +103,21 @@ function normalizeOrigin(value) {
   }
 }
 
-function changedFiles(baseRef) {
-  const output = git(["diff", "--name-only", `${baseRef}...HEAD`]);
-  return output ? output.split(/\r?\n/).filter(Boolean) : [];
+export function collectSubscriberGrowthReleaseScope(baseRef, runGit = git) {
+  const diff = `${baseRef}...HEAD`;
+  const readPaths = (args) => runGit(args).split(/\r?\n/).filter(Boolean);
+  const files = readPaths(["diff", "--name-only", diff]);
+  // Keep deletions in source evidence, but validators need the surviving paths.
+  // Git's deletion filter preserves unexpected missing working-tree files so
+  // they still fail validation; do not replace this with an existsSync filter.
+  const validationFiles = readPaths(["diff", "--name-only", "--diff-filter=d", diff]);
+  return {
+    files,
+    tests: runnableChangedTests(validationFiles),
+    e2eSpecs: runnableChangedE2e(validationFiles),
+    lintable: lintableChangedFiles(validationFiles),
+    formattable: formattableChangedFiles(validationFiles),
+  };
 }
 
 function runnableChangedTests(files) {
@@ -321,7 +333,6 @@ async function auditLocalPreview(port) {
   try {
     return await auditSubscriberGrowthLiveParity({
       origin: `http://127.0.0.1:${port}`,
-      verifyFounderCounter: false,
     });
   } finally {
     await new Promise((resolve, reject) => {
@@ -336,11 +347,9 @@ function writeReceipt(out, receipt) {
 }
 
 export async function runSubscriberGrowthLaunchGate(args) {
-  const files = changedFiles(args.baseRef);
-  const tests = runnableChangedTests(files);
-  const e2eSpecs = runnableChangedE2e(files);
-  const lintable = lintableChangedFiles(files);
-  const formattable = formattableChangedFiles(files);
+  const { files, tests, e2eSpecs, lintable, formattable } = collectSubscriberGrowthReleaseScope(
+    args.baseRef,
+  );
   const source = inspectSource(args, files, tests, e2eSpecs, formattable);
 
   const commands = [
@@ -377,7 +386,6 @@ export async function runSubscriberGrowthLaunchGate(args) {
     try {
       liveParity = await auditSubscriberGrowthLiveParity({
         origin: args.liveOrigin,
-        verifyFounderCounter: true,
       });
     } catch (error) {
       liveParity = {
@@ -387,13 +395,6 @@ export async function runSubscriberGrowthLaunchGate(args) {
         routesTotal: 4,
         capabilitiesPassed: 0,
         capabilitiesTotal: 5,
-        founderCounter: {
-          kind: "public_founder_counter_live_check",
-          attempted: true,
-          ok: false,
-          error: "live_parity_failed",
-          errors: ["live_parity_failed"],
-        },
         error: error instanceof Error ? error.message : "live_parity_failed",
       };
     }

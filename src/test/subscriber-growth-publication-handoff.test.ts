@@ -49,18 +49,16 @@ describe("subscriber growth publication handoff", () => {
     expect(HANDOFF).toContain("LIVE_VERIFIED");
     expect(HANDOFF).toMatch(/authorizes nothing/i);
     expect(HANDOFF).toMatch(/evidence only.*not deployment authorization/i);
-    expect(LAUNCH_RUNBOOK).toContain("launch-gate.v3.json");
-    expect(LAUNCH_RUNBOOK).toMatch(/v2 receipt[\s\S]*cannot\s+support a `LIVE_VERIFIED`/i);
+    expect(LAUNCH_RUNBOOK).toContain("launch-gate.v4.json");
+    expect(LAUNCH_RUNBOOK).toMatch(/v3 receipts?[\s\S]*(?:must not|cannot)[\s\S]*`LIVE_VERIFIED`/i);
   });
 
   it("documents the exact reviewed-function deployment boundary and manual outreach fence", () => {
     expect(HANDOFF).toContain("`ai-doctor-review`");
-    expect(HANDOFF).toContain("`founder-slots-remaining`");
     expect(HANDOFF).toMatch(/do not\s+redeploy unrelated functions/i);
     expect(HANDOFF).toMatch(/source presence alone does\s+not prove[\s\S]*deployed/i);
     expect(HANDOFF).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(LAUNCH_RUNBOOK).toContain("`ai-doctor-review`");
-    expect(LAUNCH_RUNBOOK).toContain("`founder-slots-remaining`");
     expect(LAUNCH_RUNBOOK).toMatch(/Do not deploy unrelated Edge Functions/i);
     expect(HANDOFF).not.toMatch(/no changed Supabase Edge Function sources/i);
     expect(HANDOFF).not.toMatch(/Do \*\*not\*\* deploy an Edge Function/i);
@@ -81,15 +79,16 @@ describe("subscriber growth publication handoff", () => {
       /downloaded\s+(?:function|AI Doctor)\s+source parity plus\s+recorder markers/i,
     );
     expect(HANDOFF).toMatch(/does not\s+validate or expose the secret value/i);
-    expect(LAUNCH_RUNBOOK).toMatch(/browser-shaped unauthenticated `OPTIONS` preflight/i);
-    expect(HANDOFF).toMatch(/public (?:Founder )?check sends no key/i);
   });
 
-  it("keeps the public Founder-counter release contract aligned with the 100-seat offer", () => {
+  it("retires the counter requirement while preserving existing Founder protections", () => {
     for (const document of [HANDOFF, LAUNCH_RUNBOOK]) {
-      expect(document).toContain("total === 100");
-      expect(document).toContain("0..100");
-      expect(document).not.toMatch(/total === 75|0\.\.75/);
+      expect(document).toMatch(/founder-slots-remaining[\s\S]*retired/i);
+      expect(document).toMatch(/do not (?:re)?deploy[^.]*retired counter/i);
+      expect(document).toContain(
+        "Existing Founder entitlements, the Founders Wall, and refund revocation",
+      );
+      expect(document).not.toMatch(/total === 100|0\.\.100|browser-shaped unauthenticated/);
     }
   });
 

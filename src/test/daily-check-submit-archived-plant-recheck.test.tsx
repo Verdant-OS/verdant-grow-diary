@@ -30,6 +30,8 @@ type Plant = {
 
 const plantsRef = vi.hoisted(() => ({ plants: [] as Plant[] }));
 const saveInsert = vi.hoisted(() => vi.fn());
+// The real writers render an empty hint for a save with no plant (tent only).
+const TENT_ONLY_SAVE = "__tent_only__";
 const plantArchive = vi.hoisted(() => ({
   byId: {} as Record<string, boolean>,
   mode: "row" as "row" | "error" | "empty" | "shape",
@@ -154,8 +156,15 @@ vi.mock("@/components/QuickLog", () => {
         </button>
         <button
           type="button"
+          data-testid="mock-quicklog-target-tent-only"
+          onClick={() => setSavePlant(TENT_ONLY_SAVE)}
+        >
+          Target the tent only
+        </button>
+        <button
+          type="button"
           data-testid="quick-log-save"
-          data-daily-check-save-plant={savePlant || undefined}
+          data-daily-check-save-plant={savePlant === TENT_ONLY_SAVE ? "" : savePlant || undefined}
           onClick={() => {
             saveInsert("diary_entries");
             window.dispatchEvent(
@@ -358,6 +367,19 @@ describe("Daily Check submit re-checks an archived plant", () => {
     proto.hasPointerCapture = () => false;
     proto.releasePointerCapture = () => {};
     proto.setPointerCapture = () => {};
+  });
+
+  it("does not block a tent-only save on an archived page plant", async () => {
+    renderCheck();
+    await reachQuickLogSave();
+    plantArchive.byId.P = true;
+    fireEvent.click(screen.getByTestId("mock-quicklog-target-tent-only"));
+    expect(screen.getByTestId("quick-log-save")).toHaveAttribute("data-daily-check-save-plant", "");
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() => expect(saveInsert).toHaveBeenCalledWith("diary_entries"));
+    expect(screen.queryByText(ARCHIVED_PLANT_MESSAGE)).toBeNull();
   });
 
   it("blocks the diary save and tells the grower to pick another plant", async () => {

@@ -19,13 +19,25 @@ name: Typecheck (tsgo) + build
 
 on:
   push:
+    # Not a required check. Docs-only pushes do not change tsgo or the Vite build.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   workflow_dispatch:
 
+# One group per ref so a newer feature-branch push cancels the previous
+# tsgo+build. Pull requests cancel too. Pushes to the deploy branches do not:
+# those refs are shared and an in-progress base run must finish.
+# merge_group is not a trigger here. Queue refs are unique per entry, and this
+# expression never cancels them.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/verdant-grow-diary' && github.ref != 'refs/heads/main') }}
 
 permissions:
   contents: read

@@ -141,6 +141,12 @@ const H = vi.hoisted(() => {
   };
 });
 
+// The tents list VPD reads the Dashboard's diary-inclusive snapshot (#2268).
+// Idle keeps this harness on stored rows only, as before.
+vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
+  useLatestSensorSnapshot: () => ({ status: "idle", snapshot: null }),
+  useLatestSensorSnapshotsByTent: () => ({}),
+}));
 vi.mock("@/hooks/useGrowData", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/useGrowData")>();
   return {
@@ -693,7 +699,13 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
 
     expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("71.6");
     expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-rh`)).toHaveTextContent("55.0");
-    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveTextContent("—");
+    // #2268: VPD is the Dashboard's. Tonight reads raw rows and its own snapshot,
+    // and has neither here, so the list derives none from the manual card
+    // (Codex P1 on #2437, Copilot on #2442).
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveAttribute(
+      "data-status",
+      "unknown",
+    );
     expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
     expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveAttribute(
       "data-captured-at",
@@ -763,10 +775,15 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
       "data-captured-at",
       capturedAt,
     );
-    const metrics = ["temp", "rh", "vpd"].map((key) =>
+    const metrics = ["temp", "rh"].map((key) =>
       screen.getByTestId(`tents-list-metric-${H.TENT_ID}-${key}`),
     );
     expect(metrics.every((item) => item.getAttribute("data-status") === "invalid")).toBe(true);
+    // Tonight has no VPD for this tent, so the card's own is withheld, not shown.
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveAttribute(
+      "data-status",
+      "unknown",
+    );
     expect(view.container.querySelectorAll('[data-status="ok"]')).toHaveLength(0);
     expect(screen.queryByTestId("tents-list-vpd-stage-missing-badge")).toBeNull();
   });
@@ -1087,11 +1104,13 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(rh).toHaveTextContent("56.0");
     expect(rh).not.toHaveTextContent("58");
 
-    // VPD missing at the newest ts → unavailable, never 0 kPa.
+    // #2268: no stored VPD at the newest ts → the Dashboard's VPD calculated from
+    // the newest temperature/RH pair (21.78°C, 56% → 1.15 kPa); never the older
+    // stored 0.9 and never 0 kPa.
     const vpd = screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`);
-    expect(vpd).toHaveTextContent("—");
-    expect(vpd).toHaveTextContent("Unknown");
+    expect(vpd).toHaveTextContent("1.15");
     expect(vpd).not.toHaveTextContent("0.9");
+    expect(vpd).not.toHaveTextContent("0.00");
 
     // Honest freshness/source context, consistent with the detail page.
     expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveTextContent(
@@ -1148,7 +1167,16 @@ describe("Tents list sensor truth — static wiring", () => {
       /manualFallbackTentIds = sensorSetSettled \? manualFallbackCandidateTentIds : \[\]/,
     );
     expect(TENTS_SRC).toMatch(/sensorRows=\{readingsByTent\[t\.id\] \?\? \[\]\}/);
-    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(selection\.rows, stage, now/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(rows, stage, now/);
+    // The rows are the fallback selection's, or the Dashboard's diary-only
+    // capture when the selection is empty (Codex P2 on #2303 at 69de43db) or
+    // the raw read failed (Codex P2 on #2303 at fa8edcff), or the manual
+    // fallback read failed (Codex P2 on #2303 at 6a242e1f), or the manual card has
+    // no air readings (Codex P2 on #2407 at e66265eb).
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/const diaryRows = tentsListDiarySnapshotRows\(/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(
+      /const rows =\s*selection\.kind === "empty" \|\|\s*selection\.kind === "sensor_unavailable" \|\|\s*selection\.kind === "manual_unavailable" \|\|\s*selection\.kind === "manual_unusable"\s*\? diaryRows\s*: selection\.rows;/,
+    );
     expect(SNAPSHOT_STRIP_SRC).not.toMatch(
       /useManualSnapshotTimelineCards|useTentManualSnapshotBatch/,
     );
@@ -1183,7 +1211,7 @@ describe("Tents list sensor truth — static wiring", () => {
     // Dashboard strip too); the page must consume it and feed the presenter.
     expect(TENTS_SRC).toMatch(/useNowTick/);
     expect(TENTS_SRC).toMatch(/now=\{nowTick\}/);
-    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(selection\.rows, stage, now/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(rows, stage, now/);
   });
 
   it("introduces no alert/queue/automation/device-control surfaces", () => {

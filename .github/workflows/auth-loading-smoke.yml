@@ -41,9 +41,11 @@ concurrency:
 
 jobs:
   auth-loading-smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Auth loading smoke (mocked / non-destructive)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Chromium --with-deps install took ~10m on runs 40523498143 (#2545) and 40469789527 (#2526), leaving too little of the 15m cap, and the test step was cancelled ~4.5m in. Worst case is about 16.5m, so 25m leaves headroom.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout

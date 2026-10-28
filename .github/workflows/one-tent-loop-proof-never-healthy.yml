@@ -36,10 +36,11 @@ on:
 
 concurrency:
   group: one-tent-loop-proof-never-healthy-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   one-tent-loop-proof-never-healthy:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: One-Tent Loop Proof never-healthy E2E (mocked)
     runs-on: ubuntu-latest
     timeout-minutes: 15

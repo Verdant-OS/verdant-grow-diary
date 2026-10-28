@@ -161,13 +161,15 @@ describe("dependency security Phase A resolution floors", () => {
     ["@modelcontextprotocol/sdk", [1, 32, 0] as const],
     ["js-yaml", [4, 3, 2] as const],
     ["hono", [4, 13, 11] as const],
-    ["qs", [6, 16, 0] as const],
+    ["qs", [6, 16, 1] as const],
+    ["body-parser", [2, 4, 0] as const],
     ["ajv", [6, 15, 0] as const],
     ["picomatch", [2, 3, 2] as const],
     ["vitest", [4, 1, 11] as const],
     ["@vitest/mocker", [4, 1, 11] as const],
     ["nanoid", [3, 3, 18] as const],
-    ["undici", [6, 28, 1] as const],
+    ["undici", [6, 29, 1] as const],
+    ["zod", [4, 6, 7] as const],
   ])("resolves every %s instance at or above %s in bun.lock", (packageName, minimum) => {
     const versions = resolvedVersions(packageName);
     expect(versions.length, `${packageName} must be present in bun.lock`).toBeGreaterThan(0);
@@ -239,16 +241,17 @@ describe("dependency security Phase A resolution floors", () => {
   it("pins only same-major compatible overrides", () => {
     expect(packageJson.overrides).toMatchObject({
       esbuild: "0.28.1",
-      "fast-uri": "3.1.8",
+      "fast-uri": "3.1.9",
       "form-data": "4.0.6",
       "follow-redirects": "1.16.1",
       "@modelcontextprotocol/sdk": "1.32.0",
       "js-yaml": "4.3.2",
       "launch-editor": "2.14.2",
       hono: "4.13.11",
-      qs: "6.16.0",
+      qs: "6.16.1",
+      "body-parser": "2.4.0",
       nanoid: "3.3.18",
-      undici: "6.28.1",
+      undici: "6.29.1",
     });
     expect(packageJson.overrides?.postcss).toBeUndefined();
     expect(packageJson.overrides?.vite).toBeUndefined();

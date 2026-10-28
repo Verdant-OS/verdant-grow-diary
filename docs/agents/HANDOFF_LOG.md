@@ -81,7 +81,7 @@ checkout: git fetch origin claude/setup-quicklog-draft-retry-p2s verdant-grow-di
 pr: opened as a draft from this branch; read URL and head from GitHub
 head_sha: fix commit 77b2487ac01f6fb33fc0305f8f67feca8769864c; read the merged head from the PR
 state: pushed draft
-current_step: review 5677106832 P2 addressed (no-target restore); awaiting CI and an independent exact-head review
+current_step: review 5677106832 P2 addressed (no-target restore); CodeRabbit 5677337277 Major 1 fixed (hydration waits for a successful grow read); Major 2 (persist Water/Feed inputs) put to Matthew; awaiting CI and an independent exact-head review
 next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR; then merge this branch into claude/start-room-one-step (#2582)
 post_merge_check: after Publish, on the fixture account, open Quick Log for plant A, type a note, close; open for plant B: no note. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677106832; prior holder told to stop pushing)
 owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
-last_updated: 2026-10-27 22:15 CT, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-27 22:25 CT, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 ```
 
 ### SETUP-QUICKLOG-DRAFT-RETRY

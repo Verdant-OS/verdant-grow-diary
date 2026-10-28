@@ -5,7 +5,7 @@
  * Guarantees grow_id (and tent_id) on every write so Plant Detail Quick Log
  * works immediately. No device control, no Action Queue, no Edge Functions.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "@/lib/react-router-compat";
 import { Loader2, Leaf, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -142,7 +142,11 @@ export default function StartYourRoom() {
 
   const ownerId = user?.id ?? null;
   const ownerIdRef = useRef<string | null>(ownerId);
-  ownerIdRef.current = ownerId;
+  // Written at commit, not during render: a discarded render must not leave an
+  // owner the committed page is not showing.
+  useLayoutEffect(() => {
+    ownerIdRef.current = ownerId;
+  }, [ownerId]);
 
   useEffect(() => {
     // A failed roster read looks like an empty roster; hydrating then would

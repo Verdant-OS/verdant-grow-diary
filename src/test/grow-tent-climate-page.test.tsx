@@ -189,6 +189,35 @@ describe("public grow tent temperature and humidity page", () => {
     vi.useRealTimers();
   });
 
+  it("says no RH reaches the band instead of showing a clamped RH", () => {
+    renderPage();
+    setField("Air temperature (°F)", "50");
+    setField("Leaf temperature offset (°F)", "-10");
+    fireEvent.change(screen.getByLabelText("Stage"), { target: { value: "late_flower" } });
+    const result = screen.getByTestId("climate-live-result");
+    expect(result).toHaveTextContent("no RH from 0 to 100% reaches the 1.40 kPa midpoint");
+    expect(result).not.toHaveTextContent("0% RH (centers at");
+  });
+
+  it("discloses that the VPD calculator's late-flower band differs", () => {
+    renderPage();
+    expect(document.body).toHaveTextContent(
+      "Our VPD calculator uses a different late-flower band: This chart preserves",
+    );
+  });
+
+  it("stamps each logged reading with the time it was logged, not page load", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 28, 8, 0));
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
+    vi.setSystemTime(new Date(2026, 9, 28, 20, 30));
+    fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
+    expect(within(logTable()).getByText("2026-10-28 08:00")).toBeInTheDocument();
+    expect(within(logTable()).getByText("2026-10-28 20:30")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it("drops a stale clipboard fallback once the log changes", async () => {
     vi.stubGlobal("navigator", {
       clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },

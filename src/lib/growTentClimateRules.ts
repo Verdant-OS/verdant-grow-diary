@@ -218,6 +218,8 @@ export interface GrowTentNudge {
   readonly rhWhole: number;
   readonly rawRh: number;
   readonly midpoint: number;
+  /** False when no RH from 0 to 100% reaches the midpoint at this temperature. */
+  readonly reachable: boolean;
 }
 
 /** RH (clamped 0–100, whole %) that centres VPD on the stage band midpoint. */
@@ -234,7 +236,12 @@ export function calculateGrowTentNudgeRh(
   const svpAir = publicVpdChartSaturationVaporPressureKpa(airC);
   const solvedRh = ((svpLeaf - midpoint) / svpAir) * 100;
   const clamped = Math.max(0, Math.min(100, solvedRh));
-  return { rhWhole: Math.round(clamped), rawRh: clamped, midpoint: Number(midpoint.toFixed(2)) };
+  return {
+    rhWhole: Math.round(clamped),
+    rawRh: clamped,
+    midpoint: Number(midpoint.toFixed(2)),
+    reachable: solvedRh >= 0 && solvedRh <= 100,
+  };
 }
 
 export interface GrowTentClimateInputs {

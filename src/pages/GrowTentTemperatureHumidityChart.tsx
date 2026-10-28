@@ -40,6 +40,7 @@ import {
   type GrowTentClimateReading,
   type GrowTentLights,
 } from "@/lib/growTentClimateRules";
+import { publicVpdChartLateFlowerReferenceNote } from "@/lib/publicVpdChartRules";
 
 const SRC = GROW_TENT_CLIMATE_SOURCE_URLS;
 
@@ -220,6 +221,7 @@ export default function GrowTentTemperatureHumidityChart() {
     setReadings(next);
     setNextId((id) => id + 1);
     setNote("");
+    setDateTime("");
     setCopyFallback(null);
     announce(
       `Logged reading for ${entry.dateTime} (${entry.vpd.toFixed(2)} kPa, ${entry.statusText}).`,
@@ -579,8 +581,18 @@ export default function GrowTentTemperatureHumidityChart() {
                     RH that would center you in the band at this temperature (calculated, not a
                     recommendation):
                   </strong>{" "}
-                  {live.nudge.rhWhole}% RH (centers at {live.nudge.midpoint.toFixed(2)} kPa midpoint
-                  for {inputs.airF}°F air and {inputs.offsetF}°F leaf offset)
+                  {live.nudge.reachable ? (
+                    <>
+                      {live.nudge.rhWhole}% RH (centers at {live.nudge.midpoint.toFixed(2)} kPa
+                      midpoint for {inputs.airF}°F air and {inputs.offsetF}°F leaf offset)
+                    </>
+                  ) : (
+                    <>
+                      no RH from 0 to 100% reaches the {live.nudge.midpoint.toFixed(2)} kPa midpoint
+                      at {inputs.airF}°F air and {inputs.offsetF}°F leaf offset; the temperature
+                      would have to change.
+                    </>
+                  )}
                 </p>
               </div>
             ) : null}
@@ -960,12 +972,12 @@ export default function GrowTentTemperatureHumidityChart() {
               our{" "}
               <Link className="underline" to="/vpd-chart">
                 VPD chart
-              </Link>{" "}
-              and{" "}
+              </Link>
+              . Our{" "}
               <Link className="underline" to="/tools/vpd-calculator">
                 VPD calculator
-              </Link>
-              .
+              </Link>{" "}
+              uses a different late-flower band: {publicVpdChartLateFlowerReferenceNote()}
             </p>
             <div
               className={tableWrapClass}

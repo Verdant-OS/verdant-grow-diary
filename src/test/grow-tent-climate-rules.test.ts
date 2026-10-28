@@ -109,6 +109,18 @@ describe("calculateGrowTentNudgeRh", () => {
     expect(calculateGrowTentNudgeRh(50, 5, "late_flower").rhWhole).toBeGreaterThanOrEqual(0);
     expect(calculateGrowTentNudgeRh(100, -10, "clone").rhWhole).toBeLessThanOrEqual(100);
   });
+
+  it("reports an unreachable midpoint instead of claiming the clamped RH centers it", () => {
+    const tooCold = calculateGrowTentNudgeRh(50, -10, "late_flower");
+    expect(tooCold.reachable).toBe(false);
+    expect(tooCold.rhWhole).toBe(0);
+    expect(calculateGrowTentVpd(50, 0, -10)).toBeLessThan(1.2);
+    const tooHot = calculateGrowTentNudgeRh(100, 5, "clone");
+    expect(tooHot.reachable).toBe(false);
+    expect(tooHot.rhWhole).toBe(100);
+    expect(calculateGrowTentVpd(100, 100, 5)).toBeGreaterThan(0.8);
+    expect(calculateGrowTentNudgeRh(77, -2, "veg").reachable).toBe(true);
+  });
 });
 
 describe("parseGrowTentClimateInputs", () => {

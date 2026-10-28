@@ -336,23 +336,26 @@ export interface CultivarCollectionJsonLd {
   readonly name: string;
   readonly description: string;
   readonly url: string;
-  readonly about: {
-    readonly "@type": "Thing";
-    readonly name: string;
-    readonly alternateName?: string;
-    readonly additionalProperty: ReadonlyArray<{
-      readonly "@type": "PropertyValue";
-      readonly name: string;
-      readonly value: string;
-    }>;
-  };
+  readonly about: ReadonlyArray<
+    | {
+        readonly "@type": "Thing";
+        readonly name: string;
+        readonly alternateName?: string;
+      }
+    | {
+        readonly "@type": "PropertyValue";
+        readonly name: string;
+        readonly value: string;
+      }
+  >;
 }
 
 /**
  * Build a schema.org CollectionPage JSON-LD document for a cultivar profile.
  * CollectionPage rather than Product because cultivars are not sold here —
  * the page collects horticultural evidence about the strain. Strain traits
- * are encoded as PropertyValue entries under `about`.
+ * are encoded as PropertyValue topics alongside the cultivar Thing under
+ * `about`. Bare Thing does not support schema.org's `additionalProperty`.
  */
 export function buildCultivarCollectionJsonLd({
   name,
@@ -372,7 +375,7 @@ export function buildCultivarCollectionJsonLd({
   if (!/^https?:\/\//i.test(url)) {
     throw new Error(`buildCultivarCollectionJsonLd: url must be absolute (got "${url}")`);
   }
-  const additionalProperty = properties
+  const traitTopics = properties
     .filter((p) => p.name.trim() && p.value.trim())
     .map((p) => ({ "@type": "PropertyValue" as const, name: p.name, value: p.value }));
   return {
@@ -381,11 +384,13 @@ export function buildCultivarCollectionJsonLd({
     name,
     description,
     url,
-    about: {
-      "@type": "Thing",
-      name,
-      ...(alternateName ? { alternateName } : {}),
-      additionalProperty,
-    },
+    about: [
+      {
+        "@type": "Thing",
+        name,
+        ...(alternateName ? { alternateName } : {}),
+      },
+      ...traitTopics,
+    ],
   };
 }

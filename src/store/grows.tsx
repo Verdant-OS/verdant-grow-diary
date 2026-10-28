@@ -28,6 +28,7 @@ import {
   classifyGrowReadFailure,
   growReadAttemptDeadlineMs,
   readWithGrowRetry,
+  growsReadErrorValue,
   withTrackedDeadline,
   type GrowReadFailure,
 } from "@/lib/growsReadRetryRules";
@@ -202,9 +203,7 @@ function GrowsProviderForOwner({
           publishGrowReadFailure(outcome.failure);
           setGrows([]);
           setArchivedGrows([]);
-          setError(
-            outcome.failure.kind === "timeout" ? "critical_read_deadline" : "Unable to load grows",
-          );
+          setError(growsReadErrorValue(outcome.failure));
           return { status: "unavailable" };
         }
         if (outcome.value === null) return { status: "stale" };

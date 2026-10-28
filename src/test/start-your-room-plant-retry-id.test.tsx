@@ -235,4 +235,44 @@ describe("Start Your Room plant retry id (Codex review)", () => {
     // The room was finished, so its draft is still cleared.
     expect(window.sessionStorage.getItem(draftKey)).toBeNull();
   });
+
+  it("starts no tent or plant after the grower left during the grow refresh (Codex review)", async () => {
+    const inserted: string[] = [];
+    const insertRow = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: "grows" | "tents" | "plants") => {
+      const query = insertRow(table);
+      return {
+        ...query,
+        insert: (payload: Record<string, unknown>) => {
+          inserted.push(table);
+          return query.insert(payload);
+        },
+      };
+    });
+    let releaseRefresh: () => void = () => undefined;
+    let refreshHanging = false;
+    refreshMock.mockImplementation(async () => {
+      refreshHanging = true;
+      await new Promise<void>((resolve) => (releaseRefresh = resolve));
+      return undefined;
+    });
+    const user = userEvent.setup();
+    const view = render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+    await waitFor(() => expect(refreshHanging).toBe(true));
+    expect(inserted).toEqual(["grows"]);
+
+    view.unmount();
+    await act(async () => {
+      releaseRefresh();
+    });
+    // The reopened page owns the rest; this instance adds nothing.
+    expect(inserted).toEqual(["grows"]);
+    expect(navMock).not.toHaveBeenCalled();
+  });
 });

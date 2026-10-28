@@ -506,6 +506,9 @@ export default function StartYourRoom() {
           );
         }
       }
+      // A grower who left mid-save may reopen setup and submit again; this
+      // instance must not start another row the reopened page cannot see.
+      if (!mountedRef.current) return;
       if (!tentId) {
         const payload = buildStartRoomTentPayload(roomForm, {
           growId,
@@ -535,6 +538,7 @@ export default function StartYourRoom() {
           tentId: confirmedTentId,
         }));
       }
+      if (!mountedRef.current) return;
       const plantPayload = buildStartRoomPlantPayload(roomForm, { growId, tentId, plantId: null });
       if (!plantPayload) return;
       let plantRowId: string;

@@ -23,6 +23,7 @@ import {
 } from "./diaryEntryRules";
 import {
   EMPTY_QUICKLOG_WATERING_FORM,
+  QUICK_LOG_WATER_VOLUME_MAX_ML,
   type QuickLogWateringFormState,
 } from "./quickLogWateringFormViewModel";
 
@@ -91,10 +92,13 @@ function isUntrusted(entry: NormalizedDiaryEntry): boolean {
 
 /**
  * Canonical volume field string: integers stay integer text ("200"), finite
- * non-integers keep a plain decimal string. Never invents a value.
+ * non-integers keep a plain decimal string. Never invents a value. A historical
+ * watering above the single-watering ceiling (accepted before the ceiling
+ * shipped) is not a default: it would prefill a value Save refuses, so it is
+ * skipped and an older in-range watering is used instead.
  */
 export function formatWateringVolumeMlForPrefill(volumeMl: number): string | null {
-  if (!Number.isFinite(volumeMl) || volumeMl <= 0 || volumeMl > 1_000_000) {
+  if (!Number.isFinite(volumeMl) || volumeMl <= 0 || volumeMl > QUICK_LOG_WATER_VOLUME_MAX_ML) {
     return null;
   }
   if (Number.isInteger(volumeMl)) return String(volumeMl);

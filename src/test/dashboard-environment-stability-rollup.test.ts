@@ -51,7 +51,7 @@ describe("computeStabilityRollup", () => {
     const v = computeStabilityRollup([r("unavailable")]);
     expect(v.driftingCount).toBe(0);
     expect(v.unavailableCount).toBe(1);
-    expect(v.copy).toBe("1 tent unavailable");
+    expect(v.copy).toBe("VPD stability unavailable for 1 tent");
     expect(v.tone).toBe("unavailable");
   });
 

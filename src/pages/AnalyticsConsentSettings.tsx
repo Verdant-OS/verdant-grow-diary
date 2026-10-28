@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
 import { setGoogleAnalyticsOptOut } from "@/lib/googleAnalyticsLoader";
-import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
+import { AHREFS_WEB_ANALYTICS_KEY, GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 import type { AnalyticsConsentDecision } from "@/lib/analyticsConsent";
 
 /**
@@ -25,7 +25,7 @@ const STATUS_COPY: Record<
     label: "Analytics on",
     variant: "default",
     detail:
-      "You accepted analytics. Verdant loads Google Analytics and records which pages you visit.",
+      "You accepted analytics. Verdant loads Google Analytics and Ahrefs Web Analytics to record page usage.",
   },
   denied: {
     label: "Analytics off",
@@ -36,8 +36,7 @@ const STATUS_COPY: Record<
   unset: {
     label: "No choice made yet",
     variant: "outline",
-    detail:
-      "You have not answered the consent prompt yet. Analytics stays off until you accept.",
+    detail: "You have not answered the consent prompt yet. Analytics stays off until you accept.",
   },
 };
 
@@ -57,8 +56,8 @@ export default function AnalyticsConsentSettings() {
     <div className="container mx-auto max-w-2xl px-4 py-8" data-testid="analytics-consent-settings">
       <h1 className="text-2xl font-semibold tracking-tight">Analytics consent</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Verdant only measures page usage if you say yes. Your grows, diary entries, photos,
-        and sensor readings are never sent to analytics.
+        Verdant only measures page usage if you say yes. Your grows, diary entries, photos, and
+        sensor readings are never sent to analytics.
       </p>
 
       <Card className="mt-6">
@@ -100,20 +99,25 @@ export default function AnalyticsConsentSettings() {
 
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             <li>
-              The choice is stored in this browser only, so it does not follow you to other
-              devices or profiles.
+              The choice is stored in this browser only, so it does not follow you to other devices
+              or profiles.
             </li>
             <li>
-              Revoking stops further analytics hits immediately. Data already collected before
-              you revoked is handled per our{" "}
+              Revoking blocks new Verdant analytics events and prevents analytics tags from loading
+              on future pages. Refresh this tab after revoking to fully clear tags already loaded.
+              Data collected before you revoked is handled per our{" "}
               <Link to="/privacy" className="underline underline-offset-4">
                 privacy policy
               </Link>
               .
             </li>
             <li>
-              Measurement property in use:{" "}
+              Google Analytics property in use:{" "}
               <code className="font-mono text-xs">{GOOGLE_ANALYTICS_MEASUREMENT_ID}</code>
+            </li>
+            <li>
+              Ahrefs Web Analytics property in use:{" "}
+              <code className="break-all font-mono text-xs">{AHREFS_WEB_ANALYTICS_KEY}</code>
             </li>
           </ul>
         </CardContent>

@@ -120,6 +120,20 @@ export function applyTenSecondQuickCheck(
   return applyResponseCheck(existingNote, status);
 }
 
+const LEGACY_PHOTO_ONLY_NOTE = "Photo only — no other changes today.";
+
+/** True when every note line is the Photo only chip, and nothing else. */
+export function isPhotoOnlyQuickLogNote(note: string): boolean {
+  const lines = splitLines(note);
+  if (lines.length === 0) return false;
+  const photoOnly = normalizeLine(actionChipLine("Photo only"));
+  const legacyPhotoOnly = normalizeLine(LEGACY_PHOTO_ONLY_NOTE);
+  return lines.every((line) => {
+    const normalized = normalizeLine(line);
+    return normalized === photoOnly || normalized === legacyPhotoOnly;
+  });
+}
+
 export function applyQuickLogActionChip(existingNote: string, chip: QuickLogActionChip): string {
   const line = actionChipLine(chip);
   const normalizedChip = normalizeLine(line);

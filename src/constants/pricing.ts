@@ -17,6 +17,7 @@ export const PRICING = {
     description: "Start free. Build your grow diary and see if Verdant fits your workflow.",
     features: [
       "1 active grow",
+      "1 tent",
       "Historical logs kept forever",
       "3 AI Doctor credits per grow",
       "Manual sensor entries",
@@ -71,25 +72,22 @@ export const PRICING = {
       "Day/night-aware temperature targets",
     ],
   },
-  founder: {
-    name: "Founder Lifetime",
-    slug: "founder-lifetime",
-    subtitle: "Early Supporter",
-    price: 129,
-    cadence: "one-time",
-    highlighted: false,
-    limit: 100,
-    badge: "First 100 only",
-    description:
-      "A limited early-supporter offer. Pay once and get full Pro access for the life of the product.",
-    features: [
-      "Lifetime Pro access",
-      "100 AI Doctor credits / month",
-      "One-time AI credit packs available",
-      "Founder badge / early supporter positioning",
-    ],
-  },
 } as const;
+
+/**
+ * Historical Founder Lifetime figures. The plan is no longer sold. Slot and
+ * entitlement code still imports these numbers; public pricing must not.
+ */
+export const FOUNDER_LIFETIME_LIMIT = 100;
+export const FOUNDER_LIFETIME_PRICE_USD = 129;
+
+/**
+ * Founder Lifetime is no longer sold (#2028), but existing holders keep the
+ * Pro Blueprint and 100 monthly AI credits (planCatalog), and can still use
+ * credit packs. Tell them so without a price or any purchase wording.
+ */
+export const EXISTING_FOUNDER_HOLDER_NOTE =
+  "Existing Founder members keep the Pro Blueprint for live per-stage SOP scoring and 100 AI Doctor credits per UTC calendar month, and the same one-time packs are available to them.";
 
 export const AI_CREDIT_EXPLAINER = {
   title: "AI Doctor Credits",
@@ -97,9 +95,10 @@ export const AI_CREDIT_EXPLAINER = {
     "1 standard AI Doctor analysis = 1 credit",
     "Advanced / escalated review may use more credits",
     "Free users can upgrade when credits are used",
-    "Pro, Craft and Founder members can buy one-time credit packs when they need more",
+    "One-time AI credit packs available",
+    "Pro and Craft members can buy one-time credit packs when they need more",
   ],
-  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro and Founder include 100 per month; Craft includes 300. Pro, Craft and Founder members who are out of monthly credits can buy a one-time top-up pack (50 for $9, 150 for $19) — packs never expire and are spent only after the monthly allowance.",
+  note: `Included AI Doctor credits work today: Free includes 3 per grow; Pro includes 100 per month; Craft includes 300. ${EXISTING_FOUNDER_HOLDER_NOTE} Pro and Craft members who are out of monthly credits can buy a one-time top-up pack (50 for $9, 150 for $19) — packs never expire and are spent only after the monthly allowance.`,
 } as const;
 
 /**
@@ -120,8 +119,6 @@ export const TRUST_STRIP = {
   items: ["Read-only", "Honest data labels", "Your history is always yours", "No blind automation"],
 } as const;
 
-export const FOUNDER_LIFETIME_LIMIT = PRICING.founder.limit;
-export const FOUNDER_LIFETIME_PRICE_USD = PRICING.founder.price;
 export const PRO_MONTHLY_PRICE_USD = PRICING.pro.monthlyPrice;
 export const PRO_ANNUAL_PRICE_USD = PRICING.pro.annualPrice;
 export const CRAFT_MONTHLY_PRICE_USD = PRICING.craft.monthlyPrice;

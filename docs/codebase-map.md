@@ -10,7 +10,7 @@ claim about production, deployment, indexing, or which migrations are applied â€
 axes belong to [`docs/agents/CURRENT_STATE.md`](agents/CURRENT_STATE.md) and keep their
 `BLOCKED` / `NOT_MEASURED` labels there.
 
-This file is **not** one of the twelve versioned governance files. It carries no
+This file is **not** one of the eighteen versioned governance files. It carries no
 `Sentinel-Version` and editing it does not trigger the parity gate.
 
 ---
@@ -92,6 +92,9 @@ never fire, measured under a publisher that no longer serves the apex
 `/strains/:slug`, `/features`, `/demo`, `/refunds`, `/refund-policy`, `/terms-of-service`,
 `/privacy-policy`. For their current state run the specification's M7 and record the result in
 the next `docs/agents/CURRENT_STATE.md` stamp; its Appendix A is a dated record, not current state.
+
+Historical as of 2026-10-10 (Matthew Cheek): production runs on Cloudflare Workers at
+https://verdantgrowdiary.com. `vercel.json` is not that host's configuration.
 
 ### Authenticated routes (`src/routes/_app/*.tsx`)
 
@@ -273,7 +276,7 @@ that it failed on the head of PR #769 and merged anyway â€” a documented enforce
 
 | Workflow                                                           | Purpose                                                                                            |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `sentinel-version-parity`                                          | PARITY / MIRROR / BUMP across the twelve governance files                                          |
+| `sentinel-version-parity`                                          | PARITY / MIRROR / BUMP across the eighteen governance files                                          |
 | `published-migration-integrity`                                    | SHA-256 diff of `supabase/migrations/**` against the base branch; edits to shipped migrations fail |
 | `contract-test-resolution`                                         | Contract tests must assert resolved values, not source text                                        |
 | `required-check-audit`                                             | Audits the pinned ruleset mirror against live check results                                        |
@@ -305,7 +308,7 @@ Ten `workflow_dispatch`-only appliers: `apply-pinned-production-migrations`,
 `security-db-local` (opt-in lane, spins a local Supabase and replays migrations into an
 immutable workspace, then runs the individual RLS lanes), `security-regression`,
 `dependency-security-ci`, `mcp-local-rls-integration`, `irrigation-pgtap-rls-gate`,
-`irrigation-evidence-gate`, `sandbox-credit-packs-smoke`.
+`irrigation-evidence-gate`.
 
 ### Test runners
 

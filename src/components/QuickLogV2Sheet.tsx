@@ -1785,6 +1785,9 @@ function QuickLogV2SheetForOwner({
     if (archiveGuard && resolved.plantId) {
       const archiveDecision = await archiveGuard(resolved.plantId);
       if (archiveDecision.block) {
+        // An unresolved earlier save still owns this form: keep it locked so
+        // the next retry replays that record, not edits made after the block.
+        if (pendingSubmission) keepSubmissionLockedRef.current = true;
         setLocalError(archiveDecision.message);
         return;
       }

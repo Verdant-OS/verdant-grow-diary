@@ -126,6 +126,23 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Quick Log save re-checks the plant it will write", () => {
+  it("keeps the v2 sheet locked when the archive re-check blocks an unresolved note retry", async () => {
+    harness.archived = false;
+    harness.rpc.mockResolvedValueOnce({ data: null, error: { message: "network down" } });
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+    const note = screen.getByLabelText("Note (optional)");
+    fireEvent.change(note, { target: { value: "Uncertain sheet note" } });
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByLabelText("Note (optional)")).toBeDisabled());
+    harness.archived = true;
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+    expect(await screen.findByText(MESSAGE)).toBeInTheDocument();
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Note (optional)")).toBeDisabled();
+  });
+
   it("does not save the dialog note when that plant was archived", async () => {
     renderQuickLog();
     const save = screen.getByTestId("quick-log-save");

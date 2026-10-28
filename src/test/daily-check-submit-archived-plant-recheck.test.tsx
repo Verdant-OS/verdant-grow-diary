@@ -5,6 +5,7 @@
  */
 import { useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
@@ -353,11 +354,15 @@ describe("Daily Check submit re-checks an archived plant", () => {
     const { invalidateQueries } = renderCheck();
     await reachQuickLogSave();
     plantArchive.byId.P = true;
+    const toastError = vi.spyOn(toast, "error");
 
     fireEvent.click(screen.getByTestId("quick-log-save"));
 
     expect(saveInsert).not.toHaveBeenCalled();
     expect(await screen.findByText(ARCHIVED_PLANT_MESSAGE)).toBeInTheDocument();
+    // The banner sits behind the dialog, so the block is also announced in a toast.
+    expect(toastError).toHaveBeenCalledWith(ARCHIVED_PLANT_MESSAGE);
+    toastError.mockRestore();
     expect(saveInsert).not.toHaveBeenCalled();
     expect(screen.queryByTestId("daily-grow-check-post-submit-plant")).not.toBeInTheDocument();
     expect(screen.getByTestId("daily-grow-check-choose")).toHaveAttribute("data-plant-id", "P");

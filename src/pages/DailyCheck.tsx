@@ -331,6 +331,9 @@ export default function DailyCheck() {
             // snapshot review and drops the typed draft. A different dialog
             // target must not clear the page selection either.
             setArchivedPlantSubmitMessage(decision.message);
+            // The page banner sits behind an open dialog; the toast is a live
+            // region above it, so the grower in the editor hears the block too.
+            toast.error(decision.message);
             return;
           }
           // This click re-read the plant it will save. A pass makes the

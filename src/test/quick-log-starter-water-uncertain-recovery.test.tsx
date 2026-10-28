@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
+import { registerDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
+import {
+  DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
+  type DailyCheckPlantArchiveDecision,
+} from "@/lib/dailyCheckPlantSelectionRules";
 import {
   setLocalStorageItemForTest,
   clearLocalStorageForTest,
@@ -240,6 +245,31 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(trackSuccessMock).toHaveBeenCalledTimes(1);
     expect(trackSuccessMock).toHaveBeenCalledWith("water");
     expect(getLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull();
+  });
+
+  it("runs the Daily Check archive re-check before a recovery retry and keeps the claim on a block", async () => {
+    seed();
+    saveMock.mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    const guard = vi.fn(async (_plantId: string): Promise<DailyCheckPlantArchiveDecision> => ({
+      block: true,
+      message: DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE,
+    }));
+    const unregister = registerDailyCheckPlantArchiveSaveGuard(guard);
+    try {
+      fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+      await waitFor(() =>
+        expect(guard).toHaveBeenCalledWith("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+      );
+      await screen.findByText(DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE);
+      expect(saveMock).toHaveBeenCalledTimes(1);
+      expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
+    } finally {
+      unregister();
+    }
   });
 
   it("treats a matching cross-tab clear as resolved without a second telemetry count", async () => {

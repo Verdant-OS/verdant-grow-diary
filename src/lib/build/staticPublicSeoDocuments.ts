@@ -34,7 +34,6 @@ import {
   type GrowStage,
 } from "../../constants/growStageCareGuide";
 import { PUBLIC_QUICK_LOG_STARTER_COPY } from "../../constants/publicQuickLogStarterCopy";
-import { FOUNDER_SOCIAL_META } from "../../constants/founderSocialMeta";
 import {
   NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
   NEXT_DOOR_CUSTOMER_BRAND,
@@ -860,21 +859,6 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
 
 /** All public documents emitted alongside Vite's primary SPA entry. */
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
-  {
-    path: "/founder",
-    fileName: routeFileName("/founder"),
-    metadata: {
-      ...FOUNDER_SOCIAL_META,
-      image: `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`,
-      jsonLd: [
-        buildStaticWebPageJsonLd({
-          title: FOUNDER_SOCIAL_META.title,
-          description: FOUNDER_SOCIAL_META.description,
-          url: FOUNDER_SOCIAL_META.url,
-        }),
-      ],
-    },
-  },
   ...CORE_ACQUISITION_DOCUMENTS,
   GUIDE_HUB,
   ...GUIDE_DOCUMENTS,

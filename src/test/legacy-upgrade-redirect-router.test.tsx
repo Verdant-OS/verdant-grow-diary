@@ -32,7 +32,7 @@ describe("LegacyUpgradeRedirect", () => {
       "/upgrade?plan=founder-lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=/dashboard",
     );
     expect(screen.getByTestId("location")).toHaveTextContent(
-      "/pricing?plan=founder_lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=%2Fdashboard",
+      "/pricing?utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=%2Fdashboard",
     );
   });
 

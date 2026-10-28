@@ -224,6 +224,23 @@ describe("public grow tent temperature and humidity page", () => {
     vi.useRealTimers();
   });
 
+  it("keeps an unedited date field on the current minute without a focus", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 28, 8, 0));
+    renderPage();
+    act(() => {
+      vi.setSystemTime(new Date(2026, 9, 28, 9, 30));
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(screen.getByLabelText("Date & time (local)")).toHaveValue("2026-10-28T09:30");
+    setField("Date & time (local)", "2026-10-27T18:00");
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(screen.getByLabelText("Date & time (local)")).toHaveValue("2026-10-27T18:00");
+    vi.useRealTimers();
+  });
+
   it("drops a stale clipboard fallback once the log changes", async () => {
     vi.stubGlobal("navigator", {
       clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },

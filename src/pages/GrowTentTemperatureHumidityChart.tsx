@@ -157,6 +157,14 @@ export default function GrowTentTemperatureHumidityChart() {
     setDateTime((current) => current || growTentLocalDateTimeInput(new Date()));
   }, []);
 
+  // An unedited date keeps tracking the clock, so it shows the stamp a reading would get.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!dateEdited.current) setDateTime(growTentLocalDateTimeInput(new Date()));
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const inputs = useMemo(
     () => parseGrowTentClimateInputs(air, rh, offset, stage),
     [air, rh, offset, stage],

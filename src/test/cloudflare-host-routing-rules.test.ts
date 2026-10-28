@@ -50,13 +50,17 @@ const vercel = JSON.parse(readFileSync(resolve(ROOT, "vercel.json"), "utf8")) as
 
 const EXACT_PERMANENT_REDIRECTS = [
   ["/strains", "/cultivars"],
-  ["/features", "/welcome"],
-  ["/demo", "/welcome"],
+  ["/welcome", "/"],
+  ["/features", "/"],
+  ["/demo", "/"],
   ["/refunds", "/refund"],
   ["/refund-policy", "/refund"],
   ["/terms-of-service", "/terms"],
   ["/privacy-policy", "/privacy"],
 ] as const;
+
+/** vercel.json still names the pre-Worker marketing aliases. It is not production. */
+const STALE_VERCEL_MARKETING_REDIRECTS = new Set(["/welcome", "/features", "/demo"]);
 
 function headerValue(headers: Headers, name: string): string | null {
   return headers.get(name);
@@ -68,7 +72,9 @@ describe("cloudflare host routing mirrors vercel.json", () => {
     expect(redirects).toHaveLength(9);
 
     for (const [source, destination] of EXACT_PERMANENT_REDIRECTS) {
-      expect(redirects).toContainEqual({ source, destination, permanent: true });
+      if (!STALE_VERCEL_MARKETING_REDIRECTS.has(source)) {
+        expect(redirects).toContainEqual({ source, destination, permanent: true });
+      }
       const decision = resolveHostRouting({ pathname: source, search: "" });
       expect(decision).toEqual({
         kind: "redirect",
@@ -113,12 +119,13 @@ describe("cloudflare host routing mirrors vercel.json", () => {
     expect(isSpaCatchAllExcluded("/assets/app.js")).toBe(true);
     expect(isSpaCatchAllExcluded("/welcome")).toBe(false);
 
-    const welcome = resolveHostRouting({ pathname: "/welcome", search: "" });
-    expect(welcome.kind).toBe("continue");
-    if (welcome.kind === "continue") {
-      expect(welcome.spaRewriteMatched).toBe(true);
-      expect(welcome.location).toBeNull();
-    }
+    const welcome = resolveHostRouting({ pathname: "/welcome", search: "?utm_source=guide" });
+    expect(welcome).toEqual({
+      kind: "redirect",
+      status: 308,
+      location: "/?utm_source=guide",
+      headers: hostHeadersForPathname("/welcome"),
+    });
   });
 });
 

@@ -55,10 +55,14 @@ export const PRIVILEGED_ROUTE_PREFIXES = [
 ] as const;
 
 export const PUBLIC_CORE_CENSUS_ROUTES = [
-  { path: "/welcome", label: "Welcome", fieldPolicy: "audit-only" },
   { path: "/auth", label: "Authentication", fieldPolicy: "fill-safe-fields" },
   { path: "/pricing", label: "Pricing", fieldPolicy: "audit-only" },
-  { path: "/founder", label: "Founder Lifetime", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/founder",
+    expectedPathname: "/pricing",
+    label: "Former Founder page redirects to pricing",
+    fieldPolicy: "audit-only",
+  },
   {
     path: "/checkout/success",
     label: "Checkout success return",
@@ -158,6 +162,8 @@ export const PUBLIC_CORE_CENSUS_ROUTES = [
   { path: "/terms", label: "Terms", fieldPolicy: "audit-only" },
   { path: "/privacy", label: "Privacy", fieldPolicy: "audit-only" },
   { path: "/refund", label: "Refund policy", fieldPolicy: "audit-only" },
+  // The canonical signed-out home, which replaced /welcome (now a 308 to /).
+  { path: "/", label: "Home (signed-out landing)", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
 
 // The public sweep includes field exercises and revisits every safe internal
@@ -367,7 +373,13 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     fieldPolicy: "fill-safe-fields",
     expectedContent: [{ kind: "test-id", value: "tent-detail-metric-chips" }],
   },
-  { path: "/onboarding", label: "Onboarding", fieldPolicy: "fill-safe-fields" },
+  {
+    // A signed-in account with a grow is sent to the dashboard (#2045).
+    path: "/onboarding",
+    expectedPathname: "/",
+    label: "Onboarding",
+    fieldPolicy: "fill-safe-fields",
+  },
   { path: "/start-room", label: "Start your room", fieldPolicy: "fill-safe-fields" },
   { path: "/health", label: "App health", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
@@ -414,7 +426,7 @@ export function visibleLinkByHrefSelector(href: string): string {
 
 const READ_ONLY_EDGE_FUNCTIONS = new Set([
   "environment-summary-report-entitlement",
-  "founder-slots-remaining",
+  "live-sensor-entitlement",
   "premium-export-entitlement",
 ]);
 
@@ -519,17 +531,26 @@ function matchingManifestRoute(
 }
 
 /**
+ * Redirects the signed-in census fixture triggers. The fixture account has a
+ * grow, so /onboarding sends it to the dashboard (src/pages/Onboarding.tsx, #2045).
+ */
+export const SIGNED_IN_FIXTURE_REDIRECTS: Readonly<Record<string, string>> = {
+  "/onboarding": "/",
+};
+
+/**
  * Where a clicked link must finish. On the signed-out lane a protected target
  * lands on the sign-in screen (`SIGNED_OUT_LANDING` in
  * src/lib/authRedirectRules.ts: "/auth", destination preserved as redirectTo),
- * never the marketing /welcome.
+ * never the marketing /welcome. On the signed-in lane only the fixture
+ * redirects above move a link off its own pathname.
  */
 export function expectedCensusNavigationPath(
   pathname: string,
   manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
   signedIn: boolean,
 ): string {
-  if (signedIn) return pathname;
+  if (signedIn) return SIGNED_IN_FIXTURE_REDIRECTS[pathname] ?? pathname;
 
   const route = matchingManifestRoute(pathname, manifest);
   if (route && ["auth", "operator", "internal"].includes(route.access)) {

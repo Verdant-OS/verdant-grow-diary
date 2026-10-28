@@ -28,6 +28,8 @@ import {
 } from "@/lib/startScreenPreferences";
 import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
 import { Sprout } from "lucide-react";
+
+export const ONBOARDING_GROWS_LOADING_COPY = "Loading your grows…";
 import {
   buildStarterQuickLogPrefill,
   STARTER_SETUP_BUTTON_LABEL,
@@ -51,10 +53,28 @@ import {
   CSV_HISTORY_ONBOARDING_TITLE,
   readCsvHistoryOnboardingIntent,
 } from "@/lib/csvHistoryOnboardingIntentRules";
+import { retryOnboardingGrowsRead } from "@/lib/onboardingGrowsRetryRules";
+import { GROWS_READ_SESSION_EXPIRED } from "@/lib/growsReadRetryRules";
+import { performSafeSignOut } from "@/lib/authSessionExitRules";
 
 export default function Onboarding() {
-  const { user, loading } = useAuth();
-  const { grows = [], loading: growsLoading, refresh: refreshGrows } = useGrows();
+  const { user, loading, signOut } = useAuth();
+  const growsState = useGrows();
+  // A missing provider value or a null list is a failed shape, not an empty
+  // account. Reading `.length` on null is the TypeError class Sentry recorded
+  // on this route (VERDANT-WEB-1; message and stack were redacted).
+  const grows = Array.isArray(growsState?.grows) ? growsState.grows : [];
+  const growsLoading = growsState?.loading === true;
+  // A settled read whose list is not an array must never take the empty-account
+  // path (start screen -> StartYourRoom -> grow creation); show the read error.
+  const growsShapeFailed = !growsLoading && !Array.isArray(growsState?.grows);
+  const growsError =
+    typeof growsState?.error === "string" && growsState.error
+      ? growsState.error
+      : growsShapeFailed
+        ? "grows-read-malformed"
+        : null;
+  const refreshGrows = growsState?.refresh;
   const {
     loading: entitlementLoading,
     lookupFailed: entitlementLookupFailed,
@@ -66,6 +86,7 @@ export default function Onboarding() {
   const [searchParams] = useSearchParams();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const [starterBusy, setStarterBusy] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const [starterRetrying, setStarterRetrying] = useState(false);
   const starterOperationInFlightRef = useRef(false);
   const [starterError, setStarterError] = useState<string | null>(null);
@@ -80,8 +101,69 @@ export default function Onboarding() {
     headingRef.current?.focus();
   }, []);
 
-  if (loading || growsLoading) return null;
+  if (loading) return null;
+  if (growsLoading) {
+    return (
+      <div
+        className="min-h-dvh flex items-center justify-center px-6"
+        role="status"
+        data-testid="onboarding-grows-loading"
+      >
+        <p className="text-sm text-muted-foreground">{ONBOARDING_GROWS_LOADING_COPY}</p>
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/auth" replace />;
+  if (growsError === GROWS_READ_SESSION_EXPIRED) {
+    // Signing out lets the `!user` branch above send the grower to /auth.
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div
+          role="alert"
+          data-testid="onboarding-grows-session-expired"
+          className="max-w-md space-y-3 text-sm"
+        >
+          <p>Your sign-in has expired. Sign in again to load your grows.</p>
+          <Button
+            type="button"
+            onClick={async () => {
+              setSignOutError(null);
+              const result = await performSafeSignOut({ signOut });
+              if (result.ok === false) setSignOutError(result.message);
+            }}
+          >
+            Sign in again
+          </Button>
+          {signOutError ? (
+            <p className="text-destructive" data-testid="onboarding-sign-out-error">
+              {signOutError}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+  if (growsError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div
+          role="alert"
+          data-testid="onboarding-grows-error"
+          className="max-w-md space-y-3 text-sm"
+        >
+          <p>We couldn&apos;t load your grows. This is not an empty account.</p>
+          <Button
+            type="button"
+            onClick={() => {
+              retryOnboardingGrowsRead(refreshGrows, () => window.location.reload());
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
   if (grows.length >= 1) return <Navigate to={routeForStartScreen("dashboard")} replace />;
 
   function go(c: StartScreenChoice, save: boolean) {
@@ -115,7 +197,7 @@ export default function Onboarding() {
       // in-memory handoff so the new grow/tent/plant can be selected and saved
       // immediately, without waiting for a focus refetch or page reload.
       await Promise.all([
-        refreshGrows(),
+        refreshGrows ? refreshGrows() : Promise.resolve(),
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);

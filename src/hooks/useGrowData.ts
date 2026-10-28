@@ -15,6 +15,7 @@ import {
   fetchSensorReadings,
 } from "@/lib/growRepo";
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
+import { readTransientValue } from "@/lib/growsReadRetryRules";
 import { useAuth } from "@/store/auth";
 
 // ---------------------------------------------------------------------------
@@ -246,7 +247,9 @@ export function useGrowTents(growId?: string): UseQueryResult<Tent[]> {
         scope: "tents",
         ownerId,
         key,
-        run: () => fetchTents(growId),
+        // The deadline sits inside run so a timeout is recorded as a failed read
+        // and a response that arrives later cannot record rows.
+        run: () => readTransientValue(() => fetchTents(growId)),
         emptyValue: () => [] as Tent[],
         isEmpty: isArrEmpty,
       }),
@@ -302,7 +305,9 @@ export function useGrowPlants(
         scope: "plants",
         ownerId,
         key,
-        run: () => fetchPlants(tentId, growId, { includeArchived }),
+        // The deadline sits inside run so a timeout is recorded as a failed read
+        // and a response that arrives later cannot record rows.
+        run: () => readTransientValue(() => fetchPlants(tentId, growId, { includeArchived })),
         emptyValue: () => [] as Plant[],
         isEmpty: isArrEmpty,
       }),

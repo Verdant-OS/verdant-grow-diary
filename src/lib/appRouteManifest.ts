@@ -138,7 +138,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Authenticated Dashboard alias; preserves optional growId scope.",
   },
-  { path: "/demo", access: "redirect", description: "→ /welcome" },
+  { path: "/demo", access: "redirect", description: "→ /" },
   {
     path: "/demo/one-tent-live-proof",
     access: "operator",
@@ -189,12 +189,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
-  { path: "/features", access: "redirect", description: "→ /welcome" },
+  { path: "/features", access: "redirect", description: "→ /" },
   { path: "/feedback", access: "public", description: "Public support feedback page." },
   {
     path: "/founder",
-    access: "public",
-    description: "Public Founder Lifetime acquisition and offer explainer.",
+    access: "redirect",
+    description: "→ /pricing. Founder Lifetime is no longer sold.",
   },
   {
     path: "/genetics",
@@ -226,6 +226,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/guides", access: "public", description: "Grower guides index." },
   { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
+  {
+    path: "/guides/athena-feed-chart-log",
+    access: "public",
+    description: "Public planned-vs-actual Athena feed log. In-memory only.",
+  },
   {
     path: "/guides/grow-stage-care-guide",
     access: "public",
@@ -540,7 +545,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "redirect",
     description: "→ /pricing with allowlisted plan, acquisition, and return intent.",
   },
-  { path: "/welcome", access: "public" },
+  {
+    path: "/vpd-chart",
+    access: "public",
+    description: "Public VPD chart by growth stage with a leaf-offset calculator.",
+  },
+  { path: "/welcome", access: "redirect", description: "→ /" },
 ];
 
 /** All manifest paths in the manifest's deterministic (path-ascending) order. */

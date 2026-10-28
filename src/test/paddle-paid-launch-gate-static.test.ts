@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 const WEBHOOK = read("supabase/functions/paddle-webhook/index.ts");
-const VERIFIER = read("supabase/functions/paddle-webhook/verifyPaddleSignature.ts");
+const VERIFIER = read("supabase/functions/_shared/verifyPaddleSignature.ts");
 const MIGRATION = read(
   "supabase/migrations/20260714230000_paddle_paid_launch_ordering_and_founder.sql",
 );
@@ -160,10 +160,6 @@ describe("founder lifetime — one-time, atomic, capped, idempotent", () => {
     expect(MIGRATION).toContain(
       "GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO service_role;",
     );
-    // And the price resolver actually consults it for founder_lifetime.
-    const priceFn = read("supabase/functions/get-paddle-price/index.ts");
-    expect(priceFn).toMatch(/founder_lifetime_slots_remaining/);
-    expect(priceFn).toMatch(/plan_sold_out/);
   });
 
   it("checkout attribution: the webhook accepts the userId key the live checkout sends", () => {

@@ -263,14 +263,14 @@ export default function PlantDailyGrowCheckConsistencyCard({
                 data-testid="plant-daily-grow-check-method-breakdown-day"
                 data-day-key={d.dayKey}
                 data-method={d.method}
-                className="flex flex-col items-center gap-0.5 rounded border border-border/40 bg-muted/30 px-1 py-1 text-center"
+                className="min-w-0 flex flex-col items-center gap-0.5 rounded border border-border/40 bg-muted/30 px-1 py-1 text-center"
                 title={`${d.label}: ${label}`}
               >
                 <span className="text-[10px] text-muted-foreground truncate max-w-full">
                   {d.label}
                 </span>
                 <span
-                  className="text-[10px] font-medium"
+                  className="text-[10px] font-medium leading-tight max-w-full [overflow-wrap:anywhere]"
                   data-testid="plant-daily-grow-check-method-breakdown-day-label"
                 >
                   {label}

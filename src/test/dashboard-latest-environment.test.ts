@@ -214,8 +214,11 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     // a candidate that strictly newer manual/env-check evidence replaces.
     expect(HOOK).toMatch(/if \(snap && !isSnapshotStale\(snap\)\) return snap;/);
     expect(HOOK).toMatch(/staleSensorCandidate = snap;/);
+    // Every diary envelope (sensor_snapshot, manual_sensor_snapshot,
+    // environment_check) resolves in snapshotFromDiaryEvidenceRow and goes
+    // through the same preferNewer (shared with the bulk read, Codex P2 at d6ef3a20).
     expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, snap\);/);
-    expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, envSnap\);/);
+    expect(HOOK).toMatch(/const envSnap = snapshotFromEnvironmentCheck\(/);
     expect(HOOK).toMatch(/return staleSensorCandidate \?\? EMPTY_SNAPSHOT;/);
   });
 

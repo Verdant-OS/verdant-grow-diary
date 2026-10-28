@@ -471,6 +471,7 @@
     "follow-redirects": "1.16.1",
     "glob": "10.5.0",
     "hono": "4.13.11",
+    "ip-address": "10.7.4",
     "nanoid": "3.3.18",
     "postcss-selector-parser": "7.1.6",
     "proxy-addr": "2.0.8",

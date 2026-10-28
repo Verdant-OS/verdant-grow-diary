@@ -10,6 +10,9 @@
 
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
+  QUICK_LOG_NOTE_MARKER_KEY,
+  QUICK_LOG_NOTE_MARKER_VALUE,
+  QUICK_LOG_OBSERVATION_TIMELINE_LABEL,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
   type QuickLogEventTypeValue,
@@ -374,6 +377,63 @@ export function planQuickLogPersistence(id: QuickLogActivityId): QuickLogPersist
   }
 }
 
+/** True when a details object carries the new-note marker. */
+export function hasQuickLogNoteMarker(details: unknown): boolean {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return false;
+  const value = (details as Record<string, unknown>)[QUICK_LOG_NOTE_MARKER_KEY];
+  return typeof value === "string" && value.trim().toLowerCase() === QUICK_LOG_NOTE_MARKER_VALUE;
+}
+
+/** Returns details with the note marker added; never mutates the input. */
+export function withQuickLogNoteMarker<T extends Record<string, unknown>>(
+  details: T | null | undefined,
+): T & Record<typeof QUICK_LOG_NOTE_MARKER_KEY, string> {
+  return {
+    ...((details ?? {}) as T),
+    [QUICK_LOG_NOTE_MARKER_KEY]: QUICK_LOG_NOTE_MARKER_VALUE,
+  };
+}
+
+/** True for an observation saved from the Issue tile (details.subtype "issue"). */
+export function isQuickLogIssueSubtype(subtype: unknown): boolean {
+  return typeof subtype === "string" && subtype.trim().toLowerCase() === "issue";
+}
+
+/**
+ * Index diary mirror details by the grow_events row they belong to
+ * (details.linked_grow_event_id, else details.grow_event_id). The first row
+ * wins for a given id, so the result is deterministic for a given order.
+ */
+export function indexQuickLogMirrorDetailsByGrowEventId(
+  diaryRows: ReadonlyArray<{ details?: unknown }> | null | undefined,
+): ReadonlyMap<string, Record<string, unknown>> {
+  const out = new Map<string, Record<string, unknown>>();
+  for (const row of diaryRows ?? []) {
+    const details = row?.details;
+    if (!details || typeof details !== "object" || Array.isArray(details)) continue;
+    const record = details as Record<string, unknown>;
+    for (const key of ["linked_grow_event_id", "grow_event_id"] as const) {
+      const id = typeof record[key] === "string" ? (record[key] as string).trim() : "";
+      if (id && !out.has(id)) out.set(id, record);
+    }
+  }
+  return out;
+}
+
+/** Heading for a grow_events row, read through its linked diary mirror. */
+export function resolveQuickLogGrowEventLabel(
+  event: { id?: string | null; event_type?: string | null },
+  mirrors: ReadonlyMap<string, Record<string, unknown>>,
+): string {
+  const mirror = event.id ? mirrors.get(event.id) : undefined;
+  const subtype = typeof mirror?.subtype === "string" ? mirror.subtype : null;
+  return resolveQuickLogEventTimelineLabel({
+    eventType: event.event_type,
+    detailsSubtype: subtype,
+    details: mirror,
+  });
+}
+
 /**
  * Timeline label resolver for events persisted via quicklog_save_event.
  *
@@ -381,16 +441,23 @@ export function planQuickLogPersistence(id: QuickLogActivityId): QuickLogPersist
  * label a card "Defoliation" when both event_type is "training" and
  * details.subtype is "defoliation". Generic training stays labeled
  * "Training" so a plain training log is never mislabeled.
+ *
+ * Note and Issue both persist as `observation`. A row is a Note when its
+ * linked diary details carry the note marker, an Issue when its subtype is
+ * "issue", and any other observation (old unmarked notes included) stays
+ * "Observation".
  */
 export function resolveQuickLogEventTimelineLabel(input: {
   eventType: string | null | undefined;
   detailsSubtype?: string | null | undefined;
+  details?: unknown;
 }): string {
   const eventType = (input.eventType ?? "").toString().trim().toLowerCase();
   const subtype = (input.detailsSubtype ?? "").toString().trim().toLowerCase();
   if (eventType === "training" && subtype === "defoliation") {
     return QUICK_LOG_ACTIVITY_DEFINITIONS.defoliation.timelineLabel;
   }
+  if (eventType === "note") return QUICK_LOG_ACTIVITY_DEFINITIONS.note.timelineLabel;
   switch (eventType) {
     case "training":
       return QUICK_LOG_ACTIVITY_DEFINITIONS.training.timelineLabel;
@@ -403,7 +470,13 @@ export function resolveQuickLogEventTimelineLabel(input: {
     case "environment":
       return QUICK_LOG_ACTIVITY_DEFINITIONS.environment_check.timelineLabel;
     case "observation":
-      return QUICK_LOG_ACTIVITY_DEFINITIONS.issue_observation.timelineLabel;
+      if (hasQuickLogNoteMarker(input.details)) {
+        return QUICK_LOG_ACTIVITY_DEFINITIONS.note.timelineLabel;
+      }
+      if (isQuickLogIssueSubtype(subtype)) {
+        return QUICK_LOG_ACTIVITY_DEFINITIONS.issue_observation.timelineLabel;
+      }
+      return QUICK_LOG_OBSERVATION_TIMELINE_LABEL;
     case "harvest":
       return QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.timelineLabel;
     default:

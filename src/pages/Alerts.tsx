@@ -270,6 +270,14 @@ export default function Alerts() {
     // alerts exist, navigate to /actions without guessing so the grower
     // chooses via the per-row "Add to Action Queue" buttons.
     if (!singleUnlinkedOpenAlert) return;
+    // VER-300: while target names or linked ids are still loading, the
+    // alert may yet prove to be on an archived/removed tent. Navigate
+    // without queuing rather than queue on an unverified target.
+    const targetsSettled =
+      targetNames.status !== "loading" &&
+      targetNames.status !== "idle" &&
+      !linkedTargets.idsLoading;
+    if (!targetsSettled) return;
     const res = await queueOpenAlertToActionQueue(singleUnlinkedOpenAlert);
     if (!res.ok) return false;
     if (res.actionQueueId) {

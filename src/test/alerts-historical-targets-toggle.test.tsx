@@ -10,7 +10,7 @@
  *   - No toggle when nothing is historical.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import Alerts from "@/pages/Alerts";
 import type { AlertTargetRecordState } from "@/lib/alertTargetContextRules";
@@ -53,27 +53,37 @@ const ALERTS = [
 const state = vi.hoisted(() => ({
   alerts: [] as unknown[],
   readComplete: true,
+  namesStatus: "ok" as "ok" | "loading",
   writes: vi.fn(),
+  queue: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAlertTargetNames", () => ({
-  useAlertTargetNames: () => ({
-    status: "ok",
-    readComplete: state.readComplete,
-    tentNameById: new Map([
-      [TENT_ACTIVE, "Veg Tent"],
-      [TENT_SECOND, "Mother Tent"],
-      [TENT_ARCHIVED, "Old Flower Tent"],
-    ]),
-    plantNameById: new Map(),
-    tentStateById: new Map<string, AlertTargetRecordState>([
-      [TENT_ACTIVE, "active"],
-      [TENT_SECOND, "active"],
-      [TENT_ARCHIVED, "archived"],
-    ]),
-    plantStateById: new Map(),
-    singleTentIdByGrowId: new Map(),
-  }),
+  // Mirrors the real hook: maps stay empty until the read completes.
+  useAlertTargetNames: () => {
+    const loaded = state.namesStatus === "ok";
+    return {
+      status: state.namesStatus,
+      readComplete: loaded && state.readComplete,
+      tentNameById: loaded
+        ? new Map([
+            [TENT_ACTIVE, "Veg Tent"],
+            [TENT_SECOND, "Mother Tent"],
+            [TENT_ARCHIVED, "Old Flower Tent"],
+          ])
+        : new Map(),
+      plantNameById: new Map(),
+      tentStateById: loaded
+        ? new Map<string, AlertTargetRecordState>([
+            [TENT_ACTIVE, "active"],
+            [TENT_SECOND, "active"],
+            [TENT_ARCHIVED, "archived"],
+          ])
+        : new Map(),
+      plantStateById: new Map(),
+      singleTentIdByGrowId: new Map(),
+    };
+  },
 }));
 vi.mock("@/hooks/useAlertLinkedTargetEvidence", () => ({
   useAlertLinkedTargetEvidence: () => ({
@@ -112,8 +122,14 @@ vi.mock("@/store/grows", () => ({
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
 vi.mock("@/components/AlertWhyContext", () => ({ AlertWhyContext: () => null }));
 vi.mock("@/components/LinkedActionCountBadge", () => ({ LinkedActionCountBadge: () => null }));
+vi.mock("@/components/AlertRowActionQueueButton", () => ({
+  AlertRowActionQueueButton: () => null,
+  queueOpenAlertToActionQueue: state.queue,
+}));
 vi.mock("@/components/OneTentLoopNextStepCard", () => ({
-  default: () => <div data-testid="loop-card" />,
+  default: ({ onBeforeNavigate }: { onBeforeNavigate?: () => unknown }) => (
+    <button data-testid="loop-card" onClick={() => void onBeforeNavigate?.()} />
+  ),
 }));
 vi.mock("@/hooks/useAlertsLinkedActionCounts", () => ({
   useAlertsLinkedActionCounts: () => new Map(),
@@ -136,6 +152,9 @@ function renderAlerts() {
 beforeEach(() => {
   state.alerts = ALERTS;
   state.readComplete = true;
+  state.namesStatus = "ok";
+  state.queue.mockReset();
+  state.queue.mockResolvedValue({ ok: true, actionQueueId: "aq-1" });
   state.writes.mockReset();
 });
 
@@ -203,5 +222,21 @@ describe("/alerts — archived and removed targets hidden by default", () => {
     renderAlerts();
     fireEvent.click(screen.getByTestId("alerts-historical-targets-toggle"));
     expect(screen.queryByTestId("loop-card")).toBeNull();
+  });
+
+  it("the loop card auto-queues the sole current-target alert once names are read", async () => {
+    state.alerts = ALERTS.slice(0, 1);
+    renderAlerts();
+    fireEvent.click(screen.getByTestId("loop-card"));
+    await waitFor(() => expect(state.queue).toHaveBeenCalledTimes(1));
+  });
+
+  it("the loop card never auto-queues while target names are still loading", async () => {
+    state.alerts = ALERTS.slice(2, 3); // only an archived-tent alert
+    state.namesStatus = "loading";
+    renderAlerts();
+    fireEvent.click(screen.getByTestId("loop-card"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(state.queue).not.toHaveBeenCalled();
   });
 });

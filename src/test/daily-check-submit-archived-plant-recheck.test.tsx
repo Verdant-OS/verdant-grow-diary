@@ -35,6 +35,7 @@ const TENT_ONLY_SAVE = "__tent_only__";
 const plantArchive = vi.hoisted(() => ({
   byId: {} as Record<string, boolean>,
   mode: "row" as "row" | "error" | "empty" | "shape",
+  reads: 0,
 }));
 
 const ARCHIVED_PLANT_MESSAGE = DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE;
@@ -49,6 +50,7 @@ vi.mock("@/integrations/supabase/client", () => {
         return builder;
       },
       maybeSingle: async () => {
+        plantArchive.reads += 1;
         if (plantArchive.mode === "error") return { data: null, error: { message: "unavailable" } };
         if (plantArchive.mode === "empty") return { data: null, error: null };
         if (plantArchive.mode === "shape") {
@@ -361,6 +363,7 @@ describe("Daily Check submit re-checks an archived plant", () => {
     plantsRef.plants = [plantP, plantQ];
     plantArchive.byId = {};
     plantArchive.mode = "row";
+    plantArchive.reads = 0;
     saveInsert.mockClear();
     const proto = window.HTMLElement.prototype;
     proto.scrollIntoView = () => {};
@@ -431,58 +434,21 @@ describe("Daily Check submit re-checks an archived plant", () => {
     expect(screen.getByTestId("daily-grow-check-choose")).toHaveAttribute("data-plant-id", "P");
   });
 
-  it("keeps the manual snapshot draft when confirm is blocked", async () => {
+  it("saves a tent-level sensor snapshot while the page plant is archived", async () => {
+    // A manual sensor snapshot belongs to the tent (no plant_id), so an
+    // archived page plant does not block it and is not re-read.
     renderCheck();
-    await choosePlant(/Plant P/);
-    fireEvent.click(screen.getByTestId("daily-grow-check-start"));
-    fireEvent.click(screen.getByTestId("daily-grow-check-next"));
-    fireEvent.change(screen.getByTestId("mock-sensor-reading"), { target: { value: "72.4" } });
-    fireEvent.click(screen.getByTestId("manual-reading-save"));
-    expect(await screen.findByTestId("manual-sensor-review-confirm")).toBeInTheDocument();
     plantArchive.byId.P = true;
-
-    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
-
-    expect(saveInsert).not.toHaveBeenCalled();
-    expect(await screen.findByText(ARCHIVED_PLANT_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByTestId("mock-sensor-reading")).toHaveValue("72.4");
-    expect(screen.getByTestId("manual-sensor-review-confirm")).toBeInTheDocument();
-    expect(screen.getByTestId("daily-grow-check-choose")).toHaveAttribute("data-plant-id", "P");
-  });
-
-  it("blocks the sensor confirm after the plant is archived during review", async () => {
-    renderCheck();
     await openManualSnapshotReview();
-    plantArchive.byId.P = true;
 
-    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
-
-    expect(saveInsert).not.toHaveBeenCalled();
-    expect(await screen.findByText(ARCHIVED_PLANT_MESSAGE)).toBeInTheDocument();
-    expect(saveInsert).not.toHaveBeenCalled();
-  });
-
-  it("blocks confirm when the archive read fails and clears that warning after a later allowed save", async () => {
-    renderCheck();
-    await openManualSnapshotReview();
-    plantArchive.mode = "error";
-
-    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
-
-    expect(await screen.findByTestId("daily-check-archived-plant-submit")).toHaveTextContent(
-      "Couldn't check whether this plant is archived. Try again.",
-    );
-    expect(saveInsert).not.toHaveBeenCalled();
-    expect(screen.getByTestId("manual-sensor-review-confirm")).toBeInTheDocument();
-
-    plantArchive.mode = "row";
-    plantArchive.byId.P = false;
     fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
 
     await waitFor(() => {
       expect(saveInsert).toHaveBeenCalledTimes(1);
     });
-    expect(screen.queryByTestId("daily-check-archived-plant-submit")).not.toBeInTheDocument();
+    expect(saveInsert).toHaveBeenCalledWith("diary_entries");
+    expect(screen.queryByText(ARCHIVED_PLANT_MESSAGE)).not.toBeInTheDocument();
+    expect(plantArchive.reads).toBe(0);
   });
 
   it("still confirms a manual snapshot when the plant is not archived", async () => {
@@ -499,12 +465,34 @@ describe("Daily Check submit re-checks an archived plant", () => {
     expect(screen.queryByText(ARCHIVED_PLANT_MESSAGE)).not.toBeInTheDocument();
   });
 
-  it("clears the archive warning when the same plant is restored and confirm is allowed", async () => {
+  it("blocks a save when the archive read fails and clears that warning after a later allowed save", async () => {
     renderCheck();
-    await openManualSnapshotReview();
+    await reachQuickLogSave();
+    plantArchive.mode = "error";
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    expect(await screen.findByTestId("daily-check-archived-plant-submit")).toHaveTextContent(
+      "Couldn't check whether this plant is archived. Try again.",
+    );
+    expect(saveInsert).not.toHaveBeenCalled();
+
+    plantArchive.mode = "row";
+    plantArchive.byId.P = false;
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() => {
+      expect(saveInsert).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByTestId("daily-check-archived-plant-submit")).not.toBeInTheDocument();
+  });
+
+  it("clears the archive warning when the same plant is restored and the save is allowed", async () => {
+    renderCheck();
+    await reachQuickLogSave();
     plantArchive.byId.P = true;
 
-    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    fireEvent.click(screen.getByTestId("quick-log-save"));
 
     expect(await screen.findByTestId("daily-check-archived-plant-submit")).toHaveTextContent(
       ARCHIVED_PLANT_MESSAGE,
@@ -512,13 +500,12 @@ describe("Daily Check submit re-checks an archived plant", () => {
     expect(saveInsert).not.toHaveBeenCalled();
 
     plantArchive.byId.P = false;
-    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    fireEvent.click(screen.getByTestId("quick-log-save"));
 
     await waitFor(() => {
       expect(saveInsert).toHaveBeenCalledTimes(1);
     });
     expect(screen.queryByTestId("daily-check-archived-plant-submit")).not.toBeInTheDocument();
-    expect(screen.getByTestId("daily-grow-check-choose")).toHaveAttribute("data-plant-id", "P");
   });
 
   it("clears the archive warning when a later save uses a different Quick Log target", async () => {

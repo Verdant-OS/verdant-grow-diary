@@ -1,9 +1,7 @@
 /**
- * A slow archive preflight must not let a second click on the manual
- * snapshot button replay after review is open. That replay would call the
- * card's save branch without the grower pressing confirm.
+ * A slow archive preflight must not let a second click on a guarded save
+ * replay too. That replay would run the same save twice.
  */
-import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -72,31 +70,19 @@ vi.mock("@/hooks/useScopedGrow", () => ({
     backHref: undefined,
   }),
 }));
-vi.mock("@/components/ManualSensorReadingCard", () => {
-  function MockManualSensorReadingCard() {
-    const [reviewOpen, setReviewOpen] = useState(false);
-    return (
-      <div>
-        <button
-          type="button"
-          data-testid="manual-reading-save"
-          onClick={() => {
-            if (!reviewOpen) {
-              setReviewOpen(true);
-              return;
-            }
-            saveInsert("doSave");
-          }}
-        >
-          Save reading
-        </button>
-        {reviewOpen ? <div data-testid="manual-review-open" /> : null}
-      </div>
-    );
-  }
-  return { default: MockManualSensorReadingCard };
-});
-vi.mock("@/components/QuickLog", () => ({ default: () => <div data-testid="mock-quicklog" /> }));
+vi.mock("@/components/ManualSensorReadingCard", () => ({ default: () => <div /> }));
+vi.mock("@/components/QuickLog", () => ({
+  default: () => (
+    <button
+      type="button"
+      data-testid="quick-log-save"
+      data-daily-check-save-plant="P"
+      onClick={() => saveInsert("quicklog_save_manual")}
+    >
+      Save
+    </button>
+  ),
+}));
 vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
   default: () => <div data-testid="daily-check-all-activities" />,
 }));
@@ -118,14 +104,15 @@ function renderCheck() {
   );
 }
 
-async function reachManualSave() {
+async function reachQuickLogSave() {
   const trigger = screen.getByTestId("daily-grow-check-plant-select");
   fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
   fireEvent.click(trigger);
   fireEvent.click(await screen.findByRole("option", { name: /Plant P/ }));
   fireEvent.click(screen.getByTestId("daily-grow-check-start"));
   fireEvent.click(screen.getByTestId("daily-grow-check-next"));
-  expect(screen.getByText(/Step 3 · Add Manual Sensor Snapshot/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("daily-grow-check-skip-manual"));
+  fireEvent.click(screen.getByTestId("daily-grow-check-open-quicklog"));
 }
 
 describe("Daily Check archive preflight", () => {
@@ -139,19 +126,20 @@ describe("Daily Check archive preflight", () => {
     proto.setPointerCapture = () => {};
   });
 
-  it("runs one preflight when the manual snapshot button is clicked twice", async () => {
+  it("runs one preflight and one save when a guarded save is clicked twice", async () => {
     renderCheck();
-    await reachManualSave();
-    const save = screen.getByTestId("manual-reading-save");
+    await reachQuickLogSave();
+    const save = await screen.findByTestId("quick-log-save");
 
     fireEvent.click(save);
     fireEvent.click(save);
 
     await waitFor(() => expect(archiveReads.pending).toHaveLength(1));
+    expect(saveInsert).not.toHaveBeenCalled();
     archiveReads.pending[0]?.({ data: { is_archived: false }, error: null });
 
-    expect(await screen.findByTestId("manual-review-open")).toBeInTheDocument();
-    expect(saveInsert).not.toHaveBeenCalled();
+    await waitFor(() => expect(saveInsert).toHaveBeenCalledTimes(1));
+    expect(saveInsert).toHaveBeenCalledWith("quicklog_save_manual");
     expect(archiveReads.pending).toHaveLength(1);
   });
 });

@@ -305,8 +305,7 @@ export default function DailyCheck() {
       event.preventDefault();
       event.stopImmediatePropagation();
       // A second click while the read is in flight must not start another
-      // preflight. Replaying both would hit manual-reading-save again after
-      // review is open and save without the confirm button.
+      // preflight. Replaying both would run the same save twice.
       if (archivePreflightRef.current) return;
       archivePreflightRef.current = true;
       void (async () => {

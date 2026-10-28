@@ -178,14 +178,13 @@ export const DAILY_CHECK_PLANTS_LIST_QUERY_KEY = ["plants"] as const;
 
 /**
  * Save controls Daily Check renders. The page re-reads `plants.is_archived`
- * before these run. `manual-reading-save` only opens review.
- * `manual-sensor-review-confirm` is the control that inserts the snapshot.
+ * before these run. The manual sensor snapshot controls are not listed: a
+ * snapshot is a tent-level reading with no plant_id, so an archived page
+ * plant must not block it.
  */
 export const DAILY_CHECK_SUBMIT_SAVE_TEST_IDS = [
   "quick-log-save",
   "daily-check-all-activities-save",
-  "manual-reading-save",
-  "manual-sensor-review-confirm",
 ] as const;
 
 export type DailyCheckSubmitSaveTestId = (typeof DAILY_CHECK_SUBMIT_SAVE_TEST_IDS)[number];

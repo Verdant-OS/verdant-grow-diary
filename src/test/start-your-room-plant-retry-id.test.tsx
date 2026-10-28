@@ -191,4 +191,45 @@ describe("Start Your Room plant retry id (Codex review)", () => {
     await act(async () => undefined);
     expect(window.sessionStorage.getItem(draftKey)).toBeNull();
   });
+
+  it("does not pull a grower back to the plant after they left mid-save (Copilot review)", async () => {
+    let plantInserted = false;
+    let releaseRefresh: () => void = () => undefined;
+    const insertRow = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: "grows" | "tents" | "plants") => {
+      const query = insertRow(table);
+      if (table !== "plants") return query;
+      return {
+        ...query,
+        insert: (payload: Record<string, unknown>) => {
+          plantInserted = true;
+          return query.insert(payload);
+        },
+      };
+    });
+    let refreshHanging = false;
+    refreshMock.mockImplementation(async () => {
+      if (!plantInserted) return undefined;
+      refreshHanging = true;
+      await new Promise<void>((resolve) => (releaseRefresh = resolve));
+      return undefined;
+    });
+    const user = userEvent.setup();
+    const view = render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+    await waitFor(() => expect(refreshHanging).toBe(true));
+
+    view.unmount();
+    await act(async () => {
+      releaseRefresh();
+    });
+    expect(navMock).not.toHaveBeenCalled();
+    // The room was finished, so its draft is still cleared.
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+  });
 });

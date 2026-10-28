@@ -141,6 +141,14 @@ export default function StartYourRoom() {
   }, [step]);
 
   const ownerId = user?.id ?? null;
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    // Set on every mount: StrictMode runs this cleanup once before remounting.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const ownerIdRef = useRef<string | null>(ownerId);
   // Written at commit, not during render: a discarded render must not leave an
   // owner the committed page is not showing.
@@ -570,11 +578,14 @@ export default function StartYourRoom() {
       // refresh above must retry this same row, not insert a second plant.
       releaseRowId("plant");
       toast.success("Plant created and linked");
-      // Persist diary-first start screen so next login skips empty onboarding.
-      setStartScreenChoice(user.id, "quickLog");
       // The page unmounts with this navigation, before the "done" effect that
       // clears the draft can run, so clear it here.
       clearBrowserSessionFormDraft(saveOwnerId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      // A grower who left while this save finished chose where to go; do not
+      // override their start screen or pull them back to the plant.
+      if (!mountedRef.current) return;
+      // Persist diary-first start screen so next login skips empty onboarding.
+      setStartScreenChoice(user.id, "quickLog");
       nav(plantDetailQuickLogHref(plantId), { replace: true });
     } finally {
       createInFlightRef.current = false;

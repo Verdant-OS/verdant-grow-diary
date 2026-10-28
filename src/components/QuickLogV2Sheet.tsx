@@ -1165,6 +1165,12 @@ function QuickLogV2SheetForOwner({
       // not survive from the previous one. A stale status would let the
       // cleanup strip prose this draft's grower typed.
       chipAuthoredStatusRef.current = null;
+      // A restored draft keeps the unit its temperature was typed in and the
+      // chip that owns its response line, so neither can be relabelled.
+      if (restorable) {
+        manualTempEntryUnitRef.current = restorable.tempEntryUnit;
+        chipAuthoredStatusRef.current = restorable.chipStatus;
+      }
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
@@ -1227,6 +1233,8 @@ function QuickLogV2SheetForOwner({
       form,
       saveFailed: observationUnconfirmedRef.current,
       idempotencyKey: observationUnconfirmedRef.current ? saveIdempotencyKeyRef.current : null,
+      tempEntryUnit: manualTempEntryUnitRef.current,
+      chipStatus: chipAuthoredStatusRef.current,
     });
   }, [user?.id, open, form, postSave, localError]);
 

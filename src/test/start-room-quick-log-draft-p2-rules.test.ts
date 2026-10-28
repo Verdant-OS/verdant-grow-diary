@@ -34,6 +34,25 @@ describe("restorableQuickLogObservationDraft", () => {
     }
     expect(restorableQuickLogObservationDraft(draft(null), null)).not.toBeNull();
   });
+  it("reads the entry unit and chip status, and older drafts without them", () => {
+    const stored = parseQuickLogObservationDraft({
+      form: { action: "note", selectedKey: "plant:a", note: "pale", temperatureC: "25" },
+      tempEntryUnit: "celsius",
+      chipStatus: "Better",
+    })!;
+    expect(stored.tempEntryUnit).toBe("celsius");
+    expect(stored.chipStatus).toBe("Better");
+    const older = draft("plant:a");
+    expect(older.tempEntryUnit).toBeNull();
+    expect(older.chipStatus).toBeNull();
+    const junk = parseQuickLogObservationDraft({
+      form: { action: "note", note: "x" },
+      tempEntryUnit: "kelvin",
+      chipStatus: "Great",
+    })!;
+    expect(junk.tempEntryUnit).toBeNull();
+    expect(junk.chipStatus).toBeNull();
+  });
   it("ignores empty or missing drafts", () => {
     expect(restorableQuickLogObservationDraft(draft("plant:a", "  "), "plant:a")).toBeNull();
     expect(restorableQuickLogObservationDraft(null, "plant:a")).toBeNull();

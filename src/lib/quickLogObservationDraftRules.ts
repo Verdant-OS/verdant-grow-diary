@@ -3,6 +3,12 @@ import {
   type QuickLogV2Action,
   type QuickLogV2FormState,
 } from "@/lib/quickLogV2Rules";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  RESPONSE_CHECK_STATUSES,
+  removeChipAuthoredResponseLine,
+  type ResponseCheckStatus,
+} from "@/lib/tenSecondQuickCheckRules";
 
 export const QUICK_LOG_OBSERVATION_DRAFT_FORM_ID = "quick-log-v2-observation";
 
@@ -21,6 +27,10 @@ export interface QuickLogObservationDraft {
   saveFailed: boolean;
   /** Same logical save across a remount. Server accepts 8..200 characters. */
   idempotencyKey: string | null;
+  /** Unit the manual temperature was typed in, so a preference change cannot relabel it. */
+  tempEntryUnit: TemperatureUnitPreference | null;
+  /** Status whose response line a chip wrote, so a retarget can still remove it. */
+  chipStatus: ResponseCheckStatus | null;
 }
 
 export function readQuickLogObservationIdempotencyKey(value: unknown): string | null {
@@ -54,7 +64,14 @@ export function restorableQuickLogObservationDraft(
   const target = defaultTargetKey || null;
   if (stored.form.selectedKey === target) return stored;
   if (target !== null) return null;
-  return { form: { ...stored.form, selectedKey: null }, saveFailed: false, idempotencyKey: null };
+  // The chip's response line belonged to the old plant; it does not follow the
+  // words into a target the grower has not picked yet.
+  const note = stored.chipStatus
+    ? removeChipAuthoredResponseLine(stored.form.note, stored.chipStatus)
+    : stored.form.note;
+  const form = { ...stored.form, selectedKey: null, note };
+  if (isQuickLogObservationDraftEmpty(form)) return null;
+  return { ...stored, form, saveFailed: false, idempotencyKey: null, chipStatus: null };
 }
 
 export function quickLogObservationDraftRestoredCopy(restored: QuickLogObservationDraft): string {
@@ -74,9 +91,18 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
   const idempotencyKey = readQuickLogObservationIdempotencyKey(wrapper.idempotencyKey);
   if (!isAction(record.action)) return null;
   const selectedKey = readText(record.selectedKey).trim();
+  const tempEntryUnit =
+    wrapper.tempEntryUnit === "celsius" || wrapper.tempEntryUnit === "fahrenheit"
+      ? wrapper.tempEntryUnit
+      : null;
+  const chipStatus = (RESPONSE_CHECK_STATUSES as readonly unknown[]).includes(wrapper.chipStatus)
+    ? (wrapper.chipStatus as ResponseCheckStatus)
+    : null;
   return {
     saveFailed,
     idempotencyKey,
+    tempEntryUnit,
+    chipStatus,
     form: {
       selectedKey: selectedKey.length > 0 ? selectedKey : null,
       action: record.action,

@@ -15,6 +15,8 @@ import {
   GROW_WALK_FOLLOW_UP_OPTIONS,
   GROW_WALK_MISSINGNESS_OPTIONS,
   GROW_WALK_RISK_OPTIONS,
+  ALERT_WALK_GUIDANCE_LEAD,
+  ALERT_WALK_GUIDANCE_STEPS,
   GROW_WALK_VISIT_MODES,
   resolveGrowWalkPlantPrompts,
   type GrowWalkVisitMode,
@@ -390,10 +392,17 @@ export default function GuidedGrowWalkPanel({
             </div>
           )}
           {visitMode === "alert_walk" && (
-            <p className="rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground">
-              Alert Walk details are coming later. Verify the alert in person before changing
-              anything.
-            </p>
+            <div
+              className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-2"
+              data-testid={`${testIdPrefix}-alert-walk-guidance`}
+            >
+              <p className="text-xs text-muted-foreground">{ALERT_WALK_GUIDANCE_LEAD}</p>
+              <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+                {ALERT_WALK_GUIDANCE_STEPS.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </div>
           )}
         </div>
       )}

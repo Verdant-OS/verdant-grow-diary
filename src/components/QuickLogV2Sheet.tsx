@@ -633,6 +633,11 @@ function QuickLogV2SheetForOwner({
   // True once this open restored or wrote the stored draft, so emptying the
   // form may forget it. Opening for another target never clears its draft.
   const observationDraftOwnedRef = useRef(false);
+  // Set when an open resets the form. The sheet stays mounted across opens, so
+  // the draft write effect in that same commit still sees the previous open's
+  // form; it must skip that one run or it rewrites (then clears) a draft that
+  // belongs to another target.
+  const observationDraftResetPendingRef = useRef(false);
   const observationUnconfirmedRef = useRef(false);
   const [observationDraftRestored, setObservationDraftRestored] = useState<string | null>(null);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
@@ -1155,6 +1160,7 @@ function QuickLogV2SheetForOwner({
         restorable ? quickLogObservationDraftRestoredCopy(restorable) : null,
       );
       observationDraftOwnedRef.current = Boolean(restorable);
+      observationDraftResetPendingRef.current = true;
       setForm({
         ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
         selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
@@ -1214,6 +1220,10 @@ function QuickLogV2SheetForOwner({
 
   useEffect(() => {
     if (!user?.id) return;
+    if (observationDraftResetPendingRef.current) {
+      observationDraftResetPendingRef.current = false;
+      return;
+    }
     if (observationDraftSuppressedRef.current) {
       if (open && isQuickLogObservationDraftEmpty(form)) {
         observationDraftSuppressedRef.current = false;
@@ -1236,6 +1246,8 @@ function QuickLogV2SheetForOwner({
       tempEntryUnit: manualTempEntryUnitRef.current,
       chipStatus: chipAuthoredStatusRef.current,
     });
+    // localError is a trigger, not an input: when only the error flips, this
+    // re-persists the ref-held saveFailed flag even though the form is unchanged.
   }, [user?.id, open, form, postSave, localError]);
 
   // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.

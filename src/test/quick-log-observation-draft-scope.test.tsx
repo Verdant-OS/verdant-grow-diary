@@ -88,6 +88,22 @@ function renderSheet(target: string | null) {
 
 const noteValue = (el: HTMLElement) => (el as HTMLTextAreaElement).value;
 
+/** One mounted sheet whose open state and target change, as AppShell drives it. */
+function renderMountedSheet(target: string | null, open: boolean) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  const tree = (t: string | null, o: boolean) => (
+    <QueryClientProvider client={client}>
+      <QuickLogV2Sheet open={o} onOpenChange={() => {}} defaultTargetKey={t} />
+    </QueryClientProvider>
+  );
+  const view = render(tree(target, open));
+  return { rerender: (t: string | null, o: boolean) => view.rerender(tree(t, o)) };
+}
+
+const storedDraftText = () => Object.values(window.sessionStorage).join("");
+
 async function failNoteOn(target: string, reason: string) {
   rpcMock.mockResolvedValue({ data: { ok: false, reason }, error: null });
   renderSheet(target);
@@ -204,6 +220,31 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     expect(screen.getByTestId("qlv2-draft-restored")).toBeInTheDocument();
     expect(noteValue(note)).toContain("Leaves look pale");
     expect(noteValue(note)).not.toContain("Response check:");
+  });
+
+  it("keeps plant A's failed draft when the same mounted sheet reopens for plant B", async () => {
+    rpcMock.mockResolvedValue({ data: { ok: false, reason: "invalid_details" }, error: null });
+    const sheet = renderMountedSheet("plant:plant-1", true);
+    fireEvent.change(await screen.findByTestId("qlv2-note"), {
+      target: { value: "First leaves look pale" },
+    });
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(storedDraftText()).toContain('"saveFailed":true'));
+
+    sheet.rerender("plant:plant-1", false);
+    sheet.rerender("plant:plant-2", true);
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("");
+    // Plant A's draft and its failed-save state survive the untouched open.
+    expect(storedDraftText()).toContain("First leaves look pale");
+    expect(storedDraftText()).toContain('"saveFailed":true');
+
+    sheet.rerender("plant:plant-2", false);
+    sheet.rerender("plant:plant-1", true);
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-note")).toHaveValue("First leaves look pale"),
+    );
+    expect(screen.getByText(QUICK_LOG_OBSERVATION_SAVE_ERROR)).toBeInTheDocument();
   });
 
   it("pins: an ambiguous outcome keeps its key through a reload (durable recovery owns it)", async () => {

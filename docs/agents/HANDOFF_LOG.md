@@ -78,8 +78,8 @@ why: Matthew (2026-10-27) asked for a replacement PR for #2541 even though its h
 branch: claude/setup-quicklog-draft-retry-p2s (created at 7250689864da30155a4bb85d1f0eedb6de1298a9)
 base: verdant-grow-diary
 checkout: git fetch origin claude/setup-quicklog-draft-retry-p2s verdant-grow-diary && git switch claude/setup-quicklog-draft-retry-p2s && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read URL and head from GitHub
-head_sha: de0101adf7468abce5d1fe0560d46de5b020ca8d is the last code commit (the handoff commit follows it); read the current head from the PR
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
+head_sha: b6f1616f6832174121ebf462017f7c188e877d85, observed on origin at 2026-10-28 05:48 UTC as the last code commit before this handoff edit; the branch tip is the commit that carries this block (git rev-parse origin/claude/setup-quicklog-draft-retry-p2s)
 state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
 current_step: Codex 2026-10-28 P2s addressed: stale reopen write (3f10b42), every-plan roster gate with step forms hidden until hydration (289b15f), plant retry id held until the plant id is recorded (de0101a); Copilot plantStage validation and sessionStorage test read (de0101a). Codex 4397081026 (clear the session draft when reviewing a mismatched saved note) and 4397081028 (re-baseline the response target on a mounted reopen) fixed; reviewer nits: STAGES derived from START_YOUR_ROOM_PLANT_STAGES, crypto unstubbed, roster-error gate scoped to before hydration for unlimited plans. Awaiting CI and an independent exact-head review
 next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR; then merge this branch into claude/start-room-one-step (#2582)
@@ -93,7 +93,7 @@ files_remaining: none
 blockers: none for repository work
 open_questions: put to Matthew 2026-10-28: (1) Codex 4396973931, a deleted tent restores the plant step and every plant insert fails closed; fix here or in a follow-up? (2) Copilot 4397048019, busy flag can carry across an account switch during one in-flight save; no data crosses accounts; not changed. (3) CodeRabbit Major 2, persist Water/Feed inputs. (4) Copilot 4396952153, keep typed tent/plant names when the stored grow is gone (kept by design)
 gotchas: src/test/start-your-room-draft-retry.test.tsx and start-your-room-draft-hydration.test.tsx are scorer-locked and unchanged; do not add saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignments (counted by quicklog-manual-idempotency-static.test.ts)
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565 (this PR); https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 (superseded); https://github.com/Verdant-OS/verdant-grow-diary/pull/2582 (stacked on this branch)
 artifacts: PR checks
 reviewer_seat: not assigned (OG Kush routes; excluded: session_017UoYKzLzTv1RAhx1Cc7Pme as author, session_017UoYKxgRTFgtyQW6ka38Ec as repairer)
 reviewer_sha: none

@@ -3,6 +3,7 @@ import {
   bindHarvestCheckHandoffPlant,
   buildHarvestHandoffNote,
   clearHarvestCheckHandoff,
+  HARVEST_HANDOFF_BIND_RESERVE_BYTES,
   HARVEST_HANDOFF_MAX_BYTES,
   HARVEST_HANDOFF_MAX_CHECKS,
   HARVEST_HANDOFF_RETURN_PATH,
@@ -163,6 +164,28 @@ describe("harvest check handoff store", () => {
     storage.setItem(HARVEST_HANDOFF_STORAGE_KEY, JSON.stringify({ ...stored, plantId: 7 }));
     expect(readHarvestCheckHandoff(NOW, storage)).toBeNull();
     expect(storage.map.size).toBe(0);
+  });
+
+  it("leaves room so binding a plant never pushes a saved log past the size cap", () => {
+    const base = (photoNote: string) => ({
+      target: "peak" as const,
+      ranges: createDefaultHarvestRanges(),
+      checks: [check(1, "2026-10-20", { photoNote, pistils: "", plant: "" })],
+    });
+    const probe = memoryStorage();
+    saveHarvestCheckHandoff(base(""), NOW, probe);
+    const emptyLength = (probe.getItem(HARVEST_HANDOFF_STORAGE_KEY) as string).length;
+    const limit = HARVEST_HANDOFF_MAX_BYTES - HARVEST_HANDOFF_BIND_RESERVE_BYTES - emptyLength;
+
+    const full = memoryStorage();
+    expect(saveHarvestCheckHandoff(base("n".repeat(limit)), NOW, full)).toBe(true);
+    const handoff = readHarvestCheckHandoff(NOW, full)!;
+    expect(bindHarvestCheckHandoffPlant(handoff, "p".repeat(200), full)).toBe(true);
+    expect(readHarvestCheckHandoff(NOW, full)?.plantId).toBe("p".repeat(200));
+    expect(bindHarvestCheckHandoffPlant(handoff, null, full)).toBe(true);
+    expect(readHarvestCheckHandoff(NOW, full)).not.toHaveProperty("plantId");
+
+    expect(saveHarvestCheckHandoff(base("n".repeat(limit + 1)), NOW, memoryStorage())).toBe(false);
   });
 
   it("removes an earlier handoff when storage refuses a new write", () => {

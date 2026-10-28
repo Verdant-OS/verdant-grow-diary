@@ -228,6 +228,45 @@ describe("harvest check import after signup", () => {
     expect(storage.map.has(HARVEST_HANDOFF_STORAGE_KEY)).toBe(false);
   });
 
+  it("drops a binding to a plant that is no longer listed, so the grower can pick again", async () => {
+    logThreeChecksAndClickCta();
+    const stored = JSON.parse(storage.map.get(HARVEST_HANDOFF_STORAGE_KEY) as string);
+    storage.map.set(
+      HARVEST_HANDOFF_STORAGE_KEY,
+      JSON.stringify({ ...stored, plantId: "99999999-9999-4999-8999-999999999999" }),
+    );
+    renderPrompt();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The plant this import started on is no longer in your list. Choose a plant.",
+    );
+    const select = screen.getByLabelText("Plant") as HTMLSelectElement;
+    expect(select).not.toBeDisabled();
+    expect(select.value).toBe("");
+    expect(JSON.parse(storage.map.get(HARVEST_HANDOFF_STORAGE_KEY) as string)).not.toHaveProperty(
+      "plantId",
+    );
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  it("saves nothing when the plant binding cannot be stored", async () => {
+    logThreeChecksAndClickCta();
+    renderPrompt();
+    fireEvent.change(await screen.findByLabelText("Plant"), {
+      target: { value: "11111111-1111-4111-8111-111111111111" },
+    });
+    storage.setItem.mockImplementation(() => {
+      throw new Error("denied");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Import 3 harvest checks" }));
+    });
+    expect(mocks.save).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This browser tab could not keep the import, so nothing was saved.",
+    );
+    expect(screen.getByLabelText("Plant")).not.toBeDisabled();
+  });
+
   it("retries a check dated today with the same instant, so the save replays", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {

@@ -46,6 +46,19 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
   const noun = count === 1 ? "harvest check" : "harvest checks";
   const list = plants.data ?? [];
   const selected = list.find((plant) => plant.id === plantId) ?? null;
+  // A bound plant missing from a loaded list (deleted, or another account in this
+  // tab) must not lock the import forever: drop the binding and let them pick again.
+  const boundPlantMissing =
+    boundPlantId !== null &&
+    plants.data !== undefined &&
+    !plants.data.some((plant) => plant.id === boundPlantId);
+  useEffect(() => {
+    if (!boundPlantMissing) return;
+    bindHarvestCheckHandoffPlant(handoff, null);
+    setBoundPlantId(null);
+    setPlantId("");
+    setError("The plant this import started on is no longer in your list. Choose a plant.");
+  }, [boundPlantMissing, handoff]);
 
   function dismiss() {
     clearHarvestCheckHandoff();
@@ -57,7 +70,11 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
     setBusy(true);
     setError("");
     if (!boundPlantId) {
-      bindHarvestCheckHandoffPlant(handoff, selected.id);
+      if (!bindHarvestCheckHandoffPlant(handoff, selected.id)) {
+        setBusy(false);
+        setError("This browser tab could not keep the import, so nothing was saved. Try again.");
+        return;
+      }
       setBoundPlantId(selected.id);
     }
     let saved = 0;

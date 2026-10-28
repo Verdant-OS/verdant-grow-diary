@@ -262,4 +262,23 @@ describe("applyManualVpdRangeGate", () => {
     expect(gated.ok).toBe(true);
     expect(gated.metrics.find((metric) => metric.metric === "vpd_kpa")?.value).toBe(1.5);
   });
+
+  it("blocks a tiny negative hPa value that rounds to 0 kPa", () => {
+    const gated = applyManualVpdRangeGate(validateManualEntry({ vpdKpa: "0" }), "-0.000001", "hPa");
+    expect(gated.ok).toBe(false);
+    expect(gated.metrics.find((metric) => metric.metric === "vpd_kpa")).toBeUndefined();
+  });
+
+  it("blocks values just outside the range that rounding would put on a boundary", () => {
+    for (const typed of ["1.999999", "25.000001"]) {
+      const canonical = typed === "1.999999" ? "0.2" : "2.5";
+      const gated = applyManualVpdRangeGate(
+        validateManualEntry({ vpdKpa: canonical }),
+        typed,
+        "hPa",
+      );
+      expect(gated.ok).toBe(false);
+      expect(gated.metrics.find((metric) => metric.metric === "vpd_kpa")).toBeUndefined();
+    }
+  });
 });

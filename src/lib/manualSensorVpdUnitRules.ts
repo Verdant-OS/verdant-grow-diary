@@ -145,15 +145,22 @@ export function relabelManualVpdMessage(message: string, unit: ManualVpdUnit): s
 
 /**
  * Blocking range message in the unit the grower typed. Null when the
- * converted kPa value is inside the realistic range, blank, non-finite, or
- * negative (the existing "cannot be negative" error covers that case).
+ * exact converted kPa value is inside the realistic range, blank, non-finite,
+ * or still negative after conversion (the "cannot be negative" error covers
+ * that case).
  */
 export function manualVpdRangeError(typed: string, unit: ManualVpdUnit): string | null {
   const trimmed = typed.trim();
   if (trimmed === "") return null;
   const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  const kpa = manualVpdToKpa(parsed, unit);
+  if (!Number.isFinite(parsed)) return null;
+  // A negative that survives conversion is caught by the "cannot be negative"
+  // error. One that rounds to 0 (e.g. -0.000001 hPa) would not be, so it is
+  // range-checked here like any other value.
+  if (parsed < 0 && manualVpdToKpa(parsed, unit) < 0) return null;
+  // Range-check the exact quotient: rounding can move a value just outside
+  // the range (1.999999 hPa) onto an accepted boundary.
+  const kpa = unit === "kPa" ? parsed : parsed / HPA_PER_KPA;
   const range = validateSensorReadingRange({ metric: "vpd_kpa", value: kpa });
   if (range.ok) return null;
   const outOfRange = range.issues.some(

@@ -80,7 +80,7 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/quicklog-note-vs-issue-tiles verdant-grow-diary && git switch claude/quicklog-note-vs-issue-tiles && git merge origin/verdant-grow-diary
 pr: opened as a draft from this branch; read URL and head from GitHub
 head_sha: feature commit a051df41b5fe72f3035b92344692d42058ab8f65; read the head from the PR
-state: pushed draft
+state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
 current_step: review 5677116739 addressed: P1 by 9f39bddf (prior holder, dependency-free quickLogNoteMarkerRules, one new mirror file), P3 copy in, both P2s answered with Matthew's kept decision; awaiting CI and an independent exact-head review
 next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR
 post_merge_check: after Publish, on the disposable fixture account, save a Note and an Issue on the fixture plant (tag [smoke <timestamp>]): Timeline card, Quick Log history badge and Dashboard recent row read "Note" and "Issue". NOT_MEASURED until live /version.json reports the SHA.
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: the prior holder's check-in trig_01Hi7LCPDNjfdvVBvGoWUhCv belongs to that session; no paused workflows
 claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677116739; prior holder told to stop pushing)
 owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
-last_updated: 2026-10-27 22:05 CT, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 04:15 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL

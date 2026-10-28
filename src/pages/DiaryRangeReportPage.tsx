@@ -214,7 +214,7 @@ export default function DiaryRangeReportPage() {
 
   if (showLocked) {
     const paywallVm = buildPaywallCtaViewModel({
-      featureTitle: "Unlock date-range diary reports",
+      featureTitle: "A date-range diary report",
       requiredPlanLabel: "Pro",
     });
     return (

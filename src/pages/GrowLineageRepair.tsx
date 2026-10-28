@@ -124,21 +124,20 @@ export default function GrowLineageRepair() {
           <h2 className="font-display font-semibold text-base">No lineage repairs needed</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             All tents are assigned to grows. Your current tents and grows are already connected. If
-            something looks missing, start by checking the grow and tent records from the Harvest
-            Archive.
+            something looks missing, start by checking the grow and tent records from My Grows.
           </p>
           <p
             className="text-xs text-muted-foreground max-w-md mx-auto"
             data-testid="grow-lineage-empty-state-first-step"
           >
-            First step: open Harvest Archive and confirm the grow exists, then return here if a tent
-            needs to be reconnected. Verdant never changes lineage automatically — every repair
-            waits for your approval.
+            First step: open My Grows and confirm the grow exists, then return here if a tent needs
+            to be reconnected. Verdant never changes lineage automatically — every repair waits for
+            your approval.
           </p>
           <div>
             <Button asChild variant="outline" size="sm">
               <a href="/grows" data-testid="grow-lineage-empty-state-archive-link">
-                Open Harvest Archive
+                Open My Grows
               </a>
             </Button>
           </div>

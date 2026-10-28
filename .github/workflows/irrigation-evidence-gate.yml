@@ -84,6 +84,7 @@ concurrency:
 
 jobs:
   irrigation-rls-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Irrigation runtime trust boundary (local Supabase)
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -174,6 +175,7 @@ jobs:
         run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true
 
   irrigation-overflow:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Irrigation overflow (real Verdant CSS)
     runs-on: ubuntu-latest
     timeout-minutes: 15

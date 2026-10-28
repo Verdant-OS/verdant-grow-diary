@@ -15,7 +15,7 @@
  * When growId is falsy the hook idles in `prompt` state — the Dashboard
  * itself decides whether to render a "Select a grow" hint.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { type RecentItem, mergeRecent } from "@/lib/growStatus";
@@ -25,7 +25,10 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { formatActionReasonForDisplay } from "@/lib/actionQueueRowView";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
 
 export async function fetchDashboardDiaryRows(growId: string) {
   const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
@@ -72,12 +75,129 @@ export interface UseDashboardScopedData {
   pending: PendingState;
 }
 
+async function readDashboardRecent(growId: string): Promise<RecentState> {
+  const [diaryRes, growEventsRes, eventsRes] = await Promise.all([
+    fetchDashboardDiaryRows(growId),
+    supabase
+      .from("grow_events")
+      .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
+      .eq("grow_id", growId)
+      .eq("source", "manual")
+      .eq("is_deleted", false)
+      .order("occurred_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("action_queue_events")
+      .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
+      .eq("grow_id", growId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  if (growEventsRes.error || eventsRes.error) return { status: "unavailable" };
+
+  // Companion diary rows dedupe against their grow_events parents so a
+  // single Quick Log save never shows up twice.
+  const activityRows = dedupeMergedManualGrowActivityRows({
+    diaryEntries: diaryRes as (ConnectedActivationDiaryEntryRow & {
+      stage?: string | null;
+      note?: string | null;
+    })[],
+    growEvents: (growEventsRes.data ?? []) as (ConnectedActivationGrowEventRow & {
+      note?: string | null;
+    })[],
+  });
+
+  const diaryItems: RecentItem[] = activityRows.diaryEntries.map((d) => ({
+    id: `diary-${d.id}`,
+    kind: "diary",
+    ts: d.entry_at ?? "",
+    title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
+    // Action Queue trace notes copy "Reading at <ISO>." from the alert reason.
+    detail: d.note ? localizeReadingAtTimestamps(d.note) : d.note,
+  }));
+
+  const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
+    const label = resolveQuickLogEventTimelineLabel({ eventType: e.event_type });
+    return {
+      id: `grow-event-${e.id}`,
+      kind: "diary",
+      ts: e.occurred_at ?? e.created_at ?? "",
+      title: label ? `Quick log (${label})` : "Quick log entry",
+      detail: e.note ?? null,
+    };
+  });
+
+  const actionIds = Array.from(
+    new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
+  );
+  let parents: Record<string, { suggested_change: string; reason: string }> = {};
+  if (actionIds.length > 0) {
+    const { data: pRows } = await supabase
+      .from("action_queue")
+      .select("id,suggested_change,reason")
+      .in("id", actionIds);
+    parents = Object.fromEntries(
+      (pRows ?? []).map((p) => [p.id, { suggested_change: p.suggested_change, reason: p.reason }]),
+    );
+  }
+
+  const eventItems: RecentItem[] = (eventsRes.data ?? []).map((e) => {
+    const parent = parents[e.action_queue_id];
+    return {
+      id: `event-${e.id}`,
+      kind: "action_event",
+      ts: e.created_at,
+      title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
+      detail: e.note ?? formatActionReasonForDisplay(parent?.reason),
+      href: `/actions/${e.action_queue_id}`,
+    };
+  });
+
+  return {
+    status: "ok",
+    items: mergeRecent([...diaryItems, ...growEventItems, ...eventItems]),
+  };
+}
+
+async function readDashboardPending(growId: string): Promise<PendingState> {
+  const { data, error } = await supabase
+    .from("action_queue")
+    .select("id,risk_level,suggested_change,reason,created_at,status,tent_id,plant_id,source")
+    .eq("grow_id", growId)
+    .eq("status", "pending_approval")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) return { status: "unavailable" };
+  return {
+    status: "ok",
+    items: (data ?? []).map((r) => ({
+      id: r.id,
+      risk_level: r.risk_level,
+      suggested_change: r.suggested_change,
+      reason: r.reason,
+      created_at: r.created_at,
+      tent_id: (r as { tent_id?: string | null }).tent_id ?? null,
+      plant_id: (r as { plant_id?: string | null }).plant_id ?? null,
+      source: (r as { source?: string | null }).source ?? null,
+      status: (r as { status?: string }).status ?? "pending_approval",
+    })),
+  };
+}
+
 export function useDashboardScopedData(growId: string | null | undefined): UseDashboardScopedData {
   const { user } = useAuth();
-  const [recent, setRecent] = useState<RecentState>({ status: "idle" });
-  const [pending, setPending] = useState<PendingState>({ status: "idle" });
+  const [recent, setRecent] = useState<RecentState>(
+    user && growId ? { status: "loading" } : { status: "idle" },
+  );
+  const [pending, setPending] = useState<PendingState>(
+    user && growId ? { status: "loading" } : { status: "idle" },
+  );
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestId === requestIdRef.current;
     if (!user || !growId) {
       setRecent({ status: "idle" });
       setPending({ status: "idle" });
@@ -86,129 +206,26 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
     setRecent({ status: "loading" });
     setPending({ status: "loading" });
 
-    // Recent activity: latest 5 diary + latest 5 manual grow_events +
-    // latest 5 action_queue_events.
-    try {
-      const [diaryRes, growEventsRes, eventsRes] = await Promise.all([
-        fetchDashboardDiaryRows(growId),
-        supabase
-          .from("grow_events")
-          .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
-          .eq("grow_id", growId)
-          .eq("source", "manual")
-          .eq("is_deleted", false)
-          .order("occurred_at", { ascending: false })
-          .limit(5),
-        supabase
-          .from("action_queue_events")
-          .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
-          .eq("grow_id", growId)
-          .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
-
-      if (growEventsRes.error || eventsRes.error) {
-        setRecent({ status: "unavailable" });
-      } else {
-        // Companion diary rows dedupe against their grow_events parents so a
-        // single Quick Log save never shows up twice.
-        const activityRows = dedupeMergedManualGrowActivityRows({
-          diaryEntries: diaryRes as (ConnectedActivationDiaryEntryRow & {
-            stage?: string | null;
-            note?: string | null;
-          })[],
-          growEvents: (growEventsRes.data ?? []) as (ConnectedActivationGrowEventRow & {
-            note?: string | null;
-          })[],
-        });
-
-        const diaryItems: RecentItem[] = activityRows.diaryEntries.map((d) => ({
-          id: `diary-${d.id}`,
-          kind: "diary",
-          ts: d.entry_at ?? "",
-          title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
-          detail: d.note,
-        }));
-
-        const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
-          const label = resolveQuickLogEventTimelineLabel({ eventType: e.event_type });
-          return {
-            id: `grow-event-${e.id}`,
-            kind: "diary",
-            ts: e.occurred_at ?? e.created_at ?? "",
-            title: label ? `Quick log (${label})` : "Quick log entry",
-            detail: e.note ?? null,
-          };
-        });
-
-        const actionIds = Array.from(
-          new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
-        );
-        let parents: Record<string, { suggested_change: string; reason: string }> = {};
-        if (actionIds.length > 0) {
-          const { data: pRows } = await supabase
-            .from("action_queue")
-            .select("id,suggested_change,reason")
-            .in("id", actionIds);
-          parents = Object.fromEntries(
-            (pRows ?? []).map((p) => [
-              p.id,
-              { suggested_change: p.suggested_change, reason: p.reason },
-            ]),
-          );
-        }
-
-        const eventItems: RecentItem[] = (eventsRes.data ?? []).map((e) => {
-          const parent = parents[e.action_queue_id];
-          return {
-            id: `event-${e.id}`,
-            kind: "action_event",
-            ts: e.created_at,
-            title: `${e.event_type}${parent ? `: ${parent.suggested_change}` : ""}`,
-            detail: e.note ?? parent?.reason ?? null,
-            href: `/actions/${e.action_queue_id}`,
-          };
-        });
-
-        setRecent({
-          status: "ok",
-          items: mergeRecent([...diaryItems, ...growEventItems, ...eventItems]),
-        });
+    // Recent activity and pending actions start together. A hung diary read
+    // must not keep the approval queue on loading. A later scope invalidates
+    // both writes, including the deadline rejection.
+    const recentWork = (async () => {
+      try {
+        const next = await withCriticalReadDeadline(readDashboardRecent(growId));
+        if (isCurrent()) setRecent(next);
+      } catch {
+        if (isCurrent()) setRecent({ status: "unavailable" });
       }
-    } catch {
-      setRecent({ status: "unavailable" });
-    }
-
-    // Pending action_queue items for this grow.
-    try {
-      const { data, error } = await supabase
-        .from("action_queue")
-        .select("id,risk_level,suggested_change,reason,created_at,status,tent_id,plant_id,source")
-        .eq("grow_id", growId)
-        .eq("status", "pending_approval")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      if (error) {
-        setPending({ status: "unavailable" });
-      } else {
-        setPending({
-          status: "ok",
-          items: (data ?? []).map((r) => ({
-            id: r.id,
-            risk_level: r.risk_level,
-            suggested_change: r.suggested_change,
-            reason: r.reason,
-            created_at: r.created_at,
-            tent_id: (r as { tent_id?: string | null }).tent_id ?? null,
-            plant_id: (r as { plant_id?: string | null }).plant_id ?? null,
-            source: (r as { source?: string | null }).source ?? null,
-            status: (r as { status?: string }).status ?? "pending_approval",
-          })),
-        });
+    })();
+    const pendingWork = (async () => {
+      try {
+        const next = await withCriticalReadDeadline(readDashboardPending(growId));
+        if (isCurrent()) setPending(next);
+      } catch {
+        if (isCurrent()) setPending({ status: "unavailable" });
       }
-    } catch {
-      setPending({ status: "unavailable" });
-    }
+    })();
+    await Promise.all([recentWork, pendingWork]);
   }, [user, growId]);
 
   useEffect(() => {

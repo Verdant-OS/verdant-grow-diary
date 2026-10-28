@@ -38,6 +38,7 @@ import {
   resolveContextFreeQuickLogStart,
   type PendingContextFreeQuickLogIntent,
 } from "@/lib/globalSearchQuickLogFallbackRules";
+import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -121,6 +122,7 @@ function resultsContentKey(rows: readonly GlobalSearchResult[]): string {
 }
 
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
+  const restoreOpenerFocus = useDialogOpenerRestore(open);
   const navigate = useNavigate();
   const location = useLocation();
   // Signed-in growers must never be handed the public /quick-log starter:
@@ -413,7 +415,10 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="overflow-hidden p-0 shadow-lg md:max-w-3xl">
+      <DialogContent
+        className="overflow-hidden p-0 shadow-lg md:max-w-3xl"
+        onCloseAutoFocus={restoreOpenerFocus}
+      >
         <CommandPrimitive
           shouldFilter={false}
           value={activeValue}
@@ -733,14 +738,14 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                   {!hasAny && !isError ? (
                     <CommandEmpty className="py-6">
                       <div
-                        className="mx-auto flex max-w-xs flex-col items-center gap-3 text-center"
+                        className="mx-auto flex w-full min-w-0 max-w-xs flex-col items-center gap-3 text-center"
                         data-testid="global-search-empty"
                       >
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
                           <SearchX className="h-5 w-5" aria-hidden="true" />
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">
+                        <div className="w-full min-w-0 space-y-1">
+                          <p className="w-full min-w-0 break-words text-sm font-medium text-foreground [overflow-wrap:anywhere]">
                             No matches for “{trimmed}”
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -912,26 +917,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               ) : null}
                             </div>
                             <div
-                              className="ml-2 flex shrink-0 items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"
-                              aria-label={`Match ${row.match_kind}, rank ${row.rank}, score ${row.score.toFixed(2)}`}
                               data-testid={`global-search-item-meta-${row.entity_type}-${row.id}`}
-                            >
-                              <span
-                                className={cn(
-                                  "rounded-sm border px-1.5 py-0.5 font-medium",
-                                  row.match_kind === "exact"
-                                    ? "border-primary/40 bg-primary/10 text-primary"
-                                    : row.match_kind === "prefix"
-                                      ? "border-foreground/20 bg-muted text-foreground/80"
-                                      : "border-border bg-transparent",
-                                )}
-                              >
-                                {row.match_kind}
-                              </span>
-                              <span className="tabular-nums">
-                                r{row.rank}·{row.score.toFixed(2)}
-                              </span>
-                            </div>
+                              data-match-kind={row.match_kind}
+                              data-rank={row.rank}
+                              data-score={row.score.toFixed(2)}
+                            />
                           </CommandItem>
                         ))}
                       </CommandGroup>

@@ -50,6 +50,20 @@ import {
   type HierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
+import {
+  clearBrowserSessionFormDraft,
+  readBrowserSessionFormDraft,
+  writeBrowserSessionFormDraft,
+} from "@/lib/sessionFormDraftStore";
+import {
+  EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS,
+  START_YOUR_ROOM_DRAFT_FORM_ID,
+  START_YOUR_ROOM_SAVE_RETRY_COPY,
+  parseStartYourRoomDraft,
+  plainStartRoomSaveError,
+  startYourRoomDraftForm,
+  type StartYourRoomPendingRowIds,
+} from "@/lib/startYourRoomDraftRules";
 
 const ROOM_LIMITS_LOADING_COPY = "Checking your plan and active room limits…";
 
@@ -99,6 +113,13 @@ export default function StartYourRoom() {
   const [ids, setIds] = useState<StartYourRoomIds>({ ...EMPTY_START_YOUR_ROOM_IDS });
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
+  const [pendingRowIds, setPendingRowIds] = useState<StartYourRoomPendingRowIds>(
+    EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS,
+  );
+  const pendingRowIdsRef = useRef(pendingRowIds);
+  pendingRowIdsRef.current = pendingRowIds;
+  const draftHydratedFor = useRef<string | null>(null);
+  const [draftOwnerReady, setDraftOwnerReady] = useState<string | null>(null);
   const [verificationRetrying, setVerificationRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
@@ -110,6 +131,60 @@ export default function StartYourRoom() {
   }, [step]);
 
   const ownerId = user?.id ?? null;
+  const ownerIdRef = useRef<string | null>(ownerId);
+  ownerIdRef.current = ownerId;
+
+  useEffect(() => {
+    if (!ownerId || growsLoading || draftHydratedFor.current === ownerId) return;
+    draftHydratedFor.current = ownerId;
+    const draft = readBrowserSessionFormDraft(
+      ownerId,
+      START_YOUR_ROOM_DRAFT_FORM_ID,
+      parseStartYourRoomDraft,
+    );
+    if (!draft) {
+      setStep("grow");
+      setForm({ ...DEFAULT_START_YOUR_ROOM_FORM });
+      setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
+      setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
+      setError(null);
+      setDraftOwnerReady(ownerId);
+      return;
+    }
+    const growStillHere =
+      draft.ids.growId != null && grows.some((grow) => grow.id === draft.ids.growId);
+    setForm(draft.form);
+    setError(growStillHere || draft.step === "grow" ? draft.saveError : null);
+    if (draft.step === "grow" || growStillHere) {
+      setPendingRowIds(draft.pendingRowIds);
+    } else {
+      setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
+    }
+    if (growStillHere) {
+      setIds(draft.ids);
+      setStep(draft.step);
+    } else {
+      setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
+      setStep("grow");
+    }
+    setDraftOwnerReady(ownerId);
+  }, [ownerId, grows, growsLoading]);
+
+  useEffect(() => {
+    if (!ownerId || draftHydratedFor.current !== ownerId || draftOwnerReady !== ownerId) return;
+    if (step === "done") {
+      clearBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      return;
+    }
+    writeBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID, {
+      step,
+      form: startYourRoomDraftForm(form, ids),
+      ids,
+      pendingRowIds,
+      saveError: error,
+    });
+  }, [ownerId, draftOwnerReady, step, form, ids, pendingRowIds, error]);
+
   const plantsFetchKey = useRef<string | null>(null);
   const [plantReadAttempt, setPlantReadAttempt] = useState(0);
   useEffect(() => {
@@ -297,7 +372,9 @@ export default function StartYourRoom() {
     attempt: HierarchyCreateAttempt,
     payload: Record<string, unknown>,
   ) {
+    const saveOwnerId = ownerIdRef.current;
     const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+    if (ownerIdRef.current !== saveOwnerId) return null;
     if (result.status === "confirmed") return result.confirmed;
     if (result.status === "unknown") {
       recordUnknownCreateOutcome(attempt);
@@ -306,8 +383,25 @@ export default function StartYourRoom() {
       );
       return null;
     }
-    setError(result.message);
+    setError(plainStartRoomSaveError(attempt.entity));
     return null;
+  }
+
+  function rowIdFor(entity: "grow" | "tent" | "plant"): string {
+    const existing = pendingRowIdsRef.current[entity];
+    if (existing) return existing;
+    const minted = newHierarchyCreateAttemptId();
+    const next = { ...pendingRowIdsRef.current, [entity]: minted };
+    pendingRowIdsRef.current = next;
+    setPendingRowIds(next);
+    return minted;
+  }
+
+  function releaseRowId(entity: "grow" | "tent" | "plant") {
+    if (!pendingRowIdsRef.current[entity]) return;
+    const next = { ...pendingRowIdsRef.current, [entity]: null };
+    pendingRowIdsRef.current = next;
+    setPendingRowIds(next);
   }
 
   async function submitGrow() {
@@ -327,12 +421,13 @@ export default function StartYourRoom() {
     }
     let growId: string;
     try {
-      growId = newHierarchyCreateAttemptId();
+      growId = rowIdFor("grow");
     } catch {
       setError("Verdant could not start a safe grow save. Refresh and try again.");
       return;
     }
     const attempt = { entity: "grow" as const, rowId: growId, ownerId: user.id };
+    const saveOwnerId = user.id;
     createInFlightRef.current = true;
     setBusy(true);
     setError(null);
@@ -342,13 +437,16 @@ export default function StartYourRoom() {
         user_id: user.id,
         ...payload,
       });
+      if (ownerIdRef.current !== saveOwnerId) return;
       if (!confirmed) return;
+      releaseRowId("grow");
       setActiveGrowId(confirmed.row.id);
       setIds((prev) => ({ ...prev, growId: confirmed.row.id }));
       toast.success("Grow created");
       setStep(nextStepAfter("grow"));
       try {
         await refresh();
+        if (ownerIdRef.current !== saveOwnerId) return;
       } catch {
         // The grow is already confirmed and the wizard is terminal for this
         // stage. Advance rather than leave the grow form ready to duplicate.
@@ -379,7 +477,7 @@ export default function StartYourRoom() {
     }
     let tentId: string;
     try {
-      tentId = newHierarchyCreateAttemptId();
+      tentId = rowIdFor("tent");
     } catch {
       setError("Verdant could not start a safe tent save. Refresh and try again.");
       return;
@@ -390,6 +488,7 @@ export default function StartYourRoom() {
       ownerId: user.id,
       growId: payload.grow_id,
     };
+    const saveOwnerId = user.id;
     createInFlightRef.current = true;
     setBusy(true);
     setError(null);
@@ -399,7 +498,9 @@ export default function StartYourRoom() {
         user_id: user.id,
         ...payload,
       });
+      if (ownerIdRef.current !== saveOwnerId) return;
       if (!confirmed) return;
+      releaseRowId("tent");
       setIds((prev) => ({
         growId: prev.growId ?? shownIds.growId,
         tentId: confirmed.row.id,
@@ -431,7 +532,7 @@ export default function StartYourRoom() {
     }
     let plantId: string;
     try {
-      plantId = newHierarchyCreateAttemptId();
+      plantId = rowIdFor("plant");
     } catch {
       setError("Verdant could not start a safe plant save. Refresh and try again.");
       return;
@@ -443,6 +544,7 @@ export default function StartYourRoom() {
       growId: payload.grow_id,
       tentId: payload.tent_id,
     };
+    const saveOwnerId = user.id;
     createInFlightRef.current = true;
     setBusy(true);
     setError(null);
@@ -452,7 +554,9 @@ export default function StartYourRoom() {
         user_id: user.id,
         ...payload,
       });
+      if (ownerIdRef.current !== saveOwnerId) return;
       if (!confirmed) return;
+      releaseRowId("plant");
       // Fail closed if binding somehow dropped (should never happen with payload).
       if (!confirmed.row.grow_id) {
         setError(
@@ -469,6 +573,7 @@ export default function StartYourRoom() {
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);
+      if (ownerIdRef.current !== saveOwnerId) return;
       setIds((prev) => ({
         growId: prev.growId ?? shownIds.growId,
         tentId: prev.tentId ?? shownIds.tentId,
@@ -493,6 +598,12 @@ export default function StartYourRoom() {
     // Persist diary-first start screen so next login skips empty onboarding.
     setStartScreenChoice(user.id, "quickLog");
     nav(plantDetailQuickLogHref(shownIds.plantId), { replace: true });
+  }
+
+  function retryCurrentSave() {
+    if (shownStep === "grow") void submitGrow();
+    else if (shownStep === "tent") void submitTent();
+    else if (shownStep === "plant") void submitPlant();
   }
 
   function submitGrowFromForm(event: { preventDefault: () => void }) {
@@ -760,9 +871,28 @@ export default function StartYourRoom() {
         ) : null}
 
         {error ? (
-          <p role="alert" className="text-sm text-destructive" data-testid="start-your-room-error">
-            {error}
-          </p>
+          <div className="space-y-2" data-testid="start-your-room-error-block">
+            <p
+              role="alert"
+              className="text-sm text-destructive"
+              data-testid="start-your-room-error"
+            >
+              {error}
+            </p>
+            {!createOutcomeUnknown ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={retryCurrentSave}
+                disabled={busy}
+                data-testid="start-room-save-retry"
+              >
+                {busy ? "Saving…" : "Retry"}
+              </Button>
+            ) : null}
+            <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_SAVE_RETRY_COPY}</p>
+          </div>
         ) : null}
       </div>
     </div>

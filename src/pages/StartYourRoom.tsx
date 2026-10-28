@@ -130,8 +130,11 @@ export default function StartYourRoom() {
     ownerId: user?.id,
   });
 
+  // First paint leaves the cursor in the plant name (autoFocus). The grow and
+  // tent steps now pass mid-submit, so only the finished room moves focus to
+  // the heading for screen readers.
   useEffect(() => {
-    headingRef.current?.focus();
+    if (step === "done") headingRef.current?.focus();
   }, [step]);
 
   const ownerId = user?.id ?? null;

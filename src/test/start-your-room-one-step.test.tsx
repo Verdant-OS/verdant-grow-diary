@@ -154,6 +154,7 @@ describe("Start your room in one submit", () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     window.sessionStorage.clear();
     // An unknown outcome leaves a same-runtime fence; never leak it to the next case.
     delete (globalThis as Record<string, unknown>)[
@@ -283,6 +284,12 @@ describe("Start your room in one submit", () => {
     );
     expect(insertedTables()).toEqual(["grows"]);
     expect(testState.nav).not.toHaveBeenCalled();
+  });
+
+  it("puts the cursor in the plant name on first paint", async () => {
+    renderPage();
+    const plantName = await screen.findByTestId("start-room-plant-name");
+    await waitFor(() => expect(plantName).toHaveFocus());
   });
 
   it("submits the room on Enter from the plant name", async () => {

@@ -9,7 +9,8 @@ import { createGrowIdsEqual } from "@/lib/createDialogGrowBindingRules";
  * Log. The step is derived from which ids already exist (firstMissingStep).
  *
  * Pure: no React, no Supabase, no side effects. The page owns writes and
- * only submits when canProceed* is true. Payloads only include fields the
+ * submits the single form only when canSubmitRoom is true, filling blank
+ * names through startRoomFormWithDefaults. Payloads only include fields the
  * existing create dialogs already write (no schema expansion).
  */
 

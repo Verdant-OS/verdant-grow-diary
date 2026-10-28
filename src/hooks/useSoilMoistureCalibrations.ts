@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { SoilMoistureCalibrationRow } from "@/lib/db";
@@ -34,6 +34,27 @@ export function isMissingSoilMoistureCalibrationsTableError(error: unknown): boo
     .filter((value): value is string => typeof value === "string")
     .join(" ");
   return description.includes("soil_moisture_calibrations");
+}
+
+/**
+ * Session marker for a confirmed missing calibration table. Lives on the
+ * QueryClient (one per router) so a later tent or page does not repeat the
+ * PostgREST 404. A full reload builds a new client and checks once more.
+ */
+const SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY = [
+  "soil_moisture_calibrations",
+  "schema_unavailable",
+] as const;
+
+function soilMoistureCalibrationSchemaUnavailableCached(client: QueryClient): boolean {
+  return client.getQueryData(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY) === true;
+}
+
+function rememberSoilMoistureCalibrationSchemaUnavailable(client: QueryClient): void {
+  client.setQueryDefaults(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY, {
+    gcTime: Number.POSITIVE_INFINITY,
+  });
+  client.setQueryData(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY, true);
 }
 
 export function mapSoilMoistureCalibrationRow(
@@ -81,7 +102,10 @@ export function useSoilMoistureCalibrations(args: {
   const query = useQuery<SoilMoistureCalibrationReadResult>({
     queryKey: ["soil_moisture_calibrations", growId ?? "none", tentId ?? "none"],
     enabled,
-    queryFn: async () => {
+    queryFn: async ({ client: queryClient }) => {
+      if (soilMoistureCalibrationSchemaUnavailableCached(queryClient)) {
+        return { availability: "schema_unavailable", calibrations: [] };
+      }
       if (!growId || !tentId) return { availability: "available", calibrations: [] };
       // The calibration migration exists, but the checked-in generated
       // Supabase types do not include this table yet. Keep this narrow cast
@@ -103,7 +127,14 @@ export function useSoilMoistureCalibrations(args: {
         .eq("is_active", true)
         .order("created_at", { ascending: false });
 
-      return resolveSoilMoistureCalibrationRead(data as SoilMoistureCalibrationRow[] | null, error);
+      const result = resolveSoilMoistureCalibrationRead(
+        data as SoilMoistureCalibrationRow[] | null,
+        error,
+      );
+      if (result.availability === "schema_unavailable") {
+        rememberSoilMoistureCalibrationSchemaUnavailable(queryClient);
+      }
+      return result;
     },
     staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 5,

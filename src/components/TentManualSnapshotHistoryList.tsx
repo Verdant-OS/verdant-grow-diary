@@ -20,10 +20,20 @@ import {
   DEFAULT_HISTORY_LIMIT,
 } from "@/lib/manualSensorSnapshotHistoryListRules";
 import type { ChangeContextReading } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+
+/**
+ * The five columns the history list reads; V2 manual events supply the same,
+ * plus the event id so two saves at one instant stay two snapshots.
+ */
+export type ManualSnapshotHistoryReading = Pick<
+  SensorReadingRow,
+  "ts" | "metric" | "value" | "source" | "tent_id"
+> & { snapshot_id?: string | null };
 
 interface Props {
   tentId: string | null | undefined;
-  readings: ReadonlyArray<SensorReadingRow>;
+  readings: ReadonlyArray<ManualSnapshotHistoryReading>;
   readStatus: "pending" | "error" | "success";
   isFetching?: boolean;
   onRetry: () => void;
@@ -44,6 +54,7 @@ export default function TentManualSnapshotHistoryList({
   onRetry,
   limit = DEFAULT_HISTORY_LIMIT,
 }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
   if (!tentId) return null;
 
   // Only a settled successful read establishes empty or populated history.
@@ -56,10 +67,13 @@ export default function TentManualSnapshotHistoryList({
         value: r.value as number | null | undefined,
         source: r.source as string | null | undefined,
         tent_id: r.tent_id as string | null | undefined,
+        snapshot_id: r.snapshot_id ?? null,
       }))
     : [];
 
-  const entries = canShowHistory ? buildManualSnapshotHistoryList(rows, { tentId, limit }) : [];
+  const entries = canShowHistory
+    ? buildManualSnapshotHistoryList(rows, { tentId, limit, temperatureUnit })
+    : [];
 
   return (
     <div className="glass rounded-2xl p-4 mb-6" data-testid="tent-manual-snapshot-history">
@@ -71,11 +85,7 @@ export default function TentManualSnapshotHistoryList({
       </div>
 
       {readStatus === "error" ? (
-        <div
-          role="alert"
-          aria-busy={isFetching}
-          data-testid="tent-manual-snapshot-history-error"
-        >
+        <div role="alert" aria-busy={isFetching} data-testid="tent-manual-snapshot-history-error">
           <p className="text-sm text-muted-foreground">Manual snapshot history is unavailable.</p>
           <Button
             type="button"
@@ -109,7 +119,7 @@ export default function TentManualSnapshotHistoryList({
         <ul className="space-y-3">
           {entries.map((e) => (
             <li
-              key={e.ts}
+              key={e.key}
               data-testid="tent-manual-snapshot-history-item"
               data-first-snapshot={e.firstSnapshot ? "true" : "false"}
               className="rounded-xl border border-border/40 bg-secondary/20 p-3"

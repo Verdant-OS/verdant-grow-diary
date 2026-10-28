@@ -25,11 +25,13 @@ import {
 } from "@/lib/accountDeletion";
 import { createAccountDeletionContinuation } from "@/lib/accountDeletionContinuationRules";
 import { useAuth } from "@/store/auth";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import AccountPlanBadge from "@/components/AccountPlanBadge";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
+import FounderOwnerPrefsForm from "@/components/FounderOwnerPrefsForm";
 import { PRICING_TIERS } from "@/config/pricing";
 import {
+  deleteAccountConfirmNamesBilling,
   describeSettingsTile,
   settingsTileAriaLabel,
   type SettingsTileState,
@@ -54,7 +56,8 @@ import { alertsPath } from "@/lib/routes";
 
 interface TileProps {
   name: string;
-  state: SettingsTileState;
+  /** Omit for tiles whose content states its own status (destructive or not-ready). */
+  state?: SettingsTileState;
   children: React.ReactNode;
 }
 
@@ -64,28 +67,32 @@ interface PreferenceFeedback {
 }
 
 function Tile({ name, state, children }: TileProps) {
-  const badge = describeSettingsTile(state);
+  const badge = state ? describeSettingsTile(state) : null;
   return (
     <div
       className="glass rounded-2xl p-5"
       data-testid="settings-tile"
       data-tile-state={state}
-      aria-label={settingsTileAriaLabel(name, state)}
+      aria-label={state ? settingsTileAriaLabel(name, state) : name}
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
         <h2 className="font-display font-semibold">{name}</h2>
-        <Badge
-          variant={badge.variant}
-          data-testid="settings-tile-badge"
-          className="self-start sm:self-auto shrink-0"
-        >
-          {badge.label}
-        </Badge>
+        {badge ? (
+          <Badge
+            variant={badge.variant}
+            data-testid="settings-tile-badge"
+            className="self-start sm:self-auto shrink-0"
+          >
+            {badge.label}
+          </Badge>
+        ) : null}
       </div>
       {children}
-      <p className="text-xs text-muted-foreground mt-3" data-testid="settings-tile-helper">
-        {badge.helper}
-      </p>
+      {badge ? (
+        <p className="text-xs text-muted-foreground mt-3" data-testid="settings-tile-helper">
+          {badge.helper}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -189,10 +196,16 @@ function StartScreenTile({ userId }: { userId: string }) {
 
 function TemperatureUnitTile() {
   const [choice, setChoice] = useState<TemperatureUnitPreference>(DEFAULT_TEMPERATURE_UNIT);
+  // What this device has stored, tracked apart from the unsaved radio choice so
+  // Reset stays available while a non-default override is still persisted. The
+  // shared hook follows saves in other tabs as well as this one (Codex P2 on
+  // #2345 at f752598a); the unsaved choice is never overwritten.
+  const stored = useTemperatureUnitPreference();
   const [feedback, setFeedback] = useState<PreferenceFeedback | null>(null);
 
   useEffect(() => {
-    setChoice(loadTemperatureUnitPreference());
+    const loaded = loadTemperatureUnitPreference();
+    setChoice(loaded);
   }, []);
 
   function onSave() {
@@ -266,8 +279,14 @@ function TemperatureUnitTile() {
         >
           Save
         </Button>
-        <Button size="sm" variant="outline" onClick={onReset} data-testid="temperature-unit-reset">
-          Use Fahrenheit default
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onReset}
+          disabled={choice === DEFAULT_TEMPERATURE_UNIT && stored === DEFAULT_TEMPERATURE_UNIT}
+          data-testid="temperature-unit-reset"
+        >
+          Reset to default
         </Button>
       </div>
       {feedback ? (
@@ -338,7 +357,6 @@ function SubscriptionTile() {
             <span className="font-medium text-foreground" data-testid="settings-subscription-plan">
               {label}
             </span>
-            {!lookupFailed && <AccountPlanBadge entitlement={entitlement} loading={loading} />}
           </p>
           {isStaff && (
             <p
@@ -450,6 +468,17 @@ function SubscriptionTile() {
 }
 
 /**
+ * Existing Founders' Founders Wall privacy controls, moved here when the
+ * /founder page was retired (#2028). Only a Founder Lifetime account renders
+ * the form, so other growers see no Founder UI and trigger no Founder query.
+ */
+function FounderWallPrefsSection() {
+  const { lookupFailed, entitlement } = useMyEntitlements();
+  if (lookupFailed || entitlement?.displayPlanId !== "founder_lifetime") return null;
+  return <FounderOwnerPrefsForm />;
+}
+
+/**
  * DeleteAccountTile — destructive, self-serve account deletion.
  *
  * Guards:
@@ -473,6 +502,12 @@ function DeleteAccountTile() {
   const confirmationOwner = useRef<string | null>(null);
   const previousOwner = useRef(user?.id);
   const activeRequest = useRef<ReturnType<typeof createAccountDeletionContinuation> | null>(null);
+  const plan = useMyEntitlements();
+  const confirmNamesBilling = deleteAccountConfirmNamesBilling({
+    loading: plan.loading,
+    lookupFailed: plan.lookupFailed,
+    displayPlanId: plan.entitlement?.displayPlanId,
+  });
   const canConfirm = confirmation === DELETE_ACCOUNT_CONFIRMATION && !busy;
 
   useEffect(() => {
@@ -543,7 +578,7 @@ function DeleteAccountTile() {
   }
 
   return (
-    <Tile name="Delete account" state="available">
+    <Tile name="Delete account">
       <p className="text-sm text-muted-foreground mb-3">
         Permanently delete your Verdant account and all associated grow data. This cannot be undone.
       </p>
@@ -611,7 +646,13 @@ function DeleteAccountTile() {
               aria-busy={busy}
               data-testid="settings-delete-account-confirm"
             >
-              {busy ? "Canceling billing and deleting…" : "Cancel billing and delete"}
+              {confirmNamesBilling
+                ? busy
+                  ? "Canceling billing and deleting…"
+                  : "Cancel billing and delete"
+                : busy
+                  ? "Deleting…"
+                  : "Delete account"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -651,8 +692,9 @@ export default function Settings() {
         {user?.id ? <StartScreenTile userId={user.id} /> : null}
 
         <SubscriptionTile />
+        <FounderWallPrefsSection />
 
-        <Tile name="Refer a friend" state="available">
+        <Tile name="Refer a friend">
           <RewardedReferralCard />
         </Tile>
 

@@ -967,6 +967,14 @@ const PROFILE_SEEDS: readonly ProfileSeed[] = [
   },
 ];
 
+/**
+ * Search alias shared by the bundled profiles and the V1.1 database read model,
+ * so both sources derive it identically.
+ */
+export function buildCultivarSearchAlias(name: string, lifeCycle: CultivarLifeCycle): string {
+  return `${name} ${lifeCycle === "autoflower" ? "autoflower " : ""}strain`;
+}
+
 function buildProfile(seed: ProfileSeed): VerdantCultivarProfile {
   const overlays = makeGuideOverlays(seed.sourceKey, seed.tendencies);
   if (seed.lifeCycle === "autoflower") {
@@ -989,7 +997,7 @@ function buildProfile(seed: ProfileSeed): VerdantCultivarProfile {
   return {
     slug: seed.slug,
     name: seed.name,
-    searchAlias: `${seed.name} ${seed.lifeCycle === "autoflower" ? "autoflower " : ""}strain`,
+    searchAlias: buildCultivarSearchAlias(seed.name, seed.lifeCycle),
     aliases: seed.aliases,
     breeder: seed.breeder,
     lineage: seed.lineage,

@@ -1,4 +1,9 @@
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
+import {
+  copyHistoryReviewTarget,
+  historyReviewTargetAllowed,
+  type PendingQuickLogHistoryReviewTarget,
+} from "./quickLogHistoryReviewTargetRules";
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import {
   buildFeedingFormPayload,
@@ -22,6 +27,8 @@ export interface PendingQuickLogFeeding {
   resolved: ResolvedQuickLogV2Target;
   /** Durable refusal of this same key; absent on older pending records. */
   historyCheckReason?: QuickLogHistoryCheckReason | FeedingRejectionHistoryReason;
+  /** Only with receipt_target_moved: where the original entry lives now. */
+  historyReviewTarget?: PendingQuickLogHistoryReviewTarget;
 }
 
 export const FEEDING_RECOVERY_UNAVAILABLE =
@@ -107,6 +114,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
       "payload",
       "resolved",
       "historyCheckReason",
+      "historyReviewTarget",
     ])
   )
     return false;
@@ -121,6 +129,8 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
     value.historyCheckReason !== undefined &&
     !feedingHistoryCheckReason(value.historyCheckReason)
   )
+    return false;
+  if (!historyReviewTargetAllowed(value.historyCheckReason, value.historyReviewTarget))
     return false;
   const p = value.payload;
   const r = value.resolved;
@@ -205,9 +215,15 @@ export function readPendingQuickLogFeeding(ownerId: string | null | undefined): 
     if (record.historyCheckReason !== undefined) return { status: "pending", record };
     const fallback = readHistoryMarker(ownerId, record.payload.idempotency_key);
     if (fallback.status === "blocked") return fallback;
-    return fallback.status === "marked"
-      ? { status: "pending", record: { ...record, historyCheckReason: fallback.reason } }
-      : { status: "pending", record };
+    if (fallback.status !== "marked") return { status: "pending", record };
+    return {
+      status: "pending",
+      record: {
+        ...record,
+        historyCheckReason: fallback.reason,
+        ...(fallback.reviewTarget ? { historyReviewTarget: fallback.reviewTarget } : {}),
+      },
+    };
   } catch {
     return { status: "blocked" };
   }
@@ -222,6 +238,7 @@ function readHistoryMarker(
   | {
       status: "marked";
       reason: QuickLogHistoryCheckReason | FeedingRejectionHistoryReason;
+      reviewTarget?: PendingQuickLogHistoryReviewTarget;
     }
   | { status: "blocked" } {
   const raw = window.sessionStorage.getItem(historyMarkerKey(ownerId));
@@ -229,15 +246,23 @@ function readHistoryMarker(
   const marker: unknown = JSON.parse(raw);
   if (
     !object(marker) ||
-    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason"]) ||
+    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason", "historyReviewTarget"]) ||
     marker.version !== 1 ||
     !id(marker.idempotencyKey) ||
-    !feedingHistoryCheckReason(marker.historyCheckReason)
+    !feedingHistoryCheckReason(marker.historyCheckReason) ||
+    !historyReviewTargetAllowed(marker.historyCheckReason, marker.historyReviewTarget)
   )
     return { status: "blocked" };
-  return marker.idempotencyKey === idempotencyKey
+  if (marker.idempotencyKey !== idempotencyKey) return { status: "none" };
+  return marker.historyReviewTarget === undefined
     ? { status: "marked", reason: marker.historyCheckReason }
-    : { status: "none" };
+    : {
+        status: "marked",
+        reason: marker.historyCheckReason,
+        reviewTarget: copyHistoryReviewTarget(
+          marker.historyReviewTarget as PendingQuickLogHistoryReviewTarget,
+        ),
+      };
 }
 
 /** Claim synchronously before dispatch; an existing unresolved Feed always wins. */
@@ -275,14 +300,24 @@ function feedingHistoryCheckReason(
 export function markPendingQuickLogFeedingHistoryCheck(
   record: PendingQuickLogFeeding | null | undefined,
   reason: unknown,
+  reviewTarget?: PendingQuickLogHistoryReviewTarget | null,
 ): { status: "marked"; record: PendingQuickLogFeeding } | { status: "blocked" } {
   try {
     if (!record || !validRecord(record, record.ownerId) || !feedingHistoryCheckReason(reason))
       return { status: "blocked" };
+    // Only a moved receipt carries a review target, and it must be well formed.
+    if (reviewTarget != null && !historyReviewTargetAllowed(reason, reviewTarget))
+      return { status: "blocked" };
     const current = readPendingQuickLogFeeding(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record))
       return { status: "blocked" };
-    const marked: PendingQuickLogFeeding = { ...current.record, historyCheckReason: reason };
+    const marked: PendingQuickLogFeeding = {
+      ...current.record,
+      historyCheckReason: reason,
+      ...(reviewTarget != null
+        ? { historyReviewTarget: copyHistoryReviewTarget(reviewTarget) }
+        : {}),
+    };
     try {
       window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
     } catch {
@@ -301,6 +336,9 @@ export function markPendingQuickLogFeedingHistoryCheck(
         version: 1,
         idempotencyKey: marked.payload.idempotency_key,
         historyCheckReason: reason,
+        ...(marked.historyReviewTarget !== undefined
+          ? { historyReviewTarget: marked.historyReviewTarget }
+          : {}),
       }),
     );
     const fallback = readPendingQuickLogFeeding(record.ownerId);

@@ -64,7 +64,9 @@ test.describe("Grow Help Toolkit local-only public flow", () => {
         "true",
         { timeout: 30_000 },
       );
-      await expect(page.getByText("No account · no analytics · no upload")).toBeVisible();
+      await expect(
+        page.getByText("No account · grow inputs stay local · no grow-data upload"),
+      ).toBeVisible();
 
       await page.getByLabel("Working reservoir volume").fill("20");
       await page.getByLabel("Label dose").fill("2.5");

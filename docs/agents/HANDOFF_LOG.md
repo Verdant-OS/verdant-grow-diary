@@ -79,7 +79,7 @@ branch: claude/mcp-oauth-verifier-test (created at 78c60a89f37996e66302789f61447
 base: verdant-grow-diary
 checkout: git fetch origin claude/mcp-oauth-verifier-test verdant-grow-diary && git switch claude/mcp-oauth-verifier-test && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2563 (replacement; #2552 is historical, superseded at 78c60a89f37996e66302789f61447f9ee7fffc15)
-head_sha: e0bbf4d26e03f8d1032bcd74366b639c18e29f1e (code checkpoint observed 2026-10-28 04:50 UTC; this log-only commit sits on top of it)
+head_sha: e0bbf4d26e03f8d1032bcd74366b639c18e29f1e (code checkpoint observed 2026-10-28 04:45 UTC; log-only commits sit on top of it)
 state: ready for review, auto-merge enabled by the merge seat
 current_step: awaiting required CI and an exact-head independent review
 next_action: route to an eligible non-author reviewer
@@ -100,23 +100,23 @@ reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 17:10 CT (Matthew: separate PRs)
 owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-last_updated: 2026-10-27 23:50 CT, by Claude
+last_updated: 2026-10-27 23:48 CT, by Claude
 ```
 
 ### VER-293-BROWSER-OAUTH-CLIENT-TESTS
 
 ```text
-TASK VER-293-BROWSER-OAUTH-CLIENT-TESTS  priority: other  status: OPEN
+TASK VER-293-BROWSER-OAUTH-CLIENT-TESTS  priority: other  status: SUPERSEDED
 goal: Add focused deterministic unit coverage for src/lib/mcp/browserOAuthClient.ts and open a draft PR linked to VER-293.
 why: The module had no unit tests. Callback, PKCE, token storage, and same-origin redirect behavior need regression locks without network or real credentials.
 branch: cursor/mcp-browser-oauth-client-tests-fd0f
 base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
 checkout: git fetch origin cursor/mcp-browser-oauth-client-tests-fd0f verdant-grow-diary && git switch cursor/mcp-browser-oauth-client-tests-fd0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2552 (draft)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2552 (superseded by https://github.com/Verdant-OS/verdant-grow-diary/pull/2563; final #2552 head 78c60a89f37996e66302789f61447f9ee7fffc15)
 head_sha: read origin/cursor/mcp-browser-oauth-client-tests-fd0f after the Jack Herer follow-up push; parent is d4e98ae40fad58741d13fdb61a5007d82d487669
 state: tests only; browserOAuthClient.ts unchanged
 current_step: Merged origin/verdant-grow-diary 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae. The only conflict was HANDOFF_LOG.md: incoming Open blocks and this block are both kept. Jack Herer 5670094164 at d4e98ae40 was PASS-pending-CI 0/0/4 plus one UNVERIFIED storage-spy concern. Follow-up spies setItem on getLocalStorageMethodOwnerForTest and records only when this is localStorage. RED check: a temporary localStorage.setItem in the client failed sends code_verifier with localSets ["verdant.mcp.oauth.token.v1"]; that edit was reverted and is not in the commit. Added token-endpoint fetch rejection, RFC 7636 Appendix B vector, SyntaxError message for malformed JSON, and fake timers for the expiry boundary.
-next_action: Read the new draft head and required CI. Jack Herer's verdict was for d4e98ae40 and does not cover this head. Keep the PR draft.
+next_action: none here. Work continues in MCP-OAUTH-VERIFIER-TEST-SUPERSEDES-2552 (#2563). Jack Herer's verdict was for d4e98ae40 and covers neither head.
 post_merge_check: bunx vitest run src/test/mcp-browser-oauth-client.test.ts on the deploy head; a failure reopens this work with the same owner.
 active_writer: Cursor Grok session on cursor/mcp-browser-oauth-client-tests-fd0f
 decisions: Do not clear the pending PKCE record on state mismatch. BrowserConnectPanel.tsx explicitly keeps a genuine pending authorization when the callback state was not issued by this browser, and it does not call completeAuthorization in that case. Document that behavior. Also document that a network failure, malformed token JSON, or a 200 body without access_token does not store a token and does not clear PKCE, while a non-2xx token response does clear PKCE. No authorization, scope, endpoint, or UI change.

@@ -27,6 +27,12 @@ Since `a980489a`, five migrations were added under `supabase/migrations/`
 unchanged. These versions are outside the ordering list above; their production states
 are recorded in the 2026-10-16 receipt below.
 
+**Re-check, 2026-10-28 (tip `4117514f826bdb114f553943e632e266bd991307`).** One more
+migration has landed since `e136fa44`: `20261014210000_quicklog_correction_editable_values.sql`.
+It sorts after every version named here, so the order below is unchanged. Neither the
+2026-10-16 receipt below nor this document records its production state, so it is
+**NOT_MEASURED**. The receipt is complete only for the versions it names.
+
 **Production receipt, 2026-10-16 (supersedes the `NOT_MEASURED` labels below for the
 versions it names).** See "Production measurement and apply, 2026-10-16" at the end. In
 short: production was measured directly, the approved files were applied, the migration

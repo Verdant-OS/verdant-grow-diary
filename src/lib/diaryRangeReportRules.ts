@@ -605,3 +605,22 @@ export function buildDiaryRangeReport(
     },
   };
 }
+
+/**
+ * Photo path a diary row carries only in `details.photo_url`. The canonical
+ * Quick Log save persists an attached photo there; filling the top-level
+ * `photo_url` column is a best-effort follow-up that a recovered (retried)
+ * save, or a failed normalization, never performs. Returns a bare storage
+ * path only — never a URL, scheme, or absolute path — and only when the
+ * column itself is empty, so a column photo always wins.
+ */
+export function diaryRowDetailsPhotoPath(row: DiaryRangeDiaryRow): string | null {
+  if (typeof row.photo_url === "string" && row.photo_url.trim() !== "") return null;
+  const raw = row.details?.photo_url;
+  if (typeof raw !== "string") return null;
+  const path = raw.trim();
+  if (path === "" || path.startsWith("/") || path.includes("://") || /^https?:/i.test(path)) {
+    return null;
+  }
+  return path;
+}

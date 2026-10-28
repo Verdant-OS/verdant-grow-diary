@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -27,8 +27,12 @@ import {
   buildTentUpdatePayload,
   isTentUpdatePayloadValid,
   tentSizeEditValidationMessage,
+  type TentUpdatePayload,
 } from "@/lib/tentManagementRules";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { removeOwnerSubjectPhoto, uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
+import { isDefinitiveUnreferencedPhotoError } from "@/lib/ownerSubjectPhotoRules";
 
 /**
  * Edits an existing tent's user-facing fields. Mirrors EditPlantDialog
@@ -56,6 +60,8 @@ export default function EditTentDialog({ tent, trigger }: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const submitInFlightRef = useRef(false);
   const [form, setForm] = useState({
     name: tent.name ?? "",
     brand: tent.brand ?? "",
@@ -65,6 +71,14 @@ export default function EditTentDialog({ tent, trigger }: Props) {
     light_schedule: tent.light?.schedule ?? "",
     light_wattage: tent.light?.wattage ? String(tent.light.wattage) : "",
   });
+
+  // Each open (or a different tent) is a new editing session: a file picked
+  // in an earlier, cancelled or saved session must never ride along with
+  // this one. Keyed on tent.id, not the tent object, so a parent re-render
+  // does not drop a file picked in the current session.
+  useEffect(() => {
+    setPhotoFile(null);
+  }, [open, tent.id]);
 
   useEffect(() => {
     if (open) {
@@ -87,7 +101,7 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       return;
     }
     if (!hasTrimmedRequiredIdentity(form.name)) return;
-    const payload = buildTentUpdatePayload({
+    const built = buildTentUpdatePayload({
       name: form.name,
       brand: form.brand,
       size: form.size,
@@ -96,8 +110,10 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       light_schedule: form.light_schedule,
       light_wattage: form.light_wattage ? Number(form.light_wattage) : null,
     });
-    // Only a changed size is validated: a size saved before BUG-012 must not
-    // block renaming the tent.
+    const payload: TentUpdatePayload & { photo_url?: string } = { ...built };
+    // Every local check runs before the upload, so a rejected edit never
+    // writes a storage object. Only a changed size is validated: a size
+    // saved before BUG-012 must not block renaming the tent.
     const sizeMessage = tentSizeEditValidationMessage(tent.size, payload.size);
     if (sizeMessage) {
       toast.error(sizeMessage);
@@ -107,12 +123,44 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       toast.error("Tent name is required");
       return;
     }
+    const checkedPhoto = photoFile ? validatePlantProfilePhotoFile(photoFile) : null;
+    if (checkedPhoto && !checkedPhoto.ok) {
+      toast.error(checkedPhoto.message);
+      return;
+    }
+    if (submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
     setBusy(true);
-    const { error } = await supabase
-      .from("tents")
-      .update(payload as never)
-      .eq("id", tent.id);
-    setBusy(false);
+    let error: { message: string } | null = null;
+    try {
+      let uploadedPath: string | null = null;
+      if (photoFile && checkedPhoto?.ok) {
+        try {
+          const uploaded = await uploadOwnerSubjectPhoto({
+            file: photoFile,
+            mime: checkedPhoto.mime,
+            userId: user.id,
+            kind: "tent",
+            subjectId: tent.id,
+          });
+          uploadedPath = uploaded.path;
+          payload.photo_url = uploaded.reference;
+        } catch {
+          toast.error("The tent photo was not saved. Tent details were not changed.");
+          return;
+        }
+      }
+      ({ error } = await supabase
+        .from("tents")
+        .update(payload as never)
+        .eq("id", tent.id));
+      if (error && uploadedPath && isDefinitiveUnreferencedPhotoError(error)) {
+        await removeOwnerSubjectPhoto({ path: uploadedPath });
+      }
+    } finally {
+      submitInFlightRef.current = false;
+      setBusy(false);
+    }
     if (error) {
       toast.error(error.message);
       return;
@@ -226,6 +274,20 @@ export default function EditTentDialog({ tent, trigger }: Props) {
               onCheckedChange={(v) => setForm({ ...form, light_on: !!v })}
               data-testid="edit-tent-light-on"
             />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="edit-tent-photo">Photo (optional)</Label>
+            <Input
+              id="edit-tent-photo"
+              data-testid="edit-tent-photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              disabled={busy}
+              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              A photo is optional. Saving without one still updates the tent.
+            </p>
           </div>
           <Button
             disabled={busy || !hasTrimmedRequiredIdentity(form.name)}

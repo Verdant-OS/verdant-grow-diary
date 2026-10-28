@@ -400,11 +400,11 @@ BEGIN
   v_result := public.badge_awards_evaluate_owner('not_a_badge');
   ASSERT v_result->>'status' = 'not_in_slice', 'other badge keys must write nothing';
   v_result := public.badge_awards_evaluate_owner('first_tent');
-  ASSERT v_result->>'status' = 'not_in_slice', 'first_tent must stay outside this slice';
+  ASSERT v_result->>'status' = 'unchanged', 'first_tent with no photo must write nothing';
   v_result := public.badge_awards_evaluate_owner('setup_documented');
-  ASSERT v_result->>'status' = 'not_in_slice', 'setup_documented must stay outside this slice';
+  ASSERT v_result->>'status' = 'unchanged', 'setup_documented with no photo must write nothing';
   v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
-  ASSERT v_result->>'status' = 'not_in_slice', 'first_recorded_harvest must stay outside this slice';
+  ASSERT v_result->>'status' = 'unchanged', 'first_recorded_harvest with no photo must write nothing';
   SELECT count(*) INTO v_count
   FROM public.badge_awards
   WHERE user_id = v_owner AND badge_key <> 'first_diary_entry';

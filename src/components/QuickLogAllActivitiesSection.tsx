@@ -35,6 +35,8 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { HARVEST_PHOTO_UPLOAD_FAILED } from "@/constants/quickLogHarvestPhotoCopy";
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -46,7 +48,6 @@ import {
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
-import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
@@ -313,6 +314,20 @@ export default function QuickLogAllActivitiesSection({
   const selected = selectedDraft ? QUICK_LOG_ACTIVITY_DEFINITIONS[selectedDraft.activityId] : null;
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
+  const [harvestPhotoFile, setHarvestPhotoFile] = useState<File | null>(null);
+  const harvestPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  // The file input is uncontrolled, so clearing state alone would leave the
+  // picker showing a file that will no longer upload. Clear both together.
+  // A chosen PNG is read for its signature before it counts, as on the Photo
+  // picker; the generation drops a stale read when the choice changes.
+  const harvestPhotoGenerationRef = useRef(0);
+  const [harvestPhotoValidating, setHarvestPhotoValidating] = useState(false);
+  const clearHarvestPhoto = useCallback(() => {
+    harvestPhotoGenerationRef.current += 1;
+    setHarvestPhotoValidating(false);
+    setHarvestPhotoFile(null);
+    if (harvestPhotoInputRef.current) harvestPhotoInputRef.current.value = "";
+  }, []);
   const [harvestDry, setHarvestDry] = useState("");
   const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
   // Generic per-activity structured detail values (e.g. training technique),
@@ -425,6 +440,10 @@ export default function QuickLogAllActivitiesSection({
   const [structuredFeedError, setStructuredFeedError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
+  // Mirrors localSaveInFlightRef for rendering: the activity save hook's
+  // `saving` drops before the harvest photo upload finishes, so Save must
+  // stay disabled for the whole handler, not just the RPC.
+  const [activitySaveInFlight, setActivitySaveInFlight] = useState(false);
   const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
   const [pendingActivity, setPendingActivity] = useState<PendingQuickLogActivity | null>(null);
   const [activityRecoveryBlocked, setActivityRecoveryBlocked] = useState(false);
@@ -626,13 +645,14 @@ export default function QuickLogAllActivitiesSection({
     photoContentGenerationRef.current += 1;
     setPhotoValidating(false);
     setPhotoFile(null);
+    clearHarvestPhoto();
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
     setStructuredFeedError(null);
     setRecoveryNotice(null);
     setSaved([]);
-  }, [currentTargetKey]);
+  }, [currentTargetKey, clearHarvestPhoto]);
 
   // Ordered after the target reset: an async target resolution must reset
   // old target-specific state first, then apply the requested editor and
@@ -662,6 +682,7 @@ export default function QuickLogAllActivitiesSection({
     photoContentGenerationRef.current += 1;
     setPhotoValidating(false);
     setPhotoFile(null);
+    clearHarvestPhoto();
     if (requestedActivityAvailability?.disabled) {
       setSelectedDraft(null);
       return;
@@ -679,6 +700,7 @@ export default function QuickLogAllActivitiesSection({
     setSelectedDraft(bindQuickLogActivityDraft(requestedActivity, currentTarget));
     setNote(requestedNote ?? "");
   }, [
+    clearHarvestPhoto,
     currentTarget,
     openStructuredFeed,
     openStructuredFeeding,
@@ -806,6 +828,7 @@ export default function QuickLogAllActivitiesSection({
       photoContentGenerationRef.current += 1;
       setPhotoValidating(false);
       setPhotoFile(null);
+      clearHarvestPhoto();
     },
     [
       currentTarget,
@@ -813,6 +836,7 @@ export default function QuickLogAllActivitiesSection({
       openStructuredFeed,
       openStructuredFeeding,
       openStructuredWater,
+      clearHarvestPhoto,
     ],
   );
 
@@ -884,6 +908,7 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomStageConfirmed(false);
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
+        clearHarvestPhoto();
         setErrorReason(null);
         setErrorForActivity(null);
       } else if (stillSameRecoveryScope) {
@@ -904,7 +929,7 @@ export default function QuickLogAllActivitiesSection({
         // The confirmed write remains successful if parent cleanup fails.
       }
     },
-    [onSaveSuccess],
+    [clearHarvestPhoto, onSaveSuccess],
   );
 
   const handleRetryPendingActivity = useCallback(async () => {
@@ -1236,6 +1261,7 @@ export default function QuickLogAllActivitiesSection({
     const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
     if (!acquired) return;
     localSaveInFlightRef.current = true;
+    setActivitySaveInFlight(true);
 
     try {
       const activityInput = {
@@ -1372,18 +1398,58 @@ export default function QuickLogAllActivitiesSection({
         // Fresh activities use the server's occurrence time. Keep the local
         // claim time for recovery metadata, not as an unbounded RPC timestamp.
         const createdAt = new Date().toISOString();
+        // The harvest photo rides the canonical save as p_photo_url, so the
+        // server writes it onto the linked diary companion in the same
+        // transaction. Upload first; a failed upload saves nothing.
+        let harvestPhotoPath: string | null = null;
+        if (selected.id === "harvest" && harvestPhotoFile && user?.id) {
+          const ext = (harvestPhotoFile.name.split(".").pop() || "jpg").toLowerCase();
+          const path = `${user.id}/${capturedTarget.growId}/${Date.now()}.${ext}`;
+          let uploadFailed: boolean;
+          try {
+            const { error: uploadError } = await supabase.storage
+              .from("diary-photos")
+              .upload(path, harvestPhotoFile, {
+                contentType: harvestPhotoFile.type,
+                upsert: false,
+              });
+            uploadFailed = Boolean(uploadError);
+          } catch {
+            uploadFailed = true;
+          }
+          if (uploadFailed) {
+            setErrorReason(HARVEST_PHOTO_UPLOAD_FAILED);
+            setErrorForActivity(selected.id);
+            return;
+          }
+          harvestPhotoPath = path;
+        }
+        const removeUnreferencedHarvestPhoto = async () => {
+          if (!harvestPhotoPath) return;
+          try {
+            await supabase.storage.from("diary-photos").remove([harvestPhotoPath]);
+          } catch {
+            // Best-effort: nothing references this object.
+          }
+        };
         const claim = claimPendingQuickLogActivity({
           version: 1,
           ownerId: user?.id ?? "",
           createdAt,
           ...(reviewedStarterHandoffKey ? { reviewedStarterHandoffKey } : {}),
-          input: { ...activityInput, occurredAt: null, idempotencyKey },
+          input: {
+            ...activityInput,
+            occurredAt: null,
+            idempotencyKey,
+            ...(harvestPhotoPath ? { photoUrl: harvestPhotoPath } : {}),
+          },
           receipt: {
             symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
             harvestDetails: harvestDetailsForBreakdown,
           },
         });
         if (claim.status !== "claimed") {
+          await removeUnreferencedHarvestPhoto();
           if (claim.status === "pending") {
             setPendingActivity(claim.record);
             setSelectedDraft(
@@ -1409,6 +1475,8 @@ export default function QuickLogAllActivitiesSection({
 
         if (!result.ok) {
           if (result.reason !== "save_failed") {
+            // A definitive refusal of this first attempt wrote nothing.
+            await removeUnreferencedHarvestPhoto();
             if (clearPendingQuickLogActivity(claim.record)) {
               if (stillCurrent) setPendingActivity(null);
             } else {
@@ -1431,6 +1499,20 @@ export default function QuickLogAllActivitiesSection({
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
+        if (harvestPhotoPath && savedGrowEventId) {
+          // The save already persisted details.photo_url. Filling the legacy
+          // column is the one client write the linked-diary fence allows; a
+          // failure leaves readers on details.photo_url.
+          try {
+            await supabase
+              .from("diary_entries")
+              .update({ photo_url: harvestPhotoPath })
+              .filter("details->>linked_grow_event_id", "eq", savedGrowEventId)
+              .select("id");
+          } catch {
+            // Best-effort normalization only.
+          }
+        }
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);
         } else {
@@ -1495,12 +1577,14 @@ export default function QuickLogAllActivitiesSection({
         photoContentGenerationRef.current += 1;
         setPhotoValidating(false);
         setPhotoFile(null);
+        clearHarvestPhoto();
         setSelectedDraft(null);
         setErrorReason(null);
         setErrorForActivity(null);
       }
     } finally {
       localSaveInFlightRef.current = false;
+      setActivitySaveInFlight(false);
       if (onSaveStart) onSaveEnd?.();
     }
   }, [
@@ -1518,6 +1602,8 @@ export default function QuickLogAllActivitiesSection({
     harvestWet,
     harvestDry,
     harvestUnit,
+    harvestPhotoFile,
+    clearHarvestPhoto,
     harvestWeightsInvalid,
     harvestWetValidation,
     harvestDryValidation,
@@ -2113,6 +2199,67 @@ export default function QuickLogAllActivitiesSection({
                   </div>
                   <div className="space-y-1">
                     <Label
+                      htmlFor={`${testIdPrefix}-harvest-photo`}
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      Photo (optional)
+                    </Label>
+                    <Input
+                      id={`${testIdPrefix}-harvest-photo`}
+                      data-testid={`${testIdPrefix}-harvest-photo`}
+                      ref={harvestPhotoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                      disabled={mutationBlocked || activitySaveInFlight}
+                      onChange={(e) => {
+                        if (isMutationBlocked()) return;
+                        const file = e.target.files?.[0] ?? null;
+                        const check = file ? validatePlantProfilePhotoFile(file) : null;
+                        if (check && !check.ok) {
+                          const failure = check as { ok: false; message: string };
+                          clearHarvestPhoto();
+                          setErrorReason(failure.message);
+                          setErrorForActivity("harvest");
+                          return;
+                        }
+                        setErrorReason(null);
+                        setErrorForActivity(null);
+                        harvestPhotoGenerationRef.current += 1;
+                        if (!file || !fileClaimsPng(file)) {
+                          setHarvestPhotoValidating(false);
+                          setHarvestPhotoFile(file);
+                          return;
+                        }
+                        const generation = harvestPhotoGenerationRef.current;
+                        setHarvestPhotoValidating(true);
+                        setHarvestPhotoFile(null);
+                        void validateQuickLogPngClaim(file).then(
+                          (content) => {
+                            if (generation !== harvestPhotoGenerationRef.current) return;
+                            setHarvestPhotoValidating(false);
+                            if (!content.ok) {
+                              clearHarvestPhoto();
+                              setErrorReason(content.message);
+                              setErrorForActivity("harvest");
+                              return;
+                            }
+                            setHarvestPhotoFile(file);
+                          },
+                          () => {
+                            if (generation !== harvestPhotoGenerationRef.current) return;
+                            clearHarvestPhoto();
+                            setErrorReason("That photo could not be read. Try a different file.");
+                            setErrorForActivity("harvest");
+                          },
+                        );
+                      }}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      A photo is optional. Saving without one still records the harvest activity.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label
                       htmlFor={`${testIdPrefix}-note`}
                       className="text-[11px] text-muted-foreground"
                     >
@@ -2176,6 +2323,7 @@ export default function QuickLogAllActivitiesSection({
                   onClick={handleSave}
                   disabled={
                     mutationBlocked ||
+                    activitySaveInFlight ||
                     !!activityPersistenceBlockReason(selected.id) ||
                     noContext ||
                     (selected.id === "photo" && photoAttachmentUncertain) ||
@@ -2183,6 +2331,7 @@ export default function QuickLogAllActivitiesSection({
                     selected.id === "manual_sensor_snapshot" ||
                     (requiresNote && note.trim().length === 0) ||
                     (selected.id === "harvest" && harvestWeightsInvalid) ||
+                    (selected.id === "harvest" && harvestPhotoValidating) ||
                     (selected.id === "photo" && !photoFile) ||
                     detailNumbersInvalid ||
                     (guidedSymptomCheck &&
@@ -2195,7 +2344,7 @@ export default function QuickLogAllActivitiesSection({
                   }
                   data-testid={`${testIdPrefix}-save`}
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {saving || activitySaveInFlight ? "Saving…" : "Save"}
                 </Button>
                 <Button
                   type="button"
@@ -2208,6 +2357,7 @@ export default function QuickLogAllActivitiesSection({
                     setPhotoFile(null);
                     setSelectedDraft(null);
                     setNote("");
+                    clearHarvestPhoto();
                     setGuidedSymptomCheck(false);
                     setGuidedSymptomStage(null);
                     setGuidedSymptomStageConfirmed(false);

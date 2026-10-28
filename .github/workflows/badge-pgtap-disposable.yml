@@ -131,6 +131,10 @@ jobs:
         shell: bash
         run: bash scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --force-session2-failure
 
+      - name: pgTAP — tent, setup, and harvest badges
+        shell: bash
+        run: bash scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_tent_setup_harvest.sql
+
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

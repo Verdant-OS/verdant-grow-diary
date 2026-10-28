@@ -12,11 +12,17 @@ vi.mock("@/lib/sensorReadingNormalizationRules", async (importOriginal) => {
     isVpdValid: (v: number | null) => v === null,
   };
 });
+// Manual air temperature (-10..50 °C) lives in manualAirTemperatureRules,
+// which quickLogV2SavePayload.ts also uses; reject everything there too.
+vi.mock("@/lib/manualAirTemperatureRules", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/manualAirTemperatureRules")>();
+  return { ...actual, isManualAirTemperatureValid: (v: number | null) => v === null };
+});
 
 import { assessQuickLogSensorSnapshotGate } from "@/lib/quickLogSensorSnapshotGateRules";
 
 describe("assessQuickLogSensorSnapshotGate canonical guard reuse", () => {
-  it("defers temperature, humidity and VPD bands to sensorReadingNormalizationRules", () => {
+  it("defers temperature to manualAirTemperatureRules and humidity/VPD to sensorReadingNormalizationRules", () => {
     const gate = assessQuickLogSensorSnapshotGate({
       temperatureInput: "77",
       humidityInput: "55",

@@ -1008,7 +1008,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(stored).not.toBe(75);
   });
 
-  it("Environment check manual Temperature rejects an out-of-band Fahrenheit entry (140°F ceiling, not the celsius 60 ceiling)", async () => {
+  it("Environment check manual Temperature rejects an out-of-band Fahrenheit entry (122°F ceiling, not the celsius 50 ceiling)", async () => {
     clearTemperatureUnitPreference();
     mountSection();
     selectActivity("environment_check");
@@ -1017,7 +1017,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       target: { value: "150" },
     });
     expect(screen.getByTestId("quick-log-all-activities-detail-temp_c-error")).toHaveTextContent(
-      /between 14 and 140/,
+      /between 14 and 122/,
     );
     expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));

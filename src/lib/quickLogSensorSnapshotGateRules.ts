@@ -2,34 +2,30 @@
  * Render-time gate for the Quick Log V2 sensor snapshot fields
  * (temperature / humidity / VPD) on every action that carries a snapshot.
  * Inputs are the raw typed strings; temperature is in the grower's unit.
- * Bands come from the canonical guards in sensorReadingNormalizationRules.ts
- * (the same guards quickLogV2SavePayload.ts uses, which stays authoritative),
- * applied after the shared °F → °C conversion (quickLogTypedTemperatureRules)
- * that the sheet's save seam also uses.
+ * Humidity/VPD bands come from the canonical guards in
+ * sensorReadingNormalizationRules.ts; temperature uses the manual air band
+ * (manualAirTemperatureRules, -10..50 °C). quickLogV2SavePayload.ts uses the
+ * same guards and stays authoritative. Applied after the shared °F → °C
+ * conversion (quickLogTypedTemperatureRules) that the sheet's save seam uses.
  */
 import type { TemperatureUnitPreference } from "./temperatureUnitPreference";
-import { isHumidityValid, isTemperatureValid, isVpdValid } from "./sensorReadingNormalizationRules";
-import { celsiusToFahrenheit } from "./temperatureUnits";
+import { isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import {
+  isManualAirTemperatureValid,
+  MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_CELSIUS,
+  manualAirTemperatureRangeMessage,
+} from "./manualAirTemperatureRules";
 import { convertTypedTemperatureToCelsius } from "./quickLogTypedTemperatureRules";
 
 export const QUICK_LOG_SNAPSHOT_HUMIDITY_RANGE_MESSAGE =
   "Humidity must be between 0 and 100%." as const;
 export const QUICK_LOG_SNAPSHOT_VPD_RANGE_MESSAGE = "VPD must be between 0 and 10 kPa." as const;
 export const QUICK_LOG_SNAPSHOT_TEMPERATURE_RANGE_MESSAGE_CELSIUS =
-  "Temperature must be between -10 and 60 °C." as const;
+  MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_CELSIUS;
 
-/** Snapshot temperature copy in the grower's unit (canonical band -10..60 °C). */
+/** Snapshot temperature copy in the grower's unit (manual air band -10..50 °C). */
 export function quickLogSnapshotTemperatureRangeMessage(unit: TemperatureUnitPreference): string {
-  if (unit === "fahrenheit") {
-    const low = formatFahrenheitBound(celsiusToFahrenheit(-10));
-    const high = formatFahrenheitBound(celsiusToFahrenheit(60));
-    return `Temperature must be between ${low} and ${high} °F.`;
-  }
-  return QUICK_LOG_SNAPSHOT_TEMPERATURE_RANGE_MESSAGE_CELSIUS;
-}
-
-function formatFahrenheitBound(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
+  return manualAirTemperatureRangeMessage(unit);
 }
 
 export type QuickLogSensorSnapshotGateField = "temperature" | "humidity" | "vpd";
@@ -67,7 +63,7 @@ export function assessQuickLogSensorSnapshotGate(input: {
   );
   if (
     temperature.kind === "unconvertible" ||
-    (temperature.kind === "celsius" && !isTemperatureValid(temperature.value))
+    (temperature.kind === "celsius" && !isManualAirTemperatureValid(temperature.value))
   ) {
     fields.temperature = quickLogSnapshotTemperatureRangeMessage(input.temperatureUnit);
   }

@@ -17,6 +17,7 @@
  *    can never disagree on what counts as a physically real reading.
  */
 import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { isManualAirTemperatureValid } from "./manualAirTemperatureRules";
 
 export type EnvironmentCheckWaterTempUnit = "F" | "C";
 
@@ -247,7 +248,7 @@ export function validateEnvironmentCheckSensorBand(
   const roomRaw = parseFinite(input.roomTempF);
   if (roomRaw !== null) {
     const roomC = input.roomTempUnit === "C" ? roomRaw : fahrenheitToCelsius(roomRaw);
-    if (!isTemperatureValid(roomC)) {
+    if (!isManualAirTemperatureValid(roomC)) {
       return { ok: false, reason: "temperature_out_of_range" };
     }
   }

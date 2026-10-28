@@ -48,7 +48,7 @@ describe("assessQuickLogWaterSaveGate", () => {
     });
     expect(gate.blocksSave).toBe(true);
     expect(gate.fields.volume).toBe("Applied volume must be a positive number of milliliters.");
-    expect(gate.fields.temperature).toBe("Temperature must be between 14 and 140 °F.");
+    expect(gate.fields.temperature).toBe("Temperature must be between 14 and 122 °F.");
     expect(gate.fields.humidity).toBe("Humidity must be between 0 and 100%.");
     expect(gate.fields.vpd).toBe("VPD must be between 0 and 10 kPa.");
     expect(gate.footerMessage).toBe(gate.fields.volume);
@@ -57,12 +57,12 @@ describe("assessQuickLogWaterSaveGate", () => {
   it("states the Celsius band when the grower enters Celsius", () => {
     const gate = assessQuickLogWaterSaveGate({
       form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "500" },
-      temperatureC: "61",
+      temperatureC: "51",
       humidityPct: "",
       vpdKpa: "",
       temperatureUnit: "celsius",
     });
-    expect(gate.fields.temperature).toBe("Temperature must be between -10 and 60 °C.");
+    expect(gate.fields.temperature).toBe("Temperature must be between -10 and 50 °C.");
     expect(gate.fields.volume).toBeUndefined();
   });
 

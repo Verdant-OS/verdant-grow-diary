@@ -75,7 +75,7 @@ describe("Quick Log sensor snapshot gate on Note", () => {
     fireEvent.change(screen.getByLabelText("RH (%)"), { target: { value: "150" } });
     fireEvent.change(screen.getByLabelText("VPD (kPa)"), { target: { value: "11" } });
     expect(screen.getByTestId("qlv2-temp-error")).toHaveTextContent(
-      "Temperature must be between 14 and 140 °F.",
+      "Temperature must be between 14 and 122 °F.",
     );
     expect(screen.getByTestId("qlv2-rh-error")).toHaveTextContent(
       "Humidity must be between 0 and 100%.",
@@ -84,7 +84,7 @@ describe("Quick Log sensor snapshot gate on Note", () => {
       "VPD must be between 0 and 10 kPa.",
     );
     expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
-      "Temperature must be between 14 and 140 °F.",
+      "Temperature must be between 14 and 122 °F.",
     );
     expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByTestId("qlv2-save"));
@@ -99,7 +99,7 @@ describe("Quick Log sensor snapshot gate on Note", () => {
     });
     fireEvent.change(screen.getByLabelText(/^Temp /), { target: { value: "0x10" } });
     expect(screen.getByTestId("qlv2-temp-error")).toHaveTextContent(
-      "Temperature must be between 14 and 140 °F.",
+      "Temperature must be between 14 and 122 °F.",
     );
     expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(true);
   });

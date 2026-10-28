@@ -6,7 +6,8 @@
 
 import type { QuickLogV2Action, ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { isQuickLogV2CriticalContentMissing } from "./quickLogV2Rules";
-import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { isManualAirTemperatureValid } from "./manualAirTemperatureRules";
 import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import { hasQuickLogMaturityEvidence } from "./quickLogMaturityEvidenceRules";
 import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEvidenceRules";
@@ -109,12 +110,13 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
   if (t === "invalid" || h === "invalid" || v === "invalid") {
     return { ok: false, reason: "invalid_sensor_value" };
   }
-  // Reconcile plausibility onto the single canonical band shared with v1 and
-  // the server trigger (temperature -10..60°C, humidity 0..100, VPD 0..10 kPa;
-  // null = not provided). Reusing the shared guards keeps a fat-fingered
-  // temperature or a physically impossible VPD out of the permanent diary
-  // entry, and stops this bound from drifting from the rest of the pipeline.
-  if (!isTemperatureValid(t)) {
+  // Reconcile plausibility onto the bands shared with v1 (manual air
+  // temperature -10..50°C, humidity 0..100, VPD 0..10 kPa; null = not
+  // provided). The server trigger accepts up to 60°C; the manual band is the
+  // stricter owner decision (manualAirTemperatureRules). Reusing the shared
+  // guards keeps a fat-fingered temperature or a physically impossible VPD
+  // out of the permanent diary entry.
+  if (!isManualAirTemperatureValid(t)) {
     return { ok: false, reason: "temperature_out_of_range" };
   }
   if (!isHumidityValid(h)) {

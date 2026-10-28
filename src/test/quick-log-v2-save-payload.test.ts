@@ -324,19 +324,19 @@ describe("quickLogV2SavePayload — canonical air-sensor bands", () => {
     expect(r.payload.p_vpd_kpa).toBe(0);
   });
 
-  it("accepts the upper canonical boundaries (60°C, 100%, 10 kPa)", () => {
+  it("accepts the upper boundaries (manual air 50°C, 100%, 10 kPa)", () => {
     const r = buildQuickLogV2SavePayload(
-      base({ temperatureC: "60", humidityPct: "100", vpdKpa: "10" }),
+      base({ temperatureC: "50", humidityPct: "100", vpdKpa: "10" }),
     );
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("expected ok");
-    expect(r.payload.p_temperature_c).toBe(60);
+    expect(r.payload.p_temperature_c).toBe(50);
     expect(r.payload.p_humidity_pct).toBe(100);
     expect(r.payload.p_vpd_kpa).toBe(10);
   });
 
   it("rejects just past each boundary (epsilon edge)", () => {
-    expect(reason({ temperatureC: "60.01" })).toBe("temperature_out_of_range");
+    expect(reason({ temperatureC: "50.01" })).toBe("temperature_out_of_range");
     expect(reason({ temperatureC: "-10.01" })).toBe("temperature_out_of_range");
     expect(reason({ vpdKpa: "10.01" })).toBe("vpd_out_of_range");
   });

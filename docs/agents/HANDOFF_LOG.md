@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### MANUAL-AIR-TEMP-BAND-50C
+
+```text
+TASK MANUAL-AIR-TEMP-BAND-50C  priority: P2  status: OPEN
+goal: Every grower-typed air temperature (Quick Log v1/v2 snapshot, Water form snapshot, Environment-check detail field, Sensors/Daily Check manual card) is refused outside -10..50 °C (14–122 °F), with copy in the grower's unit. The card refuses before Confirm instead of reporting "save is unconfirmed".
+why: Matthew chose -10..50 °C (2026-10-28) after a source check for the Case Files Ep07 handoff found two bands (-10..60 Quick Log, -10..50 card insert/correction RPC/quality badge). 2,462 °F on the card surfaced as "unconfirmed, retry", not a refusal.
+branch: claude/new-session-gqat8s
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-gqat8s verdant-grow-diary && git switch claude/new-session-gqat8s && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: read from the branch; draft
+head_sha: read the PR head; this commit cannot name itself
+state: pushed draft
+current_step: awaiting CI (35 required) and an independent exact-head review
+next_action: read CI at the PR head; fix any red in the touched files; then request an eligible independent reviewer (not this session)
+post_merge_check: on https://verdantgrowdiary.com once /version.json reports the merge SHA: Quick Log V2 Note snapshot with 123 °F shows "Temperature must be between 14 and 122 °F." and Save stays disabled (no save needed)
+active_writer: Claude session_017UoYKyF2kKTQuQzkLLpPqT
+decisions: scope "manual entry only" (Matthew, 2026-10-28): new pure src/lib/manualAirTemperatureRules.ts reuses AIR_TEMP_C_RANGE; isTemperatureValid (-10..60, mirrored into supabase/functions/_shared), webhook ingest, readers of stored rows, the environment_events DB guard and water_temp_c bands are unchanged. The unit-agnostic server-reason message names both units.
+tried_and_rejected: tightening isTemperatureValid itself (would change Edge mirror, webhook ingest and old-row readers); suppressing the typical-range warning when refused (unneeded behavior change)
+commands: bun test src/test/manual-air-temperature-rules.test.ts (bun's vitest shim; the frozen bun install 403s on the Lovable registry, vitest/tsc are not runnable locally)
+files_touched: src/lib/manualAirTemperatureRules.ts (new); src/lib/{quickLogSensorSnapshotGateRules,quickLogV2SavePayload,quickLogSaveErrorMessage,quickLogWaterSaveGateRules,quickLogWateringFormViewModel,environmentCheckQuickLogRules,quickLogActivityDetailFields,sensorReadingManualEntryRules}.ts; src/test/manual-air-temperature-rules.test.ts (new); 11 existing tests re-pinned (listed in the PR body)
+files_remaining: none unless CI finds more pins
+blockers: none for the PR; local typecheck/vitest BLOCKED (registry 403)
+open_questions: harmonizing Edge/webhook/DB guard to 50 is a separate owner decision (Edge + migration)
+gotchas: three re-pinned .tsx component tests and the canonical-guards mock test do not run under bun; only CI verifies them
+links: Case Files handoff 2026-10-28 §07 (owner document, not in repo)
+artifacts: PR body
+reviewer_seat: not assigned (this session excluded as author)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKyF2kKTQuQzkLLpPqT, 2026-10-28 16:10 CT (Matthew's decision and scope choice in session)
+owner: Claude session_017UoYKyF2kKTQuQzkLLpPqT
+last_updated: 2026-10-28 16:10 CT, by Claude
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

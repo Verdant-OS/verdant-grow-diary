@@ -198,9 +198,10 @@ describe("validateManualEntry with an explicit entry unit", () => {
     expect(f.warnings.some((w) => w.includes("50–100°F"))).toBe(true);
   });
 
-  it("warns but does not block a plausible-unit mix-up — the grower decides", () => {
+  it("warns about a plausible-unit mix-up and still refuses a °C value past 50", () => {
     const v = validateManualEntry({ airTemp: 75, airTempUnit: "C" });
-    expect(v.ok).toBe(true);
+    expect(v.ok).toBe(false);
+    expect(v.errors).toContain("Temperature must be between -10 and 50 °C.");
     expect(v.warnings.some((w) => w.includes("looks like a Fahrenheit value"))).toBe(true);
   });
 

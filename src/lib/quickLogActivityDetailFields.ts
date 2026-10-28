@@ -35,6 +35,7 @@
  */
 
 import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
+import { MANUAL_AIR_TEMP_MAX_C, MANUAL_AIR_TEMP_MIN_C } from "@/lib/manualAirTemperatureRules";
 import {
   celsiusToFahrenheit,
   fahrenheitToCelsius,
@@ -269,8 +270,8 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       key: "temp_c",
       label: "Temperature (manual)",
       kind: "number",
-      min: -10,
-      max: 60,
+      min: MANUAL_AIR_TEMP_MIN_C,
+      max: MANUAL_AIR_TEMP_MAX_C,
       unit: "°C",
       placeholder: "e.g. 24",
       placeholderF: "e.g. 75",
@@ -292,7 +293,7 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
 
 /**
  * Round-trip a Celsius plausibility bound to a whole-number Fahrenheit
- * bound for display/validation. -10°C/60°C are exact (14°F/140°F); the
+ * bound for display/validation. -10°C/50°C are exact (14°F/122°F); the
  * rounding guards any future non-exact bound.
  */
 function toFahrenheitBound(celsius: number): number {

@@ -104,7 +104,7 @@ describe("spec shape", () => {
     const rh = fields.find((f) => f.key === "humidity_pct")!;
     expect(temp.kind).toBe("number");
     expect(temp.min).toBe(-10);
-    expect(temp.max).toBe(60);
+    expect(temp.max).toBe(50);
     expect(temp.envelope).toBe("environment_check");
     expect(rh.min).toBe(0);
     expect(rh.max).toBe(100);
@@ -119,15 +119,15 @@ describe("spec shape", () => {
     )!;
     expect(celsiusTemp.unit).toBe("°C");
     expect(celsiusTemp.min).toBe(-10);
-    expect(celsiusTemp.max).toBe(60);
+    expect(celsiusTemp.max).toBe(50);
 
     const fFields = getQuickLogActivityDetailFields("environment_check", "fahrenheit");
     const fTemp = fFields.find((f) => f.key === "temp_c")!;
     const fRh = fFields.find((f) => f.key === "humidity_pct")!;
-    // -10°C/60°C are exact round Fahrenheit bounds: 14°F/140°F.
+    // -10°C/50°C are exact round Fahrenheit bounds: 14°F/122°F.
     expect(fTemp.unit).toBe("°F");
     expect(fTemp.min).toBe(14);
-    expect(fTemp.max).toBe(140);
+    expect(fTemp.max).toBe(122);
     expect(fTemp.placeholder).toBe("e.g. 75");
     // The storage key/envelope never change — only the display-facing fields.
     expect(fTemp.key).toBe("temp_c");
@@ -300,7 +300,7 @@ describe("validateQuickLogDetailNumberInput (blocking UI gate)", () => {
     expect(validateQuickLogDetailNumberInput(temp, "24").ok).toBe(true);
     const tooHot = validateQuickLogDetailNumberInput(temp, "999");
     expect(tooHot.ok).toBe(false);
-    expect(tooHot.error).toMatch(/between -10 and 60/);
+    expect(tooHot.error).toMatch(/between -10 and 50/);
     const tooHumid = validateQuickLogDetailNumberInput(rh, "150");
     expect(tooHumid.ok).toBe(false);
     expect(tooHumid.error).toMatch(/between 0 and 100/);
@@ -319,15 +319,15 @@ describe("validateQuickLogDetailNumberInput (blocking UI gate)", () => {
       (f) => f.key === "temp_c",
     )!;
     expect(validateQuickLogDetailNumberInput(fTemp, "75").ok).toBe(true);
-    // 5 is a plausible °C reading (well within -10..60) but below the
+    // 5 is a plausible °C reading (well within -10..50) but below the
     // Fahrenheit-adjusted 14°F floor — proves the bounds actually switched,
     // not just the label.
     const tooCold = validateQuickLogDetailNumberInput(fTemp, "5");
     expect(tooCold.ok).toBe(false);
-    expect(tooCold.error).toMatch(/between 14 and 140/);
+    expect(tooCold.error).toMatch(/between 14 and 122/);
     const tooHot = validateQuickLogDetailNumberInput(fTemp, "150");
     expect(tooHot.ok).toBe(false);
-    expect(tooHot.error).toMatch(/between 14 and 140/);
+    expect(tooHot.error).toMatch(/between 14 and 122/);
   });
 });
 

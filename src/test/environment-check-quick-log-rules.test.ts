@@ -235,9 +235,10 @@ describe("validateEnvironmentCheckSensorBand — canonical band, blocking (match
     expect(reason({ roomTempF: "-50" })).toBe("temperature_out_of_range");
   });
 
-  it("accepts the canonical temperature edges (-10°C = 14°F, 60°C = 140°F)", () => {
+  it("accepts the manual air temperature edges (-10°C = 14°F, 50°C = 122°F)", () => {
     expect(validateEnvironmentCheckSensorBand({ roomTempF: "14" }).ok).toBe(true);
-    expect(validateEnvironmentCheckSensorBand({ roomTempF: "140" }).ok).toBe(true);
+    expect(validateEnvironmentCheckSensorBand({ roomTempF: "122" }).ok).toBe(true);
+    expect(validateEnvironmentCheckSensorBand({ roomTempF: "123" }).ok).toBe(false);
   });
 
   it("reports the first offending metric deterministically (temperature before vpd)", () => {

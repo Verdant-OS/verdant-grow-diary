@@ -33,7 +33,7 @@ Evidence labels follow `CLAUDE.md` § Evidence discipline. Status words: `PASS`,
 | R3  | Separate permanent architecture from CURRENT_STATE operational facts  | Contract §0.1 already fences this; nothing operational is written into the contract by this session                                                                  |
 | R4  | Rejected/deferred alternatives                                        | Contract §12–§13 and spec §14 carry them; §10 below lists what this session adds to that record                                                                      |
 | R5  | Release topology only after overlapping PRs resolve                   | Gates `#2555`, `#2553`, `#1971`, `#2538` merged 2026-10-27; Matthew approved the stacked slice                                                                       |
-| R6  | No application code in the specification slice                        | `PASS`: one new Markdown file, seven corrected lines in `handoff-verdant-architecture-contract.md` (on Matthew's instruction, 2026-10-28), and one handoff-log block |
+| R6  | No application code in the specification slice                        | `PASS`: one new Markdown file, eight corrected lines in `handoff-verdant-architecture-contract.md` (on Matthew's instruction, 2026-10-28), and one handoff-log block |
 | R7  | PASS/FAIL/BLOCKED/NOT_MEASURED/NOT_APPLICABLE; one calibrated verdict | §12 and §14                                                                                                                                                          |
 
 Assumptions, each labelled:
@@ -157,8 +157,9 @@ Matthew's instruction):
 
 - `docs/audits/architecture-contract-post-merge-verification-2026-10-28.md` — this file.
 - `docs/agents/HANDOFF_LOG.md` — one block, `ARCH-CONTRACT-POST-MERGE-20261028`.
-- `handoff-verdant-architecture-contract.md` — rules 8 and 13, §5, Q2/Q4 and the lineage line: the
-  three assignment-text corrections, on Matthew's instruction (2026-10-28).
+- `handoff-verdant-architecture-contract.md` — rules 8 and 13, §5, Q2/Q4, the lineage line, the §13
+  re-attach checklist sentence and the audit footer count: the three assignment-text corrections, on
+  Matthew's instruction (2026-10-28), plus the review follow-ups that keep the file consistent with them.
 
 Not touched, by design: `docs/architecture-contract.md`, `docs/specs/release-topology-specification.md`
 (both merged via `#2564` 60 minutes before this audit; the two merges past the stamp, `#2559` and

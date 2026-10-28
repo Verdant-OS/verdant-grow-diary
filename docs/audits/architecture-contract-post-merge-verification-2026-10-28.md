@@ -157,8 +157,9 @@ This slice (docs only, one branch `claude/new-session-u6kn52`, one draft PR):
 - `docs/agents/HANDOFF_LOG.md` — one block, `ARCH-CONTRACT-POST-MERGE-20261028`.
 
 Not touched, by design: `docs/architecture-contract.md`, `docs/specs/release-topology-specification.md`
-(both merged via `#2564` 60 minutes before this audit; the next restamp owns the 609 / 941-940
-figures), `docs/agents/CURRENT_STATE.md`, any governance file, any file under `src/`, `supabase/`,
+(both merged via `#2564` 60 minutes before this audit; the two merges past the stamp, `#2559` and
+`#2028`, are application changes, not docs, and `#2564` re-read the cites they moved; the next restamp
+owns the 609 / 941-940 figures), `docs/agents/CURRENT_STATE.md`, any governance file, any file under `src/`, `supabase/`,
 `.github/`, `config/`.
 
 Proposed next slices, none started here (`PROPOSED — NOT ASSIGNED`):
@@ -198,15 +199,15 @@ Proposed next slices, none started here (`PROPOSED — NOT ASSIGNED`):
 
 ## 12. Deferred and rejected
 
-| Item                                                                 | Disposition  | Reason                                                                                                      |
-| -------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------- |
-| Writing a new Current Architecture Contract                          | REJECTED     | `#2564` merged it in place; AGENTS.md §9 one implementation                                                 |
-| Writing a new Release Topology Specification                         | REJECTED     | Same; fifth amendment merged in `#2564`                                                                     |
-| Restamping the contract again at `604274a7` for the 609 / 941 deltas | DEFERRED     | Two docs-only merges past the stamp; `#2564`'s post-stamp note already discloses them; next restamp owns it |
-| Closing the stale `ARCH-CONTRACT-RESTAMP` / `FIX-2146` log blocks    | NOT TAKEN    | `#2571` (opened 00:01 UTC) already does it                                                                  |
-| Running M1–M10 from this session                                     | BLOCKED      | Three egress routes refused once each                                                                       |
-| Next.js, Drizzle, tRPC, auth migration, provider/model change        | OUT OF SCOPE | Assignment; contract §12 already records Next.js as REJECTED                                                |
-| Nelson Rules, Modified Z-Score/MAD                                   | REJECTED     | Contract §12; AC-10.2 keeps them described as absent                                                        |
+| Item                                                                 | Disposition  | Reason                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Writing a new Current Architecture Contract                          | REJECTED     | `#2564` merged it in place; AGENTS.md §9 one implementation                                                                                                                                                                                                                                                                                                                                    |
+| Writing a new Release Topology Specification                         | REJECTED     | Same; fifth amendment merged in `#2564`                                                                                                                                                                                                                                                                                                                                                        |
+| Restamping the contract again at `604274a7` for the 609 / 941 deltas | DEFERRED     | Two **application** merges past the stamp (`#2559`, `#2028`: 35 commits, 86 non-docs files across pricing, checkout, host routing, timeline rendering and `supabase/functions/get-paddle-price/index.ts`); `#2564` already re-read the five cites they moved on the merged tree, and the census deltas are itemized in §4; the next restamp owns the figures. This receipt itself is docs only |
+| Closing the stale `ARCH-CONTRACT-RESTAMP` / `FIX-2146` log blocks    | NOT TAKEN    | `#2571` (opened 00:01 UTC) already does it                                                                                                                                                                                                                                                                                                                                                     |
+| Running M1–M10 from this session                                     | BLOCKED      | Three egress routes refused once each                                                                                                                                                                                                                                                                                                                                                          |
+| Next.js, Drizzle, tRPC, auth migration, provider/model change        | OUT OF SCOPE | Assignment; contract §12 already records Next.js as REJECTED                                                                                                                                                                                                                                                                                                                                   |
+| Nelson Rules, Modified Z-Score/MAD                                   | REJECTED     | Contract §12; AC-10.2 keeps them described as absent                                                                                                                                                                                                                                                                                                                                           |
 
 ## 13. Handoff to Grok as independent reviewer
 
@@ -251,8 +252,10 @@ disposition: draft PR, docs only; no merge, enqueue, publish or production actio
 
 **The assigned deliverables exist, are source-grounded at `27991451` with a disclosed post-stamp
 note for `0200d255`, and are merged with an independent exact-head PASS. This session's independent
-re-measurement at `604274a7` reproduces every census figure and every one of the eight stack
-verdicts, with the two post-stamp deltas explained to the file. Confidence: high for the repository
+re-measurement at `604274a7` reproduces the AC-3.2 figure (at `27991451` and at the tip), the AC-3.4
+figure at the tip (reconciled to `#2564`'s stamp figure by named files; not re-run at `27991451`),
+the AC-10.2 zero, and every one of the eight stack verdicts, with the two post-stamp deltas explained
+to the file. AC-4.3 is `NOT_MEASURED` here and its multi-line figure stays a carried `source claim`. Confidence: high for the repository
 claims (every one re-read from the named lines this session); none for production, which stays
 `BLOCKED`/`NOT_MEASURED` on every axis. Two statements in the assignment text are wrong against
 source and should not be repeated to the next implementer: AI Doctor is Gemini-direct, not a Lovable

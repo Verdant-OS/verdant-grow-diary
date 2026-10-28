@@ -212,6 +212,11 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason: `${blocked} ADDITIONALLY BROKEN: line 59 calls max(user_id) on a uuid column, and max(uuid) does not exist in PostgreSQL — proven on a throwaway PG 16.13 cluster (0 rows in pg_aggregate; "ERROR: function max(uuid) does not exist", with max(text) as a passing control). Note it is not necessarily the FIRST error: without psql variables the file dies earlier at "syntax error at or near \\":\\"". Wiring this lane will not make this suite pass.`,
   };
+  out["supabase/tests/badge_awards_first_tent_reearn.sql"] = {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Cut 001 AC6 local pgTAP: First Tent hides when the earliest tent is deleted and restores when a new earliest tent has an owned photo, reusing the award row. Same CI wiring gap as other badge pgTAP files. Static contract pins live in src/test/badge-awards-first-tent-reearn-harness-static.test.ts.",
+  };
   return out;
 }
 
@@ -315,7 +320,7 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 21,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 22,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 2,

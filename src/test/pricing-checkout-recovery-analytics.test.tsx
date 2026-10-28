@@ -52,16 +52,6 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 
-vi.mock("@/hooks/useFounderSlotsRemaining", () => ({
-  useFounderSlotsRemaining: () => ({
-    status: "ready" as const,
-    remaining: 25,
-    total: 100,
-    claimed: 75,
-    soldOut: false,
-  }),
-}));
-
 vi.mock("@/components/SubscriberInterestForm", () => ({
   default: () => null,
 }));

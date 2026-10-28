@@ -57,7 +57,12 @@ export const PRIVILEGED_ROUTE_PREFIXES = [
 export const PUBLIC_CORE_CENSUS_ROUTES = [
   { path: "/auth", label: "Authentication", fieldPolicy: "fill-safe-fields" },
   { path: "/pricing", label: "Pricing", fieldPolicy: "audit-only" },
-  { path: "/founder", label: "Founder Lifetime", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/founder",
+    expectedPathname: "/pricing",
+    label: "Former Founder page redirects to pricing",
+    fieldPolicy: "audit-only",
+  },
   {
     path: "/checkout/success",
     label: "Checkout success return",
@@ -421,7 +426,6 @@ export function visibleLinkByHrefSelector(href: string): string {
 
 const READ_ONLY_EDGE_FUNCTIONS = new Set([
   "environment-summary-report-entitlement",
-  "founder-slots-remaining",
   "live-sensor-entitlement",
   "premium-export-entitlement",
 ]);

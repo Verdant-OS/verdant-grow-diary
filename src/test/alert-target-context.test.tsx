@@ -373,9 +373,13 @@ describe("static safety", () => {
     });
   }
 
-  it("hook is read-only selects of id,name", () => {
-    expect(HOOK_SRC).toMatch(/\.from\(["']tents["']\)\.select\(["']id,name,grow_id["']\)/);
-    expect(HOOK_SRC).toMatch(/\.from\(["']plants["']\)\.select\(["']id,name["']\)/);
+  it("hook is read-only selects of id,name (+ is_archived for VER-300 labels)", () => {
+    expect(HOOK_SRC).toMatch(
+      /\.from\(["']tents["']\)\.select\(["']id,name,grow_id,is_archived["'], \{ count: "exact" \}\)/,
+    );
+    expect(HOOK_SRC).toMatch(
+      /\.from\(["']plants["']\)\.select\(["']id,name,is_archived["'], \{ count: "exact" \}\)/,
+    );
   });
 
   it("evidence hook is read-only selects of linked snapshot/diary ids", () => {

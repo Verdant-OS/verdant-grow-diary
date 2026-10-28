@@ -522,6 +522,10 @@ export default function Alerts() {
                         plantNameById: targetNames.plantNameById,
                         linkedEvidence: linkedTargets.evidenceByAlertId.get(a.id) ?? [],
                         singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+                        tentStateById: targetNames.tentStateById,
+                        plantStateById: targetNames.plantStateById,
+                        namesReady:
+                          targetNames.status === "ok" && targetNames.readComplete === true,
                         namesLoading: targetNames.status === "loading",
                         idsLoading: linkedTargets.idsLoading,
                       })}
@@ -677,6 +681,8 @@ function AlertCard({
           idsLoading={targetInput.idsLoading}
           linkedEvidence={targetInput.linkedEvidence}
           singleTentId={targetInput.singleTentId}
+          tentState={targetInput.tentState}
+          plantState={targetInput.plantState}
           variant="compact"
         />
         <AlertWhyContext alert={a} variant="compact" />

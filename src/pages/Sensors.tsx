@@ -930,6 +930,7 @@ export default function Sensors() {
       {(hasReadings || !manualHistoryIncomplete) && (
         <SensorSourceSummaryWidget
           className="mt-4 max-w-xl"
+          options={{ now: nowMs }}
           readings={filtered.map((r) => ({
             source: (r as unknown as { source?: string | null }).source ?? null,
             captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,

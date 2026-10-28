@@ -1,7 +1,8 @@
 /**
  * SensorSourceSummaryWidget — read-only summary card that shows how
  * many sensor readings came from each canonical source for the supplied
- * readings/date range.
+ * readings/date range, plus a separate freshness line (Fresh / Stale /
+ * Unknown) computed by the same rule as the Dashboard badges (VER-299).
  *
  * Rows with count > 0 link to the Timeline filtered by that source
  * (and optional date range / plant). Rows with count = 0 stay visible
@@ -18,6 +19,9 @@ import {
 } from "@/constants/sensorSourceLabels";
 import {
   SENSOR_SOURCE_SUMMARY_EMPTY_TEXT,
+  SENSOR_SOURCE_SUMMARY_FRESHNESS_LABEL,
+  SENSOR_SOURCE_SUMMARY_FRESHNESS_LEGEND,
+  SENSOR_SOURCE_SUMMARY_FRESHNESS_ORDER,
   summarizeSensorSources,
   type SensorSourceSummaryOptions,
   type SensorSourceSummaryReading,
@@ -143,6 +147,26 @@ export default function SensorSourceSummaryWidget({
           <p className="text-[11px] text-muted-foreground">
             {summary.total} {summary.total === 1 ? "reading" : "readings"} in this period
           </p>
+          {!summary.isEmpty && (
+            <p
+              className="text-[11px] text-muted-foreground"
+              data-testid="sensor-source-summary-freshness"
+              aria-label="Reading freshness"
+            >
+              {SENSOR_SOURCE_SUMMARY_FRESHNESS_ORDER.map((bucket, i) => (
+                <span key={bucket} title={SENSOR_SOURCE_SUMMARY_FRESHNESS_LEGEND[bucket]}>
+                  {i > 0 ? " · " : null}
+                  {SENSOR_SOURCE_SUMMARY_FRESHNESS_LABEL[bucket]}{" "}
+                  <span
+                    className="tabular-nums font-semibold"
+                    data-testid={`sensor-source-summary-freshness-count-${bucket}`}
+                  >
+                    {summary.freshness[bucket]}
+                  </span>
+                </span>
+              ))}
+            </p>
+          )}
         </div>
         <SensorSourceLegendTooltip testIdSuffix="summary" />
       </header>

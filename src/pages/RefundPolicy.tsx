@@ -39,7 +39,7 @@ export default function RefundPolicy() {
       <h2>What is refundable</h2>
       <ul>
         <li>Monthly and annual Pro subscription fees within the 30-day window.</li>
-        <li>One-time purchases (including Founder Lifetime) within the 30-day window.</li>
+        <li>One-time purchases within the 30-day window.</li>
       </ul>
 
       <h2>Subscription cancellation</h2>

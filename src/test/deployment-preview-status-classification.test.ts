@@ -24,7 +24,7 @@ const ENFORCE_STEP = "Enforce overall preview verdict";
 
 type Step = { name?: string; run?: string; env?: Record<string, string> };
 type Workflow = {
-  concurrency?: { "cancel-in-progress"?: boolean };
+  concurrency?: { "cancel-in-progress"?: boolean | string };
   jobs: Record<string, { if?: string; steps: Step[] }>;
 };
 
@@ -96,7 +96,9 @@ describe("deployment-preview status job in a superseded run", () => {
   // that was not cancelled still reports, because `!cancelled()` is true there.
   it("skips publishing when the run was cancelled, and still runs after a failure", () => {
     const doc = load(readFileSync(WORKFLOW, "utf8")) as Workflow;
-    expect(doc.concurrency?.["cancel-in-progress"]).toBe(true);
+    expect(doc.concurrency?.["cancel-in-progress"]).toBe(
+      "${{ github.event_name == 'pull_request' }}",
+    );
     const condition = doc.jobs["publish-preview-status"].if ?? "";
     expect(condition).toContain("!cancelled()");
     expect(condition).not.toContain("always()");

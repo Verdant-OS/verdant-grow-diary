@@ -83,6 +83,16 @@ export function getPlantDropdownHelperText(
   visibility: PlantDropdownVisibility,
   opts: PlantDropdownHelperOptions = {},
 ): string {
+  if (
+    visibility.visible === 0 &&
+    visibility.hiddenAlreadyInTent === 1 &&
+    visibility.hiddenArchived === 0 &&
+    visibility.hiddenCrossGrow === 0 &&
+    visibility.hiddenMissingGrow === 0 &&
+    visibility.hiddenSourcePlant === 0
+  ) {
+    return "This tent's only plant is already here.";
+  }
   const v = visibility.visible;
   const verb = v === 1 ? "plant" : "plants";
   let head = `Showing ${v} active ${verb}`;

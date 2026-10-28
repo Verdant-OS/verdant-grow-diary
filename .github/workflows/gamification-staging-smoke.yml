@@ -34,6 +34,11 @@ on:
   push:
     branches: [main]
 
+# Push to the dormant base ref only. Do not cancel an in-progress smoke run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   gamification-staging-smoke:
     name: Gamification RLS + award_nugs smoke (staging)

@@ -1,10 +1,11 @@
+import { PRIVACY_PAGE_LAST_UPDATED } from "@/constants/agreements";
 import { LegalPageShell } from "./legal/LegalPageShell";
 
 export default function PrivacyPolicy() {
   return (
     <LegalPageShell
       title="Privacy Policy"
-      lastUpdated="July 9, 2026"
+      lastUpdated={PRIVACY_PAGE_LAST_UPDATED}
       path="/privacy"
       description="Privacy Policy for Verdant Grow Diary — what data is collected and why, retention, your rights, and Paddle's role as Merchant of Record payment processor."
     >
@@ -83,8 +84,22 @@ export default function PrivacyPolicy() {
           function, and email delivery providers used to run the Service.
         </li>
         <li>
-          <strong>Analytics</strong> — privacy-respecting analytics used to understand aggregate
-          usage. See "Cookies" below.
+          <strong>Analytics</strong> — consent-gated Google Analytics and Ahrefs Web Analytics used
+          to understand aggregate usage. See "Cookies" below.
+        </li>
+        <li>
+          <strong>Error reporting — Sentry (Functional Software, Inc.)</strong> — on our production
+          website, when the app hits an unexpected error, the error report is sent to Sentry so we
+          can fix bugs. Error reporting is separate from analytics and runs whether or not you
+          accept analytics. Before a report leaves your browser we remove user details, cookies,
+          request headers and bodies, URL query strings, and error message text. We replace IDs in
+          page addresses, keep only the file name and line or column number of each stack frame, and
+          drop activity trail entries that contain text or data. A report can still include the
+          cleaned page path, the error type, the app version, and basic technical details about the
+          error. Like any request from your browser, Sentry receives your IP address in transit. We
+          do not add it to the report. How long Sentry keeps error reports and whether it stores IP
+          addresses depend on Sentry project settings we have not yet confirmed. We will update this
+          policy once they are confirmed.
         </li>
         <li>
           <strong>Professional advisers</strong> — legal, accounting, or insurance advisers where
@@ -112,6 +127,8 @@ export default function PrivacyPolicy() {
         We retain personal data for as long as your account is active and for a reasonable period
         afterwards to meet legal, tax, and audit obligations. When data is no longer needed we
         delete or anonymize it. You can request export or deletion of your grow content at any time.
+        Error reports sent to Sentry are covered in section 4; their retention period is not yet
+        confirmed.
       </p>
 
       <h2>7. Your rights</h2>

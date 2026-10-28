@@ -61,6 +61,8 @@ export interface NutrientInputs {
   sourceWaterEc: number | null;
   targetEc: number | null;
   measuredMixedEc: number | null;
+  /** Provenance for the optional comparison reading; this client-only field is grower-entered. */
+  measuredMixedEcSource: "manual";
   ecParts: EcPartInput[];
   /** Grower-entered planning notes only; never used to infer nutrient dose. */
   elementalTargetsPpm: ElementalTargetsPpmInput;
@@ -186,6 +188,7 @@ export function createDefaultGrowHelpToolkitState(): GrowHelpToolkitState {
       sourceWaterEc: null,
       targetEc: null,
       measuredMixedEc: null,
+      measuredMixedEcSource: "manual",
       ecParts: [{ id: "ec-1", name: "Part A", ecPerMlPerL: null, ratio: 1 }],
       elementalTargetsPpm: {
         nitrogen: null,
@@ -398,6 +401,7 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       sourceWaterEc: asNullableNumber(nutrient.sourceWaterEc, null),
       targetEc: asNullableNumber(nutrient.targetEc, null),
       measuredMixedEc: asNullableNumber(nutrient.measuredMixedEc, null),
+      measuredMixedEcSource: asEnum(nutrient.measuredMixedEcSource, ["manual"] as const, "manual"),
       ecParts: ecParts.length > 0 ? ecParts : defaults.nutrient.ecParts,
       elementalTargetsPpm: {
         nitrogen: asNullableNumber(elementalTargetsPpm.nitrogen, null),

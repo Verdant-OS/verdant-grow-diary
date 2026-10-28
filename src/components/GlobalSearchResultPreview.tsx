@@ -163,29 +163,17 @@ export default function GlobalSearchResultPreview({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-        <span
-          className={cn(
-            "rounded-sm border px-1.5 py-0.5 font-medium",
-            row.match_kind === "exact"
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : row.match_kind === "prefix"
-                ? "border-foreground/20 bg-muted text-foreground/80"
-                : "border-border bg-transparent",
-          )}
+      {query.trim().length > 0 ? (
+        <div
+          className="flex flex-wrap items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground"
           data-testid="global-search-preview-match-kind"
+          data-match-kind={row.match_kind}
+          data-rank={row.rank}
+          data-score={row.score.toFixed(2)}
         >
-          {row.match_kind}
-        </span>
-        <span className="tabular-nums" data-testid="global-search-preview-score">
-          r{row.rank}·{row.score.toFixed(2)}
-        </span>
-        {query.trim().length > 0 ? (
-          <span className="normal-case tracking-normal text-muted-foreground">
-            for “{query.trim()}”
-          </span>
-        ) : null}
-      </div>
+          <span className="text-muted-foreground">for “{query.trim()}”</span>
+        </div>
+      ) : null}
 
       <p
         className="text-xs leading-snug text-muted-foreground"

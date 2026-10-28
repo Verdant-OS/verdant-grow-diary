@@ -78,16 +78,16 @@ why: The review reported 559 impressions for July 29-October 27 with freshness u
 branch: claude/october-27-seo-review-4zbdgy
 base: verdant-grow-diary
 checkout: git fetch origin claude/october-27-seo-review-4zbdgy verdant-grow-diary && git switch claude/october-27-seo-review-4zbdgy
-pr: NOT_MEASURED (opened as a draft after the first push; read the branch's PR)
-head_sha: read the PR; this block is written before the first push
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2600
+head_sha: 8be2ebd205d02af3c21a2055a56628814a90f8bb, remote observed 2026-10-28 17:53 CT. This block update follows it as its child; re-read the PR for the current exact head before resuming.
 state: pushed draft (docs only)
 current_step: receipt written at docs/seo/gsc-ahrefs-measurement-reconciliation-2026-10-28.md
-next_action: Owner re-syncs Search Console in Ahrefs project 10225273 and names the linked GSC property; then re-run gsc-performance-history and supersede the receipt once a row dated 2026-10-02 or later appears.
+next_action: Owner re-syncs Search Console in Ahrefs project 10225273.
 post_merge_check: NOT_APPLICABLE (docs-only measurement receipt; no shipped behavior)
 active_writer: Claude (this session); only the holder pushes
 decisions: Docs-only receipt. Did not edit CURRENT_STATE (GSC row stays BLOCKED until the owner names the property). Did not touch #2259, #2561/#2543, #2549, #2597 or Quick Log structured data.
 tried_and_rejected: Live curl re-check of canonicals/sitemap was refused by a local plugin network hook; not worked around.
-commands: Ahrefs MCP read-only calls listed in the receipt's Reproduce section; node scripts/assert-docs-safety.mjs
+commands: Ahrefs MCP (read-only): management-projects {}; site-audit-projects {}; gsc-performance-history {project_id: 10225273, date_from: "2026-07-29", date_to: "2026-10-28", history_grouping: "daily", search_type: "web"}; gsc-pages {project_id: 10225273, date_from: "2026-07-29", date_to: "2026-10-27", search_type: "web", limit: 100}; gsc-keywords {same arguments as gsc-pages}. Repo check: node scripts/assert-docs-safety.mjs
 files_touched: docs/seo/gsc-ahrefs-measurement-reconciliation-2026-10-28.md docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: GSC property identity and the Ahrefs GSC sync (owner, Ahrefs project settings)
@@ -98,9 +98,9 @@ artifacts: docs/seo/gsc-ahrefs-measurement-reconciliation-2026-10-28.md
 reviewer_seat: an eligible independent session under OWNERSHIP.md section 4.3 (docs-only; Graft's low-risk allowlist may apply)
 reviewer_sha: none yet
 session_state: no routines, no paused workflows; pending owner decision on GSC property and Ahrefs project of record
-claimed_by: Claude, 2026-10-28 CT
+claimed_by: Claude, 2026-10-28 17:45 CT (first push of this block)
 owner: Claude
-last_updated: 2026-10-28, by Claude
+last_updated: 2026-10-28 17:53 CT, by Claude
 ```
 
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540

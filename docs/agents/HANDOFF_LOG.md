@@ -78,7 +78,7 @@ why: Matthew's architecture/specification assignment (2026-10-27) was already de
 branch: claude/new-session-u6kn52
 base: verdant-grow-diary at 604274a793b0b38320a09de246bd8c4d166089ad
 checkout: git fetch origin claude/new-session-u6kn52 verdant-grow-diary && git switch claude/new-session-u6kn52 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read the PR URL from GitHub after the first push
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2572 (draft)
 head_sha: read origin/claude/new-session-u6kn52; this commit cannot name its own SHA
 state: pushed draft, docs only
 current_step: Receipt written: AC-3.2 610 at 27991451 -> 609 at the tip (#2028 deleted founderShareRules.ts); AC-3.4 941 statements / 940 files at the tip, reconciled to #2564's 940/939 by named files; AC-10.2 zero hits; eight stack rows re-read (rows "Lovable gateway", "npm compatibility may remain" and "billing_subscriptions" FAIL against source). Live M1/M2/M7/M10 BLOCKED on all three egress routes.
@@ -482,7 +482,7 @@ why: The standalone HTML log needs the same public-route, sitemap, and consent-g
 branch: cursor/athena-feed-chart-log-431f
 base: verdant-grow-diary
 checkout: git fetch origin cursor/athena-feed-chart-log-431f verdant-grow-diary && git switch cursor/athena-feed-chart-log-431f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read the PR URL from GitHub after the first push
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2572 (draft)
 head_sha: 2db14d480136d50737460569b2e7d62e9a496023, the formula-guard commit and the parent of the commit that records this line. Read origin/cursor/athena-feed-chart-log-431f for the exact PR head.
 state: pushed draft once this commit is on the remote
 current_step: APP_ROUTES lists /guides/athena-feed-chart-log before /guides/grow-stage-care-guide so the path sort matches Array.sort. The CSV download appends the anchor, clicks it without preventDefault, and revokes the object URL on the next turn. escapeCsvField prefixes a cell that starts with = + - @ tab or CR with a single quote. e2e/athena-feed-chart-log-csv.spec.ts runs from .github/workflows/mocked-e2e-unwired-closure.yml. The latest verdant-grow-diary was merged with a normal merge.
@@ -826,7 +826,7 @@ why: Unpushed session state and SHA-unbound passes leave the next agent unable t
 branch: cursor/handoff-continuity-a798
 base: verdant-grow-diary
 checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2572 (draft) (a commit cannot name its own SHA or the PR number created after it)
 head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
 state: pushed draft once this commit is on the remote
 current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry

@@ -537,7 +537,6 @@ export default function StartYourRoom() {
         { id: plantRowId, user_id: user.id, ...plantPayload },
       );
       if (ownerIdRef.current !== saveOwnerId || !confirmedPlant) return;
-      releaseRowId("plant");
       // Fail closed if binding somehow dropped (should never happen with payload).
       if (!confirmedPlant.row.grow_id) {
         setError(
@@ -557,6 +556,9 @@ export default function StartYourRoom() {
       if (ownerIdRef.current !== saveOwnerId) return;
       const plantId = confirmedPlant.row.id;
       setIds({ growId, tentId, plantId });
+      // Hold the retry id until the plant id is recorded: a reload during the
+      // refresh above must retry this same row, not insert a second plant.
+      releaseRowId("plant");
       toast.success("Plant created and linked");
       // Persist diary-first start screen so next login skips empty onboarding.
       setStartScreenChoice(user.id, "quickLog");

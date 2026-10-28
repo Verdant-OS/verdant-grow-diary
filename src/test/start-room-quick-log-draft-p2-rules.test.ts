@@ -8,6 +8,7 @@ import {
 import {
   adoptablePendingGrowId,
   isStartRoomRetryableSaveError,
+  parseStartYourRoomDraft,
   plainStartRoomSaveError,
   startRoomSaveErrorWithReason,
 } from "@/lib/startYourRoomDraftRules";
@@ -104,5 +105,27 @@ describe("adoptablePendingGrowId", () => {
     expect(adoptablePendingGrowId({ ...base, growId: "g0" })).toBeNull();
     expect(adoptablePendingGrowId({ ...base, ownedGrowIds: ["g2"] })).toBeNull();
     expect(adoptablePendingGrowId({ ...base, pendingGrowId: null })).toBeNull();
+  });
+});
+
+describe("parseStartYourRoomDraft plant stage (Copilot review)", () => {
+  const stored = (plantStage: unknown) =>
+    parseStartYourRoomDraft({
+      step: "plant",
+      form: { growName: "", tentName: "", plantName: "Plant 1", plantStage },
+      ids: { growId: null, tentId: null, plantId: null },
+      pendingRowIds: { grow: null, tent: null, plant: null },
+      saveError: null,
+    })?.form.plantStage;
+
+  it("keeps a stage the form offers", () => {
+    expect(stored("veg")).toBe("veg");
+    expect(stored("flower")).toBe("flower");
+  });
+
+  it("falls back to seedling for an unknown or missing stage", () => {
+    expect(stored("bogus")).toBe("seedling");
+    expect(stored(undefined)).toBe("seedling");
+    expect(stored(3)).toBe("seedling");
   });
 });

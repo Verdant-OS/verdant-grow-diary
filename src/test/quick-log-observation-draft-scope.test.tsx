@@ -102,7 +102,11 @@ function renderMountedSheet(target: string | null, open: boolean) {
   return { rerender: (t: string | null, o: boolean) => view.rerender(tree(t, o)) };
 }
 
-const storedDraftText = () => Object.values(window.sessionStorage).join("");
+const storedDraftText = () =>
+  Array.from({ length: window.sessionStorage.length }, (_, i) => {
+    const key = window.sessionStorage.key(i);
+    return key ? (window.sessionStorage.getItem(key) ?? "") : "";
+  }).join("");
 
 async function failNoteOn(target: string, reason: string) {
   rpcMock.mockResolvedValue({ data: { ok: false, reason }, error: null });

@@ -334,6 +334,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           { label: "Understand sensor truth", to: "/guides/sensor-truth-grow-room" },
           { label: "Open the stage-aware VPD calculator", to: "/tools/vpd-calculator" },
           { label: "VPD chart by growth stage", to: "/vpd-chart" },
+          {
+            label: "Check your tent and fix high or low RH",
+            to: "/guides/grow-tent-temperature-humidity-chart",
+          },
         ],
       },
       {
@@ -1464,6 +1468,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         body: "The classic triggers are sustained high humidity above roughly 60% in late flower, cool overnight temperatures that push relative humidity even higher, dense canopies with poor airflow, wet foliage from foliar sprays or condensation, and dense colas that trap moisture inside. Verdant does not adjust your fans, dehumidifier, or lights. It surfaces the pattern — a source-labeled humidity reading holding above your target, or a VPD number sliding out of range overnight — so the grower can decide whether to defoliate lightly, improve airflow, or pull affected buds.",
         links: [
           { label: "Grow-room VPD tracker guide", to: "/guides/grow-room-vpd-tracker" },
+          {
+            label: "Grow tent temperature and humidity chart",
+            to: "/guides/grow-tent-temperature-humidity-chart",
+          },
           { label: "Open Environment Check", to: "/quick-log" },
         ],
       },

@@ -33,6 +33,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/grow-help-toolkit`,
   },
   {
+    path: "/guides/grow-tent-temperature-humidity-chart",
+    expectTitle: /Grow Tent Temperature & Humidity Chart/,
+    canonical: `${ORIGIN}/guides/grow-tent-temperature-humidity-chart`,
+  },
+  {
     path: "/guides/athena-feed-chart-log",
     expectTitle: /Athena Feed Chart Log/,
     canonical: `${ORIGIN}/guides/athena-feed-chart-log`,

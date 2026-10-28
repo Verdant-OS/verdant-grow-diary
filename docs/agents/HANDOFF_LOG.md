@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GUIDE-GROW-TENT-TEMPERATURE-HUMIDITY-CHART
+
+```text
+TASK GUIDE-GROW-TENT-TEMPERATURE-HUMIDITY-CHART  priority: other  status: OPEN
+goal: port the founder-supplied climate-chart HTML to the public route /guides/grow-tent-temperature-humidity-chart, same pattern as /guides/when-to-harvest-cannabis.
+why: Matthew (2026-10-28) asked for the guide as one ready-for-review PR against verdant-grow-diary.
+branch: claude/guide-grow-tent-temperature-humidity-chart
+base: verdant-grow-diary
+checkout: git fetch origin claude/guide-grow-tent-temperature-humidity-chart verdant-grow-diary && git switch claude/guide-grow-tent-temperature-humidity-chart && git merge origin/verdant-grow-diary
+pr: read from the PR list for branch claude/guide-grow-tent-temperature-humidity-chart
+head_sha: read the current head from the PR (first push follows this line)
+state: pushed, PR ready for review
+current_step: awaiting CI and an independent exact-head review
+next_action: independent exact-head review of the PR head (author: this Claude session; exclude it); founder decision on the late-flower band split noted below
+post_merge_check: after Publish, https://verdantgrowdiary.com/guides/grow-tent-temperature-humidity-chart returns the page with the H1 "Grow Tent Temperature & Humidity Chart: Check Your Tent and Fix RH" and /version.json reports the merge SHA; else NOT_MEASURED
+active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+decisions: stage bands and the VPD formula are imported from publicVpdChartRules (the live /vpd-chart), as the brief's consistency rule requires; /tools/vpd-calculator agrees on three stages but uses 1.1-1.5 kPa for late flower against the chart's 1.2-1.6, a pre-existing split pinned by a test and left for the founder. Chart example VPDs are computed by the shared formula (the source printed every 75 F value 0.01-0.02 kPa high); 75 F / 60 % late flower computes to 1.19 kPa, outside its band, so that example is 59 % (1.22 kPa). climate_tool_checked is throttled to one event per 2 s (leading edge) instead of the source's 2 s debounce. CSV reuses the Athena escapeCsvField; TSV copy neutralizes formula leads. Copy and FAQ are verbatim; JSON-LD has no ratings.
+tried_and_rejected: matching /tools/vpd-calculator's late-flower band; it would contradict the visible copy, FAQ and the /vpd-chart page linked twice from this guide.
+commands: bun run typecheck (NODE_OPTIONS=--max-old-space-size=8192 here); bunx vitest run src/test/grow-tent-climate-*.ts* src/test/route-indexation-matrix.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx --reporter=dot
+files_touched: src/lib/growTentClimateRules.ts src/lib/growTentClimateAnalytics.ts src/pages/GrowTentTemperatureHumidityChart.tsx src/routes/guides.grow-tent-temperature-humidity-chart.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/constants/verdantSeoContent.ts src/pages/GuidesIndex.tsx src/styles.css public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts and the guide/SEO tests
+files_remaining: none
+blockers: none
+open_questions: late-flower band split between /vpd-chart and /tools/vpd-calculator (founder); "fix your RH" link from /vpd-chart is in the brief but not in this PR
+gotchas: the Keep reading link to /guides/when-to-harvest-cannabis resolves only after #2592 merges; sibling guide PRs edit the same registration files, styles.css hunk and matrix counts, so whichever merges later needs a base merge and recount.
+links: NOT_MEASURED
+artifacts: PR checks
+reviewer_seat: unassigned (eligible independent reviewer per OWNERSHIP.md 4.3)
+reviewer_sha: none
+session_state: no routines, no paused workflows
+claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-28 10:20 UTC
+owner: Claude
+last_updated: 2026-10-28 05:20 CT, by Claude
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

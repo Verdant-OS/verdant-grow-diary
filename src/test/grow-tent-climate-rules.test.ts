@@ -7,6 +7,20 @@ import {
   calculateGrowTentNudgeRh,
   parseGrowTentClimateInputs,
   shouldEmitThrottled,
+  GROW_TENT_CLIMATE_EXAMPLE_PAIRS,
+  growTentExampleLines,
+  GROW_TENT_CLIMATE_FAQ,
+  GROW_TENT_CLIMATE_QUICK_ANSWER,
+  buildGrowTentClimateCsv,
+  buildGrowTentClimateReading,
+  buildGrowTentClimateTsv,
+  formatGrowTentDateTime,
+  growTentBandBarGeometry,
+  growTentClimateCsvFilename,
+  growTentLocalDateTimeInput,
+  summarizeGrowTentClimateLog,
+  type GrowTentClimateReading,
+  type GrowTentLights,
 } from "@/lib/growTentClimateRules";
 import { PUBLIC_VPD_CHART_STAGES } from "@/lib/publicVpdChartRules";
 import { getVpdTargetBand } from "@/lib/vpdStageTargetRules";
@@ -141,5 +155,160 @@ describe("shouldEmitThrottled", () => {
   it("honours a custom window", () => {
     expect(shouldEmitThrottled(0, 499, 500)).toBe(false);
     expect(shouldEmitThrottled(0, 500, 500)).toBe(true);
+  });
+});
+
+function reading(
+  id: number,
+  airF: string,
+  rh: string,
+  offsetF: string,
+  stage: string,
+  lights: GrowTentLights = "Lights on",
+  note = "",
+): GrowTentClimateReading {
+  const inputs = parseGrowTentClimateInputs(airF, rh, offsetF, stage);
+  return buildGrowTentClimateReading(id, inputs, lights, "2026-10-28 09:00", note);
+}
+
+describe("example °F/RH pairs in the chart copy", () => {
+  it("sit inside their stage band by the shared formula", () => {
+    for (const stage of GROW_TENT_CLIMATE_STAGES) {
+      const pairs = GROW_TENT_CLIMATE_EXAMPLE_PAIRS[stage.id];
+      expect(pairs).toHaveLength(6);
+      for (const pair of pairs) {
+        const vpd = calculateGrowTentVpd(pair.airF, pair.rh, 0);
+        expect(evaluateGrowTentBandStatus(vpd, stage.id).code).toBe("in_band");
+      }
+    }
+  });
+
+  it("render example lines with formula VPDs", () => {
+    expect(growTentExampleLines("clone")).toEqual([
+      "At 75°F: 85% RH (0.44 kPa), 80% RH (0.59 kPa), 75% RH (0.74 kPa)",
+      "At 80°F: 85% RH (0.52 kPa), 82% RH (0.63 kPa), 78% RH (0.77 kPa)",
+    ]);
+    expect(growTentExampleLines("late_flower")[0]).toBe(
+      "At 75°F: 59% RH (1.22 kPa), 53% RH (1.39 kPa), 47% RH (1.57 kPa)",
+    );
+  });
+
+  it("quick answer and first FAQ state the same four bands as the stage table", () => {
+    for (const text of [GROW_TENT_CLIMATE_QUICK_ANSWER, GROW_TENT_CLIMATE_FAQ[0].answer]) {
+      expect(text).toContain("0.4–0.8 kPa");
+      expect(text).toContain("0.8–1.2 for veg");
+      expect(text).toContain("1.0–1.5 for early flower");
+      expect(text).toContain("1.2–1.6 for late flower");
+    }
+    expect(GROW_TENT_CLIMATE_STAGES.map((s) => [s.min, s.max])).toEqual([
+      [0.4, 0.8],
+      [0.8, 1.2],
+      [1.0, 1.5],
+      [1.2, 1.6],
+    ]);
+  });
+});
+
+describe("climate readings and summary", () => {
+  it("builds a reading with the source status text", () => {
+    const r = reading(1, "77", "60", "-2", "veg", "Lights on", "  after raising exhaust ");
+    expect(r).toMatchObject({
+      vpd: 1.06,
+      stageLabel: "Veg",
+      statusCode: "in_band",
+      statusText: "Within your Veg band",
+      note: "after raising exhaust",
+    });
+  });
+
+  it("summarizes an empty log without averages", () => {
+    expect(summarizeGrowTentClimateLog([])).toEqual({
+      total: 0,
+      inBand: 0,
+      below: 0,
+      above: 0,
+      overall: null,
+      lightsOn: null,
+      lightsOff: null,
+    });
+  });
+
+  it("counts statuses and splits lights-on/off averages only when both exist", () => {
+    const onOnly = [
+      reading(1, "77", "60", "-2", "veg"),
+      reading(2, "80", "45", "-2", "late_flower"),
+    ];
+    const s1 = summarizeGrowTentClimateLog(onOnly);
+    expect([s1.inBand, s1.below, s1.above]).toEqual([1, 0, 1]);
+    expect(s1.overall).toEqual({ count: 2, avgF: "78.5", avgRh: 53, avgVpd: "1.38" });
+    expect(s1.lightsOn).toBeNull();
+
+    const mixed = [...onOnly, reading(3, "72", "75", "-2", "veg", "Lights off")];
+    const s2 = summarizeGrowTentClimateLog(mixed);
+    expect(s2.below).toBe(1);
+    expect(s2.lightsOn?.count).toBe(2);
+    expect(s2.lightsOff).toEqual({ count: 1, avgF: "72.0", avgRh: 75, avgVpd: "0.49" });
+  });
+});
+
+describe("climate log exports", () => {
+  const header =
+    "Date & Time,Lights,Air Temp (°F),RH (%),Leaf Offset (°F),Stage,VPD (kPa),Status,Note";
+
+  it("writes the source CSV header and quotes notes with commas, quotes and newlines", () => {
+    const note = 'Raised exhaust, "lights off" check\ndrop 2F';
+    const csv = buildGrowTentClimateCsv([reading(1, "77", "60", "-2", "veg", "Lights on", note)]);
+    const [first, ...rest] = csv.split("\r\n");
+    expect(first).toBe(header);
+    expect(rest.join("\r\n")).toBe(
+      '2026-10-28 09:00,Lights on,77,60,-2,Veg,1.06,Within your Veg band,"Raised exhaust, ""lights off"" check\ndrop 2F"',
+    );
+    expect(buildGrowTentClimateCsv([])).toBe(header);
+  });
+
+  it("guards CSV and TSV cells against spreadsheet formulas", () => {
+    const csv = buildGrowTentClimateCsv([reading(1, "77", "60", "-2", "veg", "Lights on", "=1+1")]);
+    expect(csv).not.toMatch(/,=1\+1/);
+    const tsv = buildGrowTentClimateTsv([
+      reading(1, "77", "60", "-2", "veg", "Lights on", "=SUM(1,2)"),
+      reading(2, "77", "60", "-2", "veg", "Lights on", "+4 days\tlater"),
+    ]);
+    const lines = tsv.split("\n");
+    expect(lines[0]).toBe(header.replaceAll(",", "\t"));
+    expect(lines[1].split("\t")).toEqual([
+      "2026-10-28 09:00",
+      "Lights on",
+      "77",
+      "60",
+      "-2",
+      "Veg",
+      "1.06",
+      "Within your Veg band",
+      "'=SUM(1,2)",
+    ]);
+    expect(lines[2].split("\t").at(-1)).toBe("'+4 days later");
+  });
+
+  it("names the CSV by local date", () => {
+    expect(growTentClimateCsvFilename("2026-10-28")).toBe("tent-climate-log-2026-10-28.csv");
+  });
+});
+
+describe("date/time and band bar", () => {
+  it("formats the datetime-local value and falls back to the injected now", () => {
+    const now = new Date(2026, 0, 5, 7, 4);
+    expect(growTentLocalDateTimeInput(now)).toBe("2026-01-05T07:04");
+    expect(formatGrowTentDateTime("2026-10-28T21:15", now)).toBe("2026-10-28 21:15");
+    expect(formatGrowTentDateTime("  ", now)).toBe("2026-01-05 07:04");
+    expect(formatGrowTentDateTime(null, now)).toBe("2026-01-05 07:04");
+  });
+
+  it("places the veg zone and marker on the 0–2.2 kPa scale and clamps the marker", () => {
+    const g = growTentBandBarGeometry(1.06, "veg");
+    expect(g.left.toFixed(2)).toBe("36.36");
+    expect(g.width.toFixed(2)).toBe("18.18");
+    expect(g.marker.toFixed(2)).toBe("48.18");
+    expect(growTentBandBarGeometry(3.4, "veg").marker).toBe(100);
+    expect(growTentBandBarGeometry(-0.2, "veg").marker).toBe(0);
   });
 });

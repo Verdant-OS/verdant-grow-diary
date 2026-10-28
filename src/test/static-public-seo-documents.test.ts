@@ -37,6 +37,7 @@ describe("static public SEO documents", () => {
       "/guides",
       "/guides/grow-stage-care-guide",
       "/guides/athena-feed-chart-log",
+      "/guides/grow-tent-temperature-humidity-chart",
       "/cultivars",
       "/tools/grow-help-toolkit",
       "/tools/vpd-calculator",

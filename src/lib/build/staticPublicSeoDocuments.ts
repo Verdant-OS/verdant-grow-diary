@@ -25,6 +25,15 @@ import {
   athenaFeedLogWebApplicationJsonLd,
 } from "../athenaFeedLogRules";
 import {
+  GROW_TENT_CLIMATE_DATE_MODIFIED,
+  GROW_TENT_CLIMATE_DESCRIPTION,
+  GROW_TENT_CLIMATE_FAQ,
+  GROW_TENT_CLIMATE_H1,
+  GROW_TENT_CLIMATE_PATH,
+  GROW_TENT_CLIMATE_TITLE,
+  growTentClimateWebApplicationJsonLd,
+} from "../growTentClimateRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -565,6 +574,42 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
           },
         ],
       }),
+    ],
+  }),
+  publicDocument(GROW_TENT_CLIMATE_PATH, {
+    title: `${GROW_TENT_CLIMATE_TITLE} | Verdant Grow Diary`,
+    description: GROW_TENT_CLIMATE_DESCRIPTION,
+    imageAlt: "Grow tent temperature and humidity chart with climate check",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${GROW_TENT_CLIMATE_TITLE} | Verdant Grow Diary`,
+        description: GROW_TENT_CLIMATE_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${GROW_TENT_CLIMATE_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: GROW_TENT_CLIMATE_H1,
+        description: GROW_TENT_CLIMATE_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${GROW_TENT_CLIMATE_PATH}`,
+        datePublished: GROW_TENT_CLIMATE_DATE_MODIFIED,
+        dateModified: GROW_TENT_CLIMATE_DATE_MODIFIED,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${GROW_TENT_CLIMATE_PATH}`,
+        questions: GROW_TENT_CLIMATE_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Grow Tent Temperature & Humidity Chart",
+            url: `${VERDANT_SITE_ORIGIN}${GROW_TENT_CLIMATE_PATH}`,
+          },
+        ],
+      }),
+      growTentClimateWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${GROW_TENT_CLIMATE_PATH}`),
     ],
   }),
   publicDocument(ATHENA_FEED_LOG_PATH, {

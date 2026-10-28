@@ -59,6 +59,9 @@ export const START_YOUR_ROOM_COPY = {
   skipToStartScreen: "Choose start screen instead",
 } as const;
 
+/** Plant stages the setup form offers; a restored draft must hold one of them. */
+export const START_YOUR_ROOM_PLANT_STAGES = ["seedling", "veg", "flower"] as const;
+
 export const DEFAULT_START_YOUR_ROOM_FORM: StartYourRoomForm = {
   growName: "",
   tentName: "",

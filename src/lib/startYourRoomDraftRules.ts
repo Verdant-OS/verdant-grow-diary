@@ -1,6 +1,7 @@
 import {
   DEFAULT_START_YOUR_ROOM_FORM,
   EMPTY_START_YOUR_ROOM_IDS,
+  START_YOUR_ROOM_PLANT_STAGES,
   START_YOUR_ROOM_STEPS,
   type StartYourRoomForm,
   type StartYourRoomIds,
@@ -41,6 +42,12 @@ function readName(value: unknown, fallback: string): string {
   return typeof value === "string" ? value.slice(0, 80) : fallback;
 }
 
+function readStage(value: unknown): string {
+  return (START_YOUR_ROOM_PLANT_STAGES as ReadonlyArray<unknown>).includes(value)
+    ? (value as string)
+    : DEFAULT_START_YOUR_ROOM_FORM.plantStage;
+}
+
 function readId(value: unknown): string | null {
   return typeof value === "string" && isUuid(value) ? value.toLowerCase() : null;
 }
@@ -71,7 +78,7 @@ export function parseStartYourRoomDraft(value: unknown): StartYourRoomDraft | nu
       growName: readName(formRecord.growName, DEFAULT_START_YOUR_ROOM_FORM.growName),
       tentName: readName(formRecord.tentName, DEFAULT_START_YOUR_ROOM_FORM.tentName),
       plantName: readName(formRecord.plantName, DEFAULT_START_YOUR_ROOM_FORM.plantName),
-      plantStage: readName(formRecord.plantStage, DEFAULT_START_YOUR_ROOM_FORM.plantStage),
+      plantStage: readStage(formRecord.plantStage),
     },
     ids: {
       growId: readId(idsRecord.growId) ?? EMPTY_START_YOUR_ROOM_IDS.growId,

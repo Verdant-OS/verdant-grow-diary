@@ -584,7 +584,6 @@ export default function StartYourRoom() {
       });
       if (ownerIdRef.current !== saveOwnerId) return;
       if (!confirmed) return;
-      releaseRowId("plant");
       // Fail closed if binding somehow dropped (should never happen with payload).
       if (!confirmed.row.grow_id) {
         setError(
@@ -607,6 +606,9 @@ export default function StartYourRoom() {
         tentId: prev.tentId ?? shownIds.tentId,
         plantId: confirmed.row.id,
       }));
+      // Hold the retry id until the plant id is recorded: a reload during the
+      // refresh above must retry this same row, not insert a second plant.
+      releaseRowId("plant");
       setForm((prev) => ({
         ...prev,
         growName: prev.growName || shownForm.growName,

@@ -39,6 +39,8 @@ export interface HarvestCheckHandoff {
   target: HarvestTarget;
   ranges: HarvestRanges;
   checks: HarvestHandoffCheck[];
+  /** Set before the first save, so every retry and remount targets the same plant. */
+  plantId?: string;
 }
 
 export interface HarvestHandoffStorage {
@@ -120,7 +122,16 @@ function validCheck(value: unknown): value is HarvestHandoffCheck {
 export function parseHarvestCheckHandoff(value: unknown, now: Date): HarvestCheckHandoff | null {
   if (
     !object(value) ||
-    !onlyKeys(value, ["version", "createdAt", "target", "ranges", "checks"]) ||
+    !onlyKeys(
+      value,
+      "plantId" in value
+        ? ["version", "createdAt", "target", "ranges", "checks", "plantId"]
+        : ["version", "createdAt", "target", "ranges", "checks"],
+    ) ||
+    ("plantId" in value &&
+      (typeof value.plantId !== "string" ||
+        value.plantId.length === 0 ||
+        value.plantId.length > 200)) ||
     value.version !== 1 ||
     typeof value.createdAt !== "string" ||
     !(HARVEST_TARGETS as readonly unknown[]).includes(value.target) ||
@@ -181,6 +192,29 @@ export function saveHarvestCheckHandoff(
     clearHarvestCheckHandoff(store);
     return false;
   }
+  try {
+    store.setItem(HARVEST_HANDOFF_STORAGE_KEY, raw);
+    if (store.getItem(HARVEST_HANDOFF_STORAGE_KEY) === raw) return true;
+  } catch {
+    // Fall through: storage refused the write.
+  }
+  clearHarvestCheckHandoff(store);
+  return false;
+}
+
+/**
+ * Record the plant an import targets before its first save. Retries, a lost
+ * response or a reload then stay on that plant, so the idempotency keys replay
+ * instead of copying checks onto another plant. Returns false if not stored.
+ */
+export function bindHarvestCheckHandoffPlant(
+  handoff: HarvestCheckHandoff,
+  plantId: string,
+  storage?: HarvestHandoffStorage | null,
+): boolean {
+  const store = resolveStorage(storage);
+  if (!store) return false;
+  const raw = JSON.stringify({ ...handoff, plantId });
   try {
     store.setItem(HARVEST_HANDOFF_STORAGE_KEY, raw);
     return store.getItem(HARVEST_HANDOFF_STORAGE_KEY) === raw;

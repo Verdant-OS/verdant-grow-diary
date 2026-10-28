@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bindHarvestCheckHandoffPlant,
   buildHarvestHandoffNote,
   clearHarvestCheckHandoff,
   HARVEST_HANDOFF_MAX_BYTES,
@@ -147,6 +148,33 @@ describe("harvest check handoff store", () => {
       typeof mutate === "string" ? mutate : JSON.stringify(mutate(stored)),
     );
     expect(readHarvestCheckHandoff(NOW, storage)).toBeNull();
+    expect(storage.map.size).toBe(0);
+  });
+
+  it("binds a target plant that survives a re-read, and rejects a malformed one", () => {
+    const storage = memoryStorage();
+    saveThree(storage);
+    const handoff = readHarvestCheckHandoff(NOW, storage);
+    expect(handoff?.plantId).toBeUndefined();
+    expect(bindHarvestCheckHandoffPlant(handoff!, "plant-1", storage)).toBe(true);
+    expect(readHarvestCheckHandoff(NOW, storage)?.plantId).toBe("plant-1");
+
+    const stored = JSON.parse(storage.getItem(HARVEST_HANDOFF_STORAGE_KEY) as string);
+    storage.setItem(HARVEST_HANDOFF_STORAGE_KEY, JSON.stringify({ ...stored, plantId: 7 }));
+    expect(readHarvestCheckHandoff(NOW, storage)).toBeNull();
+    expect(storage.map.size).toBe(0);
+  });
+
+  it("removes an earlier handoff when storage refuses a new write", () => {
+    const storage = memoryStorage();
+    saveThree(storage);
+    const refusing = {
+      ...storage,
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
+    expect(saveThree(refusing)).toBe(false);
     expect(storage.map.size).toBe(0);
   });
 

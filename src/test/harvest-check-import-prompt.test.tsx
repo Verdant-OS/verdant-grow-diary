@@ -194,6 +194,40 @@ describe("harvest check import after signup", () => {
     expect(screen.getByLabelText("Plant")).toBeDisabled();
   });
 
+  it("binds the plant before the first save, so a lost response or a reload cannot switch it", async () => {
+    mocks.plants = {
+      data: [
+        { id: "11111111-1111-4111-8111-111111111111", name: "Blue Dream #1", tent_id: "tent-1" },
+        { id: "22222222-2222-4222-8222-222222222222", name: "Gelato #2", tent_id: "tent-1" },
+      ],
+      isLoading: false,
+    };
+    // The first save commits but its response is lost: nothing counts as saved.
+    mocks.save.mockResolvedValueOnce({ ok: false, reason: "network" });
+    logThreeChecksAndClickCta();
+    const first = renderPrompt();
+    fireEvent.change(await screen.findByLabelText("Plant"), {
+      target: { value: "11111111-1111-4111-8111-111111111111" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Import 3 harvest checks" }));
+    });
+    expect(screen.getByLabelText("Plant")).toBeDisabled();
+    first.unmount();
+
+    // After a reload the prompt comes back on the same plant, still locked.
+    renderPrompt();
+    const select = (await screen.findByLabelText("Plant")) as HTMLSelectElement;
+    expect(select.value).toBe("11111111-1111-4111-8111-111111111111");
+    expect(select).toBeDisabled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Import 3 harvest checks" }));
+    });
+    const targets = new Set(mocks.save.mock.calls.map(([payload]) => payload.p_target_id));
+    expect([...targets]).toEqual(["11111111-1111-4111-8111-111111111111"]);
+    expect(storage.map.has(HARVEST_HANDOFF_STORAGE_KEY)).toBe(false);
+  });
+
   it("retries a check dated today with the same instant, so the save replays", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {

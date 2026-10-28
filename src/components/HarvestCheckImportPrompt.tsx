@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { usePlants } from "@/hooks/use-plants";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
+  bindHarvestCheckHandoffPlant,
   buildHarvestHandoffNote,
   clearHarvestCheckHandoff,
   harvestHandoffCountBucket,
@@ -36,11 +37,11 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
   const plants = usePlants();
   const { save } = useQuickLogV2Save();
   const queryClient = useQueryClient();
-  const [plantId, setPlantId] = useState("");
+  const [plantId, setPlantId] = useState(handoff.plantId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Once any check is saved, retries stay on that plant so the idempotency keys replay.
-  const [savedOnce, setSavedOnce] = useState(false);
+  // Bound before the first save: retries, lost responses and reloads stay on this plant.
+  const [boundPlantId, setBoundPlantId] = useState(handoff.plantId ?? null);
   const count = handoff.checks.length;
   const noun = count === 1 ? "harvest check" : "harvest checks";
   const list = plants.data ?? [];
@@ -55,6 +56,10 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
     if (!selected || busy) return;
     setBusy(true);
     setError("");
+    if (!boundPlantId) {
+      bindHarvestCheckHandoffPlant(handoff, selected.id);
+      setBoundPlantId(selected.id);
+    }
     let saved = 0;
     for (const [index, check] of handoff.checks.entries()) {
       const result = await save({
@@ -73,7 +78,6 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
       saved += 1;
     }
     if (saved > 0) {
-      setSavedOnce(true);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: selected.id,
@@ -123,7 +127,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
             className="mt-1 block w-full min-w-0 rounded-md border border-emerald-900/30 bg-white p-2"
             value={plantId}
             onChange={(e) => setPlantId(e.target.value)}
-            disabled={busy || savedOnce}
+            disabled={busy || boundPlantId !== null}
           >
             <option value="">Choose a plant</option>
             {list.map((plant) => (

@@ -139,7 +139,9 @@ export default function StartYourRoom() {
   ownerIdRef.current = ownerId;
 
   useEffect(() => {
-    if (!ownerId || growsLoading || draftHydratedFor.current === ownerId) return;
+    // A failed roster read looks like an empty roster; hydrating then would
+    // reset a tent/plant-step draft and overwrite it. Wait for a good read.
+    if (!ownerId || growsLoading || growsError || draftHydratedFor.current === ownerId) return;
     draftHydratedFor.current = ownerId;
     const draft = readBrowserSessionFormDraft(
       ownerId,
@@ -165,7 +167,7 @@ export default function StartYourRoom() {
     }
     setIds(growStillHere ? draft.ids : { ...EMPTY_START_YOUR_ROOM_IDS });
     setDraftOwnerReady(ownerId);
-  }, [ownerId, grows, growsLoading]);
+  }, [ownerId, grows, growsLoading, growsError]);
 
   // A grow whose create outcome was unknown before a reload may already exist
   // under the pending row id. Adopt it (the same steps a confirmed save takes).

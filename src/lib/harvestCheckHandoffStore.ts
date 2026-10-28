@@ -23,10 +23,6 @@ export const HARVEST_HANDOFF_MAX_BYTES = 64_000;
 /** Where the post-signup prompt lives; a known authenticated route. */
 export const HARVEST_HANDOFF_RETURN_PATH = "/plants" as const;
 
-const MAX_PLANT_CHARS = 80;
-const MAX_PISTILS_CHARS = 500;
-const MAX_PHOTO_NOTE_CHARS = 1000;
-
 export interface HarvestHandoffCheck {
   date: string;
   plant: string;
@@ -77,8 +73,8 @@ function percent(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
 }
 
-function boundedString(value: unknown, max: number): value is string {
-  return typeof value === "string" && value.length <= max;
+function text(value: unknown): value is string {
+  return typeof value === "string";
 }
 
 /** Strict YYYY-MM-DD that round-trips (no 02-30 rollover). */
@@ -111,12 +107,12 @@ function validCheck(value: unknown): value is HarvestHandoffCheck {
     object(value) &&
     onlyKeys(value, ["date", "plant", "clear", "cloudy", "amber", "pistils", "photoNote"]) &&
     isHarvestHandoffDate(value.date) &&
-    boundedString(value.plant, MAX_PLANT_CHARS) &&
+    text(value.plant) &&
     percent(value.clear) &&
     percent(value.cloudy) &&
     percent(value.amber) &&
-    boundedString(value.pistils, MAX_PISTILS_CHARS) &&
-    boundedString(value.photoNote, MAX_PHOTO_NOTE_CHARS)
+    text(value.pistils) &&
+    text(value.photoNote)
   );
 }
 
@@ -142,21 +138,23 @@ export function parseHarvestCheckHandoff(value: unknown, now: Date): HarvestChec
   return value as unknown as HarvestCheckHandoff;
 }
 
+// Text is never shortened: a handoff carries every check whole or is not saved.
 function toHandoffCheck(check: HarvestCheck): HarvestHandoffCheck {
   return {
     date: check.date,
-    plant: check.plant.slice(0, MAX_PLANT_CHARS),
+    plant: check.plant,
     clear: check.clear,
     cloudy: check.cloudy,
     amber: check.amber,
-    pistils: check.pistils.slice(0, MAX_PISTILS_CHARS),
-    photoNote: check.photoNote.slice(0, MAX_PHOTO_NOTE_CHARS),
+    pistils: check.pistils,
+    photoNote: check.photoNote,
   };
 }
 
 /**
  * Save the visitor's checks for the signup round trip. Zero checks never
- * write. Returns true only when the stored value reads back intact.
+ * write. Returns true only when every check is stored whole and reads back
+ * intact; more than the check or size cap returns false and writes nothing.
  */
 export function saveHarvestCheckHandoff(
   input: { target: HarvestTarget; ranges: HarvestRanges; checks: readonly HarvestCheck[] },
@@ -175,7 +173,7 @@ export function saveHarvestCheckHandoff(
       peak: { ...input.ranges.peak },
       body: { ...input.ranges.body },
     },
-    checks: input.checks.slice(0, HARVEST_HANDOFF_MAX_CHECKS).map(toHandoffCheck),
+    checks: input.checks.map(toHandoffCheck),
   };
   if (!parseHarvestCheckHandoff(handoff, now)) return false;
   const raw = JSON.stringify(handoff);
@@ -239,9 +237,14 @@ export function harvestHandoffCountBucket(count: number): HarvestHandoffCountBuc
   return "21+";
 }
 
-/** Midday UTC keeps the check's calendar date in every timezone from UTC−11 to UTC+11. */
-export function harvestHandoffOccurredAt(date: string): string {
-  return `${date}T12:00:00.000Z`;
+/**
+ * Local noon on the check's date, so the timeline shows that calendar date in
+ * the grower's own timezone; a check dated today is never placed after `now`.
+ */
+export function harvestHandoffOccurredAt(date: string, now: Date): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const noon = new Date(year, month - 1, day, 12);
+  return (noon.getTime() > now.getTime() ? now : noon).toISOString();
 }
 
 /** Deterministic per check, so a retried import replays instead of duplicating. */

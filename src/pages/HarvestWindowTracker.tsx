@@ -154,6 +154,7 @@ export default function HarvestWindowTracker() {
   const [plant, setPlant] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
+  const [handoffFailedAt, setHandoffFailedAt] = useState<HarvestTrackerCtaLocation | null>(null);
   const [status, setStatus] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
   const [copyFallback, setCopyFallback] = useState<string | null>(null);
@@ -317,17 +318,20 @@ export default function HarvestWindowTracker() {
             : HARVEST_WINDOW_CTA_HREF
         }
         data-cta-location={location}
-        onClick={() => {
+        onClick={(event) => {
           trackHarvestTrackerEvent("harvest_tracker_cta_click", { cta_location: location });
           // Only a non-empty log is carried through signup, and only on this click.
-          if (
-            checks.length > 0 &&
-            saveHarvestCheckHandoff({ target, ranges, checks }, new Date())
-          ) {
-            trackHarvestTrackerEvent("harvest_tracker_handoff_saved", {
-              count_bucket: harvestHandoffCountBucket(checks.length),
-            });
+          if (checks.length === 0) return;
+          if (!saveHarvestCheckHandoff({ target, ranges, checks }, new Date())) {
+            // Never leave for signup implying the log came along when it did not.
+            event.preventDefault();
+            setHandoffFailedAt(location);
+            return;
           }
+          setHandoffFailedAt(null);
+          trackHarvestTrackerEvent("harvest_tracker_handoff_saved", {
+            count_bucket: harvestHandoffCountBucket(checks.length),
+          });
         }}
       >
         Keep this log in Verdant →
@@ -339,7 +343,17 @@ export default function HarvestWindowTracker() {
       {checks.length > 0 ? (
         <p className="mt-1 text-xs">
           This button keeps your logged checks in this browser tab for up to 24 hours, so you can
-          import them onto a plant after you sign up. Nothing is sent until you choose a plant.
+          import them onto a plant after you sign up. Nothing is sent until you choose a plant. If
+          you confirm your email in another tab, come back to this tab and sign in to import them.
+        </p>
+      ) : null}
+      {handoffFailedAt === location && checks.length > 0 ? (
+        <p role="alert" className="mt-1 text-xs text-red-800">
+          Your log could not be kept for signup in this browser. Download CSV first, then{" "}
+          <Link className="underline" to={HARVEST_WINDOW_CTA_HREF}>
+            continue to signup without it
+          </Link>
+          .
         </p>
       ) : null}
     </div>

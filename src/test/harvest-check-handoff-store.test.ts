@@ -3,6 +3,7 @@ import {
   buildHarvestHandoffNote,
   clearHarvestCheckHandoff,
   HARVEST_HANDOFF_MAX_BYTES,
+  HARVEST_HANDOFF_MAX_CHECKS,
   HARVEST_HANDOFF_RETURN_PATH,
   HARVEST_HANDOFF_STORAGE_KEY,
   HARVEST_HANDOFF_TTL_MS,
@@ -194,7 +195,63 @@ describe("harvest check handoff store", () => {
     expect(key).toBe(harvestHandoffIdempotencyKey({ createdAt: NOW.toISOString() }, "plant-1", 2));
     expect(key.length).toBeGreaterThanOrEqual(8);
     expect(key.length).toBeLessThanOrEqual(200);
-    expect(harvestHandoffOccurredAt("2026-10-20")).toBe("2026-10-20T12:00:00.000Z");
+  });
+
+  it("dates an import at local noon on the check's day, never after now", () => {
+    expect(harvestHandoffOccurredAt("2026-10-20", NOW)).toBe(
+      new Date(2026, 9, 20, 12).toISOString(),
+    );
+    // Local noon reads back as the same local calendar day in any timezone.
+    expect(new Date(harvestHandoffOccurredAt("2026-10-20", NOW)).getDate()).toBe(20);
+    const earlyToday = new Date(2026, 9, 28, 7);
+    expect(harvestHandoffOccurredAt("2026-10-28", earlyToday)).toBe(earlyToday.toISOString());
+  });
+
+  it("keeps long text whole and refuses, rather than trims, an oversized log", () => {
+    const storage = memoryStorage();
+    const pistils = "p".repeat(1500);
+    const photoNote = "n".repeat(3000);
+    expect(
+      saveHarvestCheckHandoff(
+        {
+          target: "peak",
+          ranges: createDefaultHarvestRanges(),
+          checks: [check(1, "2026-10-20", { pistils, photoNote })],
+        },
+        NOW,
+        storage,
+      ),
+    ).toBe(true);
+    const [stored] = readHarvestCheckHandoff(NOW, storage)?.checks ?? [];
+    expect(stored.pistils).toBe(pistils);
+    expect(stored.photoNote).toBe(photoNote);
+
+    const tooMany = memoryStorage();
+    const checks = Array.from({ length: HARVEST_HANDOFF_MAX_CHECKS + 1 }, (_, i) =>
+      check(i, "2026-10-20"),
+    );
+    expect(
+      saveHarvestCheckHandoff(
+        { target: "peak", ranges: createDefaultHarvestRanges(), checks },
+        NOW,
+        tooMany,
+      ),
+    ).toBe(false);
+    expect(tooMany.map.size).toBe(0);
+
+    const tooBig = memoryStorage();
+    expect(
+      saveHarvestCheckHandoff(
+        {
+          target: "peak",
+          ranges: createDefaultHarvestRanges(),
+          checks: [check(1, "2026-10-20", { photoNote: "n".repeat(HARVEST_HANDOFF_MAX_BYTES) })],
+        },
+        NOW,
+        tooBig,
+      ),
+    ).toBe(false);
+    expect(tooBig.map.size).toBe(0);
   });
 
   it("builds the note text from the check, skipping empty fields", () => {

@@ -126,9 +126,9 @@ describe("harvest check import after signup", () => {
     expect(mocks.save).toHaveBeenCalledTimes(3);
     const payloads = mocks.save.mock.calls.map(([payload]) => payload);
     expect(payloads.map((p) => p.p_occurred_at)).toEqual([
-      "2026-10-20T12:00:00.000Z",
-      "2026-10-24T12:00:00.000Z",
-      "2026-10-27T12:00:00.000Z",
+      new Date(2026, 9, 20, 12).toISOString(),
+      new Date(2026, 9, 24, 12).toISOString(),
+      new Date(2026, 9, 27, 12).toISOString(),
     ]);
     for (const payload of payloads) {
       expect(payload).toMatchObject({
@@ -187,6 +187,34 @@ describe("harvest check import after signup", () => {
     expect(mocks.save).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("alert")).toHaveTextContent("1 of 3 harvest checks saved");
     expect(storage.map.has(HARVEST_HANDOFF_STORAGE_KEY)).toBe(true);
+    // A retry stays on the same plant, so saved checks replay instead of duplicating.
+    expect(screen.getByLabelText("Plant")).toBeDisabled();
+  });
+
+  it("stays on the page and says so when the log cannot be kept", () => {
+    storage.setItem.mockImplementation(() => {
+      throw new Error("denied");
+    });
+    render(
+      <MemoryRouter>
+        <HarvestWindowTracker />
+      </MemoryRouter>,
+    );
+    addCheck("2026-10-20", "30", "70", "0");
+    const [cta] = screen.getAllByRole("link", { name: "Keep this log in Verdant →" });
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    fireEvent(cta, click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Your log could not be kept for signup in this browser.",
+    );
+    expect(
+      screen.getByRole("link", { name: "continue to signup without it" }).getAttribute("href"),
+    ).toBe(HARVEST_WINDOW_CTA_HREF);
+    expect(vi.mocked(trackHarvestTrackerEvent)).not.toHaveBeenCalledWith(
+      "harvest_tracker_handoff_saved",
+      expect.anything(),
+    );
   });
 
   it("ignores and removes a malformed handoff", async () => {

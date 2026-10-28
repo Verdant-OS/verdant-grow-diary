@@ -39,6 +39,8 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
   const [plantId, setPlantId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Once any check is saved, retries stay on that plant so the idempotency keys replay.
+  const [savedOnce, setSavedOnce] = useState(false);
   const count = handoff.checks.length;
   const noun = count === 1 ? "harvest check" : "harvest checks";
   const list = plants.data ?? [];
@@ -64,13 +66,14 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
         p_temperature_c: null,
         p_humidity_pct: null,
         p_vpd_kpa: null,
-        p_occurred_at: harvestHandoffOccurredAt(check.date),
+        p_occurred_at: harvestHandoffOccurredAt(check.date, new Date()),
         p_idempotency_key: harvestHandoffIdempotencyKey(handoff, selected.id, index),
       });
       if (!result.ok) break;
       saved += 1;
     }
     if (saved > 0) {
+      setSavedOnce(true);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: selected.id,
@@ -120,7 +123,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
             className="mt-1 block w-full min-w-0 rounded-md border border-emerald-900/30 bg-white p-2"
             value={plantId}
             onChange={(e) => setPlantId(e.target.value)}
-            disabled={busy}
+            disabled={busy || savedOnce}
           >
             <option value="">Choose a plant</option>
             {list.map((plant) => (

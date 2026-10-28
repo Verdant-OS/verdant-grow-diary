@@ -47,10 +47,11 @@ on:
 # consumes a runner.
 concurrency:
   group: demo-proof-walkthrough-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   demo-proof-readonly:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Demo Proof Walkthrough readonly E2E (mocked)
     runs-on: ubuntu-latest
     timeout-minutes: 15

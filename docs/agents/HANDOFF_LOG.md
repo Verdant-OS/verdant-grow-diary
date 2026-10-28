@@ -79,10 +79,10 @@ branch: claude/new-session-wp1j5i (the session-bound branch; the cleanup prompt 
 base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
 checkout: git fetch origin claude/new-session-wp1j5i verdant-grow-diary && git switch claude/new-session-wp1j5i && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2556 (ready for review; Matthew marked it ready on 2026-10-27)
-head_sha: 53c23df12beedd8ea8e5f7615f42109d4d2456cf, observed on origin/claude/new-session-wp1j5i at 2026-10-27T23:35Z; the commit that records this line moves the head past it, so re-read the PR head before any current-head claim
+head_sha: 91d396fd2d34fc8b4f1b812d4232c91fb3431901, observed on origin/claude/new-session-wp1j5i at 2026-10-28T01:45Z (35/35 required green there); the commit that records this line moves the head past it, so re-read the PR head before any current-head claim
 state: pushed, ready for review, docs only. The governance change (CLAUDE.md session-recovery block and the 2026-10-27.1 bump in 175cfbd15) was withdrawn on Matthew's approval in e35c49a0d and a79d0a1ae: all 18 governance files match base at 2026-10-26.2, and the PR changes only docs/agents/pr-cleanup-2026-10-27.md and this block. The context-recovery hook writes to ~/.claude/CLAUDE.md instead (a container-local patch, not durable).
-current_step: Phases 1 and 2 done. Phase 1: docs/agents/pr-cleanup-2026-10-27.md holds the per-PR table, the close list, the consolidation plan (29 folds) and the decision list. Phase 2: #2226 #2214 #2182 #1951 #1955 #1980 closed as superseded and #2372 #2299 closed as stale, each on Matthew's approval; Matthew kept #1986 #2010 #2024 #2333 #1904 #1902 for now. The #2032 takeover is done: Matthew approved the takeover, the port and the scorer unlocks; the harvest photo flow was reworked through the canonical quicklog_save_event save on his approval; #2032 head is e69de87b23863de95874628f27ddf23e58757629 (observed 2026-10-27T23:40Z; another Claude session pushed b79785ff1, 9041066fb and e69de87b2 after this session's last push, 3f4c3f487). Re-read the PR head before resuming #2032.
-next_action: Do not repeat Phase 2 closes or the #2032 scorer push. Wait on the open needs-Matthew decisions below, then run Phase 3 (consolidations) only on his approval.
+current_step: Phases 1, 2 and 3 done. Phase 2: #2226 #2214 #2182 #1951 #1955 #1980 closed as superseded and #2372 #2299 closed as stale, each on Matthew's approval; he kept #1986 #2010 #2024 #2333 #1904 #1902. Phase 3 (approved 2026-10-28): draft consolidation PRs #2575 sensors, #2576 community, #2577 timeline, #2578 quick-log, #2579 plants, #2580 other. 2026-10-28 decisions from Matthew: this session holds #2032; the harvest CI wiring (b79785ff1), the second scorer unlock (growAdapters.test.ts, vpd-stage-missing-badge-gates.test.ts) and the regression-test deferral are confirmed and recorded in the #2032 body. #2032 head 4c0d71b6587 merges base 30d6d9643 (Settings.tsx and QuickLogAllActivitiesSection.tsx conflicts resolved). #1979 head 72aa1cf68 merges base (Settings.tsx).
+next_action: Do not repeat the Phase 2 closes or re-open Phase 3 work. Drive #2575-#2580 and #2032 to green; close each folded source PR, with a comment, only after its consolidation merges. Phase 4 (survivors) needs Matthew's approval.
 post_merge_check: NOT_APPLICABLE (inventory doc; not a feature)
 active_writer: Claude session session_017UoYKyHCyHbSMw6VpDj2mb
 decisions: Hands-off PRs (OG Kush) and holds (#2539 #2532 #2252) left untouched. Test-only follow-ups fold into area consolidation PRs, or into their still-open parent. Product fixes are never folded into test consolidations. Protected-scope PRs go to Matthew.
@@ -90,17 +90,17 @@ tried_and_rejected: gh pr list (GH_TOKEN reported invalid for gh auth, though gh
 commands: git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'; git merge-tree --write-tree origin/verdant-grow-diary refs/remotes/pr/<n>; gh api repos/Verdant-OS/verdant-grow-diary/commits/<sha>/check-runs?per_page=100&page=<k>
 files_touched: docs/agents/pr-cleanup-2026-10-27.md; docs/agents/HANDOFF_LOG.md (this block only)
 files_remaining: Phase 5 report appended to docs/agents/pr-cleanup-2026-10-27.md
-blockers: None for this PR. On #2032, the harvest pgTAP suite was wired into the disposable badge pgTAP lane by another Claude session in b79785ff1 (runner + badge-pgtap-disposable.yml), which reports Matthew approved those edits; that approval is not verified in this session. The 35 required checks on #2032 do not run while its base is #1979's branch.
-open_questions: Needs Matthew (this list is canonical; docs/agents/pr-cleanup-2026-10-27.md points here): (1) retimestamp migration 20261011143000, which sorts before the live latest 20261014210000; (2) confirm the harvest pgTAP CI wiring in b79785ff1, which another session reports he approved; (3) confirm a second scorer unlock, for growAdapters.test.ts and vpd-stage-missing-badge-gates.test.ts, which another session reports he approved; this is separate from the unlocks he approved in this session for the 06f4238c0 push; (4) confirm the two-session regression-test deferral another session reports he accepted; (5) regenerated Supabase types for badge_evidence.harvest_id; (6) whether #2140 is redundant with applied migration 20260924120000; (7) which session holds #2032 from here.
+blockers: #2032's regenerated Supabase types for badge_evidence.harvest_id are BLOCKED in this container: there's no Docker daemon and no Supabase CLI for `bun run sb:types:local`, production lacks migration 20261027235500, and types.ts must not be hand-edited.
+open_questions: Needs Matthew: (1) #2140 is NOT a duplicate (corrected 2026-10-28): it drops the plants.health NOT NULL and the 'unknown' default that 20260924120000 set, so keep it or close it as a product call; (2) Phase 4 go-ahead; (3) where to run the #2032 type generation.
 gotchas: A green 35/35 at a head 100+ commits behind base is not current; the strict up-to-date policy re-runs CI after a base merge. #2333 carries a product security commit (98f48c08a) that must be checked before closing.
 links: docs/agents/pr-cleanup-2026-10-27.md
 artifacts: docs/agents/pr-cleanup-2026-10-27.md
 reviewer_seat: an eligible independent session routed by OG Kush; not this session
 reviewer_sha: none yet
-session_state: Claude cloud session; one self check-in armed (trig_019FUfcDvCQpU9psDxuqoa3J, 2026-10-28T01:17Z); no paused workflows; pending human decisions: the open_questions list
+session_state: Claude cloud session; self check-in trig_01Qi9RH9aH5Dg64ZSU1XiQUL (2026-10-28T02:09Z); subscribed to #2556 #2032 #2575-#2580; no paused workflows; pending human decisions: open_questions
 claimed_by: Claude, 2026-10-27 12:13 CT (first commit of this block, e99de0741; session_017UoYKyHCyHbSMw6VpDj2mb)
 owner: Claude (default inheritor OG Kush)
-last_updated: 2026-10-27 18:45 CT, by Claude
+last_updated: 2026-10-27 21:05 CT, by Claude
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL

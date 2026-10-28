@@ -207,6 +207,18 @@ describe("calendar local-day grouping (America/Chicago)", () => {
   });
 });
 
+describe("calendar day keys fail closed on malformed input", () => {
+  it("rejects a bare date that overflows instead of rolling it into the next month", () => {
+    expect(calendarInstantDayKey("2026-02-30")).toBeNull();
+    expect(calendarInstantDayKey("2026-02-28")).toBe("2026-02-28");
+  });
+
+  it("returns null for an out-of-range numeric start date instead of throwing", () => {
+    expect(() => calendarStartDateDayKey(1e20)).not.toThrow();
+    expect(calendarStartDateDayKey(1e20)).toBeNull();
+  });
+});
+
 describe("calendarInstantDayKey date-only year range", () => {
   it("rejects a bare date outside years 1000-9999, matching the instant path", () => {
     expect(calendarInstantDayKey("0500-06-01")).toBeNull();

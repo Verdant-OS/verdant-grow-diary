@@ -55,6 +55,9 @@ export function calendarInstantDayKey(value: string | null | undefined): string 
   const trimmed = value.trim();
   if (trimmed === "") return null;
   if (isStrictDateOnly(trimmed)) return trimmed;
+  // A bare date that fails the strict check (2026-02-30) is malformed, not an
+  // instant: Date.parse would roll it into March, so reject it.
+  if (DATE_ONLY_RE.test(trimmed)) return null;
   const timestamp = Date.parse(trimmed);
   if (!Number.isFinite(timestamp)) return null;
   return localCalendarDayKey(new Date(timestamp));
@@ -75,7 +78,10 @@ export function calendarStartDateDayKey(
   } else if (value instanceof Date) {
     stored = Number.isFinite(value.getTime()) ? value.toISOString() : null;
   } else if (typeof value === "number") {
-    stored = Number.isFinite(value) ? new Date(value).toISOString() : null;
+    // Number.isFinite(1e20) is true, but new Date(1e20) is invalid and its
+    // toISOString() throws; fail closed instead of crashing the calendar.
+    const date = new Date(value);
+    stored = Number.isFinite(date.getTime()) ? date.toISOString() : null;
   }
   if (stored == null) return null;
   const date = resolvePlantStartCalendarDate(stored);

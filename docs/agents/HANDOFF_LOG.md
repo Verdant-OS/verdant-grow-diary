@@ -826,7 +826,7 @@ why: Unpushed session state and SHA-unbound passes leave the next agent unable t
 branch: cursor/handoff-continuity-a798
 base: verdant-grow-diary
 checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2572 (draft) (a commit cannot name its own SHA or the PR number created after it)
+pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
 head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
 state: pushed draft once this commit is on the remote
 current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry

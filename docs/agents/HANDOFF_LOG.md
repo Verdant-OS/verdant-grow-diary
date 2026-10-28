@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SUPABASE-DATA-API-DEFAULT-GRANTS-20261030
+
+```text
+TASK SUPABASE-DATA-API-DEFAULT-GRANTS-20261030  priority: P2  status: OPEN
+goal: audit migrations for Supabase's 2026-10-30 Data API default-grant change; fix only verified gaps.
+why: after 2026-10-30 a new hosted public table, function or sequence with no GRANT returns 42501 to the app; supabase/seed.sql grants every table locally, so no local DB lane sees a missing GRANT.
+branch: ccr-01625fd2-17flsm
+base: verdant-grow-diary
+checkout: git fetch origin ccr-01625fd2-17flsm verdant-grow-diary && git switch ccr-01625fd2-17flsm && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED at block creation; read it from the branch's open draft PR
+head_sha: read from the PR (this block lands in the first push)
+state: pushed draft
+current_step: draft PR open; awaiting 35/35 required checks and an independent exact-head review
+next_action: confirm required CI at the PR head; route to an eligible reviewer who did not author it
+post_merge_check: NOT_APPLICABLE for production (test-only change); after merge, the required Vitest suite on verdant-grow-diary runs src/test/supabase-table-explicit-acl.test.ts green
+active_writer: Claude session_017UoYKwf4ZrLARR3NCo2iwM
+decisions: no migration needed a correction (pending badge/referral/plants migrations all explicit or no new object); added a NEW check instead of editing scripts/check-supabase-migration-safety.mjs because the scorer lock refuses that edit and the unlock was denied in-session; a partial REVOKE does not count as an ACL decision because reads stay on the inherited default; the 22 legacy tables are frozen in LEGACY_DEFAULT_PRIVILEGE_TABLES and may only shrink
+tried_and_rejected: adding a TABLE_WITHOUT_EXPLICIT_ACL scanner to check-supabase-migration-safety.mjs (scorer-locked; unlock denied by the session permission classifier)
+commands: bunx vitest run src/test/supabase-table-explicit-acl.test.ts; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: scripts/lib/supabaseTableAclRules.mjs, src/test/supabase-table-explicit-acl.test.ts, docs/audits/supabase-data-api-default-grants-2026-10-28.md, docs/agents/HANDOFF_LOG.md
+files_remaining: none in scope
+blockers: none for the PR; production applied-migration state is NOT_MEASURED (Matthew's surface)
+open_questions: explicit grants for the 22 legacy tables (new additive migration) need Matthew's decision; function/sequence grant check is deferred
+gotchas: node_modules was absent; bun install --frozen-lockfile worked and left bun.lock unchanged; full tsc needs a larger heap in this container
+links: docs/audits/supabase-data-api-default-grants-2026-10-28.md; https://supabase.com/docs/guides/api/securing-your-api
+artifacts: the draft PR's checks
+reviewer_seat: eligible independent reviewer under OWNERSHIP.md §4.3 (not this session)
+reviewer_sha: none yet
+session_state: no routines; no paused workflows; migration-touching follow-ups held for Matthew
+claimed_by: Claude session_017UoYKwf4ZrLARR3NCo2iwM, 2026-10-28 02:45 UTC (Matthew's direct assignment in chat; no GitHub claim comment posted)
+owner: Claude
+last_updated: 2026-10-27 21:45 CT, by Claude
+```
+
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL
 
 ```text

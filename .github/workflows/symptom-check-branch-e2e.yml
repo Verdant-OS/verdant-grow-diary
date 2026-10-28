@@ -41,6 +41,7 @@ concurrency:
 
 jobs:
   symptom-check-branch-e2e:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Symptom Check branch E2E (mocked / non-destructive)
     runs-on: ubuntu-latest
     timeout-minutes: 15

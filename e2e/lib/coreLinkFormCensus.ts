@@ -55,10 +55,14 @@ export const PRIVILEGED_ROUTE_PREFIXES = [
 ] as const;
 
 export const PUBLIC_CORE_CENSUS_ROUTES = [
-  { path: "/welcome", label: "Welcome", fieldPolicy: "audit-only" },
   { path: "/auth", label: "Authentication", fieldPolicy: "fill-safe-fields" },
   { path: "/pricing", label: "Pricing", fieldPolicy: "audit-only" },
-  { path: "/founder", label: "Founder Lifetime", fieldPolicy: "fill-safe-fields" },
+  {
+    path: "/founder",
+    expectedPathname: "/pricing",
+    label: "Former Founder page redirects to pricing",
+    fieldPolicy: "audit-only",
+  },
   {
     path: "/checkout/success",
     label: "Checkout success return",
@@ -158,6 +162,8 @@ export const PUBLIC_CORE_CENSUS_ROUTES = [
   { path: "/terms", label: "Terms", fieldPolicy: "audit-only" },
   { path: "/privacy", label: "Privacy", fieldPolicy: "audit-only" },
   { path: "/refund", label: "Refund policy", fieldPolicy: "audit-only" },
+  // The canonical signed-out home, which replaced /welcome (now a 308 to /).
+  { path: "/", label: "Home (signed-out landing)", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
 
 // The public sweep includes field exercises and revisits every safe internal

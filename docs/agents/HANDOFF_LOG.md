@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GUIDE-AUTOFLOWER-WEEK-BY-WEEK
+
+```text
+TASK GUIDE-AUTOFLOWER-WEEK-BY-WEEK  priority: other  status: OPEN
+goal: port the founder-supplied Autoflower Week-by-Week planner HTML to the public route /guides/autoflower-week-by-week, same pattern as /guides/athena-feed-chart-log.
+why: Matthew (2026-10-28) asked for the guide as one ready-for-review PR against verdant-grow-diary.
+branch: claude/guide-autoflower-week-by-week
+base: verdant-grow-diary
+checkout: git fetch origin claude/guide-autoflower-week-by-week verdant-grow-diary && git switch claude/guide-autoflower-week-by-week && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: read from the PR list for branch claude/guide-autoflower-week-by-week
+head_sha: read the current head from the PR
+state: pushed, PR ready for review
+current_step: awaiting CI and an independent exact-head review
+next_action: independent exact-head review of the PR head (author: this Claude session; exclude it)
+post_merge_check: after Publish, https://verdantgrowdiary.com/guides/autoflower-week-by-week returns the H1 "Autoflower Week by Week: Your Schedule, Light and Feeding Planner" and /version.json reports the merge SHA; else NOT_MEASURED
+active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+decisions: copy, title, meta, FAQ and JSON-LD come verbatim from the source HTML; the brief was context only. Date math is UTC calendar arithmetic with today injected from the component. Strict YYYY-MM-DD parsing rejects rollover dates the source accepted. autoflower_planner_generated is throttled (leading edge, 1 per 2 s) instead of the source's 2 s trailing debounce, as Matthew asked. CSV reuses the Athena escapeCsvField formula guard. CTAs use the relative /auth URL Matthew specified.
+tried_and_rejected: finishing the port in a subagent; it handed back after the rules module because of its context budget.
+commands: bun run typecheck (NODE_OPTIONS=--max-old-space-size=8192 here); bunx vitest run src/test/autoflower-week-plan-*.ts* --reporter=dot; TZ=Pacific/Auckland bunx vitest run src/test/autoflower-week-plan-rules.test.ts
+files_touched: src/lib/autoflowerWeekPlanRules.ts src/lib/autoflowerWeekPlanAnalytics.ts src/pages/AutoflowerWeekByWeek.tsx src/routes/guides.autoflower-week-by-week.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/constants/verdantSeoContent.ts src/pages/GuidesIndex.tsx public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts src/test/autoflower-week-plan-rules.test.ts src/test/autoflower-week-plan-export.test.ts src/test/autoflower-week-plan-analytics.test.ts src/test/autoflower-week-plan-page.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: links to /guides/when-to-harvest-cannabis, which lands in a sibling PR; until that merges the link resolves to the catch-all. Sibling guide PRs edit the same registration lines and matrix counts; whichever merges later needs a normal base merge and recount.
+links: NOT_MEASURED
+artifacts: PR checks
+reviewer_seat: unassigned (eligible independent reviewer per OWNERSHIP.md 4.3)
+reviewer_sha: none
+session_state: no routines, no paused workflows
+claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-28 09:00 UTC
+owner: Claude
+last_updated: 2026-10-28 04:00 CT, by Claude
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

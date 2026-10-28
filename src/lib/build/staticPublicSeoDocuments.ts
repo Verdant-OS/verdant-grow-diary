@@ -25,6 +25,15 @@ import {
   athenaFeedLogWebApplicationJsonLd,
 } from "../athenaFeedLogRules";
 import {
+  AUTOFLOWER_WEEK_PLAN_DATE_MODIFIED,
+  AUTOFLOWER_WEEK_PLAN_DESCRIPTION,
+  AUTOFLOWER_WEEK_PLAN_FAQ,
+  AUTOFLOWER_WEEK_PLAN_H1,
+  AUTOFLOWER_WEEK_PLAN_PATH,
+  AUTOFLOWER_WEEK_PLAN_TITLE,
+  autoflowerWeekPlanWebApplicationJsonLd,
+} from "../autoflowerWeekPlanRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -600,6 +609,42 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
         ],
       }),
       athenaFeedLogWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`),
+    ],
+  }),
+  publicDocument(AUTOFLOWER_WEEK_PLAN_PATH, {
+    title: `${AUTOFLOWER_WEEK_PLAN_TITLE} | Verdant Grow Diary`,
+    description: AUTOFLOWER_WEEK_PLAN_DESCRIPTION,
+    imageAlt: "Autoflower week-by-week schedule planner and milestone log",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${AUTOFLOWER_WEEK_PLAN_TITLE} | Verdant Grow Diary`,
+        description: AUTOFLOWER_WEEK_PLAN_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${AUTOFLOWER_WEEK_PLAN_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: AUTOFLOWER_WEEK_PLAN_H1,
+        description: AUTOFLOWER_WEEK_PLAN_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${AUTOFLOWER_WEEK_PLAN_PATH}`,
+        datePublished: AUTOFLOWER_WEEK_PLAN_DATE_MODIFIED,
+        dateModified: AUTOFLOWER_WEEK_PLAN_DATE_MODIFIED,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${AUTOFLOWER_WEEK_PLAN_PATH}`,
+        questions: AUTOFLOWER_WEEK_PLAN_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Autoflower Week by Week",
+            url: `${VERDANT_SITE_ORIGIN}${AUTOFLOWER_WEEK_PLAN_PATH}`,
+          },
+        ],
+      }),
+      autoflowerWeekPlanWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${AUTOFLOWER_WEEK_PLAN_PATH}`),
     ],
   }),
   publicDocument("/tools/blueprint-targets", {

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { SESSION_FORM_DRAFT_VERSION } from "@/lib/sessionFormDraftRules";
 import { START_YOUR_ROOM_DRAFT_FORM_ID } from "@/lib/startYourRoomDraftRules";
-import { getStartScreenChoice } from "@/lib/startScreenPreferences";
+import { getStartScreenChoice, setStartScreenChoice } from "@/lib/startScreenPreferences";
 
 const { OWNER_ID } = vi.hoisted(() => ({ OWNER_ID: "44444444-4444-4444-8444-444444444444" }));
 
@@ -226,12 +226,14 @@ describe("Start Your Room plant retry id (Codex review)", () => {
     await waitFor(() => expect(refreshHanging).toBe(true));
 
     view.unmount();
+    // The grower chose another start screen on the way out.
+    setStartScreenChoice(OWNER_ID, "timeline");
     await act(async () => {
       releaseRefresh();
     });
     expect(navMock).not.toHaveBeenCalled();
-    // The grower may have chosen another start screen on the way out; it stays theirs.
-    expect(getStartScreenChoice(OWNER_ID)).toBeNull();
+    // Their choice survives the save finishing behind them.
+    expect(getStartScreenChoice(OWNER_ID)).toBe("timeline");
     // The room was finished, so its draft is still cleared.
     expect(window.sessionStorage.getItem(draftKey)).toBeNull();
   });

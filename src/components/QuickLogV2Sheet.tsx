@@ -638,6 +638,10 @@ function QuickLogV2SheetForOwner({
   // form; it must skip that one run or it rewrites (then clears) a draft that
   // belongs to another target.
   const observationDraftResetPendingRef = useRef(false);
+  // An open re-baselines the response target. "armed" in the open's own commit
+  // (the form is still the previous open's), "ready" in the next, which holds
+  // the reset form; retarget checks wait until then.
+  const responseBaselineResetRef = useRef<"armed" | "ready" | null>(null);
   const observationUnconfirmedRef = useRef(false);
   const [observationDraftRestored, setObservationDraftRestored] = useState<string | null>(null);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
@@ -1161,6 +1165,9 @@ function QuickLogV2SheetForOwner({
       );
       observationDraftOwnedRef.current = Boolean(restorable);
       observationDraftResetPendingRef.current = true;
+      // A new open starts the response-target baseline over, so restoring a
+      // draft is never read as a retarget from whatever the sheet showed last.
+      responseBaselineResetRef.current = "armed";
       setForm({
         ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
         selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
@@ -1391,7 +1398,7 @@ function QuickLogV2SheetForOwner({
       : null;
   const responseTargetPlantIdRef = useRef(responseTargetPlantId);
   useEffect(() => {
-    if (submissionLockedRef.current) return;
+    if (submissionLockedRef.current || responseBaselineResetRef.current) return;
     const previousPlantId = responseTargetPlantIdRef.current;
     responseTargetPlantIdRef.current = responseTargetPlantId;
     // Fire when the plant the marker DESCRIBES changes — to a different plant,
@@ -1423,6 +1430,16 @@ function QuickLogV2SheetForOwner({
       return nextFeedingNote === previous.note ? previous : { ...previous, note: nextFeedingNote };
     });
   }, [responseTargetPlantId, form.note, setField]);
+  // Runs every commit, after the retarget check: take the reset form's plant as
+  // the baseline once that form has committed.
+  useEffect(() => {
+    if (responseBaselineResetRef.current === "armed") {
+      responseBaselineResetRef.current = "ready";
+    } else if (responseBaselineResetRef.current === "ready") {
+      responseBaselineResetRef.current = null;
+      responseTargetPlantIdRef.current = responseTargetPlantId;
+    }
+  });
 
   const handleAction = (a: QuickLogV2Action) => {
     if (submissionLockedRef.current) return;
@@ -3013,6 +3030,12 @@ function QuickLogV2SheetForOwner({
     // The grower deliberately opens the verified existing record for review.
     // This is a resolution action, never a successful receipt for this draft.
     manualRetrySubmissionRef.current = null;
+    // The words are already saved; a restored draft would save them again
+    // under a new key.
+    observationDraftSuppressedRef.current = true;
+    if (user?.id) {
+      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+    }
     keepSubmissionLockedRef.current = false;
     submissionLockedRef.current = false;
     setSubmissionLocked(false);

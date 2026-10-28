@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { SESSION_FORM_DRAFT_VERSION } from "@/lib/sessionFormDraftRules";
 import { START_YOUR_ROOM_DRAFT_FORM_ID } from "@/lib/startYourRoomDraftRules";
@@ -116,6 +116,10 @@ beforeEach(() => {
       }),
     }),
   }));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("Start Your Room plant retry id (Codex review)", () => {

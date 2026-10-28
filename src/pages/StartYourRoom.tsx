@@ -34,6 +34,7 @@ import {
   progressLabel,
   plantDetailQuickLogHref,
   resolveStartYourRoomResume,
+  START_YOUR_ROOM_PLANT_STAGES,
   type StartYourRoomForm,
   type StartYourRoomIds,
   type StartYourRoomResumePlant,
@@ -78,11 +79,13 @@ function plantsSelectAvailable(): boolean {
   }
 }
 
-const STAGES = [
-  { value: "seedling", label: "Seedling" },
-  { value: "veg", label: "Vegetative" },
-  { value: "flower", label: "Flowering" },
-];
+const STAGE_LABELS: Record<(typeof START_YOUR_ROOM_PLANT_STAGES)[number], string> = {
+  seedling: "Seedling",
+  veg: "Vegetative",
+  flower: "Flowering",
+};
+// The draft parser accepts only these stages, so the select is built from them.
+const STAGES = START_YOUR_ROOM_PLANT_STAGES.map((value) => ({ value, label: STAGE_LABELS[value] }));
 
 export default function StartYourRoom() {
   const { user, loading } = useAuth();
@@ -282,16 +285,19 @@ export default function StartYourRoom() {
     entitlementLoading ||
     (growCountRequired && growsLoading) ||
     (tentCountRequired && tentsQuery.isLoading);
+  // A failed roster read blocks a counted plan always. Any plan waits while it
+  // also holds back draft hydration, so a later good read cannot reset what
+  // the grower created; after hydration an unlimited plan is not held.
+  const rosterReadBlocksCreation =
+    Boolean(growsError) && (growCountRequired || draftOwnerReady !== ownerId);
   const creationVerificationFailed =
     entitlementLookupFailed ||
     plantReadFailed ||
-    // Any plan: a failed roster read also holds back draft hydration, so the
-    // grower must not create anything a later good read would then reset.
-    Boolean(growsError) ||
+    rosterReadBlocksCreation ||
     (tentCountRequired && tentsQuery.isError);
   const planVerificationReady = !entitlementLoading && !entitlementLookupFailed;
   const growVerificationReady =
-    planVerificationReady && !growsError && (!growCountRequired || !growsLoading);
+    planVerificationReady && !rosterReadBlocksCreation && (!growCountRequired || !growsLoading);
   const tentVerificationReady =
     planVerificationReady && (!tentCountRequired || (!tentsQuery.isLoading && !tentsQuery.isError));
   const growGate = evaluateVerifiedGrowCreationGate(

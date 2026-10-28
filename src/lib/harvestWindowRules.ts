@@ -201,6 +201,14 @@ export function localIsoDate(now: Date): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+export const HARVEST_FUTURE_DATE_MESSAGE =
+  "Check dates can't be in the future. Pick today or an earlier date." as const;
+
+/** A check dated after the grower's local today; ISO dates compare as strings. */
+export function isFutureHarvestCheckDate(date: string, now: Date): boolean {
+  return date > localIsoDate(now);
+}
+
 export interface AmberProjection {
   hasProjection: boolean;
   projectedDate: string | null;

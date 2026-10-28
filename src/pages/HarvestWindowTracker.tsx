@@ -33,6 +33,8 @@ import {
   sortHarvestChecks,
   summarizeHarvestPlants,
   validateTrichomePercentages,
+  isFutureHarvestCheckDate,
+  HARVEST_FUTURE_DATE_MESSAGE,
   type HarvestCheck,
   type HarvestRange,
   type HarvestRanges,
@@ -202,6 +204,10 @@ export default function HarvestWindowTracker() {
     event.preventDefault();
     const dateValue = date.trim() || localIsoDate(new Date());
     const plantValue = plant.trim() || "Plant A";
+    if (isFutureHarvestCheckDate(dateValue, new Date())) {
+      setFormError(HARVEST_FUTURE_DATE_MESSAGE);
+      return;
+    }
     const validation = validateTrichomePercentages(form.clear, form.cloudy, form.amber);
     if (!validation.valid) {
       setFormError(validation.reason);

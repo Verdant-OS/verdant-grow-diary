@@ -79,7 +79,7 @@ branch: claude/youthful-franklin-n0mg0f
 base: verdant-grow-diary
 checkout: git fetch origin claude/youthful-franklin-n0mg0f verdant-grow-diary && git switch claude/youthful-franklin-n0mg0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/youthful-franklin-n0mg0f
-head_sha: f814455d449f8a93a5e1b78381f1b327625a824e before the storage-matrix wording fix; read the current head from the PR
+head_sha: 489e9faff3daece28a758b4e78b41f134774b68a before the future-date check fix; read the current head from the PR
 state: pushed, PR ready for review
 current_step: "Keep this log in Verdant" now carries the visitor's checks through signup (sessionStorage key verdant:harvest-handoff:v1, 24 h TTL) to an AppShell import prompt that saves them as plant Notes through useQuickLogV2Save on an explicit click. src/test/funnel-events-wiring.test.ts (scorer-locked) gains one QUICK_LOG_V2_SAVE_CALLERS entry for src/components/HarvestCheckImportPrompt.tsx, unlocked by the user on 2026-10-28
 next_action: independent exact-head review of the PR head (author: this Claude session; exclude it)

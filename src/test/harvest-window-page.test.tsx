@@ -24,6 +24,7 @@ import {
   HARVEST_WINDOW_FAQ,
   HARVEST_WINDOW_H1,
   HARVEST_WINDOW_PATH,
+  HARVEST_FUTURE_DATE_MESSAGE,
 } from "@/lib/harvestWindowRules";
 import HarvestWindowTracker from "@/pages/HarvestWindowTracker";
 
@@ -109,8 +110,8 @@ describe("public harvest window tracker page", () => {
 
   it("logs checks in memory, shows status and summary, and tracks counters only", () => {
     renderPage();
-    addCheck("2026-11-01", "26", "70", "4");
-    addCheck("2026-11-06", "6", "80", "14");
+    addCheck("2026-10-01", "26", "70", "4");
+    addCheck("2026-10-06", "6", "80", "14");
     const table = screen.getByRole("region", { name: "Trichome check log table" });
     expect(within(table).getByText("Before window")).toBeInTheDocument();
     expect(within(table).getByText("In window")).toBeInTheDocument();
@@ -133,7 +134,7 @@ describe("public harvest window tracker page", () => {
 
   it("shows the source validation message and adds nothing for a bad total", () => {
     renderPage();
-    addCheck("2026-11-01", "30", "30", "30");
+    addCheck("2026-10-01", "30", "30", "30");
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Clear %, Cloudy % and Amber % currently total 90%.",
     );
@@ -142,7 +143,7 @@ describe("public harvest window tracker page", () => {
 
   it("tracks a target change and recomputes status", () => {
     renderPage();
-    addCheck("2026-11-01", "0", "60", "40");
+    addCheck("2026-10-01", "0", "60", "40");
     expect(screen.getByText("Past window")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText(/^Body \/ later/));
     expect(trackHarvestTrackerEvent).toHaveBeenLastCalledWith("harvest_tracker_target_changed", {
@@ -178,9 +179,21 @@ describe("public harvest window tracker page", () => {
     vi.useRealTimers();
   });
 
+  it("refuses a future check date instead of logging it", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 28, 9));
+    renderPage();
+    addCheck("2026-10-29", "26", "70", "4");
+    expect(screen.getByText(HARVEST_FUTURE_DATE_MESSAGE)).toBeInTheDocument();
+    expect(screen.queryByText("Plant A (1 check)")).not.toBeInTheDocument();
+    addCheck("2026-10-28", "26", "70", "4");
+    expect(screen.getByText("Plant A (1 check)")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it("clears only after confirmation", () => {
     renderPage();
-    addCheck("2026-11-01", "26", "70", "4");
+    addCheck("2026-10-01", "26", "70", "4");
     fireEvent.click(screen.getByRole("button", { name: "Clear log" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm clear" }));
     expect(screen.getByText(/No trichome checks logged yet/)).toBeInTheDocument();
@@ -202,7 +215,7 @@ describe("public harvest window tracker page", () => {
       check_count: 0,
     });
     // A changed log drops the stale snapshot instead of offering it for copying.
-    addCheck("2026-11-01", "26", "70", "4");
+    addCheck("2026-10-01", "26", "70", "4");
     expect(screen.queryByLabelText(/Clipboard access was unavailable/)).not.toBeInTheDocument();
   });
 });

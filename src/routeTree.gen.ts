@@ -1,4 +1,4 @@
- 
+/* eslint-disable */
 
 // @ts-nocheck
 
@@ -78,6 +78,7 @@ import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
 import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesAthenaFeedChartLogRouteImport } from './routes/guides.athena-feed-chart-log'
+import { Route as GuidesCannabisFloweringStagesWeekByWeekRouteImport } from './routes/guides.cannabis-flowering-stages-week-by-week'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
@@ -501,6 +502,12 @@ const GuidesAthenaFeedChartLogRoute =
   GuidesAthenaFeedChartLogRouteImport.update({
     id: '/guides/athena-feed-chart-log',
     path: '/guides/athena-feed-chart-log',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const GuidesCannabisFloweringStagesWeekByWeekRoute =
+  GuidesCannabisFloweringStagesWeekByWeekRouteImport.update({
+    id: '/guides/cannabis-flowering-stages-week-by-week',
+    path: '/guides/cannabis-flowering-stages-week-by-week',
     getParentRoute: () => rootRouteImport,
   } as any)
 const GuidesGrowStageCareGuideRoute =
@@ -1014,6 +1021,7 @@ export interface FileRoutesByFullPath {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
+  '/guides/cannabis-flowering-stages-week-by-week': typeof GuidesCannabisFloweringStagesWeekByWeekRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1162,6 +1170,7 @@ export interface FileRoutesByTo {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
+  '/guides/cannabis-flowering-stages-week-by-week': typeof GuidesCannabisFloweringStagesWeekByWeekRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1314,6 +1323,7 @@ export interface FileRoutesById {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
+  '/guides/cannabis-flowering-stages-week-by-week': typeof GuidesCannabisFloweringStagesWeekByWeekRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1465,6 +1475,7 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
+    | '/guides/cannabis-flowering-stages-week-by-week'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1613,6 +1624,7 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
+    | '/guides/cannabis-flowering-stages-week-by-week'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1764,6 +1776,7 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
+    | '/guides/cannabis-flowering-stages-week-by-week'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1890,6 +1903,7 @@ export interface RootRouteChildren {
   DocsMcpApiRoute: typeof DocsMcpApiRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesAthenaFeedChartLogRoute: typeof GuidesAthenaFeedChartLogRoute
+  GuidesCannabisFloweringStagesWeekByWeekRoute: typeof GuidesCannabisFloweringStagesWeekByWeekRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
@@ -2392,6 +2406,13 @@ declare module '@tanstack/react-router' {
       path: '/guides/athena-feed-chart-log'
       fullPath: '/guides/athena-feed-chart-log'
       preLoaderRoute: typeof GuidesAthenaFeedChartLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/cannabis-flowering-stages-week-by-week': {
+      id: '/guides/cannabis-flowering-stages-week-by-week'
+      path: '/guides/cannabis-flowering-stages-week-by-week'
+      fullPath: '/guides/cannabis-flowering-stages-week-by-week'
+      preLoaderRoute: typeof GuidesCannabisFloweringStagesWeekByWeekRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guides/grow-stage-care-guide': {
@@ -3231,6 +3252,8 @@ const rootRouteChildren: RootRouteChildren = {
   DocsMcpApiRoute: DocsMcpApiRoute,
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesAthenaFeedChartLogRoute: GuidesAthenaFeedChartLogRoute,
+  GuidesCannabisFloweringStagesWeekByWeekRoute:
+    GuidesCannabisFloweringStagesWeekByWeekRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,

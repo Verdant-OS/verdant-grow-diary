@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GUIDE-CANNABIS-FLOWERING-STAGES-WEEK-BY-WEEK
+
+```text
+TASK GUIDE-CANNABIS-FLOWERING-STAGES-WEEK-BY-WEEK  priority: other  status: OPEN
+goal: port the founder-supplied flowering-planner HTML to the public route /guides/cannabis-flowering-stages-week-by-week, same pattern as /guides/when-to-harvest-cannabis.
+why: Matthew (2026-10-28) asked for one small draft PR against verdant-grow-diary, without touching scorer-locked files.
+branch: claude/guide-cannabis-flowering-stages-week-by-week
+base: verdant-grow-diary
+checkout: git fetch origin claude/guide-cannabis-flowering-stages-week-by-week verdant-grow-diary && git switch claude/guide-cannabis-flowering-stages-week-by-week && git merge origin/verdant-grow-diary
+pr: read from the PR list for branch claude/guide-cannabis-flowering-stages-week-by-week
+head_sha: read the current head from the PR (first push follows this line)
+state: pushed, draft PR
+current_step: draft; awaiting founder decision on the /guides index card, then CI and an independent exact-head review
+next_action: founder decides whether to unlock src/test/verdant-seo-guides-public-links.test.tsx for the GuidesIndex card; then independent exact-head review (author: this Claude session; exclude it)
+post_merge_check: after Publish, https://verdantgrowdiary.com/guides/cannabis-flowering-stages-week-by-week returns the H1 "Cannabis Flowering Stages Week by Week: Plan and Log Your Flower" and /version.json reports the merge SHA; else NOT_MEASURED
+active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+decisions: copy, FAQ and the four JSON-LD blocks are verbatim; date math is strict UTC with month-end, year-end and leap-day tests; flowering_planner_generated and stage_edited keep the source's 2 s trailing debounce; params are integers and enums only. No existing test, e2e spec or gate script is edited (scorer-lock --report --strict is clean); registration is covered by the new flowering-week-plan-seo-registration test. The GuidesIndex card is left out because adding it fails the locked verdant-seo-guides-public-links test (31 vs 30 custom guide slugs).
+tried_and_rejected: adding the GuidesIndex card; it needs an edit to a locked scorer.
+commands: bun run typecheck (NODE_OPTIONS=--max-old-space-size=8192 here); bunx vitest run src/test/flowering-week-plan-*.ts* src/test/route-indexation-matrix.test.ts src/test/*seo*.test.ts* src/test/*guides*.test.ts* --reporter=dot; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/lib/floweringWeekPlanRules.ts src/lib/floweringWeekPlanAnalytics.ts src/pages/CannabisFloweringStagesWeekByWeek.tsx src/routes/guides.cannabis-flowering-stages-week-by-week.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/styles.css public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs and four new flowering tests
+files_remaining: src/pages/GuidesIndex.tsx card (blocked on the locked-test decision)
+blockers: GuidesIndex card needs a scorer unlock the founder has not given
+open_questions: unlock verdant-seo-guides-public-links.test.tsx for the index card, or ship the card in a separate reviewed PR
+gotchas: links to /guides/when-to-harvest-cannabis (#2592), /guides/autoflower-week-by-week (#2593) and /guides/grow-tent-temperature-humidity-chart (#2594) resolve only after those merge; all guide PRs edit the same registration lines, styles.css hunk and matrix counts.
+links: NOT_MEASURED
+artifacts: PR checks
+reviewer_seat: unassigned (eligible independent reviewer per OWNERSHIP.md 4.3)
+reviewer_sha: none
+session_state: no routines, no paused workflows
+claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-28 10:50 UTC
+owner: Claude
+last_updated: 2026-10-28 05:50 CT, by Claude
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

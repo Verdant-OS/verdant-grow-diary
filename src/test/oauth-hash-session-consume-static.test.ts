@@ -30,7 +30,8 @@ describe("oauth hash session consume wiring", () => {
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("recovery");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("signup");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("invite");
-    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("magiclink");
+    // magiclink is a sign-in return, consumed by the bootstrap like Google OAuth.
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toContain("magiclink");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("email_change");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toContain('indexOf("access_token=")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toMatch(/console\./);

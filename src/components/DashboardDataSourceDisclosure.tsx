@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import GrowDataLoadError from "@/components/GrowDataLoadError";
 import { cn } from "@/lib/utils";
 import { combineGrowDataMeta, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
+import { isSuccessfulEmptyGrowRead } from "@/lib/growDataEmptyReadRules";
 import { useAuth } from "@/store/auth";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
@@ -114,24 +115,30 @@ export default function DashboardDataSourceDisclosure({
   }
 
   // Welcome / empty state — no usable data anywhere.
+  // A successful empty read (no-rows) is not a failed fetch. Same rule as
+  // GrowDataSourceDisclosure after #1969.
   if (!hasAnyData && combined.dataSource === "unavailable") {
+    const emptySuccess = isSuccessfulEmptyGrowRead(resolved);
     return (
       <section
         data-testid="dashboard-data-source-disclosure"
         data-source={combined.dataSource}
+        data-empty-reason={emptySuccess ? "no-rows" : "unavailable"}
         className={cn("glass rounded-2xl p-4 mb-4", className)}
         aria-label="Grow data source"
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Badge
-            variant="destructive"
-            data-testid="dashboard-data-source-badge"
-            data-label="Unavailable"
-            className="text-[10px] uppercase tracking-wide"
-          >
-            Unavailable
-          </Badge>
-        </div>
+        {!emptySuccess && (
+          <div className="flex items-center gap-2 mb-2">
+            <Badge
+              variant="destructive"
+              data-testid="dashboard-data-source-badge"
+              data-label="Unavailable"
+              className="text-[10px] uppercase tracking-wide"
+            >
+              Unavailable
+            </Badge>
+          </div>
+        )}
         <h2 className="font-display font-semibold">Welcome to Verdant Grow OS</h2>
         <p className="text-sm text-muted-foreground mt-1">
           No real grow, tent, plant, or sensor data yet. Create your first grow to get started.

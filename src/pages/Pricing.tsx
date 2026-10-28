@@ -8,7 +8,6 @@ import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Check,
   Minus,
-  Sparkles,
   ShieldCheck,
   Database,
   Cpu,
@@ -32,8 +31,6 @@ import {
   PRO_ANNUAL_PRICE_USD,
   CRAFT_MONTHLY_PRICE_USD,
   CRAFT_ANNUAL_PRICE_USD,
-  FOUNDER_LIFETIME_PRICE_USD,
-  FOUNDER_LIFETIME_LIMIT,
 } from "@/constants/pricing";
 import {
   Accordion,
@@ -54,8 +51,11 @@ import {
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 import { SandboxCheckoutTestModeNote } from "@/components/SandboxCheckoutTestModeNote";
-import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
-import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
+import {
+  CHECKOUT_LIVE_FAQ_ID,
+  CHECKOUT_LIVE_FAQ_ITEM_VALUE,
+  resolvePricingFaqValueForHash,
+} from "@/lib/sandboxCheckoutTestModeNoteRules";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
@@ -63,11 +63,12 @@ import { buildCreditPackSuccessUrl } from "@/lib/checkoutReturnTo";
 import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
 import { buildCheckoutPlanReturnPath, savePlanIntent } from "@/lib/checkoutPlanIntent";
 import { resolvePricingCheckoutRetryGate } from "@/lib/pricingCheckoutRetryRules";
+import { isFounderLifetimeCheckoutSku } from "@/lib/founderLifetimeCheckoutGuard";
 
 type BillingPeriod = "monthly" | "annual";
 
 type Cell = boolean | string;
-type Row = { label: string; free: Cell; pro: Cell; craft: Cell; founder: Cell };
+type Row = { label: string; free: Cell; pro: Cell; craft: Cell };
 
 const COMPARISON_ROWS: Row[] = [
   {
@@ -75,93 +76,75 @@ const COMPARISON_ROWS: Row[] = [
     free: "Starting a grow diary",
     pro: "Active growers who want sync, history & exports",
     craft: "Craft growers dialing in every run against an SOP",
-    founder: "Early supporters who want lifetime Pro access",
   },
   {
     label: "Price",
     free: "$0",
     pro: "See toggle above",
     craft: "See toggle above",
-    founder: "$129 one-time",
   },
   {
     label: "AI Doctor credits",
     free: "3 / grow",
     pro: "100 / month",
     craft: "300 / month",
-    founder: "100 / month",
   },
   {
     // Label intentionally drops the "Pro" prefix used by the product name
     // (PRICING.craft: "Pro Blueprint"): in a table with a Pro column, a row
     // called "Pro Blueprint" marked "Not included" under Pro reads as a
-    // contradiction. The capability is Craft + Founder only.
+    // contradiction. The capability is Craft only.
     label: "Blueprint (live SOP scoring)",
     free: false,
     pro: false,
     craft: true,
-    founder: true,
   },
-  { label: "Plant profiles & grow diary", free: true, pro: true, craft: true, founder: true },
-  { label: "Photo logs", free: true, pro: true, craft: true, founder: true },
-  { label: "Manual sensor snapshots", free: true, pro: true, craft: true, founder: true },
+  { label: "Plant profiles & grow diary", free: true, pro: true, craft: true },
+  { label: "Photo logs", free: true, pro: true, craft: true },
+  { label: "Manual sensor snapshots", free: true, pro: true, craft: true },
   {
     label: "Diary & timeline history",
     free: "Kept forever",
     pro: "Kept forever",
     craft: "Kept forever",
-    founder: "Kept forever",
   },
   {
     label: "Cultivation calendar (history-aware)",
     free: true,
     pro: true,
     craft: true,
-    founder: true,
   },
   {
     label: "Date-range diary report (Print / Save PDF)",
     free: false,
     pro: true,
     craft: true,
-    founder: true,
   },
-  { label: "Multi-tent support", free: false, pro: true, craft: true, founder: true },
-  { label: "Exports", free: "Limited", pro: "Advanced", craft: "Advanced", founder: "Advanced" },
+  { label: "Multi-tent support", free: false, pro: true, craft: true },
+  { label: "Exports", free: "Limited", pro: "Advanced", craft: "Advanced" },
   {
     label: "Post-Grow Learning Report (Print / Save PDF)",
     free: false,
     pro: true,
     craft: true,
-    founder: true,
   },
   {
     label: "CSV sensor import (source-labeled)",
     free: true,
     pro: true,
     craft: true,
-    founder: true,
   },
   {
     label: "Sensor snapshot history",
     free: "90 days",
     pro: "Full history",
     craft: "Full history",
-    founder: "Full history",
   },
   {
     label: "Advanced timeline filtering & jump tools",
     free: false,
     pro: true,
     craft: true,
-    founder: true,
-  },
-  {
-    label: "Founder badge / early-supporter access",
-    free: false,
-    pro: false,
-    craft: false,
-    founder: true,
   },
 ];
 
@@ -223,6 +206,7 @@ export default function Pricing() {
   const recoveryRef = useRef<HTMLElement>(null);
   const creditPacksRef = useRef<HTMLElement>(null);
   const handledCreditPacksHashRef = useRef<string | null>(null);
+  const [openFaqItem, setOpenFaqItem] = useState<string>("");
   const {
     openCheckout,
     loading: checkoutLoading,
@@ -296,27 +280,14 @@ export default function Pricing() {
     environment: checkoutEnvironment,
     blocked: Boolean(checkoutRecoveryReason),
   });
-  /**
-   * Founder Lifetime is no longer part of the public pricing grid. It stays
-   * reachable ONLY through an explicit `?plan=founder_lifetime` deep link, so
-   * URLs already in circulation (marketing email, the legacy
-   * `/billing/founder-lifetime` redirect) still complete instead of landing on
-   * a page where the offer has silently vanished.
-   *
-   * Presentation-only. `founder_lifetime` remains in planCatalog,
-   * PAID_PLAN_IDS / SUBSCRIPTION_PLAN_IDS, ai_credit_allowance and every
-   * entitlement gate — existing holders keep exactly what they bought, and the
-   * sell-vs-grant parity guards stay satisfied.
-   */
-  const showFounderOffer = preselect.plan === "founder_lifetime";
-  const founderSlots = useFounderSlotsRemaining();
-  const founderSoldOut = founderSlots.status === "ready" && founderSlots.soldOut;
-
   function handlePaidIntent(
     planId: SubscriberInterestPlanId,
     eventName: PricingAnalyticsName,
     source: string,
   ) {
+    if (isFounderLifetimeCheckoutSku(planId)) {
+      return;
+    }
     lastCheckoutSkuRef.current = planId;
     setInterestPlan(planId);
     setRecoveryRequested(true);
@@ -459,6 +430,45 @@ export default function Pricing() {
   }, [location.hash, preselectedCreditPack]);
 
   useEffect(() => {
+    const scrollToCheckoutLiveFaq = () => {
+      if (typeof document === "undefined") return;
+      const target = document.getElementById(CHECKOUT_LIVE_FAQ_ID);
+      if (!target || typeof target.scrollIntoView !== "function") return;
+      try {
+        target.scrollIntoView({
+          behavior: isReducedMotionPreferred() ? "auto" : "smooth",
+          block: "start",
+        });
+      } catch {
+        try {
+          target.scrollIntoView();
+        } catch {
+          // Presentation-only fallback; ignore in non-browser/jsdom environments.
+        }
+      }
+    };
+
+    const faqValue =
+      (typeof window !== "undefined"
+        ? resolvePricingFaqValueForHash(window.location.hash)
+        : null) ?? resolvePricingFaqValueForHash(location.hash);
+    if (faqValue) {
+      setOpenFaqItem(faqValue);
+      scrollToCheckoutLiveFaq();
+    }
+
+    if (typeof window === "undefined") return;
+    const handleHashChange = () => {
+      const nextFaqValue = resolvePricingFaqValueForHash(window.location.hash);
+      if (!nextFaqValue) return;
+      setOpenFaqItem(nextFaqValue);
+      scrollToCheckoutLiveFaq();
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [location.hash]);
+
+  useEffect(() => {
     if (!blockedReason) {
       // openCheckout clears blockedReason on a fresh attempt; drop the SKU
       // binding with it so a stale one can never keep a button labelled
@@ -587,10 +597,10 @@ export default function Pricing() {
       data-preselected-billing={preselect.billing ?? ""}
     >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <Link to="/welcome" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <BrandLogo size="md" showText />
         </Link>
-        <Link to="/welcome">
+        <Link to="/">
           <Button variant="outline" size="sm">
             Back to home
           </Button>
@@ -617,14 +627,21 @@ export default function Pricing() {
 
       {/* Billing toggle */}
       <section className="px-6 pb-8 max-w-6xl mx-auto flex items-center justify-center gap-3">
-        <span
+        <button
+          type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "monthly" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
+          aria-pressed={billing === "monthly"}
+          onClick={() => {
+            setBilling("monthly");
+            setInterestPlan("pro_monthly");
+            trackPricingEvent("pricing_billing_toggle", { period: "monthly" });
+          }}
         >
           Monthly
-        </span>
+        </button>
         <button
           data-testid="billing-toggle"
           type="button"
@@ -646,18 +663,28 @@ export default function Pricing() {
             ].join(" ")}
           />
         </button>
-        <span
+        <button
+          type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "annual" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
+          aria-pressed={billing === "annual"}
+          onClick={() => {
+            setBilling("annual");
+            setInterestPlan("pro_annual");
+            trackPricingEvent("pricing_billing_toggle", { period: "annual" });
+          }}
         >
           Annual
-        </span>
+        </button>
       </section>
 
       <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
-        <SandboxCheckoutTestModeNote environment={checkoutEnvironment} />
+        <SandboxCheckoutTestModeNote
+          environment={checkoutEnvironment}
+          onCheckoutLiveClick={() => setOpenFaqItem(CHECKOUT_LIVE_FAQ_ITEM_VALUE)}
+        />
         <div
           data-testid="pricing-checkout-trust"
           data-checkout-state={checkoutTrustCopy.state}
@@ -679,7 +706,7 @@ export default function Pricing() {
         id="pricing-plans"
         aria-labelledby="pricing-plans-heading"
         data-testid="pricing-plans-grid"
-        className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4 scroll-mt-24"
+        className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-3 scroll-mt-24"
       >
         <h2 id="pricing-plans-heading" className="sr-only">
           Choose a Verdant plan
@@ -798,191 +825,141 @@ export default function Pricing() {
           }
         />
 
-        {/* Founder Lifetime — retired from the public pricing grid.
-            Rendered ONLY when a grower arrives on an explicit
-            `?plan=founder_lifetime` deep link (including via the legacy
-            `/billing/founder-lifetime` redirect), so links already sent out
-            still complete rather than dead-ending on a page with no Founder
-            offer anywhere. Browsing to /pricing normally shows Free / Pro /
-            Craft only. Nothing about the ENTITLEMENT changes: founder_lifetime
-            stays in planCatalog, PAID_PLAN_IDS and every gate, so existing
-            holders keep exactly what they bought. */}
-        {showFounderOffer && (
-          <PricingCard
-            testId="pricing-card-founder"
-            name={PRICING.founder.name}
-            subtitle={PRICING.founder.subtitle}
-            price={`$${PRICING.founder.price}`}
-            cadence={` ${PRICING.founder.cadence}`}
-            description={PRICING.founder.description}
-            features={PRICING.founder.features}
-            badge={
-              founderSlots.status === "ready" && founderSlots.claimed !== null
-                ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
-                : PRICING.founder.badge
+        {checkoutRecoveryReason && (
+          <section
+            ref={recoveryRef}
+            id={
+              checkoutRecoveryKind === "configuration" ? "subscriber-interest" : "checkout-recovery"
             }
-            footnote={
-              founderSoldOut
-                ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
-                : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
-            }
-            cta={
-              <Button
-                size="lg"
-                className="w-full h-auto min-h-11 whitespace-normal"
-                disabled={checkoutLoading || founderSoldOut}
-                data-testid="pricing-cta-founder-lifetime"
-                data-founder-remaining={founderSlots.remaining ?? ""}
-                onClick={() => {
-                  handlePaidIntent(
-                    "founder_lifetime",
-                    "pricing_cta_founder_lifetime_clicked",
-                    "plan_card",
-                  );
-                }}
-              >
-                {founderSoldOut
-                  ? "Founder Lifetime sold out"
-                  : isSkuBlocked("founder_lifetime")
-                    ? "Join the Founder launch list"
-                    : `Claim Founder Lifetime — $${PRICING.founder.price}`}
-              </Button>
-            }
-          />
+            tabIndex={-1}
+            aria-label={checkoutRecoveryPanelCopy.ariaLabel}
+            data-testid="pricing-checkout-recovery"
+            className="px-6 pb-12 max-w-3xl mx-auto"
+          >
+            <div className="rounded-2xl border border-primary/35 bg-card/40 p-6 md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                {checkoutRecoveryPanelCopy.eyebrow}
+              </p>
+              <h2 className="mt-2 font-display text-2xl font-semibold">
+                {checkoutRecoveryPanelCopy.title}
+              </h2>
+              <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
+              {blockedReason && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {checkoutRecoveryKind === "auth" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid="pricing-checkout-sign-in"
+                      disabled={reauthenticating}
+                      onClick={() => void handleCheckoutReauthentication()}
+                    >
+                      {reauthenticating ? "Opening sign in…" : "Sign in again"}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-testid="pricing-checkout-retry"
+                        disabled={checkoutLoading || !checkoutRetryGate.allowed}
+                        onClick={() => {
+                          // Retry the SKU that actually failed. This read used to be
+                          // lastCheckoutPlanRef, which credit-pack clicks never
+                          // wrote, so a failed "Buy 50 credits" ($9) retried its
+                          // initial value — interestPlan, default pro_annual — and
+                          // opened a $99/yr subscription checkout instead.
+                          const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
+                          if (!resolvePricingCheckoutRetryGate(rawSku, creditPackGate).allowed)
+                            return;
+                          const plan = sanitizeCheckoutRecoveryPlanSlug(rawSku);
+                          trackPricingEvent("pricing_checkout_recovery_retry", {
+                            plan,
+                            source: "recovery_panel",
+                          });
+                          trackFunnelEvent("checkout_recovery_retry", { plan });
+                          dismissBlocked();
+                          void openCheckout({
+                            priceId: rawSku,
+                            successUrl: packSuccessUrlFor(rawSku),
+                          });
+                        }}
+                      >
+                        Try again
+                      </Button>
+                      {checkoutRetryGate.message && (
+                        <p role="status" className="basis-full text-sm text-muted-foreground">
+                          {checkoutRetryGate.message}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {checkoutRecoveryKind === "configuration" && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-testid="pricing-checkout-choose-another-plan"
+                        onClick={() => {
+                          const plan = sanitizeCheckoutRecoveryPlanSlug(
+                            lastCheckoutSkuRef.current ?? interestPlan,
+                          );
+                          trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
+                            plan,
+                            source: "recovery_panel",
+                          });
+                          trackFunnelEvent("checkout_recovery_choose_another_plan", { plan });
+                          dismissBlocked();
+                          setRecoveryRequested(false);
+                          const grid =
+                            typeof document !== "undefined"
+                              ? document.getElementById("pricing-plans")
+                              : null;
+                          grid?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          (grid as HTMLElement | null)?.focus?.();
+                        }}
+                      >
+                        Choose another plan
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-testid="pricing-checkout-dismiss"
+                        onClick={() => {
+                          const plan = sanitizeCheckoutRecoveryPlanSlug(
+                            lastCheckoutSkuRef.current ?? interestPlan,
+                          );
+                          trackPricingEvent("pricing_checkout_recovery_dismissed", {
+                            plan,
+                            source: "recovery_panel",
+                          });
+                          trackFunnelEvent("checkout_recovery_dismissed", { plan });
+                          dismissBlocked();
+                          setRecoveryRequested(false);
+                        }}
+                      >
+                        Dismiss
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+              {checkoutRecoveryKind === "configuration" && (
+                <div className="mt-5">
+                  <SubscriberInterestForm
+                    planId={interestPlan}
+                    leadSource={paidInterestLeadSource}
+                  />
+                </div>
+              )}
+            </div>
+          </section>
         )}
       </section>
-
-      {checkoutRecoveryReason && (
-        <section
-          ref={recoveryRef}
-          id={
-            checkoutRecoveryKind === "configuration" ? "subscriber-interest" : "checkout-recovery"
-          }
-          tabIndex={-1}
-          aria-label={checkoutRecoveryPanelCopy.ariaLabel}
-          data-testid="pricing-checkout-recovery"
-          className="px-6 pb-12 max-w-3xl mx-auto"
-        >
-          <div className="rounded-2xl border border-primary/35 bg-card/40 p-6 md:p-8">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-              {checkoutRecoveryPanelCopy.eyebrow}
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-semibold">
-              {checkoutRecoveryPanelCopy.title}
-            </h2>
-            <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
-            {blockedReason && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {checkoutRecoveryKind === "auth" ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    data-testid="pricing-checkout-sign-in"
-                    disabled={reauthenticating}
-                    onClick={() => void handleCheckoutReauthentication()}
-                  >
-                    {reauthenticating ? "Opening sign in…" : "Sign in again"}
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      data-testid="pricing-checkout-retry"
-                      disabled={checkoutLoading || !checkoutRetryGate.allowed}
-                      onClick={() => {
-                        // Retry the SKU that actually failed. This read used to be
-                        // lastCheckoutPlanRef, which credit-pack clicks never
-                        // wrote, so a failed "Buy 50 credits" ($9) retried its
-                        // initial value — interestPlan, default pro_annual — and
-                        // opened a $99/yr subscription checkout instead.
-                        const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
-                        if (!resolvePricingCheckoutRetryGate(rawSku, creditPackGate).allowed)
-                          return;
-                        const plan = sanitizeCheckoutRecoveryPlanSlug(rawSku);
-                        trackPricingEvent("pricing_checkout_recovery_retry", {
-                          plan,
-                          source: "recovery_panel",
-                        });
-                        trackFunnelEvent("checkout_recovery_retry", { plan });
-                        dismissBlocked();
-                        void openCheckout({
-                          priceId: rawSku,
-                          successUrl: packSuccessUrlFor(rawSku),
-                        });
-                      }}
-                    >
-                      Try again
-                    </Button>
-                    {checkoutRetryGate.message && (
-                      <p role="status" className="basis-full text-sm text-muted-foreground">
-                        {checkoutRetryGate.message}
-                      </p>
-                    )}
-                  </>
-                )}
-                {checkoutRecoveryKind === "configuration" && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      data-testid="pricing-checkout-choose-another-plan"
-                      onClick={() => {
-                        const plan = sanitizeCheckoutRecoveryPlanSlug(
-                          lastCheckoutSkuRef.current ?? interestPlan,
-                        );
-                        trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
-                          plan,
-                          source: "recovery_panel",
-                        });
-                        trackFunnelEvent("checkout_recovery_choose_another_plan", { plan });
-                        dismissBlocked();
-                        setRecoveryRequested(false);
-                        const grid =
-                          typeof document !== "undefined"
-                            ? document.getElementById("pricing-plans")
-                            : null;
-                        grid?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        (grid as HTMLElement | null)?.focus?.();
-                      }}
-                    >
-                      Choose another plan
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      data-testid="pricing-checkout-dismiss"
-                      onClick={() => {
-                        const plan = sanitizeCheckoutRecoveryPlanSlug(
-                          lastCheckoutSkuRef.current ?? interestPlan,
-                        );
-                        trackPricingEvent("pricing_checkout_recovery_dismissed", {
-                          plan,
-                          source: "recovery_panel",
-                        });
-                        trackFunnelEvent("checkout_recovery_dismissed", { plan });
-                        dismissBlocked();
-                        setRecoveryRequested(false);
-                      }}
-                    >
-                      Dismiss
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-            {checkoutRecoveryKind === "configuration" && (
-              <div className="mt-5">
-                <SubscriberInterestForm planId={interestPlan} leadSource={paidInterestLeadSource} />
-              </div>
-            )}
-          </div>
-        </section>
-      )}
 
       {/* AI Credit explainer */}
       <section className="px-6 pb-12 max-w-4xl mx-auto">
@@ -1124,73 +1101,16 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* Founder Lifetime highlight band — retired from the public page along
-          with the grid card; shown only on an explicit deep link. */}
-      {showFounderOffer && (
-        <section className="px-6 py-10 max-w-5xl mx-auto">
-          <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
-            <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-display text-xl md:text-2xl font-semibold">
-                Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
-              </h2>
-              <p className="mt-2 text-sm md:text-base text-muted-foreground">
-                Verdant is founder-built. This is a limited early-supporter offer for the first{" "}
-                {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro
-                access for the life of the product, and help shape what ships next. No hype, no
-                countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
-                ends.
-              </p>
-              <Link
-                to="/founder"
-                className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
-                onClick={() =>
-                  trackPricingEvent("pricing_founder_details_clicked", {
-                    source: "highlight_band",
-                  })
-                }
-              >
-                See exactly what Founder includes
-              </Link>
-            </div>
-            <Button
-              size="lg"
-              className="shrink-0"
-              disabled={checkoutLoading || founderSoldOut}
-              data-testid="pricing-cta-founder-highlight"
-              onClick={() => {
-                handlePaidIntent(
-                  "founder_lifetime",
-                  "pricing_cta_founder_lifetime_clicked",
-                  "highlight_band",
-                );
-              }}
-            >
-              {founderSoldOut
-                ? "Founder Lifetime sold out"
-                : isSkuBlocked("founder_lifetime")
-                  ? "Join the Founder launch list"
-                  : "Claim Founder Lifetime"}
-            </Button>
-          </div>
-        </section>
-      )}
-
       {/* Comparison table */}
       <section className="px-6 py-12 max-w-5xl mx-auto">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          {showFounderOffer
-            ? "Compare Free, Pro, Craft, and Founder Lifetime"
-            : "Compare Free, Pro and Craft"}
+          Compare Free, Pro and Craft
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
           Free is genuinely useful for starting a grow diary, with diary and timeline history kept
           forever. Pro adds full sensor history, advanced filtering and jump tools, advanced
           exports, and multi-tent support. Craft adds the live Pro Blueprint that scores every
-          reading against your per-stage SOP. Founder Lifetime is a limited early-supporter offer
-          that includes full Pro access and the Pro Blueprint.
+          reading against your per-stage SOP.
         </p>
 
         <div
@@ -1206,11 +1126,6 @@ export default function Pricing() {
                 <th className="text-center font-medium px-4 py-3">Free</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Pro</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Craft</th>
-                {showFounderOffer && (
-                  <th className="text-center font-medium px-4 py-3 text-primary">
-                    Founder Lifetime
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
@@ -1226,18 +1141,13 @@ export default function Pricing() {
                   <td className="px-4 py-3 text-center">
                     <CellValue value={row.craft} accent />
                   </td>
-                  {showFounderOffer && (
-                    <td className="px-4 py-3 text-center">
-                      <CellValue value={row.founder} accent />
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-xs text-muted-foreground text-center sm:hidden">
-          {showFounderOffer ? "Swipe to compare all four plans →" : "Swipe to compare all plans →"}
+          "Swipe to compare all plans →"
         </p>
       </section>
 
@@ -1272,7 +1182,9 @@ export default function Pricing() {
           type="single"
           collapsible
           className="mt-6"
+          value={openFaqItem}
           onValueChange={(value) => {
+            setOpenFaqItem(value);
             if (value) trackPricingEvent("pricing_faq_opened", { item: value });
           }}
         >
@@ -1300,17 +1212,6 @@ export default function Pricing() {
               Multi-tent support, advanced exports including date-range diary reports, full sensor
               snapshot history, advanced timeline filtering and jump tools, and post-grow learning
               reports.
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="founder-lifetime">
-            <AccordionTrigger>How does the Founder Lifetime Offer work?</AccordionTrigger>
-            <AccordionContent className="text-muted-foreground">
-              ${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the
-              product. This is a limited early-supporter offer, not a separate recurring plan.
-              Limited to the first {FOUNDER_LIFETIME_LIMIT} buyers. When the first{" "}
-              {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends. No fake countdowns and no
-              expiring timers beyond that real limit.
             </AccordionContent>
           </AccordionItem>
 

@@ -11,7 +11,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const WEBHOOK = read("supabase/functions/payments-webhook/index.ts");
 const SHARED = read("supabase/functions/_shared/paddle.ts");
-const PURE = read("supabase/functions/paddle-webhook/verifyPaddleSignature.ts");
+const PURE = read("supabase/functions/_shared/verifyPaddleSignature.ts");
 const PURCHASE_CONFIRMATION = read(
   "supabase/functions/payments-webhook/sendPurchaseConfirmation.ts",
 );

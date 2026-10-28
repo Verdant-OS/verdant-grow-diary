@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
   readPendingQuickLogNote,
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
   markPendingQuickLogNoteHistoryCheck,
+  updatePendingQuickLogNotePayload,
   NOTE_RECOVERY_UNAVAILABLE,
   NOTE_RECOVERY_PENDING,
   NOTE_RECOVERY_CLEAR_FAILED,
@@ -16,6 +18,7 @@ import {
   claimPendingQuickLogWatering,
   reconcilePendingQuickLogWateringClear,
   reconcilePendingQuickLogWateringHistoryDiscard,
+  clearUnreadablePendingQuickLogWatering,
   markPendingQuickLogWateringHistoryCheck,
   WATERING_RECOVERY_UNAVAILABLE,
   WATERING_RECOVERY_PENDING,
@@ -28,6 +31,16 @@ import {
   STARTER_WATER_RECOVERY_UNAVAILABLE,
 } from "@/lib/quickLogPendingStarterWaterStore";
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
+import {
+  mayClearUnreadableWaterRecovery,
+  unreadableWaterRecoveryOutcome,
+} from "@/lib/quickLogUnreadableWaterRecoveryRules";
+import {
+  QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER,
+} from "@/constants/quickLogWaterRecoveryCopy";
 import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
 import {
   feedingHistoryCheckMessage,
@@ -46,6 +59,7 @@ import {
 } from "@/lib/quickLogPendingFeedingStore";
 import { buildFeedingRecoveryForm } from "@/lib/quickLogFeedingRecoveryViewModel";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,7 +74,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
   buildQuickLogTimelineNavTarget,
@@ -121,6 +135,7 @@ import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
   FEEDING_SAVE_SUCCESS_MESSAGE,
+  assessFeedingEcFields,
   buildFeedingFormPayload,
   feedingFormReasonToHelper,
   findFeedingPayloadRangeViolation,
@@ -131,6 +146,11 @@ import { writeFeedingTypedEvent, type FeedingTypedEventInput } from "@/lib/write
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
 import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
+import { assessQuickLogSensorSnapshotGate } from "@/lib/quickLogSensorSnapshotGateRules";
+import {
+  assessLargeWaterAmount,
+  confirmLargeWaterAmount,
+} from "@/lib/quickLogWaterVolumeWarningRules";
 import {
   EMPTY_QUICKLOG_WATERING_FORM,
   WATERING_SAVE_FAILURE_MESSAGE,
@@ -148,8 +168,15 @@ import QuickLogMaturityEvidenceFields from "@/components/QuickLogMaturityEvidenc
 import {
   buildFeedingDefaults,
   applyFeedingDefaultsToForm,
+  feedingDefaultsPrefillSettled,
+  feedingRecipeMatches,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
+import {
+  feedingDefaultsSaveCutoffQueryKey,
+  readFeedingDefaultsSaveCutoff,
+  recordFeedingDefaultsSaveCutoff,
+} from "@/lib/feedingDefaultsSaveCutoff";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
   applyWateringVolumeDefaultsToForm,
@@ -204,29 +231,21 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
 import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import {
-  fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
-
-const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+import { typedTemperatureToCelsiusInput } from "@/lib/quickLogTypedTemperatureRules";
 
 /**
  * Convert a grower-typed temperature string (entered in the active
  * preference unit) into a canonical-°C string. Called EXACTLY ONCE per
  * save attempt, at the payload-build seam, on the raw typed value — the
  * built payload (including the locked watering retry submission) already
- * holds °C and is never re-converted. Blank stays blank and non-numeric
- * text passes through unchanged so the existing validators keep rejecting
- * it with their original reasons.
+ * holds °C and is never re-converted. The conversion itself is the shared
+ * pure helper the sensor snapshot gate also uses, so they cannot drift.
  */
 function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
-  if (unit !== "fahrenheit") return raw;
-  const trimmed = raw.trim();
-  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return raw;
-  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+  return typedTemperatureToCelsiusInput(raw, unit);
 }
 
 interface Props {
@@ -254,6 +273,8 @@ interface LockedManualSubmission {
   videoMeta: QuickLogVideoMeta | null;
   note: string;
   action: "note";
+  /** Storage path of the photo already uploaded for this exact submission. */
+  uploadedPath?: string | null;
 }
 
 interface LockedFeedingSubmission {
@@ -304,6 +325,9 @@ function loadRecentTargetRecord(userId: string | null | undefined) {
 }
 
 function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmission {
+  // A journal written after the upload already names the photo path; the
+  // restored retry replays that same payload and never uploads again.
+  const journaledPhotoPath = record.payload.p_details?.photo_url;
   return {
     recovery: record,
     payload: record.payload,
@@ -313,6 +337,7 @@ function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmis
     videoMeta: null,
     note: record.payload.p_note ?? "",
     action: "note",
+    uploadedPath: typeof journaledPhotoPath === "string" ? journaledPhotoPath : null,
   };
 }
 
@@ -356,6 +381,7 @@ function QuickLogV2SheetForOwner({
   defaultTargetKey,
   defaultAction = "note",
 }: Props) {
+  const restoreOpenerFocus = useDialogOpenerRestore(open);
   const { user } = useAuth();
   const [initialRecovery] = useState(() => readPendingQuickLogNote(user?.id ?? null));
   const initialNote = initialRecovery.status === "pending" ? initialRecovery.record : null;
@@ -384,6 +410,11 @@ function QuickLogV2SheetForOwner({
   const [noteStorageFence, setNoteStorageFence] = useState(false);
   const confirmedNoteRecoveryRef = useRef<PendingQuickLogNote | null>(null);
   const [wateringStorageFence, setWateringStorageFence] = useState(false);
+  // The typed Water journal for this owner exists but cannot be read. Only the
+  // grower’s "Check Timeline, then clear" action resolves it; nothing replays.
+  const [wateringRecoveryUnreadable, setWateringRecoveryUnreadable] = useState(
+    () => Boolean(user?.id) && initialWateringRecovery.status === "blocked",
+  );
   const confirmedWateringRecoveryRef = useRef<PendingQuickLogWatering | null>(null);
   const [feedingStorageFence, setFeedingStorageFence] = useState(false);
   const confirmedFeedingRecoveryRef = useRef<PendingQuickLogFeeding | null>(null);
@@ -500,6 +531,15 @@ function QuickLogV2SheetForOwner({
   const [wateringForm, setWateringForm] = useState<QuickLogWateringFormState>(
     initialWateringForm?.wateringForm ?? EMPTY_QUICKLOG_WATERING_FORM,
   );
+  const largeWaterSessionRef = useRef<{ inFlight: boolean; confirmedKey: string | null }>({
+    inFlight: false,
+    confirmedKey: null,
+  });
+  const [largeWaterConfirmedKey, setLargeWaterConfirmedKey] = useState<string | null>(null);
+  const clearLargeWaterConfirmation = () => {
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
   const [maturityEvidenceForm, setMaturityEvidenceForm] =
     useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
@@ -526,7 +566,14 @@ function QuickLogV2SheetForOwner({
   const [videoMeta, setVideoMeta] = useState<QuickLogVideoMeta | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
+  const [photoChecking, setPhotoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  // The recipe the one-shot prefill wrote, so a target change can tell an
+  // untouched prefill (re-derive for the new plant) from grower edits (keep).
+  const appliedFeedingDefaultsRef = useRef<QuickLogFeedingFormState | null>(null);
+  const [feedingDefaultsRefetchAfterByPlant, setFeedingDefaultsRefetchAfterByPlant] = useState<
+    Record<string, number>
+  >({});
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
@@ -610,6 +657,8 @@ function QuickLogV2SheetForOwner({
   // from installing a stale file when its probe resolves late.
   const videoValidationGenerationRef = useRef(0);
   const videoValidationInFlightRef = useRef(false);
+  const photoValidationGenerationRef = useRef(0);
+  const photoValidationInFlightRef = useRef(false);
   // Dedicated synchronous guard for the photo-diary insert path so
   // rapid re-taps during photo capture/upload cannot enqueue a second
   // insert before the first resolves. Reset in try/finally.
@@ -813,9 +862,24 @@ function QuickLogV2SheetForOwner({
       }
     : { plantId: null, tentId: null, growId: null };
 
+  const feedingDefaultsSaveCutoffQ = useQuery({
+    queryKey: feedingDefaultsSaveCutoffQueryKey(resolvedContext.plantId ?? ""),
+    enabled: false,
+    staleTime: Infinity,
+    queryFn: () => 0,
+  });
+  const recordedFeedingDefaultsSaveCutoff =
+    typeof feedingDefaultsSaveCutoffQ.data === "number" ? feedingDefaultsSaveCutoffQ.data : 0;
+
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
-  }) as { data?: unknown[] };
+  }) as {
+    data?: unknown[];
+    isFetching?: boolean;
+    isPending?: boolean;
+    isError?: boolean;
+    dataUpdatedAt?: number;
+  };
   const feedingDefaults = useMemo(
     () =>
       buildFeedingDefaults({
@@ -824,6 +888,28 @@ function QuickLogV2SheetForOwner({
       }),
     [recentFeedingsQ.data, resolvedContext.plantId],
   );
+
+  // #2172 / VER-195: a target change must not carry plant A's prefilled recipe
+  // into plant B. An untouched prefill is cleared so B's own defaults (or none)
+  // apply; a recipe the grower edited is theirs and stays.
+  const feedingDefaultsPlantRef = useRef(resolvedContext.plantId);
+  // After a retarget reset only the recipe must be pristine for B's defaults.
+  const feedingRecipeRetargetedRef = useRef(false);
+  useEffect(() => {
+    if (feedingDefaultsPlantRef.current === resolvedContext.plantId) return;
+    feedingDefaultsPlantRef.current = resolvedContext.plantId;
+    const applied = appliedFeedingDefaultsRef.current;
+    if (!feedingDefaultsApplied || !applied) return;
+    if (!feedingRecipeMatches(feedingForm, applied)) return;
+    appliedFeedingDefaultsRef.current = null;
+    feedingRecipeRetargetedRef.current = true;
+    setFeedingForm((previous) => ({
+      ...previous,
+      lineId: EMPTY_QUICKLOG_FEEDING_FORM.lineId,
+      products: EMPTY_QUICKLOG_FEEDING_FORM.products.map((row) => ({ ...row })),
+    }));
+    setFeedingDefaultsApplied(false);
+  }, [resolvedContext.plantId, feedingDefaultsApplied, feedingForm]);
 
   const recentWateringsQ = useRecentWateringsForVolumeDefaults({
     plantId: resolvedContext.plantId,
@@ -883,7 +969,38 @@ function QuickLogV2SheetForOwner({
       wateringForm,
     ],
   );
-  const waterFieldMessage = retryPending ? null : (waterSaveGate?.footerMessage ?? null);
+  // Every other snapshot-bearing action (Feed has no snapshot fields) gets the
+  // same render-time band check; Save still goes through the one payload
+  // builder and quicklog_save_manual, which stay authoritative.
+  const snapshotGate = useMemo(
+    () =>
+      form.action !== "water" && form.action !== "feed"
+        ? assessQuickLogSensorSnapshotGate({
+            temperatureInput: form.temperatureC,
+            humidityInput: form.humidityPct,
+            vpdInput: form.vpdKpa,
+            temperatureUnit: manualEntryUnit,
+          })
+        : null,
+    [form.action, form.temperatureC, form.humidityPct, form.vpdKpa, manualEntryUnit],
+  );
+  const sensorFieldErrors = waterSaveGate?.fields ?? snapshotGate?.fields ?? {};
+  const waterFieldMessage = retryPending
+    ? null
+    : (waterSaveGate?.footerMessage ?? snapshotGate?.footerMessage ?? null);
+  // #2159: a negative feeding EC is named under its field and blocks Save
+  // while typed, not only when the save is attempted.
+  const feedingEcGate =
+    form.action === "feed" && !retryPending ? assessFeedingEcFields(feedingForm) : null;
+  const feedingFieldMessage = feedingEcGate?.footerMessage ?? null;
+  const largeWaterAssessment =
+    form.action === "water" && !retryPending
+      ? assessLargeWaterAmount({
+          amount: wateringForm.volumeMl,
+          unit: "ml",
+          confirmedKey: largeWaterConfirmedKey,
+        })
+      : null;
   const criticalContentMissing = isQuickLogV2CriticalContentMissing({
     action: form.action,
     note: form.note,
@@ -952,11 +1069,18 @@ function QuickLogV2SheetForOwner({
           selectedTargetMissing,
           volumeMissing,
           waterFieldMessage,
+          feedingFieldMessage,
+          largeWaterMessage: largeWaterAssessment?.needsConfirmation
+            ? largeWaterAssessment.message
+            : null,
           criticalContentMissing,
           saving: saving || feedingSaving || wateringSaving,
         });
 
   function resetPhotoSelection() {
+    photoValidationGenerationRef.current += 1;
+    photoValidationInFlightRef.current = false;
+    setPhotoChecking(false);
     setPhotoFile(null);
     setPhotoPreview(null);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -1011,6 +1135,7 @@ function QuickLogV2SheetForOwner({
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
@@ -1089,17 +1214,53 @@ function QuickLogV2SheetForOwner({
     if (!open || submissionLockedRef.current) return;
     if (form.action !== "feed") return;
     if (feedingDefaultsApplied) return;
+    if (
+      !feedingDefaultsPrefillSettled({
+        isFetching: Boolean(recentFeedingsQ.isFetching),
+        isPending: Boolean(recentFeedingsQ.isPending),
+        isError: Boolean(recentFeedingsQ.isError),
+        dataUpdatedAt: recentFeedingsQ.dataUpdatedAt ?? 0,
+        refetchRequiredAfter: 0,
+        plantId: resolvedContext.plantId,
+        refetchRequiredAfterByPlant: feedingDefaultsRefetchAfterByPlant,
+        recordedSaveCutoff: recordedFeedingDefaultsSaveCutoff,
+      })
+    )
+      return;
     if (!feedingDefaults.defaults) return;
     // Defaults affect only the recipe. A note handed off from Note/Water (for
     // example a selected Better/Same/Worse response) must neither block those
     // defaults nor be overwritten by them.
-    if (!isFeedingFormPristine({ ...feedingForm, note: "" })) return;
-    setFeedingForm((previous) => ({
-      ...applyFeedingDefaultsToForm(feedingDefaults),
-      note: previous.note,
-    }));
+    const retargeted = feedingRecipeRetargetedRef.current;
+    if (
+      retargeted
+        ? !feedingRecipeMatches(feedingForm, EMPTY_QUICKLOG_FEEDING_FORM)
+        : !isFeedingFormPristine({ ...feedingForm, note: "" })
+    )
+      return;
+    const applied = applyFeedingDefaultsToForm(feedingDefaults);
+    appliedFeedingDefaultsRef.current = applied;
+    feedingRecipeRetargetedRef.current = false;
+    setFeedingForm((previous) =>
+      retargeted
+        ? { ...previous, lineId: applied.lineId, products: applied.products }
+        : { ...applied, note: previous.note },
+    );
     setFeedingDefaultsApplied(true);
-  }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
+  }, [
+    open,
+    form.action,
+    feedingDefaults,
+    feedingDefaultsApplied,
+    feedingDefaultsRefetchAfterByPlant,
+    recordedFeedingDefaultsSaveCutoff,
+    resolvedContext.plantId,
+    feedingForm,
+    recentFeedingsQ.isFetching,
+    recentFeedingsQ.isPending,
+    recentFeedingsQ.isError,
+    recentFeedingsQ.dataUpdatedAt,
+  ]);
 
   // One-shot prefill of Water volume from the plant's most recent watering
   // that recorded a positive volume. Fail closed: never invent 200/500/pot
@@ -1201,6 +1362,7 @@ function QuickLogV2SheetForOwner({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setWateringVolumeDefaultsApplied(false);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
@@ -1227,9 +1389,45 @@ function QuickLogV2SheetForOwner({
 
   function handlePhotoInputChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0] ?? null;
-    if (!file) return;
-    handlePhotoSelected(file);
     e.currentTarget.value = "";
+    if (!file || submissionLockedRef.current) return;
+    if (!fileClaimsPng(file)) {
+      photoValidationGenerationRef.current += 1;
+      photoValidationInFlightRef.current = false;
+      setPhotoChecking(false);
+      handlePhotoSelected(file);
+      return;
+    }
+    const validationGeneration = photoValidationGenerationRef.current + 1;
+    photoValidationGenerationRef.current = validationGeneration;
+    photoValidationInFlightRef.current = true;
+    setPhotoChecking(true);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setLocalError(null);
+    setSaveStatus("Checking photo…");
+    void (async () => {
+      try {
+        const pngClaim = await validateQuickLogPngClaim(file);
+        if (validationGeneration !== photoValidationGenerationRef.current) return;
+        if (!pngClaim.ok) {
+          setLocalError(pngClaim.message);
+          setSaveStatus("");
+          return;
+        }
+        if (submissionLockedRef.current) return;
+        handlePhotoSelected(file);
+      } catch {
+        if (validationGeneration !== photoValidationGenerationRef.current) return;
+        setLocalError("That photo could not be read. Try a different file.");
+        setSaveStatus("");
+      } finally {
+        if (validationGeneration === photoValidationGenerationRef.current) {
+          photoValidationInFlightRef.current = false;
+          setPhotoChecking(false);
+        }
+      }
+    })();
   }
 
   async function handleVideoInputChange(e: ChangeEvent<HTMLInputElement>) {
@@ -1483,11 +1681,32 @@ function QuickLogV2SheetForOwner({
     );
   }
 
+  const releaseUnstartedLargeWaterConfirm = () => {
+    if (saveInFlightRef.current) return;
+    if (
+      !largeWaterSessionRef.current.inFlight &&
+      largeWaterSessionRef.current.confirmedKey === null
+    ) {
+      return;
+    }
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
+
   const handleSave = async () => {
-    if (recoveryStorageFence || historyCheckRequiredRef.current) return;
+    if (recoveryStorageFence || historyCheckRequiredRef.current) {
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
     const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
+    if (photoValidationInFlightRef.current) {
+      setLocalError("Wait for the photo check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     // Synchronous re-entry guard: prevents a rapid double-click from
@@ -1499,7 +1718,19 @@ function QuickLogV2SheetForOwner({
         postSaveShown: postSave !== null,
       })
     ) {
+      releaseUnstartedLargeWaterConfirm();
       return;
+    }
+    if (form.action === "water" && !wateringRetrySubmissionRef.current) {
+      const largeWater = assessLargeWaterAmount({
+        amount: wateringForm.volumeMl,
+        unit: "ml",
+        confirmedKey: largeWaterSessionRef.current.confirmedKey,
+      });
+      if (largeWater.needsConfirmation) {
+        releaseUnstartedLargeWaterConfirm();
+        return;
+      }
     }
     // Freeze every supported submission before the first await, using the
     // same synchronous guard as Water. Local validation releases this lock.
@@ -1515,6 +1746,10 @@ function QuickLogV2SheetForOwner({
     try {
       await runHandleSave();
     } finally {
+      largeWaterSessionRef.current = {
+        ...largeWaterSessionRef.current,
+        inFlight: false,
+      };
       if (lifetime.active) {
         saveInFlightRef.current = false;
         if (lockSubmission) {
@@ -1716,6 +1951,18 @@ function QuickLogV2SheetForOwner({
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      const savedPlantId = resolved.plantId ?? null;
+      if (savedPlantId) {
+        const refetchAfter = Date.now();
+        recordFeedingDefaultsSaveCutoff(queryClient, savedPlantId, refetchAfter);
+        setFeedingDefaultsRefetchAfterByPlant((previous) => ({
+          ...previous,
+          [savedPlantId]: refetchAfter,
+        }));
+        void queryClient.invalidateQueries({
+          queryKey: ["quicklog_v2_feed_defaults", savedPlantId],
+        });
+      }
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
         // Feed uses the same canonical grow-scoped Timeline as note/water.
@@ -1844,6 +2091,7 @@ function QuickLogV2SheetForOwner({
       if (claim.status !== "claimed") {
         if (claim.status === "pending") restorePendingWatering(claim.record);
         else {
+          if (claim.status === "blocked") setWateringRecoveryUnreadable(true);
           if (!pendingWateringSubmission) wateringRetrySubmissionRef.current = null;
           else keepSubmissionLockedRef.current = true;
           setLocalError(
@@ -1856,6 +2104,7 @@ function QuickLogV2SheetForOwner({
       }
       exactWateringSubmission.recovery = claim.record;
       keepSubmissionLockedRef.current = true;
+      setWateringRecoveryUnreadable(false);
     }
     const releaseUnsentWatering = async () => {
       if (!exactWateringSubmission) return;
@@ -1870,6 +2119,14 @@ function QuickLogV2SheetForOwner({
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
+        // New manual Note saves only. Feed returns above this call. Water
+        // builds its own payload and skips this builder. A retry replays the
+        // stored payload, so a later stage change does not rewrite it.
+        // Pass the stage stored on the resolved target: the plant's stage for
+        // a plant, the tent's stage for a tent. Neither target borrows the
+        // other's stage. The builder keeps a canonical stage and omits a
+        // missing or unknown one.
+        stage: targetStage,
         volumeMl: form.volumeMl,
         note: form.note,
         temperatureC: typedTempToCelsiusInput(
@@ -1942,8 +2199,10 @@ function QuickLogV2SheetForOwner({
     const submissionNote = exactSubmission?.note ?? form.note;
     const submissionAction: QuickLogV2Action = exactSubmission?.action ?? form.action;
 
-    let uploadedPath: string | null = null;
-    if (submissionPhotoFile) {
+    // An exact retry reuses its first upload: the replayed key returns the
+    // original event, whose details.photo_url names that path.
+    let uploadedPath: string | null = exactManualSubmission?.uploadedPath ?? null;
+    if (submissionPhotoFile && !uploadedPath) {
       if (!resolved.growId) {
         await releaseUnsentWatering();
         releaseUnsentNote();
@@ -1973,6 +2232,38 @@ function QuickLogV2SheetForOwner({
       if (exactWateringSubmission) setFailedWaterPhotoUpload(false);
       uploadedPath = upload.path;
     }
+    if (uploadedPath && exactManualSubmission) {
+      // The photo travels inside the single quicklog_save_manual write, so
+      // its diary mirror is the only row (production QA 2026-10-14 saw the
+      // mirror plus a second "Photo attached" companion insert).
+      // Keep the upload on the in-memory lock first: an exact retry reuses it
+      // whether or not the journal write below lands.
+      exactManualSubmission.uploadedPath = uploadedPath;
+      if (exactManualSubmission.payload.p_details?.photo_url !== uploadedPath) {
+        const payloadWithPhoto: QuickLogV2SavePayload = {
+          ...exactManualSubmission.payload,
+          p_details: {
+            ...(exactManualSubmission.payload.p_details ?? {}),
+            photo_url: uploadedPath,
+          },
+        };
+        // The RPC hashes p_details into its replay lock, so the journal a
+        // reload restores must carry this exact payload before dispatch.
+        const journaled = updatePendingQuickLogNotePayload(
+          exactManualSubmission.recovery,
+          payloadWithPhoto,
+        );
+        if (journaled.status !== "updated") {
+          keepSubmissionLockedRef.current = true;
+          setExactRetryPending(true);
+          setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+          setSaveStatus("");
+          return;
+        }
+        exactManualSubmission.payload = journaled.record.payload;
+        exactManualSubmission.recovery = journaled.record;
+      }
+    }
 
     let res: Awaited<ReturnType<typeof save>>;
     if (wateringPayload) {
@@ -1987,6 +2278,7 @@ function QuickLogV2SheetForOwner({
       if (claim.status !== "claimed") {
         keepSubmissionLockedRef.current = true;
         setWateringRetryPending(true);
+        if (claim.status === "blocked") setWateringRecoveryUnreadable(true);
         setLocalError(
           claim.status === "other_pending"
             ? STARTER_WATER_RECOVERY_PENDING
@@ -2119,7 +2411,9 @@ function QuickLogV2SheetForOwner({
       setExactRetryPending(unresolved);
       keepSubmissionLockedRef.current = unresolved;
       if (!unresolved) manualRetrySubmissionRef.current = null;
-      if (uploadedPath) {
+      // An unresolved note keeps its upload: the exact retry replays the same
+      // payload, whose details.photo_url names this path.
+      if (uploadedPath && !(unresolved && exactManualSubmission)) {
         await supabase.storage
           .from("diary-photos")
           .remove([uploadedPath])
@@ -2204,7 +2498,27 @@ function QuickLogV2SheetForOwner({
     let photoAttached = false;
     let videoAttached = false;
 
-    if (uploadedPath && confirmedScope.growId) {
+    if (uploadedPath && confirmedScope.growId && exactManualSubmission) {
+      // quicklog_save_manual already mirrored details.photo_url. This only
+      // fills the legacy top-level column through the client write fence;
+      // Timeline falls back to details.photo_url if the patch does not apply.
+      photoAttached = true;
+      if (res.growEventId) {
+        try {
+          const { data: patched, error: photoErr } = await supabase
+            .from("diary_entries")
+            .update({ photo_url: uploadedPath })
+            .filter("details->>linked_grow_event_id", "eq", res.growEventId)
+            .select("id");
+          if (photoErr || !Array.isArray(patched) || patched.length !== 1) {
+            console.warn("Quick Log companion photo_url normalization did not complete");
+          }
+        } catch (photoErr) {
+          console.warn("Quick Log companion photo_url normalization did not complete", photoErr);
+        }
+        if (exactSubmission && !canContinueNote()) return;
+      }
+    } else if (uploadedPath && confirmedScope.growId) {
       const photoEntry = await createPhotoDiaryEntry({
         growId: confirmedScope.growId,
         tentId: confirmedScope.tentId,
@@ -2495,6 +2809,52 @@ function QuickLogV2SheetForOwner({
     handleLogAnother();
   }
 
+  const unreadableWaterClearAllowed = mayClearUnreadableWaterRecovery({
+    blocked: wateringRecoveryUnreadable,
+    hasReadableRecord: false,
+    ownerId: user?.id,
+    inFlight: recoveryStorageFence || saving || feedingSaving || wateringSaving,
+  });
+  // The grower checked Timeline and clears an unreadable typed Water key. The
+  // stored record is never replayed, and an in-memory locked Water is dropped
+  // (new key) rather than resent; a readable record found instead goes to Retry.
+  async function handleClearUnreadableWatering() {
+    const ownerId = user?.id;
+    if (!ownerId || !unreadableWaterClearAllowed || saveInFlightRef.current) return;
+    const lifetime = noteLifetimeRef.current;
+    saveInFlightRef.current = true;
+    let outcome: ReturnType<typeof unreadableWaterRecoveryOutcome>;
+    try {
+      outcome = unreadableWaterRecoveryOutcome(
+        await clearUnreadablePendingQuickLogWatering(ownerId),
+      );
+    } finally {
+      saveInFlightRef.current = false;
+    }
+    if (!lifetime.active || noteLifetimeRef.current !== lifetime) return;
+    if (outcome === "still_blocked") {
+      setLocalError(QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED);
+      return;
+    }
+    setWateringRecoveryUnreadable(false);
+    const current = readPendingQuickLogWatering(ownerId);
+    if (current.status === "pending") {
+      restorePendingWatering(current.record);
+      return;
+    }
+    if (current.status === "blocked") {
+      setWateringRecoveryUnreadable(true);
+      setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+      return;
+    }
+    if (wateringRetrySubmissionRef.current) {
+      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      handleLogAnother();
+      return;
+    }
+    setLocalError(null);
+  }
+
   function handleLogAnother() {
     if (recoveryStorageFence) return;
     setRestoredMediaPending(false);
@@ -2502,9 +2862,13 @@ function QuickLogV2SheetForOwner({
     setPostSave(null);
     setLocalError(null);
     setSaveStatus("");
+    // Keep the activity as well as the target (#2172): a grower logging a
+    // second Feed should land on the Feed form. The cleared feeding form and
+    // defaults flag below let the post-save recipe prefill apply again.
     setForm((prev) => ({
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
+      action: prev.action,
     }));
     setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
@@ -2515,6 +2879,7 @@ function QuickLogV2SheetForOwner({
     feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
     wateringTempEntryUnitRef.current = null;
+    clearLargeWaterConfirmation();
     setWateringRetryPending(false);
     setFailedWaterPhotoUpload(false);
     setWaterPhotoOmitted(false);
@@ -2608,6 +2973,7 @@ function QuickLogV2SheetForOwner({
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"
         aria-describedby="qlv2-sheet-description"
+        onCloseAutoFocus={restoreOpenerFocus}
       >
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>
@@ -2986,6 +3352,7 @@ function QuickLogV2SheetForOwner({
                 disabled={feedingSaving || wateringSaving || saving || submissionLocked}
                 defaultsApplied={feedingDefaultsApplied}
                 entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
+                ecFieldErrors={feedingEcGate?.fields}
               />
             </div>
           )}
@@ -3014,11 +3381,28 @@ function QuickLogV2SheetForOwner({
                   } else if (nextWaterTempC === "") {
                     wateringTempEntryUnitRef.current = null;
                   }
+                  if (next.volumeMl !== wateringForm.volumeMl) {
+                    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+                    setLargeWaterConfirmedKey(null);
+                  }
                   setWateringForm(next);
                   setLocalError(null);
                 }}
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
                 volumeError={retryPending ? null : (waterSaveGate?.fields.volume ?? null)}
+                confirmedLargeWaterKey={largeWaterConfirmedKey}
+                onConfirmLargeWater={(confirmationKey) => {
+                  const next = confirmLargeWaterAmount(
+                    largeWaterSessionRef.current,
+                    confirmationKey,
+                  );
+                  largeWaterSessionRef.current = {
+                    inFlight: next.inFlight,
+                    confirmedKey: next.confirmedKey,
+                  };
+                  setLargeWaterConfirmedKey(next.confirmedKey);
+                  if (next.save) void handleSave();
+                }}
               />
               {wateringRetryPending && (
                 <div
@@ -3265,10 +3649,8 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.temperatureC}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.temperature) || undefined}
-                    aria-describedby={
-                      waterSaveGate?.fields.temperature ? "qlv2-temp-error" : undefined
-                    }
+                    aria-invalid={Boolean(sensorFieldErrors.temperature) || undefined}
+                    aria-describedby={sensorFieldErrors.temperature ? "qlv2-temp-error" : undefined}
                     onChange={(e) => {
                       const next = e.target.value;
                       if (form.temperatureC.trim() === "" && next.trim() !== "") {
@@ -3279,14 +3661,14 @@ function QuickLogV2SheetForOwner({
                       setField("temperatureC", next);
                     }}
                   />
-                  {waterSaveGate?.fields.temperature && !retryPending && (
+                  {sensorFieldErrors.temperature && !retryPending && (
                     <p
                       id="qlv2-temp-error"
                       data-testid="qlv2-temp-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.temperature}
+                      {sensorFieldErrors.temperature}
                     </p>
                   )}
                 </div>
@@ -3297,18 +3679,18 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.humidityPct}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.humidity) || undefined}
-                    aria-describedby={waterSaveGate?.fields.humidity ? "qlv2-rh-error" : undefined}
+                    aria-invalid={Boolean(sensorFieldErrors.humidity) || undefined}
+                    aria-describedby={sensorFieldErrors.humidity ? "qlv2-rh-error" : undefined}
                     onChange={(e) => setField("humidityPct", e.target.value)}
                   />
-                  {waterSaveGate?.fields.humidity && !retryPending && (
+                  {sensorFieldErrors.humidity && !retryPending && (
                     <p
                       id="qlv2-rh-error"
                       data-testid="qlv2-rh-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.humidity}
+                      {sensorFieldErrors.humidity}
                     </p>
                   )}
                 </div>
@@ -3319,18 +3701,18 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.vpdKpa}
                     disabled={submissionLocked}
-                    aria-invalid={Boolean(waterSaveGate?.fields.vpd) || undefined}
-                    aria-describedby={waterSaveGate?.fields.vpd ? "qlv2-vpd-error" : undefined}
+                    aria-invalid={Boolean(sensorFieldErrors.vpd) || undefined}
+                    aria-describedby={sensorFieldErrors.vpd ? "qlv2-vpd-error" : undefined}
                     onChange={(e) => setField("vpdKpa", e.target.value)}
                   />
-                  {waterSaveGate?.fields.vpd && !retryPending && (
+                  {sensorFieldErrors.vpd && !retryPending && (
                     <p
                       id="qlv2-vpd-error"
                       data-testid="qlv2-vpd-error"
                       className="mt-1 text-sm text-destructive"
                       role="alert"
                     >
-                      {waterSaveGate.fields.vpd}
+                      {sensorFieldErrors.vpd}
                     </p>
                   )}
                 </div>
@@ -3413,6 +3795,32 @@ function QuickLogV2SheetForOwner({
             </p>
           )}
 
+          {wateringRecoveryUnreadable && !postSave && (
+            <div
+              data-testid="qlv2-watering-unreadable-recovery"
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 space-y-2 text-sm text-foreground"
+            >
+              <p>{QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER}</p>
+              <a
+                href={QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block underline"
+              >
+                {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+              </a>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid="qlv2-watering-clear-unreadable"
+                disabled={!unreadableWaterClearAllowed}
+                onClick={() => void handleClearUnreadableWatering()}
+              >
+                {QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL}
+              </Button>
+            </div>
+          )}
           {localError && (
             <div
               role="alert"
@@ -3450,6 +3858,7 @@ function QuickLogV2SheetForOwner({
                     feedingSaving ||
                     wateringSaving ||
                     videoChecking ||
+                    photoChecking ||
                     (contextBlocked && !retryPending)
                   }
                   onClick={handleSave}
@@ -3585,12 +3994,15 @@ function QuickLogV2SheetForOwner({
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
+                      photoChecking ||
                       historyCheckRequired ||
                       (contextBlocked && !retryPending) ||
                       (selectedTargetMissing && !retryPending) ||
                       (selectedTargetStale && !retryPending) ||
                       (criticalContentMissing && !retryPending) ||
                       (Boolean(waterFieldMessage) && !retryPending) ||
+                      Boolean(feedingFieldMessage) ||
+                      Boolean(largeWaterAssessment?.needsConfirmation) ||
                       Boolean(archivedGrowActionBlock)
                     }
                     aria-describedby="qlv2-save-helper"
@@ -3620,6 +4032,8 @@ function getSaveHelperMessage(input: {
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
   waterFieldMessage: string | null;
+  feedingFieldMessage?: string | null;
+  largeWaterMessage?: string | null;
   criticalContentMissing: boolean;
   saving: boolean;
 }): string {
@@ -3629,6 +4043,8 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.waterFieldMessage) return input.waterFieldMessage;
+  if (input.feedingFieldMessage) return input.feedingFieldMessage;
+  if (input.largeWaterMessage) return input.largeWaterMessage;
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";

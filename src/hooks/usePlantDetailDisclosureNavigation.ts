@@ -28,6 +28,129 @@ const ALL_CLOSED: PlantDetailDisclosureOpenState = {
   ai: false,
 };
 
+/** How long a hash landing keeps correcting scroll while async cards above it mount. */
+const HASH_SCROLL_FOLLOW_MS = 3000;
+/**
+ * After the last smooth alignment starts, cancel listeners stay at most this long
+ * when `scrollend` never fires (older Safari, a no-op scroll, or an aligned target).
+ */
+export const HASH_SCROLL_CANCEL_CEILING_MS = 1200;
+
+function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () => void {
+  if (
+    typeof document === "undefined" ||
+    typeof window === "undefined" ||
+    typeof ResizeObserver === "undefined"
+  ) {
+    return () => {};
+  }
+
+  let stopped = false;
+  let observing = true;
+  // The landing alignment and each resize correction start a smooth scroll that
+  // can still be moving after observation ends. Listeners stay until that scroll
+  // finishes (scrollend), the ceiling elapses, or the grower cancels it.
+  let scrollInFlight = false;
+  let ceilingTimer: number | null = null;
+
+  const removeInputListeners = () => {
+    window.removeEventListener("wheel", stopOnUserInput);
+    window.removeEventListener("touchmove", stopOnUserInput);
+    window.removeEventListener("touchstart", stopOnUserInput);
+    window.removeEventListener("keydown", stopOnUserInput);
+    window.removeEventListener("pointerdown", stopOnUserInput);
+    window.removeEventListener("scrollend", onScrollFinished);
+    document.removeEventListener("scrollend", onScrollFinished);
+  };
+  const clearCeiling = () => {
+    if (ceilingTimer === null) return;
+    window.clearTimeout(ceilingTimer);
+    ceilingTimer = null;
+  };
+  const releaseInputListenersIfIdle = () => {
+    if (stopped || observing || scrollInFlight) return;
+    stopped = true;
+    clearCeiling();
+    removeInputListeners();
+  };
+  const noteSmoothScroll = () => {
+    scrollInFlight = true;
+    clearCeiling();
+    ceilingTimer = window.setTimeout(() => {
+      ceilingTimer = null;
+      if (stopped) return;
+      scrollInFlight = false;
+      releaseInputListenersIfIdle();
+    }, HASH_SCROLL_CANCEL_CEILING_MS);
+  };
+  const endObservation = () => {
+    if (!observing) return;
+    observing = false;
+    observer.disconnect();
+    window.clearTimeout(timer);
+    releaseInputListenersIfIdle();
+  };
+  const onScrollFinished = () => {
+    clearCeiling();
+    scrollInFlight = false;
+    releaseInputListenersIfIdle();
+  };
+  const haltInFlightScroll = () => {
+    try {
+      window.scrollTo({
+        top: window.scrollY,
+        left: window.scrollX,
+        behavior: "instant" as ScrollBehavior,
+      });
+    } catch {
+      window.scrollTo(window.scrollX, window.scrollY);
+    }
+  };
+  const stopOnUserInput = () => {
+    if (stopped) return;
+    stopped = true;
+    observing = false;
+    scrollInFlight = false;
+    clearCeiling();
+    observer.disconnect();
+    window.clearTimeout(timer);
+    removeInputListeners();
+    onUserInput?.();
+    haltInFlightScroll();
+  };
+  const release = () => {
+    if (stopped) return;
+    stopped = true;
+    observing = false;
+    scrollInFlight = false;
+    clearCeiling();
+    observer.disconnect();
+    window.clearTimeout(timer);
+    removeInputListeners();
+  };
+
+  const observer = new ResizeObserver(() => {
+    if (stopped || !observing) return;
+    const target = document.getElementById(anchorId);
+    if (!target) return;
+    noteSmoothScroll();
+    safelyFocusAndScroll(target);
+  });
+  observer.observe(document.documentElement);
+  const timer = window.setTimeout(endObservation, HASH_SCROLL_FOLLOW_MS);
+  window.addEventListener("wheel", stopOnUserInput, { passive: true });
+  window.addEventListener("touchmove", stopOnUserInput, { passive: true });
+  window.addEventListener("touchstart", stopOnUserInput, { passive: true });
+  window.addEventListener("keydown", stopOnUserInput);
+  // Section-nav and quick-action buttons navigate without changing the hash,
+  // so a pointer press is the grower taking over from the landing hash.
+  window.addEventListener("pointerdown", stopOnUserInput, { passive: true });
+  window.addEventListener("scrollend", onScrollFinished);
+  document.addEventListener("scrollend", onScrollFinished);
+  noteSmoothScroll();
+  return release;
+}
+
 interface PlantDetailDisclosureState {
   plantId: string | null | undefined;
   routeHash: string;
@@ -72,6 +195,12 @@ export function usePlantDetailDisclosureNavigation({
     openGroups: openStateFor(initialTarget?.group ?? null),
   }));
   const pendingFrameRef = useRef<number | null>(null);
+  const stopFollowRef = useRef<(() => void) | null>(null);
+
+  const endHashScrollFollow = useCallback(() => {
+    stopFollowRef.current?.();
+    stopFollowRef.current = null;
+  }, []);
 
   const routeScopeChanged =
     disclosureState.plantId !== plantId || disclosureState.routeHash !== location.hash;
@@ -86,6 +215,14 @@ export function usePlantDetailDisclosureNavigation({
     }
     pendingFrameRef.current = null;
   }, []);
+
+  const beginHashScrollFollow = useCallback(
+    (anchorId: string) => {
+      endHashScrollFollow();
+      stopFollowRef.current = startHashScrollFollow(anchorId, cancelPendingFrame);
+    },
+    [cancelPendingFrame, endHashScrollFollow],
+  );
 
   const scheduleNavigation = useCallback(
     (anchorId: string, preferredTarget?: HTMLElement | null) => {
@@ -131,6 +268,9 @@ export function usePlantDetailDisclosureNavigation({
     (targetValue, preferredTarget, options) => {
       const target = resolvePlantDetailDisclosureTarget(targetValue);
       if (!target) return;
+      // A new section navigation replaces any landing-hash follow; otherwise a
+      // layout change from opening this disclosure would scroll back to the old hash.
+      endHashScrollFollow();
       const revealGroup = target.group;
       if (revealGroup) {
         setDisclosureState((current) => {
@@ -160,7 +300,15 @@ export function usePlantDetailDisclosureNavigation({
         );
       }
     },
-    [location.hash, location.pathname, location.search, navigate, plantId, scheduleNavigation],
+    [
+      endHashScrollFollow,
+      location.hash,
+      location.pathname,
+      location.search,
+      navigate,
+      plantId,
+      scheduleNavigation,
+    ],
   );
 
   useEffect(() => {
@@ -174,8 +322,21 @@ export function usePlantDetailDisclosureNavigation({
         openGroups: openStateFor(target?.group ?? null),
       };
     });
-    if (target) scheduleNavigation(target.anchorId);
-  }, [cancelPendingFrame, location.hash, plantId, scheduleNavigation]);
+    if (target) {
+      scheduleNavigation(target.anchorId);
+      beginHashScrollFollow(target.anchorId);
+    } else {
+      endHashScrollFollow();
+    }
+    return endHashScrollFollow;
+  }, [
+    beginHashScrollFollow,
+    cancelPendingFrame,
+    endHashScrollFollow,
+    location.hash,
+    plantId,
+    scheduleNavigation,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -196,10 +357,11 @@ export function usePlantDetailDisclosureNavigation({
         });
       }
       scheduleNavigation(target.anchorId);
+      beginHashScrollFollow(target.anchorId);
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
-  }, [location.hash, plantId, scheduleNavigation]);
+  }, [beginHashScrollFollow, location.hash, plantId, scheduleNavigation]);
 
   useEffect(() => cancelPendingFrame, [cancelPendingFrame]);
 

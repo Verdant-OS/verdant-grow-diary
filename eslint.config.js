@@ -16,6 +16,9 @@ export default tseslint.config(
       // sync by its own CI preflight gate).
       "supabase/functions/mcp/index.ts",
       "supabase/functions/_shared/lib",
+      // TanStack Start regenerates this file, including its eslint-disable header.
+      // ESLint --fix treats that header as an unused directive and deletes it.
+      "src/routeTree.gen.ts",
     ],
   },
   {

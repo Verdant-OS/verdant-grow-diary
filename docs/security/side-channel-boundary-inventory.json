@@ -8,7 +8,7 @@
   "boundaries": [
     {
       "boundary_id": "sc-paddle-byo-verify-pure",
-      "path": "supabase/functions/paddle-webhook/verifyPaddleSignature.ts",
+      "path": "supabase/functions/_shared/verifyPaddleSignature.ts",
       "symbol": "verifyPaddleWebhookSignature",
       "category": "webhook",
       "auth_scheme": "paddle-signature HMAC-SHA256 ts:rawBody",
@@ -20,8 +20,9 @@
       "logging_behavior": "caller maps reason; verifier never logs secrets",
       "verdict": "PASS",
       "evidence": [
-        "supabase/functions/paddle-webhook/verifyPaddleSignature.ts:41-48",
-        "supabase/functions/paddle-webhook/verifyPaddleSignature.ts:98-135",
+        "supabase/functions/_shared/verifyPaddleSignature.ts:44-51",
+        "supabase/functions/_shared/verifyPaddleSignature.ts:101-138",
+        "supabase/functions/paddle-webhook/verifyPaddleSignature.ts (compatibility re-export only)",
         "supabase/functions/paddle-webhook/security.test.ts"
       ],
       "recommended_slice": "Keep as reference implementation; optional extract to shared helper (P1)",

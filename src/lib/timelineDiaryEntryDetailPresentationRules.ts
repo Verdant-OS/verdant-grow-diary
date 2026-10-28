@@ -35,7 +35,10 @@ import {
   QUICK_LOG_DETAIL_FIELD_KEYS,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
-import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
 import { readDetailsLoggedAt } from "@/lib/quicklogManualDiagnosticsRules";
 
@@ -73,6 +76,8 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   // "Attached to", never the raw snake_case chip.
   "logged_at",
   "attached_to_action",
+  // Operator attestation blob. Never a grower-facing chip.
+  "manual_provenance",
 ]);
 
 /**
@@ -159,6 +164,139 @@ function friendlyAttachedAction(value: unknown): string | null {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
+const TYPED_ACTIVITY_ENVELOPES = ["watering", "feeding"] as const;
+
+export const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
+  ph: "pH",
+  ec_ms_cm: "EC",
+  ec_in: "EC in",
+  ec_out: "EC out",
+  runoff_ml: "Runoff",
+  runoff_ph: "Runoff pH",
+  runoff_ec: "Runoff EC",
+  water_temp_c: "Water temperature",
+  watering_amount_ml: "Water Volume",
+  wateringAmountMl: "Water Volume",
+  watering_amount: "Water Volume",
+  wateringAmount: "Water Volume",
+  volume_ml: "Water Volume",
+};
+
+const ML_VOLUME_KEYS: ReadonlySet<string> = new Set([
+  "volume_ml",
+  "runoff_ml",
+  "watering_amount_ml",
+  "wateringAmountMl",
+  "watering_amount",
+  "wateringAmount",
+]);
+
+/** A bare finite number written as text (EntryEditDialog saves details as strings). */
+const BARE_NUMBER_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
+
+function typedActivityScalar(
+  key: string,
+  value: unknown,
+  tempUnit: TemperatureUnitPreference,
+): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (ML_VOLUME_KEYS.has(key)) {
+      return `${value} ml`;
+    }
+    if (key === "water_temp_c") {
+      const displayed = tempUnit === "fahrenheit" ? celsiusToFahrenheit(value) : value;
+      const shown = String(Math.round(displayed * 10) / 10);
+      return `${shown} ${tempUnit === "fahrenheit" ? "°F" : "°C"}`;
+    }
+    return String(value);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "" || trimmed === "default") return null;
+    // Unit-bearing text ("500 ml", "2 L") is kept verbatim.
+    if (ML_VOLUME_KEYS.has(key) && BARE_NUMBER_RE.test(trimmed)) return `${trimmed} ml`;
+    return trimmed;
+  }
+  return null;
+}
+
+function typedProductText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const name = typeof record.name === "string" ? record.name.trim() : "";
+  const brand =
+    typeof record.brand === "string"
+      ? record.brand.trim()
+      : typeof record.nutrient_brand === "string"
+        ? record.nutrient_brand.trim()
+        : "";
+  const identity = name && brand ? `${name} (${brand})` : name || brand;
+  if (!identity) return null;
+  const amount =
+    typeof record.amount === "number" && Number.isFinite(record.amount) ? record.amount : null;
+  const unit = typeof record.unit === "string" ? record.unit.trim() : "";
+  if (amount != null && unit) return `${identity} ${amount} ${unit}`;
+  return identity;
+}
+
+function plainDetailValue(value: unknown): string | null {
+  if (typeof value === "string" || typeof value === "boolean") return String(value);
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const parts: string[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (trimmed === "") return null;
+      parts.push(trimmed);
+    } else if (typeof item === "number") {
+      if (!Number.isFinite(item)) return null;
+      parts.push(String(item));
+    } else if (typeof item === "boolean") {
+      parts.push(String(item));
+    } else {
+      return null;
+    }
+  }
+  return parts.join(", ");
+}
+
+function typedVolumeLabel(envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number]): string {
+  return envelope === "watering" ? "Water Volume" : "Feed Volume";
+}
+
+function typedActivityEnvelopeLines(
+  envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number],
+  value: unknown,
+  tempUnit: TemperatureUnitPreference,
+): QuickLogDetailDisplayLine[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const record = value as Record<string, unknown>;
+  const lines: QuickLogDetailDisplayLine[] = [];
+  for (const [key, child] of Object.entries(record)) {
+    if (key === "products" || key === "nutrients") {
+      const items = Array.isArray(child) ? child : [child];
+      const texts = items
+        .map((item) => typedProductText(item))
+        .filter((item): item is string => item != null);
+      if (texts.length > 0) {
+        lines.push({ key: `${envelope}.${key}`, label: "Products", value: texts.join(", ") });
+      }
+      continue;
+    }
+    const label =
+      key === "volume_ml" ? typedVolumeLabel(envelope) : TYPED_ACTIVITY_FIELD_LABELS[key];
+    const text = typedActivityScalar(key, child, tempUnit);
+    if (!label || !text) continue;
+    lines.push({ key: `${envelope}.${key}`, label, value: text });
+  }
+  return lines;
+}
+
 function withGrowerFacingDetailLines(
   record: Record<string, unknown>,
   lines: readonly QuickLogDetailDisplayLine[],
@@ -194,12 +332,57 @@ export function presentTimelineDiaryEntryDetails(
     describeQuickLogDetailsFromExtras(details, tempUnit),
     options,
   );
+  for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
+    detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
+  }
+  // snake_case and legacy camelCase type keys, as the diary normalizer accepts.
+  const rawEventType =
+    [record.event_type, record.eventType, record.entry_type, record.entryType]
+      .find((v): v is string => typeof v === "string" && v.trim() !== "")
+      ?.trim()
+      .toLowerCase() ?? "";
+  const flatVolumeEnvelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number] =
+    rawEventType === "feeding" ? "feeding" : "watering";
+  const hasVolumeLine = detailLines.some(
+    (line) => line.key === "watering.volume_ml" || line.key === "feeding.volume_ml",
+  );
+  if (!hasVolumeLine) {
+    for (const flatVolKey of [
+      "watering_amount_ml",
+      "wateringAmountMl",
+      "watering_amount",
+      "wateringAmount",
+      "volume_ml",
+    ] as const) {
+      if (!(flatVolKey in record)) continue;
+      const text = typedActivityScalar(flatVolKey, record[flatVolKey], tempUnit);
+      if (text) {
+        detailLines.push({
+          key: `${flatVolumeEnvelope}.volume_ml`,
+          label: typedVolumeLabel(flatVolumeEnvelope),
+          value: text,
+        });
+        break;
+      }
+    }
+  }
   const extra = Object.entries(record)
     .filter(
-      ([k, v]) =>
-        v != null && !HIDDEN_DIARY_DETAIL_KEYS.has(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
+      ([k]) =>
+        !HIDDEN_DIARY_DETAIL_KEYS.has(k) &&
+        !QUICK_LOG_DETAIL_FIELD_KEYS.has(k) &&
+        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]) &&
+        k !== "watering_amount_ml" &&
+        k !== "wateringAmountMl" &&
+        k !== "watering_amount" &&
+        k !== "wateringAmount" &&
+        k !== "volume_ml",
     )
-    .map(([k, v]) => [k, String(v)] as const);
+    .map(([k, v]) => {
+      const text = plainDetailValue(v);
+      return text == null ? null : ([k, text] as const);
+    })
+    .filter((entry): entry is readonly [string, string] => entry != null);
 
   return { detailLines, extra };
 }

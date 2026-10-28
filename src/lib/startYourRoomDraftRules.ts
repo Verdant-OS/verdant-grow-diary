@@ -35,7 +35,7 @@ export const EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS: StartYourRoomPendingRowIds =
 };
 
 function isStep(value: unknown): value is Exclude<StartYourRoomStep, "done"> {
-  return value === "grow" || value === "tent" || value === "plant";
+  return value !== "done" && (START_YOUR_ROOM_STEPS as ReadonlyArray<unknown>).includes(value);
 }
 
 function readName(value: unknown, fallback: string): string {
@@ -56,7 +56,6 @@ export function parseStartYourRoomDraft(value: unknown): StartYourRoomDraft | nu
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (!isStep(record.step)) return null;
-  if (!START_YOUR_ROOM_STEPS.includes(record.step)) return null;
   const formRecord =
     record.form && typeof record.form === "object" && !Array.isArray(record.form)
       ? (record.form as Record<string, unknown>)

@@ -126,6 +126,7 @@ describe("Start your room owner changes", () => {
   afterEach(() => {
     cleanup();
     window.sessionStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   it("keeps account B's stored draft when account A's save finishes after the switch", async () => {

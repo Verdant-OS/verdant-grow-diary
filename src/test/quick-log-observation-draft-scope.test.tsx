@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpcMock = vi.fn();
 
@@ -63,10 +63,25 @@ const elementPrototype = Element.prototype as Element & {
   releasePointerCapture?: () => void;
   scrollIntoView?: () => void;
 };
+const PATCHED_ELEMENT_METHODS = [
+  "hasPointerCapture",
+  "setPointerCapture",
+  "releasePointerCapture",
+  "scrollIntoView",
+] as const;
+const originalElementMethods = PATCHED_ELEMENT_METHODS.map(
+  (name) => [name, Object.getOwnPropertyDescriptor(Element.prototype, name)] as const,
+);
 elementPrototype.hasPointerCapture ??= () => false;
 elementPrototype.setPointerCapture ??= () => {};
 elementPrototype.releasePointerCapture ??= () => {};
 elementPrototype.scrollIntoView ??= () => {};
+afterAll(() => {
+  for (const [name, descriptor] of originalElementMethods) {
+    if (descriptor) Object.defineProperty(Element.prototype, name, descriptor);
+    else delete (elementPrototype as Record<string, unknown>)[name];
+  }
+});
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import {

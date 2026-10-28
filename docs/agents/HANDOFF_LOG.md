@@ -69,6 +69,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-278-MANUAL-ENVIRONMENT-DISPLAY
+
+```text
+TASK VER-278-MANUAL-ENVIRONMENT-DISPLAY  priority: P2  status: OPEN
+goal: Show the tent's valid Quick Log manual observation on the Tents list and Dashboard Environment strip, with its own source and freshness, matching Tent Detail.
+branch: codex/ver-278-manual-environment-display
+base: verdant-grow-diary at 0451952b355076500fb1d04797d84b96ed9accd8 (2026-10-24 20:23 UTC)
+checkout: git fetch origin codex/ver-278-manual-environment-display verdant-grow-diary && git switch codex/ver-278-manual-environment-display && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2534 (draft; ownership checkpoint opened before product implementation)
+head_sha: 258f3cae37c44ba48864be40b4329c8a404f3033 is the pushed ownership checkpoint; this implementation commit follows it. Read draft #2534 for its current full implementation SHA before review.
+state: implemented after pushed draft checkpoint. The list reads owner-scoped Quick Log history once per page; both compact displays admit the manual VPD through Detail's realism/capture/rejection rules. Manual source/capture time and stale downgrades are preserved. Pending/failed manual history is not confirmed absence. New tests: 42 PASS; combined focused run: 9 files / 216 PASS / 0 FAIL / 0 SKIP. Focused original reproduction: 10 expected FAIL / 8 PASS before wiring, plus a refresh-timestamp regression observed RED before its correction. Sensor safety, docs safety, scoped lint and strict scorer report PASS. Typecheck and full-suite results are recorded in the PR body when finished; no full-suite-green claim here.
+next_action: Verify exact implementation head and hosted CI; route one review to an actually available eligible non-contributing Claude/Grok session or Durban Poison. Keep draft; no merge or deploy.
+files: src/pages/Tents.tsx; src/pages/Dashboard.tsx (Environment strip only); src/components/TentEnvironmentSnapshotStrip.tsx; new src/lib/tentEnvironmentDisplayRules.ts; src/test/ver278-manual-environment-pages.test.tsx; src/test/ver278-manual-environment-selection.test.ts; docs/agents/HANDOFF_LOG.md (this block)
+blockers: Independent exact-head acceptance requires an available non-contributing Claude/Grok session or Durban Poison; no such session or approved review transport is available here. Hosted CI at resulting head remains NOT_MEASURED.
+artifacts: draft #2534 body carries exact-head validation/review ledger. Local receipts: /workspace/scratch/ce20cca6c34b/evidence/ver278-*.{log,json}. Tests use synthetic event-only fixtures through real page presenters and shared selectors. Existing node_modules reused; frozen dependency install and hosted required gates must be measured in CI. No live reproduction.
+reviewer_seat: BLOCKED — independent session unavailable; Codex authors this change and cannot accept it
+review_request: not sent; owner: Codex VER-278 session; permalink: NOT_MEASURED; state: blocked; fallback transfers: 0
+claimed_by: Codex VER-278 session, 2026-10-24 20:23 UTC, direct user assignment: "Codex owns the narrow fix; preserve #1942's separate changes (Recommended)". #1942's tentIds memoization/trends changes and branch remain separate. No claim comment posted; existing comment-approval gate remains.
+last_updated: 2026-10-24 20:37 UTC, by Codex VER-278 session
+limits: VER-225 / Tonight tent card excluded. No changes to existing locked tests, dependencies, lockfiles, global ingestion, auth, RLS, Supabase, alert/Action Queue logic, governance, or #1942/#2510 branches. No merge, ready, auto-merge, deploy, production writes or dispatch.
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

@@ -66,7 +66,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
         p_temperature_c: null,
         p_humidity_pct: null,
         p_vpd_kpa: null,
-        p_occurred_at: harvestHandoffOccurredAt(check.date, new Date()),
+        p_occurred_at: harvestHandoffOccurredAt(check.date, new Date(handoff.createdAt)),
         p_idempotency_key: harvestHandoffIdempotencyKey(handoff, selected.id, index),
       });
       if (!result.ok) break;

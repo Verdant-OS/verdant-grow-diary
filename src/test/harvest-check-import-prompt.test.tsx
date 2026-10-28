@@ -16,9 +16,12 @@ vi.mock("@/hooks/useQuickLogV2Save", () => ({
 vi.mock("@/lib/harvestWindowAnalytics", () => ({ trackHarvestTrackerEvent: vi.fn() }));
 
 import HarvestCheckImportPrompt from "@/components/HarvestCheckImportPrompt";
-import { HARVEST_HANDOFF_STORAGE_KEY } from "@/lib/harvestCheckHandoffStore";
+import {
+  HARVEST_HANDOFF_STORAGE_KEY,
+  saveHarvestCheckHandoff,
+} from "@/lib/harvestCheckHandoffStore";
 import { trackHarvestTrackerEvent } from "@/lib/harvestWindowAnalytics";
-import { HARVEST_WINDOW_CTA_HREF } from "@/lib/harvestWindowRules";
+import { createDefaultHarvestRanges, HARVEST_WINDOW_CTA_HREF } from "@/lib/harvestWindowRules";
 import HarvestWindowTracker from "@/pages/HarvestWindowTracker";
 
 function memoryStorage() {
@@ -189,6 +192,52 @@ describe("harvest check import after signup", () => {
     expect(storage.map.has(HARVEST_HANDOFF_STORAGE_KEY)).toBe(true);
     // A retry stays on the same plant, so saved checks replay instead of duplicating.
     expect(screen.getByLabelText("Plant")).toBeDisabled();
+  });
+
+  it("retries a check dated today with the same instant, so the save replays", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const clickedAt = new Date(2026, 9, 28, 8, 59);
+      vi.setSystemTime(clickedAt);
+      saveHarvestCheckHandoff(
+        {
+          target: "peak",
+          ranges: createDefaultHarvestRanges(),
+          checks: [
+            {
+              id: 1,
+              date: "2026-10-28",
+              plant: "",
+              clear: 10,
+              cloudy: 80,
+              amber: 10,
+              pistils: "",
+              photoNote: "",
+            },
+          ],
+        },
+        clickedAt,
+      );
+      mocks.save.mockResolvedValueOnce({ ok: false, reason: "network" });
+      renderPrompt();
+      fireEvent.change(await screen.findByLabelText("Plant"), {
+        target: { value: "11111111-1111-4111-8111-111111111111" },
+      });
+      vi.setSystemTime(new Date(2026, 9, 28, 9, 5));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Import 1 harvest check" }));
+      });
+      vi.setSystemTime(new Date(2026, 9, 28, 9, 10));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Import 1 harvest check" }));
+      });
+      const [first, retry] = mocks.save.mock.calls.map(([payload]) => payload);
+      expect(retry.p_idempotency_key).toBe(first.p_idempotency_key);
+      expect(retry.p_occurred_at).toBe(first.p_occurred_at);
+      expect(first.p_occurred_at).toBe(clickedAt.toISOString());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stays on the page and says so when the log cannot be kept", () => {

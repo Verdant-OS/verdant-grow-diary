@@ -175,9 +175,12 @@ export function saveHarvestCheckHandoff(
     },
     checks: input.checks.map(toHandoffCheck),
   };
-  if (!parseHarvestCheckHandoff(handoff, now)) return false;
   const raw = JSON.stringify(handoff);
-  if (raw.length > HARVEST_HANDOFF_MAX_BYTES) return false;
+  if (!parseHarvestCheckHandoff(handoff, now) || raw.length > HARVEST_HANDOFF_MAX_BYTES) {
+    // A refused log must not leave an older handoff behind to be imported instead.
+    clearHarvestCheckHandoff(store);
+    return false;
+  }
   try {
     store.setItem(HARVEST_HANDOFF_STORAGE_KEY, raw);
     return store.getItem(HARVEST_HANDOFF_STORAGE_KEY) === raw;
@@ -239,12 +242,14 @@ export function harvestHandoffCountBucket(count: number): HarvestHandoffCountBuc
 
 /**
  * Local noon on the check's date, so the timeline shows that calendar date in
- * the grower's own timezone; a check dated today is never placed after `now`.
+ * the grower's own timezone; a check dated today is never placed after
+ * `latest`. Pass the handoff's `createdAt` so every retry sends the same
+ * instant under the same idempotency key.
  */
-export function harvestHandoffOccurredAt(date: string, now: Date): string {
+export function harvestHandoffOccurredAt(date: string, latest: Date): string {
   const [year, month, day] = date.split("-").map(Number);
   const noon = new Date(year, month - 1, day, 12);
-  return (noon.getTime() > now.getTime() ? now : noon).toISOString();
+  return (noon.getTime() > latest.getTime() ? latest : noon).toISOString();
 }
 
 /** Deterministic per check, so a retried import replays instead of duplicating. */

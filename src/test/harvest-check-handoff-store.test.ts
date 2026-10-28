@@ -226,7 +226,9 @@ describe("harvest check handoff store", () => {
     expect(stored.pistils).toBe(pistils);
     expect(stored.photoNote).toBe(photoNote);
 
+    // A refused log also removes an earlier handoff, so it cannot be imported instead.
     const tooMany = memoryStorage();
+    saveThree(tooMany);
     const checks = Array.from({ length: HARVEST_HANDOFF_MAX_CHECKS + 1 }, (_, i) =>
       check(i, "2026-10-20"),
     );

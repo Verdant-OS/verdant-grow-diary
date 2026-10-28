@@ -4,6 +4,10 @@
  */
 
 import { readAnalyticsConsent } from "@/lib/analyticsConsent";
+import {
+  HARVEST_HANDOFF_COUNT_BUCKETS,
+  type HarvestHandoffCountBucket,
+} from "@/lib/harvestCheckHandoffStore";
 import { HARVEST_TARGETS, type HarvestTarget } from "@/lib/harvestWindowRules";
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 
@@ -14,6 +18,8 @@ export const HARVEST_TRACKER_ANALYTICS_EVENTS = [
   "harvest_tracker_copy",
   "harvest_tracker_cta_click",
   "harvest_tracker_export_csv",
+  "harvest_tracker_handoff_imported",
+  "harvest_tracker_handoff_saved",
   "harvest_tracker_print",
   "harvest_tracker_target_changed",
 ] as const;
@@ -28,6 +34,7 @@ export interface HarvestTrackerAnalyticsParams {
   plant_count?: number;
   target?: HarvestTarget;
   cta_location?: HarvestTrackerCtaLocation;
+  count_bucket?: HarvestHandoffCountBucket;
 }
 
 const NUMBER_KEYS = ["check_count", "plant_count"] as const;
@@ -44,6 +51,9 @@ export function sanitizeHarvestTrackerAnalyticsParams(
   if (params.target && HARVEST_TARGETS.includes(params.target)) safe.target = params.target;
   if (params.cta_location && HARVEST_TRACKER_CTA_LOCATIONS.includes(params.cta_location)) {
     safe.cta_location = params.cta_location;
+  }
+  if (params.count_bucket && HARVEST_HANDOFF_COUNT_BUCKETS.includes(params.count_bucket)) {
+    safe.count_bucket = params.count_bucket;
   }
   return safe;
 }

@@ -33,8 +33,8 @@ describe("harvest window tracker analytics", () => {
     vi.unstubAllGlobals();
   });
 
-  it("lists exactly the eight harvest_tracker events and no page_view", () => {
-    expect(HARVEST_TRACKER_ANALYTICS_EVENTS).toHaveLength(8);
+  it("lists exactly the ten harvest_tracker events and no page_view", () => {
+    expect(HARVEST_TRACKER_ANALYTICS_EVENTS).toHaveLength(10);
     expect(
       HARVEST_TRACKER_ANALYTICS_EVENTS.every((name) => name.startsWith("harvest_tracker_")),
     ).toBe(true);

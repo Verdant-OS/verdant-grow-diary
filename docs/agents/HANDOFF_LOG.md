@@ -79,9 +79,9 @@ branch: claude/youthful-franklin-n0mg0f
 base: verdant-grow-diary
 checkout: git fetch origin claude/youthful-franklin-n0mg0f verdant-grow-diary && git switch claude/youthful-franklin-n0mg0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/youthful-franklin-n0mg0f
-head_sha: d4a76f7f6e6b69c58632565582ef6d125258fa5a observed on origin/claude/youthful-franklin-n0mg0f at 2026-10-28T09:58Z; the review-fix commit that records this line moves the head past it, so read the current head from the PR
+head_sha: 5c4dccce9f3234cd08523e5ba76f0f67f21e4fb7 before the harvest-handoff commit; read the current head from the PR
 state: pushed, PR ready for review
-current_step: awaiting CI and an independent exact-head review
+current_step: "Keep this log in Verdant" now carries the visitor's checks through signup (sessionStorage key verdant:harvest-handoff:v1, 24 h TTL) to an AppShell import prompt that saves them as plant Notes through useQuickLogV2Save on an explicit click. src/test/funnel-events-wiring.test.ts (scorer-locked) gains one QUICK_LOG_V2_SAVE_CALLERS entry for src/components/HarvestCheckImportPrompt.tsx, unlocked by the user on 2026-10-28
 next_action: independent exact-head review of the PR head (author: this Claude session; exclude it)
 post_merge_check: after Publish, https://verdantgrowdiary.com/guides/when-to-harvest-cannabis returns the page with the H1 "When to Harvest Cannabis: Track Your Trichomes and Harvest Window" and /version.json reports the merge SHA; else NOT_MEASURED
 active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF

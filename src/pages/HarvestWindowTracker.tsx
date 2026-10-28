@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { Link } from "@/lib/react-router-compat";
 
 import BrandLogo from "@/components/BrandLogo";
+import {
+  harvestHandoffCountBucket,
+  harvestHandoffSignupHref,
+  saveHarvestCheckHandoff,
+} from "@/lib/harvestCheckHandoffStore";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   trackHarvestTrackerEvent,
@@ -306,11 +311,24 @@ export default function HarvestWindowTracker() {
     <div className="mt-4 rounded-lg border border-emerald-900/15 bg-emerald-50 p-4 print:hidden">
       <Link
         className="inline-flex min-h-11 items-center rounded-md bg-emerald-900 px-4 text-sm font-semibold text-white"
-        to={HARVEST_WINDOW_CTA_HREF}
-        data-cta-location={location}
-        onClick={() =>
-          trackHarvestTrackerEvent("harvest_tracker_cta_click", { cta_location: location })
+        to={
+          checks.length > 0
+            ? harvestHandoffSignupHref(HARVEST_WINDOW_CTA_HREF)
+            : HARVEST_WINDOW_CTA_HREF
         }
+        data-cta-location={location}
+        onClick={() => {
+          trackHarvestTrackerEvent("harvest_tracker_cta_click", { cta_location: location });
+          // Only a non-empty log is carried through signup, and only on this click.
+          if (
+            checks.length > 0 &&
+            saveHarvestCheckHandoff({ target, ranges, checks }, new Date())
+          ) {
+            trackHarvestTrackerEvent("harvest_tracker_handoff_saved", {
+              count_bucket: harvestHandoffCountBucket(checks.length),
+            });
+          }
+        }}
       >
         Keep this log in Verdant →
       </Link>
@@ -318,6 +336,12 @@ export default function HarvestWindowTracker() {
         Free to start. Log harvest checks next to your plant&apos;s full timeline, feeds and
         environment.
       </p>
+      {checks.length > 0 ? (
+        <p className="mt-1 text-xs">
+          This button keeps your logged checks in this browser tab for up to 24 hours, so you can
+          import them onto a plant after you sign up. Nothing is sent until you choose a plant.
+        </p>
+      ) : null}
     </div>
   );
 

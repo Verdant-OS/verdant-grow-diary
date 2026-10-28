@@ -320,24 +320,26 @@ BEGIN
   ASSERT v_result->>'status' = 'unchanged',
     'an unlinked photo, or a retracted companion photo, earns nothing';
 
-  -- A companion of another event keeps a caller-supplied legacy alias next to
-  -- its server-written link (quicklog_save_event merges p_details under the
-  -- link). When that alias names this photo-free harvest, its photo is not
-  -- harvest evidence: the link wins. Fixture row written as service_role, the
-  -- shape the save RPC produces.
-  RESET role;
-  PERFORM set_config('role', 'service_role', true);
-  INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at, details)
-  VALUES (
-    v_both, v_both_grow, 'alias points at the harvest', v_both_photo, now(),
-    jsonb_build_object(
-      'linked_grow_event_id', gen_random_uuid()::text,
-      'grow_event_id', v_harvest_event::text
-    )
-  )
-  RETURNING id INTO v_alias_entry;
-  RESET role;
-  PERFORM set_config('role', 'authenticated', true);
+  -- The grower saves a photo on an observation and supplies a legacy
+  -- details.grow_event_id naming this photo-free harvest. The save RPC keeps
+  -- that alias next to its own linked_grow_event_id (the observation), so the
+  -- companion carries both. The link wins: the photo is not harvest evidence.
+  v_result := public.quicklog_save_event(
+    'badge-harvest-alias-0001', v_both_grow, 'observation', v_both_tent, v_harvest_plant,
+    'alias points at the harvest', v_both_photo, NULL, NULL,
+    jsonb_build_object('grow_event_id', v_harvest_event::text)
+  );
+  ASSERT (v_result->>'ok')::boolean,
+    format('the observation save with a conflicting alias succeeds: %s', v_result);
+  SELECT entry.id INTO v_alias_entry
+  FROM public.diary_entries AS entry
+  WHERE entry.user_id = v_both
+    AND entry.details ->> 'linked_grow_event_id' = v_result ->> 'grow_event_id';
+  ASSERT v_alias_entry IS NOT NULL, 'the observation save writes a linked companion';
+  ASSERT (
+    SELECT entry.details ->> 'grow_event_id' FROM public.diary_entries AS entry
+    WHERE entry.id = v_alias_entry
+  ) = v_harvest_event::text, 'the companion keeps the caller alias naming the harvest';
   v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
   ASSERT v_result->>'status' = 'unchanged',
     'a photo linked to another event earns nothing through a legacy alias';

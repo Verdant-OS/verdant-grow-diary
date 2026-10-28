@@ -88,10 +88,10 @@ active_writer: Claude session_017UoYKvojgRxESWUyQyGEmj on claude/new-session-u6k
 decisions: No second contract or spec (AGENTS.md section 9; #2564 merged 23:51 UTC). No closure edit of the ARCH-CONTRACT-RESTAMP / FIX-2146 blocks (#2571 already carries it). Contract and spec left untouched for the two docs-only merges past the stamp.
 tried_and_rejected: Live /version.json read: curl blocked by the session bash safety hook; Firecrawl out of credits; fetch tool ENOTFOUND (host outside allowed domains). One attempt each; not routed around.
 commands: git ls-tree -r --name-only 604274a7 -- src/lib | grep -E '^src/lib/[^/]*Rules\.ts$' | wc -l; grep -rhoE 'from "@/lib/react-router-compat"' src --include=*.ts --include=*.tsx | wc -l; grep -rliE 'nelson|modified ?z|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' src supabase scripts e2e tools plugins spikes; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs
-files_touched: docs/audits/architecture-contract-post-merge-verification-2026-10-28.md (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_touched: docs/audits/architecture-contract-post-merge-verification-2026-10-28.md (new); handoff-verdant-architecture-contract.md (rules 8 and 13, corrections log, Q2/Q4, lineage: the three assignment-text corrections, on Matthew's instruction 2026-10-28); docs/agents/HANDOFF_LOG.md (this block only)
 files_remaining: none
 blockers: Live apex reads BLOCKED (network policy). Grok review NOT_MEASURED until a session picks it up; no GitHub review request posted.
-open_questions: Whether Matthew wants the assignment text corrected at its source (AI Doctor is Gemini-direct; entitlement source is public.subscriptions; package-lock.json retired).
+open_questions: None. Matthew answered 2026-10-28: correct the assignment text with the three fixes; done in handoff-verdant-architecture-contract.md. The persona text outside the repository is his to update.
 gotchas: The contract's AC-3.2 / AC-3.4 figures now trail the tip by one each; do not "fix" them outside a restamp. The persona text names billing_subscriptions; the read is subscriptions (useMyEntitlements.ts:90).
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2571 ; handoff-verdant-architecture-contract.md (#2336)
 artifacts: the receipt file above
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: Claude cloud session; no cron, watcher, comment, review request, ready-state change, merge or production action
 claimed_by: Claude session_017UoYKvojgRxESWUyQyGEmj, 2026-10-28 00:20 UTC (Matthew's assignment prompt; no GitHub claim comment posted)
 owner: Claude (this session); default inheritor OG Kush
-last_updated: 2026-10-28 00:20 UTC, by Claude
+last_updated: 2026-10-28 00:35 UTC, by Claude
 ```
 
 ### ARCH-CONTRACT-RESTAMP-20261027

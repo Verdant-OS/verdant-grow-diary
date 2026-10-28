@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEO-GSC-AHREFS-RECONCILIATION-20261028
+
+```text
+TASK SEO-GSC-AHREFS-RECONCILIATION-20261028  priority: other  status: OPEN
+goal: Record whether the October 27 SEO review's Search Console numbers (via Ahrefs) are fresh and which Ahrefs project is authoritative, before work is prioritised on them.
+why: The review reported 559 impressions for July 29-October 27 with freshness unverified; acting on stale or mixed-project data would mis-rank the next SEO work.
+branch: claude/october-27-seo-review-4zbdgy
+base: verdant-grow-diary
+checkout: git fetch origin claude/october-27-seo-review-4zbdgy verdant-grow-diary && git switch claude/october-27-seo-review-4zbdgy
+pr: NOT_MEASURED (opened as a draft after the first push; read the branch's PR)
+head_sha: read the PR; this block is written before the first push
+state: pushed draft (docs only)
+current_step: receipt written at docs/seo/gsc-ahrefs-measurement-reconciliation-2026-10-28.md
+next_action: Owner re-syncs Search Console in Ahrefs project 10225273 and names the linked GSC property; then re-run gsc-performance-history and supersede the receipt once a row dated 2026-10-02 or later appears.
+post_merge_check: NOT_APPLICABLE (docs-only measurement receipt; no shipped behavior)
+active_writer: Claude (this session); only the holder pushes
+decisions: Docs-only receipt. Did not edit CURRENT_STATE (GSC row stays BLOCKED until the owner names the property). Did not touch #2259, #2561/#2543, #2549, #2597 or Quick Log structured data.
+tried_and_rejected: Live curl re-check of canonicals/sitemap was refused by a local plugin network hook; not worked around.
+commands: Ahrefs MCP read-only calls listed in the receipt's Reproduce section; node scripts/assert-docs-safety.mjs
+files_touched: docs/seo/gsc-ahrefs-measurement-reconciliation-2026-10-28.md docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: GSC property identity and the Ahrefs GSC sync (owner, Ahrefs project settings)
+open_questions: Is project 10225273 or 10204962 the Ahrefs project of record?
+gotchas: Ahrefs gsc-performance-history returns no rows (not zero rows) for unsynced dates, so a requested window can silently end early. Page and query tables cover about 6-7% of impressions (anonymised queries).
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2259 https://github.com/Verdant-OS/verdant-grow-diary/pull/2561
+artifacts: docs/seo/gsc-ahrefs-measurement-reconciliation-2026-10-28.md
+reviewer_seat: an eligible independent session under OWNERSHIP.md section 4.3 (docs-only; Graft's low-risk allowlist may apply)
+reviewer_sha: none yet
+session_state: no routines, no paused workflows; pending owner decision on GSC property and Ahrefs project of record
+claimed_by: Claude, 2026-10-28 CT
+owner: Claude
+last_updated: 2026-10-28, by Claude
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

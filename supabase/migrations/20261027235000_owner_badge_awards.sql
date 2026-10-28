@@ -29,10 +29,12 @@
 -- badge_awards_reconcile() is the server sweep. It reads the kill switch
 -- first and writes nothing unless that switch is exactly true. Each call
 -- visits at most 25 owners and stores the cursor in reconcile_after, so
--- one transaction holds at most 25 advisory locks. EXECUTE is service_role
--- only. The pg_cron job badge-awards-reconcile is inserted inactive when
--- pg_cron is installed. When pg_cron is absent the schedule block returns
--- before it reads cron.job. This migration does not enable the job.
+-- one transaction holds at most 25 advisory locks. An error evaluating one
+-- owner is logged and skipped. The cursor still advances, and the rest of
+-- that batch continues. EXECUTE is service_role only. The pg_cron job
+-- badge-awards-reconcile is inserted inactive when pg_cron is installed.
+-- When pg_cron is absent the schedule block returns before it reads
+-- cron.job. This migration does not enable the job.
 --
 -- Cut 001: any photo attached to the owner's own diary entry earns
 -- First Diary Entry. Note text is not a qualification input. A photo
@@ -40,11 +42,12 @@
 -- because the function reads the current photo columns. The photo
 -- must be on that entry, on that owner's path, and present in
 -- storage.objects for this account. A '..' segment, another user's path,
--- and an inferred link do not qualify. This migration does not publish
--- badges. Profile display, signed-in member visibility before community
--- launch, and logged-out refusal are a later slice and are not built
--- here. Evidence SELECT stays owner-only, so evidence photos are not
--- granted to other accounts or to anon.
+-- and an inferred link do not qualify. Signed-in members can SELECT
+-- active badge_awards rows. A hidden or revoked row stays visible to
+-- its owner and hidden from other members. Logged-out visitors (anon)
+-- receive no award rows. Profile display is a later slice and is not
+-- built here. Evidence SELECT stays owner-only, so evidence photos are
+-- not granted to other accounts or to anon.
 --
 -- Evidence can name a diary entry, tent, setup, or harvest. Only
 -- first_diary_entry has a qualification rule. The other keys are stored
@@ -146,7 +149,21 @@ CREATE POLICY badge_awards_owner_select
   ON public.badge_awards
   FOR SELECT
   TO authenticated
-  USING (user_id = auth.uid());
+  USING (
+    user_id = auth.uid()
+    AND COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+  );
+
+-- Cut 001 (Matthew, 2026-10-11 03:41 CT): until community launch, signed-in
+-- members can see other growers' active badges. Evidence and photos stay
+-- owner-only. Logged-out visitors (anon) never see awards.
+CREATE POLICY badge_awards_member_select ON public.badge_awards
+  FOR SELECT TO authenticated
+  USING (
+    COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+    AND hidden_at IS NULL
+    AND revoked_at IS NULL
+  );
 
 CREATE POLICY badge_evidence_owner_select
   ON public.badge_evidence
@@ -322,6 +339,8 @@ DECLARE
   was_hidden boolean;
   revoked_at timestamptz;
 BEGIN
+  -- Fast path only. The write barrier is the FOR UPDATE recheck after the
+  -- advisory lock, immediately before any award or evidence mutation.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
@@ -333,6 +352,10 @@ BEGIN
 
   uid := auth.uid();
   IF uid IS NULL THEN
+    RETURN jsonb_build_object('status', 'not_authenticated');
+  END IF;
+
+  IF COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) THEN
     RETURN jsonb_build_object('status', 'not_authenticated');
   END IF;
 
@@ -411,6 +434,20 @@ BEGIN
 
   IF revoked_at IS NOT NULL THEN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
+  END IF;
+
+  -- Recheck under a row lock after the advisory lock and immediately before
+  -- any award or evidence write, so a committed enabled = false is a write
+  -- barrier. This lock stays after the advisory wait: taking it earlier
+  -- deadlocks a concurrent disable that is waiting to commit.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN jsonb_build_object('status', 'disabled');
   END IF;
 
   IF entry_id IS NULL THEN
@@ -505,9 +542,10 @@ COMMENT ON FUNCTION public.badge_awards_evaluate_owner(text) IS
 -- before unlock. A procedure that COMMITs each owner would release the xact
 -- lock per iteration, and it would change this call from SELECT to CALL.
 -- This function visits at most 25 owners per call, ordered by user id, and
--- stores the last id in reconcile_after. The next call continues after that
--- id. A short or empty batch clears the cursor. A failure rolls back only
--- that call.
+-- stores the last visited id in reconcile_after. The next call continues
+-- after that id. A short or empty batch clears the cursor. Each owner runs
+-- in its own BEGIN block. WHEN OTHERS logs that owner and continues, so one
+-- error does not abort the batch and does not stop the cursor.
 CREATE OR REPLACE FUNCTION public.badge_awards_reconcile()
 RETURNS integer
 LANGUAGE plpgsql
@@ -520,8 +558,11 @@ DECLARE
   owner uuid;
   last_owner uuid;
   reconciled integer := 0;
+  visited integer := 0;
   batch_limit constant integer := 25;
 BEGIN
+  -- Fast path only. Each owner is read again before evaluate_owner, and the
+  -- cursor write rechecks under FOR UPDATE after that call returns.
   SELECT runtime.enabled, runtime.reconcile_after
     INTO runtime_enabled, cursor_after
   FROM public.badge_award_runtime AS runtime
@@ -545,17 +586,46 @@ BEGIN
     ORDER BY owners.user_id
     LIMIT batch_limit
   LOOP
-    PERFORM set_config('request.jwt.claim.sub', owner::text, true);
-    PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
-    PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
-    reconciled := reconciled + 1;
+    -- Plain read, once per owner. Do not lock the runtime row across
+    -- evaluate_owner: that call waits on the owner advisory lock, and holding
+    -- the runtime row across that wait deadlocks a concurrent disable.
+    SELECT runtime.enabled
+      INTO runtime_enabled
+    FROM public.badge_award_runtime AS runtime
+    WHERE runtime.id = 1;
+
+    IF runtime_enabled IS NOT TRUE THEN
+      EXIT;
+    END IF;
+
+    BEGIN
+      PERFORM set_config('request.jwt.claim.sub', owner::text, true);
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
+      PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
+      reconciled := reconciled + 1;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'badge_awards_reconcile skipped owner %: %', owner, SQLERRM;
+    END;
+    visited := visited + 1;
     last_owner := owner;
   END LOOP;
 
   PERFORM set_config('request.jwt.claim.sub', '', true);
   PERFORM set_config('request.jwt.claims', '{}', true);
 
-  IF reconciled < batch_limit THEN
+  -- Same write barrier as the evaluator. Skip the cursor update when the
+  -- switch is off. The row lock is taken only after evaluate_owner returns.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN reconciled;
+  END IF;
+
+  IF visited < batch_limit THEN
     UPDATE public.badge_award_runtime
        SET reconcile_after = NULL
      WHERE id = 1;

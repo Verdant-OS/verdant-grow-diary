@@ -8,7 +8,7 @@ function readProjectFile(rel: string): string {
 
 const HARNESS = readProjectFile("supabase/tests/badge_awards_first_tent_reearn.sql");
 const MIGRATION = readProjectFile(
-  "supabase/migrations/20261011143000_badge_awards_tent_setup_harvest.sql",
+  "supabase/migrations/20261027235500_badge_awards_tent_setup_harvest.sql",
 );
 
 describe("First Tent re-earn pgTAP harness (Cut 001 AC6)", () => {

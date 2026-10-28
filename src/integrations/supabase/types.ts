@@ -626,16 +626,19 @@ export type Database = {
         Row: {
           enabled: boolean
           id: number
+          reconcile_after: string | null
           updated_at: string
         }
         Insert: {
           enabled?: boolean
           id: number
+          reconcile_after?: string | null
           updated_at?: string
         }
         Update: {
           enabled?: boolean
           id?: number
+          reconcile_after?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -5411,7 +5414,7 @@ export type Database = {
           light_schedule: string | null
           light_wattage: number | null
           name: string
-          photo_url?: string | null
+          photo_url: string | null
           schema_version: number
           size: string | null
           stage: string

@@ -24,7 +24,12 @@ beforeEach(() => {
   }
 });
 
-const visibleAward = { badgeKey: "first_diary_entry", hiddenAt: null };
+const visibleAward = {
+  badgeKey: "first_diary_entry",
+  hiddenAt: null,
+  revokedAt: null,
+  userId: "user-badge-1",
+};
 
 describe("OwnerBadgeShelf", () => {
   it("renders nothing while the display flag is off", () => {
@@ -33,7 +38,7 @@ describe("OwnerBadgeShelf", () => {
   });
 
   it("renders the documentation sentence for a visible award", () => {
-    render(<OwnerBadgeShelf enabled awards={[visibleAward]} />);
+    render(<OwnerBadgeShelf enabled ownerUserId="user-badge-1" awards={[visibleAward]} />);
     expect(screen.getByTestId("owner-badge-shelf")).toHaveAttribute(
       "aria-label",
       BADGE_AWARD_COPY.shelfLabel,
@@ -43,11 +48,39 @@ describe("OwnerBadgeShelf", () => {
     );
   });
 
+  it("passes the owner user id into the backup filter", () => {
+    const otherGrower = {
+      badgeKey: "first_diary_entry",
+      hiddenAt: null,
+      revokedAt: null,
+      userId: "user-other",
+    };
+    const { rerender } = render(
+      <OwnerBadgeShelf enabled ownerUserId="user-shelf-a" awards={[otherGrower]} />,
+    );
+    expect(screen.queryByTestId("owner-badge-shelf")).not.toBeInTheDocument();
+    rerender(
+      <OwnerBadgeShelf
+        enabled
+        ownerUserId="user-shelf-a"
+        awards={[{ ...otherGrower, userId: "user-shelf-a" }]}
+      />,
+    );
+    expect(screen.getByTestId("owner-badge-shelf")).toBeInTheDocument();
+  });
+
   it("renders nothing when the only award is hidden", () => {
     render(
       <OwnerBadgeShelf
         enabled
-        awards={[{ badgeKey: "first_diary_entry", hiddenAt: "2026-10-10T00:00:00Z" }]}
+        ownerUserId="user-badge-1"
+        awards={[
+          {
+            badgeKey: "first_diary_entry",
+            hiddenAt: "2026-10-10T00:00:00Z",
+            userId: "user-badge-1",
+          },
+        ]}
       />,
     );
     expect(screen.queryByTestId("owner-badge-shelf")).not.toBeInTheDocument();

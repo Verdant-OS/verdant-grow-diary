@@ -212,16 +212,6 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason: `${blocked} ADDITIONALLY BROKEN: line 59 calls max(user_id) on a uuid column, and max(uuid) does not exist in PostgreSQL — proven on a throwaway PG 16.13 cluster (0 rows in pg_aggregate; "ERROR: function max(uuid) does not exist", with max(text) as a passing control). Note it is not necessarily the FIRST error: without psql variables the file dies earlier at "syntax error at or near \\":\\"". Wiring this lane will not make this suite pass.`,
   };
-  out["supabase/tests/badge_awards_permissions.sql"] = {
-    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
-    reason:
-      "Local-only owner-badge pgTAP. irrigation-pgtap-rls-gate.yml executes create_feeding_event.sql and create_watering_event.sql only. Matthew Cheek, 2026-10-10 5:34 PM CT, required the CI wiring for this file be proposed separately and not built in this slice. Local psql and supabase test db both PASS against loopback.",
-  };
-  out["supabase/tests/badge_awards_tent_setup_harvest.sql"] = {
-    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
-    reason:
-      "Local-only owner-badge pgTAP for First Tent, Setup Documented, and First Recorded Harvest. Same lane gap as badge_awards_permissions.sql: irrigation-pgtap-rls-gate.yml runs feeding/watering only; CI wiring for badge suites is a separate proposal. src/test/badge-awards-first-tent-reearn-harness-static.test.ts pins harness shape in CI without Docker.",
-  };
   out["supabase/tests/badge_awards_first_tent_reearn.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason:
@@ -330,7 +320,7 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 24,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 22,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 2,

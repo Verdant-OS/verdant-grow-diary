@@ -39,11 +39,12 @@ import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 import {
   newHierarchyCreateAttemptId,
   persistHierarchyCreateAttempt,
+  reconcileHierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
-import { uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
+import { removeOwnerSubjectPhoto, uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
 
 export interface CreatedTent {
   id: string;
@@ -146,6 +147,12 @@ export default function CreateTentDialog({
     setForm(EMPTY_TENT_FORM);
   }, [writeBlocked]);
 
+  // The file input is uncontrolled and unmounts with the form, so a picked
+  // photo must not outlive the form being on screen.
+  useEffect(() => {
+    if (!open || formBlocked) setPhotoFile(null);
+  }, [open, formBlocked]);
+
   function handleOpenChange(next: boolean) {
     if (next && (writeBlocked || createOutcomeUnknown)) return;
     setOpen(next);
@@ -200,25 +207,10 @@ export default function CreateTentDialog({
       stage: form.stage,
       grow_id: targetGrowId,
     };
-    if (photoFile) {
-      const checked = validatePlantProfilePhotoFile(photoFile);
-      if (!checked.ok) {
-        toast.error(checked.message);
-        return;
-      }
-      try {
-        const uploaded = await uploadOwnerSubjectPhoto({
-          file: photoFile,
-          mime: checked.mime,
-          userId: user.id,
-          kind: "tent",
-          subjectId: tentId,
-        });
-        payload.photo_url = uploaded.reference;
-      } catch {
-        toast.error("The tent photo was not saved. The tent was not created.");
-        return;
-      }
+    const checkedPhoto = photoFile ? validatePlantProfilePhotoFile(photoFile) : null;
+    if (checkedPhoto && !checkedPhoto.ok) {
+      toast.error(checkedPhoto.message);
+      return;
     }
     const attempt = {
       entity: "tent" as const,
@@ -226,10 +218,41 @@ export default function CreateTentDialog({
       ownerId: user.id,
       growId: targetGrowId,
     };
+    // Lock before the upload: a second click while storage is pending must
+    // not start another attempt with a different tent id.
     createInFlightRef.current = true;
     setBusy(true);
     try {
-      const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+      let uploadedPath: string | null = null;
+      if (photoFile && checkedPhoto?.ok) {
+        try {
+          const uploaded = await uploadOwnerSubjectPhoto({
+            file: photoFile,
+            mime: checkedPhoto.mime,
+            userId: user.id,
+            kind: "tent",
+            subjectId: tentId,
+          });
+          uploadedPath = uploaded.path;
+          payload.photo_url = uploaded.reference;
+        } catch {
+          toast.error("The tent photo was not saved. The tent was not created.");
+          return;
+        }
+      }
+      let result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+      if (result.status === "definitive_error" && uploadedPath) {
+        // A code-less error is classified definitive without a re-read. With a
+        // photo uploaded, re-read the exact row before deleting anything.
+        const reread = await reconcileHierarchyCreateAttempt(supabase, attempt);
+        if (reread.status === "confirmed") {
+          result = reread;
+        } else if (reread.status === "unavailable") {
+          result = { status: "unknown" };
+        } else {
+          await removeOwnerSubjectPhoto({ path: uploadedPath });
+        }
+      }
       if (result.status === "unknown") {
         recordUnknownCreateOutcome(attempt);
         toast.error(
@@ -503,6 +526,7 @@ export default function CreateTentDialog({
                 data-testid="create-tent-photo"
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                disabled={busy}
                 onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
               />
               <p className="text-[11px] text-muted-foreground">

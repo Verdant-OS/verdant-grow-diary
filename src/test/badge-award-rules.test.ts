@@ -29,7 +29,7 @@ describe("badge award display rules", () => {
     expect(BADGE_AWARD_COPY.firstDiaryEntry).toBe("You saved a diary entry with a photo attached.");
     expect(BADGE_AWARD_COPY.firstDiaryEntry.toLowerCase()).not.toContain("relevant photo");
     const migration = readFileSync(
-      "supabase/migrations/20261011120000_owner_badge_awards.sql",
+      "supabase/migrations/20261027235000_owner_badge_awards.sql",
       "utf8",
     );
     expect(migration).toContain("added later to that same entry qualifies on the next evaluation");
@@ -52,20 +52,68 @@ describe("badge award display rules", () => {
 
   it("shows only a visible first diary entry award", () => {
     const awards = [
-      { badgeKey: "first_diary_entry", hiddenAt: null, revokedAt: null },
-      { badgeKey: "first_diary_entry", hiddenAt: "2026-10-10T00:00:00Z" },
-      { badgeKey: "first_diary_entry", hiddenAt: null, revokedAt: "2026-10-10T00:00:00Z" },
-      { badgeKey: "first_tent", hiddenAt: null },
+      {
+        badgeKey: "first_diary_entry",
+        hiddenAt: null,
+        revokedAt: null,
+        userId: "user-shelf-a",
+      },
+      { badgeKey: "first_diary_entry", hiddenAt: "2026-10-10T00:00:00Z", userId: "user-shelf-a" },
+      {
+        badgeKey: "first_diary_entry",
+        hiddenAt: null,
+        revokedAt: "2026-10-10T00:00:00Z",
+        userId: "user-shelf-a",
+      },
+      { badgeKey: "first_tent", hiddenAt: null, userId: "user-shelf-a" },
     ];
-    expect(selectVisibleOwnerBadgeAwards(awards)).toEqual([
-      { badgeKey: "first_diary_entry", hiddenAt: null, revokedAt: null },
+    expect(selectVisibleOwnerBadgeAwards(awards, "user-shelf-a")).toEqual([
+      {
+        badgeKey: "first_diary_entry",
+        hiddenAt: null,
+        revokedAt: null,
+        userId: "user-shelf-a",
+      },
     ]);
   });
 
   it("returns no shelf rows for null hidden markers that are not this badge", () => {
-    expect(selectVisibleOwnerBadgeAwards([])).toEqual([]);
+    expect(selectVisibleOwnerBadgeAwards([], "user-shelf-a")).toEqual([]);
     expect(
-      selectVisibleOwnerBadgeAwards([{ badgeKey: "first_recorded_harvest", hiddenAt: null }]),
+      selectVisibleOwnerBadgeAwards(
+        [{ badgeKey: "first_recorded_harvest", hiddenAt: null, userId: "user-shelf-a" }],
+        "user-shelf-a",
+      ),
+    ).toEqual([]);
+  });
+
+  it("returns no shelf rows when the owner user id is null or undefined", () => {
+    const awards = [
+      {
+        badgeKey: "first_diary_entry",
+        hiddenAt: null,
+        revokedAt: null,
+        userId: "user-shelf-a",
+      },
+    ];
+    expect(selectVisibleOwnerBadgeAwards(awards, null)).toEqual([]);
+    expect(selectVisibleOwnerBadgeAwards(awards, undefined)).toEqual([]);
+    expect(selectVisibleOwnerBadgeAwards(awards)).toEqual([]);
+  });
+
+  it("returns no shelf rows when the owner user id is empty", () => {
+    expect(
+      selectVisibleOwnerBadgeAwards(
+        [
+          {
+            badgeKey: "first_diary_entry",
+            hiddenAt: null,
+            revokedAt: null,
+            userId: "user-shelf-a",
+          },
+        ],
+        "",
+      ),
     ).toEqual([]);
   });
 });

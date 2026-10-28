@@ -23,3 +23,16 @@ export function buildOwnerSubjectPhotoObjectPath(input: {
 export function formatOwnerSubjectPhotoReference(path: string): string {
   return `storage://${PLANT_PROFILE_PHOTO_BUCKET}/${path}`;
 }
+
+/**
+ * True only when a database write error proves nothing committed, so an
+ * object uploaded for that write is unreferenced and safe to remove. A
+ * structured PostgREST/Postgres code is a terminal rejection; a missing code
+ * (network loss) or a unique collision (possible replay) may have committed
+ * and must keep the object.
+ */
+export function isDefinitiveUnreferencedPhotoError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && code.trim() !== "" && code !== "23505";
+}

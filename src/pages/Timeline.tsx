@@ -31,6 +31,7 @@ import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { STAGES } from "@/lib/grow";
 import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
+import { QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS } from "@/lib/quickLogFabClearanceRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
@@ -86,6 +87,7 @@ import {
   TrainingHistoryPanel,
   MeasurementHistoryPanel,
 } from "@/components/QuickLogHistoryPanels";
+import { scopeTimelineQuickLogLaneRows } from "@/lib/timelineQuickLogLaneScopeRules";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import {
@@ -139,11 +141,16 @@ import {
   type TimelineDiaryPhotoReferenceSource,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
+  timelineEntryHasNoteText,
   timelineMeasurementChipCount,
   timelineResultsCountReceiptSuffix,
   timelineStageChipRows,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
+import {
+  dropBlankQuickLogPlaceholderRows,
+  projectTimelineDiaryPage,
+} from "@/lib/timelineQuickLogPlaceholderDedupeRules";
 import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
@@ -226,7 +233,11 @@ import {
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
 import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
-import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
+import {
+  diaryEntriesTotalAfterRemoval,
+  diaryRemovalCompletionStillCurrent,
+  isLinkedQuickLogDiaryDetails,
+} from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
   diaryEntryMatchesHighlight,
@@ -286,6 +297,8 @@ interface Entry {
   id: string;
   note: string;
   photo_url: string | null;
+  /** Private object path kept after `photo_url` is replaced by a signed display URL. */
+  photo_object_path?: string | null;
   stage: string | null;
   details: Record<string, unknown>;
   entry_at: string;
@@ -320,6 +333,14 @@ function buildTimelineDiaryPhotoDisplayRows(
     }
     if (reference.kind === "storage") {
       privatePhotoPathById.set(row.id, reference.path);
+      // Keep the private path for blank-mirror dedupe after signing, and the
+      // reference source the initial signer requires before it will apply a URL.
+      return {
+        ...row,
+        photo_url: null,
+        photo_object_path: reference.path,
+        photoReferenceSource,
+      };
     }
 
     return { ...row, photo_url: null, photoReferenceSource };
@@ -364,7 +385,12 @@ type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "acti
 
 function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
   const kinds: EventFilter[] = [];
-  if (!isTimelineSensorDerivedDiaryId(e.id)) kinds.push("note");
+  // "Notes" means the grower wrote something: an empty note, or text Verdant
+  // generated in its place (Quick Log fallbacks, outcome defaults), is not a
+  // note (Pollen #1).
+  if (!isTimelineSensorDerivedDiaryId(e.id) && timelineEntryHasNoteText(e.note)) {
+    kinds.push("note");
+  }
   if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
   // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
@@ -581,7 +607,11 @@ export default function Timeline() {
   const [manualSensorHistoryLimited, setManualSensorHistoryLimited] = useState(false);
   // Keyset pagination (audit M1): the diary is unbounded but the page used
   // to silently cap at the newest 100 rows and report "Showing 100 of 100".
+  // Server count minus the blank Quick Log mirrors hidden from fetched pages,
+  // so `entriesTotal > entries.length` means unfetched rows remain (#2094).
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
+  // Keyset cursor: the oldest fetched diary row, even when it is a hidden mirror.
+  const [oldestFetchedEntryAt, setOldestFetchedEntryAt] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
@@ -611,6 +641,7 @@ export default function Timeline() {
   const [directorySensorsLoading, setDirectorySensorsLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
   const readRequestIdRef = useRef(0);
+  const entriesSnapshotRef = useRef<Entry[]>([]);
   const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
@@ -695,7 +726,16 @@ export default function Timeline() {
     const v = searchParams.get(TIMELINE_END_DATE_PARAM);
     return isTimelineDateFilterValue(v) ? v : "";
   });
-  const [missingAction, setMissingAction] = useState<MissingActionResult | null>(null);
+  // The suggestion is tagged with the plant/tent scope it was computed for and
+  // only shown while that scope is active, so switching the filter never
+  // leaves one plant's gap above another plant's history.
+  const [missingAction, setMissingAction] = useState<{
+    scope: string;
+    result: MissingActionResult;
+  } | null>(null);
+  const missingActionScope = `${plantFilter}|${tentFilter}`;
+  const visibleMissingAction =
+    missingAction?.scope === missingActionScope ? missingAction.result : null;
 
   // Push date-range state → URL whenever it diverges (mirrors the
   // sensorSources param sync above).
@@ -736,6 +776,7 @@ export default function Timeline() {
   });
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
+  entriesSnapshotRef.current = entries;
 
   // Same fail-closed grow-list gate as the owner name directory: no
   // supplemental tents / sensor_readings while ownership proof is
@@ -764,6 +805,7 @@ export default function Timeline() {
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
+      setOldestFetchedEntryAt(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
       setTimelineLinkedRoots([]);
@@ -788,6 +830,7 @@ export default function Timeline() {
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
+      setOldestFetchedEntryAt(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
       setTimelineLinkedRoots([]);
@@ -865,7 +908,10 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
 
-      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const entriesPage = projectTimelineDiaryPage(
+        (entriesResult.data as Entry[]).map((row) => ({ ...row })),
+      );
+      const rows = entriesPage.rows;
       const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
       const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rows,
@@ -908,7 +954,12 @@ export default function Timeline() {
       setDiaryPhotoIds(nextDiaryPhotoIds);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
-      setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
+      setEntriesTotal(
+        typeof entriesResult.count === "number"
+          ? entriesResult.count - entriesPage.hiddenCount
+          : null,
+      );
+      setOldestFetchedEntryAt(entriesPage.oldestFetchedEntryAt);
       setGrowEvents(nextGrowEvents);
       setTimelineSensorEvents(nextSensorEvents);
       setTimelineLinkedRoots([]);
@@ -1211,7 +1262,7 @@ export default function Timeline() {
       entries.length === 0
     )
       return;
-    const cursor = entries[entries.length - 1]?.entry_at;
+    const cursor = oldestFetchedEntryAt;
     if (!cursor) return;
     const requestedGrowId = activeGrowId;
     const requestedReadKey = activeReadKey;
@@ -1241,7 +1292,10 @@ export default function Timeline() {
       });
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
-      const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const olderPage = projectTimelineDiaryPage(
+        ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row })),
+      );
+      const rawOlder = olderPage.rows;
       const olderPhotoIds = collectTimelineDiaryPhotoIds(rawOlder, user);
       const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rawOlder,
@@ -1276,6 +1330,10 @@ export default function Timeline() {
         }
       }
       if (isCurrentPage() && older.length) {
+        setOldestFetchedEntryAt(olderPage.oldestFetchedEntryAt);
+        if (olderPage.hiddenCount > 0) {
+          setEntriesTotal((total) => (total === null ? null : total - olderPage.hiddenCount));
+        }
         setDiaryPhotoIds((current) => unionTimelineDiaryPhotoIds(current, olderPhotoIds));
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
@@ -1408,19 +1466,6 @@ export default function Timeline() {
     };
   }, [load]);
 
-  const stageCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    entries.forEach((e) => {
-      const stage = resolveTimelineDiaryEntryStage(e);
-      if (stage) m[stage] = (m[stage] || 0) + 1;
-    });
-    return m;
-  }, [entries]);
-  const stageTaggedEntryCount = STAGES.reduce(
-    (total, stage) => total + (stageCounts[stage.value] || 0),
-    0,
-  );
-
   const enrichedEntries = useMemo(() => {
     const knownGrowEvents =
       supplementalLinkedGrowEvents.length === 0
@@ -1475,13 +1520,28 @@ export default function Timeline() {
 
   const displayEntries = useMemo(
     () =>
-      mergeTimelineMeasurementDisplayEntries(
-        enrichedEntries,
-        manualSensorMeasurementEntries.map((entry) =>
-          formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+      dropBlankQuickLogPlaceholderRows(
+        mergeTimelineMeasurementDisplayEntries(
+          enrichedEntries,
+          manualSensorMeasurementEntries.map((entry) =>
+            formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+          ),
         ),
       ),
     [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
+  );
+
+  const stageCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    displayEntries.forEach((e) => {
+      const stage = resolveTimelineDiaryEntryStage(e);
+      if (stage) m[stage] = (m[stage] || 0) + 1;
+    });
+    return m;
+  }, [displayEntries]);
+  const stageTaggedEntryCount = STAGES.reduce(
+    (total, stage) => total + (stageCounts[stage.value] || 0),
+    0,
   );
 
   // Canonical Action Response Memory (read-only). One grower response renders
@@ -1759,13 +1819,17 @@ export default function Timeline() {
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
-  // its own logged rhythm. Suggestion-only — the grower decides; Verdant
-  // only points at the grower's own history.
+  // its own logged rhythm. Reads the plant/tent-scoped rows so a filtered
+  // view never surfaces another plant's gap. Suggestion-only — the grower
+  // decides; Verdant only points at the grower's own history.
   function handleFindMissingAction() {
-    const result = findNextMissingAction(recentLaneRawEntries, new Date());
-    setMissingAction(result);
+    const result = findNextMissingAction(scopedRecentLaneRawEntries, new Date());
+    setMissingAction({ scope: missingActionScope, result });
     if (result.status === "found") {
-      const targetId = findNewestEntryIdForCategory(entries, result.suggestion.category);
+      const targetId = findNewestEntryIdForCategory(
+        scopedHistoryEntries,
+        result.suggestion.category,
+      );
       if (targetId && typeof document !== "undefined") {
         const node = document.getElementById(`timeline-entry-${targetId}`);
         const prefersReduced =
@@ -1908,6 +1972,26 @@ export default function Timeline() {
     }
     return out;
   }, [displayEntries, growEvents, supplementalLinkedGrowEvents]);
+  // The Quick Log history lanes follow the same plant/tent filter as the main
+  // list (filming bug #3), as does "Next missing action"; unscoped
+  // `recentLaneRawEntries` still feeds the grow-wide evidence counts.
+  const scopedRecentLaneRawEntries = useMemo(
+    () =>
+      scopeTimelineQuickLogLaneRows(recentLaneRawEntries, {
+        plantId: plantFilter,
+        tentId: tentFilter,
+      }),
+    [recentLaneRawEntries, plantFilter, tentFilter],
+  );
+  const scopedHistoryEntries = useMemo(
+    () => scopeTimelineQuickLogLaneRows(entries, { plantId: plantFilter, tentId: tentFilter }),
+    [entries, plantFilter, tentFilter],
+  );
+  const scopedMeasurementEntries = useMemo(
+    () =>
+      scopeTimelineQuickLogLaneRows(displayEntries, { plantId: plantFilter, tentId: tentFilter }),
+    [displayEntries, plantFilter, tentFilter],
+  );
 
   const symptomEvidenceByEntryId = useMemo(() => {
     const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
@@ -2297,7 +2381,10 @@ export default function Timeline() {
         data-testid="timeline-evidence-filters"
         aria-label="Search and filter timeline entries"
       >
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          className={`flex flex-wrap items-center gap-2 ${QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS}`}
+          data-testid="timeline-plant-filter-row"
+        >
           <input
             type="search"
             value={searchQuery}
@@ -2442,16 +2529,16 @@ export default function Timeline() {
             </Link>
           </p>
         )}
-        {missingAction && (
+        {visibleMissingAction && (
           <div
             role="status"
             data-testid="timeline-missing-action-banner"
             className="rounded-xl border border-border/50 bg-secondary/30 p-3 space-y-1"
           >
             <p className="text-sm">
-              {missingAction.status === "found"
-                ? buildMissingActionCopy(missingAction.suggestion)
-                : missingAction.status === "nothing_missing"
+              {visibleMissingAction.status === "found"
+                ? buildMissingActionCopy(visibleMissingAction.suggestion)
+                : visibleMissingAction.status === "nothing_missing"
                   ? MISSING_ACTION_NOTHING_MISSING_COPY
                   : MISSING_ACTION_NOT_ENOUGH_HISTORY_COPY}
             </p>
@@ -2740,7 +2827,7 @@ export default function Timeline() {
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
         <RecentQuickLogActivityPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           limit={10}
           growId={activeGrowId ?? null}
           onEntryChanged={() => {
@@ -2751,7 +2838,9 @@ export default function Timeline() {
 
       <div className="mt-4">
         <DiaryCalendarSection
-          rawEntries={recentLaneRawEntries}
+          // Remount on a scope change so the month snaps to the new scope's activity.
+          key={`${plantFilter ?? ""}|${tentFilter ?? ""}`}
+          rawEntries={scopedRecentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
           plantStartedAt={activeGrow?.started_at ?? null}
         />
@@ -2759,7 +2848,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <WateringHistoryPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
@@ -2770,7 +2859,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <FeedingHistoryPanel
-          rawEntries={recentLaneRawEntries}
+          rawEntries={scopedRecentLaneRawEntries}
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
@@ -2781,7 +2870,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <PestDiseaseHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2791,7 +2880,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <TrainingHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2801,7 +2890,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <MeasurementHistoryPanel
-          rawEntries={displayEntries}
+          rawEntries={scopedMeasurementEntries}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2811,7 +2900,7 @@ export default function Timeline() {
 
       <div className="mt-4">
         <PhotoHistoryPanel
-          rawEntries={entries}
+          rawEntries={scopedHistoryEntries}
           limit={24}
           onEntryChanged={() => {
             void load();
@@ -3128,11 +3217,42 @@ export default function Timeline() {
                                       plantId={e.plant_id ?? null}
                                       tentId={e.tent_id ?? null}
                                       showFollowUp
-                                      onRemoved={(removedId) => {
-                                        setEntries((rows) =>
-                                          rows.filter((r) => r.id !== removedId),
-                                        );
-                                      }}
+                                      onRemoved={(
+                                        (origin: { requestId: number; readKey: string | null }) =>
+                                        (removedId: string) => {
+                                          if (
+                                            !diaryRemovalCompletionStillCurrent(origin, {
+                                              requestId: readRequestIdRef.current,
+                                              readKey: activeReadKeyRef.current,
+                                            })
+                                          ) {
+                                            if (
+                                              origin.readKey !== null &&
+                                              origin.readKey === activeReadKeyRef.current
+                                            ) {
+                                              // A same-scope refresh may still include this deletion
+                                              // or already count it. Reload after confirmation instead
+                                              // of guessing, superseding any older in-flight read.
+                                              void load();
+                                            }
+                                            return;
+                                          }
+                                          const rows = entriesSnapshotRef.current;
+                                          if (!rows.some((row) => row.id === removedId)) return;
+                                          const next = rows.filter((row) => row.id !== removedId);
+                                          // Snapshot of the rows this completion already counted, so a
+                                          // second completion of the same read sees the id as gone.
+                                          // It is not the list React renders.
+                                          entriesSnapshotRef.current = next;
+                                          setEntries((current) =>
+                                            current.filter((row) => row.id !== removedId),
+                                          );
+                                          setEntriesTotal(diaryEntriesTotalAfterRemoval);
+                                        }
+                                      )({
+                                        requestId: readRequestIdRef.current,
+                                        readKey: activeReadKey,
+                                      })}
                                     />
                                   </>
                                 ) : null}
@@ -3602,6 +3722,7 @@ function FilterChip({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={active}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition",
         active

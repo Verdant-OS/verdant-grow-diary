@@ -28,10 +28,11 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.32.0",
   hono: "4.13.11",
+  "ip-address": "10.7.4",
   vite: "8.3.3",
   "launch-editor": "2.14.2",
   postcss: "8.5.18",
-  "fast-uri": "3.1.8",
+  "fast-uri": "3.1.9",
   "form-data": "4.0.6",
   "follow-redirects": "1.16.1",
   "js-yaml": "4.3.2",
@@ -64,6 +65,10 @@ export const BUN_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
     4: null,
     5: "5.0.12",
   }),
+  // GHSA-xjj6-f33q-929c: >=6.23.0 <6.29.1, >=7.18.0 <7.30.1, >=8.0.0 <8.12.2.
+  // Deliberately "patched release of each major or nothing": each floor also rejects
+  // older releases of its major that this advisory does not cover (e.g. 7.0.0-7.17.x).
+  undici: Object.freeze({ 6: "6.29.1", 7: "7.30.1", 8: "8.12.2" }),
 });
 // Patched minimatch within the two majors that carried the advisory. Other
 // majors present in the graph (for example 5.x and 10.x) are outside it.

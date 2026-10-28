@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom";
 import { beforeEach, afterEach } from "vitest";
-import { cleanup } from "@testing-library/react";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
+import { teardownDomForTest } from "./helpers/domTeardown";
 
 // Production deliberately retains this fence for the complete browser page
 // runtime. A Vitest worker hosts many unrelated test runtimes, so clean the
@@ -47,11 +47,8 @@ beforeEach(() => {
 // nodes, listeners, or component state across files within the same
 // worker process. Cheap and idempotent; does not change test behavior.
 // Node-environment suites (// @vitest-environment node) have no document.
-afterEach(() => {
-  cleanup();
-  if (typeof document !== "undefined") {
-    document.body.replaceChildren();
-  }
+afterEach(async () => {
+  await teardownDomForTest();
   resetHierarchyCreateOutcomeRecoveryForTest();
 });
 

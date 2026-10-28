@@ -20,6 +20,10 @@ import {
 import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { STAGES } from "@/lib/grow";
+import {
+  TIMELINE_STAGE_NOT_RECORDED_LABEL,
+  timelineStagePresentationLabel,
+} from "@/lib/timelineStagePresentationRules";
 import { toast } from "sonner";
 import DiaryStressObservationsSection from "@/components/DiaryStressObservationsSection";
 import {
@@ -46,6 +50,8 @@ interface Props {
 }
 
 const SUGGESTED_KEYS = ["ph", "ec", "runoff", "watering", "nutrients", "training"];
+// Radix Select items require a non-empty string; this UI token is never saved.
+const UNRECORDED_STAGE_VALUE = "__unrecorded__";
 
 const EVENT_TYPES = [
   { value: "observation", label: "Observation" },
@@ -64,16 +70,18 @@ const EVENT_TYPES = [
 
 export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, onDeleted }: Props) {
   const [note, setNote] = useState("");
-  const [stage, setStage] = useState<string>("veg");
+  const [stage, setStage] = useState<string | null>(null);
+  const [stageChanged, setStageChanged] = useState(false);
   const [eventType, setEventType] = useState<string>("observation");
   const [rows, setRows] = useState<{ key: string; value: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!entry) return;
+    if (!entry || !open) return;
     setNote(entry.note || "");
-    setStage(entry.stage || "veg");
+    setStage(entry.stage ?? null);
+    setStageChanged(false);
     const d = entry.details || {};
     const inferred =
       typeof d.event_type === "string" && d.event_type
@@ -87,7 +95,7 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
         .filter(([k]) => k !== "event_type")
         .map(([key, value]) => ({ key, value: String(value ?? "") })),
     );
-  }, [entry]);
+  }, [entry, open]);
 
   function setRow(i: number, patch: Partial<{ key: string; value: string }>) {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -117,7 +125,8 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
       const v = r.value.trim();
       if (k && k !== "event_type" && v) details[k] = v;
     }
-    const patch = { note: note.trim(), stage, details };
+    // An unrelated edit must not invent, normalize, or overwrite historical stage.
+    const patch = { note: note.trim(), ...(stageChanged ? { stage } : {}), details };
     const { data: updated, error } = await supabase
       .from("diary_entries")
       .update(patch)
@@ -172,11 +181,22 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-xs">Stage</Label>
-              <Select value={stage} onValueChange={setStage}>
-                <SelectTrigger>
-                  <SelectValue />
+              <Select
+                value={stage ?? UNRECORDED_STAGE_VALUE}
+                onValueChange={(value) => {
+                  setStage(value === UNRECORDED_STAGE_VALUE ? null : value);
+                  setStageChanged(true);
+                }}
+              >
+                <SelectTrigger aria-label="Stage">
+                  <SelectValue placeholder={TIMELINE_STAGE_NOT_RECORDED_LABEL}>
+                    {timelineStagePresentationLabel(stage)}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={UNRECORDED_STAGE_VALUE}>
+                    {TIMELINE_STAGE_NOT_RECORDED_LABEL}
+                  </SelectItem>
                   {STAGES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}

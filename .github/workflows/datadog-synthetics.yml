@@ -21,6 +21,11 @@ on:
   push:
     branches: ["main"]
 
+# Push to the dormant base ref only. Do not cancel an in-progress synthetic run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest

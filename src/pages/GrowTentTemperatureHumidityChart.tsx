@@ -479,6 +479,10 @@ export default function GrowTentTemperatureHumidityChart() {
                       dateEdited.current = true;
                       setDateTime(e.target.value);
                     }}
+                    // Until edited, the field tracks the time a reading would be stamped with.
+                    onFocus={() => {
+                      if (!dateEdited.current) setDateTime(growTentLocalDateTimeInput(new Date()));
+                    }}
                   />
                 </label>
                 <fieldset className="min-w-0">

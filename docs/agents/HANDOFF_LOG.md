@@ -79,7 +79,7 @@ branch: claude/guide-grow-tent-temperature-humidity-chart
 base: verdant-grow-diary
 checkout: git fetch origin claude/guide-grow-tent-temperature-humidity-chart verdant-grow-diary && git switch claude/guide-grow-tent-temperature-humidity-chart && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/guide-grow-tent-temperature-humidity-chart
-head_sha: 436663fc16506ad4220f57f5b77d765034932f4f before the review-fix commit; read the current head from the PR
+head_sha: 55876e95d315f7b1a2e58701726002a59ae2f4f1 before the date-field refresh on focus; read the current head from the PR
 state: pushed, PR ready for review
 current_step: cheekhimself and Codex findings at 436663f fixed: an unreachable RH midpoint now says no RH reaches it, each logged reading is stamped at log time unless the grower edits the date (first reading included, per the 57dd51c re-review), and the copy discloses the calculator's late-flower band. Awaiting CI (billing lock) and an independent exact-head review
 next_action: independent exact-head review of the PR head (author: this Claude session; exclude it); founder decision on the late-flower band split noted below

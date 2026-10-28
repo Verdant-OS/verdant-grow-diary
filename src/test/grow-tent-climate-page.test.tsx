@@ -211,6 +211,8 @@ describe("public grow tent temperature and humidity page", () => {
     vi.setSystemTime(new Date(2026, 9, 28, 8, 0));
     renderPage();
     vi.setSystemTime(new Date(2026, 9, 28, 9, 30));
+    fireEvent.focus(screen.getByLabelText("Date & time (local)"));
+    expect(screen.getByLabelText("Date & time (local)")).toHaveValue("2026-10-28T09:30");
     fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
     vi.setSystemTime(new Date(2026, 9, 28, 20, 30));
     fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));

@@ -5,6 +5,7 @@ import { createContext, runInContext } from "node:vm";
 import ts from "typescript";
 
 const SECRET = "paddle-wire-fixture-secret";
+export const LIVE_WEBHOOK_SECRET = "different-live-fixture-secret";
 export const USER_ID = "00000000-0000-4000-8000-000000000001";
 export const START = "2026-10-16T00:00:00Z";
 export const END = "2026-11-16T00:00:00Z";
@@ -69,7 +70,10 @@ export function transaction(sku: string | null = "credit_pack_50", overrides: Ro
  * IO, never verification, normalization, decisions or orchestration. No server,
  * credentials, provider requests, email delivery or real database is involved.
  */
-export function harness() {
+export function harness(options?: {
+  env?: Record<string, string | undefined>;
+  productsGet?: (id: string) => unknown | Promise<unknown>;
+}) {
   const events = new Map<string, Row>();
   const subscriptions = new Map<string, Row>();
   const grants = new Map<string, Row>();
@@ -77,15 +81,20 @@ export function harness() {
   const rpcCalls: Array<{ name: string; args: Row }> = [];
   const emails: Row[] = [];
   const lookups: string[] = [];
+  const productLookups: string[] = [];
   const normalizedEvents: Row[] = [];
   const env = new Map([
     ["PAYMENTS_SANDBOX_WEBHOOK_SECRET", SECRET],
-    ["PAYMENTS_LIVE_WEBHOOK_SECRET", "different-live-fixture-secret"],
+    ["PAYMENTS_LIVE_WEBHOOK_SECRET", LIVE_WEBHOOK_SECRET],
     ["SUPABASE_URL", "https://fixture.invalid"],
     ["SUPABASE_SERVICE_ROLE_KEY", "fixture-only-key"],
     ["PADDLE_SANDBOX_API_KEY", "fixture-only-key"],
     ["LOVABLE_API_KEY", "fixture-only-key"],
   ]);
+  for (const [key, value] of Object.entries(options?.env ?? {})) {
+    if (value === undefined) env.delete(key);
+    else env.set(key, value);
+  }
   let handler!: (request: Request) => Promise<Response>;
   let failWrite = false;
   const client = {
@@ -166,6 +175,13 @@ export function harness() {
       get: async (id: string) => {
         lookups.push(id);
         return { importMeta: { externalId: "credit_pack_50" } };
+      },
+    };
+    products = {
+      get: async (id: string) => {
+        productLookups.push(id);
+        if (options?.productsGet) return options.productsGet(id);
+        return { name: "Catalog product" };
       },
     };
   }
@@ -264,6 +280,7 @@ export function harness() {
     rpcCalls,
     emails,
     lookups,
+    productLookups,
     normalizedEvents,
     clearWebhookSecret: () => env.delete("PAYMENTS_SANDBOX_WEBHOOK_SECRET"),
     setFailWrite: (value: boolean) => {

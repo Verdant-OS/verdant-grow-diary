@@ -12,6 +12,14 @@
  * client just to fail-closed on a bad signature.
  */
 import { Environment, Paddle, EventName } from "npm:@paddle/paddle-node-sdk";
+import {
+  PADDLE_DIRECT_CONFIG_REFUSED,
+  PADDLE_GATEWAY_ORIGIN,
+  paddleClientPlan,
+  performPaddleFetch,
+  resolvePaddleTransport,
+  type PaddleTransport,
+} from "./paddleDirectTransport.ts";
 import { verifyPaddleWebhookSignature } from "./verifyPaddleSignature.ts";
 
 const getEnv = (key: string): string => {
@@ -28,16 +36,23 @@ export type PaddleEnv = "sandbox" | "live";
 export const PAYMENTS_WEBHOOK_MAX_AGE_SECONDS = 5 * 60;
 export const PAYMENTS_WEBHOOK_MAX_FUTURE_SKEW_SECONDS = 60;
 
-const GATEWAY_BASE_URL = "https://connector-gateway.lovable.dev/paddle";
+const GATEWAY_BASE_URL = PADDLE_GATEWAY_ORIGIN;
 
 export function getConnectionApiKey(env: PaddleEnv): string {
   return env === "sandbox" ? getEnv("PADDLE_SANDBOX_API_KEY") : getEnv("PADDLE_LIVE_API_KEY");
 }
 
-export function getPaddleClient(env: PaddleEnv): Paddle {
+function transportFor(env: PaddleEnv): Exclude<PaddleTransport, { mode: "refused" }> {
+  const transport = resolvePaddleTransport(env, (key) => Deno.env.get(key));
+  if (transport.mode === "refused") {
+    throw new Error(PADDLE_DIRECT_CONFIG_REFUSED);
+  }
+  return transport;
+}
+
+function gatewayPaddleClient(env: PaddleEnv): Paddle {
   const connectionApiKey = getConnectionApiKey(env);
   const lovableApiKey = getEnv("LOVABLE_API_KEY");
-
   return new Paddle(connectionApiKey, {
     environment: GATEWAY_BASE_URL as unknown as Environment,
     customHeaders: {
@@ -47,22 +62,41 @@ export function getPaddleClient(env: PaddleEnv): Paddle {
   });
 }
 
+/** Gateway client. Does not consult direct-mode config. */
+export function getGatewayPaddleClient(env: PaddleEnv): Paddle {
+  return gatewayPaddleClient(env);
+}
+
+export function getPaddleClient(env: PaddleEnv): Paddle {
+  const transport = transportFor(env);
+  const plan = paddleClientPlan(transport);
+  if (plan.mode === "direct") {
+    return new Paddle(plan.apiKey, { environment: Environment.sandbox });
+  } else {
+    return gatewayPaddleClient(env);
+  }
+}
+
 export async function gatewayFetch(
   env: PaddleEnv,
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const connectionApiKey = getConnectionApiKey(env);
-  const lovableApiKey = getEnv("LOVABLE_API_KEY");
-  return fetch(`${GATEWAY_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Connection-Api-Key": connectionApiKey,
-      "Lovable-API-Key": lovableApiKey,
-      ...init?.headers,
-    },
+  return performPaddleFetch({
+    env,
+    getEnv: (key) => Deno.env.get(key),
+    path,
+    init,
+    fetch: (input, requestInit) => fetch(input, requestInit),
+    gatewayKeys: () => ({
+      connectionApiKey: getConnectionApiKey(env),
+      lovableApiKey: getEnv("LOVABLE_API_KEY"),
+    }),
   });
+}
+
+export function isPaddleDirectMode(env: PaddleEnv): boolean {
+  return transportFor(env).mode === "direct";
 }
 
 export function getWebhookSecret(env: PaddleEnv): string {

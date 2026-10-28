@@ -1,6 +1,11 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { gatewayFetch, type PaddleEnv } from "../_shared/paddle.ts";
+import { gatewayFetch, isPaddleDirectMode, type PaddleEnv } from "../_shared/paddle.ts";
+import {
+  extractDirectPriceId,
+  founderSlotCheckoutBlock,
+  priceLookupPath,
+} from "../_shared/paddleDirectTransport.ts";
 import {
   loadUnionEntitlementForUser,
   resolveRequiredServerBillingEnvironment,
@@ -251,7 +256,10 @@ Deno.serve(async (req) => {
         // Fail closed: if availability cannot be proven, no founder checkout.
         return json(503, { error: "price_resolution_unavailable" });
       }
-      if (typeof remaining !== "number" || remaining <= 0) {
+      if (
+        (typeof remaining !== "number" || remaining <= 0) &&
+        founderSlotCheckoutBlock(remaining) === "sold_out"
+      ) {
         logCatalogUnavailable({
           plan: requested,
           reason: "plan_sold_out",
@@ -276,9 +284,22 @@ Deno.serve(async (req) => {
     }
     environment = environmentResolution.environment;
 
+    const direct = isPaddleDirectMode(environment);
+    const configuredId = SERVER_PRICE_CONFIG[requested] ?? "";
+    if (direct && configuredId.length === 0) {
+      logCatalogUnavailable({
+        plan: requested,
+        reason: "price_resolution_unavailable",
+        environment,
+        envVarConfigured: configuredId.length > 0,
+        stage: "config_drift",
+      });
+      return json(502, { error: "price_resolution_unavailable" });
+    }
+
     const response = await gatewayFetch(
       environment,
-      `/prices?external_id=${encodeURIComponent(requested)}`,
+      priceLookupPath(direct, configuredId, requested),
     );
     if (!response.ok) {
       logCatalogUnavailable({
@@ -293,7 +314,7 @@ Deno.serve(async (req) => {
       return json(502, { error: "price_resolution_unavailable" });
     }
     const data = await response.json().catch(() => null);
-    const paddleId = data?.data?.[0]?.id;
+    const paddleId = direct ? extractDirectPriceId(data, requested) : data?.data?.[0]?.id;
 
     if (typeof paddleId !== "string" || paddleId.length === 0) {
       logCatalogUnavailable({
@@ -310,7 +331,6 @@ Deno.serve(async (req) => {
     // this plan. If the sources have drifted (or the env var is not set), we
     // reject rather than return an ID the webhook would classify as
     // unknown_price_id and leave the buyer without an entitlement.
-    const configuredId = SERVER_PRICE_CONFIG[requested] ?? "";
     if (configuredId.length === 0 || paddleId !== configuredId) {
       logCatalogUnavailable({
         plan: requested,

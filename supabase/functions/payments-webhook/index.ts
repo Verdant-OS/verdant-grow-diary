@@ -26,8 +26,17 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   verifyPaymentsWebhookRequest,
   getPaddleClient,
+  getGatewayPaddleClient,
   type PaddleEnv,
 } from "../_shared/paddle.ts";
+import {
+  attachCatalogProductExternalId,
+  directEventEnrichesProductCatalog,
+  directPriceOnlyProductId,
+  normalizeVerifiedPaddleEvent,
+  priceExternalIdFromResolvedPrice,
+  webhookBillingMode,
+} from "../_shared/paddleDirectTransport.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
 import { insertPaddleEventLog } from "./eventLogInsert.ts";
 import { maybeSendPurchaseConfirmation } from "./sendPurchaseConfirmation.ts";
@@ -55,84 +64,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** Alias only named provider fields; never recursively rewrite custom_data. */
-function aliasProviderFields(value: unknown, aliases: Record<string, string>): unknown {
-  if (!isRecord(value)) return value;
-  const result = { ...value };
-  for (const [wire, sdk] of Object.entries(aliases)) {
-    if (Object.prototype.hasOwnProperty.call(value, wire)) result[sdk] = value[wire];
-  }
-  return result;
-}
-
-/** Map verified Paddle wire fields to the processor's SDK-style shape. */
-function normalizeVerifiedPaddleEvent(raw: unknown): EventLikeWithId | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const eventId =
-    typeof o.eventId === "string"
-      ? o.eventId
-      : typeof o.event_id === "string"
-        ? o.event_id
-        : undefined;
-  const eventType =
-    typeof o.eventType === "string"
-      ? o.eventType
-      : typeof o.event_type === "string"
-        ? o.event_type
-        : undefined;
-  if (!eventType) return null;
-  const data = aliasProviderFields(o.data, {
-    customer_id: "customerId",
-    subscription_id: "subscriptionId",
-    custom_data: "customData",
-    current_billing_period: "currentBillingPeriod",
-    scheduled_change: "scheduledChange",
-    currency_code: "currencyCode",
-  });
-  if (isRecord(data)) {
-    data.currentBillingPeriod = aliasProviderFields(data.currentBillingPeriod, {
-      starts_at: "startsAt",
-      ends_at: "endsAt",
-    });
-    data.scheduledChange = aliasProviderFields(data.scheduledChange, {
-      effective_at: "effectiveAt",
-    });
-    if (Array.isArray(data.items)) {
-      data.items = data.items.map((item) => {
-        if (!isRecord(item)) return item;
-        const normalized = { ...item };
-        for (const key of ["price", "product"]) {
-          const resource = aliasProviderFields(item[key], { import_meta: "importMeta" });
-          if (isRecord(resource)) {
-            resource.importMeta = aliasProviderFields(resource.importMeta, {
-              external_id: "externalId",
-            });
-          }
-          normalized[key] = resource;
-        }
-        return normalized;
-      });
-    }
-    // The existing confirmation helper also consumes SDK-style monetary fields.
-    if (isRecord(data.details)) {
-      data.details = {
-        ...data.details,
-        totals: aliasProviderFields(data.details.totals, {
-          grand_total: "grandTotal",
-          currency_code: "currencyCode",
-        }),
-      };
-    }
-  }
-  return {
-    ...(o as object),
-    eventId,
-    eventType,
-    data,
-  } as EventLikeWithId;
-}
-
 function mapVerifyFailure(reason: string): { status: number; body: string } {
   if (reason === "webhook_secret_not_configured") {
     return { status: 500, body: "webhook_secret_not_configured" };
@@ -147,9 +78,41 @@ function mapVerifyFailure(reason: string): { status: number; body: string } {
   return { status: 401, body: reason };
 }
 
-function buildDeps(): Deps {
+function webhookPaddleClient(env: PaddleEnv) {
+  const billing = webhookBillingMode(env, (key) => Deno.env.get(key));
+  if (billing.mode === "direct") return getPaddleClient(env);
+  return getGatewayPaddleClient(env);
+}
+
+async function attachDirectCatalogProducts(event: EventLikeWithId, env: PaddleEnv): Promise<void> {
+  const data = event.data as { items?: unknown[] } | undefined;
+  if (!data || !Array.isArray(data.items)) return;
+  let client: ReturnType<typeof webhookPaddleClient> | null = null;
+  for (const item of data.items) {
+    const productId = directPriceOnlyProductId(item);
+    if (!productId) continue;
+    client ??= webhookPaddleClient(env);
+    const catalog = await client.products.get(productId);
+    attachCatalogProductExternalId(item, catalog);
+  }
+}
+
+function buildDeps(directMode: boolean, env: PaddleEnv): Deps {
   const sb = getSupabase();
   return {
+    ...(directMode
+      ? {
+          async enrichEvent(event: EventLikeWithId) {
+            if (!directEventEnrichesProductCatalog(event.eventType)) return { ok: true as const };
+            try {
+              await attachDirectCatalogProducts(event, env);
+              return { ok: true as const };
+            } catch (e) {
+              return { ok: false as const, error: String(e instanceof Error ? e.message : e) };
+            }
+          },
+        }
+      : {}),
     async insertEventReceived({ paddle_event_id, audit, payload }) {
       const row = {
         paddle_event_id,
@@ -214,6 +177,14 @@ function buildDeps(): Deps {
       if (error) return { ok: false, error: error.message };
       return { ok: true };
     },
+    async updateEventAudit(paddle_event_id, ids) {
+      const { error } = await sb
+        .from("lovable_paddle_events")
+        .update(ids)
+        .eq("paddle_event_id", paddle_event_id);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
     async markEvent(paddle_event_id, patch) {
       const { error } = await sb
         .from("lovable_paddle_events")
@@ -228,12 +199,15 @@ function buildDeps(): Deps {
       // Env-aware: uses sandbox/live credentials via getPaddleClient(env),
       // so no hardcoded pri_... ids are baked into the code.
       try {
-        const paddle = getPaddleClient(env);
+        const paddle = webhookPaddleClient(env);
         const price = await paddle.prices.get(paddlePriceId);
-        // Paddle SDK camelCases → importMeta.externalId
-        const externalId =
-          (price as { importMeta?: { externalId?: string } | null } | null)?.importMeta
-            ?.externalId ?? null;
+        // Paddle SDK camelCases → importMeta.externalId. Direct sandbox catalog
+        // rows carry the plan id on customData instead of import_meta.
+        const priced = price as {
+          importMeta?: { externalId?: string } | null;
+          customData?: { external_id?: string } | null;
+        } | null;
+        const externalId = priceExternalIdFromResolvedPrice(priced, directMode);
         return { ok: true, externalId };
       } catch (e) {
         return { ok: false, error: String(e instanceof Error ? e.message : e) };
@@ -307,7 +281,7 @@ function buildDeps(): Deps {
       if (error) return { ok: false, error: `candidate_query:${error.message}` };
       const rows = (data ?? []) as Array<{ paddle_subscription_id: string }>;
       if (rows.length === 0) return { ok: true, canceled: 0 };
-      const paddle = getPaddleClient(environment);
+      const paddle = webhookPaddleClient(environment);
       let canceled = 0;
       const failures: string[] = [];
       for (const row of rows) {
@@ -391,15 +365,22 @@ Deno.serve(async (req) => {
     return new Response(body, { status });
   }
 
-  const event = normalizeVerifiedPaddleEvent(verified.event);
-  if (!event) {
-    return new Response("invalid_event_shape", { status: 400 });
+  const billingMode = webhookBillingMode(env, (key) => Deno.env.get(key));
+  if (billingMode.mode === "reject") {
+    console.error("payments-webhook direct config refused", { reason: billingMode.reason });
+    return new Response("paddle_direct_config_refused", { status: 503 });
   }
+  const directMode = billingMode.mode === "direct";
 
-  let result;
+  let event!: EventLikeWithId;
+  let result!: Awaited<ReturnType<typeof handleVerifiedEvent>>;
   try {
+    event = normalizeVerifiedPaddleEvent(verified.event, { directMode }) as EventLikeWithId | null;
+    if (!event) {
+      return new Response("invalid_event_shape", { status: 400 });
+    }
     result = await handleVerifiedEvent(
-      buildDeps(),
+      buildDeps(directMode, env),
       event,
       env,
       new Date(),

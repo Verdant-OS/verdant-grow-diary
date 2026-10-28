@@ -171,6 +171,16 @@ const EXEMPTIONS: Record<string, { class: string; reason: string }> = {
     reason:
       'Credential-free and mocked (7 page.route). 2 of 9 tests fail deterministically at 320px and 1440px: "/daily-check must not conceal intrinsic horizontal overflow", 11 violations. The other 7 pass. Wiring the file red would block every PR.',
   },
+  "e2e/owner-badge-shelf.spec.ts": {
+    class: EXEMPTION_CLASS.AWAITING_DECISION,
+    reason:
+      "Credential-free chromium-mocked spec: page.route stubs /auth/v1 and /rest/v1, and no workflow names this file. Matthew Cheek, 2026-10-10 5:34 PM CT, approved the First Diary Entry draft and required CI wiring be proposed separately, not built. Adding it to mocked-e2e-unwired-closure.yml is a scorer-locked workflow edit outside that approval. Local run: 1 passed, 0 skipped.",
+  },
+  "e2e/owner-badge-kill-switch.spec.ts": {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Playwright request spec. test.skip unless E2E_LOCAL_SUPABASE_URL and E2E_LOCAL_SUPABASE_ANON_KEY are set, and it throws unless the host is loopback and is not verdantgrowdiary.com. A mocked CI job would record a skip. Local run against 127.0.0.1 passed. The required-CI change for this lane is the separate proposal, not this slice.",
+  },
 
   /* ---------------- pgTAP lane ---------------- */
   ...pgTapExemptions(),
@@ -305,10 +315,10 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 20,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 21,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
-      [EXEMPTION_CLASS.AWAITING_DECISION]: 1,
+      [EXEMPTION_CLASS.AWAITING_DECISION]: 2,
     });
     expect(byClass[EXEMPTION_CLASS.FLAKY] ?? 0).toBe(0);
   });

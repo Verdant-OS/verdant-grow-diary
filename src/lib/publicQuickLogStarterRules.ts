@@ -13,14 +13,18 @@
  *  - stage validates through the EXISTING `normalizeQuickLogStage`
  *    (unknown stays "" — never silently defaulted to "veg"),
  *  - log types are exactly the four server-supported event types,
- *  - numeric parsing uses the EXISTING `parseOptionalNumber`
- *    (empty input → null, never 0; non-finite rejected),
+ *  - watering volume parsing uses the EXISTING `assessWateringVolumeInput`
+ *    (the Water form's plain-decimal grammar and single-watering ceiling;
+ *    empty input never becomes 0; non-finite rejected),
  *  - attribution is exactly the SAFE_UTM_KEYS allow-list.
  *
  * Pure: no React, no Supabase, no I/O, no time reads (callers pass `now`).
  */
 import { normalizeQuickLogStage, UNKNOWN_STAGE } from "@/lib/quickLogStageDefaultRules";
-import { parseOptionalNumber } from "@/lib/quickLogRules";
+import {
+  assessWateringVolumeInput,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "@/lib/quickLogWateringFormViewModel";
 import { SAFE_UTM_KEYS, type SafeUtmKey } from "@/lib/utm/preserveUtm";
 
 /**
@@ -137,8 +141,9 @@ function isStarterLogType(value: string): value is PublicQuickLogStarterLogType 
  *
  * Honesty rules enforced here:
  *  - stage: unknown/blank stays "" (UNKNOWN_STAGE) — never coerced to "veg";
- *  - watering volume: parsed via parseOptionalNumber (empty → null, never 0)
- *    and must be finite > 0 for watering;
+ *  - watering volume: parsed with the Water form's plain-decimal grammar
+ *    (assessWateringVolumeInput; empty → error, never 0) and must be
+ *    > 0 and within the single-watering ceiling;
  *  - note: required for every type except watering (a watering entry can be
  *    just the volume).
  */
@@ -175,10 +180,16 @@ export function validatePublicQuickLogStarterInput(
 
   let wateringVolumeMl: number | null = null;
   if (isWatering) {
-    wateringVolumeMl = parseOptionalNumber(input.wateringVolumeRaw);
-    if (wateringVolumeMl === null || !Number.isFinite(wateringVolumeMl) || wateringVolumeMl <= 0) {
-      errors.wateringVolumeMl = "Enter how much water you gave, in ml (a number above 0).";
-      wateringVolumeMl = null;
+    // The raw text is validated with the Water form's grammar before it is
+    // stored: once normalized to a number, 0x10 / 1e2 would be undetectable.
+    const assessed = assessWateringVolumeInput(input.wateringVolumeRaw);
+    if (assessed.ok) {
+      wateringVolumeMl = assessed.value;
+    } else {
+      errors.wateringVolumeMl =
+        assessed.reason === "too_large"
+          ? QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE
+          : "Enter how much water you gave, in ml (a number above 0).";
     }
   }
 

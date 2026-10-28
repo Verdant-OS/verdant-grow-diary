@@ -1,0 +1,45 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * Ported from draft #2239 (the one case not already on base). When a census route
+ * redirects before its landing page (signed-in /onboarding goes to "/" since
+ * #2045), the spec must settle reads on the final path and skip the link audit
+ * for the route it never rendered. The branch lives inline in a Playwright spec
+ * that cannot be imported under Vitest, so this is a presence fence over the spec
+ * source: it proves the construct exists, it does not verify configuration. The
+ * resolved redirect values are pinned in
+ * src/test/core-link-form-census-onboarding-redirect.test.ts.
+ *
+ * @source-scan-justified: e2e/core-link-form-census.spec.ts calls `test.describe` from
+ * @playwright/test at module load, and Playwright throws "Playwright Test did not expect
+ * test.describe() to be called here" outside its runner, so Vitest cannot import the spec
+ * to assert the redirected-route branch as a resolved value.
+ */
+const CENSUS_SPEC_RAW = readFileSync(
+  resolve(process.cwd(), "e2e/core-link-form-census.spec.ts"),
+  "utf8",
+);
+
+// Match live code only, so a commented-out branch can't satisfy the fence.
+// Block comments are removed; a `//` comment is removed only where it starts
+// a line or follows whitespace, so URLs like "https://..." in strings survive.
+const CENSUS_SPEC_SOURCE = CENSUS_SPEC_RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+  /(^|\s)\/\/.*$/gm,
+  "$1",
+);
+
+describe("core census redirected-route link audit skip", () => {
+  it("skips link audits on routes that redirect before the landing page", () => {
+    expect(CENSUS_SPEC_SOURCE).toMatch(/const redirected = finalPath !==/);
+    expect(CENSUS_SPEC_SOURCE).toMatch(
+      /const links = redirected \? \[\] : await visibleLinkAudits\(/,
+    );
+    expect(CENSUS_SPEC_SOURCE).toMatch(/redirected \? finalPath : route\.path/);
+  });
+
+  it("never audits links unconditionally on a route that may have redirected", () => {
+    expect(CENSUS_SPEC_SOURCE).not.toMatch(/const links = await visibleLinkAudits\(/);
+  });
+});

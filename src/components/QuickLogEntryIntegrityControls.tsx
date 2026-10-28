@@ -48,7 +48,11 @@ import {
   QUICKLOG_RETRACTION_REASON_CHIPS,
   QUICKLOG_REVISION_NOTE_MAX_LENGTH,
   QUICKLOG_REVISION_REASON_LABELS,
+  quickLogCorrectionEnvironmentCheckReadingsNote,
   quickLogRevisionFailureCopy,
+  type QuickLogCorrectionChanges,
+  type QuickLogCorrectionSensorValues,
+  type QuickLogCorrectionValueContext,
   type QuickLogRevisionReasonCode,
 } from "@/lib/quick-log/quickLogRevisionRules";
 import type { QuickLogEntryHandle } from "@/lib/quickLogRevisionService";
@@ -66,6 +70,10 @@ export interface QuickLogEntryIntegrityControlsProps {
   currentNote?: string | null;
   currentOccurredAt?: string | null;
   currentPlantId?: string | null;
+  /** Volume, dose, or sensor values for this entry type. Omitted for other types. */
+  correctionValues?: QuickLogCorrectionValueContext | null;
+  /** Saved `details`; Environment checks get a note on readings the dialog has no field for. */
+  environmentCheckDetails?: unknown;
   /** Invalidation scope (best-effort; broad prefixes are used regardless). */
   plantId?: string | null;
   tentId?: string | null;
@@ -97,6 +105,26 @@ function useOwnedPlantOptions(enabled: boolean, ownerId: string | null) {
   });
 }
 
+function draftSensor(
+  values: QuickLogCorrectionValueContext | null | undefined,
+  key: keyof QuickLogCorrectionSensorValues,
+): string {
+  const value =
+    values?.kind === "sensor" || values?.kind === "watering" ? values.sensor?.[key] : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+}
+
+function volumeDraftFrom(values: QuickLogCorrectionValueContext | null | undefined): string {
+  if (
+    (values?.kind === "watering" || values?.kind === "feeding") &&
+    values.volumeMl != null &&
+    Number.isFinite(values.volumeMl)
+  ) {
+    return String(values.volumeMl);
+  }
+  return "";
+}
+
 function toDatetimeLocalValue(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -105,6 +133,19 @@ function toDatetimeLocalValue(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
     d.getHours(),
   )}:${pad(d.getMinutes())}`;
+}
+
+function RevisionInlineFailure({ reason, testId }: { reason: string | null; testId: string }) {
+  if (!reason) return null;
+  return (
+    <p
+      role="alert"
+      data-testid={testId}
+      className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-[12px] text-destructive"
+    >
+      {quickLogRevisionFailureCopy(reason)}
+    </p>
+  );
 }
 
 function ReasonChips({
@@ -163,6 +204,8 @@ function RevisionControls({
   currentNote,
   currentOccurredAt,
   currentPlantId,
+  correctionValues,
+  environmentCheckDetails,
   plantId,
   tentId,
   growId,
@@ -180,7 +223,29 @@ function RevisionControls({
   const [noteDraft, setNoteDraft] = useState<string>(currentNote ?? "");
   const [timeDraft, setTimeDraft] = useState<string>(toDatetimeLocalValue(currentOccurredAt));
   const [plantDraft, setPlantDraft] = useState<string>(currentPlantId ?? "");
+  // A watering log saved with readings corrects its volume and readings together.
+  const editsSensor =
+    correctionValues?.kind === "sensor" ||
+    (correctionValues?.kind === "watering" && correctionValues.sensor != null);
+  const readingsNote = quickLogCorrectionEnvironmentCheckReadingsNote(environmentCheckDetails, {
+    offersAirReadingFields: editsSensor,
+  });
+  const [volumeDraft, setVolumeDraft] = useState<string>(volumeDraftFrom(correctionValues));
+  const [doseDraft, setDoseDraft] = useState<string>(
+    correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
+      ? String(correctionValues.doseAmount)
+      : "",
+  );
+  const [temperatureDraft, setTemperatureDraft] = useState<string>(
+    draftSensor(correctionValues, "temperature_c"),
+  );
+  const [humidityDraft, setHumidityDraft] = useState<string>(
+    draftSensor(correctionValues, "humidity_pct"),
+  );
+  const [vpdDraft, setVpdDraft] = useState<string>(draftSensor(correctionValues, "vpd_kpa"));
   const [explain, setExplain] = useState("");
+  const [correctFailureReason, setCorrectFailureReason] = useState<string | null>(null);
+  const [retractFailureReason, setRetractFailureReason] = useState<string | null>(null);
 
   const plantsQuery = useOwnedPlantOptions(correctOpen, ownerId);
 
@@ -215,11 +280,21 @@ function RevisionControls({
   if (!hasHandle) return null;
 
   const openCorrect = () => {
+    setCorrectFailureReason(null);
     if (unconfirmed) {
       setCorrectOpen(true);
       return;
     }
     setNoteDraft(currentNote ?? "");
+    setVolumeDraft(volumeDraftFrom(correctionValues));
+    setDoseDraft(
+      correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
+        ? String(correctionValues.doseAmount)
+        : "",
+    );
+    setTemperatureDraft(draftSensor(correctionValues, "temperature_c"));
+    setHumidityDraft(draftSensor(correctionValues, "humidity_pct"));
+    setVpdDraft(draftSensor(correctionValues, "vpd_kpa"));
     setTimeDraft(toDatetimeLocalValue(currentOccurredAt));
     setPlantDraft(currentPlantId ?? "");
     setExplain("");
@@ -227,17 +302,19 @@ function RevisionControls({
     setCorrectOpen(true);
   };
 
+  const rememberDefiniteFailure = (reason: string, setReason: (next: string | null) => void) => {
+    // Ambiguous commits already render the same copy in the role="status"
+    // recovery line. A second alert would duplicate that path.
+    setReason(reason === "rpc_error" ? null : reason);
+  };
+
   const submitCorrection = async () => {
     if (!correctReason) {
       toast.error("Pick a reason chip first.");
       return;
     }
-    const changes: {
-      note?: string | null;
-      occurredAt?: string;
-      targetType?: "plant" | "tent";
-      targetId?: string;
-    } = {};
+    setCorrectFailureReason(null);
+    const changes: QuickLogCorrectionChanges = {};
     if ((currentNote ?? "") !== noteDraft) changes.note = noteDraft;
     const originalTime = toDatetimeLocalValue(currentOccurredAt);
     if (timeDraft && timeDraft !== originalTime) {
@@ -248,9 +325,40 @@ function RevisionControls({
       changes.targetType = "plant";
       changes.targetId = plantDraft;
     }
+    if (
+      correctionValues?.kind === "watering" ||
+      (correctionValues?.kind === "feeding" && correctionValues.volumeMl != null)
+    ) {
+      const parsed = Number(volumeDraft);
+      if (volumeDraft.trim() !== "" && parsed !== correctionValues.volumeMl) {
+        changes.volumeMl = parsed;
+        changes.volumeKind = correctionValues.kind;
+      }
+    }
+    if (correctionValues?.kind === "feeding") {
+      const parsed = Number(doseDraft);
+      if (doseDraft.trim() !== "" && parsed !== correctionValues.doseAmount) {
+        changes.doseAmount = parsed;
+      }
+    }
+    if (editsSensor && correctionValues) {
+      const sensor: QuickLogCorrectionSensorValues = {};
+      const original = correctionValues.sensor ?? {};
+      const temperature = temperatureDraft.trim() === "" ? undefined : Number(temperatureDraft);
+      const humidity = humidityDraft.trim() === "" ? undefined : Number(humidityDraft);
+      const vpd = vpdDraft.trim() === "" ? undefined : Number(vpdDraft);
+      if (temperature !== undefined && temperature !== original.temperature_c) {
+        sensor.temperature_c = temperature;
+      }
+      if (humidity !== undefined && humidity !== original.humidity_pct)
+        sensor.humidity_pct = humidity;
+      if (vpd !== undefined && vpd !== original.vpd_kpa) sensor.vpd_kpa = vpd;
+      if (Object.keys(sensor).length > 0) changes.sensorValues = sensor;
+    }
     const result = await submit("correction", correctReason, changes, explain);
     if (!result) return;
     if (!result.ok) {
+      rememberDefiniteFailure(result.reason, setCorrectFailureReason);
       toast.error(quickLogRevisionFailureCopy(result.reason));
       return;
     }
@@ -265,9 +373,11 @@ function RevisionControls({
       toast.error("Pick a reason chip first.");
       return;
     }
+    setRetractFailureReason(null);
     const result = await submit("retraction", retractReason, {}, explain);
     if (!result) return;
     if (!result.ok) {
+      rememberDefiniteFailure(result.reason, setRetractFailureReason);
       toast.error(quickLogRevisionFailureCopy(result.reason));
       return;
     }
@@ -297,6 +407,7 @@ function RevisionControls({
         type="button"
         onClick={(ev) => {
           ev.stopPropagation();
+          setRetractFailureReason(null);
           if (!unconfirmed) {
             setRetractReason(null);
             setExplain("");
@@ -315,7 +426,9 @@ function RevisionControls({
       <Dialog
         open={correctOpen}
         onOpenChange={(open) => {
-          if (!busy) setCorrectOpen(open);
+          if (busy) return;
+          if (!open) setCorrectFailureReason(null);
+          setCorrectOpen(open);
         }}
       >
         <DialogContent data-testid="quicklog-entry-correct-dialog">
@@ -324,18 +437,117 @@ function RevisionControls({
             <DialogDescription>{QUICKLOG_CORRECT_DIALOG_BODY}</DialogDescription>
           </DialogHeader>
           {unconfirmed && <p role="status">{quickLogRevisionFailureCopy("rpc_error")}</p>}
+          <RevisionInlineFailure
+            reason={correctFailureReason}
+            testId="quicklog-correct-inline-error"
+          />
           <fieldset disabled={busy || unconfirmed} className="space-y-3">
             <ReasonChips
               chips={QUICKLOG_CORRECTION_REASON_CHIPS}
               selected={correctReason}
-              onSelect={setCorrectReason}
+              onSelect={(reason) => {
+                setCorrectFailureReason(null);
+                setCorrectReason(reason);
+              }}
               testIdPrefix="quicklog-correct"
             />
+            {(correctionValues?.kind === "watering" ||
+              (correctionValues?.kind === "feeding" && correctionValues.volumeMl != null)) && (
+              <label className="block text-xs text-muted-foreground">
+                Volume (ml)
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={volumeDraft}
+                  onChange={(e) => {
+                    setCorrectFailureReason(null);
+                    setVolumeDraft(e.target.value);
+                  }}
+                  data-testid="quicklog-correct-volume-input"
+                  className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                />
+              </label>
+            )}
+            {correctionValues?.kind === "feeding" && (
+              <label className="block text-xs text-muted-foreground">
+                Dose
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={doseDraft}
+                  onChange={(e) => {
+                    setCorrectFailureReason(null);
+                    setDoseDraft(e.target.value);
+                  }}
+                  data-testid="quicklog-correct-dose-input"
+                  className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                />
+              </label>
+            )}
+            {readingsNote && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="quicklog-correct-readings-note"
+              >
+                {readingsNote}
+              </p>
+            )}
+            {editsSensor && (
+              <div className="space-y-2">
+                <label className="block text-xs text-muted-foreground">
+                  Temperature (°C)
+                  <input
+                    type="number"
+                    step="any"
+                    value={temperatureDraft}
+                    onChange={(e) => {
+                      setCorrectFailureReason(null);
+                      setTemperatureDraft(e.target.value);
+                    }}
+                    data-testid="quicklog-correct-temperature-input"
+                    className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                  />
+                </label>
+                <label className="block text-xs text-muted-foreground">
+                  Humidity (%)
+                  <input
+                    type="number"
+                    step="any"
+                    value={humidityDraft}
+                    onChange={(e) => {
+                      setCorrectFailureReason(null);
+                      setHumidityDraft(e.target.value);
+                    }}
+                    data-testid="quicklog-correct-humidity-input"
+                    className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                  />
+                </label>
+                <label className="block text-xs text-muted-foreground">
+                  VPD (kPa)
+                  <input
+                    type="number"
+                    step="any"
+                    value={vpdDraft}
+                    onChange={(e) => {
+                      setCorrectFailureReason(null);
+                      setVpdDraft(e.target.value);
+                    }}
+                    data-testid="quicklog-correct-vpd-input"
+                    className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
+                  />
+                </label>
+              </div>
+            )}
             <label className="block text-xs text-muted-foreground">
               Note
               <textarea
                 value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setNoteDraft(e.target.value);
+                }}
                 rows={3}
                 data-testid="quicklog-correct-note-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
@@ -346,7 +558,10 @@ function RevisionControls({
               <input
                 type="datetime-local"
                 value={timeDraft}
-                onChange={(e) => setTimeDraft(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setTimeDraft(e.target.value);
+                }}
                 data-testid="quicklog-correct-time-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />
@@ -355,7 +570,10 @@ function RevisionControls({
               Plant
               <select
                 value={plantDraft}
-                onChange={(e) => setPlantDraft(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setPlantDraft(e.target.value);
+                }}
                 data-testid="quicklog-correct-plant-select"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               >
@@ -373,7 +591,10 @@ function RevisionControls({
                 type="text"
                 value={explain}
                 maxLength={QUICKLOG_REVISION_NOTE_MAX_LENGTH}
-                onChange={(e) => setExplain(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setExplain(e.target.value);
+                }}
                 data-testid="quicklog-correct-explain-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />
@@ -383,7 +604,10 @@ function RevisionControls({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setCorrectOpen(false)}
+              onClick={() => {
+                setCorrectFailureReason(null);
+                setCorrectOpen(false);
+              }}
               disabled={busy}
               data-testid="quicklog-correct-cancel"
             >
@@ -404,7 +628,9 @@ function RevisionControls({
       <AlertDialog
         open={retractOpen}
         onOpenChange={(open) => {
-          if (!busy) setRetractOpen(open);
+          if (busy) return;
+          if (!open) setRetractFailureReason(null);
+          setRetractOpen(open);
         }}
       >
         <AlertDialogContent data-testid="quicklog-entry-retract-dialog">
@@ -413,11 +639,18 @@ function RevisionControls({
             <AlertDialogDescription>{QUICKLOG_RETRACT_DIALOG_BODY}</AlertDialogDescription>
           </AlertDialogHeader>
           {unconfirmed && <p role="status">{quickLogRevisionFailureCopy("rpc_error")}</p>}
+          <RevisionInlineFailure
+            reason={retractFailureReason}
+            testId="quicklog-retract-inline-error"
+          />
           <fieldset disabled={busy || unconfirmed} className="space-y-3">
             <ReasonChips
               chips={QUICKLOG_RETRACTION_REASON_CHIPS}
               selected={retractReason}
-              onSelect={setRetractReason}
+              onSelect={(reason) => {
+                setRetractFailureReason(null);
+                setRetractReason(reason);
+              }}
               testIdPrefix="quicklog-retract"
             />
             <label className="block text-xs text-muted-foreground">
@@ -426,7 +659,10 @@ function RevisionControls({
                 type="text"
                 value={explain}
                 maxLength={QUICKLOG_REVISION_NOTE_MAX_LENGTH}
-                onChange={(e) => setExplain(e.target.value)}
+                onChange={(e) => {
+                  setRetractFailureReason(null);
+                  setExplain(e.target.value);
+                }}
                 data-testid="quicklog-retract-explain-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />

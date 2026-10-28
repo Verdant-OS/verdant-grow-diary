@@ -61,10 +61,10 @@ describe("paid acquisition attribution rules", () => {
       "utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch",
     );
     expect(shared).toBe(
-      "/pricing?plan=founder_lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch",
+      "/pricing?utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch",
     );
     expect(buildFounderPricingPath("utm_source=evil")).toBe(
-      "/pricing?plan=founder_lifetime&utm_source=founder_page&utm_medium=owned&utm_campaign=founder_launch",
+      "/pricing?utm_source=founder_page&utm_medium=owned&utm_campaign=founder_launch",
     );
   });
 });

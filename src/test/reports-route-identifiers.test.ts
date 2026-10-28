@@ -67,7 +67,7 @@ describe("Reports hub card identifiers + routes", () => {
     expect(snapshot).toMatchInlineSnapshot(`
       [
         {
-          "href": "/grows/grow-route-id-test",
+          "href": "/grows/grow-route-id-test/learning",
           "hrefLabel": "Open learning report",
           "id": "action_outcome_learning",
         },

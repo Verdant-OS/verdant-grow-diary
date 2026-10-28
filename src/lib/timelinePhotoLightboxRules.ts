@@ -74,6 +74,28 @@ export function buildTimelinePhotoLightboxList(
   return out;
 }
 
+/**
+ * Same list as `buildTimelinePhotoLightboxList`, but in the caller's id
+ * order (the Plant Relative Timeline renders oldest-first while its rows
+ * arrive newest-first). Ids with no row or no usable photo are skipped.
+ */
+export function buildOrderedTimelinePhotoLightboxList(
+  rows: ReadonlyArray<TimelinePhotoSourceRow> | null | undefined,
+  orderedIds: ReadonlyArray<string> | null | undefined,
+): TimelinePhotoLightboxItem[] {
+  if (!Array.isArray(rows) || !Array.isArray(orderedIds)) return [];
+  const byId = new Map<string, TimelinePhotoSourceRow>();
+  for (const r of rows) {
+    if (r && typeof r.id === "string" && r.id && !byId.has(r.id)) byId.set(r.id, r);
+  }
+  const ordered: TimelinePhotoSourceRow[] = [];
+  for (const id of orderedIds) {
+    const r = byId.get(id);
+    if (r) ordered.push(r);
+  }
+  return buildTimelinePhotoLightboxList(ordered);
+}
+
 export interface TimelinePhotoNavigationState {
   currentIndex: number;
   previousIndex: number | null;

@@ -23,6 +23,7 @@ DECLARE
   v_harvest_event uuid;
   v_harvest_plant uuid := gen_random_uuid();
   v_linked_entry uuid;
+  v_alias_entry uuid;
   v_refused boolean;
   v_hw uuid := gen_random_uuid();
   v_hw_grow uuid := gen_random_uuid();
@@ -319,18 +320,32 @@ BEGIN
   ASSERT v_result->>'status' = 'unchanged',
     'an unlinked photo, or a retracted companion photo, earns nothing';
 
-  -- A photo saved on another event, whose caller-supplied legacy alias names
-  -- this photo-free harvest, is not harvest evidence: the server-written
-  -- linked_grow_event_id points at the note, and it wins.
-  v_result := public.quicklog_save_event(
-    'badge-harvest-alias-0001', v_both_grow, 'note', v_both_tent, v_harvest_plant,
-    'alias points at the harvest', v_both_photo, NULL, NULL,
-    jsonb_build_object('grow_event_id', v_harvest_event::text)
-  );
-  ASSERT (v_result->>'ok')::boolean, 'the note save with a conflicting alias succeeds';
+  -- A companion of another event keeps a caller-supplied legacy alias next to
+  -- its server-written link (quicklog_save_event merges p_details under the
+  -- link). When that alias names this photo-free harvest, its photo is not
+  -- harvest evidence: the link wins. Fixture row written as service_role, the
+  -- shape the save RPC produces.
+  RESET role;
+  PERFORM set_config('role', 'service_role', true);
+  INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at, details)
+  VALUES (
+    v_both, v_both_grow, 'alias points at the harvest', v_both_photo, now(),
+    jsonb_build_object(
+      'linked_grow_event_id', gen_random_uuid()::text,
+      'grow_event_id', v_harvest_event::text
+    )
+  )
+  RETURNING id INTO v_alias_entry;
+  RESET role;
+  PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
   ASSERT v_result->>'status' = 'unchanged',
-    'a note photo whose legacy alias names the harvest earns nothing';
+    'a photo linked to another event earns nothing through a legacy alias';
+  RESET role;
+  PERFORM set_config('role', 'service_role', true);
+  UPDATE public.diary_entries SET retracted_at = now() WHERE id = v_alias_entry;
+  RESET role;
+  PERFORM set_config('role', 'authenticated', true);
 
   RESET role;
   PERFORM set_config('role', 'service_role', true);

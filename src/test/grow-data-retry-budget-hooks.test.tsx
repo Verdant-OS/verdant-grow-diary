@@ -49,6 +49,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  // Restore React Query's default scheduler even when an assertion throws.
+  notifyManager.setScheduler((callback) => {
+    setTimeout(callback, 0);
+  });
 });
 
 describe("tent and plant retry bounds", () => {
@@ -81,8 +85,5 @@ describe("tent and plant retry bounds", () => {
     });
     expect(result.current.isError).toBe(true);
     expect(repo.tents).toBe(2);
-    notifyManager.setScheduler((callback) => {
-      setTimeout(callback, 0);
-    });
   });
 });

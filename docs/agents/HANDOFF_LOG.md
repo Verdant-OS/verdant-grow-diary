@@ -78,9 +78,9 @@ why: a malformed read could spend the Free plan's one grow. Matthew (2026-10-27)
 branch: claude/onboarding-grows-read-error (created at b92cbcd186f3c157814916d06deaa9e5350774a5)
 base: verdant-grow-diary
 checkout: git fetch origin claude/onboarding-grows-read-error verdant-grow-diary && git switch claude/onboarding-grows-read-error && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2562 (ready for review since 2026-10-28, auto-merge on)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2562 (ready for review since 2026-10-28; auto-merge off since the 06:21Z base merge, re-queue is the merge seat's call)
 head_sha: dde99eb008a0e38338edf47a6c9456b01046e43d before the Codex-findings commit; read the current head from the PR
-state: pushed draft
+state: ready for review
 current_step: awaiting CI and an independent exact-head review
 next_action: re-review at the current head (Jack Herer PASS-pending-CI at dde99eb0 no longer covers it); Codex P2s fixed: growRepo keeps database error codes so permanent errors stop retrying, and Sign in again handles a failed sign-out via performSafeSignOut
 post_merge_check: NOT_APPLICABLE for production without a forced malformed read; covered by onboarding-null-grows-render.test.tsx

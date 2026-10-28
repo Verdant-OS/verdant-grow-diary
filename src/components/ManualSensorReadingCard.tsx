@@ -593,7 +593,10 @@ export default function ManualSensorReadingCard({
       const createdAt = submissionCorrection
         ? submissionCorrection.originalCapturedAt
         : (payloads[0]?.captured_at ?? new Date().toISOString());
-      const successLine = buildManualSaveSuccessLine({ metrics: savedMetrics });
+      const successLine = buildManualSaveSuccessLine({
+        metrics: savedMetrics,
+        temperatureUnit: preferredUnit,
+      });
       const stillOwnsDraft = submissionStillOwnsDraft();
       const confirmedValues = (current: ManualDraftValues): ManualDraftValues => ({
         ...createManualDraftValues(

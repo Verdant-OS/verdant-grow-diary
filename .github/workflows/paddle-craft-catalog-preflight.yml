@@ -47,7 +47,7 @@ on:
 # with each other or with PR runs.
 concurrency:
   group: paddle-craft-catalog-preflight-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

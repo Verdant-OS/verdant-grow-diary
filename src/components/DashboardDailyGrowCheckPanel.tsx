@@ -38,6 +38,7 @@ import {
   refreshDailyCheckQueries,
 } from "@/lib/dailyCheckRefreshRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
+import { DASHBOARD_SAVED_WORK_LINK_CLASS } from "@/lib/dashboardSavedWorkLinkClass";
 
 interface Props {
   scopedGrowId: string | null;
@@ -364,13 +365,31 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                   />
                 )}
                 <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{row.plantName}</div>
+                  <Link
+                    to={row.plantHref}
+                    data-testid="dashboard-daily-grow-check-panel-plant-link"
+                    aria-label={`Open ${row.plantName}`}
+                    className={`block max-w-full text-sm font-medium truncate ${DASHBOARD_SAVED_WORK_LINK_CLASS}`}
+                  >
+                    {row.plantName}
+                  </Link>
                   <div
                     className="text-xs text-muted-foreground truncate"
                     data-testid="dashboard-daily-grow-check-panel-row-method"
                   >
                     {row.tentName ? `${row.tentName} · ` : ""}
-                    {row.shortGuidance}
+                    {row.latestActivityHref ? (
+                      <Link
+                        to={row.latestActivityHref}
+                        data-testid="dashboard-daily-grow-check-panel-activity-link"
+                        aria-label={`${row.shortGuidance}, latest log for ${row.plantName}`}
+                        className={DASHBOARD_SAVED_WORK_LINK_CLASS}
+                      >
+                        {row.shortGuidance}
+                      </Link>
+                    ) : (
+                      row.shortGuidance
+                    )}
                   </div>
                 </div>
               </div>

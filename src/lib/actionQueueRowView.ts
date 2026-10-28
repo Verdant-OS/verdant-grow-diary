@@ -7,7 +7,11 @@
  * and reused for accessibility-related labels.
  */
 
-import { getActionQueueSourceLabel } from "@/lib/actionQueueProvenanceRules";
+import {
+  getActionQueueSourceLabel,
+  stripBackPointerTokens,
+} from "@/lib/actionQueueProvenanceRules";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Sanitize grower-facing action copy by replacing internal AI prompt
@@ -186,3 +190,13 @@ export const APPROVE_DIALOG_REASSURANCE =
  */
 export const ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE =
   "Evidence quality: not available from this action record";
+
+/**
+ * Display-only copy of a stored action reason for Recent Activity details
+ * (#2270): drops `[alert:...]` back-pointers, applies sanitizeActionCopy and
+ * shows "Reading at <ISO>." in local time. The stored row is never changed.
+ */
+export function formatActionReasonForDisplay(reason: string | null | undefined): string | null {
+  const text = localizeReadingAtTimestamps(sanitizeActionCopy(stripBackPointerTokens(reason)));
+  return text === "" ? null : text;
+}

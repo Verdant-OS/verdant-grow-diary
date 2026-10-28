@@ -16,6 +16,13 @@ import { sanitizeReferralCode } from "@/lib/referralCaptureRules";
 
 export const REFERRAL_GIVE_CREDITS = 10;
 export const REFERRAL_GET_CREDITS = 10;
+/**
+ * Rewarded conversions per referrer per UTC calendar month. Display only: the
+ * cap is enforced server-side by convert_referral
+ * (20261003020000_referral_referrer_monthly_cap.sql). The referee's credits
+ * are never capped.
+ */
+export const REFERRAL_GIVE_MONTHLY_CAP = 10;
 
 export interface ReferralShareData {
   title: string;
@@ -29,7 +36,7 @@ export function buildReferralShareData(code: unknown, origin: string): ReferralS
   if (!sanitized || typeof origin !== "string" || origin.length === 0) return null;
   return Object.freeze({
     title: "Verdant Grow Diary",
-    text: `Track your grow with me on Verdant — sign up with my link and we both get ${REFERRAL_GET_CREDITS} AI Doctor credits.`,
+    text: `Track your grow with me on Verdant — sign up with my link and you get ${REFERRAL_GET_CREDITS} AI Doctor credits.`,
     url: `${origin}/auth?mode=signup&ref=${sanitized}`,
   });
 }

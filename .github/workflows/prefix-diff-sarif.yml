@@ -5,15 +5,14 @@ name: Prefix Diff — SARIF upload
 # See docs/production-only-verification-runbook.md; no dispatch/APPLY here.
 
 # Trust lanes:
-#   - Pull requests run only offline file/manifest checks.
-#   - Sandbox DB verification runs only from the trusted base branch through
-#     the verdant-sandbox environment.
+#   - Pull requests and pushes run only offline file/manifest checks.
 #   - Production DB verification is manual-only from the trusted base branch
 #     through the verdant-production environment.
+#   - There is no sandbox lane: Verdant has no non-production environment, and
+#     AGENTS.md ("CI probes production or nothing") bars probing one.
 #
 # Prereqs (Repo Settings):
 #   - Settings → Code security → Code scanning: enabled (default setup off).
-#   - Environment secret SUPABASE_DB_URL_SANDBOX in verdant-sandbox.
 #   - Environment secret SUPABASE_DB_URL in verdant-production.
 
 on:
@@ -50,18 +49,21 @@ on:
       target_env:
         description: "Protected target environment"
         required: true
-        default: "sandbox"
+        default: "live"
         type: choice
         options:
-          - sandbox
           - live
+      confirm_live:
+        description: "Type LIVE to run the read-only check against the production database"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
   group: prefix-diff-sarif-${{ github.ref }}-${{ inputs.target_env || github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   prefix-diff-offline:
@@ -130,106 +132,10 @@ jobs:
           echo "::error::Offline money-migration manifest validation failed — see Code Scanning and the workflow artifact."
           exit 1
 
-  prefix-diff-sandbox:
-    name: Prefix diff against SANDBOX
-    needs: prefix-diff-offline
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
-    environment: verdant-sandbox
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write
-    env:
-      DATABASE_URL: ""
-      DIFF_JSON_PATH: artifacts/prefix-diff-sandbox.json
-      PGDATABASE: ""
-      PGHOST: ""
-      PGPASSWORD: ""
-      PGPORT: ""
-      PGSERVICE: ""
-      PGSERVICEFILE: ""
-      PGUSER: ""
-      SARIF_PATH: artifacts/prefix-diff-sandbox.sarif
-      TARGET_ENV: sandbox
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
-        uses: ./.github/actions/require-ci-secret
-        with:
-          secret-name: SUPABASE_DB_URL_SANDBOX
-          secret-value: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          guard-heading: "Money-migration prefix diff — SANDBOX"
-          fix-steps-json: >-
-            ["1. Open **Settings → Environments → verdant-sandbox** in this repository.",
-             "2. Add the `SUPABASE_DB_URL_SANDBOX` environment secret.",
-             "3. Re-run this workflow from `verdant-grow-diary`."]
-
-      - name: Install psql client
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
-
-      - name: Prepare artifacts dir
-        run: mkdir -p artifacts
-
-      - name: Run sandbox prefix diff (JSON)
-        id: diff-json
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-        shell: bash
-        run: |
-          set +e
-          node scripts/diff-money-migration-prefixes.mjs \
-            --json > "${DIFF_JSON_PATH}"
-          status=$?
-          echo "exit=${status}" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Run sandbox prefix diff (SARIF)
-        id: diff-sarif
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-        shell: bash
-        run: |
-          set +e
-          node scripts/diff-money-migration-prefixes.mjs \
-            --sarif --sarif-out="${SARIF_PATH}"
-          status=$?
-          echo "exit=${status}" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Validate sandbox SARIF structure
-        run: node scripts/validate-sarif.mjs "${SARIF_PATH}"
-
-      - name: Upload sandbox SARIF to Code Scanning
-        if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
-        with:
-          sarif_file: ${{ env.SARIF_PATH }}
-          category: prefix-diff-sandbox
-
-      - name: Archive sandbox SARIF + JSON
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: prefix-diff-sarif-sandbox
-          path: |
-            ${{ env.SARIF_PATH }}
-            ${{ env.DIFF_JSON_PATH }}
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Fail on sandbox drift
-        if: steps.diff-json.outputs.exit != '0' || steps.diff-sarif.outputs.exit != '0'
-        run: |
-          echo "::error::Sandbox prefix-diff failed (JSON=${{ steps.diff-json.outputs.exit }}, SARIF=${{ steps.diff-sarif.outputs.exit }}) — see Code Scanning and the workflow artifact."
-          exit 1
-
   prefix-diff-live:
     name: Prefix diff against LIVE
     needs: prefix-diff-offline
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' && inputs.confirm_live == 'LIVE' }}
     environment: verdant-production
     runs-on: ubuntu-latest
     timeout-minutes: 10

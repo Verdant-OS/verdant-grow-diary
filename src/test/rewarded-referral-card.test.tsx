@@ -5,7 +5,11 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { buildReferralShareData, loadOwnReferralCode } from "@/lib/referralShareRules";
+import {
+  buildReferralShareData,
+  loadOwnReferralCode,
+  REFERRAL_GIVE_MONTHLY_CAP,
+} from "@/lib/referralShareRules";
 import type { ReferralCodeClient } from "@/lib/referralShareRules";
 
 const mocks = vi.hoisted(() => ({
@@ -50,6 +54,17 @@ describe("buildReferralShareData", () => {
     expect(data?.text).toContain("10 AI Doctor credits");
   });
 
+  it("promises the friend their credits without promising the sender a reward", () => {
+    // The referrer's reward is capped per UTC month (convert_referral,
+    // 20261003020000), so a share message saying "we both get" would be untrue
+    // once the cap is reached. The referee's credits are never capped.
+    const data = buildReferralShareData("abc234kmn", "https://verdantgrowdiary.com");
+    expect(data?.text).toBe(
+      "Track your grow with me on Verdant — sign up with my link and you get 10 AI Doctor credits.",
+    );
+    expect(data?.text).not.toMatch(/we both/i);
+  });
+
   it("returns null for a bad code or missing origin", () => {
     expect(buildReferralShareData("bad code!", "https://x.example")).toBeNull();
     expect(buildReferralShareData("abc234kmn", "")).toBeNull();
@@ -77,8 +92,10 @@ describe("RewardedReferralCard", () => {
     const input = screen.getByLabelText("Your referral link") as HTMLInputElement;
     expect(input.value).toContain("/auth?mode=signup&ref=abc234kmn");
     expect(screen.getByTestId("rewarded-referral-card").textContent).toContain(
-      "you get 10 AI Doctor credits and they get 10",
+      "When a friend signs up and confirms their email, they get 10 AI Doctor credits. " +
+        "You get 10 for each one, up to 10 friends per calendar month (UTC).",
     );
+    expect(REFERRAL_GIVE_MONTHLY_CAP).toBe(10);
     // The view event fires in a passive effect scheduled after the commit
     // that waitFor observed — poll for it instead of asserting synchronously
     // (the synchronous form was flaky on CI's forked jsdom).

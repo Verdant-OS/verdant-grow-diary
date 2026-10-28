@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 
 import {
   PRICING_TIERS,
+  PURCHASABLE_PRICING_TIERS,
   PLAN_COMPARISON,
   UPGRADE_FAQ,
   resolveTierFeatures,
@@ -400,7 +401,7 @@ function PlanComparisonTable() {
           <thead className="bg-muted/40">
             <tr>
               <th className="p-3 text-left font-medium">Feature</th>
-              {PRICING_TIERS.map((t) => (
+              {PURCHASABLE_PRICING_TIERS.map((t) => (
                 <th
                   key={t.id}
                   className="p-3 text-center font-medium"
@@ -418,7 +419,7 @@ function PlanComparisonTable() {
                 className={cn("border-t border-border/40", idx % 2 === 1 && "bg-muted/20")}
               >
                 <td className="p-3 text-left font-medium">{row.label}</td>
-                {PRICING_TIERS.map((t) => (
+                {PURCHASABLE_PRICING_TIERS.map((t) => (
                   <td key={t.id} className="p-3 text-center">
                     <ComparisonCell value={row.values[t.id] ?? false} />
                   </td>
@@ -748,7 +749,7 @@ export default function Upgrade() {
         aria-label="Pricing tiers"
         className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3"
       >
-        {PRICING_TIERS.map((tier) => (
+        {PURCHASABLE_PRICING_TIERS.map((tier) => (
           <TierCard
             key={tier.id}
             tier={tier}

@@ -45,14 +45,13 @@ export function ogImageSlugForPath(path: string): string {
 /** Returns a stable category label based on the route path. */
 export function categoryForPath(path: string): string {
   if (path === "/") return "Grow OS";
-  if (path === "/founder") return "Founder Lifetime";
   if (path === "/pricing") return "Pricing";
   if (path === "/welcome") return "Grow OS";
   if (path.startsWith("/guides/")) return "Grower Guide";
   if (path === "/guides") return "Guides";
   if (path.startsWith("/cultivars/")) return "Cultivar Guide";
   if (path === "/cultivars") return "Cultivar Library";
-  if (path.startsWith("/tools/")) return "Free Tool";
+  if (path.startsWith("/tools/") || path === "/vpd-chart") return "Free Tool";
   if (path === "/hardware-integrations") return "Hardware";
   if (path === "/how-ai-doctor-works") return "AI Doctor";
   if (path === "/ai-doctor-readiness-check") return "Readiness Check";

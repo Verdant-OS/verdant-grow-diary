@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-296-START-ROOM-ONE-STEP
+
+```text
+TASK VER-296-START-ROOM-ONE-STEP  priority: P2  status: OPEN
+goal: first win in one submit: Start Your Room creates the grow, tent and plant from one form, then opens Plant Detail with Quick Log.
+why: Toad Venom onboarding fix (Cheeko yes, 2026-10-27 3:56 PM CT); VER-296 SENTINEL prompt; Matthew: "yes to 296 tests", then "Push both" (2026-10-28).
+branch: claude/start-room-one-step (stacked on claude/setup-quicklog-draft-retry-p2s, PR #2565)
+base: claude/setup-quicklog-draft-retry-p2s; retarget to verdant-grow-diary once #2565 merges
+checkout: git fetch origin claude/start-room-one-step && git switch claude/start-room-one-step && git merge origin/claude/setup-quicklog-draft-retry-p2s
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: feature commit 6f32664205d57373b3049646d731aa34346163f5; read the merged head from the PR
+state: pushed draft
+current_step: awaiting CI and an independent exact-head review
+next_action: route to an eligible non-author reviewer after #2565 settles
+post_merge_check: after Publish, on the disposable fixture account with no grow, open Start Your Room, type a plant name, submit once: Plant Detail opens with Quick Log and the grow/tent/plant exist once each. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: blank grow/tent names default to "My grow" / "Tent 1"; a partial resume creates only what is missing; plan gates block before any insert; Retry reuses the same preallocated row ids; Free with an existing grow keeps showing the grow-limit notice (unchanged) while tent+plant creation is allowed; paid with one grow still creates a new grow (unchanged appliedResume behaviour).
+tried_and_rejected: delegate:builder agents stopped at the 200k context mark before writing code; implemented in-session instead.
+commands: bunx vitest run src/test/start-your-room* src/test/start-room* src/test/hierarchy-create-response-loss.test.tsx
+files_touched: src/pages/StartYourRoom.tsx; src/lib/startYourRoomRules.ts; src/test/start-your-room-one-step.test.tsx (new); renegotiated (approved): src/test/hierarchy-create-response-loss.test.tsx and start-your-room-{draft-hydration,draft-owner-switch,draft-retry,enter-submits,entitlement-gate,quick-log-handoff,resume,review-regressions,save-reason-and-adopt}.test.tsx
+files_remaining: none
+blockers: none for repository work
+open_questions: retry help text in startYourRoomDraftRules.ts still says "Retry saves this same step once" (copy left to Cheeko)
+gotchas: Start Your Room tests must clear sessionStorage in beforeEach (the draft store persists the form across tests); old step test ids (start-room-grow-submit etc.) are gone, use start-room-submit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
+artifacts: PR checks
+reviewer_seat: not assigned (this session excluded as author)
+reviewer_sha: none
+session_state: safety-net check-in scheduled task trig_01Hi7LCPDNjfdvVBvGoWUhCv; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-28 (Matthew: Push both)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-27 21:45 CT, by Claude
+```
+
 ### SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541
 
 ```text

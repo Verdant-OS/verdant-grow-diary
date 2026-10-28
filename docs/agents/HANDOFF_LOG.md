@@ -81,7 +81,7 @@ checkout: git fetch origin claude/start-room-one-step && git switch claude/start
 pr: opened as a draft from this branch; read URL and head from GitHub
 head_sha: 0e412c911ad3354a62301cc56f2d240ac2148ffc is the last code commit (a handoff merge follows it); read the current head from the PR
 state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
-current_step: #2565 head b6f1616 merged in (mismatch-review draft clear, chip baseline, roster gate scoped to pre-hydration for unlimited plans) (every-plan roster gate, plant retry id held until recorded); Copilot 4397135141 fixed in 0e412c9 (setup draft cleared before navigating to the new plant); awaiting CI and an independent exact-head review
+current_step: #2565 head 0c825bf merged in (mismatch-review draft clear, chip baseline, roster gate scoped to pre-hydration for unlimited plans, commit-time owner ref, test global hygiene); Copilot 4397135141 fixed in 0e412c9 (setup draft cleared before navigating to the new plant); awaiting CI and an independent exact-head review
 next_action: confirm required checks at the new head; route to an eligible reviewer who neither authored nor repaired this PR after #2565 settles; retarget to verdant-grow-diary once #2565 merges
 post_merge_check: after Publish, on the disposable fixture account with no grow, open Start Your Room, type a plant name, submit once: Plant Detail opens with Quick Log and the grow/tent/plant exist once each. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: the prior holder's check-in trig_01Hi7LCPDNjfdvVBvGoWUhCv belongs to that session; no paused workflows
 claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677102928; prior holder told to stop pushing)
 owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
-last_updated: 2026-10-28 05:35 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 05:47 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 ```
 
 ### SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541
@@ -113,7 +113,7 @@ branch: claude/setup-quicklog-draft-retry-p2s (created at 7250689864da30155a4bb8
 base: verdant-grow-diary
 checkout: git fetch origin claude/setup-quicklog-draft-retry-p2s verdant-grow-diary && git switch claude/setup-quicklog-draft-retry-p2s && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
-head_sha: b6f1616f6832174121ebf462017f7c188e877d85, observed on origin at 2026-10-28 05:48 UTC as the last code commit before this handoff edit; the branch tip is the commit that carries this block (git rev-parse origin/claude/setup-quicklog-draft-retry-p2s)
+head_sha: 0b96e783706335b8b4b88ada3914fc16264af571 was the remote tip, observed on origin at 2026-10-28 05:47 UTC, before this commit; the tip after it is the commit that carries this block (git rev-parse origin/claude/setup-quicklog-draft-retry-p2s)
 state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
 current_step: Codex 2026-10-28 P2s addressed: stale reopen write (3f10b42), every-plan roster gate with step forms hidden until hydration (289b15f), plant retry id held until the plant id is recorded (de0101a); Copilot plantStage validation and sessionStorage test read (de0101a). Codex 4397081026 (clear the session draft when reviewing a mismatched saved note) and 4397081028 (re-baseline the response target on a mounted reopen) fixed; reviewer nits: STAGES derived from START_YOUR_ROOM_PLANT_STAGES, crypto unstubbed, roster-error gate scoped to before hydration for unlimited plans. Awaiting CI and an independent exact-head review
 next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR; then merge this branch into claude/start-room-one-step (#2582)
@@ -134,7 +134,7 @@ reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677106832; prior holder told to stop pushing)
 owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
-last_updated: 2026-10-28 05:30 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 05:47 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 ```
 
 ### SETUP-QUICKLOG-DRAFT-RETRY

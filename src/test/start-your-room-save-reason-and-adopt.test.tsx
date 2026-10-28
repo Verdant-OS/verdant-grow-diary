@@ -109,6 +109,7 @@ describe("Start your room save reason and pending-grow adoption (#2541 P2s)", ()
   afterEach(() => {
     cleanup();
     window.sessionStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   it("keeps the server reason when a save is definitively rejected", async () => {

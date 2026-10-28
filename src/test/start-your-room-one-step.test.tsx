@@ -149,11 +149,15 @@ describe("Start your room in one submit", () => {
     testState.nav.mockReset();
     let n = 0;
     const order = [IDS.grow, IDS.tent, IDS.plant];
-    vi.stubGlobal("crypto", { randomUUID: () => order[n++] ?? IDS.plant });
+    // Override only randomUUID; the rest of crypto stays real.
+    vi.spyOn(globalThis.crypto, "randomUUID").mockImplementation(
+      () => (order[n++] ?? IDS.plant) as ReturnType<Crypto["randomUUID"]>,
+    );
   });
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     window.sessionStorage.clear();
     // An unknown outcome leaves a same-runtime fence; never leak it to the next case.

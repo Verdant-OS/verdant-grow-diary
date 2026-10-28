@@ -57,7 +57,9 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
     bindHarvestCheckHandoffPlant(handoff, null);
     setBoundPlantId(null);
     setPlantId("");
-    setError("The plant this import started on is no longer in your list. Choose a plant.");
+    setError(
+      "The plant this import started on is no longer in your list. Checks already saved stay on that plant. Choose a plant.",
+    );
   }, [boundPlantMissing, handoff]);
 
   function dismiss() {
@@ -130,6 +132,10 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
       </p>
       {plants.isLoading ? (
         <p className="mt-3">Loading your plants…</p>
+      ) : plants.isError ? (
+        <p role="alert" className="mt-3 text-red-800">
+          Your plants could not be loaded. Reload to try again. Your checks stay in this tab.
+        </p>
       ) : list.length === 0 ? (
         <p className="mt-3">
           Add your first plant, then come back here to import.{" "}

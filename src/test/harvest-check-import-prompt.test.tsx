@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
 const mocks = vi.hoisted(() => ({
-  plants: { data: [] as { id: string; name: string; tent_id: string | null }[], isLoading: false },
+  plants: {
+    data: [] as { id: string; name: string; tent_id: string | null }[] | undefined,
+    isLoading: false,
+    isError: false,
+  },
   save: vi.fn(),
 }));
 
@@ -92,6 +96,7 @@ describe("harvest check import after signup", () => {
         { id: "11111111-1111-4111-8111-111111111111", name: "Blue Dream #1", tent_id: "tent-1" },
       ],
       isLoading: false,
+      isError: false,
     };
     mocks.save.mockReset();
     mocks.save.mockResolvedValue({ ok: true });
@@ -163,7 +168,7 @@ describe("harvest check import after signup", () => {
   });
 
   it("with no plant yet, links to Plants and keeps the handoff", async () => {
-    mocks.plants = { data: [], isLoading: false };
+    mocks.plants = { data: [], isLoading: false, isError: false };
     logThreeChecksAndClickCta();
     renderPrompt();
     expect(await screen.findByRole("link", { name: "Go to Plants" })).toHaveAttribute(
@@ -201,6 +206,7 @@ describe("harvest check import after signup", () => {
         { id: "22222222-2222-4222-8222-222222222222", name: "Gelato #2", tent_id: "tent-1" },
       ],
       isLoading: false,
+      isError: false,
     };
     // The first save commits but its response is lost: nothing counts as saved.
     mocks.save.mockResolvedValueOnce({ ok: false, reason: "network" });
@@ -237,7 +243,7 @@ describe("harvest check import after signup", () => {
     );
     renderPrompt();
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The plant this import started on is no longer in your list. Choose a plant.",
+      "The plant this import started on is no longer in your list. Checks already saved stay on that plant. Choose a plant.",
     );
     const select = screen.getByLabelText("Plant") as HTMLSelectElement;
     expect(select).not.toBeDisabled();
@@ -246,6 +252,17 @@ describe("harvest check import after signup", () => {
       "plantId",
     );
     expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  it("says the plants could not load instead of asking for a first plant", async () => {
+    mocks.plants = { data: undefined, isLoading: false, isError: true };
+    logThreeChecksAndClickCta();
+    renderPrompt();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your plants could not be loaded. Reload to try again. Your checks stay in this tab.",
+    );
+    expect(screen.queryByRole("link", { name: "Go to Plants" })).not.toBeInTheDocument();
+    expect(storage.map.has(HARVEST_HANDOFF_STORAGE_KEY)).toBe(true);
   });
 
   it("saves nothing when the plant binding cannot be stored", async () => {

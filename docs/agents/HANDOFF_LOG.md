@@ -351,6 +351,38 @@ owner: Cursor cloud agent for VER-288
 last_updated: 2026-10-27 14:15 CT, by Cursor cloud agent
 ```
 
+### BRAND-IDENTITY-20261023
+
+```text
+TASK BRAND-IDENTITY-20261023  priority: other  status: OPEN
+goal: Link Verdant Grow Diary's application JSON-LD to its existing organization and describe the indoor Grow OS accurately; no claim that this fixes an unmeasured AI answer.
+branch: codex/brand-identity-20261023-app-publisher
+base: verdant-grow-diary at 0200d2551b86d3df63e709651874ee85d9863fdc, fetched and remote-verified 2026-10-27 UTC; original implementation base was 65d9964e49eb4b95910bedc59d288d747461da79
+checkout: git fetch origin codex/brand-identity-20261023-app-publisher verdant-grow-diary && git switch codex/brand-identity-20261023-app-publisher && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2507 (OPEN and non-draft; preserve readiness)
+head_sha: 3b28274bfc4c68c470b9b797bd232fd7e1aa87db is the verified pre-integration checkpoint, not the resulting head. Read the resulting full SHA from the PR after push; verify this checkpoint and the recorded base are ancestors. This merge commit cannot embed its own hash.
+state: Latest-base HANDOFF conflict resolved locally with all 76 incoming task payloads and their relative order preserved, plus this BRAND block (77 actual tasks). Publisher/description and identity test preserved; builder also retains the incoming Founder Lifetime comment. Focused validation PASS: 7 files, 124 passed, 14 existing skips, 0 failed. Resulting-head hosted CI and independent acceptance NOT_MEASURED.
+current_step: Matthew explicitly assigned the latest-base conflict repair, ordinary push, independent review and conditional queue merge on 2026-10-27. Only this task block is edited after the base merge; every other file equals the base except the original publisher/description and identity test. No deployment authority.
+next_action: Read back the pushed full head with gh pr view 2507 --repo Verdant-OS/verdant-grow-diary --json headRefOid,mergeable,mergeStateStatus,statusCheckRollup; reconcile all pages of new-head CI, then obtain one eligible outside complete-scope exact-head review.
+later_gates: Fresh 35/35 required contexts and applicable supplemental mustBeGreen evidence under current base workflows, hosted typecheck and checkout provenance, no conflicts or holds, complete outside PASS with zero P1/P2 and session/contributor provenance. Only then enqueue via GraphQL enqueuePullRequest with expectedHeadOid and verify actual merge, queue removal and target ancestry. Old green checks/reviews do not carry forward.
+typecheck: Integrated-tree local FAIL: node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit reports the same two TS2339 diagnostics as the prior local environment, in unchanged src/test/not-found-route-status.test.tsx at 56:66 and 83:64 (getSsrStatus missing from the shared installed router types). Full base typecheck NOT_MEASURED; dependencies were not changed. Historical source-head hosted PASS was at 3b28274bfc4c68c470b9b797bd232fd7e1aa87db, run 40353307515 attempt 2/job 121877136798, using old base 3bc6b346f25249db408ca9cb9d2d94c33b3a442b. Fresh hosted typecheck is mandatory for the new head; the old PASS cannot establish this merge.
+local_validation: PASS: focused 7-file tests (124 passed, 14 existing skips, 0 failed), targeted ESLint and Prettier, config-resolution guard, docs/release safety, governance parity and strict scorer report. Full suite/build NOT_MEASURED locally; fresh hosted CI is required. Ordinary commit/push must not bypass hooks: core.hooksPath is .husky/_, but its launchers and Bun are absent in this pre-existing checkout; direct available checks are recorded instead, not claimed as hook execution.
+commands: node node_modules/vitest/vitest.mjs run src/test/site-application-identity.test.ts src/test/software-application-offers-truth.test.ts src/test/root-canonical-seo.test.ts src/test/seo-metadata.test.ts src/test/verdant-seo-structured-data.test.ts src/test/v0-operating-loop-contract.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts --reporter=dot; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/check-sentinel-version-parity.mjs 0200d2551b86d3df63e709651874ee85d9863fdc; node scripts/scorer-lock.mjs --report --base 0200d2551b86d3df63e709651874ee85d9863fdc --strict
+files_touched: src/lib/build/siteSoftwareApplicationJsonLd.ts (original publisher/description change); src/test/site-application-identity.test.ts (original regression); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned in the repository; independent review and fresh CI are external gates
+blockers: Outside review delivery BLOCKED: fresh Claude Code 2.1.288 auth check is loggedIn=false, authMethod=none. Grok Bot is running but this runtime has no usable native conversation transport to verify session identity, non-contribution or existing requests. Historical Grok CLI HTTP 402 is not a review; no paid reprobe or auth/spend change. Every contributing Codex session/subagent is excluded from acceptance. No public claim/renewal comment is authorized or posted.
+artifacts: Local preservation baseline and repair evidence: C:/Users/G8/verdant-work/pr2507-completion-evidence/. Historical 3b checkpoint required aggregate: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40353307629/job/121943283277 ; hosted typecheck: https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40353307515/job/121877136798 . Both cover the old integrated base, not this merge. PR #2507 retains original implementation provenance.
+reviewer_seat: BLOCKED pending an actually available non-contributing Claude/Grok session or another eligible outside reviewer under OWNERSHIP.md; no current review request was sent
+claimed_by: Codex PR #2507 repair session, 2026-10-27 23:38 UTC, Matthew's direct latest-base repair/push/review/conditional-queue assignment; no conflicting writer found; public comment remains unapproved
+active_writer: Codex PR #2507 repair/merge-readiness session, directly assigned by Matthew; only this PR branch is in scope
+owner: Codex PR #2507 repair/merge-readiness session; no claim on #2028/#2023 or another workstream
+reviewer_sha: NOT_MEASURED for the resulting head; no eligible independent acceptance
+post_merge_check: NOT_MEASURED; after approved merge and founder-controlled deployment, verify the live application JSON-LD publisher resolves to its emitted organization and the description retains the indoor Grow OS and grower-approved decisions. A failure reopens this work with the same owner. User authorized merge when ready, not deployment.
+session_state: Root Codex is the sole writer; collision and route helpers are read-only support and excluded from acceptance. No external review request is active. Existing merge-pr-2507-when-ready monitor must follow the resulting head and supersede the old read-only restriction under Matthew's new repair grant. No PR/review/issue comment, enqueue, direct merge, deployment, auth or spend change.
+last_updated: 2026-10-27 18:45 CT, by Codex PR #2507 conflict-repair session
+limits: User authorized merge only after exact-head independent PASS, no P1/P2, all 35 required checks successful and applicable supplemental gates. Use the merge queue with expectedHeadOid. No direct/admin merge, force-push, deployment, production write, GitHub comment, protected-file edit, dependency/lockfile change or takeover of #2028/#2023.
+```
+
 ### ATHENA-FEED-LOG-PUBLIC-GUIDE
 
 ```text
@@ -758,19 +790,18 @@ TASK STOP-SELLING-FOUNDER-LIFETIME  priority: P1  status: CLOSED
 goal: Stop selling Founder Lifetime on public sales surfaces. Keep existing Founder entitlements until a separate PR and migration. Follow-up FOUNDER-BLUEPRINT-20261024 (Matthew, 2026-10-24 3:51 PM CT): existing-holder copy names the retained Pro Blueprint.
 branch: cursor/stop-selling-founder-lifetime-0628
 base: verdant-grow-diary
-checkout: None; closed (merged). Historical: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (merged; was ready for review since 2026-10-27 21:28 UTC)
-head_sha: f4754d21d48fdec73d4fec25d46da7132601d903 (final PR head: HANDOFF_LOG-only commit over 87067552, which logs the Founder refusal as stage plan_retired, over base merge 9472c1a3 of 27991451); merge commit 0200d2551b86d3df63e709651874ee85d9863fdc on the deploy branch
-state: CLOSED (merged). Last recorded open state: PR ready for review (marked 2026-10-27 21:28 UTC at Matthew's instruction); base 27991451 merged 2026-10-27. All review threads resolved. At prior head 862ab201: 35/35 required checks green, Codex code + security review no findings; Paddle Founder price archived. The new merge head supersedes that CI, review and approval
-next_action: None; closed. Entitlement removal for existing Founder holders remains a separate later PR plus migration, not tracked by this block.
+checkout: None; closed (merged). Historical: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (merged)
+head_sha: f4754d21d48fdec73d4fec25d46da7132601d903 (final PR head); base 27991451a756d2521df08e26e504776a43c7bbb8
+state: CLOSED (merged). At final head f4754d21: 35/35 required checks green, Codex no major issues, Sour Diesel no blocking findings, Paddle Founder price archived; Matthew queued it 2026-10-27 22:48 UTC
+next_action: None; closed. Production delivery is NOT_MEASURED until live /version.json reports 0200d255. Follow-up outside this task: Founder entitlement removal (separate PR plus owner-approved migration)
 files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md, src/test/founder-blueprint-retained-copy.test.tsx
-blockers: none in this PR; entitlement removal is a later PR plus migration
+blockers: none
 artifacts: .claude/scorer-unlock.json is gitignored and must not be committed
-reviewer_seat: Sour Diesel review session (login cheekhimself), review-only, neither authored nor repaired, recorded as the OWNERSHIP.md section 4.3 independent acceptance for billing scope; Codex connector code review at the same head as supplemental evidence. Excluded: the Cursor author session and the Claude renewal/repair session, connector bots.
-reviewer_sha: f4754d21d48fdec73d4fec25d46da7132601d903, Sour Diesel review 5675000273 at 2026-10-27 21:59 UTC: no blocking findings (0 blocking / 0 should-fix / 1 nit, the PR-body nit resolved in comment 6454664077); Codex code review 6454664816 at f4754d21: no major issues; Codex security review at 862ab201: no findings, with no code change after 87067552
-claimed_by: Claude, 2026-10-27 18:17 UTC (renewal, PR comment 6450051931) (historical)
-last_updated: 2026-10-28 04:45 UTC, by Claude (handoff-close session, branch claude/handoff-close-2559-2028) (closure)
-closure: #2028 merged as 0200d2551b86d3df63e709651874ee85d9863fdc at 2026-10-27 22:54:01 UTC by cheekhimself (Matthew; the payment-PR exact-SHA approval and queue step the block was waiting on) from final head f4754d21d48fdec73d4fec25d46da7132601d903. Required checks at that head: 35/35 SUCCESS, read from the PR status rollup at closure time and matching the 22:22 UTC receipt (comment 6455071613). Supplemental: one test:security-regression run shows CANCELLED on the rollup; the 22:22 UTC receipt records a duplicate run that passed at 22:02 UTC, which this closure did not independently re-read. Post-merge: Paddle Founder price archived per the receipt; live sales-surface check NOT_MEASURED here. Closed by this follow-up PR.
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing scope: Codex on non-Codex work, or a non-contributing Claude/Grok session); all contributors excluded
+claimed_by: Claude, 2026-10-27 18:17 UTC (renewal, PR comment 6450051931)
+last_updated: 2026-10-27 23:00 UTC, by Claude
+closure: #2028 merged as 0200d2551b86d3df63e709651874ee85d9863fdc at 2026-10-27 22:54:01 UTC from final head f4754d21d48fdec73d4fec25d46da7132601d903 via the merge queue (GitHub API: merged true, merge_commit_sha 0200d255)
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL

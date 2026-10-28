@@ -229,7 +229,10 @@ date: 2026-10-28
 scope_to_review:
   1. docs/architecture-contract.md at 604274a793b0b38320a09de246bd8c4d166089ad (merged #2564 text)
   2. docs/specs/release-topology-specification.md §2.11 and §6.3 at the same SHA
-  3. this receipt (docs/audits/architecture-contract-post-merge-verification-2026-10-28.md)
+  3. this PR's complete diff at its head (read the head from the PR): this receipt
+     (docs/audits/architecture-contract-post-merge-verification-2026-10-28.md), the three
+     assignment-text corrections in handoff-verdant-architecture-contract.md, and the
+     ARCH-CONTRACT-POST-MERGE-20261028 block in docs/agents/HANDOFF_LOG.md
 
 review_asks:
   - Re-run AT-3 and AT-4 above from a clean checkout: `git ls-tree -r --name-only 604274a7 -- src/lib

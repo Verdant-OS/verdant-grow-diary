@@ -67,7 +67,9 @@ own two files were made under unlocks Matthew approved on 2026-10-28.
 - Whether the hosted project already runs the hardened defaults: NOT_MEASURED.
 - Whether the platform change also revokes the built-in `PUBLIC` `EXECUTE` on new functions:
   `uncertainty`. All called RPCs grant explicitly, so the answer changes nothing today.
-- Function and sequence grants for future migrations are not enforced by a check yet. The same
-  pattern applies when a new client-called RPC or client-inserted serial column appears.
+- Function, sequence, view and materialized-view grants for future migrations are not enforced by
+  a check yet. Only `CREATE [UNLOGGED] TABLE` is tracked, so a new `CREATE VIEW public.v ...` with
+  no GRANT passes the rule. The same pattern applies when a new client-called RPC, client-inserted
+  serial column or client-read view appears.
 - The 22 legacy tables still depend on default privileges in any fresh schema without `seed.sql`.
   Giving them explicit grants is a separate, additive migration and needs Matthew's decision.

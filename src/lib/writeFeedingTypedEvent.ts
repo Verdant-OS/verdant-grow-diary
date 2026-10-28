@@ -13,6 +13,14 @@
 
 import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
+import {
+  resolveTypedReceiptReaders,
+  verifyActiveTypedQuickLogEvent,
+  type TypedQuickLogEventReader,
+  type TypedQuickLogChildReader,
+  type TypedReceiptReadClient,
+} from "./quickLogTypedReusedReceiptService";
+import type { TypedReusedReviewTarget } from "./quickLogTypedReusedReceiptRules";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 import {
   quickLogSaveRequiresHistoryCheck,
@@ -53,6 +61,8 @@ export interface FeedingRpcClient {
     fn: "quicklog_save_event",
     args: QuickLogFeedingEventRpcArgs,
   ) => Promise<{ data: unknown; error: unknown }>;
+  /** Reads a reused receipt back; without an injected client the singleton reads. */
+  from?: TypedReceiptReadClient["from"];
 }
 
 export interface FeedingTypedEventInput {
@@ -78,7 +88,13 @@ export interface FeedingTypedEventInput {
 }
 
 export type WriteFeedingTypedEventResult =
-  { ok: true; eventId: string; reused: boolean } | { ok: false; reason: WriteFeedingFailureReason };
+  | { ok: true; eventId: string; reused: boolean }
+  | {
+      ok: false;
+      reason: WriteFeedingFailureReason;
+      /** Only with receipt_target_moved: where the reused entry lives now. */
+      reviewTarget?: TypedReusedReviewTarget;
+    };
 
 export type WriteFeedingFailureReason =
   | QuickLogHistoryCheckReason
@@ -93,6 +109,7 @@ export type WriteFeedingFailureReason =
   | "numeric:not_finite"
   | "occurred_at:invalid"
   | "rpc:no_event_id"
+  | "rpc:receipt_unverified"
   | "rpc:invalid_typed_payload"
   | "rpc:rejected"
   | "rpc:error";
@@ -236,6 +253,8 @@ export function mapFeedingInputToRpcArgs(
 
 export interface WriteFeedingTypedEventOptions {
   client?: FeedingRpcClient;
+  reusedEventReader?: TypedQuickLogEventReader;
+  reusedChildReader?: TypedQuickLogChildReader;
 }
 
 export async function writeFeedingTypedEvent(
@@ -274,6 +293,31 @@ export async function writeFeedingTypedEvent(
   }
   const eventId = trimOrNull(envelope.grow_event_id);
   if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
+
+  // Read the receipt back through the same client the RPC used.
+  const readers = resolveTypedReceiptReaders(options);
+  if (envelope.reused === true) {
+    const receipt = await verifyActiveTypedQuickLogEvent(
+      {
+        id: eventId,
+        eventType: "feeding",
+        growId: mapped.args.p_grow_id,
+        tentId: mapped.args.p_tent_id,
+        plantId: mapped.args.p_plant_id,
+        volumeMl: mapped.args.p_feed.volume_ml,
+        lineId: mapped.args.p_feed.line_id,
+      },
+      readers.eventReader,
+      readers.childReader,
+    );
+    // A read failure stays retryable with the same key; a confirmed mismatch is
+    // returned again by every same-key Retry, so it goes to history review.
+    if (receipt.status === "unavailable") return { ok: false, reason: "rpc:receipt_unverified" };
+    if (receipt.status === "refused")
+      return receipt.reviewTarget
+        ? { ok: false, reason: receipt.reason, reviewTarget: receipt.reviewTarget }
+        : { ok: false, reason: receipt.reason };
+  }
 
   return {
     ok: true,

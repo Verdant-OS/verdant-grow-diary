@@ -11,6 +11,9 @@ const rpcMock = vi.fn();
 const readbackMock = vi.fn();
 const selectMock = vi.fn();
 const eqMock = vi.fn();
+/** diary_entries photo_url fill (the fence-permitted companion update). */
+const updateMock = vi.fn();
+let settleUpdate: ((value: { data: unknown; error: unknown }) => void) | null = null;
 const fromMock = vi.fn();
 const toastSuccess = vi.fn();
 const telemetryMock = vi.fn();
@@ -121,6 +124,9 @@ type StoredNote = {
   grow_id: string | null;
   plant_id: string | null;
   tent_id: string | null;
+  event_type: "observation";
+  source: "manual";
+  is_deleted: boolean;
 };
 let committed: Map<string, StoredNote>;
 
@@ -137,6 +143,9 @@ function modelLostNoteReply() {
       grow_id: "66666666-6666-4666-8666-666666666666",
       plant_id: payload.p_target_type === "plant" ? payload.p_target_id : null,
       tent_id: "55555555-5555-4555-8555-555555555555",
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
     });
     return { data: null, error: { message: "Failed to fetch" } };
   });
@@ -225,9 +234,30 @@ beforeEach(() => {
       grow_id: "66666666-6666-4666-8666-666666666666",
     },
   ];
-  fromMock.mockImplementation(() => ({ select: selectMock }));
+  updateMock.mockReset();
+  settleUpdate = null;
+  fromMock.mockImplementation(() => ({
+    select: selectMock,
+    update: (patch: Record<string, unknown>) => ({
+      filter: (...args: unknown[]) => ({
+        select: () => {
+          updateMock(patch, args);
+          return new Promise<{ data: unknown; error: unknown }>((resolve) => {
+            if (settleUpdate === null) resolve({ data: [{ id: "diary-1" }], error: null });
+            else settleUpdate = resolve;
+          });
+        },
+      }),
+    }),
+  }));
   selectMock.mockImplementation(() => ({ eq: eqMock }));
-  eqMock.mockImplementation(() => ({ maybeSingle: readbackMock }));
+  // Mirrors the real builder: the receipt readback passes its deadline signal.
+  eqMock.mockImplementation(() => ({
+    maybeSingle: readbackMock,
+    abortSignal() {
+      return this;
+    },
+  }));
   readbackMock.mockImplementation(async () => ({
     data: [...committed.values()][0] ?? null,
     error: null,
@@ -287,6 +317,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: payload.p_target_id,
         tent_id: "88888888-8888-4888-8888-888888888888",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       });
       return {
         data: { ok: true, grow_event_id: confirmedEventId, reused: false },
@@ -300,6 +333,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: "88888888-8888-4888-8888-888888888888",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
@@ -362,6 +398,22 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(eqMock).toHaveBeenCalledWith("id", "77777777-7777-4777-8777-000000000001");
     expect(screen.getByTestId("qlv2-persisted-note")).toHaveTextContent(originalNote);
     expect(screen.getByTestId("qlv2-post-save")).not.toHaveTextContent("Edited before resolution");
+  });
+
+  it("keeps a reused Note unresolved when its original event was retracted", async () => {
+    modelLostNoteReply();
+    renderSheet();
+    typeNote();
+    save();
+    await expectRetry();
+    const original = [...committed.values()][0];
+    original.is_deleted = true;
+    retry();
+    await expectRetry();
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(readbackMock).toHaveBeenCalled();
+    expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeInTheDocument();
   });
 
   it("locks the first in-flight attempt and suppresses same-tick double submission", async () => {
@@ -454,6 +506,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "44444444-4444-4444-8444-444444444444",
         tent_id: "55555555-5555-4555-8555-555555555555",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
@@ -558,6 +613,9 @@ describe("ASTRA-001 exact Note recovery", () => {
           grow_id: "66666666-6666-4666-8666-666666666666",
           plant_id: plantId,
           tent_id: "55555555-5555-4555-8555-555555555555",
+          event_type: "observation",
+          source: "manual",
+          is_deleted: false,
         },
         error: null,
       });
@@ -594,6 +652,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: "88888888-8888-4888-8888-888888888888",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
     },
     {
@@ -604,6 +665,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: null,
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
     },
   ])("accepts %s while keeping the receipt fences intact", async ({ event }) => {
@@ -652,6 +716,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "44444444-4444-4444-8444-444444444444",
         tent_id: "55555555-5555-4555-8555-555555555555",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
@@ -699,6 +766,9 @@ describe("ASTRA-001 exact Note recovery", () => {
           grow_id: "66666666-6666-4666-8666-666666666666",
           plant_id: null,
           tent_id: tentId,
+          event_type: "observation",
+          source: "manual",
+          is_deleted: false,
         },
         error: null,
       });
@@ -740,6 +810,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: "55555555-5555-4555-8555-555555555555",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
@@ -860,6 +933,37 @@ describe("ASTRA-001 related Feed recovery", () => {
     await expectRetry();
     expect(screen.getByLabelText("Applied volume (ml)")).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Applied volume (ml)"), { target: { value: "1000" } });
+    readbackMock.mockImplementationOnce(async () => {
+      const args = stored as {
+        p_grow_id: string;
+        p_tent_id: string | null;
+        p_plant_id: string | null;
+        p_feed: { volume_ml: number; line_id: string };
+      };
+      return {
+        data: {
+          id: "77777777-7777-4777-8777-000000000003",
+          event_type: "feeding",
+          source: "manual",
+          is_deleted: false,
+          grow_id: args.p_grow_id,
+          tent_id: args.p_tent_id,
+          plant_id: args.p_plant_id,
+        },
+        error: null,
+      };
+    });
+    readbackMock.mockImplementationOnce(async () => {
+      const args = stored as { p_feed: { volume_ml: number; line_id: string } };
+      return {
+        data: {
+          event_id: "77777777-7777-4777-8777-000000000003",
+          volume_ml: args.p_feed.volume_ml,
+          line_id: args.p_feed.line_id,
+        },
+        error: null,
+      };
+    });
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(rpcMock).toHaveBeenCalledTimes(2);
@@ -979,6 +1083,9 @@ describe("durable unresolved Note recovery", () => {
       grow_id: record.resolved.growId,
       plant_id: record.payload.p_target_id,
       tent_id: record.resolved.tentId,
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
     });
     renderSheet();
     await expectRetry();
@@ -1002,6 +1109,9 @@ describe("durable unresolved Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: payload.p_target_id,
         tent_id: "88888888-8888-4888-8888-888888888888",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       });
       return {
         data: { ok: true, grow_event_id: confirmedEventId, reused: false },
@@ -1015,6 +1125,9 @@ describe("durable unresolved Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: "88888888-8888-4888-8888-888888888888",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
@@ -1029,12 +1142,16 @@ describe("durable unresolved Note recovery", () => {
     retry();
 
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock.mock.calls[0][0]).toMatchObject({
-      growId: "66666666-6666-4666-8666-666666666666",
-      plantId: "33333333-3333-4333-8333-333333333333",
-      tentId: "88888888-8888-4888-8888-888888888888",
-    });
+    // The photo rides inside the single quicklog_save_manual write; the mirror
+    // row carries the verified lineage, so no companion insert is made.
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[1][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(updateMock).toHaveBeenCalledWith({ photo_url: uploadMock.mock.calls[0][0] }, [
+      "details->>linked_grow_event_id",
+      "eq",
+      confirmedEventId,
+    ]);
 
     fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
     expect(navigationMock).toHaveBeenCalledTimes(1);
@@ -1060,17 +1177,24 @@ describe("durable unresolved Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: null,
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock.mock.calls[0][0]).toMatchObject({
-      growId: "66666666-6666-4666-8666-666666666666",
-      plantId: "33333333-3333-4333-8333-333333333333",
-      tentId: null,
-    });
+    // The photo rides inside the single quicklog_save_manual write; the mirror
+    // row carries the verified lineage, so no companion insert is made.
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[1][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(updateMock).toHaveBeenCalledWith({ photo_url: uploadMock.mock.calls[0][0] }, [
+      "details->>linked_grow_event_id",
+      "eq",
+      confirmedEventId,
+    ]);
     fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
     expect(navigationMock).toHaveBeenCalledTimes(1);
     expect(navigationMock.mock.calls[0][0].href).not.toContain("tentId=");
@@ -1092,6 +1216,9 @@ describe("durable unresolved Note recovery", () => {
         grow_id: null,
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: null,
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
@@ -1121,6 +1248,9 @@ describe("durable unresolved Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: "33333333-3333-4333-8333-333333333333",
         tent_id: "55555555-5555-4555-8555-555555555555",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       },
       error: null,
     });
@@ -1128,12 +1258,16 @@ describe("durable unresolved Note recovery", () => {
     retry();
 
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock.mock.calls[0][0]).toMatchObject({
-      growId: "66666666-6666-4666-8666-666666666666",
-      plantId: "33333333-3333-4333-8333-333333333333",
-      tentId: "55555555-5555-4555-8555-555555555555",
-    });
+    // The photo rides inside the single quicklog_save_manual write; the mirror
+    // row carries the verified lineage, so no companion insert is made.
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[1][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(updateMock).toHaveBeenCalledWith({ photo_url: uploadMock.mock.calls[0][0] }, [
+      "details->>linked_grow_event_id",
+      "eq",
+      confirmedEventId,
+    ]);
 
     fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
     expect(navigationMock).toHaveBeenCalledTimes(1);
@@ -1307,6 +1441,9 @@ describe("durable unresolved Note recovery", () => {
       grow_id: record.resolved.growId,
       plant_id: record.payload.p_target_id,
       tent_id: record.resolved.tentId,
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
     });
     const view = renderSheet();
     await expectRetry();
@@ -1416,16 +1553,9 @@ describe("durable unresolved Note recovery", () => {
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
   });
 
-  it("never starts video upload after account change during failed-photo cleanup", async () => {
+  it("never starts video upload after account change during the photo_url fill", async () => {
     rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: confirmedEventId }, error: null });
-    photoEntryMock.mockResolvedValue({ ok: false, message: "Photo entry rejected" });
-    let finish!: (value: unknown) => void;
-    removeMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
+    settleUpdate = () => {};
     const view = renderSheet();
     typeNote();
     fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
@@ -1437,14 +1567,15 @@ describe("durable unresolved Note recovery", () => {
       });
     });
     save();
-    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
     const pending = window.sessionStorage.getItem(pendingKey());
     expect(JSON.parse(pending!).attachments).toEqual({ photo: true, video: true });
     context.userId = ownerB;
     view.rerender();
-    await act(async () => finish({ error: null }));
+    await act(async () => settleUpdate!({ data: [{ id: "diary-1" }], error: null }));
     expect(uploadMock).toHaveBeenCalledTimes(1);
     expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(photoEntryMock).not.toHaveBeenCalled();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
@@ -1673,32 +1804,30 @@ describe("late successful media upload cleanup attempts", () => {
     save();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(rpcMock).toHaveBeenCalledTimes(1);
-    expect(photoEntryMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[0][1].p_details.photo_url).toBe(uploadMock.mock.calls[0][0]);
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(updateMock).toHaveBeenCalledTimes(1);
     expect(videoEntryMock).toHaveBeenCalledTimes(1);
     expect(removeMock).not.toHaveBeenCalled();
     expect(toastSuccess).toHaveBeenCalled();
   });
 
-  it("does not add post-upload cleanup after an already-dispatched photo companion becomes ambiguous", async () => {
+  it("does not add post-upload cleanup after the photo_url fill fails under a changed account", async () => {
     rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: confirmedEventId }, error: null });
-    let finish!: (value: unknown) => void;
-    photoEntryMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
+    settleUpdate = () => {};
     const view = renderSheet();
     typeNote();
     attachPhoto();
     save();
-    await waitFor(() => expect(photoEntryMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
     const pending = window.sessionStorage.getItem(pendingKey());
     context.userId = ownerB;
     view.rerender();
-    await act(async () => finish({ ok: false, message: "insert response lost", ambiguous: true }));
+    await act(async () => settleUpdate!({ data: null, error: { message: "update lost" } }));
+    // details.photo_url is already persisted by the RPC: never delete the object.
     expect(removeMock).not.toHaveBeenCalled();
     expect(storageOps.calls.filter((call) => call.op === "remove")).toHaveLength(0);
+    expect(photoEntryMock).not.toHaveBeenCalled();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);

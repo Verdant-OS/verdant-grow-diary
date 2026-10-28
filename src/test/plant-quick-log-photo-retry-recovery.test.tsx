@@ -56,6 +56,9 @@ vi.mock("@/integrations/supabase/client", () => ({
         const id = "22222222-2222-4222-8222-" + String(state.events.size + 1).padStart(12, "0");
         state.events.set(key, {
           id,
+          event_type: "observation",
+          source: "manual",
+          is_deleted: false,
           note: payload.p_note,
           plant_id: payload.p_target_id,
           tent_id: "tent-1",
@@ -156,7 +159,10 @@ function choosePhotoAndNote() {
   fireEvent.change(screen.getByTestId("plant-quick-log-photo-library-input"), {
     target: {
       files: [
-        new File([new Uint8Array([1, 2, 3])], "leaf.png", { type: "image/png", lastModified: 123 }),
+        new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "leaf.png", {
+          type: "image/png",
+          lastModified: 123,
+        }),
       ],
     },
   });
@@ -236,7 +242,7 @@ describe("Plant Quick Log photo persistence through uncertain saves", () => {
     fireEvent.change(screen.getByTestId("plant-quick-log-photo-library-input"), {
       target: {
         files: [
-          new File([new Uint8Array([4, 5, 6])], "leaf.png", {
+          new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "leaf.png", {
             type: "image/png",
             lastModified: 123,
           }),

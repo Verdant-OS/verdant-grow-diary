@@ -19,6 +19,7 @@ const backend = vi.hoisted(() => ({
   failAfterHeldPost: 0,
   holdPost: 0,
   heldReply: null as Promise<void> | null,
+  retracted: false,
 }));
 const telemetry = vi.hoisted(() => vi.fn());
 const receiptLookup = vi.hoisted(() => vi.fn());
@@ -27,6 +28,37 @@ vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "owner-a" }, load
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
+      if (table === "grow_events") {
+        return {
+          select: () => ({
+            eq: (_column: string, id: string) => ({
+              maybeSingle: async () => {
+                const last = backend.posts.at(-1);
+                const original = last && backend.rows.get(String(last.p_idempotency_key));
+                if (!original) return { data: null, error: null };
+                return {
+                  data: {
+                    id,
+                    event_type: original.p_event_type ?? "observation",
+                    source: "manual",
+                    is_deleted: backend.retracted,
+                    grow_id: original.p_grow_id ?? "grow-a",
+                    tent_id:
+                      original.p_tent_id ??
+                      (original.p_target_type === "tent" ? original.p_target_id : "tent-a"),
+                    plant_id:
+                      original.p_plant_id ??
+                      (original.p_target_type === "plant" ? original.p_target_id : null),
+                    note: original.p_note || null,
+                    occurred_at: original.p_occurred_at,
+                  },
+                  error: null,
+                };
+              },
+            }),
+          }),
+        };
+      }
       if (table !== "quicklog_idempotency") throw new Error(`Unexpected table: ${table}`);
       const query = {
         select: () => query,
@@ -147,6 +179,7 @@ beforeEach(() => {
   backend.failAfterHeldPost = 0;
   backend.holdPost = 0;
   backend.heldReply = null;
+  backend.retracted = false;
   telemetry.mockReset();
   receiptLookup.mockReset();
   receiptLookup.mockResolvedValue({ data: null, error: null });
@@ -230,6 +263,28 @@ describe("All activity types retry confirmation", () => {
     } finally {
       window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, onEntryCreated);
     }
+  });
+
+  it("keeps a moved plant locked when the persisted activity was retracted", async () => {
+    const first = mount();
+    await loseReply();
+    first.unmount();
+    backend.retracted = true;
+    receiptLookup.mockResolvedValueOnce({
+      data: { grow_event_id: "77777777-7777-4777-8777-000000000001" },
+      error: null,
+    });
+    const onSaveSuccess = vi.fn();
+    mount("plant-a", "flower", onSaveSuccess, null, { growId: "grow-b", tentId: "tent-b" });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-retry-original"));
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+        /original save could not be verified/i,
+      ),
+    );
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
+    expect(onSaveSuccess).not.toHaveBeenCalled();
+    expect(backend.posts).toHaveLength(1);
   });
 
   it("keeps a moved plant locked when the committed receipt cannot be read", async () => {

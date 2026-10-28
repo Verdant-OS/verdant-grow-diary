@@ -81,6 +81,29 @@ describe("StructuredWateringEntry", () => {
     expect(k1).toBe(k2);
   });
 
+  it("keeps the attempt key after an unverified reused receipt and Retry reuses it", async () => {
+    const results: WriteWateringTypedEventResult[] = [
+      { ok: false, reason: "rpc:receipt_unverified" },
+      { ok: true, eventId: "evt-3", reused: true },
+    ];
+    const writer = vi.fn<(arg: unknown) => Promise<WriteWateringTypedEventResult>>(() =>
+      Promise.resolve(results.shift()!),
+    );
+    const onSaved = vi.fn();
+    render(<StructuredWateringEntry growId={GROW} writer={writer as never} onSaved={onSaved} />);
+    typeVolume("900");
+    fireEvent.click(screen.getByRole("button", { name: /save watering record/i }));
+    await waitFor(() => expect(screen.getByTestId("watering-failed")).toBeTruthy());
+    expect(onSaved).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("watering-retry"));
+    await waitFor(() => expect(screen.getByTestId("watering-saved")).toBeTruthy());
+    expect(writer).toHaveBeenCalledTimes(2);
+    const k1 = (writer.mock.calls[0][0] as Record<string, unknown>).idempotency_key;
+    const k2 = (writer.mock.calls[1][0] as Record<string, unknown>).idempotency_key;
+    expect(k1).toBe(k2);
+    expect(onSaved).toHaveBeenCalledWith("evt-3");
+  });
+
   it("blank optional fields stay unknown (never coerced to zero)", async () => {
     const writer = vi
       .fn<(arg: unknown) => Promise<WriteWateringTypedEventResult>>()

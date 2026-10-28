@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TYPED_REUSED_RECEIPT_READ_DEADLINE_MS } from "@/lib/quickLogTypedReusedReceiptService";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -252,12 +253,43 @@ describe("writeFeedingTypedEvent — RPC behavior", () => {
     const { client, rpc } = makeClient({
       data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
-    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "feeding",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    });
+    const reusedChildReader = vi.fn().mockResolvedValue({
+      data: {
+        event_id: "77777777-7777-4777-8777-000000000001",
+        volume_ml: 750,
+        line_id: "veg-week-3",
+      },
+      error: null,
+    });
+    expect(
+      await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader, reusedChildReader }),
+    ).toEqual({
       ok: true,
       eventId: "77777777-7777-4777-8777-000000000001",
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
+    expect(reusedEventReader).toHaveBeenCalledWith(
+      "77777777-7777-4777-8777-000000000001",
+      expect.any(AbortSignal),
+    );
+    expect(reusedChildReader).toHaveBeenCalledWith(
+      "feeding",
+      "77777777-7777-4777-8777-000000000001",
+      expect.any(AbortSignal),
+    );
     expect(rpc.mock.calls[0][0]).toBe("quicklog_save_event");
   });
 
@@ -313,6 +345,152 @@ describe("writeFeedingTypedEvent — static safety guards", () => {
 });
 
 describe("receipt identity", () => {
+  it("does not confirm a reused Feeding that was retracted after its first save", async () => {
+    const { client } = makeClient({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    });
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "feeding",
+        source: "manual",
+        is_deleted: true,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    });
+    expect(await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader })).toEqual({
+      ok: false,
+      reason: "idempotency_key_retracted",
+    });
+  });
+
+  it("routes a reused Feeding now on another plant to history review", async () => {
+    const { client } = makeClient({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    });
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "feeding",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-2",
+      },
+      error: null,
+    });
+    const reusedChildReader = vi.fn();
+    expect(
+      await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader, reusedChildReader }),
+    ).toEqual({
+      ok: false,
+      reason: "receipt_target_moved",
+      reviewTarget: { growId: "grow-1", tentId: "tent-1", plantId: "plant-2" },
+    });
+    expect(reusedChildReader).not.toHaveBeenCalled();
+  });
+
+  it("keeps a reused Feeding retryable when its receipt cannot be read", async () => {
+    const { client } = makeClient({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    });
+    const reusedEventReader = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: { message: "offline" } });
+    expect(await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader })).toEqual({
+      ok: false,
+      reason: "rpc:receipt_unverified",
+    });
+  });
+
+  it("stops waiting for a reused Feeding receipt read that never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client } = makeClient({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      });
+      const reusedEventReader = vi.fn(
+        () => new Promise<{ data: unknown; error: unknown }>(() => {}),
+      );
+      const result = writeFeedingTypedEvent(baseInput(), { client, reusedEventReader });
+      await vi.advanceTimersByTimeAsync(TYPED_REUSED_RECEIPT_READ_DEADLINE_MS);
+      await expect(result).resolves.toEqual({ ok: false, reason: "rpc:receipt_unverified" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe("unverifiable reused Feeding receipts", () => {
+    const activeEvent = {
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "feeding",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    };
+    const reusedReply = {
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    };
+
+    it("refuses a missing typed child as idempotency_receipt_missing", async () => {
+      // The active parent read back without its typed child: a confirmed
+      // mismatch every same-key Retry would return, so it goes to history review.
+      const { client } = makeClient(reusedReply);
+      const reusedEventReader = vi.fn().mockResolvedValue(activeEvent);
+      const reusedChildReader = vi.fn().mockResolvedValue({ data: null, error: null });
+      expect(
+        await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader, reusedChildReader }),
+      ).toEqual({ ok: false, reason: "idempotency_receipt_missing" });
+    });
+
+    it("returns rpc:receipt_unverified for a child read error", async () => {
+      const childRead = { data: null, error: { message: "read failed" } };
+      const { client } = makeClient(reusedReply);
+      const reusedEventReader = vi.fn().mockResolvedValue(activeEvent);
+      const reusedChildReader = vi.fn().mockResolvedValue(childRead);
+      expect(
+        await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader, reusedChildReader }),
+      ).toEqual({ ok: false, reason: "rpc:receipt_unverified" });
+      expect(reusedChildReader).toHaveBeenCalledWith(
+        "feeding",
+        "77777777-7777-4777-8777-000000000001",
+        expect.any(AbortSignal),
+      );
+    });
+
+    it.each([
+      ["an event read error", vi.fn().mockResolvedValue({ data: null, error: { message: "x" } })],
+      ["a thrown event read", vi.fn().mockRejectedValue(new Error("network"))],
+    ])("returns rpc:receipt_unverified for %s without reading the child", async (_l, reader) => {
+      const { client } = makeClient(reusedReply);
+      const reusedChildReader = vi.fn().mockResolvedValue({
+        data: {
+          event_id: "77777777-7777-4777-8777-000000000001",
+          volume_ml: 750,
+          line_id: "veg-week-3",
+        },
+        error: null,
+      });
+      expect(
+        await writeFeedingTypedEvent(baseInput(), {
+          client,
+          reusedEventReader: reader,
+          reusedChildReader,
+        }),
+      ).toEqual({ ok: false, reason: "rpc:receipt_unverified" });
+      expect(reusedChildReader).not.toHaveBeenCalled();
+    });
+  });
+
   it.each(["not-an-event", "", " ", null, undefined, 42, {}])(
     "rejects malformed event ID %j",
     async (id) => {

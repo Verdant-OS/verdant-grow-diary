@@ -73,13 +73,16 @@ export default function TonightTentHomeCard(props: {
       data-testid="tonight-tent-home"
       className="glass rounded-2xl p-4"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2
           id="tonight-tent-home-heading"
-          className="flex items-center gap-2 font-display text-lg font-semibold"
+          className="flex items-center gap-2 font-display text-lg font-semibold min-w-0"
         >
-          <Box className="h-5 w-5 text-primary" aria-hidden="true" />
-          <Link to={tentDetailPath(selection.tent.id)} className="hover:underline">
+          <Box className="h-5 w-5 text-primary shrink-0" aria-hidden="true" />
+          <Link
+            to={tentDetailPath(selection.tent.id)}
+            className="hover:underline break-words min-w-0"
+          >
             {selection.tent.name}
           </Link>
           {hasDemo && (
@@ -102,14 +105,24 @@ export default function TonightTentHomeCard(props: {
             key={metric.key}
             data-testid={`tonight-tent-home-metric-${metric.key}`}
             data-state={metric.state}
-            className="rounded-xl border border-border/50 p-3"
+            className="min-w-0 rounded-xl border border-border/50 p-2.5 sm:p-3"
           >
-            <dt className="text-xs text-muted-foreground">{metric.label}</dt>
-            <dd className="mt-1 text-lg font-semibold tabular-nums">{formatMetricValue(metric)}</dd>
+            <dt className="truncate text-xs text-muted-foreground">{metric.label}</dt>
+            <dd className="mt-1 text-base font-semibold leading-tight tabular-nums [overflow-wrap:anywhere] sm:text-lg">
+              {formatMetricValue(metric)}
+            </dd>
             {metric.sourceLabel && (
               <dd className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
                 {metric.sourceLabel}
                 {metric.ageText ? ` · ${metric.ageText}` : ""}
+              </dd>
+            )}
+            {metric.calculated && (
+              <dd
+                className="mt-0.5 text-[11px] leading-tight text-muted-foreground"
+                data-testid={`tonight-tent-home-metric-${metric.key}-calculated`}
+              >
+                {COPY.calculatedVpd}
               </dd>
             )}
           </div>

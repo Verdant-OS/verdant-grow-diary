@@ -12,6 +12,10 @@ import {
   matchesRetractedWaterReceipt,
   resolveStarterWaterReceiptTarget,
 } from "@/lib/quickLogWaterReceiptRules";
+import {
+  hasMatchingQuickLogNoteTarget,
+  matchesActiveQuickLogNoteEvent,
+} from "@/lib/quickLogReusedActivityReceiptRules";
 
 export interface QuickLogV2SaveResult {
   ok: boolean;
@@ -204,7 +208,7 @@ export function useQuickLogV2Save() {
             }
             const { data: event, error: readError } = await supabase
               .from("grow_events")
-              .select("id,note,grow_id,plant_id,tent_id")
+              .select("id,note,grow_id,plant_id,tent_id,event_type,source,is_deleted")
               .eq("id", r.grow_event_id)
               .maybeSingle();
             if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
@@ -215,8 +219,7 @@ export function useQuickLogV2Save() {
             persistedGrowId = event.grow_id ?? null;
             persistedTentId = event.tent_id ?? null;
             persistedPlantId = event.plant_id ?? null;
-            const targetId = payload.p_target_type === "plant" ? event.plant_id : event.tent_id;
-            if (targetId !== payload.p_target_id) {
+            if (!hasMatchingQuickLogNoteTarget(payload, r.grow_event_id, event)) {
               setError("receipt_target_moved");
               return {
                 ok: false,
@@ -225,6 +228,10 @@ export function useQuickLogV2Save() {
                 ...(persistedTentId !== undefined ? { persistedTentId } : {}),
                 ...(persistedPlantId !== undefined ? { persistedPlantId } : {}),
               };
+            }
+            if (!matchesActiveQuickLogNoteEvent(payload, r.grow_event_id, event)) {
+              setError("receipt_unverified");
+              return { ok: false, reason: "receipt_unverified" };
             }
             if (event.note !== payload.p_note) {
               setError("receipt_mismatch");

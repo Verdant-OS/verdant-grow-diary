@@ -50,6 +50,10 @@ import QuickLogAllActivitiesSection, {
   type QuickLogAllActivitiesSaveSuccess,
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
+import {
+  QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY,
+  resolveQuickLogPendingSectionPhotoBlock,
+} from "@/lib/quickLogPendingSectionPhotoRules";
 import { buildQuickLogTargetKey } from "@/lib/quickLogActivityRules";
 import { readPendingQuickLogActivity } from "@/lib/quickLogPendingActivityStore";
 import { STAGES } from "@/lib/grow";
@@ -113,10 +117,21 @@ import {
   TYPED_WATER_RECOVERY_PENDING,
   claimPendingStarterWater,
   canPersistStarterWaterRecovery,
+  clearUnreadablePendingStarterWater,
   reconcilePendingStarterWaterClear,
   readPendingStarterWater,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
+import {
+  mayClearUnreadableWaterRecovery,
+  unreadableWaterRecoveryOutcome,
+} from "@/lib/quickLogUnreadableWaterRecoveryRules";
+import {
+  QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL,
+  QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER,
+} from "@/constants/quickLogWaterRecoveryCopy";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
@@ -124,6 +139,10 @@ import {
   ORDINARY_LEGACY_WATERING_BLOCKED_COPY,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
+import {
+  assessWateringVolumeInput,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "@/lib/quickLogWateringFormViewModel";
 import {
   ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY,
   isArchivedGrowId,
@@ -495,6 +514,17 @@ export default function QuickLog({
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // The All activity types Photo editor saves its image itself; Save log never carries it.
+  const [sectionPhotoPending, setSectionPhotoPending] = useState(false);
+  const handleSectionPhotoPendingChange = useCallback((pending: boolean) => {
+    setSectionPhotoPending(pending);
+    // Once the photo is saved, cleared or rejected, drop only this block message.
+    if (!pending) {
+      setSaveError((current) =>
+        current === QUICK_LOG_PENDING_SECTION_PHOTO_BLOCKED_COPY ? null : current,
+      );
+    }
+  }, []);
   const [starterWaterPending, setStarterWaterPending] = useState<PendingStarterWater | null>(null);
   const [starterWaterStorageBlocked, setStarterWaterStorageBlocked] = useState(false);
   const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
@@ -1423,6 +1453,11 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const pendingSectionPhotoBlock = resolveQuickLogPendingSectionPhotoBlock(sectionPhotoPending);
+    if (pendingSectionPhotoBlock) {
+      setSaveError(pendingSectionPhotoBlock);
+      return;
+    }
     // The previous Water may have committed. Never let a new/edited payload
     // rotate its key until the exact stored attempt has been reconciled.
     if (user?.id) {
@@ -1529,10 +1564,12 @@ export default function QuickLog({
       noteOccurredAtIso = occurredDecision.pOccurredAt;
     }
     if (saveEventType === "watering") {
-      const raw = details.watering.trim();
-      const vol = Number(raw);
-      if (!raw || !Number.isFinite(vol) || vol <= 0) {
-        const message = "Add a watering volume (ml) to save.";
+      const assessedVolume = assessWateringVolumeInput(details.watering);
+      if (!assessedVolume.ok) {
+        const message =
+          assessedVolume.reason === "too_large"
+            ? QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE
+            : "Add a watering volume (ml) to save.";
         setShowMore(true);
         setWateringError(message);
         setSaveError(message);
@@ -1950,6 +1987,43 @@ export default function QuickLog({
     }
   }
 
+  // The grower checked Timeline and clears an unreadable starter Water key.
+  // Nothing is replayed; a readable record found instead goes back to Retry.
+  async function clearUnreadableStarterWater() {
+    const ownerId = user?.id;
+    if (
+      !ownerId ||
+      !mayClearUnreadableWaterRecovery({
+        blocked: starterWaterStorageBlocked,
+        hasReadableRecord: starterWaterPending !== null,
+        ownerId,
+        inFlight: saveInFlightRef.current || saveLocked,
+      })
+    )
+      return;
+    saveInFlightRef.current = true;
+    let outcome: ReturnType<typeof unreadableWaterRecoveryOutcome>;
+    try {
+      outcome = unreadableWaterRecoveryOutcome(await clearUnreadablePendingStarterWater(ownerId));
+    } finally {
+      saveInFlightRef.current = false;
+    }
+    if (outcome === "still_blocked") {
+      setSaveError(QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_FAILED);
+      return;
+    }
+    const current = readPendingStarterWater(ownerId);
+    setStarterWaterPending(current.status === "pending" ? current.record : null);
+    setStarterWaterStorageBlocked(current.status === "blocked");
+    setSaveError(
+      current.status === "pending"
+        ? STARTER_WATER_RECOVERY_PENDING
+        : current.status === "blocked"
+          ? STARTER_WATER_RECOVERY_UNAVAILABLE
+          : null,
+    );
+  }
+
   async function retryStarterWater() {
     if (!user?.id || saveInFlightRef.current || saveLocked) return;
     const current = readPendingStarterWater(user.id);
@@ -2323,6 +2397,7 @@ export default function QuickLog({
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           onRecoveryLockChange={handleActivityRecoveryLockChange}
+          onPendingPhotoChange={handleSectionPhotoPendingChange}
           saveBlocked={saveLocked || recoveryLocked}
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {
@@ -4091,6 +4166,30 @@ export default function QuickLog({
                     onClick={() => void retryStarterWater()}
                   >
                     Retry original Watering
+                  </Button>
+                </>
+              )}
+              {starterWaterStorageBlocked && !starterWaterPending && (
+                <>
+                  <p data-testid="quick-log-starter-water-unreadable-helper">
+                    {QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER}
+                  </p>
+                  <a
+                    href={QUICK_LOG_WATER_RECOVERY_TIMELINE_HREF}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block underline"
+                  >
+                    {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-testid="quick-log-starter-water-clear-unreadable"
+                    disabled={saveLocked}
+                    onClick={() => void clearUnreadableStarterWater()}
+                  >
+                    {QUICK_LOG_WATER_RECOVERY_UNREADABLE_CLEAR_LABEL}
                   </Button>
                 </>
               )}

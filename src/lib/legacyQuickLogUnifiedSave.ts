@@ -37,6 +37,10 @@ import {
   QUICK_LOG_NOTE_OCCURRED_AT_INVALID,
   canonicalQuickLogOccurredAtIso,
 } from "./quickLogNoteOccurredAtRules";
+import {
+  assessWateringVolumeInput,
+  QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+} from "./quickLogWateringFormViewModel";
 
 /**
  * Redacted sensor envelope produced by `buildSensorSnapshotSavePayload`.
@@ -300,15 +304,24 @@ export function buildLegacyQuickLogUnifiedPayload(
   const envVpdKpa = finiteOrNull(envCheck?.["vpd_kpa"]);
 
   if (input.eventType === "watering") {
-    const raw = trimStr(input.details.watering);
-    const volume = Number(raw);
-    if (!raw || !Number.isFinite(volume) || volume <= 0) {
-      return {
-        ok: false,
-        reason: "invalid_volume",
-        message: "Add a watering volume (ml) to save a watering log.",
-      };
+    // Same grammar and single-watering ceiling as the structured Water form
+    // and the V2 payload, so a resumed public-starter draft cannot persist
+    // 1,000,000 ml or have 0x10 read as 16 ml.
+    const assessed = assessWateringVolumeInput(input.details.watering);
+    if (!assessed.ok) {
+      return assessed.reason === "too_large"
+        ? {
+            ok: false,
+            reason: "volume_too_large",
+            message: QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
+          }
+        : {
+            ok: false,
+            reason: "invalid_volume",
+            message: "Add a watering volume (ml) to save a watering log.",
+          };
     }
+    const volume = assessed.value;
     return {
       ok: true,
       payload: {

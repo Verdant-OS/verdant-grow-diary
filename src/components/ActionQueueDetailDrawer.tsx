@@ -44,6 +44,7 @@ import {
 import { buildCopyableTraceLinkFromHighlight } from "@/lib/actionQueueTraceLinkCopyRules";
 import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { buildRetryTraceViewModel } from "@/lib/actionQueueRetryTraceViewModel";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 export interface ActionQueueDetailDrawerProps {
   open: boolean;
@@ -307,7 +308,7 @@ function ActionQueueDetailDrawerBody({
         <section>
           <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Reason</h3>
           <p className="text-sm mt-1" data-testid="action-queue-detail-drawer-reason">
-            {vm.reasonText}
+            {localizeReadingAtTimestamps(vm.reasonText)}
           </p>
         </section>
       )}

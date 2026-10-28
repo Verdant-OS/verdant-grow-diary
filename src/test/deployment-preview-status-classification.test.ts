@@ -23,7 +23,10 @@ const POST_STEP = "Post preview-status comment";
 const ENFORCE_STEP = "Enforce overall preview verdict";
 
 type Step = { name?: string; run?: string; env?: Record<string, string> };
-type Workflow = { jobs: Record<string, { steps: Step[] }> };
+type Workflow = {
+  concurrency?: { "cancel-in-progress"?: boolean | string };
+  jobs: Record<string, { if?: string; steps: Step[] }>;
+};
 
 const bashAvailable = spawnSync("bash", ["-c", "true"]).status === 0;
 
@@ -83,6 +86,25 @@ function runEnforceStep(preflight: JobResult, build: JobResult): number {
   expect(script).not.toContain("${{");
   return spawnSync("bash", ["-c", script], { encoding: "utf8" }).status ?? -1;
 }
+
+describe("deployment-preview status job in a superseded run", () => {
+  // A newer push cancels the in-flight run (cancel-in-progress). With
+  // `always()`, that run's publish job still ran: it posted a red
+  // "Publish preview status to PR" check and could overwrite the newer run's
+  // comment with "did not complete (cancelled)". A cancelled run now skips
+  // the job; the newer run reports. A build that fails or times out in a run
+  // that was not cancelled still reports, because `!cancelled()` is true there.
+  it("skips publishing when the run was cancelled, and still runs after a failure", () => {
+    const doc = load(readFileSync(WORKFLOW, "utf8")) as Workflow;
+    expect(doc.concurrency?.["cancel-in-progress"]).toBe(
+      "${{ github.event_name == 'pull_request' }}",
+    );
+    const condition = doc.jobs["publish-preview-status"].if ?? "";
+    expect(condition).toContain("!cancelled()");
+    expect(condition).not.toContain("always()");
+    expect(condition).toContain("github.event_name == 'pull_request'");
+  });
+});
 
 describe.skipIf(!bashAvailable)("deployment-preview status comment classification", () => {
   let dir = "";

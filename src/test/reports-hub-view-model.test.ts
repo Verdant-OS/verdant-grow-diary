@@ -126,7 +126,7 @@ describe("buildReportsHubSummary", () => {
   it("links to existing detail surfaces", () => {
     const { cards } = buildReportsHubSummary(baseInput);
     const map = Object.fromEntries(cards.map((c) => [c.id, c.href]));
-    expect(map.action_outcome_learning).toBe("/grows/grow-1");
+    expect(map.action_outcome_learning).toBe("/grows/grow-1/learning");
     expect(map.recent_outcomes).toBe("/grows/grow-1");
     expect(map.environment_alerts).toBe("/alerts?growId=grow-1");
     expect(map.sensor_context).toBe("/grows/grow-1");

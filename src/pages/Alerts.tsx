@@ -22,6 +22,10 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { AlertTargetContext } from "@/components/AlertTargetContext";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
+import {
+  AlertRowActionQueueButton,
+  queueOpenAlertToActionQueue,
+} from "@/components/AlertRowActionQueueButton";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
 import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
@@ -62,7 +66,8 @@ import {
   type AlertSeverityRow,
   type AlertStatusRow,
 } from "@/lib/alerts";
-import { alertDetailPath, alertsPath } from "@/lib/routes";
+import { showAlertsOneTentLoopNextStep } from "@/lib/oneTentLoopNavigationRules";
+import { actionsPath, alertDetailPath, alertsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 type StatusFilter = AlertStatusRow | "all";
@@ -187,6 +192,46 @@ export default function Alerts() {
   // Read-only per-alert summary of open linked Action Queue items.
   const visibleAlertIds = useMemo(() => alerts.map((a) => a.id), [alerts]);
   const linkedActionCounts = useAlertsLinkedActionCounts(visibleAlertIds);
+  const [locallyQueuedByAlertId, setLocallyQueuedByAlertId] = useState<Record<string, string>>({});
+
+  const effectiveLinkedSummaryForAlert = (alertId: string) => {
+    const existing = linkedActionCounts.get(alertId);
+    if (existing && existing.count > 0) return existing;
+    const localActionId = locallyQueuedByAlertId[alertId];
+    if (localActionId) {
+      return { count: 1, singleActionId: localActionId };
+    }
+    return existing;
+  };
+
+  const unlinkedOpenAlerts = useMemo(
+    () =>
+      grouped.open.filter((a) => {
+        const summary = effectiveLinkedSummaryForAlert(a.id);
+        return !summary || summary.count === 0;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [grouped.open, linkedActionCounts, locallyQueuedByAlertId],
+  );
+  const singleUnlinkedOpenAlert = unlinkedOpenAlerts.length === 1 ? unlinkedOpenAlerts[0] : null;
+  const loopCardGrowId = singleUnlinkedOpenAlert?.grow_id ?? scopedGrowId ?? null;
+
+  const handleLoopCardBeforeNavigate = async () => {
+    // Only auto-queue from the generic loop CTA when the target alert is
+    // unambiguous (exactly one unlinked open alert). When multiple open
+    // alerts exist, navigate to /actions without guessing so the grower
+    // chooses via the per-row "Add to Action Queue" buttons.
+    if (!singleUnlinkedOpenAlert) return;
+    const res = await queueOpenAlertToActionQueue(singleUnlinkedOpenAlert);
+    if (!res.ok) return false;
+    if (res.actionQueueId) {
+      setLocallyQueuedByAlertId((prev) => ({
+        ...prev,
+        [singleUnlinkedOpenAlert.id]: res.actionQueueId!,
+      }));
+    }
+    return actionsPath(singleUnlinkedOpenAlert.grow_id ?? scopedGrowId ?? null);
+  };
 
   /**
    * Status-change handler:
@@ -256,12 +301,15 @@ export default function Alerts() {
         description="Persistent environment alerts. Read-only insights — no automation."
         icon={<Bell className="h-5 w-5" />}
       />
-      <OneTentLoopNextStepCard
-        current="alert"
-        ids={{ growId: urlGrowId ?? null }}
-        testId="alerts-one-tent-loop-next-step-card"
-        className="mb-3"
-      />
+      {showAlertsOneTentLoopNextStep(grouped.open.length) ? (
+        <OneTentLoopNextStepCard
+          current="alert"
+          ids={{ growId: loopCardGrowId }}
+          testId="alerts-one-tent-loop-next-step-card"
+          className="mb-3"
+          onBeforeNavigate={handleLoopCardBeforeNavigate}
+        />
+      ) : null}
       <p
         className="text-[11px] text-muted-foreground mb-3"
         data-testid="alerts-one-tent-loop-approval-note"
@@ -477,7 +525,10 @@ export default function Alerts() {
                         namesLoading: targetNames.status === "loading",
                         idsLoading: linkedTargets.idsLoading,
                       })}
-                      linkedSummary={linkedActionCounts.get(a.id)}
+                      linkedSummary={effectiveLinkedSummaryForAlert(a.id)}
+                      onQueued={(alertId, actionId) =>
+                        setLocallyQueuedByAlertId((prev) => ({ ...prev, [alertId]: actionId }))
+                      }
                       onAcknowledge={handleAcknowledge}
                       onResolve={handleResolve}
                       onDismiss={handleDismiss}
@@ -531,6 +582,7 @@ interface AlertCardProps {
   alert: AlertRow;
   targetInput: AlertTargetContextInput;
   linkedSummary: ReturnType<ReturnType<typeof useAlertsLinkedActionCounts>["get"]>;
+  onQueued?: (alertId: string, actionId: string) => void;
   onAcknowledge: AlertActionHandler;
   onResolve: AlertActionHandler;
   onDismiss: AlertActionHandler;
@@ -540,6 +592,7 @@ function AlertCard({
   alert: a,
   targetInput,
   linkedSummary,
+  onQueued,
   onAcknowledge,
   onResolve,
   onDismiss,
@@ -635,6 +688,7 @@ function AlertCard({
         />
 
         <div className="flex flex-wrap gap-2">
+          <AlertRowActionQueueButton alert={a} linkedSummary={linkedSummary} onQueued={onQueued} />
           {a.status !== "acknowledged" && a.status !== "resolved" && (
             <Button
               size="sm"

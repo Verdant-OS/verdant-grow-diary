@@ -44,6 +44,7 @@ permissions:
 
 jobs:
   ga-e2e:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: GA E2E (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 20

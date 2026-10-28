@@ -2,16 +2,15 @@
 // Verifies (1) no uncaught/init-order errors from the manualChunks split and
 // (2) usePageSeo actually sets per-route <title> + self-canonical at runtime.
 import { chromium } from "playwright";
-import { readFile } from "node:fs/promises";
 
 const BASE = process.env.SMOKE_BASE ?? "http://localhost:4180";
 const ORIGIN = "https://verdantgrowdiary.com";
 
 const ROUTES = [
   {
-    path: "/welcome",
+    path: "/",
     expectTitle: /Grow Diary & Grow Room Tracking App/,
-    canonical: `${ORIGIN}/welcome`,
+    canonical: `${ORIGIN}/`,
   },
   {
     path: "/pricing",
@@ -20,8 +19,8 @@ const ROUTES = [
   },
   {
     path: "/founder",
-    expectTitle: /Founder Lifetime — Support Verdant Early/,
-    canonical: `${ORIGIN}/founder`,
+    expectTitle: /Pricing — Free, Pro & Craft/,
+    canonical: `${ORIGIN}/pricing`,
   },
   {
     path: "/ai-doctor-readiness-check",
@@ -34,9 +33,19 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/grow-help-toolkit`,
   },
   {
+    path: "/guides/athena-feed-chart-log",
+    expectTitle: /Athena Feed Chart Log/,
+    canonical: `${ORIGIN}/guides/athena-feed-chart-log`,
+  },
+  {
     path: "/tools/vpd-calculator",
     expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
     canonical: `${ORIGIN}/tools/vpd-calculator`,
+  },
+  {
+    path: "/vpd-chart",
+    expectTitle: /VPD Chart by Growth Stage \+ Calculator/,
+    canonical: `${ORIGIN}/vpd-chart`,
   },
   {
     path: "/hardware-integrations",
@@ -54,30 +63,6 @@ const ROUTES = [
 
 const browser = await chromium.launch();
 let failed = 0;
-
-// Filesystem-first production hosts serve this entry to non-JavaScript social
-// crawlers before the SPA fallback. Check the emitted document directly
-// because Vite preview does not reproduce every production host's routing.
-{
-  const html = await readFile(new URL("../dist/founder/index.html", import.meta.url), "utf8");
-  const expected = {
-    title: "Founder Lifetime — Support Verdant Early | Verdant Grow Diary",
-    url: `${ORIGIN}/founder`,
-  };
-  const problems = [];
-  if (!html.includes(`<title>${expected.title}</title>`)) problems.push("Founder title missing");
-  if (!html.includes(`property="og:url" content="${expected.url}"`))
-    problems.push("Founder og:url missing");
-  if (!html.includes(`name="twitter:title" content="${expected.title}"`))
-    problems.push("Founder twitter:title missing");
-  if (!html.includes(`rel="canonical" href="${expected.url}"`))
-    problems.push("Founder canonical missing");
-  if (!html.includes('id="root"')) problems.push("Founder app root missing");
-  const ok = problems.length === 0;
-  if (!ok) failed++;
-  console.log(`${ok ? "PASS" : "FAIL"} static /founder social entry`);
-  for (const problem of problems) console.log(`   ✗ ${problem}`);
-}
 
 for (const r of ROUTES) {
   const page = await browser.newPage();
@@ -125,7 +110,7 @@ for (const r of ROUTES) {
 // structured data can never silently drift from src/constants/pricing.ts.
 {
   const page = await browser.newPage();
-  await page.goto(BASE + "/welcome", { waitUntil: "networkidle" });
+  await page.goto(BASE + "/", { waitUntil: "networkidle" });
   const blocks = await page.$$eval('script[type="application/ld+json"]', (els) =>
     els.map((e) => e.textContent || ""),
   );

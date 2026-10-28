@@ -30,19 +30,87 @@ describe("supabase table explicit ACL rule", () => {
         name,
         sql: readFileSync(join(MIGRATIONS_DIR, name), "utf8").replace(/\r\n/g, "\n"),
       }));
-    const found = findTablesWithoutExplicitAcl(migrations).map((f: { table: string }) => f.table);
-    expect(found).toEqual([...LEGACY_DEFAULT_PRIVILEGE_TABLES]);
-  });
-
-  it("keeps the legacy list frozen, sorted and free of duplicates", () => {
-    expect(Object.isFrozen(LEGACY_DEFAULT_PRIVILEGE_TABLES)).toBe(true);
-    expect([...LEGACY_DEFAULT_PRIVILEGE_TABLES]).toEqual(
-      [...new Set(LEGACY_DEFAULT_PRIVILEGE_TABLES)].sort(),
+    // Bound to the creating migration: a legacy table that is dropped and
+    // recreated is a new table and must not inherit the exemption.
+    expect(findTablesWithoutExplicitAcl(migrations)).toEqual(
+      LEGACY_DEFAULT_PRIVILEGE_TABLES.map((e: { table: string; migration: string }) => ({
+        table: e.table,
+        migration: e.migration,
+      })),
     );
   });
 
-  it("flags a new public table with no grant", () => {
-    expect(tables(CREATE)).toEqual(["leaky"]);
+  it("keeps the legacy list frozen, sorted and free of duplicates", () => {
+    const names = LEGACY_DEFAULT_PRIVILEGE_TABLES.map((e: { table: string }) => e.table);
+    expect(Object.isFrozen(LEGACY_DEFAULT_PRIVILEGE_TABLES)).toBe(true);
+    expect(LEGACY_DEFAULT_PRIVILEGE_TABLES.every((e: object) => Object.isFrozen(e))).toBe(true);
+    expect(names).toEqual([...new Set(names)].sort());
+  });
+
+  it("does not let a legacy name cover a table dropped and recreated without an ACL", () => {
+    const legacy = LEGACY_DEFAULT_PRIVILEGE_TABLES.find(
+      (e: { table: string }) => e.table === "plants",
+    );
+    const found = findTablesWithoutExplicitAcl([
+      { name: legacy.migration, sql: "CREATE TABLE public.plants (id uuid);" },
+      {
+        name: "20261101000000_m.sql",
+        sql: "DROP TABLE public.plants;\nCREATE TABLE public.plants (id uuid);",
+      },
+    ]);
+    expect(found).toEqual([{ table: "plants", migration: "20261101000000_m.sql" }]);
+    expect(found).not.toContainEqual({ table: legacy.table, migration: legacy.migration });
+  });
+
+  it.each([
+    CREATE,
+    'CREATE TABLE public."leaky" (id int);',
+    'CREATE TABLE "public"."leaky" (id int);',
+    'CREATE TABLE "public" . leaky (id int);',
+    "CREATE UNLOGGED TABLE public.leaky (id int);",
+    "create table if not exists public.leaky (id int);",
+  ])("flags a new public table with no grant: %s", (sql) => {
+    expect(tables(sql)).toEqual(["leaky"]);
+  });
+
+  it("keeps quoted identifier case distinct from the folded name", () => {
+    expect(
+      tables(
+        'CREATE TABLE public."Leaky" (id int);\nGRANT SELECT ON public.leaky TO authenticated;',
+      ),
+    ).toEqual(["Leaky"]);
+    expect(
+      tables(
+        'CREATE TABLE public."Leaky" (id int);\nGRANT SELECT ON public."Leaky" TO authenticated;',
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps an existing table's ACL through a no-op CREATE TABLE IF NOT EXISTS", () => {
+    expect(
+      tables(
+        `${CREATE}\nGRANT SELECT ON public.leaky TO authenticated;`,
+        "CREATE TABLE IF NOT EXISTS public.leaky (id uuid primary key);",
+      ),
+    ).toEqual([]);
+  });
+
+  it("resets the ACL when IF NOT EXISTS follows a real drop", () => {
+    expect(
+      tables(
+        `${CREATE}\nGRANT SELECT ON public.leaky TO authenticated;`,
+        "DROP TABLE public.leaky;\nCREATE TABLE IF NOT EXISTS public.leaky (id int);",
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("drops every table in a DROP TABLE list", () => {
+    expect(
+      tables(
+        "CREATE TABLE public.a (id int);\nCREATE TABLE public.b (id int);",
+        "DROP TABLE IF EXISTS public.a, public.b CASCADE;",
+      ),
+    ).toEqual([]);
   });
 
   it.each([
@@ -53,6 +121,8 @@ describe("supabase table explicit ACL rule", () => {
     "GRANT INSERT (id) ON public.leaky TO anon;",
     "REVOKE ALL ON TABLE public.leaky FROM PUBLIC, anon, authenticated, service_role;",
     "REVOKE ALL PRIVILEGES ON public.leaky FROM anon, authenticated;",
+    "COMMENT ON TABLE public.leaky IS 'it''s granted below';\nGRANT SELECT ON public.leaky TO anon;",
+    "DO $$ BEGIN EXECUTE 'SELECT 1'; GRANT SELECT ON public.leaky TO authenticated; END $$;",
   ])("accepts an explicit table ACL: %s", (acl) => {
     expect(tables(`${CREATE}\n${acl}`)).toEqual([]);
   });
@@ -66,6 +136,18 @@ describe("supabase table explicit ACL rule", () => {
     ["a column-level revoke", "REVOKE ALL PRIVILEGES (id) ON TABLE public.leaky FROM anon;"],
     ["a line-commented grant", "-- GRANT SELECT ON public.leaky TO authenticated;"],
     ["a block-commented grant", "/* GRANT SELECT ON public.leaky TO authenticated; */"],
+    [
+      "a grant inside a nested block comment",
+      "/* outer /* nested */ GRANT SELECT ON public.leaky TO authenticated; */",
+    ],
+    [
+      "grant text inside a COMMENT string literal",
+      "COMMENT ON TABLE public.leaky IS 'Requires GRANT SELECT ON public.leaky TO authenticated; first';",
+    ],
+    [
+      "grant text inside an escaped E-string literal",
+      "COMMENT ON TABLE public.leaky IS E'it\\'s GRANT SELECT ON public.leaky TO authenticated;';",
+    ],
     ["a grant on another table", "GRANT SELECT ON public.leaky_audit TO authenticated;"],
     ["a function grant", "GRANT EXECUTE ON FUNCTION public.leaky() TO authenticated;"],
     ["a sequence grant", "GRANT USAGE ON SEQUENCE public.leaky TO authenticated;"],

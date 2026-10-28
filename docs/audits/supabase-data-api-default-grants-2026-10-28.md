@@ -42,13 +42,19 @@ app once it is applied to the hosted project after 2026-10-30. Before this chang
 Correction (this PR): `scripts/lib/supabaseTableAclRules.mjs` and
 `src/test/supabase-table-explicit-acl.test.ts`. Every persistent `public` table must have, after
 its latest `CREATE`, a table-level `GRANT` or a full `REVOKE ALL`. A partial or column-level revoke,
-a commented statement, a schema-wide or default-privilege statement, or a function/sequence grant
-does not count. The test runs against the real migration tree in the required Vitest suite. The
-result must equal the frozen legacy list exactly, so a new table without an ACL fails CI, and the
-list can only shrink.
+a statement inside a comment (nested block comments included) or a single-quoted string literal,
+a schema-wide or default-privilege statement, or a function/sequence grant does not count. Quoted
+names (`"public"."x"`) and `CREATE UNLOGGED TABLE` are recognised; a `CREATE TABLE IF NOT EXISTS`
+of a table that already exists keeps its ACL. The test runs against the real migration tree in the
+required Vitest suite. The result must equal the frozen legacy list exactly, with each legacy table
+bound to the migration that created it, so a new table without an ACL fails CI, a legacy table that
+is dropped and recreated needs its own ACL, and the list can only shrink. Known ceiling: a `GRANT`
+written as prose inside a dollar-quoted literal is still counted, because dollar-quoted bodies are
+scanned as SQL so dynamic DDL in a `DO` block counts.
 
 It is a new check, not an edit to `scripts/check-supabase-migration-safety.mjs`. The scorer lock
-refuses edits to that existing gate. The unlock was not taken in this session.
+refuses edits to that existing gate, and that unlock was not taken. The review fixes to this PR's
+own two files were made under unlocks Matthew approved on 2026-10-28.
 
 ## Not verified
 

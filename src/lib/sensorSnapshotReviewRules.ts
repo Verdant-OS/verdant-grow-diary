@@ -17,6 +17,7 @@
  *    subset of these metrics) is out of scope. This module just reviews.
  */
 
+import { manualReadingObservedAtWindowLabel } from "@/lib/manualSensorObservedAtRules";
 import { PPFD_MAX } from "@/lib/ppfdRules";
 import { computeVpdKpa, fahrenheitToCelsius } from "@/lib/sensorReadingManualEntryRules";
 
@@ -72,11 +73,20 @@ export interface SensorSnapshotReviewOptions {
   now?: Date;
   /** Max allowed clock skew for future-dated captures. Defaults to 5 minutes. */
   futureSkewMs?: number;
+  /**
+   * Age past which a capture time is a blocker. Defaults to 24h so corrections
+   * and every existing caller keep the historical-import block. A new manual
+   * reading passes the 7-day lookback instead.
+   */
+  staleBlockMs?: number;
 }
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DEFAULT_FUTURE_SKEW_MS = 5 * MINUTE_MS;
+const DEFAULT_STALE_BLOCK_MS = 24 * HOUR_MS;
+const DEFAULT_STALE_BLOCK_MESSAGE =
+  "Capture time is older than 24h — save as historical import instead.";
 
 function toFinite(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
@@ -100,6 +110,7 @@ export function reviewManualSensorSnapshot(
 ): SensorSnapshotReviewResult {
   const now = opts.now ?? new Date();
   const futureSkew = opts.futureSkewMs ?? DEFAULT_FUTURE_SKEW_MS;
+  const staleBlockMs = opts.staleBlockMs ?? DEFAULT_STALE_BLOCK_MS;
 
   const tempF = toFinite(input.tempF);
   const humidity = toFinite(input.humidity);
@@ -162,12 +173,15 @@ export function reviewManualSensorSnapshot(
         label: "Captured at",
         message: "Capture time is in the future.",
       });
-    } else if (-deltaMs > 24 * HOUR_MS) {
+    } else if (-deltaMs > staleBlockMs) {
       push({
         key: "captured_at_too_old",
         severity: "blocker",
         label: "Captured at",
-        message: "Capture time is older than 24h — save as historical import instead.",
+        message:
+          staleBlockMs === DEFAULT_STALE_BLOCK_MS
+            ? DEFAULT_STALE_BLOCK_MESSAGE
+            : `Capture time is older than ${manualReadingObservedAtWindowLabel(staleBlockMs)} — save as historical import instead.`,
       });
     } else if (-deltaMs > HOUR_MS) {
       push({

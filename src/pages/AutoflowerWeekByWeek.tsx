@@ -177,6 +177,7 @@ export default function AutoflowerWeekByWeek() {
   function updatePlan(partial: Partial<AutoflowerPlanState>, generated = false) {
     const next = { ...plan, ...partial };
     setPlan(next);
+    setCopyFallback(null);
     if (generated) trackGenerated(next);
   }
 

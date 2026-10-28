@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
@@ -131,6 +131,19 @@ describe("public autoflower week-by-week planner page", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Stages must be in order without overlapping.",
     );
+  });
+
+  it("drops a stale clipboard fallback once the plan changes", async () => {
+    vi.stubGlobal("navigator", {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    renderPage();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy plan" }));
+    });
+    expect(screen.getByLabelText(/Clipboard access was unavailable/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Sprout date"), { target: { value: "2026-11-01" } });
+    expect(screen.queryByLabelText(/Clipboard access was unavailable/)).not.toBeInTheDocument();
   });
 
   it("prints inside a visible print section", () => {

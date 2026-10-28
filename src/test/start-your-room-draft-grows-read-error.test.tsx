@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
@@ -16,6 +16,7 @@ const OWNER_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const testState = vi.hoisted(() => ({
   grows: [] as Array<{ id: string; name: string }>,
   growsError: null as string | null,
+  capabilities: null as Record<string, unknown> | null,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -46,7 +47,7 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,
     lookupFailed: false,
-    entitlement: { capabilities: FREE_CAPABILITIES },
+    entitlement: { capabilities: testState.capabilities ?? FREE_CAPABILITIES },
     refetch: vi.fn(async () => false),
   }),
 }));
@@ -85,6 +86,7 @@ describe("Start your room draft hydration after a failed grow read", () => {
     window.sessionStorage.clear();
     testState.grows = [];
     testState.growsError = "Could not load grows";
+    testState.capabilities = null;
   });
 
   afterEach(() => {
@@ -116,5 +118,24 @@ describe("Start your room draft hydration after a failed grow read", () => {
     expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent("North run");
     expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(draftKey)).toContain(PENDING_TENT_ID);
+  });
+
+  it("blocks a paid grower from creating anything until the grow roster reads (Codex review)", async () => {
+    // Paid plans skip the grow-count check, so before this fix the form stayed
+    // usable while hydration waited; a later good read then reset what the
+    // grower had just created.
+    testState.capabilities = { ...FREE_CAPABILITIES, maxActiveGrows: null, multiTent: true };
+    const view = render(page());
+    expect(await screen.findByTestId("start-room-creation-gate")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-creation-retry")).toBeEnabled();
+    expect(screen.queryByTestId("start-your-room-step-room")).not.toBeInTheDocument();
+
+    testState.growsError = null;
+    view.rerender(page());
+    fireEvent.change(await screen.findByTestId("start-room-plant-name"), {
+      target: { value: "Plant 1" },
+    });
+    expect(screen.getByTestId("start-room-submit")).toBeEnabled();
+    expect(screen.queryByTestId("start-room-creation-gate")).not.toBeInTheDocument();
   });
 });

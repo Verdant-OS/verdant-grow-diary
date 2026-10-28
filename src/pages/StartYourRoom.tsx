@@ -282,11 +282,13 @@ export default function StartYourRoom() {
   const creationVerificationFailed =
     entitlementLookupFailed ||
     plantReadFailed ||
-    (growCountRequired && Boolean(growsError)) ||
+    // Any plan: a failed roster read also holds back draft hydration, so the
+    // grower must not create anything a later good read would then reset.
+    Boolean(growsError) ||
     (tentCountRequired && tentsQuery.isError);
   const planVerificationReady = !entitlementLoading && !entitlementLookupFailed;
   const growVerificationReady =
-    planVerificationReady && (!growCountRequired || (!growsLoading && !growsError));
+    planVerificationReady && !growsError && (!growCountRequired || !growsLoading);
   const tentVerificationReady =
     planVerificationReady && (!tentCountRequired || (!tentsQuery.isLoading && !tentsQuery.isError));
   const growGate = evaluateVerifiedGrowCreationGate(
@@ -332,6 +334,9 @@ export default function StartYourRoom() {
   const currentCreationGate = !growGate.allowed ? growGate : stepCreationGate;
   const progress = oneStepProgressLabel(shownStep);
   const showRoomLoading = roomSourcesLoading || creationVerificationLoading;
+  // Until the stored draft is restored (it waits for a good roster read), the
+  // step forms stay hidden: anything typed now would be reset by hydration.
+  const stepFormsReady = !showRoomLoading && draftOwnerReady === ownerId;
 
   useEffect(() => {
     if (!appliedResume) return;
@@ -617,7 +622,7 @@ export default function StartYourRoom() {
           </p>
         )}
 
-        {!showRoomLoading && shownStep !== "done" && (
+        {stepFormsReady && shownStep !== "done" && (
           <form onSubmit={submitRoomFromForm}>
             <section className="space-y-3" data-testid="start-your-room-step-room">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -730,7 +735,7 @@ export default function StartYourRoom() {
           </form>
         )}
 
-        {!showRoomLoading && shownStep === "done" && (
+        {stepFormsReady && shownStep === "done" && (
           <section className="space-y-3" data-testid="start-your-room-step-done">
             <div className="flex items-center gap-2 text-sm font-medium text-emerald-500">
               <CheckCircle2 className="h-4 w-4" aria-hidden />

@@ -630,6 +630,9 @@ function QuickLogV2SheetForOwner({
   // during the same tick.
   const saveInFlightRef = useRef(false);
   const observationDraftSuppressedRef = useRef(false);
+  // True once this open restored or wrote the stored draft, so emptying the
+  // form may forget it. Opening for another target never clears its draft.
+  const observationDraftOwnedRef = useRef(false);
   const observationUnconfirmedRef = useRef(false);
   const [observationDraftRestored, setObservationDraftRestored] = useState<string | null>(null);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
@@ -1151,6 +1154,7 @@ function QuickLogV2SheetForOwner({
       setObservationDraftRestored(
         restorable ? quickLogObservationDraftRestoredCopy(restorable) : null,
       );
+      observationDraftOwnedRef.current = Boolean(restorable);
       setForm({
         ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
         selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
@@ -1210,7 +1214,15 @@ function QuickLogV2SheetForOwner({
       }
       return;
     }
-    if (!open || postSave || isQuickLogObservationDraftEmpty(form)) return;
+    if (!open || postSave) return;
+    if (isQuickLogObservationDraftEmpty(form)) {
+      if (observationDraftOwnedRef.current) {
+        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+        observationDraftOwnedRef.current = false;
+      }
+      return;
+    }
+    observationDraftOwnedRef.current = true;
     writeBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
       form,
       saveFailed: observationUnconfirmedRef.current,

@@ -122,6 +122,27 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     expect(screen.queryByText(QUICK_LOG_OBSERVATION_SAVE_ERROR)).toBeNull();
   });
 
+  it("forgets a draft the grower deleted back to empty (review 5677784998)", async () => {
+    renderSheet("plant:plant-1");
+    const note = await screen.findByTestId("qlv2-note");
+    fireEvent.change(note, { target: { value: "abc" } });
+    await waitFor(() => expect(window.sessionStorage.length).toBeGreaterThan(0));
+    fireEvent.change(note, { target: { value: "" } });
+    cleanup();
+    renderSheet("plant:plant-1");
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("");
+    expect(screen.queryByTestId("qlv2-draft-restored")).toBeNull();
+  });
+
+  it("keeps plant A's draft when the sheet opens for plant B and nothing is typed", async () => {
+    await failNoteOn("plant:plant-1", "invalid_details");
+    renderSheet("plant:plant-2");
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("");
+    cleanup();
+    renderSheet("plant:plant-1");
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("First leaves look pale");
+  });
+
   it("pins: an ambiguous outcome keeps its key through a reload (durable recovery owns it)", async () => {
     await failNoteOn("plant:plant-1", "receipt_unverified");
     const firstKey = rpcMock.mock.calls[0]?.[1]?.p_idempotency_key;

@@ -2119,6 +2119,14 @@ function QuickLogV2SheetForOwner({
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
+        // New manual Note saves only. Feed returns above this call. Water
+        // builds its own payload and skips this builder. A retry replays the
+        // stored payload, so a later stage change does not rewrite it.
+        // Pass the stage stored on the resolved target: the plant's stage for
+        // a plant, the tent's stage for a tent. Neither target borrows the
+        // other's stage. The builder keeps a canonical stage and omits a
+        // missing or unknown one.
+        stage: targetStage,
         volumeMl: form.volumeMl,
         note: form.note,
         temperatureC: typedTempToCelsiusInput(

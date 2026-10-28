@@ -1,4 +1,8 @@
-import { CRITICAL_READ_DEADLINE_MS, CriticalReadDeadlineError } from "@/lib/boundedReadRules";
+import {
+  CRITICAL_READ_DEADLINE_MS,
+  CriticalReadDeadlineError,
+  withCriticalReadDeadline,
+} from "@/lib/boundedReadRules";
 
 /**
  * Two short waits after the first attempt. The first attempt keeps the full
@@ -104,6 +108,20 @@ export function classifyGrowReadFailure(error: unknown): GrowReadFailure {
   return { kind: "db", code: "unknown" };
 }
 
+/** Grows-store error value when the JWT is still rejected after every retry. */
+export const GROWS_READ_SESSION_EXPIRED = "session_expired";
+
+/**
+ * The grows store's `error` value for a failed read. An expired or invalid JWT
+ * that outlasts the retries gets its own value so pages can send the grower to
+ * sign in instead of offering a retry that cannot work.
+ */
+export function growsReadErrorValue(failure: GrowReadFailure): string {
+  if (failure.kind === "timeout") return "critical_read_deadline";
+  if (failure.code === "PGRST301") return GROWS_READ_SESSION_EXPIRED;
+  return "Unable to load grows";
+}
+
 export function isRetryableGrowReadFailure(failure: GrowReadFailure): boolean {
   if (failure.kind === "timeout" || failure.kind === "network") return true;
   if (failure.code === "unknown") return true;
@@ -198,4 +216,37 @@ export async function readWithGrowRetry<T>(
     if (controls.shouldStop?.()) return { ok: false, failure, stopped: true };
   }
   return { ok: false, failure };
+}
+
+/**
+ * Run one critical read, then the short backoff sequence, and return the
+ * first success. A non-retryable failure stops immediately. The last failure
+ * is rethrown so callers still record a failed read.
+ */
+export async function readTransientValue<T>(
+  read: () => Promise<T>,
+  controls: GrowRetryControls = {},
+): Promise<T> {
+  const budgetMs = controls.budgetMs ?? GROW_READ_BUDGET_MS;
+  const now = controls.now ?? Date.now;
+  const startedAt = now();
+  let attempt = 0;
+  let lastError: unknown = new Error("grow_read_failed");
+  const outcome = await readWithGrowRetry(async () => {
+    const remaining = budgetMs - (now() - startedAt);
+    const deadline = growReadAttemptDeadlineMs(attempt, remaining);
+    attempt += 1;
+    if (deadline <= 0) {
+      lastError = new CriticalReadDeadlineError();
+      return { ok: false as const, failure: classifyGrowReadFailure(lastError) };
+    }
+    try {
+      return { ok: true as const, value: await withCriticalReadDeadline(read(), deadline) };
+    } catch (caught) {
+      lastError = caught;
+      return { ok: false as const, failure: classifyGrowReadFailure(caught) };
+    }
+  }, controls);
+  if (outcome.ok) return outcome.value;
+  throw lastError;
 }

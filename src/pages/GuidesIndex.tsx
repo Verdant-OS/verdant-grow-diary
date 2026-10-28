@@ -182,8 +182,8 @@ export default function GuidesIndex() {
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Log clear, cloudy and amber trichome checks for each plant and compare them with the
-                harvest window you chose. Your log stays on the page unless you choose to carry it
-                into Verdant.
+                harvest window you chose. The log is lost on reload unless you download it or choose
+                to carry it into Verdant.
               </p>
             </Link>
           </li>

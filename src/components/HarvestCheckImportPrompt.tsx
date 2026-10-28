@@ -58,7 +58,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
     setBoundPlantId(null);
     setPlantId("");
     setError(
-      "The plant this import started on is no longer in your list. Checks already saved stay on that plant. Choose a plant.",
+      "The plant this import started on is no longer in your list. Any checks already saved stay on that plant. Choose a plant.",
     );
   }, [boundPlantMissing, handoff]);
 
@@ -130,9 +130,10 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
         From the Harvest Window Tracker. Each check becomes a note on the plant you choose, with its
         original date.
       </p>
+      {/* A failed background refetch keeps the cached list usable; only a failed first read blocks. */}
       {plants.isLoading ? (
         <p className="mt-3">Loading your plants…</p>
-      ) : plants.isError ? (
+      ) : plants.isError && !plants.data ? (
         <p role="alert" className="mt-3 text-red-800">
           Your plants could not be loaded. Reload to try again. Your checks stay in this tab.
         </p>

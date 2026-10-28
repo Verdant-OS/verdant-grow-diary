@@ -211,6 +211,14 @@ describe("/guides internal links resolve to known routes with one scoped diary h
     });
   }
 
+  it("the harvest tracker card says the log is lost on reload unless it is kept", () => {
+    const { container } = renderGuides("/guides");
+    const card = container.querySelector('a[href="/guides/when-to-harvest-cannabis"]');
+    expect(card?.textContent).toContain(
+      "The log is lost on reload unless you download it or choose to carry it into Verdant.",
+    );
+  });
+
   it("guide-family slugs linked from /guides all exist in shared constants or known custom guide pages", () => {
     const { container } = renderGuides("/guides");
     const { internal } = collectLinks(container);

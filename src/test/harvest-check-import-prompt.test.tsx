@@ -243,7 +243,7 @@ describe("harvest check import after signup", () => {
     );
     renderPrompt();
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The plant this import started on is no longer in your list. Checks already saved stay on that plant. Choose a plant.",
+      "The plant this import started on is no longer in your list. Any checks already saved stay on that plant. Choose a plant.",
     );
     const select = screen.getByLabelText("Plant") as HTMLSelectElement;
     expect(select).not.toBeDisabled();
@@ -263,6 +263,21 @@ describe("harvest check import after signup", () => {
     );
     expect(screen.queryByRole("link", { name: "Go to Plants" })).not.toBeInTheDocument();
     expect(storage.map.has(HARVEST_HANDOFF_STORAGE_KEY)).toBe(true);
+  });
+
+  it("keeps the cached plant list usable after a failed background refetch", async () => {
+    mocks.plants = {
+      data: [
+        { id: "11111111-1111-4111-8111-111111111111", name: "Blue Dream #1", tent_id: "tent-1" },
+      ],
+      isLoading: false,
+      isError: true,
+    };
+    logThreeChecksAndClickCta();
+    renderPrompt();
+    const select = (await screen.findByLabelText("Plant")) as HTMLSelectElement;
+    expect(select).not.toBeDisabled();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 
   it("saves nothing when the plant binding cannot be stored", async () => {

@@ -11,6 +11,7 @@ import {
   type BridgeFlags,
   type MqttPublisher,
 } from "../../scripts/dev/ecowitt-http-local-bridge";
+import { prepareForwardPayload } from "../../scripts/dev/ecowitt-ingest-forwarder";
 
 const baseFlags = (overrides: Partial<BridgeFlags> = {}): BridgeFlags => ({
   port: 8080,
@@ -101,6 +102,21 @@ describe("parseEcowittBody", () => {
   it("returns null for empty/malformed", () => {
     expect(parseEcowittBody("", "application/json")).toBeNull();
     expect(parseEcowittBody("{not json", "application/json")).toBeNull();
+  });
+});
+
+describe("parseEcowittBody PASSKEY", () => {
+  it("keeps a digits-only PASSKEY as the exact string the forwarder accepts (Codex P2 on #2335)", () => {
+    const parsed = parseEcowittBody("PASSKEY=000012345678&temp1f=70", undefined);
+    expect(parsed).toEqual({ PASSKEY: "000012345678", temp1f: 70 });
+    const msg = buildMqttMessage(parsed!, "ecowitt/test", new Date("2026-10-22T12:00:00.000Z"));
+    expect(msg.metricKeys).toEqual(["temp1f"]);
+    const fwd = prepareForwardPayload(
+      JSON.stringify({ ...JSON.parse(msg.payload), dateutc: "2026-10-22 05:27:14" }),
+      new Date("2026-10-22T12:00:00.000Z"),
+    );
+    expect(fwd.ok).toBe(true);
+    if (fwd.ok) expect(fwd.payload.PASSKEY).toBe("000012345678");
   });
 });
 

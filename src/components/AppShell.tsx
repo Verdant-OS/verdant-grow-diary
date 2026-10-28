@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useManualSensorCorrectionRefresh } from "@/hooks/useManualSensorCorrectionRefresh";
 import { useHydrated } from "@/hooks/useHydrated";
+import { useSearchShortcut } from "@/hooks/useSearchShortcut";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   buildSignedOutRedirect,
@@ -24,6 +25,7 @@ import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
 import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
+import SearchShortcutHint from "./SearchShortcutHint";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
 import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
@@ -33,6 +35,11 @@ import {
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
+import {
+  QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
+  QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
+  mobileShellToastOffsetCss,
+} from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { TentQuickLogTargetScope } from "@/components/TentQuickLogTargetScope";
@@ -43,6 +50,11 @@ import {
   isQuickLogV2OpenIntent,
   type QuickLogV2OpenIntent,
 } from "@/lib/quickLogV2OpenIntent";
+import {
+  QUICK_LOG_V2_FEED_OPEN_EVENT,
+  isQuickLogV2FeedOpenIntent,
+  type QuickLogV2FeedOpenIntent,
+} from "@/lib/quickLogV2FeedOpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading, isSignOutNavigationPending } = useAuth();
@@ -97,9 +109,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const [mobileLaunchTargetKey, setMobileLaunchTargetKey] = useState<string | null>(null);
   const [tentQuickLogTargetEvidence, setTentQuickLogTargetEvidence] =
     useState<TentQuickLogTargetEvidence | null>(null);
-  const [structuredOpenIntent, setStructuredOpenIntent] = useState<QuickLogV2OpenIntent | null>(
-    null,
-  );
+  const [structuredOpenIntent, setStructuredOpenIntent] = useState<
+    QuickLogV2OpenIntent | QuickLogV2FeedOpenIntent | null
+  >(null);
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -153,26 +165,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     entitlement.effectivePlanId !== "free";
   useCheckoutReturnCompletionTracking(paidDestinationReady);
 
-  // Global ⌘K / Ctrl+K shortcut to open the search palette. Guarded so
-  // it does not steal keystrokes while the grower is typing in an input,
-  // textarea, or contenteditable surface.
-  useEffect(() => {
-    function isTypingTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      if (target.isContentEditable) return true;
-      const tag = target.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-    }
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        if (isTypingTarget(e.target)) return;
-        e.preventDefault();
-        setSearchOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useSearchShortcut(setSearchOpen);
 
   useEffect(() => {
     function onOpenV2(event: Event) {
@@ -189,7 +182,21 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenScopedLog(true);
     }
     window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
-    return () => window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+    function onOpenFeed(event: Event) {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isQuickLogV2FeedOpenIntent(detail)) return;
+      setOpenLog(false);
+      setPrefill(null);
+      setLegacyQuickLogSession((session) => session + 1);
+      setMobileLaunchTargetKey(null);
+      setStructuredOpenIntent(detail);
+      setOpenScopedLog(true);
+    }
+    window.addEventListener(QUICK_LOG_V2_FEED_OPEN_EVENT, onOpenFeed as EventListener);
+    return () => {
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+      window.removeEventListener(QUICK_LOG_V2_FEED_OPEN_EVENT, onOpenFeed as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -267,7 +274,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // Also wait for useRequireAuth (getUser) before mounting protected children
   // (#588): a stale cached session must not let pageContent fire authenticated
   // REST calls until the auth server revalidation settles.
-  if (!hydrated || loading || authStatus === "loading")
+  // A failed revalidation skips the wait for auth, never the hydration render.
+  if (
+    (!hydrated || loading || authStatus === "loading") &&
+    (!hydrated || authStatus !== "revalidation_failed")
+  )
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
@@ -328,6 +339,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         />
         <a
           href="#main-content"
+          onClick={(event) => {
+            // A hash change alone leaves focus on BODY under the router, so
+            // the next Tab restarts at this link. Move focus into main.
+            const main = document.getElementById("main-content");
+            if (!main) return;
+            event.preventDefault();
+            main.focus();
+          }}
           className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Skip to main content
@@ -359,7 +378,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   <Search className="h-4 w-4" />
                   <span className="hidden lg:inline">Search…</span>
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">
-                    ⌘K
+                    <SearchShortcutHint />
                   </kbd>
                 </button>
                 {/* Mobile-reachable search entry: the ⌘K composite button
@@ -418,14 +437,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           <main
             id="main-content"
             tabIndex={-1}
-            className="mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pb-9 md:pt-7 lg:px-10"
+            className={`mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pt-7 lg:px-10 ${QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS}`}
           >
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
-              <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
-                {pageContent}
-              </TentQuickLogTargetScope>
+              <div
+                data-testid="app-shell-page-content"
+                className={QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS}
+              >
+                <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
+                  {pageContent}
+                </TentQuickLogTargetScope>
+              </div>
             )}
             {/* In-flow legal footer: stays at the end of scrolled content
                 (never fixed), so the mobile FAB cannot clip it. */}
@@ -437,6 +461,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             </footer>
           </main>
         </div>
+
+        {/* Only while this shell (and its bottom nav) is mounted, and only below md. */}
+        <style data-testid="mobile-shell-toast-offset">{mobileShellToastOffsetCss()}</style>
 
         {/* Mobile floating + — same QuickLogV2 entry as header/+ */}
         <button

@@ -11,16 +11,17 @@ import { Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import {
+  composeGrowWalkCloseoutNote,
   GROW_WALK_FOLLOW_UP_OPTIONS,
   GROW_WALK_MISSINGNESS_OPTIONS,
   GROW_WALK_RISK_OPTIONS,
   ALERT_WALK_GUIDANCE_LEAD,
   ALERT_WALK_GUIDANCE_STEPS,
   GROW_WALK_VISIT_MODES,
-  composeGrowWalkCloseoutNote,
   resolveGrowWalkPlantPrompts,
   type GrowWalkVisitMode,
 } from "@/lib/growWalkContracts";
+import { GROW_WALK_VISIT_MODE_BUTTON_CLASSNAME } from "@/lib/guidedGrowWalkPanelRules";
 import {
   EVIDENCE_PHOTO_SLOT_LABELS,
   V0_VISIBLE_SLOTS,
@@ -134,6 +135,7 @@ export default function GuidedGrowWalkPanel({
             type="button"
             size="sm"
             variant={visitMode === mode.id ? "default" : "outline"}
+            className={GROW_WALK_VISIT_MODE_BUTTON_CLASSNAME}
             aria-pressed={visitMode === mode.id}
             data-testid={`${testIdPrefix}-visit-mode-${mode.id}`}
             onClick={() => onVisitModeChange(mode.id)}

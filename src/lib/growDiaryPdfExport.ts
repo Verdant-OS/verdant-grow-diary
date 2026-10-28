@@ -11,13 +11,17 @@
  *    device control, no schema/RLS/Edge changes.
  *  - Never invents chart data — falls back to a summary table and
  *    explicitly states that charts were unavailable.
- *  - Sensor `source` labels are preserved verbatim. `stale`, `invalid`,
- *    and `demo` are flagged and never summarized as "healthy".
+ *  - Sensor `source` labels are the canonical six (live, manual, csv, demo,
+ *    stale, invalid) via resolveSensorSourceDisplayCanon. Bridge / vendor
+ *    tokens are shown only as separate provenance, never as the Source
+ *    label. `stale`, `invalid`, and `demo` are flagged and never
+ *    summarized as "healthy".
  *  - Does not render raw payloads, tokens, secrets, or internal IDs.
  */
 
 import type { CountValue } from "@/lib/growStatus";
 import type { RecentItem } from "@/lib/growStatus";
+import { resolveSensorSourceDisplayCanon } from "@/lib/sensorSourceDisplayCanon";
 
 /** Minimal grow context accepted by the PDF builder. */
 export interface GrowDiaryPdfGrowContext {
@@ -79,6 +83,8 @@ export interface GrowDiaryPdfModel {
     count: number;
     healthy: boolean;
     note: string;
+    /** Raw transport/vendor token as provenance copy (e.g. "Bridge"), never the label. */
+    provenance: string | null;
   }>;
   charts: Array<{ label: string; summary: string }>;
   chartsUnavailableNote: string | null;
@@ -87,13 +93,7 @@ export interface GrowDiaryPdfModel {
 }
 
 const HEALTHY_SOURCES = new Set(["live", "manual", "csv"]);
-const FLAGGED_SOURCES = new Set(["demo", "stale", "invalid", "unknown"]);
-
-function normSource(s: string): string {
-  const v = (s ?? "").toString().toLowerCase().trim();
-  if (!v) return "unknown";
-  return v;
-}
+const FLAGGED_SOURCES = new Set(["demo", "stale", "invalid"]);
 
 function countText(c: CountValue | undefined): string {
   if (c === undefined) return "—";
@@ -105,8 +105,24 @@ function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-function isoDate(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+function zoneLabel(d: Date): string {
+  try {
+    const short = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+      .formatToParts(d)
+      .find((part) => part.type === "timeZoneName")?.value;
+    if (short && short.trim()) return short;
+  } catch {
+    /* fall through to a fixed label */
+  }
+  return "local";
+}
+
+function localDate(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function localStamp(d: Date): string {
+  return `${localDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())} ${zoneLabel(d)}`;
 }
 
 function safeSlug(s: string): string {
@@ -119,8 +135,12 @@ function safeSlug(s: string): string {
   );
 }
 
+/** Note for a sensor source printed under its canonical name instead of the stored alias. */
+export const GROW_DIARY_PDF_SOURCE_NORMALIZED_NOTE =
+  "Source label normalized to its canonical name; it may differ from the stored label.";
+
 export function buildGrowDiaryReportFilename(growName: string, now: Date): string {
-  return `verdant-grow-diary-${safeSlug(growName)}-${isoDate(now)}.pdf`;
+  return `verdant-grow-diary-${safeSlug(growName)}-${localDate(now)}.pdf`;
 }
 
 export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): GrowDiaryPdfModel {
@@ -135,7 +155,9 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
   }
 
   const startedIso = input.grow.startedAt ? tryDateLabel(input.grow.startedAt) : null;
-  const dateRangeLabel = startedIso ? `${startedIso} → ${isoDate(now)}` : `Through ${isoDate(now)}`;
+  const dateRangeLabel = startedIso
+    ? `${startedIso} → ${localDate(now)} ${zoneLabel(now)}`
+    : `Through ${localDate(now)} ${zoneLabel(now)}`;
 
   const countsRows = [
     { label: "Diary entries", value: countText(input.counts.diary) },
@@ -165,18 +187,25 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
   }));
 
   const sensorSources = (input.sensorSources ?? []).map((s) => {
-    const src = normSource(s.source);
+    const canon = resolveSensorSourceDisplayCanon(s.source);
+    const src = canon.canonical;
     const healthy = HEALTHY_SOURCES.has(src);
     const flagged = FLAGGED_SOURCES.has(src);
+    // An alias such as pi_bridge, user or import is printed under its canonical
+    // name, so the note must not claim the stored label was kept as-is.
+    const relabeled = canon.rawToken !== null && canon.rawToken !== src;
     return {
       label: src,
       count: Math.max(0, Math.floor(s.count) || 0),
       healthy,
       note: flagged
         ? "Flagged — not treated as current healthy data."
-        : healthy
-          ? "Source label preserved from ingest."
-          : "Source label preserved.",
+        : relabeled
+          ? GROW_DIARY_PDF_SOURCE_NORMALIZED_NOTE
+          : healthy
+            ? "Source label preserved from ingest."
+            : "Source label preserved.",
+      provenance: canon.provenanceLabel,
     };
   });
 
@@ -196,7 +225,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
   return {
     title: `Grow Diary Summary — ${input.grow.name}`,
     filename: buildGrowDiaryReportFilename(input.grow.name, now),
-    generatedAtLabel: now.toISOString(),
+    generatedAtLabel: localStamp(now),
     scopeLabel: scopeParts.join(" · "),
     dateRangeLabel,
     countsRows,
@@ -206,14 +235,14 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
     chartsUnavailableNote,
     isEmpty,
     safetyFooter:
-      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor source labels are preserved; stale/invalid/demo readings are not treated as healthy.",
+      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor sources are shown under their canonical labels, which may differ from the stored labels; stale/invalid/demo readings are not treated as healthy.",
   };
 }
 
 function tryDateLabel(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso ?? "";
-  return d.toISOString().replace("T", " ").slice(0, 16) + "Z";
+  return localStamp(d);
 }
 
 function esc(v: string): string {
@@ -248,7 +277,7 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
     ? `<ul class="sources">${model.sensorSources
         .map(
           (s) =>
-            `<li><span class="badge ${s.healthy ? "healthy" : "flag"}">${esc(s.label)}</span> · ${s.count} reading${s.count === 1 ? "" : "s"} · ${esc(s.note)}</li>`,
+            `<li><span class="badge ${s.healthy ? "healthy" : "flag"}">${esc(s.label)}</span>${s.provenance ? ` · via ${esc(s.provenance)}` : ""} · ${s.count} reading${s.count === 1 ? "" : "s"} · ${esc(s.note)}</li>`,
         )
         .join("")}</ul>`
     : `<p class="muted">No sensor snapshots included in this export.</p>`;
@@ -287,7 +316,8 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
   .sources{list-style:none;padding-left:0}
   .callout{border:1px dashed #aaa;border-radius:8px;background:#fafafa;padding:10px 12px;margin-top:8px}
   .safety{margin-top:24px;padding:10px 12px;border:1px solid #999;border-radius:8px;background:#f9f9f9;font-size:12px}
-  @media print{body{padding:0}.no-print{display:none}}
+  @page{margin:0}
+  @media print{body{padding:32px}.no-print{display:none}}
 </style>
 </head>
 <body data-testid="grow-diary-pdf-document">
@@ -299,7 +329,7 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
 
   ${emptyBanner}
 
-  <section><h2>Summary totals</h2><table><tbody>${countsRows}</tbody></table></section>
+  <section><h2>Summary totals</h2><table><tbody>${countsRows}</tbody></table><p class="muted" data-testid="grow-diary-pdf-omitted-count-legend">0 is a recorded count. — = not included in this export.</p></section>
 
   <section><h2>Charts</h2>${chartsBlock}</section>
 

@@ -146,7 +146,7 @@ describe("Upgrade page", () => {
     expect(screen.getByTestId("tier-pro_annual")).toBeInTheDocument();
     expect(screen.getByTestId("tier-craft_monthly")).toBeInTheDocument();
     expect(screen.getByTestId("tier-craft_annual")).toBeInTheDocument();
-    expect(screen.getByTestId("tier-founder_lifetime")).toBeInTheDocument();
+    expect(screen.queryByTestId("tier-founder_lifetime")).toBeNull();
   });
 
   it("does not label fallback Free or allow checkout when verification fails", () => {
@@ -208,13 +208,10 @@ describe("Upgrade page", () => {
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
   });
 
-  it("founder sold-out state disables CTA", () => {
-    const founder = PRICING_TIERS.find((t) => t.id === "founder_lifetime")!;
-    founder.cap = { total: 100, claimed: 100 };
+  it("does not offer a Founder Lifetime purchase card", () => {
     renderPage();
-    const cta = screen.getByTestId("tier-founder_lifetime-cta") as HTMLButtonElement;
-    expect(cta).toBeDisabled();
-    expect(cta.textContent).toMatch(/Sold out/i);
+    expect(screen.queryByTestId("tier-founder_lifetime")).toBeNull();
+    expect(screen.queryByTestId("tier-founder_lifetime-cta")).toBeNull();
   });
 
   it("shows checkout-unavailable banner when Paddle config is missing", () => {
@@ -256,8 +253,8 @@ describe("Upgrade page", () => {
     const triggerText = faq.textContent ?? "";
     expect(triggerText).toMatch(/billing/i);
     expect(triggerText).toMatch(/grow data/i);
-    expect(triggerText).toMatch(/Founder/i);
     expect(triggerText).toMatch(/cancel/i);
+    expect(triggerText).not.toMatch(/Founder/i);
     expect(triggerText).toMatch(/equipment|autopilot/i);
     // Answer copy (source of truth) must include the safety statements.
     const allAnswers = UPGRADE_FAQ.map((f) => f.a)
@@ -270,7 +267,7 @@ describe("Upgrade page", () => {
     expect(allAnswers).toMatch(/paddle/);
     expect(allAnswers).toMatch(/current plan and price/);
     expect(allAnswers).not.toMatch(/provisional|placeholder|being finalized/);
-    expect(allAnswers).toMatch(/founder/);
+    expect(allAnswers).not.toMatch(/founder/);
     expect(allAnswers).toMatch(/cancel|stop when your billing/);
   });
 
@@ -280,7 +277,8 @@ describe("Upgrade page", () => {
     expect(within(table).getByTestId("compare-header-free")).toBeInTheDocument();
     expect(within(table).getByTestId("compare-header-pro_monthly")).toBeInTheDocument();
     expect(within(table).getByTestId("compare-header-pro_annual")).toBeInTheDocument();
-    expect(within(table).getByTestId("compare-header-founder_lifetime")).toBeInTheDocument();
+    expect(within(table).getByTestId("compare-header-craft_annual")).toBeInTheDocument();
+    expect(within(table).queryByTestId("compare-header-founder_lifetime")).toBeNull();
   });
 
   it("contains none of the forbidden marketing claims", () => {

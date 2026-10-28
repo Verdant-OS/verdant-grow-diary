@@ -165,6 +165,46 @@ export function buildFeedingDefaults(input: FeedingDefaultsInput): FeedingDefaul
  * Merge derived defaults into the empty Quick Log feeding form. Always
  * returns a fresh state object — never mutates `EMPTY_QUICKLOG_FEEDING_FORM`.
  */
+/**
+ * Log another may reset the one-shot flag while the feed-defaults query still
+ * holds the pre-save recipe. Apply only after that refetch has settled.
+ */
+export function feedingDefaultsPrefillSettled(input: {
+  isFetching: boolean;
+  isPending: boolean;
+  isError: boolean;
+  dataUpdatedAt: number;
+  refetchRequiredAfter: number;
+  plantId?: string | null;
+  refetchRequiredAfterByPlant?: Readonly<Record<string, number>>;
+  /** Save time for this plant, read from the sheet's QueryClient. */
+  recordedSaveCutoff?: number;
+}): boolean {
+  if (input.isFetching || input.isPending || input.isError) return false;
+  const fromCaller = input.refetchRequiredAfterByPlant
+    ? input.plantId
+      ? (input.refetchRequiredAfterByPlant[input.plantId] ?? 0)
+      : 0
+    : input.refetchRequiredAfter;
+  const cutoff = Math.max(fromCaller, input.recordedSaveCutoff ?? 0);
+  if (cutoff > 0 && input.dataUpdatedAt < cutoff) return false;
+  return true;
+}
+
+/**
+ * Recipe identity only (line and products). Volume, readings and the note are
+ * the grower's own entries and never mark a prefilled recipe as edited.
+ */
+export function feedingRecipeMatches(
+  form: Pick<QuickLogFeedingFormState, "lineId" | "products">,
+  recipe: Pick<QuickLogFeedingFormState, "lineId" | "products">,
+): boolean {
+  return (
+    form.lineId === recipe.lineId &&
+    JSON.stringify(form.products) === JSON.stringify(recipe.products)
+  );
+}
+
 export function applyFeedingDefaultsToForm(
   result: FeedingDefaultsResult,
 ): QuickLogFeedingFormState {

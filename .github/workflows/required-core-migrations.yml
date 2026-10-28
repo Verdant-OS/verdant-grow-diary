@@ -42,7 +42,7 @@ permissions:
 
 concurrency:
   group: required-core-schema-${{ github.event_name }}-${{ github.ref }}-${{ inputs.target_env || 'none' }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # This is the only pull-request job. It is deliberately offline and has no

@@ -15,6 +15,7 @@ import {
   type StaticPublicSeoDocument,
 } from "./staticPublicSeoDocuments";
 import { ogImageSlugForPath } from "./ogImageCard";
+import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
 export type ResolvedStaticRouteMetadata = Omit<StaticSocialRouteMetadata, "bodyFallbackHtml">;
@@ -24,6 +25,14 @@ export type ResolvedStaticRouteMetadata = Omit<StaticSocialRouteMetadata, "bodyF
  * deterministic per-route PNG emitted next to the manifest, not the brand
  * fallback baked into the document definition.
  */
+function isRootOwnedNode(node: unknown): boolean {
+  return (
+    typeof node === "object" &&
+    node !== null &&
+    (node as { "@id"?: unknown })["@id"] === SITE_SOFTWARE_APPLICATION_JSON_LD["@id"]
+  );
+}
+
 export function resolveStaticDocumentMetadata(
   document: StaticPublicSeoDocument,
 ): ResolvedStaticRouteMetadata {
@@ -31,6 +40,8 @@ export function resolveStaticDocumentMetadata(
   const { bodyFallbackHtml: _bodyFallbackHtml, ...metadata } = document.metadata;
   return {
     ...metadata,
+    // The root head already emits the sitewide app node; a route copy would duplicate its @id.
+    ...(metadata.jsonLd ? { jsonLd: metadata.jsonLd.filter((node) => !isRootOwnedNode(node)) } : {}),
     image: `${VERDANT_SITE_ORIGIN}/og/${ogImageSlugForPath(canonicalPath)}.png`,
   };
 }

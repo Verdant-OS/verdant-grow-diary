@@ -1,4 +1,4 @@
-import { isPreselectPlanId, type PricingPreselectPlan } from "@/lib/pricingPlanPreselect";
+import { isPreselectPlanId } from "@/lib/pricingPlanPreselect";
 
 export type PaidAcquisitionSource =
   | "landing_page"
@@ -175,7 +175,7 @@ export function buildAttributedLandingPath(input: { source: PaidAcquisitionSourc
 
 export function buildAttributedPricingPath(input: {
   source: PaidAcquisitionSource;
-  planId?: PricingPreselectPlan | null;
+  planId?: string | null;
 }): string {
   const config = PAID_ACQUISITION_ATTRIBUTIONS[input.source];
   const params = new URLSearchParams();

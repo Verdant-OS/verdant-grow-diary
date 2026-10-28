@@ -58,6 +58,8 @@ const state = vi.hoisted(() => ({
   namesStatus: "ok" as "ok" | "loading" | "unavailable",
   writes: vi.fn(),
   queue: vi.fn(),
+  // What the loop card got back from onBeforeNavigate; `false` cancels navigation.
+  navResult: undefined as unknown,
 }));
 
 vi.mock("@/hooks/useAlertTargetNames", () => ({
@@ -130,7 +132,12 @@ vi.mock("@/components/AlertRowActionQueueButton", () => ({
 }));
 vi.mock("@/components/OneTentLoopNextStepCard", () => ({
   default: ({ onBeforeNavigate }: { onBeforeNavigate?: () => unknown }) => (
-    <button data-testid="loop-card" onClick={() => void onBeforeNavigate?.()} />
+    <button
+      data-testid="loop-card"
+      onClick={() => {
+        state.navResult = onBeforeNavigate?.();
+      }}
+    />
   ),
 }));
 vi.mock("@/hooks/useAlertsLinkedActionCounts", () => ({
@@ -158,6 +165,7 @@ beforeEach(() => {
   state.queue.mockReset();
   state.queue.mockResolvedValue({ ok: true, actionQueueId: "aq-1" });
   state.writes.mockReset();
+  state.navResult = undefined;
 });
 
 describe("/alerts — archived and removed targets hidden by default", () => {
@@ -255,7 +263,8 @@ describe("/alerts — archived and removed targets hidden by default", () => {
     state.namesStatus = "unavailable";
     renderAlerts();
     fireEvent.click(screen.getByTestId("loop-card"));
-    await Promise.resolve();
+    // Navigation proceeds (anything but `false`), it just doesn't queue.
+    await expect(Promise.resolve(state.navResult)).resolves.not.toBe(false);
     expect(state.queue).not.toHaveBeenCalled();
   });
 });

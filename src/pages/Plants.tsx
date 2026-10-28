@@ -36,7 +36,11 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { dashboardPath, plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { plantHealthTone, type PlantHealthTone } from "@/lib/plantHealthRules";
+import {
+  plantHealthStatusLabel,
+  plantHealthTone,
+  type PlantHealthTone,
+} from "@/lib/plantHealthRules";
 import {
   filterVisiblePlants,
   getArchivedPlantLabel,
@@ -89,11 +93,11 @@ const HEALTH_DOT_CLASSES: Readonly<Record<PlantHealthTone, string>> = {
 };
 
 function formatPlantHealthLabel(health: string | null | undefined): string {
-  return `Plant health: ${health ?? "unknown"}`;
+  return `Plant health: ${plantHealthStatusLabel(health)}`;
 }
 
 function formatPlantHealthAriaLabel(health: string | null | undefined): string {
-  return `Plant health status: ${health ?? "unknown"}. Sensor status is shown separately.`;
+  return `Plant health status: ${plantHealthStatusLabel(health)}. Sensor status is shown separately.`;
 }
 
 export default function Plants() {
@@ -873,7 +877,7 @@ export default function Plants() {
                     )}
                     {showDailyCheckBadge && !checkedToday && (
                       <div
-                        className="mt-2 flex flex-wrap items-center gap-1.5"
+                        className="mt-2 flex flex-wrap items-center gap-1.5 pr-28"
                         data-testid="plant-card-daily-check-actions"
                         data-plant-id={p.id}
                       >

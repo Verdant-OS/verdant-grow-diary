@@ -53,17 +53,17 @@ Every failure between step 1 and step 3 is deterministic and happens
 
 ## 2. Error code catalog
 
-| Code                          | Meaning                                                                  | How to fix                                                                                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `missing_tent_id`             | `VERDANT_TENT_ID` is empty or unset.                                     | Set `VERDANT_TENT_ID=<tent-uuid>` in `.env`. Copy from Verdant → Settings → Tents.                                                                      |
-| `invalid_tent_id`             | `VERDANT_TENT_ID` is not a `8-4-4-4-12` hex UUID.                        | Paste the full UUID exactly as shown in Verdant (no braces, no quotes, no trailing spaces).                                                             |
-| `invalid_channel_map_schema`  | `ECOWITT_SOIL_CHANNEL_MAP_JSON` is not JSON or violates the schema.      | Validate against `docs/schemas/ecowitt-soil-channel-map.schema.json`. Keys must match `soilmoisture[1-9][0-9]?`; every entry needs a UUID `tent_id`.    |
-| `mixed_tent_channel_map`      | Channels are mapped to more than one distinct `tent_id`.                 | Split into one `.env` per tent. Run one bridge process per tent — one-tent enforcement is intentional.                                                  |
-| `channel_map_tent_mismatch`   | A channel's `tent_id` does not equal `VERDANT_TENT_ID`.                  | Either change `VERDANT_TENT_ID` to match the channel, or update the channel's `tent_id` in the map. They must be identical.                             |
-| `missing_ingest_url`          | Live mode without `VERDANT_INGEST_URL`.                                  | Set `VERDANT_INGEST_URL=https://<project>.functions.supabase.co/sensor-ingest-webhook`, or add `--dry-run` for offline testing.                         |
-| `missing_bridge_token`        | Live mode without `VERDANT_BRIDGE_TOKEN`.                                | Mint a token in Verdant → Settings → Bridge Tokens (scoped to this tent). Set `VERDANT_BRIDGE_TOKEN=vbt_…`. Never commit it.                            |
-| `mqtt_package_missing`        | `mqtt` npm package not installed in the environment running the bridge.  | `bun add mqtt` (or `npm i mqtt`) in the directory that runs the bridge.                                                                                 |
-| `channel_map_parse_error`     | Unexpected parse failure (fallback; schema check normally fires first).  | Re-check JSON quoting in `.env` (single line, no trailing commas). Re-run `config validate`.                                                            |
+| Code                         | Meaning                                                                 | How to fix                                                                                                                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `missing_tent_id`            | `VERDANT_TENT_ID` is empty or unset.                                    | Set `VERDANT_TENT_ID=<tent-uuid>` in `.env`. Copy from Verdant → Settings → Tents.                                                                                               |
+| `invalid_tent_id`            | `VERDANT_TENT_ID` is not a `8-4-4-4-12` hex UUID.                       | Paste the full UUID exactly as shown in Verdant (no braces, no quotes, no trailing spaces).                                                                                      |
+| `invalid_channel_map_schema` | `ECOWITT_SOIL_CHANNEL_MAP_JSON` is not JSON or violates the schema.     | Validate against `docs/schemas/ecowitt-soil-channel-map.schema.json`. Keys must match `soilmoisture[1-9][0-9]?`; every entry needs a UUID `tent_id`.                             |
+| `mixed_tent_channel_map`     | Channels are mapped to more than one distinct `tent_id`.                | Split into one `.env` per tent. Run one bridge process per tent — one-tent enforcement is intentional.                                                                           |
+| `channel_map_tent_mismatch`  | A channel's `tent_id` does not equal `VERDANT_TENT_ID`.                 | Either change `VERDANT_TENT_ID` to match the channel, or update the channel's `tent_id` in the map. They must be identical.                                                      |
+| `missing_ingest_url`         | Live mode without `VERDANT_INGEST_URL`.                                 | Set `VERDANT_INGEST_URL=https://<project>.functions.supabase.co/sensor-ingest-webhook`, or add `--dry-run` for offline testing.                                                  |
+| `missing_bridge_token`       | Live mode without `VERDANT_BRIDGE_TOKEN`.                               | Mint a token in Verdant → Settings → Bridge Tokens (scoped to this tent). Set `VERDANT_BRIDGE_TOKEN=vbt_…`. Never commit it.                                                     |
+| `mqtt_package_missing`       | `mqtt` npm package not installed in the environment running the bridge. | `bun add --no-save mqtt` in the directory that runs the bridge. `--no-save` leaves `package.json` and `bun.lock` unchanged; never run plain `bun add mqtt` in the repo checkout. |
+| `channel_map_parse_error`    | Unexpected parse failure (fallback; schema check normally fires first). | Re-check JSON quoting in `.env` (single line, no trailing commas). Re-run `config validate`.                                                                                     |
 
 ---
 
@@ -185,20 +185,23 @@ bun run scripts/ecowitt-live-soil-bridge.ts config validate \
   trailing newline, so the file is a clean single-line JSONL record).
 - On success, stdout gains a receipt envelope:
   ```json
-  {"event":"config_effective_written","check":"ecowitt-bridge","path":"/abs/path/config-effective.json","bytes":555}
+  {
+    "event": "config_effective_written",
+    "check": "ecowitt-bridge",
+    "path": "/abs/path/config-effective.json",
+    "bytes": 555
+  }
   ```
 - Redaction rules above still apply — the file is safe to paste into
   bug reports.
 
 Failure modes (all exit `2`, all with stable machine-readable codes):
 
-| Code                        | When                                                       |
-| --------------------------- | ---------------------------------------------------------- |
-| `out_flag_requires_dry_run` | `--out` passed without `--dry-run`.                        |
-| `out_flag_missing_value`    | `--out=` (empty) or trailing `--out` with nothing after.   |
-| `out_write_failed`          | Filesystem write failed (missing directory, permissions).  |
-
-
+| Code                        | When                                                      |
+| --------------------------- | --------------------------------------------------------- |
+| `out_flag_requires_dry_run` | `--out` passed without `--dry-run`.                       |
+| `out_flag_missing_value`    | `--out=` (empty) or trailing `--out` with nothing after.  |
+| `out_write_failed`          | Filesystem write failed (missing directory, permissions). |
 
 ### `--debug`
 
@@ -227,7 +230,6 @@ Flags compose: `--debug --dry-run` prints `config_ok`, then the
 `config_debug` block, then the full `config_effective` envelope, in that
 order. On failure, `--debug` is suppressed and only the standard
 `config_error` envelope is emitted, exit 2.
-
 
 ### `--help-errors`
 
@@ -266,8 +268,6 @@ Output is two blocks on stdout, exit code `0`:
 ```
 
 Automation can pipe stdout through `tail -n1 | jq` to load the envelope.
-
-
 
 ## 5. Related files
 

@@ -25,16 +25,27 @@ describe("checkout cancel recovery rules", () => {
 
   it("builds a plan-specific, non-automatic route back to pricing", () => {
     const recovery = resolveCheckoutCancelRecovery(
-      "?plan=founder_lifetime&returnTo=%2Fpheno-hunts%2Fnew",
+      "?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew",
     );
 
     expect(recovery).toEqual({
-      planId: "founder_lifetime",
-      planLabel: "Founder Lifetime",
-      pricingPath: "/pricing?plan=founder_lifetime&returnTo=%2Fpheno-hunts%2Fnew",
+      planId: "pro_annual",
+      planLabel: "Pro Annual",
+      pricingPath: "/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew",
       returnPath: "/pheno-hunts/new",
       returnLabel: "Return to previous page",
     });
+  });
+
+  it("does not send a cancelled Founder Lifetime checkout back to a purchase preselect", () => {
+    const recovery = resolveCheckoutCancelRecovery(
+      "?plan=founder_lifetime&returnTo=%2Fpheno-hunts%2Fnew",
+    );
+
+    expect(recovery.planId).toBeNull();
+    expect(recovery.planLabel).toBeNull();
+    expect(recovery.pricingPath).toBe("/pricing?returnTo=%2Fpheno-hunts%2Fnew");
+    expect(recovery.returnPath).toBe("/pheno-hunts/new");
   });
 
   it("fails closed to generic pricing and the grow when query values are invalid", () => {

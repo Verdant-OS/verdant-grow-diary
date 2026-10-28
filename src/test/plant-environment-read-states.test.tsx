@@ -5,10 +5,12 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 
-const io = vi.hoisted(() => ({ read: vi.fn() }));
+// `manualRead` serves the plant page's Quick Log manual grow_events read
+// (#2115) so `read` keeps counting only the sensor read these checks pin.
+const io = vi.hoisted(() => ({ read: vi.fn(), manualRead: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: () => {
+    from: (table?: string) => {
       let tentId: string;
       const query = {
         select: () => query,
@@ -16,8 +18,9 @@ vi.mock("@/integrations/supabase/client", () => ({
           tentId = id;
           return query;
         },
+        or: () => query,
         order: () => query,
-        limit: () => io.read(tentId),
+        limit: () => (table === "grow_events" ? io.manualRead(tentId) : io.read(tentId)),
       };
       return query;
     },
@@ -98,6 +101,7 @@ function expectNoFalseEmpty() {
 beforeEach(() => {
   onlineManager.setOnline(true);
   io.read.mockReset().mockResolvedValue({ data: rows(), error: null });
+  io.manualRead.mockReset().mockResolvedValue({ data: [], error: null });
 });
 afterEach(() => {
   cleanup();

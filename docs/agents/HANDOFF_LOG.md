@@ -79,7 +79,7 @@ branch: claude/guide-autoflower-week-by-week
 base: verdant-grow-diary
 checkout: git fetch origin claude/guide-autoflower-week-by-week verdant-grow-diary && git switch claude/guide-autoflower-week-by-week && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/guide-autoflower-week-by-week
-head_sha: read the current head from the PR
+head_sha: 9e6d4ccb072a32a2518a5811833ac47bbbbb858d before the handoff-only commit that records it; read the current head from the PR
 state: pushed, PR ready for review
 current_step: awaiting CI and an independent exact-head review
 next_action: independent exact-head review of the PR head (author: this Claude session; exclude it)

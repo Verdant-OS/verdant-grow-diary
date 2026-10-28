@@ -636,8 +636,11 @@ export default function HarvestWindowTracker() {
               ) : (
                 <div className="mt-2 grid gap-3">
                   {summaries.map((summary) => (
-                    <div key={summary.key} className="rounded-lg border border-emerald-900/15 p-3">
-                      <h4 className="font-semibold break-words">{summary.heading}</h4>
+                    <div
+                      key={summary.key}
+                      className="min-w-0 rounded-lg border border-emerald-900/15 p-3 [overflow-wrap:anywhere]"
+                    >
+                      <h4 className="font-semibold">{summary.heading}</h4>
                       {summary.lines.map((line) => (
                         <p key={line} className="mt-1 text-sm leading-6">
                           {line}

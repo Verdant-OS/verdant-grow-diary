@@ -78,9 +78,9 @@ why: Verdant promises stale readings are never presented as healthy current tele
 branch: claude/ver-299-sensor-source-summary-freshness
 base: verdant-grow-diary at a5ac6a974 (#1972 merge, 2026-10-28)
 checkout: git fetch origin claude/ver-299-sensor-source-summary-freshness verdant-grow-diary && git switch claude/ver-299-sensor-source-summary-freshness && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED (opened as a draft right after the first push; see the PR comment "resume here")
-head_sha: NOT_MEASURED at the first push (this block ships in it); read git rev-parse origin/claude/ver-299-sensor-source-summary-freshness and the PR head before any current-head claim
-state: implemented, local checks run, first push pending
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2586 (draft)
+head_sha: 26832cec8fa5710f86fdae50ecfed7f860ad5a50, observed on origin/claude/ver-299-sensor-source-summary-freshness and PR #2586 at 2026-10-28 (first push; the commit that records it is a newer descendant, so re-read the PR head before any current-head claim)
+state: pushed draft; CI pending at the first push
 current_step: Rules rewritten (provenance never age-downgraded; counts.stale = freshness-stale; new freshness {fresh,stale,unknown} summing to total; classifySensorSourceSummaryFreshness exported; staleMs option removed, now injected). Widget renders "Fresh n · Stale n · Unknown n" with testids sensor-source-summary-freshness-count-<bucket>. Sensors.tsx passes options={{ now: nowMs }}; PlantSensorSourceBreakdownCard uses useNowTick and passes now (the second caller had the same omission). Tests: sensor-source-summary-freshness-ver-299.test.tsx (30h manual, 23h manual, 20m live, 5m live, missing/unparseable/future timestamps, persisted stale/invalid, sum-to-total, determinism, parity with resolveDashboardSensorBadgeStatus, widget line); two rules tests renegotiated; widget stale pin made deterministic with an injected now.
 next_action: Hosted CI at the PR head (35 required checks; vitest cannot run in the authoring container: bun install --frozen-lockfile 403s on the private registry mirror), then an independent exact-head review by an available non-contributing session under OWNERSHIP.md section 4.3. No merge from the authoring session.
 post_merge_check: On the live site after the publish that carries the fix, /sensors with a manual reading older than 24 hours shows the same Stale count in the summary as the badges beside it; NOT_MEASURED until then.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: Claude cloud session; PR subscription after creation; no cron, merge, publish, sensor write or production action
 claimed_by: Claude session_017UoYKvojgRxESWUyQyGEmj, 2026-10-28 (Matthew's assignment in session; no GitHub claim comment posted)
 owner: Claude (this session); default inheritor OG Kush
-last_updated: 2026-10-28 (UTC, pre-push), by Claude session_017UoYKvojgRxESWUyQyGEmj
+last_updated: 2026-10-28 UTC (PR opened), by Claude session_017UoYKvojgRxESWUyQyGEmj
 ```
 
 ### PR-CLEANUP-2026-10-27-INVENTORY

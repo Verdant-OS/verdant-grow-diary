@@ -1,17 +1,9 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   openCheckout: vi.fn(),
-  founderSlots: {
-    status: "ready",
-    remaining: 42,
-    total: 100,
-    claimed: 58,
-    soldOut: false,
-  },
 }));
 
 vi.mock("@/hooks/usePaddleCheckout", () => ({
@@ -22,10 +14,6 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
     unavailableMessage: null,
     blockedReason: null,
   }),
-}));
-
-vi.mock("@/hooks/useFounderSlotsRemaining", () => ({
-  useFounderSlotsRemaining: () => mocks.founderSlots,
 }));
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
@@ -48,65 +36,15 @@ function renderPricing() {
 
 beforeEach(() => {
   mocks.openCheckout.mockReset();
-  Object.assign(mocks.founderSlots, {
-    status: "ready",
-    remaining: 42,
-    total: 100,
-    claimed: 58,
-    soldOut: false,
-  });
 });
 
-describe("Pricing Founder counter consistency", () => {
-  it("uses the same available count across the card and highlight CTA", async () => {
-    const user = userEvent.setup();
+describe("Pricing Founder counter is not a sales surface", () => {
+  it("does not render a Founder card, count, or checkout CTA on the deep link", async () => {
     renderPricing();
-
-    expect(screen.getByTestId("pricing-card-founder")).toHaveTextContent("58 of 100 claimed");
-    expect(screen.getByTestId("pricing-cta-founder-lifetime")).toBeEnabled();
-    expect(screen.getByTestId("pricing-cta-founder-highlight")).toBeEnabled();
-
-    await user.click(screen.getByTestId("pricing-cta-founder-highlight"));
-    expect(mocks.openCheckout).toHaveBeenCalledWith({ priceId: "founder_lifetime" });
-  });
-
-  it("disables and relabels both Founder CTAs when the validated count is sold out", async () => {
-    Object.assign(mocks.founderSlots, {
-      status: "ready",
-      remaining: 0,
-      total: 100,
-      claimed: 100,
-      soldOut: true,
-    });
-    const user = userEvent.setup();
-    renderPricing();
-
-    const planCta = screen.getByTestId("pricing-cta-founder-lifetime");
-    const highlightCta = screen.getByTestId("pricing-cta-founder-highlight");
-    expect(planCta).toBeDisabled();
-    expect(highlightCta).toBeDisabled();
-    expect(planCta).toHaveTextContent("Founder Lifetime sold out");
-    expect(highlightCta).toHaveTextContent("Founder Lifetime sold out");
-    expect(screen.getByTestId("pricing-card-founder")).toHaveTextContent("100 of 100 claimed");
-
-    await user.click(highlightCta);
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+    expect(screen.queryByTestId("pricing-cta-founder-lifetime")).toBeNull();
+    expect(screen.queryByTestId("pricing-cta-founder-highlight")).toBeNull();
+    expect(screen.queryByText(/of 100 claimed/i)).toBeNull();
     expect(mocks.openCheckout).not.toHaveBeenCalled();
-  });
-
-  it("fails soft on unknown availability without inventing a count or sold-out state", () => {
-    Object.assign(mocks.founderSlots, {
-      status: "unknown",
-      remaining: null,
-      total: 100,
-      claimed: null,
-      soldOut: false,
-    });
-    renderPricing();
-
-    const founderCard = screen.getByTestId("pricing-card-founder");
-    expect(founderCard).toHaveTextContent("First 100 only");
-    expect(founderCard).not.toHaveTextContent(/NaN|of 100 claimed|sold out/i);
-    expect(screen.getByTestId("pricing-cta-founder-lifetime")).toBeEnabled();
-    expect(screen.getByTestId("pricing-cta-founder-highlight")).toBeEnabled();
   });
 });

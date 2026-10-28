@@ -17,6 +17,14 @@ import {
   VERDANT_SEO_GUIDES,
 } from "../../constants/verdantSeoContent";
 import {
+  ATHENA_FEED_LOG_DESCRIPTION,
+  ATHENA_FEED_LOG_FAQ,
+  ATHENA_FEED_LOG_H1,
+  ATHENA_FEED_LOG_PATH,
+  ATHENA_FEED_LOG_TITLE,
+  athenaFeedLogWebApplicationJsonLd,
+} from "../athenaFeedLogRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -26,7 +34,6 @@ import {
   type GrowStage,
 } from "../../constants/growStageCareGuide";
 import { PUBLIC_QUICK_LOG_STARTER_COPY } from "../../constants/publicQuickLogStarterCopy";
-import { FOUNDER_SOCIAL_META } from "../../constants/founderSocialMeta";
 import {
   NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
   NEXT_DOOR_CUSTOMER_BRAND,
@@ -46,6 +53,12 @@ import {
   buildFaqPageJsonLd,
   buildWebPageJsonLd,
 } from "../seoStructuredData";
+import {
+  PUBLIC_VPD_CHART_DESCRIPTION,
+  PUBLIC_VPD_CHART_FAQ,
+  PUBLIC_VPD_CHART_TITLE,
+  PUBLIC_VPD_CHART_WEB_APPLICATION_JSON_LD,
+} from "../publicVpdChartRules";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 
@@ -554,6 +567,41 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       }),
     ],
   }),
+  publicDocument(ATHENA_FEED_LOG_PATH, {
+    title: `${ATHENA_FEED_LOG_TITLE} | Verdant Grow Diary`,
+    description: ATHENA_FEED_LOG_DESCRIPTION,
+    imageAlt: "Blank Athena feed chart log, planned vs actual by week",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${ATHENA_FEED_LOG_TITLE} | Verdant Grow Diary`,
+        description: ATHENA_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: ATHENA_FEED_LOG_H1,
+        description: ATHENA_FEED_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+        datePublished: "2026-10-26",
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+        questions: ATHENA_FEED_LOG_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Athena Feed Chart Log",
+            url: `${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`,
+          },
+        ],
+      }),
+      athenaFeedLogWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`),
+    ],
+  }),
   publicDocument("/tools/blueprint-targets", {
     title: "Grow stage target bands | Temperature, humidity, EC, pH, PPFD | Verdant",
     description:
@@ -595,6 +643,20 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "Calculate air VPD from manual temperature and humidity inputs, then compare it with a conservative stage-aware range. No upload, live telemetry, diagnosis, or device control.",
     imageAlt: "Verdant VPD calculator",
+  }),
+  publicDocument("/vpd-chart", {
+    title: PUBLIC_VPD_CHART_TITLE,
+    description: PUBLIC_VPD_CHART_DESCRIPTION,
+    imageAlt: "Verdant VPD chart by growth stage",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: PUBLIC_VPD_CHART_TITLE,
+        description: PUBLIC_VPD_CHART_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}/vpd-chart`,
+      }),
+      PUBLIC_VPD_CHART_WEB_APPLICATION_JSON_LD,
+      buildFaqPageJsonLd({ questions: PUBLIC_VPD_CHART_FAQ }),
+    ],
   }),
   publicDocument("/hardware-integrations", {
     title: "Sensor & Hardware Integrations | Verdant Grow Diary",
@@ -797,21 +859,6 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
 
 /** All public documents emitted alongside Vite's primary SPA entry. */
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
-  {
-    path: "/founder",
-    fileName: routeFileName("/founder"),
-    metadata: {
-      ...FOUNDER_SOCIAL_META,
-      image: `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`,
-      jsonLd: [
-        buildStaticWebPageJsonLd({
-          title: FOUNDER_SOCIAL_META.title,
-          description: FOUNDER_SOCIAL_META.description,
-          url: FOUNDER_SOCIAL_META.url,
-        }),
-      ],
-    },
-  },
   ...CORE_ACQUISITION_DOCUMENTS,
   GUIDE_HUB,
   ...GUIDE_DOCUMENTS,

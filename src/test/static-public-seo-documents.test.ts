@@ -33,10 +33,10 @@ describe("static public SEO documents", () => {
 
     for (const required of [
       "/",
-      "/founder",
       "/pricing",
       "/guides",
       "/guides/grow-stage-care-guide",
+      "/guides/athena-feed-chart-log",
       "/cultivars",
       "/tools/grow-help-toolkit",
       "/tools/vpd-calculator",
@@ -47,6 +47,7 @@ describe("static public SEO documents", () => {
     ]) {
       expect(paths).toContain(required);
     }
+    expect(paths.has("/founder")).toBe(false);
     for (const slug of VERDANT_GUIDE_SLUGS) {
       expect(paths).toContain(`/guides/${slug}`);
     }

@@ -28,6 +28,7 @@ import { useAuth } from "@/store/auth";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
+import FounderOwnerPrefsForm from "@/components/FounderOwnerPrefsForm";
 import { PRICING_TIERS } from "@/config/pricing";
 import {
   deleteAccountConfirmNamesBilling,
@@ -467,6 +468,17 @@ function SubscriptionTile() {
 }
 
 /**
+ * Existing Founders' Founders Wall privacy controls, moved here when the
+ * /founder page was retired (#2028). Only a Founder Lifetime account renders
+ * the form, so other growers see no Founder UI and trigger no Founder query.
+ */
+function FounderWallPrefsSection() {
+  const { lookupFailed, entitlement } = useMyEntitlements();
+  if (lookupFailed || entitlement?.displayPlanId !== "founder_lifetime") return null;
+  return <FounderOwnerPrefsForm />;
+}
+
+/**
  * DeleteAccountTile — destructive, self-serve account deletion.
  *
  * Guards:
@@ -680,6 +692,7 @@ export default function Settings() {
         {user?.id ? <StartScreenTile userId={user.id} /> : null}
 
         <SubscriptionTile />
+        <FounderWallPrefsSection />
 
         <Tile name="Refer a friend">
           <RewardedReferralCard />

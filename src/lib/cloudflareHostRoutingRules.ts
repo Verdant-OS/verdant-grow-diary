@@ -61,6 +61,8 @@ const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/refund-policy": "/refund",
   "/terms-of-service": "/terms",
   "/privacy-policy": "/privacy",
+  // Founder Lifetime is no longer sold (#2028); the retired page is permanent.
+  "/founder": "/pricing",
 };
 
 export type HostHeader = [string, string];

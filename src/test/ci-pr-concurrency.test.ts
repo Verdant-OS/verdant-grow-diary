@@ -8,7 +8,14 @@ type Workflow = {
   concurrency?: { group: string; "cancel-in-progress": boolean | string };
   jobs: Record<
     string,
-    { name?: string; if?: string; strategy?: { matrix?: { shard?: number[]; batch?: number[] } } }
+    {
+      name?: string;
+      if?: string;
+      strategy?: {
+        "max-parallel"?: number;
+        matrix?: { shard?: number[]; batch?: number[] };
+      };
+    }
   >;
 };
 
@@ -52,6 +59,96 @@ const draftSkippedWorkflows = [
   "typecheck-build-push.yml",
   "typecheck.yml",
 ] as const;
+
+const requiredWorkflows = ["ci.yml", "security-regression.yml"] as const;
+type RequiredWorkflow = (typeof requiredWorkflows)[number];
+type RequiredTrigger = "push" | "pull_request" | "merge_group";
+const prActivityTypes = ["opened", "synchronize", "reopened"];
+
+function assertRequiredTriggerPolicy(
+  name: RequiredWorkflow,
+  trigger: RequiredTrigger,
+  config: unknown,
+) {
+  const options = config ?? {};
+  expect(typeof options === "object" && !Array.isArray(options), `${name} ${trigger}`).toBe(true);
+  expect(options, `${name} ${trigger}`).not.toHaveProperty("paths");
+  expect(options, `${name} ${trigger}`).not.toHaveProperty("paths-ignore");
+  expect(options, `${name} ${trigger}`).not.toHaveProperty("branches-ignore");
+
+  // Pin the reviewed branch policy rather than partially interpreting ordered
+  // glob/negation rules. Security PRs must stay unfiltered for stacked bases.
+  const branchFiltered = trigger === "push" || (name === "ci.yml" && trigger === "pull_request");
+  const resolved = options as Record<string, unknown>;
+  expect(resolved.branches, `${name} ${trigger} branches`).toEqual(
+    branchFiltered ? ["main", "verdant-grow-diary"] : undefined,
+  );
+
+  // Omitting types uses GitHub's defaults: the three PR activities below, or
+  // checks_requested for merge groups. Explicit filters must retain them.
+  if (trigger === "push") {
+    expect(options, `${name} push`).not.toHaveProperty("types");
+  } else if (resolved.types !== undefined) {
+    expect(resolved.types, `${name} ${trigger} types`).toEqual(
+      expect.arrayContaining(trigger === "pull_request" ? prActivityTypes : ["checks_requested"]),
+    );
+  }
+}
+
+const triggerFilterMutations: {
+  label: string;
+  trigger: RequiredTrigger;
+  patch: Record<string, unknown>;
+}[] = [
+  ...(["push", "pull_request", "merge_group"] as const).flatMap((trigger) => [
+    { label: `${trigger} main-only branches`, trigger, patch: { branches: ["main"] } },
+    {
+      label: `${trigger} negated deploy branch`,
+      trigger,
+      patch: { branches: ["main", "verdant-grow-diary", "!verdant-grow-diary"] },
+    },
+    {
+      label: `${trigger} ignored deploy branch`,
+      trigger,
+      patch: { "branches-ignore": ["verdant-grow-diary"] },
+    },
+  ]),
+  ...prActivityTypes.map((missing) => ({
+    label: `pull_request without ${missing}`,
+    trigger: "pull_request" as const,
+    patch: {
+      types: [...prActivityTypes.filter((activity) => activity !== missing), "ready_for_review"],
+    },
+  })),
+  { label: "merge_group empty types", trigger: "merge_group", patch: { types: [] } },
+  {
+    label: "merge_group without checks_requested",
+    trigger: "merge_group",
+    patch: { types: ["ready_for_review"] },
+  },
+  { label: "merge_group invalid null types", trigger: "merge_group", patch: { types: null } },
+  { label: "push unsupported types", trigger: "push", patch: { types: ["opened"] } },
+];
+
+describe.each(requiredWorkflows)("%s required-trigger regression fences", (name) => {
+  it.each(triggerFilterMutations)("rejects $label", ({ trigger, patch }) => {
+    const resolvedConfig = readWorkflow(name).on[trigger] ?? {};
+    const candidate: Record<string, unknown> = { ...resolvedConfig, ...patch };
+    // GitHub permits either branches or branches-ignore, never both.
+    if (Object.hasOwn(patch, "branches-ignore")) delete candidate.branches;
+    expect(() => assertRequiredTriggerPolicy(name, trigger, candidate)).toThrow();
+  });
+
+  it.each([null, { types: ["checks_requested"] }])("accepts merge_group default %j", (config) => {
+    expect(() => assertRequiredTriggerPolicy(name, "merge_group", config)).not.toThrow();
+  });
+
+  it("accepts the default pull_request activity types", () => {
+    const config = { ...readWorkflow(name).on.pull_request };
+    delete config.types;
+    expect(() => assertRequiredTriggerPolicy(name, "pull_request", config)).not.toThrow();
+  });
+});
 
 describe("resolved PR workflow concurrency", () => {
   it("gives every PR workflow a concurrency group", () => {
@@ -98,6 +195,19 @@ describe("resolved PR workflow concurrency", () => {
     }
   });
 
+  it("cancels superseded pull_request runs and no other event", () => {
+    const allowed = new Set([
+      cancelSupersededPr,
+      "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/verdant-grow-diary' && github.ref != 'refs/heads/main') }}",
+    ]);
+    const offenders = prWorkflows
+      .filter(({ workflow }) => !allowed.has(String(workflow.concurrency?.["cancel-in-progress"])))
+      .map(
+        ({ name, workflow }) => `${name}:${String(workflow.concurrency?.["cancel-in-progress"])}`,
+      );
+    expect(offenders).toEqual([]);
+  });
+
   it("cancels superseded feature-branch pushes of the non-required tsgo build", () => {
     expect(readWorkflow("typecheck-build-push.yml").concurrency).toEqual({
       group: "${{ github.workflow }}-${{ github.ref }}",
@@ -122,27 +232,47 @@ describe("resolved PR workflow concurrency", () => {
         if (!Object.hasOwn(workflow.on, trigger)) continue;
         expect(workflow.on[trigger]?.["paths-ignore"], `${name} ${trigger}`).toEqual(docsOnlySkip);
       }
-      if (workflow.on.merge_group) {
-        expect(workflow.on.merge_group["paths-ignore"], name).toBeUndefined();
+      if (Object.hasOwn(workflow.on, "merge_group")) {
+        const config = workflow.on.merge_group ?? {};
+        expect(config, name).not.toHaveProperty("paths");
+        expect(config, name).not.toHaveProperty("paths-ignore");
       }
     }
-    const ci = readFileSync(resolve(workflowsDir, "ci.yml"), "utf8");
-    const security = readFileSync(resolve(workflowsDir, "security-regression.yml"), "utf8");
-    expect(ci).not.toMatch(/\n\s+paths-ignore:/);
-    expect(security).not.toMatch(/\n\s+paths-ignore:/);
   });
+
+  it.each(requiredWorkflows)(
+    "keeps the required triggers in %s live and free of path filters",
+    (name) => {
+      const workflow = readWorkflow(name);
+      for (const trigger of ["pull_request", "push", "merge_group"] as const) {
+        expect(workflow.on, name).toHaveProperty(trigger);
+        assertRequiredTriggerPolicy(name, trigger, workflow.on[trigger]);
+      }
+    },
+  );
 
   it("preserves all required CI contexts and their draft execution", () => {
     const ci = readWorkflow("ci.yml");
     expect(ci.jobs["full-suite"].strategy?.matrix?.shard).toEqual(
       Array.from({ length: 32 }, (_, index) => index + 1),
     );
+    expect(ci.jobs["full-suite"].strategy?.["max-parallel"]).toBe(16);
     expect(ci.jobs.test.name).toBe("Lint, typecheck, test, build");
     expect(ci.jobs["edge-shared-sync-preflight"].name).toBe(
       "Preflight — edge shared-lib mirror in sync",
     );
     expect(ci.jobs["legal-seo"].name).toBe("test:legal-seo");
-    for (const job of Object.values(ci.jobs)) expect(job.if).toBeUndefined();
+    const heavyDraftSkip =
+      "github.event_name != 'pull_request' || github.event.pull_request.draft == false";
+    // The lint/build job reports Skipped on a draft. The shard matrix does not:
+    // GitHub posts one check whose name still contains ${{ matrix.shard }}, and
+    // the 32 required context names stay Expected until a ready or merge_group
+    // run actually expands them. Cheap required jobs stay unconditional.
+    expect(ci.jobs.test.if).toBe(heavyDraftSkip);
+    expect(ci.jobs["full-suite"].if).toBe(heavyDraftSkip);
+    expect(ci.jobs["quicklog-correction-measured-values"].if).toBe(heavyDraftSkip);
+    expect(ci.jobs["edge-shared-sync-preflight"].if).toBeUndefined();
+    expect(ci.jobs["legal-seo"].if).toBeUndefined();
     expect(readWorkflow("security-regression.yml").jobs["test-security-regression"].if).toBe(
       undefined,
     );
@@ -166,5 +296,42 @@ describe("resolved PR workflow concurrency", () => {
     expect(required).toHaveLength(35);
     expect(reported).toHaveLength(35);
     expect([...reported].sort()).toEqual([...required].sort());
+  });
+
+  it("parses every workflow if as an expression, never a bare fold marker", () => {
+    const collect = (node: unknown, found: string[]) => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        for (const item of node) collect(item, found);
+        return;
+      }
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (key === "if") {
+          expect(typeof value, "if must be a string").toBe("string");
+          found.push(value as string);
+        } else {
+          collect(value, found);
+        }
+      }
+    };
+    const bad: string[] = [];
+    for (const { name, workflow } of workflows) {
+      const expressions: string[] = [];
+      collect(workflow, expressions);
+      for (const expression of expressions) {
+        if (expression.includes(">-") || expression.trimStart().startsWith(">")) {
+          bad.push(`${name}: ${expression.slice(0, 160)}`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+    const irrigation = readWorkflow("irrigation-pgtap-rls-gate.yml");
+    for (const id of ["harness-typecheck", "pgtap-irrigation"] as const) {
+      const expression = irrigation.jobs[id].if ?? "";
+      expect(expression).toContain("github.event.pull_request.draft == false");
+      expect(expression).toContain("needs.changes.outputs.irrigation == 'true'");
+      expect(expression).toContain("needs.changes.outputs.dry_run != 'true'");
+      expect(expression).not.toContain(">-");
+    }
   });
 });

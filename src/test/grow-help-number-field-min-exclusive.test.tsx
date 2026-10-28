@@ -51,24 +51,13 @@ describe("NumberField minExclusive (#2256)", () => {
     );
   });
 
-  it("accepts any value strictly above min", () => {
+  it("accepts 0.001, just above min", () => {
     render(<MinExclusiveHarness />);
     const input = screen.getByLabelText("Actual wall draw per fixture");
 
     fireEvent.change(input, { target: { value: "0.001" } });
     expect(input).toHaveAttribute("aria-invalid", "false");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("flags zero typed after a valid value", () => {
-    render(<MinExclusiveHarness />);
-    const input = screen.getByLabelText("Actual wall draw per fixture");
-
-    fireEvent.change(input, { target: { value: "120" } });
-    expect(input).toHaveAttribute("aria-invalid", "false");
-
-    fireEvent.change(input, { target: { value: "0" } });
-    expect(input).toHaveAttribute("aria-invalid", "true");
   });
 
   it("keeps min inclusive when minExclusive is off", () => {

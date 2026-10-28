@@ -277,4 +277,49 @@ describe("Start Your Room plant retry id (Codex review)", () => {
     expect(inserted).toEqual(["grows"]);
     expect(navMock).not.toHaveBeenCalled();
   });
+
+  it("starts no plant after the grower left during the tent save (review nit)", async () => {
+    refreshMock.mockImplementation(async () => undefined);
+    const inserted: string[] = [];
+    let releaseTent: () => void = () => undefined;
+    let tentHanging = false;
+    const insertRow = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: "grows" | "tents" | "plants") => {
+      const query = insertRow(table);
+      return {
+        ...query,
+        insert: (payload: Record<string, unknown>) => {
+          inserted.push(table);
+          const chain = query.insert(payload);
+          if (table !== "tents") return chain;
+          return {
+            select: () => ({
+              single: async () => {
+                tentHanging = true;
+                await new Promise<void>((resolve) => (releaseTent = resolve));
+                return chain.select().single();
+              },
+            }),
+          };
+        },
+      };
+    });
+    const user = userEvent.setup();
+    const view = render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+    await waitFor(() => expect(tentHanging).toBe(true));
+    expect(inserted).toEqual(["grows", "tents"]);
+
+    view.unmount();
+    await act(async () => {
+      releaseTent();
+    });
+    expect(inserted).toEqual(["grows", "tents"]);
+    expect(navMock).not.toHaveBeenCalled();
+  });
 });

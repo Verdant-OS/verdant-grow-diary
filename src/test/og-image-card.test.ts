@@ -36,7 +36,7 @@ describe("ogImageSlugForPath", () => {
 
 describe("categoryForPath", () => {
   it("maps route families to human labels", () => {
-    expect(categoryForPath("/founder")).toBe("Founder Lifetime");
+    expect(categoryForPath("/founder")).toBe("Verdant");
     expect(categoryForPath("/pricing")).toBe("Pricing");
     expect(categoryForPath("/guides/grow-stage-care-guide")).toBe("Grower Guide");
     expect(categoryForPath("/cultivars/oreoz")).toBe("Cultivar Guide");

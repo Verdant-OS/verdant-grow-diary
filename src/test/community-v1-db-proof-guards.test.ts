@@ -1,4 +1,4 @@
-import { mkdtempSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -56,7 +56,7 @@ describe("community v1 run-errors reporter env gate", () => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
 
-  it("writes nothing when COMMUNITY_V1_RUN_ERRORS_FILE is unset", () => {
+  it("writes the counts file only when COMMUNITY_V1_RUN_ERRORS_FILE names it", () => {
     const dir = mkdtempSync(join(tmpdir(), "verdant-community-reporter-guard-"));
     dirs.push(dir);
     const out = join(dir, "run-errors.json");
@@ -65,6 +65,16 @@ describe("community v1 run-errors reporter env gate", () => {
     try {
       new CommunityV1RunErrorsReporter().onTestRunEnd([], []);
       expect(existsSync(out)).toBe(false);
+
+      // Control: with the env pointing at `out`, the same call writes it, so
+      // the unset check above can fail.
+      process.env[COMMUNITY_V1_RUN_ERRORS_ENV] = out;
+      new CommunityV1RunErrorsReporter().onTestRunEnd([], []);
+      expect(JSON.parse(readFileSync(out, "utf8"))).toEqual({
+        moduleErrors: 0,
+        suiteErrors: 0,
+        unhandledErrors: 0,
+      });
     } finally {
       if (previous === undefined) delete process.env[COMMUNITY_V1_RUN_ERRORS_ENV];
       else process.env[COMMUNITY_V1_RUN_ERRORS_ENV] = previous;

@@ -53,10 +53,8 @@ describe("community occurredDate regression coverage", () => {
     }
   });
 
-  it("rejects calendar strings whose year digits Date.UTC would remap (0–99 → 1900–1999)", () => {
-    expect(
-      validatePublicationDrafts([draftEntry({ occurredDate: "0099-01-01" })], "publish"),
-    ).toEqual({ ok: false, code: "invalid" });
+  it("accepts year 0100, the first year Date.UTC does not remap", () => {
+    // 0099-01-01 rejection is covered in community-publication-rules.test.ts.
     expect(
       validatePublicationDrafts([draftEntry({ occurredDate: "0100-01-01" })], "publish").ok,
     ).toBe(true);

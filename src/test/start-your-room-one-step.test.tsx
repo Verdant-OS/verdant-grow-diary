@@ -17,6 +17,11 @@ const testState = vi.hoisted(() => ({
   tents: [] as Array<{ id: string; name: string; grow_id?: string }>,
   plantsRead: "ok" as "ok" | "throw",
   failTable: null as string | null,
+  // Holds every insert response until released (double-submit window).
+  insertGate: null as Promise<void> | null,
+  // "lost": the insert commits but its response never arrives, and the
+  // owner-scoped re-read finds nothing, so the outcome is unknown.
+  insertOutcome: "ok" as "ok" | "lost",
   insert: vi.fn(),
   nav: vi.fn(),
 }));
@@ -33,7 +38,8 @@ vi.mock("@/lib/react-router-compat", async () => {
 });
 
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
+  // A UUID owner: the unknown-outcome fence records only well-formed owner ids.
+  useAuth: () => ({ user: { id: "44444444-4444-4444-8444-444444444444" }, loading: false }),
 }));
 
 vi.mock("@/store/grows", () => ({
@@ -77,8 +83,12 @@ vi.mock("@/integrations/supabase/client", () => ({
         testState.insert(table, payload);
         return {
           select: () => ({
-            single: async () =>
-              testState.failTable === table
+            single: async () => {
+              await testState.insertGate;
+              if (testState.insertOutcome === "lost") {
+                throw new TypeError("Failed to fetch after commit");
+              }
+              return testState.failTable === table
                 ? { data: null, error: { code: "P0001", message: "relation exploded" } }
                 : {
                     data: {
@@ -89,11 +99,16 @@ vi.mock("@/integrations/supabase/client", () => ({
                       ...(table === "plants" ? { tent_id: payload.tent_id } : {}),
                     },
                     error: null,
-                  },
+                  };
+            },
           }),
         };
       };
-      if (table !== "plants") return { insert };
+      const reRead = {
+        eq: () => reRead,
+        maybeSingle: async () => ({ data: null, error: null }),
+      };
+      if (table !== "plants") return { insert, select: () => reRead };
       const chain = {
         select: () => {
           if (testState.plantsRead === "throw") throw new Error("plants unavailable");
@@ -128,6 +143,8 @@ describe("Start your room in one submit", () => {
     testState.tents = [];
     testState.plantsRead = "ok";
     testState.failTable = null;
+    testState.insertGate = null;
+    testState.insertOutcome = "ok";
     testState.insert.mockReset();
     testState.nav.mockReset();
     let n = 0;
@@ -138,6 +155,10 @@ describe("Start your room in one submit", () => {
   afterEach(() => {
     cleanup();
     window.sessionStorage.clear();
+    // An unknown outcome leaves a same-runtime fence; never leak it to the next case.
+    delete (globalThis as Record<string, unknown>)[
+      "__verdantHierarchyCreateOutcomeRecoveryRuntimeState"
+    ];
   });
 
   it("creates the grow, tent and plant in order from one submit and opens the plant", async () => {
@@ -221,6 +242,46 @@ describe("Start your room in one submit", () => {
     fireEvent.click(submit);
     fireEvent.submit(submit.closest("form")!);
     expect(testState.insert).not.toHaveBeenCalled();
+    expect(testState.nav).not.toHaveBeenCalled();
+  });
+
+  it("ignores a second submit while the first save is still in flight", async () => {
+    let release: () => void = () => undefined;
+    testState.insertGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    renderPage();
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Plant A" },
+    });
+    // Submit the form directly: the disabled button must not be the only fence.
+    const form = screen.getByTestId("start-room-submit").closest("form")!;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => expect(testState.insert).toHaveBeenCalled());
+    expect(insertedTables()).toEqual(["grows"]);
+
+    release();
+    await waitFor(() => expect(testState.nav).toHaveBeenCalledTimes(1));
+    expect(insertedTables()).toEqual(["grows", "tents", "plants"]);
+  });
+
+  it("refuses a new submit after a save whose outcome is unknown", async () => {
+    testState.insertOutcome = "lost";
+    renderPage();
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Plant A" },
+    });
+    const form = screen.getByTestId("start-room-submit").closest("form")!;
+    fireEvent.submit(form);
+    expect(await screen.findByTestId("start-room-create-outcome-unknown")).toBeInTheDocument();
+    expect(insertedTables()).toEqual(["grows"]);
+
+    fireEvent.submit(form);
+    expect(await screen.findByTestId("start-your-room-error")).toHaveTextContent(
+      "Refresh this page before trying to create another room item.",
+    );
+    expect(insertedTables()).toEqual(["grows"]);
     expect(testState.nav).not.toHaveBeenCalled();
   });
 

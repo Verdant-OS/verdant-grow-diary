@@ -36,16 +36,31 @@ export const QUICK_LOG_OBSERVATION_SAVE_ERROR =
 export const QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY =
   "Restored your unsaved entry for this target.";
 
+export const QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY =
+  "Restored your unsaved entry. Choose a plant or tent before you save.";
+
 /**
- * A stored draft is restored only into the target it was typed for. Target
- * selection stays explicit or route-derived: a draft never picks a target.
+ * A stored draft is restored into the target it was typed for. When the sheet
+ * opens with no target, the words come back but the target does not: target
+ * selection stays explicit or route-derived, so a draft never picks one. The
+ * failed flag and its key belonged to the old target's save and stay behind;
+ * only definitive rejections are stored, so nothing committed under that key.
  */
 export function restorableQuickLogObservationDraft(
   stored: QuickLogObservationDraft | null,
   defaultTargetKey: string | null | undefined,
 ): QuickLogObservationDraft | null {
   if (!stored || isQuickLogObservationDraftEmpty(stored.form)) return null;
-  return stored.form.selectedKey === (defaultTargetKey ?? null) ? stored : null;
+  const target = defaultTargetKey || null;
+  if (stored.form.selectedKey === target) return stored;
+  if (target !== null) return null;
+  return { form: { ...stored.form, selectedKey: null }, saveFailed: false, idempotencyKey: null };
+}
+
+export function quickLogObservationDraftRestoredCopy(restored: QuickLogObservationDraft): string {
+  return restored.form.selectedKey
+    ? QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY
+    : QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY;
 }
 
 export function parseQuickLogObservationDraft(value: unknown): QuickLogObservationDraft | null {

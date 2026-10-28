@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   parseQuickLogObservationDraft,
+  QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
+  quickLogObservationDraftRestoredCopy,
   restorableQuickLogObservationDraft,
 } from "@/lib/quickLogObservationDraftRules";
 import {
@@ -19,7 +21,17 @@ describe("restorableQuickLogObservationDraft", () => {
     expect(restorableQuickLogObservationDraft(draft("plant:a"), "plant:b")).toBeNull();
   });
   it("never lets a draft pick a target when the sheet has none", () => {
-    expect(restorableQuickLogObservationDraft(draft("plant:a"), null)).toBeNull();
+    for (const none of [null, undefined, ""]) {
+      const restored = restorableQuickLogObservationDraft(draft("plant:a"), none);
+      expect(restored?.form.note).toBe("pale leaves");
+      expect(restored?.form.selectedKey).toBeNull();
+      // The old target's failed save and key stay behind.
+      expect(restored?.saveFailed).toBe(false);
+      expect(restored?.idempotencyKey).toBeNull();
+      expect(quickLogObservationDraftRestoredCopy(restored!)).toBe(
+        QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
+      );
+    }
     expect(restorableQuickLogObservationDraft(draft(null), null)).not.toBeNull();
   });
   it("ignores empty or missing drafts", () => {

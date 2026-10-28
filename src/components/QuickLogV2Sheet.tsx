@@ -5,7 +5,7 @@ import {
   isQuickLogObservationDraftEmpty,
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
-  QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY,
+  quickLogObservationDraftRestoredCopy,
   QUICK_LOG_OBSERVATION_SAVE_ERROR,
   restorableQuickLogObservationDraft,
 } from "@/lib/quickLogObservationDraftRules";
@@ -631,7 +631,7 @@ function QuickLogV2SheetForOwner({
   const saveInFlightRef = useRef(false);
   const observationDraftSuppressedRef = useRef(false);
   const observationUnconfirmedRef = useRef(false);
-  const [observationDraftRestored, setObservationDraftRestored] = useState(false);
+  const [observationDraftRestored, setObservationDraftRestored] = useState<string | null>(null);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
   // previous saved-summary state. Bumped whenever the grower starts
   // a new logical submission from the same open sheet.
@@ -1144,10 +1144,13 @@ function QuickLogV2SheetForOwner({
             QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
             parseQuickLogObservationDraft,
           );
-      // Only the draft typed for this same target comes back (never another plant's).
+      // A draft returns for its own target, or as text only when the sheet has
+      // none; never into another plant's target.
       const restorable = restorableQuickLogObservationDraft(storedDraft, defaultTargetKey);
       const restoredDraft = restorable ? restorable.form : null;
-      setObservationDraftRestored(Boolean(restorable));
+      setObservationDraftRestored(
+        restorable ? quickLogObservationDraftRestoredCopy(restorable) : null,
+      );
       setForm({
         ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
         selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
@@ -2549,7 +2552,7 @@ function QuickLogV2SheetForOwner({
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     observationDraftSuppressedRef.current = true;
     observationUnconfirmedRef.current = false;
-    setObservationDraftRestored(false);
+    setObservationDraftRestored(null);
 
     // The log row is committed from here on. Companion-media failures are
     // PARTIAL SUCCESS: the grower's entry is saved and must be presented as
@@ -3654,7 +3657,7 @@ function QuickLogV2SheetForOwner({
             <div>
               {observationDraftRestored ? (
                 <p className="text-xs text-muted-foreground" data-testid="qlv2-draft-restored">
-                  {QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY}
+                  {observationDraftRestored}
                 </p>
               ) : null}
               <Label htmlFor="qlv2-note">Note (optional)</Label>

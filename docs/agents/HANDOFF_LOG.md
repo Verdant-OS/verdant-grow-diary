@@ -115,11 +115,11 @@ checkout: git fetch origin claude/setup-quicklog-draft-retry-p2s verdant-grow-di
 pr: opened as a draft from this branch; read URL and head from GitHub
 head_sha: fix commit 77b2487ac01f6fb33fc0305f8f67feca8769864c; read the merged head from the PR
 state: pushed draft
-current_step: awaiting CI and an independent exact-head review
-next_action: route to an eligible non-author reviewer
+current_step: review 5677106832 P2 addressed (no-target restore); awaiting CI and an independent exact-head review
+next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR; then merge this branch into claude/start-room-one-step (#2582)
 post_merge_check: after Publish, on the fixture account, open Quick Log for plant A, type a note, close; open for plant B: no note. NOT_MEASURED until live /version.json reports the SHA.
-active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-decisions: CodeRabbit 4395104891: Retry button and retry copy show only for definitive save errors (isStartRoomRetryableSaveError), not validation, gate, safe-save-start or unknown-outcome errors; P2-1 restore only when draft target equals the sheet's explicit/route target, plus a visible restored line; P2-3 append the server reason to the existing plain copy (keeps scorer-locked tests); P2-4 adopt a pending grow id already in the owned grows list after hydrate; P2-2 NOT changed (see tried_and_rejected).
+active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+decisions: review 5677106832 P2 (Matthew 2026-10-28, "restore text, no target"): with no explicit or route target, restorableQuickLogObservationDraft returns the draft's words with selectedKey null, saveFailed false and no idempotency key (only definitive rejections are stored, so nothing committed under that key); the notice reads QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY; the remembered-target ban holds. CodeRabbit 4395104891: Retry button and retry copy show only for definitive save errors (isStartRoomRetryableSaveError), not validation, gate, safe-save-start or unknown-outcome errors; P2-1 restore only when draft target equals the sheet's explicit/route target, plus a visible restored line; P2-3 append the server reason to the existing plain copy (keeps scorer-locked tests); P2-4 adopt a pending grow id already in the owned grows list after hydrate; P2-2 NOT changed (see tried_and_rejected).
 tried_and_rejected: P2-2 persisting the idempotency key for ambiguous outcomes. It broke quick-log-v2-exact-recovery ("verified but subsequently edited saved note") by resurrecting the old key for a deliberate new entry. Durable Note/Watering recovery already keeps the key across reloads.
 commands: bunx vitest run src/test/quick-log-observation-draft-scope.test.tsx src/test/start-your-room-save-reason-and-adopt.test.tsx src/test/start-room-quick-log-draft-p2-rules.test.ts src/test/quick-log-v2-exact-recovery.test.tsx src/test/start-your-room-draft-retry.test.tsx src/test/start-your-room-draft-hydration.test.tsx
 files_touched: src/components/QuickLogV2Sheet.tsx; src/lib/quickLogObservationDraftRules.ts; src/lib/startYourRoomDraftRules.ts; src/pages/StartYourRoom.tsx; src/test/quick-log-observation-draft-scope.test.tsx; src/test/start-your-room-save-reason-and-adopt.test.tsx; src/test/start-room-quick-log-draft-p2-rules.test.ts
@@ -129,12 +129,12 @@ open_questions: none
 gotchas: src/test/start-your-room-draft-retry.test.tsx and start-your-room-draft-hydration.test.tsx are scorer-locked and unchanged; do not add saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignments (counted by quicklog-manual-idempotency-static.test.ts)
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
 artifacts: PR checks
-reviewer_seat: not assigned (OG Kush routes; this session excluded as author)
+reviewer_seat: not assigned (OG Kush routes; excluded: session_017UoYKzLzTv1RAhx1Cc7Pme as author, session_017UoYKxgRTFgtyQW6ka38Ec as repairer)
 reviewer_sha: none
 session_state: no routines; no paused workflows
-claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 17:45 CT (Matthew: open a replacement PR)
-owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-last_updated: 2026-10-27 18:03 CT, by Claude
+claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677106832; prior holder told to stop pushing)
+owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-27 22:15 CT, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 ```
 
 ### SETUP-QUICKLOG-DRAFT-RETRY

@@ -54,10 +54,11 @@ vi.mock("sonner", () => ({
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import {
   QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY,
+  QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
   QUICK_LOG_OBSERVATION_SAVE_ERROR,
 } from "@/lib/quickLogObservationDraftRules";
 
-function renderSheet(target: string) {
+function renderSheet(target: string | null) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -104,6 +105,21 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     expect(screen.getByTestId("qlv2-draft-restored")).toHaveTextContent(
       QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY,
     );
+  });
+
+  it("restores the words but not the target when the sheet opens with none", async () => {
+    await failNoteOn("plant:plant-1", "invalid_details");
+    renderSheet(null);
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("First leaves look pale");
+    expect(screen.getByTestId("qlv2-draft-restored")).toHaveTextContent(
+      QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
+    );
+    // The grower picks the target; the draft never does.
+    expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
+      "Choose a tent or plant",
+    );
+    // The old target's failed save does not follow the words.
+    expect(screen.queryByText(QUICK_LOG_OBSERVATION_SAVE_ERROR)).toBeNull();
   });
 
   it("pins: an ambiguous outcome keeps its key through a reload (durable recovery owns it)", async () => {

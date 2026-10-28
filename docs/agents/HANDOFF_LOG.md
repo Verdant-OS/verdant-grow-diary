@@ -78,10 +78,10 @@ why: PKCE verifier must stay client-side until token exchange. Matthew (2026-10-
 branch: claude/mcp-oauth-verifier-test (created at 78c60a89f37996e66302789f61447f9ee7fffc15)
 base: verdant-grow-diary
 checkout: git fetch origin claude/mcp-oauth-verifier-test verdant-grow-diary && git switch claude/mcp-oauth-verifier-test && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read URL and head from GitHub
-head_sha: read from the PR
-state: pushed draft
-current_step: awaiting CI and independent review
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2563 (replacement; #2552 is historical, superseded at 78c60a89f37996e66302789f61447f9ee7fffc15)
+head_sha: e0bbf4d26e03f8d1032bcd74366b639c18e29f1e (code checkpoint observed 2026-10-28 04:50 UTC; this log-only commit sits on top of it)
+state: ready for review, auto-merge enabled by the merge seat
+current_step: awaiting required CI and an exact-head independent review
 next_action: route to an eligible non-author reviewer
 post_merge_check: NOT_APPLICABLE (test-only)
 active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
@@ -93,14 +93,14 @@ files_remaining: none
 blockers: none
 open_questions: none
 gotchas: none
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2552
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2563 (current); https://github.com/Verdant-OS/verdant-grow-diary/pull/2552 (historical)
 artifacts: PR checks
 reviewer_seat: not assigned (OG Kush routes; this session excluded as author)
 reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 17:10 CT (Matthew: separate PRs)
 owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-last_updated: 2026-10-27 17:10 CT, by Claude
+last_updated: 2026-10-27 23:50 CT, by Claude
 ```
 
 ### VER-293-BROWSER-OAUTH-CLIENT-TESTS

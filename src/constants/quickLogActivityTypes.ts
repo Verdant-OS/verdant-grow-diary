@@ -17,6 +17,14 @@
  *    presenter must only render "Defoliation" when that fence is
  *    present — generic training stays labeled Training.
  */
+// Note marker and Issue heading live in a dependency-free module so the
+// identity rules mirrored into supabase/functions/_shared stay small.
+import { QUICK_LOG_ISSUE_TIMELINE_LABEL } from "@/lib/quickLogNoteMarkerRules";
+export {
+  QUICK_LOG_ISSUE_TIMELINE_LABEL,
+  QUICK_LOG_NOTE_MARKER_KEY,
+  QUICK_LOG_NOTE_MARKER_VALUE,
+} from "@/lib/quickLogNoteMarkerRules";
 
 export const QUICK_LOG_ACTIVITY_IDS = [
   "note",
@@ -110,15 +118,6 @@ export interface QuickLogActivityDefinition {
 export const QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON =
   "Harvest logging is not enabled on this backend yet.";
 
-/**
- * Marker written into p_details on every new Quick Log note save. A note and
- * an issue both persist as an `observation` grow_events row, so only the diary
- * mirror's details can tell them apart. Older notes have no marker and keep
- * their existing heading.
- */
-export const QUICK_LOG_NOTE_MARKER_KEY = "quick_log_activity";
-export const QUICK_LOG_NOTE_MARKER_VALUE = "note";
-
 /** Tile copy is still being worded; placeholders stay greppable until then. */
 export const QUICK_LOG_NOTE_TILE_COPY = {
   label: "TODO_COPY: Quick note",
@@ -129,9 +128,6 @@ export const QUICK_LOG_ISSUE_TILE_COPY = {
   label: "TODO_COPY: Problem spotted",
   description: "TODO_COPY: Something looks off (leaves, pests, smell).",
 } as const;
-
-/** Heading for a saved issue (observation + subtype "issue"). */
-export const QUICK_LOG_ISSUE_TIMELINE_LABEL = "Issue";
 
 /** Heading for any other observation, including old unmarked notes. */
 export const QUICK_LOG_OBSERVATION_TIMELINE_LABEL = "Observation";

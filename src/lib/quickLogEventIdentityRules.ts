@@ -23,8 +23,11 @@
  */
 import type { NormalizedDiaryDetails, NormalizedDiaryEntry } from "./diaryEntryRules";
 import { classifyTimelineEntry } from "./timelineEntryClassification";
-import { QUICK_LOG_ISSUE_TIMELINE_LABEL } from "@/constants/quickLogActivityTypes";
-import { hasQuickLogNoteMarker, isQuickLogIssueSubtype } from "./quickLogActivityRules";
+import {
+  QUICK_LOG_ISSUE_TIMELINE_LABEL,
+  hasQuickLogNoteMarker,
+  isQuickLogIssueSubtype,
+} from "./quickLogNoteMarkerRules";
 
 /**
  * Envelope event-type strings that indicate a Quick Log wrapper row

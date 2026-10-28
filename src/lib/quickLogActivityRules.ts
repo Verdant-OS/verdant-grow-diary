@@ -10,8 +10,6 @@
 
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_NOTE_MARKER_KEY,
-  QUICK_LOG_NOTE_MARKER_VALUE,
   QUICK_LOG_OBSERVATION_TIMELINE_LABEL,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
@@ -22,6 +20,7 @@ import {
   evaluateHarvestStageEligibility,
   type HarvestStageEligibility,
 } from "@/lib/quickLogStageDefaultRules";
+import { hasQuickLogNoteMarker, isQuickLogIssueSubtype } from "@/lib/quickLogNoteMarkerRules";
 
 export const QUICK_LOG_HARVEST_STAGE_DISABLED_REASON =
   "Harvest logging becomes available in Flower, Flush, or Harvest stages.";
@@ -377,27 +376,11 @@ export function planQuickLogPersistence(id: QuickLogActivityId): QuickLogPersist
   }
 }
 
-/** True when a details object carries the new-note marker. */
-export function hasQuickLogNoteMarker(details: unknown): boolean {
-  if (!details || typeof details !== "object" || Array.isArray(details)) return false;
-  const value = (details as Record<string, unknown>)[QUICK_LOG_NOTE_MARKER_KEY];
-  return typeof value === "string" && value.trim().toLowerCase() === QUICK_LOG_NOTE_MARKER_VALUE;
-}
-
-/** Returns details with the note marker added; never mutates the input. */
-export function withQuickLogNoteMarker<T extends Record<string, unknown>>(
-  details: T | null | undefined,
-): T & Record<typeof QUICK_LOG_NOTE_MARKER_KEY, string> {
-  return {
-    ...((details ?? {}) as T),
-    [QUICK_LOG_NOTE_MARKER_KEY]: QUICK_LOG_NOTE_MARKER_VALUE,
-  };
-}
-
-/** True for an observation saved from the Issue tile (details.subtype "issue"). */
-export function isQuickLogIssueSubtype(subtype: unknown): boolean {
-  return typeof subtype === "string" && subtype.trim().toLowerCase() === "issue";
-}
+export {
+  hasQuickLogNoteMarker,
+  isQuickLogIssueSubtype,
+  withQuickLogNoteMarker,
+} from "@/lib/quickLogNoteMarkerRules";
 
 /**
  * Index diary mirror details by the grow_events row they belong to

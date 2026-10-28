@@ -37,7 +37,7 @@ describe("buildCheckoutPlanReturnPath", () => {
         search: "?plan=pro_monthly&returnTo=%2Fpheno-hunts%2Fnew",
         plan: "founder_lifetime",
       }),
-    ).toBe("/pricing?plan=founder_lifetime&returnTo=%2Fpheno-hunts%2Fnew");
+    ).toBe("/pricing?returnTo=%2Fpheno-hunts%2Fnew");
   });
 
   it("drops unknown plans and fails hostile paths closed to Pricing", () => {
@@ -208,9 +208,11 @@ describe("consumePlanIntent — one-shot semantics", () => {
 describe("peekPlanIntent / clearPlanIntent", () => {
   it("peek does not delete the record", () => {
     const storage = makeStorage();
-    savePlanIntent("founder_lifetime", { storage, now: 1 });
-    expect(peekPlanIntent({ storage })).toBe("founder_lifetime");
-    expect(peekPlanIntent({ storage })).toBe("founder_lifetime");
+    expect(savePlanIntent("founder_lifetime", { storage, now: 1 })).toBe(false);
+    expect(peekPlanIntent({ storage })).toBeNull();
+    savePlanIntent("pro_annual", { storage, now: 1 });
+    expect(peekPlanIntent({ storage })).toBe("pro_annual");
+    expect(peekPlanIntent({ storage })).toBe("pro_annual");
   });
 
   it("peek returns null for tampered plans", () => {

@@ -71,3 +71,19 @@ export function resolveAlertContextRefresh(
   if (!nextRange || configuredRange(openReason) === nextRange) return null;
   return { title: nextTitle, reason: nextReason };
 }
+
+/** Retries after a failed context refresh before the error is left standing. */
+export const ALERT_CONTEXT_REFRESH_MAX_RETRIES = 3;
+const ALERT_CONTEXT_REFRESH_BASE_DELAY_MS = 2_000;
+
+/**
+ * Delay before retrying an open alert's context refresh after `failedAttempts`
+ * consecutive failures (2 s, 4 s, 8 s), or null once the retries are spent or
+ * the count is not a positive integer. Bounded so a persistent failure never
+ * loops; the hook surfaces the error either way.
+ */
+export function alertContextRefreshRetryDelayMs(failedAttempts: number): number | null {
+  if (!Number.isInteger(failedAttempts) || failedAttempts < 1) return null;
+  if (failedAttempts > ALERT_CONTEXT_REFRESH_MAX_RETRIES) return null;
+  return ALERT_CONTEXT_REFRESH_BASE_DELAY_MS * 2 ** (failedAttempts - 1);
+}

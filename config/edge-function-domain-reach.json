@@ -108,12 +108,6 @@
       "rpcs": ["has_role"],
       "justification": "Single-domain."
     },
-    "founder-slots-remaining": {
-      "domain": "money",
-      "tables": [],
-      "rpcs": ["founder_lifetime_slots_remaining"],
-      "justification": "RPC-only."
-    },
     "handle-email-suppression": {
       "domain": "email",
       "tables": ["email_send_log", "suppressed_emails"],
@@ -140,9 +134,9 @@
     },
     "paddle-portal-session": {
       "domain": "money",
-      "tables": ["subscriptions"],
+      "tables": ["paddle_customers", "subscriptions"],
       "rpcs": [],
-      "justification": "Single-domain."
+      "justification": "Reads the authenticated caller's subscription and matching environment-scoped Paddle customer mirror before creating a customer portal session. Single money domain; no customer writes."
     },
     "paddle-webhook": {
       "domain": "money",

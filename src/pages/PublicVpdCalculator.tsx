@@ -230,7 +230,7 @@ export default function PublicVpdCalculator() {
       data-testid="public-vpd-calculator-page"
     >
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
@@ -691,7 +691,11 @@ export default function PublicVpdCalculator() {
             <Link to={PUBLIC_VPD_GUIDE_PATH} className="underline hover:text-foreground">
               grow-room VPD tracking guide
             </Link>
-            .
+            , or open the{" "}
+            <Link to="/vpd-chart" className="underline hover:text-foreground">
+              VPD chart
+            </Link>{" "}
+            for stage ranges in one table.
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
             Planning nutrients, canopy light, and cycle costs too? Open the{" "}

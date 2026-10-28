@@ -55,7 +55,7 @@ describe("Auth page essentials", () => {
     expect(screen.getByRole("tab", { name: /sign in/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /create account/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /forgot password/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute("href", "/welcome");
+    expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute("href", "/");
   });
 
   it("renders product positioning copy", () => {

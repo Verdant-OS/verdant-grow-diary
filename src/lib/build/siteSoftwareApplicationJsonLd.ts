@@ -7,7 +7,7 @@
  * instead — same bytes, same @id, same public offer list.
  *
  * DISPLAY TRUTH: only plans a grower can actually buy from the PUBLIC pricing
- * grid may appear here. Founder Lifetime is deep-link-only and must never be
+ * grid may appear here. Founder Lifetime is no longer sold and must never be
  * advertised. Prices come from the pricing single source of truth.
  * `src/test/software-application-offers-truth.test.ts` pins both invariants.
  */
@@ -23,8 +23,9 @@ export const SITE_SOFTWARE_APPLICATION_JSON_LD = {
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   url: VERDANT_SITE_ORIGIN,
+  publisher: { "@id": `${VERDANT_SITE_ORIGIN}/#organization` },
   description:
-    "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.",
+    "Verdant Grow Diary is a web-based Grow OS for indoor cultivation, combining plant logs, photos, timelines and source-labeled sensor readings with cautious AI and grower-approved decisions.",
   offers: [
     { "@type": "Offer", name: "Free", price: String(PRICING.free.price), priceCurrency: "USD" },
     {

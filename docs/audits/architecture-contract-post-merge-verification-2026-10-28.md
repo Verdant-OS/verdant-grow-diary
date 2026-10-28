@@ -26,15 +26,15 @@ Evidence labels follow `CLAUDE.md` § Evidence discipline. Status words: `PASS`,
 
 ## 2. Requirements and assumptions
 
-| #   | Requirement (from the assignment)                                     | How it is met                                                                                                                                                        |
-| --- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | Audit the deploy branch, not `main`                                   | Every read is at `604274a7` on `verdant-grow-diary`; local HEAD fast-forwarded to it                                                                                 |
-| R2  | Reuse merged architecture documentation instead of duplicating it     | `#2564` is the deliverable; this file is a receipt and review brief, not a second contract                                                                           |
-| R3  | Separate permanent architecture from CURRENT_STATE operational facts  | Contract §0.1 already fences this; nothing operational is written into the contract by this session                                                                  |
-| R4  | Rejected/deferred alternatives                                        | Contract §12–§13 and spec §14 carry them; §10 below lists what this session adds to that record                                                                      |
-| R5  | Release topology only after overlapping PRs resolve                   | Gates `#2555`, `#2553`, `#1971`, `#2538` merged 2026-10-27; Matthew approved the stacked slice                                                                       |
-| R6  | No application code in the specification slice                        | `PASS`: one new Markdown file, eight corrected lines in `handoff-verdant-architecture-contract.md` (on Matthew's instruction, 2026-10-28), and one handoff-log block |
-| R7  | PASS/FAIL/BLOCKED/NOT_MEASURED/NOT_APPLICABLE; one calibrated verdict | §12 and §14                                                                                                                                                          |
+| #   | Requirement (from the assignment)                                     | How it is met                                                                                                                                                                          |
+| --- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | Audit the deploy branch, not `main`                                   | Every read is at `604274a7` on `verdant-grow-diary`; local HEAD fast-forwarded to it                                                                                                   |
+| R2  | Reuse merged architecture documentation instead of duplicating it     | `#2564` is the deliverable; this file is a receipt and review brief, not a second contract                                                                                             |
+| R3  | Separate permanent architecture from CURRENT_STATE operational facts  | Contract §0.1 already fences this; nothing operational is written into the contract by this session                                                                                    |
+| R4  | Rejected/deferred alternatives                                        | Contract §12–§13 and spec §14 carry them; §10 below lists what this session adds to that record                                                                                        |
+| R5  | Release topology only after overlapping PRs resolve                   | Gates `#2555`, `#2553`, `#1971`, `#2538` merged 2026-10-27; Matthew approved the stacked slice                                                                                         |
+| R6  | No application code in the specification slice                        | `PASS`: one new Markdown file, the corrected lines in `handoff-verdant-architecture-contract.md` (nine at this head) (on Matthew's instruction, 2026-10-28), and one handoff-log block |
+| R7  | PASS/FAIL/BLOCKED/NOT_MEASURED/NOT_APPLICABLE; one calibrated verdict | §12 and §14                                                                                                                                                                            |
 
 Assumptions, each labelled:
 

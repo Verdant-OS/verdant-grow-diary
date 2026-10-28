@@ -16,6 +16,8 @@ const originalTz = process.env.TZ;
 
 beforeEach(() => {
   process.env.TZ = "America/Chicago";
+  // Guard, not a test: the cases below assume Chicago is UTC-5 in October.
+  expect(new Date(PRODUCTION_ISO).getTimezoneOffset()).toBe(300);
 });
 
 afterEach(() => {
@@ -41,10 +43,6 @@ function liveSnapshot(ts: string): SensorSnapshot {
 }
 
 describe("SensorSnapshotTruthStrip captured time — regression edges", () => {
-  it("pins the test zone (America/Chicago is UTC-5 in October)", () => {
-    expect(new Date(PRODUCTION_ISO).getTimezoneOffset()).toBe(300);
-  });
-
   it("uses the shared formatter output, not the read model's raw ISO label", () => {
     const snap = liveSnapshot(PRODUCTION_ISO);
     const model = buildSensorSnapshotReadModel({

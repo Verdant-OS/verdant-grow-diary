@@ -189,6 +189,9 @@ describe("public harvest window tracker page", () => {
     expect(screen.queryByText("Plant A (1 check)")).not.toBeInTheDocument();
     addCheck("2026-10-28", "26", "70", "4");
     expect(screen.getByText("Plant A (1 check)")).toBeInTheDocument();
+    vi.setSystemTime(new Date(2026, 9, 29, 0, 5));
+    fireEvent.focus(screen.getByLabelText("Date"));
+    expect(screen.getByLabelText("Date")).toHaveAttribute("max", "2026-10-29");
     vi.useRealTimers();
   });
 

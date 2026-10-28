@@ -509,6 +509,8 @@ export default function HarvestWindowTracker() {
                     type="date"
                     required
                     max={maxDate}
+                    // A tab left open past midnight would otherwise grey out the real today.
+                    onFocus={() => setMaxDate(localIsoDate(new Date()))}
                     className={inputClass}
                     value={date}
                     onChange={(event) => setDate(event.target.value)}

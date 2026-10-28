@@ -176,6 +176,17 @@ export default function GuidesIndex() {
             </Link>
           </li>
           <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/cannabis-flowering-stages-week-by-week" className="block">
+              <h3 className="font-semibold text-lg">
+                Cannabis Flowering Stages Week by Week: Flower Planner &amp; Log
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Enter your 12/12 flip date and the breeder&apos;s flowering time to get dated weeks,
+                what to watch each week, and a trichome-check reminder.
+              </p>
+            </Link>
+          </li>
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
             <Link to="/guides/grow-stage-care-guide" className="block">
               <h3 className="font-semibold text-lg">
                 Grow-stage care guide: seedling, veg, and flower checklists

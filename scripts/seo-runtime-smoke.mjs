@@ -38,6 +38,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/guides/athena-feed-chart-log`,
   },
   {
+    path: "/guides/when-to-harvest-cannabis",
+    expectTitle: /When to Harvest Cannabis: Trichome Chart/,
+    canonical: `${ORIGIN}/guides/when-to-harvest-cannabis`,
+  },
+  {
     path: "/tools/vpd-calculator",
     expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
     canonical: `${ORIGIN}/tools/vpd-calculator`,

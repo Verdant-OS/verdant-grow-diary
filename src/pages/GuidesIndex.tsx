@@ -176,6 +176,17 @@ export default function GuidesIndex() {
             </Link>
           </li>
           <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/when-to-harvest-cannabis" className="block">
+              <h3 className="font-semibold text-lg">
+                When to Harvest Cannabis: Trichome Chart + Harvest Tracker
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Log clear, cloudy and amber trichome checks for each plant and compare them with the
+                harvest window you chose. Nothing is saved in your browser.
+              </p>
+            </Link>
+          </li>
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
             <Link to="/guides/grow-stage-care-guide" className="block">
               <h3 className="font-semibold text-lg">
                 Grow-stage care guide: seedling, veg, and flower checklists

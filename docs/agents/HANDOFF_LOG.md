@@ -80,9 +80,9 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/alert-archived-tent-display-dg3dq4 verdant-grow-diary && git switch claude/alert-archived-tent-display-dg3dq4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the branch's draft PR (opened right after the first push)
 head_sha: read from the PR; this block is written in the first commit
-state: pushed draft
-current_step: round 2 pushed for Jack Herer's review 5677093969 at 4ea09830 (P2 toggle, P3 spec copy, P3 scorer-lock report); required shards and Lint/typecheck/test/build skip while the PR is a draft (ci.yml draft == false gate)
-next_action: Matthew marks ready so the 35 required contexts run; then confirm 35/35 at the PR head and request a fresh exact-head pass from Jack Herer (or another eligible non-contributing seat)
+state: pushed; marked ready by Matthew's instruction 2026-10-28 04:17 UTC
+current_step: round 3: fixed Codex P2 (review 5677745083 at 4e9c3e2) — the sole-tent fallback is built only from a complete (counted, uncapped) tent read; awaiting 35/35 required CI at the new head and an exact-head re-review
+next_action: confirm 35/35 required checks at the PR head; then request an exact-head re-review from an eligible non-contributing seat (Jack Herer or another); merge only with Matthew's per-item yes
 post_merge_check: after Publish, on verdantgrowdiary.com the fixture account's Alerts list shows an alert on an archived tent as "Tent: <name> (archived)" with the Historical target note. Until live /version.json reports the merge SHA: NOT_MEASURED.
 active_writer: Claude session_017UoYKyX1Beo5tnXmkJp17C
 decisions: read archived rows (RLS SELECT stays auth.uid() = user_id; no schema/RLS change); sole-tent fallback still counts non-archived tents only; "missing" is inferred only from a complete read (select with count "exact" and rows >= count), never while loading, after an error, or from a capped response; callers/mocks without the new maps keep the old "Name unavailable" copy; the default list hides alerts on archived/removed targets behind a count toggle (VER-300 acceptance; presentation only, nothing resolved), and the One-Tent Loop next-step card counts only current-target open alerts so it never auto-queues for an archived tent; target inputs are not built while the scope is invalid (no card renders, old behavior kept); copy uses the VER-300 spec strings; stored alerts are never modified.
@@ -100,7 +100,7 @@ reviewer_sha: 4ea098305679942ade4d607dbe755628affd75b9 (stale after round 2)
 session_state: Claude cloud session session_017UoYKyX1Beo5tnXmkJp17C watching the PR; no routines; no paused workflows
 claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
 owner: Claude
-last_updated: 2026-10-27 21:55 CT, by Claude
+last_updated: 2026-10-27 23:25 CT, by Claude
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL

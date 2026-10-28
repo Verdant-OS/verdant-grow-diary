@@ -131,8 +131,11 @@ export function useAlertTargetNames(): UseAlertTargetNamesState {
         setPlantNameById(toNameMap(plantRows));
         setTentStateById(toStateMap(tentRows));
         setPlantStateById(toStateMap(plantRows));
-        setSingleTentIdByGrowId(toSingleTentIdByGrowId(tentRows));
-        setReadComplete(isCompleteRead(tentsRes) && isCompleteRead(plantsRes));
+        const tentReadComplete = isCompleteRead(tentsRes);
+        // "Exactly one active tent" is only knowable from every tent row; a
+        // capped list could hold one of several and mislabel an alert.
+        setSingleTentIdByGrowId(tentReadComplete ? toSingleTentIdByGrowId(tentRows) : new Map());
+        setReadComplete(tentReadComplete && isCompleteRead(plantsRes));
         setStatus("ok");
       })
       .catch(() => {

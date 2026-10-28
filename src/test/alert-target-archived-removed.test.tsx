@@ -145,6 +145,24 @@ describe("useAlertTargetNames — archived rows stay readable", () => {
     expect(result.current.readComplete).toBe(true);
   });
 
+  it("a capped tent read never derives a sole-tent fallback from a partial list", async () => {
+    // Server cap: 2 active tents exist in GROW_B, but only one came back.
+    supabaseState.tables.tents = {
+      data: [
+        { id: TENT_ACTIVE, name: "Veg Tent", grow_id: GROW, is_archived: false },
+        { id: TENT_ARCHIVED, name: "Old Flower Tent", grow_id: GROW, is_archived: true },
+      ],
+      error: null,
+      count: 1001,
+    };
+    supabaseState.tables.plants = { data: [], error: null };
+    const { result } = renderHook(() => useAlertTargetNames());
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.singleTentIdByGrowId.size).toBe(0);
+    // Names that did come back still label alerts.
+    expect(result.current.tentNameById.get(TENT_ARCHIVED)).toBe("Old Flower Tent");
+  });
+
   it("a capped read (fewer rows than the count) never lets an absent id read as removed", async () => {
     seedOwnerRows();
     // The server returned 3 tents but reports 1,200: later rows were cut off.

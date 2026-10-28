@@ -14,10 +14,10 @@
  *      Grow Detail's One-Tent Loop handoff). Never a sole-plant guess.
  *
  * Record state (read-only, from the owner's RLS-scoped tent/plant reads):
- *   - archived rows keep their name and gain an "(archived)" marker;
- *   - an id the completed read did not return is "missing" — removed or
- *     not accessible to this account. The client cannot tell those apart,
- *     so the copy names both and never invents a name;
+ *   - archived rows keep their name: "Archived tent: <name>";
+ *   - an id the completed read did not return is "missing": "Tent removed".
+ *     Reads are owner-scoped, so for an owner's alert this means the row is
+ *     gone; no name is ever invented;
  *   - archived or missing targets are flagged `historical` so presenters
  *     can set them apart from alerts on current tents and plants.
  */
@@ -33,14 +33,24 @@ export const ALERT_TARGET_LOADING_TEXT = "Loading tent and plant names…";
 
 export const ALERT_TARGET_NAME_UNAVAILABLE_LABEL = "Name unavailable";
 
-export const ALERT_TARGET_ARCHIVED_SUFFIX = "(archived)";
+export const ALERT_TARGET_ARCHIVED_PREFIX = {
+  Tent: "Archived tent:",
+  Plant: "Archived plant:",
+} as const;
 
-export const ALERT_TARGET_NOT_FOUND_LABEL = "Removed or not accessible";
+export const ALERT_TARGET_REMOVED_LABEL = {
+  Tent: "Tent removed",
+  Plant: "Plant removed",
+} as const;
 
 export const ALERT_TARGET_HISTORICAL_BADGE = "Historical target";
 
 export const ALERT_TARGET_HISTORICAL_NOTE =
-  "This tent or plant is archived or no longer available. Kept as history; it may not describe a current room.";
+  "This tent or plant is archived or removed. Kept as history; it may not describe a current room.";
+
+export function alertTargetHistoricalToggleLabel(shown: boolean, count: number): string {
+  return `${shown ? "Hide" : "Show"} archived targets (${count})`;
+}
 
 /** Read state of a tent/plant row for target labelling. */
 export type AlertTargetRecordState = "active" | "archived" | "missing";
@@ -87,10 +97,27 @@ export function sanitizeAlertTargetLabel(name: string | null | undefined): strin
   return trimmed;
 }
 
-function fieldValue(name: string | null, state: AlertTargetRecordState | null): string {
-  if (state === "missing") return ALERT_TARGET_NOT_FOUND_LABEL;
+type TargetField = "Tent" | "Plant";
+
+/** Detailed-row value under a "Tent"/"Plant" heading. */
+function fieldValue(
+  field: TargetField,
+  name: string | null,
+  state: AlertTargetRecordState | null,
+): string {
+  if (state === "missing") return ALERT_TARGET_REMOVED_LABEL[field];
   const base = name ?? ALERT_TARGET_NAME_UNAVAILABLE_LABEL;
-  return state === "archived" ? `${base} ${ALERT_TARGET_ARCHIVED_SUFFIX}` : base;
+  return state === "archived" ? `${ALERT_TARGET_ARCHIVED_PREFIX[field]} ${base}` : base;
+}
+
+/** Compact one-line segment, e.g. "Tent: Veg" or "Archived tent: Veg". */
+function fieldText(
+  field: TargetField,
+  name: string | null,
+  state: AlertTargetRecordState | null,
+): string {
+  const value = fieldValue(field, name, state);
+  return state === "missing" || state === "archived" ? value : `${field}: ${value}`;
 }
 
 const EMPTY_TARGET_FIELDS = {
@@ -224,8 +251,8 @@ export interface AlertTargetContextInput {
  * - Ids present while names are still loading → loading copy.
  * - Ids present with resolved names → "Tent: … · Plant: …".
  * - Ids present but names missing/UUID → per-field "Name unavailable".
- * - Archived record → name plus "(archived)"; missing record → "Removed or
- *   not accessible". Either marks the context `historical`.
+ * - Archived record → "Archived tent: <name>"; missing record → "Tent
+ *   removed". Either marks the context `historical`.
  */
 export function deriveAlertTargetContext(input: AlertTargetContextInput): AlertTargetContext {
   const columnTent = trimId(input.tentId);
@@ -274,11 +301,11 @@ export function deriveAlertTargetContext(input: AlertTargetContextInput): AlertT
 
   const tentState = tentId ? (input.tentState ?? null) : null;
   const plantState = plantId ? (input.plantState ?? null) : null;
-  const tentValue = tentId ? fieldValue(tentLabel, tentState) : null;
-  const plantValue = plantId ? fieldValue(plantLabel, plantState) : null;
+  const tentValue = tentId ? fieldValue("Tent", tentLabel, tentState) : null;
+  const plantValue = plantId ? fieldValue("Plant", plantLabel, plantState) : null;
   const parts: string[] = [];
-  if (tentValue) parts.push(`Tent: ${tentValue}`);
-  if (plantValue) parts.push(`Plant: ${plantValue}`);
+  if (tentId) parts.push(fieldText("Tent", tentLabel, tentState));
+  if (plantId) parts.push(fieldText("Plant", plantLabel, plantState));
   const anyNamed = Boolean(tentLabel || plantLabel);
   const historical = [tentState, plantState].some(
     (state) => state === "archived" || state === "missing",
@@ -360,4 +387,18 @@ function recordStateFor(
   const known = stateById.get(id);
   if (known) return known;
   return namesReady ? "missing" : null;
+}
+
+/**
+ * Split alerts into current and historical (archived/removed target) lists,
+ * preserving input order in each. Presentation only: no alert is changed.
+ */
+export function partitionAlertsByTargetHistory<T>(
+  alerts: readonly T[],
+  isHistorical: (alert: T) => boolean,
+): { current: T[]; historical: T[] } {
+  const current: T[] = [];
+  const historical: T[] = [];
+  for (const alert of alerts) (isHistorical(alert) ? historical : current).push(alert);
+  return { current, historical };
 }

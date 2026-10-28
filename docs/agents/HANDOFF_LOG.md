@@ -73,7 +73,7 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK VER-300-ALERT-ARCHIVED-TARGETS  priority: P2  status: OPEN
-goal: alerts on archived tents/plants show the real name marked "(archived)" instead of "Tent: Name unavailable"; ids the owner read did not return show "Removed or not accessible"; "Why this alert?" says "Target range unavailable" instead of "Target context unavailable".
+goal: per VER-300 acceptance, an alert on an archived tent/plant reads "Archived tent: <name>" / "Archived plant: <name>" instead of "Tent: Name unavailable"; an id the complete owner read did not return reads "Tent removed" / "Plant removed"; the default /alerts list hides those alerts behind a "Show archived targets (n)" toggle; "Why this alert?" says "Target range not recorded for this alert." instead of "Target context unavailable".
 why: Linear VER-300 (Toad Venom QA sweep, 2026-10-27): 3 of 5 open alerts read "Tent: Name unavailable". Cause in source: src/hooks/useAlertTargetNames.ts filtered tents and plants on is_archived = false.
 branch: claude/alert-archived-tent-display-dg3dq4
 base: verdant-grow-diary
@@ -81,26 +81,26 @@ checkout: git fetch origin claude/alert-archived-tent-display-dg3dq4 verdant-gro
 pr: read from the branch's draft PR (opened right after the first push)
 head_sha: read from the PR; this block is written in the first commit
 state: pushed draft
-current_step: draft PR open; awaiting 35/35 required CI and an independent exact-head review
-next_action: confirm 35/35 required checks at the PR head; route to an eligible reviewer who neither authored nor repaired this (Codex, or a non-contributing Claude/Grok session)
+current_step: round 2 pushed for Jack Herer's review 5677093969 at 4ea09830 (P2 toggle, P3 spec copy, P3 scorer-lock report); required shards and Lint/typecheck/test/build skip while the PR is a draft (ci.yml draft == false gate)
+next_action: Matthew marks ready so the 35 required contexts run; then confirm 35/35 at the PR head and request a fresh exact-head pass from Jack Herer (or another eligible non-contributing seat)
 post_merge_check: after Publish, on verdantgrowdiary.com the fixture account's Alerts list shows an alert on an archived tent as "Tent: <name> (archived)" with the Historical target note. Until live /version.json reports the merge SHA: NOT_MEASURED.
 active_writer: Claude session_017UoYKyX1Beo5tnXmkJp17C
-decisions: read archived rows (RLS SELECT stays auth.uid() = user_id; no schema/RLS change); sole-tent fallback still counts non-archived tents only; "missing" is inferred only from a complete read (select with count "exact" and rows >= count), never while loading, after an error, or from a capped response; callers/mocks without the new maps keep the old "Name unavailable" copy; no filtering or re-sorting of historical alerts (product decision left to Matthew); stored alerts are never modified.
+decisions: read archived rows (RLS SELECT stays auth.uid() = user_id; no schema/RLS change); sole-tent fallback still counts non-archived tents only; "missing" is inferred only from a complete read (select with count "exact" and rows >= count), never while loading, after an error, or from a capped response; callers/mocks without the new maps keep the old "Name unavailable" copy; the default list hides alerts on archived/removed targets behind a count toggle (VER-300 acceptance; presentation only, nothing resolved), and the One-Tent Loop next-step card counts only current-target open alerts so it never auto-queues for an archived tent; target inputs are not built while the scope is invalid (no card renders, old behavior kept); copy uses the VER-300 spec strings; stored alerts are never modified.
 tried_and_rejected: unbounded read without a count (fresh-context review P2: PostgREST max-rows can cap it and falsely mark a live plant removed); .in("id", alertIds) lookups (would need a hook signature change in two pages and a second sole-tent read; larger than the fix needs).
 commands: bunx vitest run src/test/alert-target-archived-removed.test.tsx src/test/alert-target-context.test.tsx src/test/alert-target-io-hooks.test.tsx src/test/alert-why-context.test.tsx src/test/alert-why-context-legacy-vpd.test.tsx --reporter=dot ; NODE_OPTIONS=--max-old-space-size=12288 bunx tsc -p tsconfig.json --noEmit
-files_touched: src/hooks/useAlertTargetNames.ts; src/lib/alertTargetContextRules.ts; src/lib/alertWhyContext.ts; src/components/AlertTargetContext.tsx; src/pages/Alerts.tsx; src/pages/AlertDetail.tsx; src/test/alert-target-archived-removed.test.tsx; src/test/alert-target-context.test.tsx; src/test/alert-why-context.test.tsx; src/test/alert-why-context-legacy-vpd.test.tsx; docs/agents/HANDOFF_LOG.md
+files_touched: src/test/alerts-historical-targets-toggle.test.tsx; src/hooks/useAlertTargetNames.ts; src/lib/alertTargetContextRules.ts; src/lib/alertWhyContext.ts; src/components/AlertTargetContext.tsx; src/pages/Alerts.tsx; src/pages/AlertDetail.tsx; src/test/alert-target-archived-removed.test.tsx; src/test/alert-target-context.test.tsx; src/test/alert-why-context.test.tsx; src/test/alert-why-context-legacy-vpd.test.tsx; docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: independent exact-head acceptance needs a non-contributing session; merge needs Matthew's per-item yes
-open_questions: should alerts on archived/removed targets be filtered out of, or grouped below, the Open list? (left unchanged here)
+open_questions: none in scope; server-side auto-resolve of alerts on archived tents stays Matthew's call (would be a migration/trigger, out of scope)
 gotchas: alerts.tent_id/plant_id are ON DELETE SET NULL, so a hard-deleted tent shows the "unavailable" copy (or the sole active tent fallback), not "Removed"; the client cannot tell deleted from not-accessible; src/lib/stabilityWhyContext.ts still says "Target context unavailable." (stability card, out of scope)
 links: https://linear.app/verdantgrowdiary/issue/VER-300/alerts-tent-name-unavailable-for-alerts-on-archived-tents-misleading
 artifacts: PR checks
-reviewer_seat: requested (eligible: Codex, or a non-contributing Claude/Grok session)
-reviewer_sha: none yet
+reviewer_seat: Jack Herer (review 5677093969, PASS-pending-CI at 4ea098305679942ade4d607dbe755628affd75b9; superseded by round 2)
+reviewer_sha: 4ea098305679942ade4d607dbe755628affd75b9 (stale after round 2)
 session_state: Claude cloud session session_017UoYKyX1Beo5tnXmkJp17C watching the PR; no routines; no paused workflows
 claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
 owner: Claude
-last_updated: 2026-10-27 21:20 CT, by Claude
+last_updated: 2026-10-27 21:55 CT, by Claude
 ```
 
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL

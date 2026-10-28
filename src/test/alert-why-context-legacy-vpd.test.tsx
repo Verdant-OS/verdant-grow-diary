@@ -71,7 +71,7 @@ describe("legacy VPD alerts — stage-aware why-context fallback", () => {
   it("legacy VPD alert with no recognizable stage → unavailable fallback", () => {
     const w = deriveAlertWhyContext(LEGACY_VPD_UNKNOWN_STAGE);
     expect(w.kind).toBe("unavailable");
-    expect(w.text).toBe("Target range unavailable for this alert.");
+    expect(w.text).toBe("Target range not recorded for this alert.");
   });
 
   it("legacy harvest/drying VPD alert → context-only copy, no numeric band", () => {

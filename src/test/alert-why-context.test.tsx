@@ -110,7 +110,7 @@ describe("deriveAlertWhyContext — stage-aware bands", () => {
   it("4. legacy generic alert → fallback context copy", () => {
     const w = deriveAlertWhyContext(LEGACY_GENERIC_TEMP);
     expect(w.kind).toBe("unavailable");
-    expect(w.text).toBe("Target range unavailable for this alert.");
+    expect(w.text).toBe("Target range not recorded for this alert.");
   });
 
   it("5. unknown/unparseable stage → fallback context copy", () => {
@@ -153,7 +153,7 @@ describe("AlertWhyContext presenter", () => {
     render(<AlertWhyContext alert={LEGACY_GENERIC_TEMP} variant="detailed" />);
     const root = screen.getByTestId("alert-why-detailed");
     expect(root.getAttribute("data-kind")).toBe("unavailable");
-    expect(root.textContent).toContain("Target range unavailable for this alert.");
+    expect(root.textContent).toContain("Target range not recorded for this alert.");
     expect(screen.queryByTestId("alert-why-stage")).toBeNull();
   });
 

@@ -3,9 +3,9 @@
  *
  * Pins:
  *   - The name lookup reads archived rows, so an alert on an archived tent or
- *     plant keeps its real name, marked "(archived)" and flagged historical.
+ *     plant keeps its real name ("Archived tent: <name>") and is flagged historical.
  *   - An id the completed owner-scoped read did not return (deleted after the
- *     alert, or not this account's) reads "Removed or not accessible" — no
+ *     alert, or not this account's) reads "Tent removed" — no
  *     invented name, no UUID, and no link to a page that will not load.
  *   - A failed, still-loading or server-capped read never claims "removed".
  *   - A tent deleted outright leaves alerts.tent_id NULL (ON DELETE SET NULL),
@@ -23,7 +23,8 @@ import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
 import {
   ALERT_TARGET_HISTORICAL_NOTE,
   ALERT_TARGET_NAME_UNAVAILABLE_LABEL,
-  ALERT_TARGET_NOT_FOUND_LABEL,
+  ALERT_TARGET_REMOVED_LABEL,
+  partitionAlertsByTargetHistory,
   ALERT_TARGET_UNAVAILABLE_TEXT,
   buildAlertTargetPresenterInput,
   deriveAlertTargetContext,
@@ -233,7 +234,7 @@ describe("alert target labels by record state", () => {
 
   it("archived tent → real name marked archived, historical", () => {
     const { ctx } = targetFor({ tentId: TENT_ARCHIVED, growId: GROW });
-    expect(ctx.text).toBe("Tent: Old Flower Tent (archived)");
+    expect(ctx.text).toBe("Archived tent: Old Flower Tent");
     expect(ctx.text).not.toContain(ALERT_TARGET_NAME_UNAVAILABLE_LABEL);
     expect(ctx.kind).toBe("located");
     expect(ctx.tentState).toBe("archived");
@@ -242,13 +243,13 @@ describe("alert target labels by record state", () => {
 
   it("archived plant in an active tent → both named, historical", () => {
     const { ctx } = targetFor({ tentId: TENT_ACTIVE, plantId: PLANT_ARCHIVED, growId: GROW });
-    expect(ctx.text).toBe("Tent: Veg Tent · Plant: Culled Pheno #3 (archived)");
+    expect(ctx.text).toBe("Tent: Veg Tent · Archived plant: Culled Pheno #3");
     expect(ctx.historical).toBe(true);
   });
 
-  it("id the completed read did not return → removed or not accessible, never a UUID", () => {
+  it("id the completed read did not return → Tent removed, never a UUID", () => {
     const { ctx } = targetFor({ tentId: TENT_GONE, growId: GROW });
-    expect(ctx.text).toBe(`Tent: ${ALERT_TARGET_NOT_FOUND_LABEL}`);
+    expect(ctx.text).toBe(ALERT_TARGET_REMOVED_LABEL.Tent);
     expect(ctx.text).not.toContain(TENT_GONE);
     expect(ctx.kind).toBe("names_unavailable");
     expect(ctx.tentState).toBe("missing");
@@ -258,7 +259,7 @@ describe("alert target labels by record state", () => {
   it("another account's plant id (RLS returns no row) reads the same as removed", () => {
     const foreignPlant = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
     const { ctx } = targetFor({ tentId: TENT_ACTIVE, plantId: foreignPlant, growId: GROW });
-    expect(ctx.text).toBe(`Tent: Veg Tent · Plant: ${ALERT_TARGET_NOT_FOUND_LABEL}`);
+    expect(ctx.text).toBe(`Tent: Veg Tent · ${ALERT_TARGET_REMOVED_LABEL.Plant}`);
     expect(ctx.plantLabel).toBeNull();
     expect(ctx.historical).toBe(true);
   });
@@ -349,10 +350,10 @@ describe("AlertTargetContext — historical targets are set apart", () => {
       </MemoryRouter>,
     );
     const tent = screen.getByTestId("alert-detail-tent-label");
-    expect(tent.textContent).toBe("Old Flower Tent (archived)");
+    expect(tent.textContent).toBe("Archived tent: Old Flower Tent");
     expect(tent.tagName).toBe("A");
     const plant = screen.getByTestId("alert-detail-plant-label");
-    expect(plant.textContent).toBe(ALERT_TARGET_NOT_FOUND_LABEL);
+    expect(plant.textContent).toBe(ALERT_TARGET_REMOVED_LABEL.Plant);
     expect(plant.tagName).toBe("SPAN");
     expect(screen.getByTestId("alert-target-historical-note")).toBeTruthy();
   });
@@ -365,7 +366,27 @@ describe("Why this alert? — missing range is not a missing tent", () => {
       "celsius",
     );
     expect(why.kind).toBe("unavailable");
-    expect(why.text).toBe("Target range unavailable for this alert.");
+    expect(why.text).toBe("Target range not recorded for this alert.");
     expect(why.text).not.toMatch(/tent|plant/i);
+  });
+});
+
+describe("partitionAlertsByTargetHistory", () => {
+  it("splits current from historical, keeping order, without changing alerts", () => {
+    const alerts = [
+      { id: "a", historical: false },
+      { id: "b", historical: true },
+      { id: "c", historical: false },
+      { id: "d", historical: true },
+    ];
+    const snapshot = JSON.stringify(alerts);
+    const { current, historical } = partitionAlertsByTargetHistory(alerts, (a) => a.historical);
+    expect(current.map((a) => a.id)).toEqual(["a", "c"]);
+    expect(historical.map((a) => a.id)).toEqual(["b", "d"]);
+    expect(JSON.stringify(alerts)).toBe(snapshot);
+  });
+
+  it("handles an empty list", () => {
+    expect(partitionAlertsByTargetHistory([], () => true)).toEqual({ current: [], historical: [] });
   });
 });

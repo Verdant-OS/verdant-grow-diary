@@ -108,12 +108,6 @@
       "rpcs": ["has_role"],
       "justification": "Single-domain."
     },
-    "founder-slots-remaining": {
-      "domain": "money",
-      "tables": [],
-      "rpcs": ["founder_lifetime_slots_remaining"],
-      "justification": "RPC-only."
-    },
     "handle-email-suppression": {
       "domain": "email",
       "tables": ["email_send_log", "suppressed_emails"],

@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 
 // @ts-nocheck
 
@@ -41,6 +41,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
+import { Route as VpdChartRouteImport } from './routes/vpd-chart'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as AppOperatorRouteImport } from './routes/_app/_operator'
 import { Route as AppActionQueueRouteImport } from './routes/_app/action-queue'
@@ -76,6 +77,7 @@ import { Route as CultivarsSlugRouteImport } from './routes/cultivars.$slug'
 import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
 import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
+import { Route as GuidesAthenaFeedChartLogRouteImport } from './routes/guides.athena-feed-chart-log'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
@@ -316,6 +318,11 @@ const UpgradeRoute = UpgradeRouteImport.update({
   path: '/upgrade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VpdChartRoute = VpdChartRouteImport.update({
+  id: '/vpd-chart',
+  path: '/vpd-chart',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
@@ -490,6 +497,12 @@ const GuidesSlugRoute = GuidesSlugRouteImport.update({
   path: '/guides/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuidesAthenaFeedChartLogRoute =
+  GuidesAthenaFeedChartLogRouteImport.update({
+    id: '/guides/athena-feed-chart-log',
+    path: '/guides/athena-feed-chart-log',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const GuidesGrowStageCareGuideRoute =
   GuidesGrowStageCareGuideRouteImport.update({
     id: '/guides/grow-stage-care-guide',
@@ -967,6 +980,7 @@ export interface FileRoutesByFullPath {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/upgrade': typeof UpgradeRoute
+  '/vpd-chart': typeof VpdChartRoute
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
   '/actions': typeof AppActionsRoute
@@ -999,6 +1013,7 @@ export interface FileRoutesByFullPath {
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1114,6 +1129,7 @@ export interface FileRoutesByTo {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/upgrade': typeof UpgradeRoute
+  '/vpd-chart': typeof VpdChartRoute
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
   '/actions': typeof AppActionsRoute
@@ -1145,6 +1161,7 @@ export interface FileRoutesByTo {
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1262,6 +1279,7 @@ export interface FileRoutesById {
   '/terms-of-service': typeof TermsOfServiceRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/upgrade': typeof UpgradeRoute
+  '/vpd-chart': typeof VpdChartRoute
   '/welcome': typeof WelcomeRoute
   '/_app/_operator': typeof AppOperatorRouteWithChildren
   '/_app/action-queue': typeof AppActionQueueRoute
@@ -1295,6 +1313,7 @@ export interface FileRoutesById {
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
+  '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
@@ -1412,6 +1431,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/unsubscribe'
     | '/upgrade'
+    | '/vpd-chart'
     | '/welcome'
     | '/action-queue'
     | '/actions'
@@ -1444,6 +1464,7 @@ export interface FileRouteTypes {
     | '/cultivars/$slug'
     | '/docs/mcp-api'
     | '/guides/$slug'
+    | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1559,6 +1580,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/unsubscribe'
     | '/upgrade'
+    | '/vpd-chart'
     | '/welcome'
     | '/action-queue'
     | '/actions'
@@ -1590,6 +1612,7 @@ export interface FileRouteTypes {
     | '/cultivars/$slug'
     | '/docs/mcp-api'
     | '/guides/$slug'
+    | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1706,6 +1729,7 @@ export interface FileRouteTypes {
     | '/terms-of-service'
     | '/unsubscribe'
     | '/upgrade'
+    | '/vpd-chart'
     | '/welcome'
     | '/_app/_operator'
     | '/_app/action-queue'
@@ -1739,6 +1763,7 @@ export interface FileRouteTypes {
     | '/cultivars/$slug'
     | '/docs/mcp-api'
     | '/guides/$slug'
+    | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
@@ -1856,6 +1881,7 @@ export interface RootRouteChildren {
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   UpgradeRoute: typeof UpgradeRoute
+  VpdChartRoute: typeof VpdChartRoute
   WelcomeRoute: typeof WelcomeRoute
   BillingPlanRoute: typeof BillingPlanRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
@@ -1863,6 +1889,7 @@ export interface RootRouteChildren {
   CultivarsSlugRoute: typeof CultivarsSlugRoute
   DocsMcpApiRoute: typeof DocsMcpApiRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
+  GuidesAthenaFeedChartLogRoute: typeof GuidesAthenaFeedChartLogRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
@@ -2108,6 +2135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UpgradeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vpd-chart': {
+      id: '/vpd-chart'
+      path: '/vpd-chart'
+      fullPath: '/vpd-chart'
+      preLoaderRoute: typeof VpdChartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/welcome': {
       id: '/welcome'
       path: '/welcome'
@@ -2351,6 +2385,13 @@ declare module '@tanstack/react-router' {
       path: '/guides/$slug'
       fullPath: '/guides/$slug'
       preLoaderRoute: typeof GuidesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/athena-feed-chart-log': {
+      id: '/guides/athena-feed-chart-log'
+      path: '/guides/athena-feed-chart-log'
+      fullPath: '/guides/athena-feed-chart-log'
+      preLoaderRoute: typeof GuidesAthenaFeedChartLogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guides/grow-stage-care-guide': {
@@ -3181,6 +3222,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsOfServiceRoute: TermsOfServiceRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   UpgradeRoute: UpgradeRoute,
+  VpdChartRoute: VpdChartRoute,
   WelcomeRoute: WelcomeRoute,
   BillingPlanRoute: BillingPlanRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
@@ -3188,6 +3230,7 @@ const rootRouteChildren: RootRouteChildren = {
   CultivarsSlugRoute: CultivarsSlugRoute,
   DocsMcpApiRoute: DocsMcpApiRoute,
   GuidesSlugRoute: GuidesSlugRoute,
+  GuidesAthenaFeedChartLogRoute: GuidesAthenaFeedChartLogRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,

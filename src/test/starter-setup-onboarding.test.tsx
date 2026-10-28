@@ -24,7 +24,7 @@ vi.mock("@/store/auth", () => ({
 
 const refreshGrows = vi.hoisted(() => vi.fn());
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({ refresh: refreshGrows }),
+  useGrows: () => ({ grows: [], loading: false, error: null, refresh: refreshGrows }),
 }));
 
 const entitlementState = vi.hoisted(() => ({

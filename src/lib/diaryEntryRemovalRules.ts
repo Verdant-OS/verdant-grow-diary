@@ -127,3 +127,24 @@ export function getRemoveButtonAriaLabel(isPhoto: boolean, plantName?: string | 
   const name = typeof plantName === "string" ? plantName.trim() : "";
   return name.length > 0 ? `${base} for ${name}` : base;
 }
+
+/**
+ * Server row count for the Detailed diary header after one loaded entry is
+ * removed. `null` means the count is unknown and stays unknown.
+ */
+export function diaryEntriesTotalAfterRemoval(total: number | null): number | null {
+  if (total === null) return null;
+  return Math.max(0, total - 1);
+}
+
+/**
+ * A removal that started on one Timeline page may finish after navigation or
+ * a refresh. Apply it only while that page's read is still the one on screen.
+ */
+export function diaryRemovalCompletionStillCurrent(
+  origin: { requestId: number; readKey: string | null },
+  current: { requestId: number; readKey: string | null },
+): boolean {
+  if (origin.readKey === null || current.readKey === null) return false;
+  return origin.requestId === current.requestId && origin.readKey === current.readKey;
+}

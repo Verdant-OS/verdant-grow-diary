@@ -1,0 +1,293 @@
+/**
+ * QA 2026-10-21 (production 05f5138d, 2/2): every Quick Log correction,
+ * including a note-only "Typo", failed with "…isn't available right now…
+ * Try again later." The client always calls the keyed quicklog_correct_entry
+ * overload; production answers PGRST202 because that server function is not
+ * there (docs/quicklog-revision-idempotent-replay-operator-runbook.md), so a
+ * retry can never succeed. The copy now says so.
+ *
+ * Same report: an Environment Check's correction dialog showed no
+ * temperature/humidity fields. For a check whose readings live only in
+ * details.environment_check, the correction RPC rejects sensor changes
+ * (20261014210000 → "unsupported_change"), so fields could never save. The
+ * dialog now explains instead of silently omitting them.
+ */
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
+  quickLogCorrectionEnvironmentCheckReadingsNote,
+  quickLogRevisionFailureCopy,
+} from "@/lib/quick-log/quickLogRevisionRules";
+import { ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS } from "@/lib/environmentCheckQuickLogRules";
+
+const mocks = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "owner-a" } }) }));
+vi.mock("sonner", () => ({ toast: { success: mocks.success, error: mocks.error } }));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    rpc: mocks.rpc,
+    from: () => {
+      const query = {
+        select: () => query,
+        eq: () => query,
+        order: () => query,
+        limit: async () => ({ data: [{ id: "plant-a", name: "Plant A" }], error: null }),
+      };
+      return query;
+    },
+  },
+}));
+
+import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { RecentQuickLogActivityPanel } from "@/components/QuickLogHistoryPanels";
+
+const envCheckNote = (details: unknown) =>
+  quickLogCorrectionEnvironmentCheckReadingsNote(details, { offersAirReadingFields: false });
+
+const ENV_CHECK_ONLY = {
+  event_type: "environment_check",
+  linked_grow_event_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  environment_check: { checkType: "airflow", temp_c: 24.5, humidity_pct: 58 },
+};
+
+function mount(props: Partial<Parameters<typeof QuickLogEntryIntegrityControls>[0]> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const changed = vi.fn();
+  render(
+    <QueryClientProvider client={client}>
+      <QuickLogEntryIntegrityControls
+        handle={{ growEventId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" }}
+        currentNote="Original"
+        currentPlantId="plant-a"
+        onChanged={changed}
+        {...props}
+      />
+    </QueryClientProvider>,
+  );
+  return { changed };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.rpc.mockReset();
+});
+
+afterEach(async () => {
+  await act(async () => {
+    cleanup();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  });
+});
+
+describe("missing correction server function", () => {
+  it("says retrying won't help, and that nothing changed", () => {
+    const copy = quickLogRevisionFailureCopy("rpc_unavailable");
+    expect(copy).toBe(
+      "Correcting or retracting entries isn't set up on the server yet. Nothing was changed. Trying again won't help until the server is updated.",
+    );
+    expect(copy).not.toMatch(/try again later/i);
+  });
+
+  it("shows that copy for a note-only Typo correction answered with PGRST202, and writes nothing", async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "PGRST202",
+        message: "Could not find the function public.quicklog_correct_entry",
+      },
+    });
+    const { changed } = mount();
+    fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+    fireEvent.click(screen.getByTestId("quicklog-correct-reason-typo"));
+    fireEvent.change(screen.getByTestId("quicklog-correct-note-input"), {
+      target: { value: "Corrected note" },
+    });
+    fireEvent.click(screen.getByTestId("quicklog-correct-save"));
+
+    const alert = await within(screen.getByTestId("quicklog-entry-correct-dialog")).findByRole(
+      "alert",
+    );
+    expect(alert).toHaveTextContent("isn't set up on the server yet");
+    expect(alert).toHaveTextContent("Trying again won't help until the server is updated.");
+    expect(alert).not.toHaveTextContent("Try again later");
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(changed).not.toHaveBeenCalled();
+    expect(mocks.success).not.toHaveBeenCalled();
+  });
+
+  it("leaves other failure copy unchanged", () => {
+    expect(quickLogRevisionFailureCopy("rpc_error")).toBe(
+      "We could not confirm whether this change saved. Try again to confirm the same change.",
+    );
+    expect(quickLogRevisionFailureCopy("unsupported_change")).toBe(
+      "That change is not supported for this entry.",
+    );
+  });
+});
+
+describe("Environment Check readings note", () => {
+  it("explains readings that live only in details.environment_check", () => {
+    expect(envCheckNote(ENV_CHECK_ONLY)).toBe(
+      "Recorded readings on this Environment check that have no field here can't be corrected. You can still correct the note, time, or plant.",
+    );
+  });
+
+  it("explains a legacy check whose only temperature is room_temp_f", () => {
+    expect(
+      envCheckNote({
+        event_type: "environment_check",
+        environment_check: { checkType: "airflow", room_temp_f: 76 },
+      }),
+    ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+  });
+
+  it("explains legacy numeric-string and VPD-only readings, like the canonical parser", () => {
+    expect(
+      envCheckNote({
+        event_type: "environment_check",
+        environment_check: { checkType: "airflow", room_temp_f: "76" },
+      }),
+    ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    expect(
+      envCheckNote({
+        event_type: "environment_check",
+        environment_check: { checkType: "airflow", vpd_kpa: 1.1 },
+      }),
+    ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+  });
+
+  it("explains a CO₂-only check, and names no specific reading it did not record", () => {
+    const note = envCheckNote({
+      event_type: "environment_check",
+      environment_check: { checkType: "airflow", co2_ppm: 900 },
+    });
+    expect(note).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    expect(note).not.toMatch(/temperature|humidity/i);
+  });
+
+  it("explains every reading the Environment check writer persists, each on its own", () => {
+    for (const key of ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS) {
+      expect(
+        envCheckNote({
+          event_type: "environment_check",
+          environment_check: { checkType: "airflow", [key]: 1.5 },
+        }),
+        key,
+      ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    }
+  });
+
+  it("explains water-temperature-only and EC-only checks", () => {
+    for (const reading of [{ water_temp_f: 68 }, { water_temp_c: 20 }, { ec_mscm: 1.4 }]) {
+      expect(
+        envCheckNote({
+          event_type: "environment_check",
+          environment_check: { checkType: "root_zone", ...reading },
+        }),
+      ).toBe(QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE);
+    }
+  });
+
+  it("is null for a typed Watering entry that carries an environment envelope as context", () => {
+    expect(
+      envCheckNote({
+        event_type: "watering",
+        watering: { volume_ml: 500 },
+        environment_check: { temp_c: 24.5, humidity_pct: 58 },
+      }),
+    ).toBeNull();
+  });
+
+  it("is null when the dialog's sensor fields cover every recorded reading", () => {
+    // A check with a sensor snapshot opens with temperature/humidity fields.
+    expect(
+      quickLogCorrectionEnvironmentCheckReadingsNote(
+        { ...ENV_CHECK_ONLY, sensor_snapshot: { temperature_c: 24.5, humidity_pct: 58 } },
+        { offersAirReadingFields: true },
+      ),
+    ).toBeNull();
+  });
+
+  it("is null for a check with no recorded readings, other entries, and bad input", () => {
+    expect(
+      envCheckNote({
+        event_type: "environment_check",
+        environment_check: { checkType: "smell" },
+      }),
+    ).toBeNull();
+    expect(envCheckNote({ event_type: "watering", watering: {} })).toBeNull();
+    expect(envCheckNote(null)).toBeNull();
+    expect(envCheckNote("x")).toBeNull();
+  });
+
+  it("renders the note in the correction dialog when it offers no reading fields", () => {
+    mount({ environmentCheckDetails: ENV_CHECK_ONLY, correctionValues: null });
+    fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+    expect(screen.getByTestId("quicklog-correct-readings-note")).toHaveTextContent(
+      QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
+    );
+    expect(screen.queryByTestId("quicklog-correct-temperature-input")).toBeNull();
+  });
+
+  it("shows no note when the offered sensor fields cover every recorded reading", () => {
+    mount({
+      environmentCheckDetails: ENV_CHECK_ONLY,
+      correctionValues: { kind: "sensor", sensor: { temperature_c: 24.5, humidity_pct: 58 } },
+    });
+    fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+    expect(screen.getByTestId("quicklog-correct-temperature-input")).toBeInTheDocument();
+    expect(screen.queryByTestId("quicklog-correct-readings-note")).toBeNull();
+  });
+
+  it("shows the note beside the sensor fields when water temperature, EC or CO₂ has no field", () => {
+    for (const extra of [{ water_temp_f: 68 }, { ec_mscm: 1.4 }, { co2_ppm: 900 }]) {
+      mount({
+        environmentCheckDetails: {
+          ...ENV_CHECK_ONLY,
+          environment_check: { ...ENV_CHECK_ONLY.environment_check, ...extra },
+        },
+        correctionValues: { kind: "sensor", sensor: { temperature_c: 24.5, humidity_pct: 58 } },
+      });
+      fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+      expect(screen.getByTestId("quicklog-correct-temperature-input")).toBeInTheDocument();
+      expect(screen.getByTestId("quicklog-correct-readings-note")).toHaveTextContent(
+        QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
+      );
+      cleanup();
+    }
+  });
+});
+
+describe("history correction dialogs", () => {
+  it("explain an envelope-only Environment check in the recent Quick Log panel", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <RecentQuickLogActivityPanel
+          rawEntries={[
+            {
+              id: "diary-env",
+              entry_at: "2026-03-15T09:00:00.000Z",
+              note: "airflow ok",
+              details: {
+                ...ENV_CHECK_ONLY,
+                origin_grow_event_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+              },
+            },
+          ]}
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+    expect(screen.getByTestId("quicklog-correct-readings-note")).toHaveTextContent(
+      QUICKLOG_CORRECTION_ENVIRONMENT_CHECK_READINGS_NOTE,
+    );
+  });
+});

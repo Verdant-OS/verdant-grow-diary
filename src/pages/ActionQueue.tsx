@@ -160,6 +160,7 @@ import {
 } from "@/lib/actionQueueUrlStateRules";
 
 import { Input } from "@/components/ui/input";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -639,6 +640,11 @@ export default function ActionQueue() {
     }
   }, [focusedActionId, loading, rows.length]);
 
+  // Set only by the Previous/Next buttons: a page transition replaces the
+  // visible rows, so it scrolls back to the top. A page reset caused by a
+  // filter, search or page-size change keeps the scroll position (#2348 review).
+  const pagerScrollResetRef = useRef(false);
+
   // Reset to page 1 whenever search/filters/page size change. Skip the
   // very first run so an initial ?page=N from the URL is preserved.
   const filterResetSkipRef = useRef(true);
@@ -662,9 +668,14 @@ export default function ActionQueue() {
       page,
       pageSize,
     });
+    const pagerTransition = pagerScrollResetRef.current;
+    pagerScrollResetRef.current = false;
     // Only write when something actually changes — avoids replace loops.
     if (next.toString() !== searchParams.toString()) {
-      setSearchParams(next, { replace: true });
+      setSearchParams(next, {
+        replace: true,
+        ...(pagerTransition ? { preventScrollReset: false } : {}),
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, traceExtraFilter, page, pageSize]);
@@ -1355,7 +1366,10 @@ export default function ActionQueue() {
             variant="ghost"
             className="min-h-11 sm:min-h-9"
             disabled={!paginated.hasPrev}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => {
+              pagerScrollResetRef.current = true;
+              setPage((p) => Math.max(1, p - 1));
+            }}
             aria-label="Previous page"
             data-testid="action-queue-pagination-prev"
           >
@@ -1372,7 +1386,10 @@ export default function ActionQueue() {
             variant="ghost"
             className="min-h-11 sm:min-h-9"
             disabled={!paginated.hasNext}
-            onClick={() => setPage((p) => Math.min(paginated.totalPages, p + 1))}
+            onClick={() => {
+              pagerScrollResetRef.current = true;
+              setPage((p) => Math.min(paginated.totalPages, p + 1));
+            }}
             aria-label="Next page"
             data-testid="action-queue-pagination-next"
           >
@@ -1657,7 +1674,9 @@ export default function ActionQueue() {
                           </div>
                           <p className="text-sm mt-1">{sanitizeActionCopy(row.suggested_change)}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {sanitizeActionCopy(stripBackPointerTokens(row.reason))}
+                            {localizeReadingAtTimestamps(
+                              sanitizeActionCopy(stripBackPointerTokens(row.reason)),
+                            )}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <AiDoctorSessionLink row={row} />

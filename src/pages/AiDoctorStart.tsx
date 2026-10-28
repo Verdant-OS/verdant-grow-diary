@@ -1,9 +1,12 @@
 /**
  * Canonical grower entry for AI Doctor.
  *
- * This page is navigation only. It never invokes a model, spends a credit,
- * persists a session, or selects a plant implicitly. The grower explicitly
- * chooses an active plant, then lands on the existing plant-scoped review.
+ * Rendering never invokes a model, spends a credit, persists a session, or
+ * selects a plant implicitly. The plant list is navigation only: the grower
+ * explicitly chooses an active plant, then lands on the existing plant-scoped
+ * review. The one exception is the grow-level "Next steps" card: an explicit
+ * click there calls `ai-coach` for the named grow and may spend one AI credit
+ * (the server decides credits and refunds an empty grow).
  */
 import { useMemo } from "react";
 import { ArrowRight, History, Sprout, Stethoscope } from "lucide-react";
@@ -12,6 +15,7 @@ import { Link, useSearchParams } from "@/lib/react-router-compat";
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
+import DoctorGrowNextStepsCard from "@/components/DoctorGrowNextStepsCard";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -28,6 +32,7 @@ import {
   partitionDoctorEntryOptionsByTent,
   resolveDoctorStartScope,
 } from "@/lib/doctorStartContextRules";
+import { resolveDoctorGrowNextStepsTarget } from "@/lib/doctorGrowNextStepsRules";
 import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { plantsPath } from "@/lib/routes";
 import { useGrows } from "@/store/grows";
@@ -42,7 +47,13 @@ export default function AiDoctorStart() {
   // the grower's loaded options + carried tent. An id in a URL is a request,
   // not a grant — and an unacceptable plant is messaged, never silently dropped.
   const [searchParams] = useSearchParams();
-  const { grows, loading: growsLoading, error: growsError, refresh: refreshGrows } = useGrows();
+  const {
+    grows,
+    activeGrowId,
+    loading: growsLoading,
+    error: growsError,
+    refresh: refreshGrows,
+  } = useGrows();
   const tentsQuery = useGrowTents();
 
   // Ownership reads start EMPTY, not absent: `grows` is `[]` while loading and
@@ -208,6 +219,17 @@ export default function AiDoctorStart() {
     scopeReadsSettled &&
     !scopeReadFailed;
 
+  // Grow-level next steps (owner decision 2026-10-22): the grow is named on
+  // screen and the AI runs only on an explicit click. No plant is chosen here.
+  const nextStepsTarget = resolveDoctorGrowNextStepsTarget({
+    grows,
+    growsLoading,
+    growsError,
+    carriedScopeUnresolved: scopeOrderingPending || (carriedScopeRequested && scopeReadFailed),
+    carriedGrowId: resolvedScope.growId,
+    activeGrowId,
+  });
+
   return (
     <div className="mx-auto w-full max-w-4xl">
       <PageHeader
@@ -230,6 +252,12 @@ export default function AiDoctorStart() {
         testId="ai-doctor-start-one-tent-loop-next-step-card"
         className="mb-3"
       />
+
+      {nextStepsTarget ? (
+        // Keyed by grow so a result or in-flight request never shows under
+        // another grow's name.
+        <DoctorGrowNextStepsCard key={nextStepsTarget.growId} target={nextStepsTarget} />
+      ) : null}
 
       <section
         className="glass rounded-2xl p-4 sm:p-6"

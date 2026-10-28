@@ -37,7 +37,7 @@ function gate(volumeMl: string) {
 }
 
 const OVERSIZED_VALID = `10001.${"0".repeat(40)}`;
-const JUST_ABOVE_HARD_MAX = "1000000.00000000001";
+const JUST_ABOVE_HARD_MAX = "50000.000000000001";
 
 describe("water volume save parser parity", () => {
   it("rejects volume text longer than the warning can evaluate", () => {
@@ -50,13 +50,14 @@ describe("water volume save parser parity", () => {
   it("rejects a decimal just above the hard maximum that Number() rounds down", () => {
     expect(Number(JUST_ABOVE_HARD_MAX)).toBe(LARGE_WATER_AMOUNT_HARD_MAX_ML);
     expect(JUST_ABOVE_HARD_MAX.length).toBeLessThanOrEqual(MAX_WATER_VOLUME_TEXT_LENGTH);
-    expect(save(JUST_ABOVE_HARD_MAX)).toEqual({ ok: false, reason: "volume_ml:invalid" });
+    expect(save(JUST_ABOVE_HARD_MAX)).toEqual({ ok: false, reason: "volume_ml:too_large" });
     expect(gate(JUST_ABOVE_HARD_MAX).blocksSave).toBe(true);
   });
 
   it("still saves the hard maximum and ordinary amounts unchanged", () => {
-    const max = save("1000000");
-    expect(max.ok && max.payload.volume_ml).toBe(1_000_000);
+    const max = save("50000");
+    expect(max.ok && max.payload.volume_ml).toBe(50_000);
+    expect(save("50001")).toEqual({ ok: false, reason: "volume_ml:too_large" });
     const half = save(" 10.5 ");
     expect(half.ok && half.payload.volume_ml).toBe(10.5);
     expect(save("0")).toEqual({ ok: false, reason: "volume_ml:invalid" });

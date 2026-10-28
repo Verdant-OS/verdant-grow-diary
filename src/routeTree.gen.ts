@@ -104,6 +104,7 @@ import { Route as AppDiaryEnvironmentSummaryRouteImport } from './routes/_app/di
 import { Route as AppDiaryPhenoExpressionComparisonRouteImport } from './routes/_app/diary.pheno-expression-comparison'
 import { Route as AppDoctorSessionsRouteImport } from './routes/_app/doctor_.sessions'
 import { Route as AppGeneticsIndexRouteImport } from './routes/_app/genetics.index'
+import { Route as AppGrowersUserIdRouteImport } from './routes/_app/growers.$userId'
 import { Route as AppGrowsGrowIdRouteImport } from './routes/_app/grows_.$growId'
 import { Route as AppPhenoHuntsNewRouteImport } from './routes/_app/pheno-hunts_.new'
 import { Route as AppPlantsIdRouteImport } from './routes/_app/plants_.$id'
@@ -640,6 +641,11 @@ const AppGeneticsIndexRoute = AppGeneticsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppGeneticsRoute,
 } as any)
+const AppGrowersUserIdRoute = AppGrowersUserIdRouteImport.update({
+  id: '/growers/$userId',
+  path: '/growers/$userId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppGrowsGrowIdRoute = AppGrowsGrowIdRouteImport.update({
   id: '/grows_/$growId',
   path: '/grows/$growId',
@@ -1028,6 +1034,7 @@ export interface FileRoutesByFullPath {
   '/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
   '/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
   '/doctor/sessions': typeof AppDoctorSessionsRoute
+  '/growers/$userId': typeof AppGrowersUserIdRoute
   '/grows/$growId': typeof AppGrowsGrowIdRoute
   '/pheno-hunts/new': typeof AppPhenoHuntsNewRoute
   '/plants/$id': typeof AppPlantsIdRoute
@@ -1174,6 +1181,7 @@ export interface FileRoutesByTo {
   '/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
   '/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
   '/doctor/sessions': typeof AppDoctorSessionsRoute
+  '/growers/$userId': typeof AppGrowersUserIdRoute
   '/grows/$growId': typeof AppGrowsGrowIdRoute
   '/pheno-hunts/new': typeof AppPhenoHuntsNewRoute
   '/plants/$id': typeof AppPlantsIdRoute
@@ -1324,6 +1332,7 @@ export interface FileRoutesById {
   '/_app/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
   '/_app/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
   '/_app/doctor_/sessions': typeof AppDoctorSessionsRoute
+  '/_app/growers/$userId': typeof AppGrowersUserIdRoute
   '/_app/grows_/$growId': typeof AppGrowsGrowIdRoute
   '/_app/pheno-hunts_/new': typeof AppPhenoHuntsNewRoute
   '/_app/plants_/$id': typeof AppPlantsIdRoute
@@ -1473,6 +1482,7 @@ export interface FileRouteTypes {
     | '/diary/environment-summary'
     | '/diary/pheno-expression-comparison'
     | '/doctor/sessions'
+    | '/growers/$userId'
     | '/grows/$growId'
     | '/pheno-hunts/new'
     | '/plants/$id'
@@ -1619,6 +1629,7 @@ export interface FileRouteTypes {
     | '/diary/environment-summary'
     | '/diary/pheno-expression-comparison'
     | '/doctor/sessions'
+    | '/growers/$userId'
     | '/grows/$growId'
     | '/pheno-hunts/new'
     | '/plants/$id'
@@ -1768,6 +1779,7 @@ export interface FileRouteTypes {
     | '/_app/diary/environment-summary'
     | '/_app/diary/pheno-expression-comparison'
     | '/_app/doctor_/sessions'
+    | '/_app/growers/$userId'
     | '/_app/grows_/$growId'
     | '/_app/pheno-hunts_/new'
     | '/_app/plants_/$id'
@@ -2549,6 +2561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppGeneticsIndexRouteImport
       parentRoute: typeof AppGeneticsRoute
     }
+    '/_app/growers/$userId': {
+      id: '/_app/growers/$userId'
+      path: '/growers/$userId'
+      fullPath: '/growers/$userId'
+      preLoaderRoute: typeof AppGrowersUserIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/grows_/$growId': {
       id: '/_app/grows_/$growId'
       path: '/grows/$growId'
@@ -3078,6 +3097,7 @@ interface AppRouteChildren {
   AppDiaryEnvironmentSummaryRoute: typeof AppDiaryEnvironmentSummaryRoute
   AppDiaryPhenoExpressionComparisonRoute: typeof AppDiaryPhenoExpressionComparisonRoute
   AppDoctorSessionsRoute: typeof AppDoctorSessionsRoute
+  AppGrowersUserIdRoute: typeof AppGrowersUserIdRoute
   AppGrowsGrowIdRoute: typeof AppGrowsGrowIdRoute
   AppPhenoHuntsNewRoute: typeof AppPhenoHuntsNewRoute
   AppPlantsIdRoute: typeof AppPlantsIdRoute
@@ -3130,6 +3150,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDiaryPhenoExpressionComparisonRoute:
     AppDiaryPhenoExpressionComparisonRoute,
   AppDoctorSessionsRoute: AppDoctorSessionsRoute,
+  AppGrowersUserIdRoute: AppGrowersUserIdRoute,
   AppGrowsGrowIdRoute: AppGrowsGrowIdRoute,
   AppPhenoHuntsNewRoute: AppPhenoHuntsNewRoute,
   AppPlantsIdRoute: AppPlantsIdRoute,

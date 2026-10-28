@@ -11,3 +11,10 @@
  * see no awards. Evidence photos stay private to the owning account.
  */
 export const ownerBadgeShelfEnabled = false as const;
+
+/**
+ * Display flag for the member badge profile (`/growers/:userId`, Cut 001 AC7).
+ * Presentation only; RLS is the boundary. Petal must approve
+ * `memberBadgeProfileCopy` before this flag is turned on.
+ */
+export const memberBadgeProfileEnabled = false as const;

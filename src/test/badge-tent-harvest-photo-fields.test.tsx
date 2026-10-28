@@ -14,6 +14,9 @@ const updateMock = vi.fn(() => ({ eq: eqMock }));
 const insertMock = vi.fn();
 const singleMock = vi.fn();
 const rpcMock = vi.fn();
+const uploadMock = vi.fn();
+const removeMock = vi.fn();
+const tentReadMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -23,26 +26,32 @@ vi.mock("@/integrations/supabase/client", () => ({
         return { select: () => ({ single: singleMock }) };
       };
       if (table === "tents") {
-        return { update: updateMock, insert };
+        const read = { eq: () => read, maybeSingle: tentReadMock };
+        return { update: updateMock, insert, select: () => read };
       }
       return { insert };
     },
     rpc: (...args: unknown[]) => rpcMock(...args),
     storage: {
       from: () => ({
-        upload: vi.fn(),
-        remove: vi.fn(),
+        upload: uploadMock,
+        remove: removeMock,
       }),
     },
   },
 }));
 
+// One stable user object across renders, like the real auth store, so a
+// stale useCallback closure over harvestPhotoFile cannot hide behind
+// per-render identity churn.
+const authState = vi.hoisted(() => ({ user: { id: "user-1" }, loading: false }));
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
+  useAuth: () => authState,
 }));
 
+const toastError = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: toastError, success: vi.fn() },
 }));
 
 const growsState = vi.hoisted(() => ({
@@ -96,11 +105,21 @@ function withClient(node: ReactNode) {
 
 describe("badge tent and harvest photo fields", () => {
   beforeEach(() => {
+    // Pending-save recovery records persist in web storage between renders.
+    window.sessionStorage.clear();
+    window.localStorage.clear();
     eqMock.mockReset();
     updateMock.mockClear();
     insertMock.mockReset();
     singleMock.mockReset();
     rpcMock.mockReset();
+    uploadMock.mockReset();
+    removeMock.mockReset();
+    tentReadMock.mockReset();
+    tentReadMock.mockResolvedValue({ data: null, error: null });
+    removeMock.mockResolvedValue({ data: [], error: null });
+    toastError.mockReset();
+    uploadMock.mockResolvedValue({ error: null });
     eqMock.mockResolvedValue({ error: null });
     singleMock.mockResolvedValue({
       data: { id: "tent-new", name: "Tent #1", grow_id: "grow-1" },
@@ -151,5 +170,283 @@ describe("badge tent and harvest photo fields", () => {
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
     await waitFor(() => expect(rpcMock).toHaveBeenCalled());
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  function renderHarvestSection() {
+    render(
+      withClient(
+        <QuickLogAllActivitiesSection
+          growId="grow-1"
+          tentId="tent-1"
+          plantId="plant-1"
+          plantStage="flower"
+        />,
+      ),
+    );
+  }
+
+  async function openHarvest() {
+    if (!screen.queryByTestId("quick-log-all-activities-picker-harvest")) {
+      fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+    }
+    fireEvent.click(await screen.findByTestId("quick-log-all-activities-picker-harvest"));
+    return (await screen.findByTestId(
+      "quick-log-all-activities-harvest-photo",
+    )) as HTMLInputElement;
+  }
+
+  const harvestInserts = () => insertMock.mock.calls.filter(([table]) => table === "harvests");
+  const photoDiaryInserts = () =>
+    insertMock.mock.calls.filter(([table]) => table === "diary_entries");
+  const savedPhotoUrls = () =>
+    rpcMock.mock.calls
+      .filter(([fn]) => fn === "quicklog_save_event")
+      .map(([, args]) => (args as { p_photo_url: string | null }).p_photo_url);
+
+  it("attaches a harvest photo once, then a second harvest save attaches nothing", async () => {
+    renderHarvestSection();
+    const input = await openHarvest();
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+      target: { value: "28" },
+    });
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(savedPhotoUrls()).toHaveLength(1));
+    expect(savedPhotoUrls()[0]).toMatch(/^user-1\/grow-1\//);
+    expect(input.value).toBe("");
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-harvest-photo")).toBeNull(),
+    );
+
+    // Second harvest with the picker untouched: the activity saves, but the
+    // first photo must not be uploaded again or attached to a new row.
+    await openHarvest();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-harvest-photo")).toBeNull(),
+    );
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(savedPhotoUrls()).toEqual([savedPhotoUrls()[0], null]);
+    expect(photoDiaryInserts()).toHaveLength(0);
+    expect(harvestInserts()).toHaveLength(0);
+  });
+
+  it("keeps Save disabled until the harvest photo upload settles, so one click is one row", async () => {
+    let releaseUpload: (value: { error: null }) => void = () => {};
+    uploadMock.mockReturnValue(
+      new Promise((resolve) => {
+        releaseUpload = resolve;
+      }),
+    );
+    renderHarvestSection();
+    const input = await openHarvest();
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
+    });
+    const save = screen.getByTestId("quick-log-all-activities-save");
+    fireEvent.click(save);
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    // The upload runs before any save is claimed, so Save stays on screen
+    // and disabled until it settles; a second click starts nothing.
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    expect(screen.queryByTestId("quick-log-all-activities-retry-original")).toBeNull();
+    fireEvent.click(save);
+    releaseUpload({ error: null });
+    await waitFor(() => expect(savedPhotoUrls()).toHaveLength(1));
+    expect(photoDiaryInserts()).toHaveLength(0);
+    expect(harvestInserts()).toHaveLength(0);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+  const photo = () => new File(["img"], "tent.jpg", { type: "image/jpeg" });
+
+  function deferredUpload() {
+    let release: (value: { error: null }) => void = () => {};
+    uploadMock.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    return () => release({ error: null });
+  }
+
+  function openEditTent() {
+    fireEvent.click(screen.getByTestId("edit-tent-trigger"));
+    return screen.getByTestId("edit-tent-photo") as HTMLInputElement;
+  }
+
+  const tentPhotoPath = () => String(uploadMock.mock.calls[0]?.[0]);
+
+  it("create tent: a double click during a pending photo upload creates one tent", async () => {
+    const releaseUpload = deferredUpload();
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    const submit = screen.getByRole("button", { name: /create tent|save/i });
+    fireEvent.click(submit);
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form") as HTMLFormElement);
+    releaseUpload();
+    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    const payload = insertMock.mock.calls[0]?.[1] as { photo_url?: string };
+    expect(payload.photo_url).toMatch(/^storage:\/\//);
+  });
+
+  it("create tent: a definitive insert error removes the uploaded photo", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    singleMock.mockResolvedValue({ data: null, error: { code: "23514", message: "rejected" } });
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    expect(removeMock).toHaveBeenCalledWith([tentPhotoPath()]);
+  });
+
+  it("create tent: keeps the uploaded photo when a code-less error leaves the row unconfirmed", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    singleMock.mockResolvedValue({ data: null, error: { message: "Bad gateway" } });
+    tentReadMock.mockResolvedValue({ data: null, error: { message: "unavailable" } });
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "Verdant could not confirm whether this tent was saved. Refresh before adding another.",
+      ),
+    );
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(removeMock).not.toHaveBeenCalled();
+  });
+
+  it("create tent: a photo picked before the form is hidden is not uploaded after it returns", async () => {
+    const view = render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    view.rerender(
+      withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" writeBlocked />),
+    );
+    view.rerender(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.click(screen.getByRole("button", { name: /new tent/i }));
+    fireEvent.change(await screen.findByPlaceholderText("Tent #1"), {
+      target: { value: "Tent #1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).not.toHaveBeenCalled();
+  });
+
+  it("harvest: a rejected photo leaves the picker empty and a valid pick clears its error", async () => {
+    renderHarvestSection();
+    const input = await openHarvest();
+    fireEvent.change(input, {
+      target: { files: [new File(["x"], "notes.txt", { type: "text/plain" })] },
+    });
+    const error = await screen.findByTestId("quick-log-all-activities-error");
+    const message = error.textContent;
+    expect(input.value).toBe("");
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "bud.jpg", { type: "image/jpeg" })] },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText(message ?? "__none__", { exact: false })).toBeNull(),
+    );
+  });
+
+  it("create tent: a code-less error whose row re-reads as saved takes the success path", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    singleMock.mockResolvedValue({ data: null, error: { message: "Bad gateway" } });
+    tentReadMock.mockImplementation(async () => ({
+      data: {
+        id: (insertMock.mock.calls[0]?.[1] as { id: string }).id,
+        user_id: "user-1",
+        grow_id: "grow-1",
+        name: "Tent #1",
+      },
+      error: null,
+    }));
+    render(withClient(<CreateTentDialog initiallyOpen defaultGrowId="grow-1" />));
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "Tent #1" } });
+    fireEvent.change(screen.getByTestId("create-tent-photo"), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByRole("button", { name: /create tent|save/i }));
+    await waitFor(() => expect(tentReadMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByPlaceholderText("Tent #1")).toBeNull());
+    expect(removeMock).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("edit tent: an invalid size is rejected before any photo upload", async () => {
+    render(withClient(<EditTentDialog tent={tent} />));
+    const input = openEditTent();
+    fireEvent.change(screen.getByTestId("edit-tent-size"), { target: { value: "4x-4" } });
+    fireEvent.change(input, { target: { files: [photo()] } });
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("edit tent: a photo picked then cancelled is not uploaded by the next edit", async () => {
+    render(withClient(<EditTentDialog tent={tent} />));
+    fireEvent.change(openEditTent(), { target: { files: [photo()] } });
+    fireEvent.keyDown(screen.getByTestId("edit-tent-dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("edit-tent-dialog")).toBeNull());
+    openEditTent();
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).not.toHaveBeenCalled();
+    const payload = (updateMock.mock.calls as unknown as Array<[{ photo_url?: string }]>)[0]?.[0];
+    expect(payload.photo_url).toBeUndefined();
+  });
+
+  it("edit tent: a saved photo is not uploaded again by a later text-only edit", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    render(withClient(<EditTentDialog tent={tent} />));
+    fireEvent.change(openEditTent(), { target: { files: [photo()] } });
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(screen.queryByTestId("edit-tent-dialog")).toBeNull());
+    openEditTent();
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(2));
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    const second = (updateMock.mock.calls as unknown as Array<[{ photo_url?: string }]>)[1]?.[0];
+    expect(second.photo_url).toBeUndefined();
+  });
+
+  it("edit tent: a double submit during a pending photo upload sends one update", async () => {
+    const releaseUpload = deferredUpload();
+    render(withClient(<EditTentDialog tent={tent} />));
+    fireEvent.change(openEditTent(), { target: { files: [photo()] } });
+    const submit = screen.getByTestId("edit-tent-submit");
+    fireEvent.click(submit);
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form") as HTMLFormElement);
+    releaseUpload();
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("edit tent: removes the uploaded photo only when the update definitively failed", async () => {
+    uploadMock.mockResolvedValue({ error: null });
+    eqMock.mockResolvedValueOnce({ error: { code: "42501", message: "denied" } });
+    eqMock.mockResolvedValueOnce({ error: { message: "Failed to fetch" } });
+    render(withClient(<EditTentDialog tent={tent} />));
+    const input = openEditTent();
+    fireEvent.change(input, { target: { files: [photo()] } });
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    expect(removeMock).toHaveBeenCalledWith([tentPhotoPath()]);
+
+    // Network loss may have committed the reference: keep the object.
+    fireEvent.click(screen.getByTestId("edit-tent-submit"));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(2));
+    expect(uploadMock).toHaveBeenCalledTimes(2);
+    expect(removeMock).toHaveBeenCalledTimes(1);
   });
 });

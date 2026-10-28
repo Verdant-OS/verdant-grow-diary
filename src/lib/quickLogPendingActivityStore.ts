@@ -19,6 +19,8 @@ export interface PendingQuickLogActivityInput {
   readonly occurredAt: string | null;
   readonly extraDetails: Record<string, unknown> | null;
   readonly idempotencyKey: string;
+  /** Harvest only: the already-uploaded diary photo the retried save must replay. */
+  readonly photoUrl?: string;
 }
 
 export interface PendingQuickLogActivity {
@@ -134,6 +136,7 @@ function validRecord(
       "occurredAt",
       "extraDetails",
       "idempotencyKey",
+      "photoUrl",
     ])
   )
     return false;
@@ -152,6 +155,13 @@ function validRecord(
     typeof input.activityId !== "string" ||
     !Object.prototype.hasOwnProperty.call(QUICK_LOG_ACTIVITY_DEFINITIONS, input.activityId) ||
     ["photo", "watering", "manual_sensor_snapshot"].includes(input.activityId)
+  )
+    return false;
+  if (
+    input.photoUrl !== undefined &&
+    (input.activityId !== "harvest" ||
+      !nonempty(input.photoUrl) ||
+      !input.photoUrl.startsWith(`${ownerId}/`))
   )
     return false;
   if (

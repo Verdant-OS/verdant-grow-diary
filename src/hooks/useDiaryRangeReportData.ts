@@ -18,6 +18,7 @@ import type {
   DiaryRangeHarvestRow,
   DiaryRangeSensorReadingRow,
 } from "@/lib/diaryRangeReportRules";
+import { diaryRowDetailsPhotoPath } from "@/lib/diaryRangeReportRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import {
   EFFECTIVE_SENSOR_QUERY_VERSION,
@@ -73,15 +74,47 @@ async function signPhotoUrls(rows: DiaryRangeDiaryRow[]): Promise<DiaryRangeDiar
   const paths = rows
     .map((r) => r.photo_url)
     .filter((p): p is string => !!p && !p.startsWith("http"));
-  if (paths.length === 0) return rows;
-  const { data, error } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
-  if (error || !Array.isArray(data)) throw new Error("Diary report photos unavailable.");
-  const map = new Map(data.map((s) => [s.path as string, s.signedUrl]));
-  if (paths.some((path) => !map.get(path)?.trim()))
-    throw new Error("Diary report photos unavailable.");
-  return rows.map((r) =>
-    r.photo_url && map.has(r.photo_url) ? { ...r, photo_url: map.get(r.photo_url)! } : r,
-  );
+  let map = new Map<string, string | null>();
+  if (paths.length > 0) {
+    const { data, error } = await supabase.storage
+      .from("diary-photos")
+      .createSignedUrls(paths, 3600);
+    if (error || !Array.isArray(data)) throw new Error("Diary report photos unavailable.");
+    map = new Map(data.map((s) => [s.path as string, s.signedUrl]));
+    if (paths.some((path) => !map.get(path)?.trim()))
+      throw new Error("Diary report photos unavailable.");
+  }
+  // A photo kept only in details.photo_url (a recovered save, or a failed
+  // column normalization). It is signed in its own call, and any failure
+  // there, per item or for the whole batch, drops those photos instead of
+  // failing the report: a stale path on an old row cannot take down a
+  // report that rendered before this fallback existed.
+  const fallbackPaths = [
+    ...new Set(rows.map(diaryRowDetailsPhotoPath).filter((p): p is string => p !== null)),
+  ];
+  const fallbackMap = new Map<string, string>();
+  if (fallbackPaths.length > 0) {
+    try {
+      const { data, error } = await supabase.storage
+        .from("diary-photos")
+        .createSignedUrls(fallbackPaths, 3600);
+      if (!error && Array.isArray(data)) {
+        for (const s of data) {
+          const url = typeof s.signedUrl === "string" ? s.signedUrl.trim() : "";
+          if (url) fallbackMap.set(s.path as string, url);
+        }
+      }
+    } catch {
+      // Fallback photos are best-effort; the report renders without them.
+    }
+  }
+  if (paths.length === 0 && fallbackMap.size === 0) return rows;
+  return rows.map((r) => {
+    if (r.photo_url && map.has(r.photo_url)) return { ...r, photo_url: map.get(r.photo_url)! };
+    const fallback = diaryRowDetailsPhotoPath(r);
+    const signed = fallback ? fallbackMap.get(fallback) : undefined;
+    return signed ? { ...r, photo_url: signed } : r;
+  });
 }
 
 export function useDiaryRangeReportData(

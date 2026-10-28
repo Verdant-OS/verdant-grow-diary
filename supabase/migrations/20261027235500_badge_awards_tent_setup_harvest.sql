@@ -20,6 +20,9 @@ COMMENT ON COLUMN public.harvests.photo_url IS
 ALTER TABLE public.badge_evidence
   ADD COLUMN IF NOT EXISTS harvest_id uuid;
 
+COMMENT ON COLUMN public.badge_evidence.harvest_id IS
+  'The qualifying harvest: a harvests row id or a Quick Log harvest grow_events id. No foreign key.';
+
 ALTER TABLE public.badge_awards DROP CONSTRAINT IF EXISTS badge_awards_badge_key_check;
 ALTER TABLE public.badge_awards
   ADD CONSTRAINT badge_awards_badge_key_check
@@ -33,8 +36,8 @@ ALTER TABLE public.badge_awards
   );
 
 -- Qualifies first_tent, setup_documented, and first_recorded_harvest.
--- Called only from badge_awards_evaluate_owner after the kill switch and
--- auth.uid() checks. Not granted to client roles.
+-- Called only from badge_awards_evaluate_owner after the kill switch,
+-- auth.uid() and anonymous-session checks. Not granted to client roles.
 CREATE OR REPLACE FUNCTION public.badge_awards_evaluate_photo_subject(
   badge_key text,
   uid uuid
@@ -59,6 +62,7 @@ DECLARE
   prior_photo text;
   prior_tent uuid;
   prior_harvest uuid;
+  runtime_enabled boolean;
 BEGIN
   IF badge_key = 'first_tent' THEN
     subject_kind := 'tent';
@@ -98,8 +102,7 @@ BEGIN
         OR NULLIF(btrim(tent.light_schedule), '') IS NOT NULL
         OR tent.light_wattage IS NOT NULL
         OR (
-          tent.hardware_config IS NOT NULL
-          AND tent.hardware_config <> 'null'::jsonb
+          jsonb_typeof(tent.hardware_config) = 'object'
           AND tent.hardware_config <> '{}'::jsonb
         )
       )
@@ -108,16 +111,54 @@ BEGIN
     tent_id := subject_id;
   ELSE
     -- The account's earliest harvest, not the earliest harvest that has a photo.
-    SELECT harvest.id,
-           public.badge_awards_owned_diary_photo_name(harvest.photo_url, uid),
-           harvest.grow_id
+    -- A harvest is a harvests row or a live Quick Log harvest event. An
+    -- event's photo is the owned photo on its unretracted linked diary
+    -- companion (written by quicklog_save_event's p_photo_url), matched by
+    -- the exact event id, never by time.
+    SELECT candidate.subject_id, candidate.photo_name, candidate.grow_id
       INTO subject_id, photo_name, grow_id
-    FROM public.harvests AS harvest
-    JOIN public.grows AS grow
-      ON grow.id = harvest.grow_id
-     AND grow.user_id = uid
-    WHERE harvest.user_id = uid
-    ORDER BY harvest.harvested_at ASC, harvest.id ASC
+    FROM (
+      SELECT harvest.id AS subject_id,
+             public.badge_awards_owned_diary_photo_name(harvest.photo_url, uid) AS photo_name,
+             harvest.grow_id AS grow_id,
+             harvest.harvested_at::timestamptz AS happened_at
+      FROM public.harvests AS harvest
+      JOIN public.grows AS grow
+        ON grow.id = harvest.grow_id
+       AND grow.user_id = uid
+      WHERE harvest.user_id = uid
+      UNION ALL
+      SELECT event.id,
+             (
+               SELECT public.badge_awards_owned_diary_photo_name(
+                        coalesce(entry.photo_url, entry.details ->> 'photo_url'), uid
+                      )
+               FROM public.diary_entries AS entry
+               WHERE entry.user_id = uid
+                 AND entry.grow_id = event.grow_id
+                 AND entry.retracted_at IS NULL
+                 AND event.id::text IN (
+                   entry.details ->> 'linked_grow_event_id',
+                   entry.details ->> 'grow_event_id'
+                 )
+                 AND public.badge_awards_owned_diary_photo_name(
+                       coalesce(entry.photo_url, entry.details ->> 'photo_url'), uid
+                     ) IS NOT NULL
+               ORDER BY entry.entry_at ASC, entry.id ASC
+               LIMIT 1
+             ),
+             event.grow_id,
+             coalesce(event.occurred_at, event.created_at)
+      FROM public.grow_events AS event
+      JOIN public.grows AS grow
+        ON grow.id = event.grow_id
+       AND grow.user_id = uid
+      WHERE event.user_id = uid
+        AND event.event_type = 'harvest'
+        AND event.is_deleted IS NOT TRUE
+        AND event.deleted_at IS NULL
+    ) AS candidate
+    ORDER BY candidate.happened_at ASC, candidate.subject_id ASC
     LIMIT 1;
     IF photo_name IS NULL THEN
       subject_id := NULL;
@@ -135,6 +176,22 @@ BEGIN
 
   IF revoked_at IS NOT NULL THEN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
+  END IF;
+
+  -- Same write barrier as badge_awards_evaluate_owner (#1979, cbdb77fd2):
+  -- recheck the kill switch under a row lock after the advisory lock and
+  -- immediately before any award or evidence write. FOR SHARE still blocks a
+  -- concurrent `UPDATE ... enabled = false`, but two evaluations never block
+  -- each other: reconcile keeps this lock for its whole batch, and an
+  -- exclusive lock there deadlocks a user check that holds its owner lock.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR SHARE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN jsonb_build_object('status', 'disabled');
   END IF;
 
   IF subject_id IS NULL THEN
@@ -245,6 +302,8 @@ DECLARE
   was_hidden boolean;
   revoked_at timestamptz;
 BEGIN
+  -- Fast path only. The write barrier is the FOR SHARE recheck after the
+  -- advisory lock, immediately before any award or evidence mutation.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
@@ -256,6 +315,10 @@ BEGIN
 
   uid := auth.uid();
   IF uid IS NULL THEN
+    RETURN jsonb_build_object('status', 'not_authenticated');
+  END IF;
+
+  IF COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) THEN
     RETURN jsonb_build_object('status', 'not_authenticated');
   END IF;
 
@@ -342,6 +405,22 @@ BEGIN
 
   IF revoked_at IS NOT NULL THEN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
+  END IF;
+
+  -- Recheck under a row lock after the advisory lock and immediately before
+  -- any award or evidence write, so a committed enabled = false is a write
+  -- barrier. This lock stays after the advisory wait: taking it earlier
+  -- deadlocks a concurrent disable that is waiting to commit. It is FOR SHARE
+  -- so reconcile, which keeps it for its whole batch, cannot deadlock a user
+  -- check that holds its own owner advisory lock.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR SHARE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN jsonb_build_object('status', 'disabled');
   END IF;
 
   IF entry_id IS NULL THEN
@@ -440,8 +519,19 @@ DECLARE
   owner uuid;
   last_owner uuid;
   reconciled integer := 0;
+  visited integer := 0;
   batch_limit constant integer := 25;
 BEGIN
+  -- One reconcile at a time. Each evaluate_owner leaves a FOR SHARE lock on
+  -- the runtime row for the rest of this transaction, and the cursor write
+  -- below upgrades it to FOR UPDATE. A second, overlapping run returns 0
+  -- instead of queueing behind this one or racing it for that upgrade.
+  IF NOT pg_try_advisory_xact_lock(hashtextextended('badge_awards_reconcile', 0)) THEN
+    RETURN 0;
+  END IF;
+
+  -- Fast path only. Each owner is read again before evaluate_owner, and the
+  -- cursor write rechecks under FOR UPDATE after that call returns.
   SELECT runtime.enabled, runtime.reconcile_after
     INTO runtime_enabled, cursor_after
   FROM public.badge_award_runtime AS runtime
@@ -473,20 +563,51 @@ BEGIN
     ORDER BY owners.user_id
     LIMIT batch_limit
   LOOP
-    PERFORM set_config('request.jwt.claim.sub', owner::text, true);
-    PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
-    PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
-    PERFORM public.badge_awards_evaluate_owner('first_tent');
-    PERFORM public.badge_awards_evaluate_owner('setup_documented');
-    PERFORM public.badge_awards_evaluate_owner('first_recorded_harvest');
-    reconciled := reconciled + 1;
+    -- Plain read, once per owner. Do not take FOR UPDATE here: evaluate_owner
+    -- waits on the owner advisory lock, and an exclusive runtime lock held
+    -- across that wait deadlocks a user check. evaluate_owner's own recheck
+    -- leaves only FOR SHARE for the rest of this transaction, which a
+    -- concurrent disable waits on and which other evaluations share.
+    SELECT runtime.enabled
+      INTO runtime_enabled
+    FROM public.badge_award_runtime AS runtime
+    WHERE runtime.id = 1;
+
+    IF runtime_enabled IS NOT TRUE THEN
+      EXIT;
+    END IF;
+
+    BEGIN
+      PERFORM set_config('request.jwt.claim.sub', owner::text, true);
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
+      PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
+      PERFORM public.badge_awards_evaluate_owner('first_tent');
+      PERFORM public.badge_awards_evaluate_owner('setup_documented');
+      PERFORM public.badge_awards_evaluate_owner('first_recorded_harvest');
+      reconciled := reconciled + 1;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'badge_awards_reconcile skipped owner %: %', owner, SQLERRM;
+    END;
+    visited := visited + 1;
     last_owner := owner;
   END LOOP;
 
   PERFORM set_config('request.jwt.claim.sub', '', true);
   PERFORM set_config('request.jwt.claims', '{}', true);
 
-  IF reconciled < batch_limit THEN
+  -- Same write barrier as the evaluator. Skip the cursor update when the
+  -- switch is off. The row lock is taken only after evaluate_owner returns.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN reconciled;
+  END IF;
+
+  IF visited < batch_limit THEN
     UPDATE public.badge_award_runtime
        SET reconcile_after = NULL
      WHERE id = 1;

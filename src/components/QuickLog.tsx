@@ -190,6 +190,12 @@ import {
 } from "@/lib/tenSecondQuickCheckRules";
 import { buildQuickLogTimelineNavTarget } from "@/lib/quickLogTimelineNavigationTarget";
 import {
+  clearLegacyQuickLogHistoryFence,
+  readLegacyQuickLogHistoryFence,
+  writeLegacyQuickLogHistoryFence,
+  type LegacyQuickLogHistoryFence,
+} from "@/lib/quickLogLegacyHistoryFenceStore";
+import {
   EARLY_STAGE_MILESTONES,
   EARLY_STAGE_VIGOR_OPTIONS,
   EARLY_STAGE_PHOTO_HINT,
@@ -526,6 +532,28 @@ export default function QuickLog({
   const historyWaterRecordRef = useRef<PendingStarterWater | null>(null);
   const [historyReviewNavigation, setHistoryReviewNavigation] =
     useState<ReturnType<typeof buildQuickLogTimelineNavTarget>>(null);
+  // Whether this tab may hold a stored history fence that discard must clear.
+  const historyFenceStoredRef = useRef(false);
+  // Persists the review lock so a reload cannot reopen this dialog unlocked
+  // with a fresh key and save the same log again as a new record.
+  const persistHistoryFence = useCallback(
+    (
+      ownerId: string,
+      reason: LegacyQuickLogHistoryFence["reason"],
+      review: LegacyQuickLogHistoryFence["review"],
+    ) => {
+      const written = writeLegacyQuickLogHistoryFence({
+        version: 1,
+        ownerId,
+        createdAt: new Date().toISOString(),
+        reason,
+        review,
+      });
+      historyFenceStoredRef.current =
+        written || readLegacyQuickLogHistoryFence(ownerId).status !== "empty";
+    },
+    [],
+  );
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
   const [savedDraftHandoffKey, setSavedDraftHandoffKey] = useState<string | null>(null);
   const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
@@ -611,6 +639,26 @@ export default function QuickLog({
     setStarterWaterStorageBlocked(current.status === "blocked");
     if (current.status === "pending") setSaveError(STARTER_WATER_RECOVERY_PENDING);
     if (current.status === "blocked") setSaveError(STARTER_WATER_RECOVERY_UNAVAILABLE);
+  }, [open, user?.id]);
+
+  // A history-review refusal from before a reload or remount stays locked until
+  // the grower's explicit discard. An unreadable stored fence also stays locked.
+  useEffect(() => {
+    if (!open || !user?.id) return;
+    const fence = readLegacyQuickLogHistoryFence(user.id);
+    if (fence.status === "empty") return;
+    historyFenceStoredRef.current = true;
+    historyCheckRequiredRef.current = true;
+    historyDraftOwnerRef.current = user.id;
+    setHistoryCheckRequired(true);
+    setHistoryReviewNavigation(
+      fence.status === "fenced" ? buildQuickLogTimelineNavTarget(fence.record.review) : null,
+    );
+    setSaveError(
+      quickLogReasonToOperatorMessage(
+        fence.status === "fenced" ? fence.record.reason : "idempotency_key_unverified",
+      ),
+    );
   }, [open, user?.id]);
 
   const prefillRequestKey = quickLogPrefillTargetKey(prefill);
@@ -1798,23 +1846,20 @@ export default function QuickLog({
           // target; review it where the verified readback says it is now.
           const movedReceipt =
             reason === "receipt_target_moved" && result.persistedGrowId !== undefined;
-          setHistoryReviewNavigation(
-            buildQuickLogTimelineNavTarget(
-              movedReceipt
-                ? {
-                    growId: result.persistedGrowId ?? null,
-                    plantId: result.persistedPlantId ?? null,
-                    tentId: result.persistedTentId ?? null,
-                  }
-                : {
-                    growId: saveTarget.growId,
-                    targetType: "plant",
-                    targetId: saveTarget.plantId,
-                    plantId: saveTarget.plantId,
-                    tentId: saveTarget.tentId,
-                  },
-            ),
-          );
+          const review = movedReceipt
+            ? {
+                growId: result.persistedGrowId ?? null,
+                plantId: result.persistedPlantId ?? null,
+                tentId: result.persistedTentId ?? null,
+              }
+            : {
+                growId: saveTarget.growId ?? null,
+                plantId: saveTarget.plantId ?? null,
+                tentId: saveTarget.tentId ?? null,
+              };
+          setHistoryReviewNavigation(buildQuickLogTimelineNavTarget(review));
+          // Water keeps its own durable recovery claim; other activities had none.
+          if (!waterHistoryCheck) persistHistoryFence(user.id, reason, review);
         }
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
@@ -2249,6 +2294,14 @@ export default function QuickLog({
       setStarterWaterPending(null);
       setStarterWaterStorageBlocked(false);
       lastFailedSaveSigRef.current = null;
+    }
+    if (historyFenceStoredRef.current) {
+      // A fence left in storage would relock the next reload; stay locked instead.
+      if (!clearLegacyQuickLogHistoryFence(user?.id)) {
+        setSaveError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+        return;
+      }
+      historyFenceStoredRef.current = false;
     }
     historyCheckRequiredRef.current = false;
     historyDraftOwnerRef.current = null;

@@ -318,7 +318,13 @@ export default function QuickLogAllActivitiesSection({
   const harvestPhotoInputRef = useRef<HTMLInputElement | null>(null);
   // The file input is uncontrolled, so clearing state alone would leave the
   // picker showing a file that will no longer upload. Clear both together.
+  // A chosen PNG is read for its signature before it counts, as on the Photo
+  // picker; the generation drops a stale read when the choice changes.
+  const harvestPhotoGenerationRef = useRef(0);
+  const [harvestPhotoValidating, setHarvestPhotoValidating] = useState(false);
   const clearHarvestPhoto = useCallback(() => {
+    harvestPhotoGenerationRef.current += 1;
+    setHarvestPhotoValidating(false);
     setHarvestPhotoFile(null);
     if (harvestPhotoInputRef.current) harvestPhotoInputRef.current.value = "";
   }, []);
@@ -2218,7 +2224,34 @@ export default function QuickLogAllActivitiesSection({
                         }
                         setErrorReason(null);
                         setErrorForActivity(null);
-                        setHarvestPhotoFile(file);
+                        harvestPhotoGenerationRef.current += 1;
+                        if (!file || !fileClaimsPng(file)) {
+                          setHarvestPhotoValidating(false);
+                          setHarvestPhotoFile(file);
+                          return;
+                        }
+                        const generation = harvestPhotoGenerationRef.current;
+                        setHarvestPhotoValidating(true);
+                        setHarvestPhotoFile(null);
+                        void validateQuickLogPngClaim(file).then(
+                          (content) => {
+                            if (generation !== harvestPhotoGenerationRef.current) return;
+                            setHarvestPhotoValidating(false);
+                            if (!content.ok) {
+                              clearHarvestPhoto();
+                              setErrorReason(content.message);
+                              setErrorForActivity("harvest");
+                              return;
+                            }
+                            setHarvestPhotoFile(file);
+                          },
+                          () => {
+                            if (generation !== harvestPhotoGenerationRef.current) return;
+                            clearHarvestPhoto();
+                            setErrorReason("That photo could not be read. Try a different file.");
+                            setErrorForActivity("harvest");
+                          },
+                        );
                       }}
                     />
                     <p className="text-[11px] text-muted-foreground">
@@ -2298,6 +2331,7 @@ export default function QuickLogAllActivitiesSection({
                     selected.id === "manual_sensor_snapshot" ||
                     (requiresNote && note.trim().length === 0) ||
                     (selected.id === "harvest" && harvestWeightsInvalid) ||
+                    (selected.id === "harvest" && harvestPhotoValidating) ||
                     (selected.id === "photo" && !photoFile) ||
                     detailNumbersInvalid ||
                     (guidedSymptomCheck &&

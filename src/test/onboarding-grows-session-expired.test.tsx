@@ -4,6 +4,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { SIGN_OUT_FAILURE_MESSAGE } from "@/lib/authSessionExitRules";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
@@ -55,6 +56,23 @@ describe("Onboarding when the session expired during the grows read", () => {
     expect(screen.queryByTestId("onboarding-grows-error")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /sign in again/i }));
     expect(state.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the sign-out failure message instead of an unhandled rejection", async () => {
+    state.signOut.mockRejectedValueOnce(new Error("sign_out_failed"));
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/onboarding"]}>
+          <Routes>
+            <Route path="/onboarding" element={<Onboarding />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /sign in again/i }));
+    expect(await screen.findByTestId("onboarding-sign-out-error")).toHaveTextContent(
+      SIGN_OUT_FAILURE_MESSAGE,
+    );
   });
 });
 

@@ -78,11 +78,11 @@ why: a malformed read could spend the Free plan's one grow. Matthew (2026-10-27)
 branch: claude/onboarding-grows-read-error (created at b92cbcd186f3c157814916d06deaa9e5350774a5)
 base: verdant-grow-diary
 checkout: git fetch origin claude/onboarding-grows-read-error verdant-grow-diary && git switch claude/onboarding-grows-read-error && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read URL and head from GitHub
-head_sha: read from the PR
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2562 (ready for review since 2026-10-28, auto-merge on)
+head_sha: dde99eb008a0e38338edf47a6c9456b01046e43d before the Codex-findings commit; read the current head from the PR
 state: pushed draft
 current_step: awaiting CI and an independent exact-head review
-next_action: get Matthew's call on PGRST301 routing (see open_questions); then route to an eligible non-author reviewer
+next_action: re-review at the current head (Jack Herer PASS-pending-CI at dde99eb0 no longer covers it); Codex P2s fixed: growRepo keeps database error codes so permanent errors stop retrying, and Sign in again handles a failed sign-out via performSafeSignOut
 post_merge_check: NOT_APPLICABLE for production without a forced malformed read; covered by onboarding-null-grows-render.test.tsx
 active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
 decisions: malformed settled list -> existing error state (sentinel growsError); Try again falls back to window.location.reload() via pure retryOnboardingGrowsRead; abort of timed-out attempts deferred (growRepo fetchTents/fetchPlants take no AbortSignal; reviewer rated it bounded). PGRST301 (Matthew 2026-10-27: yes): the store keeps retrying it, and only after retries run out reports error "session_expired" (pure growsReadErrorValue); Onboarding then shows "Sign in again", which calls signOut so the existing !user branch routes to /auth. Explicit button, not an automatic sign-out.

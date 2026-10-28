@@ -55,6 +55,7 @@ import {
 } from "@/lib/csvHistoryOnboardingIntentRules";
 import { retryOnboardingGrowsRead } from "@/lib/onboardingGrowsRetryRules";
 import { GROWS_READ_SESSION_EXPIRED } from "@/lib/growsReadRetryRules";
+import { performSafeSignOut } from "@/lib/authSessionExitRules";
 
 export default function Onboarding() {
   const { user, loading, signOut } = useAuth();
@@ -85,6 +86,7 @@ export default function Onboarding() {
   const [searchParams] = useSearchParams();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const [starterBusy, setStarterBusy] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const [starterRetrying, setStarterRetrying] = useState(false);
   const starterOperationInFlightRef = useRef(false);
   const [starterError, setStarterError] = useState<string | null>(null);
@@ -122,9 +124,21 @@ export default function Onboarding() {
           className="max-w-md space-y-3 text-sm"
         >
           <p>Your sign-in has expired. Sign in again to load your grows.</p>
-          <Button type="button" onClick={() => void signOut()}>
+          <Button
+            type="button"
+            onClick={async () => {
+              setSignOutError(null);
+              const result = await performSafeSignOut({ signOut });
+              if (result.ok === false) setSignOutError(result.message);
+            }}
+          >
             Sign in again
           </Button>
+          {signOutError ? (
+            <p className="text-destructive" data-testid="onboarding-sign-out-error">
+              {signOutError}
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -183,7 +197,7 @@ export default function Onboarding() {
       // in-memory handoff so the new grow/tent/plant can be selected and saved
       // immediately, without waiting for a focus refetch or page reload.
       await Promise.all([
-        refreshGrows?.() ?? Promise.resolve(),
+        refreshGrows ? refreshGrows() : Promise.resolve(),
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);

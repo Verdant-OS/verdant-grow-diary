@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { SESSION_FORM_DRAFT_VERSION } from "@/lib/sessionFormDraftRules";
 import { START_YOUR_ROOM_DRAFT_FORM_ID } from "@/lib/startYourRoomDraftRules";
@@ -118,6 +118,10 @@ beforeEach(() => {
   }));
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("Start Your Room plant retry id (Codex review)", () => {
   it("keeps the plant's retry id in the draft until the finished plant is recorded", async () => {
     // The refresh after the plant insert hangs, as if the grower reloads
@@ -183,5 +187,8 @@ describe("Start Your Room plant retry id (Codex review)", () => {
 
     await waitFor(() => expect(navMock).toHaveBeenCalledTimes(1));
     expect(draftAtNavigation).toBeNull();
+    // The page stays mounted under the mocked router; the draft must stay gone.
+    await act(async () => undefined);
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
   });
 });

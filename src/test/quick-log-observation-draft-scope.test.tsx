@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -249,6 +249,26 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
       expect(screen.getByTestId("qlv2-note")).toHaveValue("First leaves look pale"),
     );
     expect(screen.getByText(QUICK_LOG_OBSERVATION_SAVE_ERROR)).toBeInTheDocument();
+  });
+
+  it("keeps a restored chip line when the mounted sheet returns from another plant (Codex review)", async () => {
+    const sheet = renderMountedSheet("plant:plant-1", true);
+    fireEvent.click(await screen.findByTestId("qlv2-response-chip-better"));
+    await waitFor(() => expect(storedDraftText()).toContain("Response check:"));
+
+    sheet.rerender("plant:plant-1", false);
+    sheet.rerender("plant:plant-2", true);
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("");
+    sheet.rerender("plant:plant-2", false);
+    sheet.rerender("plant:plant-1", true);
+
+    await waitFor(() =>
+      expect(noteValue(screen.getByTestId("qlv2-note"))).toContain("Response check:"),
+    );
+    // Give the retarget effect its chance to run; the line must survive it.
+    await act(async () => undefined);
+    expect(noteValue(screen.getByTestId("qlv2-note"))).toContain("Response check:");
+    expect(storedDraftText()).toContain("Response check:");
   });
 
   it("pins: an ambiguous outcome keeps its key through a reload (durable recovery owns it)", async () => {

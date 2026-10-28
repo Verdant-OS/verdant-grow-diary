@@ -138,4 +138,21 @@ describe("Start your room draft hydration after a failed grow read", () => {
     expect(screen.getByTestId("start-room-submit")).toBeEnabled();
     expect(screen.queryByTestId("start-room-creation-gate")).not.toBeInTheDocument();
   });
+
+  it("does not hold a hydrated paid grower behind a later roster read error (review nit)", async () => {
+    testState.capabilities = { ...FREE_CAPABILITIES, maxActiveGrows: null, multiTent: true };
+    testState.growsError = null;
+    const view = render(page());
+    expect(await screen.findByTestId("start-room-plant-name")).toBeInTheDocument();
+
+    // A later refetch fails after the draft was restored; nothing would be
+    // reset by a good read now, so an unlimited plan keeps going.
+    testState.growsError = "Could not load grows";
+    view.rerender(page());
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Plant 1" },
+    });
+    expect(screen.getByTestId("start-room-submit")).toBeEnabled();
+    expect(screen.queryByTestId("start-room-creation-gate")).not.toBeInTheDocument();
+  });
 });

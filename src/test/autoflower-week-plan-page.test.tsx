@@ -133,6 +133,14 @@ describe("public autoflower week-by-week planner page", () => {
     );
   });
 
+  it("prints inside a visible print section", () => {
+    renderPage();
+    expect(screen.getByTestId("autoflower-week-page")).toHaveAttribute(
+      "data-print-section",
+      "public-guide-tool",
+    );
+  });
+
   it("throttles autoflower_planner_generated to one event per two seconds", () => {
     const now = vi.spyOn(performance, "now");
     renderPage();

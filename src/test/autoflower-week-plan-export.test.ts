@@ -62,6 +62,18 @@ describe("autoflower plan defaults and labels", () => {
     expect(meta.stretch_slows).toEqual({ weekLabel: "Week 8", startWeek: 8 });
     expect(meta.first_amber).toEqual({ weekLabel: "Week 8", startWeek: 8 });
     expect(meta.harvest).toEqual({ weekLabel: "Week 10", startWeek: 10 });
+    const edited = getPlannedMilestoneMeta({
+      estimateWeeks: 10,
+      trichomeWeek: 8,
+      stages: {
+        seedling: { start: 1, end: 2 },
+        veg: { start: 3, end: 6 },
+        preflower: { start: 7, end: 8 },
+        flower: { start: 9, end: 9 },
+        ripening: { start: 10, end: 10 },
+      },
+    });
+    expect(edited.stretch_slows).toEqual({ weekLabel: "Week 9", startWeek: 9 });
     const short = createDefaultAutoflowerPlan("2026-11-01", 6);
     expect(getPlannedMilestoneMeta(short).stretch_slows.startWeek).toBe(4);
     expect(getPlannedMilestoneMeta(short).true_leaves.weekLabel).toBe("Week 1");
@@ -122,6 +134,20 @@ describe("autoflower plan export", () => {
     expect(lines[1].split("\t")[1]).toBe("A B");
     expect(lines[8]).toContain("(Milestone: Start checking trichomes)");
     expect(lines[15].split("\t")[6]).toBe("line1 line2");
+  });
+
+  it("neutralizes formulas in the copied TSV without CSV quoting", () => {
+    const state = plan({
+      plantName: "=1+1",
+      milestones: {
+        ...createDefaultAutoflowerPlan("2026-11-01").milestones,
+        first_pistils: { actualDate: "2026-12-03", note: "=SUM(1,2)" },
+      },
+    });
+    const lines = buildAutoflowerPlanTsv(state).split("\n");
+    expect(lines[1].split("\t")[1]).toBe("'=1+1");
+    expect(lines[12].split("\t")[5]).toBe("'+4 days");
+    expect(lines[12].split("\t")[6]).toBe("'=SUM(1,2)");
   });
 
   it("is deterministic and names the file from an injected date", () => {

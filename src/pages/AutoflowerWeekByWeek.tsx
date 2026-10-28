@@ -303,7 +303,11 @@ export default function AutoflowerWeekByWeek() {
   );
 
   return (
-    <div data-testid="autoflower-week-page" className="min-h-screen bg-[#f6f8f5] text-emerald-950">
+    <div
+      data-testid="autoflower-week-page"
+      data-print-section="public-guide-tool"
+      className="min-h-screen bg-[#f6f8f5] text-emerald-950"
+    >
       <header className="border-b border-emerald-900/10 bg-white print:hidden">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4">
           <a href="https://verdantgrowdiary.com/" aria-label="Verdant Grow Diary">

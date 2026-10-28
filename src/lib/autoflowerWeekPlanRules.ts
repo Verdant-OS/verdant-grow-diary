@@ -474,7 +474,8 @@ export function getPlannedMilestoneMeta(
 ): Record<MilestoneKey, PlannedMilestone> {
   const s = state.stages;
   const E = state.estimateWeeks;
-  const stretchWeek = Math.min(s.flower.start + 2, Math.max(1, E - 2));
+  // Never before flower starts, even after the grower edits the stage weeks.
+  const stretchWeek = Math.max(s.flower.start, Math.min(s.flower.start + 2, Math.max(1, E - 2)));
   return {
     true_leaves: {
       weekLabel:
@@ -552,9 +553,18 @@ export function buildAutoflowerPlanCsv(state: AutoflowerPlanState): string {
     .join("\r\n");
 }
 
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+
+/** TSV cell for pasting into a spreadsheet: one line, and never a live formula. */
+function tsvCell(value: string): string {
+  const flat = value.replace(/[\t\r\n]+/g, " ");
+  const leadingSignIsFormula = /^[+-]/.test(flat) && !PLAIN_NUMBER.test(flat);
+  return /^[=@]/.test(flat) || leadingSignIsFormula ? `'${flat}` : flat;
+}
+
 export function buildAutoflowerPlanTsv(state: AutoflowerPlanState): string {
   return buildExportMatrix(state, " (Milestone: Start checking trichomes)")
-    .map((row) => row.map((cell) => cell.replace(/[\t\r\n]+/g, " ")).join("\t"))
+    .map((row) => row.map((cell) => tsvCell(cell)).join("\t"))
     .join("\n");
 }
 

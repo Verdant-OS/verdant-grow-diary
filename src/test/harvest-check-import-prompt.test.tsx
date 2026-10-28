@@ -243,7 +243,7 @@ describe("harvest check import after signup", () => {
     );
     renderPrompt();
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The plant this import started on is no longer in your list. Any checks already saved stay on that plant. Choose a plant.",
+      "The plant this import started on is no longer in your list; it may be archived or deleted. Any checks already saved stay on that plant. Restore it to finish there, or choose another plant.",
     );
     const select = screen.getByLabelText("Plant") as HTMLSelectElement;
     expect(select).not.toBeDisabled();

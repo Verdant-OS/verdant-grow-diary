@@ -58,7 +58,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
     setBoundPlantId(null);
     setPlantId("");
     setError(
-      "The plant this import started on is no longer in your list. Any checks already saved stay on that plant. Choose a plant.",
+      "The plant this import started on is no longer in your list; it may be archived or deleted. Any checks already saved stay on that plant. Restore it to finish there, or choose another plant.",
     );
   }, [boundPlantMissing, handoff]);
 

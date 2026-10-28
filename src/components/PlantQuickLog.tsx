@@ -58,7 +58,8 @@ import {
 import {
   QUICK_LOG_ACTION_CHIPS,
   RESPONSE_CHECK_STATUSES,
-  applyQuickLogActionChip,
+  hasQuickLogActionChip,
+  toggleQuickLogActionChip,
   applyResponseCheck,
   hasResponseCheck,
   isPhotoOnlyQuickLogNote,
@@ -470,11 +471,11 @@ export default function PlantQuickLog({
   }
 
   function handleActionChip(chip: QuickLogActionChip) {
-    if (chip === "Photo only" && !hasPhoto) {
+    if (chip === "Photo only" && !hasPhoto && !hasQuickLogActionChip(note, chip)) {
       setError("Add a photo before marking this as photo only.");
       return;
     }
-    setNote((prev) => applyQuickLogActionChip(prev, chip));
+    setNote((prev) => toggleQuickLogActionChip(prev, chip));
     setError(null);
   }
 
@@ -961,13 +962,17 @@ export default function PlantQuickLog({
               <p className="mt-1 text-xs text-muted-foreground">
                 Tap the grow action. This is the thing the plant will respond to.
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Choose any that apply. Tap again to remove.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="Quick Log grow action">
               {QUICK_LOG_ACTION_CHIPS.map((chip) => (
                 <Button
                   key={chip}
                   type="button"
-                  variant="outline"
+                  variant={hasQuickLogActionChip(note, chip) ? "default" : "outline"}
+                  aria-pressed={hasQuickLogActionChip(note, chip)}
                   aria-label={`Log action ${chip}`}
                   data-testid={`plant-quick-log-action-${chip
                     .toLowerCase()

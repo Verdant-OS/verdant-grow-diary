@@ -143,6 +143,52 @@ export function applyQuickLogActionChip(existingNote: string, chip: QuickLogActi
   return [...lines, line].join("\n");
 }
 
+/** Selection is derived only from a whole action line, never words inside prose. */
+export function hasQuickLogActionChip(
+  existingNote: string | null | undefined,
+  chip: QuickLogActionChip,
+): boolean {
+  const normalizedChip = normalizeLine(actionChipLine(chip));
+  return (existingNote ?? "")
+    .split(/\r\n|\n|\r/)
+    .some((line) => normalizeLine(line) === normalizedChip);
+}
+
+/** Remove matching standalone lines without normalizing any retained text or separators. */
+export function removeQuickLogActionChip(
+  existingNote: string | null | undefined,
+  chip: QuickLogActionChip,
+): string {
+  const parts = (existingNote ?? "").split(/(\r\n|\n|\r)/);
+  const normalizedChip = normalizeLine(actionChipLine(chip));
+  const kept: string[] = [];
+  for (let index = 0; index < parts.length; index += 2) {
+    if (normalizeLine(parts[index]) === normalizedChip) {
+      // Remove the line's following separator, or the preceding one at the end.
+      // Other blank lines and their original LF/CRLF/CR bytes remain untouched.
+      if (index === parts.length - 1) kept.pop();
+      continue;
+    }
+    kept.push(parts[index]);
+    if (index + 1 < parts.length) kept.push(parts[index + 1]);
+  }
+  return kept.join("");
+}
+
+/** Toggle separately from the legacy append/deduplicate contract. */
+export function toggleQuickLogActionChip(
+  existingNote: string | null | undefined,
+  chip: QuickLogActionChip,
+): string {
+  if (hasQuickLogActionChip(existingNote, chip))
+    return removeQuickLogActionChip(existingNote, chip);
+  const note = existingNote ?? "";
+  const line = actionChipLine(chip);
+  if (note.length === 0) return line;
+  const separator = note.match(/\r\n|\n|\r/)?.[0] ?? "\n";
+  return `${note}${separator}${line}`;
+}
+
 export function appendQuickLogObservation(existingNote: string, observation: string): string {
   const note = existingNote.trim();
   const detail = observation.trim();

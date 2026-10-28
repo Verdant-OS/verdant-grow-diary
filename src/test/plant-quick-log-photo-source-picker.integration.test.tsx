@@ -218,12 +218,12 @@ describe("PlantQuickLog action-first grower model", () => {
     expect(JSON.stringify(saveCalls[0])).not.toContain("user_id");
   });
 
-  it("action chips append local note detail without saving", () => {
+  it("action chips toggle local note detail without saving", () => {
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
     fireEvent.click(screen.getByRole("button", { name: /log action fed/i }));
     fireEvent.click(screen.getByRole("button", { name: /log action fed/i }));
-    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Watered.\nFed.");
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Watered.");
     expect(saveCalls).toHaveLength(0);
   });
 

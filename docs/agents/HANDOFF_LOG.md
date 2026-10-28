@@ -69,6 +69,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-2018-PLANT-QUICK-LOG-ACTION-TOGGLE
+
+```text
+TASK CODEX-2018-PLANT-QUICK-LOG-ACTION-TOGGLE  priority: P1  status: OPEN
+goal: Make PlantQuickLog action chips visibly independent toggles; remove only matching standalone action lines, preserving grower prose and response context. Persistence remains action: note.
+branch: codex/2018-plant-quick-log-action-toggle
+base: verdant-grow-diary at 6dc2f0e04491fe8683e06de14ec0ce205ecbf018
+checkout: git fetch origin codex/2018-plant-quick-log-action-toggle verdant-grow-diary; set VERIFIED_SHA to the exact current PR head after matching the fetched branch; git switch codex/2018-plant-quick-log-action-toggle; git merge --ff-only <VERIFIED_SHA>; verify HEAD equals VERIFIED_SHA before any authorized base merge
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2052 (stay draft)
+head_sha: d51e6404ee3bcd7e1b7c02027adf791aa77b0207 is the bootstrap remote head observed 2026-10-13 14:41 UTC; this docs-only blocker update cannot name itself, read the current full SHA from the PR
+state: BLOCKED at the authorized existing-test fence. Remote draft contains only this distinct handoff block. Two production edits and two new tests remain an uncommitted local candidate, not published implementation.
+next_action: Bloom coordinates a precise outside decision for the existing tracked integration assertion before implementation may resume. If explicitly authorized later, add rendered coverage and fix the Photo-only deselection edge case, then complete validation and publish only the scoped draft.
+files: Local candidate only: src/components/PlantQuickLog.tsx; src/lib/tenSecondQuickCheckRules.ts; new src/test/plant-quick-log-action-toggle.test.tsx; new src/test/plant-quick-log-action-toggle-rules.test.ts. Remote: docs/agents/HANDOFF_LOG.md (this block only).
+blockers: Existing tracked src/test/plant-quick-log-photo-source-picker.integration.test.tsx:225 expects Watered. plus Fed. after Watered/Fed/Fed taps, directly contradicting required Fed deselection. User forbids existing-test edits/unlocks and requires STOP if one is needed. No test was weakened, deleted, changed or unlocked. Candidate also retains the old Photo-only/no-photo guard, preventing deselection after removing its photo or manually typing Photo only.; do not claim candidate complete.
+artifacts: Local clean isolated worktree C:/Users/G8/AppData/Local/Temp/verdant-2018/issue-2018; sibling ui-red-final.json/log (16 total: 13 FAIL, 3 PASS, 0 pending), rules-red.json/log (78 total: 76 FAIL missing helper exports, 2 PASS legacy contract, 0 pending), green.json/log (6 files, 199 total: 198 PASS, 1 FAIL locked assertion, 0 pending), eslint.json, typecheck.log. Production diff was empty during both red runs. New UI16/rules78 and unchanged ten-second rules34/tired-grower journey19/plant rules24 pass in the green receipt; photo-source integration27 PASS/1 FAIL. These overlapping counts are not added to older runs.
+validation: Scoped ESLint0 errors/1205 warnings (1204 prettier/prettier, 1 react-hooks/exhaustive-deps); new test files0 warnings. Prettier flags2 production files; not whole-file-formatted after STOP. git diff --check and strict scorer-lock with --base 6dc2f0e04491fe8683e06de14ec0ce205ecbf018 PASS; no tracked scorer modified/deleted/renamed/retyped, no unlock. Typecheck outcome in sibling log/PR body; build not run after the scope STOP. Hooks path unset; no Husky hook ran. CI belongs only to the docs bootstrap, not the local candidate.
+reviewer_seat: Blue Dream or independently assigned Durban Poison; pending outside assignment/acceptance. Codex authored this candidate and cannot accept it.
+claimed_by: Codex, 2026-10-13 14:41 UTC; PR claim receipt https://github.com/Verdant-OS/verdant-grow-diary/pull/2052#issuecomment-6148130323 re-read with no earlier claim
+last_updated: 2026-10-13 14:52 UTC, by Codex
+limits: Stay draft; no ready, merge, auto-merge, production records, deployment, credentials, migrations, dependency changes, existing tracked-test changes or scorer unlock. Shared fleet-lock file unavailable here (NOT_MEASURED); available GitHub claims/collisions checked. All team-retained writers and dirty desktop CURRENT_STATE preserved; #2012 process/browser untouched.
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

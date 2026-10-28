@@ -69,6 +69,39 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-276-PRIVATE-DIAGNOSTICS
+
+```text
+TASK VER-276-PRIVATE-DIAGNOSTICS  priority: P2  status: OPEN
+goal: Make first-use TypeError reports distinguishable without transmitting exception text; investigate missing stack evidence.
+why: White Widow reports three redacted events, latest /welcome on 2026-10-26 17:36 UTC. Throwing line remains unknown.
+branch: codex/ver-276-private-diagnostics
+base: verdant-grow-diary at 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae
+checkout: git fetch origin codex/ver-276-private-diagnostics && git switch codex/ver-276-private-diagnostics && git merge --ff-only origin/codex/ver-276-private-diagnostics
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2557 (draft)
+head_sha: 7c41a02e4bca8fab09cf82fda30212fa6f3bfe3c is the first implementation checkpoint. A child adds the diagnostic abs_path review correction and this receipt; obtain its full current head from PR #2557. No review carries forward.
+state: Draft implementation; 48 focused tests pass after the abs_path correction. Original production cause is still unknown.
+current_step: beforeSend derives fixed error_message_kind and stack_state tags for React and route boundaries before erasing message text. No free-text field is restored.
+next_action: Remeasure hosted checks at the final full head; obtain eligible independent exact-head acceptance; access Sentry event JSON to determine where the original stack was lost.
+active_writer: Codex /root session (2026-10-27)
+files_touched: src/lib/errorReportingRules.ts; src/test/error-reporting-diagnostics.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned; diagnostic acceptance and raw-event inspection remain
+ownership: PR #2540 at 397c9c27b6027f053e9f552d67229ac4db07578c owns Onboarding null guards and grow read retries; those paths are excluded.
+decisions: No guessed crash fix, no unredaction, no source-map upload credentials or deployment changes. /welcome rendered Landing at event release 3bc6b346f252; current route redirects to /.
+tried_and_rejected: Treating null grows as the established production cause; no original frame or message supports that conclusion. Missing maps alone do not explain absent raw frames.
+commands: bun install --frozen-lockfile PASS (bun 1.3.14); bunx vitest run src/test/error-reporting-diagnostics.test.ts src/test/error-reporting-minimal.test.ts src/test/error-reporting-caught-payload.test.ts src/test/root-error-component-null-proto.test.tsx src/test/privacy-policy-error-reporting-copy.test.tsx --reporter=dot: 48 PASS / 0 FAIL after review correction; eslint on both changed source/test files PASS after prettier. New suite RED before implementation: 17 FAIL from absent diagnostic tags. SDK expectation corrected to include its real in_app flag. Strict scorer-lock and diff-check PASS. Normal commit hook passed tsc --skipLibCheck with an 8GB heap and 67 docs-safety tests at the implementation tree. Build/postbuild at 7c41 passed; initial dirty-tree build correctly refused provenance. Full bun run typecheck at 7c41 PASS (exit 0). Final-head checks are recorded in PR body; never infer PASS from pending work.
+blockers: Direct Sentry event JSON/settings/artifacts require sign-in; Linear field-note tool unavailable. Eligible non-contributing Claude/Grok or Durban Poison session not exposed here. No review PASS claimed.
+reviewer_seat: Eligible acceptance BLOCKED pending actually available non-contributing Claude/Grok or Durban Poison; Codex author excluded. Separate Codex advisory session /root/diagnostic_review at 7c41: 0 P1 / 0 P2 / 1 P3 (abs_path overlooked with empty/relative filename), reproduced with 2 failing fixtures and corrected. It is not eligible repository acceptance. Re-review of final head required. CodeRabbit automatic review rate-limited; no spend/config change authorized.
+reviewer_sha: NOT_MEASURED
+post_merge_check: Only after separately approved deployment, verify synthetic private-safe reporting envelope and any real recurrence at the live SHA; never intentionally crash production.
+links: https://linear.app/verdantgrowdiary/issue/VER-276 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2540
+limits: Draft only; no merge, enqueue, deploy, production writes, auth, RLS, migrations, Supabase, lockfile, or device changes. GitHub comments remain unposted under existing gate.
+session_state: One read-only Codex advisory reviewer; no paused workflows. Resolved production Vite config: sourcemap=false, no Sentry plugins; build at 7c41 emitted zero client JavaScript maps. Sentry artifacts and hosted publisher configuration remain unmeasured. Public production fetch was blocked by HTTP 403 from this environment.
+claimed_by: Codex, 2026-10-27 20:48 UTC, explicitly assigned by Matthew in this session
+owner: Codex
+last_updated: 2026-10-27 15:52 CT, by Codex
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

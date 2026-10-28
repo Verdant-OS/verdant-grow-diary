@@ -7,7 +7,8 @@
  * the production hostnames. A missing or unknown mode stays off. Outgoing
  * events drop user fields, IP, request bodies, contexts, transaction, and
  * breadcrumbs that carry content. Stack frames keep only filename, abs_path,
- * lineno, colno, and in_app. Tags are rebuilt from `manualReportTags`.
+ * lineno, colno, and in_app. Tags are rebuilt from `manualReportTags`, with fixed boundary
+ * diagnostic categories derived before message redaction.
  * Free-text messages are replaced so grower text does not leave. Query strings
  * never leave. A UUID path segment, a path segment of 24 or more
  * characters, or a path segment that contains `@` or `%`, becomes `:id`.
@@ -352,6 +353,57 @@ function eventHandled(value: unknown): boolean | undefined {
 }
 
 /**
+ * Describe the outer exception using fixed categories before its text is erased.
+ * These are hints, not a diagnosis: localized/nonstandard messages stay `other`.
+ * Never copy a property name, message substring, function name or component stack.
+ * The last SDK exception is the outer error (earlier entries can be causes).
+ */
+function boundaryDiagnosticTags(exception: unknown): Record<string, string> {
+  const values =
+    exception && typeof exception === "object"
+      ? (exception as { values?: unknown }).values
+      : undefined;
+  const last = Array.isArray(values) ? values.at(-1) : undefined;
+  const entry = last && typeof last === "object" ? (last as Record<string, unknown>) : {};
+  const message = typeof entry.value === "string" ? entry.value : undefined;
+  let kind = "other";
+  if (message === undefined || message.length === 0) kind = "missing";
+  else if (message === REDACTED) kind = "redacted";
+  else if (entry.type === "TypeError" && message.length <= 512) {
+    if (
+      message.startsWith("Cannot read properties of null (reading ") ||
+      message.startsWith("Cannot read properties of undefined (reading ")
+    ) {
+      kind = "nullish_read";
+    } else if (message.endsWith(" is not a function")) {
+      kind = "not_callable";
+    }
+  }
+
+  const stacktrace = entry.stacktrace;
+  const frames =
+    stacktrace && typeof stacktrace === "object"
+      ? (stacktrace as { frames?: unknown }).frames
+      : undefined;
+  let stackState = "missing";
+  if (Array.isArray(frames)) {
+    stackState = frames.length === 0 ? "empty" : "no_location";
+    if (
+      frames.some((frame) => {
+        const safe = scrubFrame(frame);
+        if (!safe || typeof safe.lineno !== "number" || safe.lineno <= 0) return false;
+        return [safe.filename, safe.abs_path].some(
+          (path) => typeof path === "string" && /^(https?:\/\/|\/(?!\/))/.test(path),
+        );
+      })
+    ) {
+      stackState = "location";
+    }
+  }
+  return { error_message_kind: kind, stack_state: stackState };
+}
+
+/**
  * Small `beforeSend` floor. Returns null only when the event itself is null.
  * Drops user (including IP), contexts, transaction, request bodies, and
  * content breadcrumbs. Rebuilds tags from `manualReportTags`. Redacts free
@@ -370,6 +422,11 @@ export function scrubEvent<T>(event: T): T {
     next.logentry = { message: REDACTED };
   }
   const tags = scrubTags(next.tags);
+  // Derive diagnostics from this event, never from arbitrary caller-supplied tags.
+  // Restrict this addition to the two boundaries involved in first-use recovery.
+  if (tags?.source === "react_error_boundary" || tags?.source === "route_error_component") {
+    Object.assign(tags, boundaryDiagnosticTags(next.exception));
+  }
   if (tags) next.tags = tags;
   else delete next.tags;
   if (next.request && typeof next.request === "object") {

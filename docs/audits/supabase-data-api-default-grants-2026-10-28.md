@@ -42,15 +42,19 @@ app once it is applied to the hosted project after 2026-10-30. Before this chang
 Correction (this PR): `scripts/lib/supabaseTableAclRules.mjs` and
 `src/test/supabase-table-explicit-acl.test.ts`. Every persistent `public` table must have, after
 its latest `CREATE`, a table-level `GRANT` or a full `REVOKE ALL`. A partial or column-level revoke,
-a statement inside a comment (nested block comments included) or a single-quoted string literal,
-a schema-wide or default-privilege statement, or a function/sequence grant does not count. Quoted
-names (`"public"."x"`) and `CREATE UNLOGGED TABLE` are recognised; a `CREATE TABLE IF NOT EXISTS`
-of a table that already exists keeps its ACL. The test runs against the real migration tree in the
-required Vitest suite. The result must equal the frozen legacy list exactly, with each legacy table
-bound to the migration that created it, so a new table without an ACL fails CI, a legacy table that
-is dropped and recreated needs its own ACL, and the list can only shrink. Known ceiling: a `GRANT`
-written as prose inside a dollar-quoted literal is still counted, because dollar-quoted bodies are
-scanned as SQL so dynamic DDL in a `DO` block counts.
+a GRANT whose every privilege has a column list, a statement inside a comment (nested block
+comments included), a string literal, a function body or other dollar-quoted text, a schema-wide or
+default-privilege statement, or a function/sequence grant does not count. A top-level statement, a
+`DO` block and a string handed straight to `EXECUTE` do count. Quoted names (`"public"."x"`),
+unqualified names (read as `public`), `CREATE UNLOGGED TABLE` and `ALTER TABLE ... RENAME TO` are
+recognised; a `CREATE TABLE IF NOT EXISTS` of a table that already exists keeps its ACL. The test
+runs against the real migration tree in the required Vitest suite. The result must equal the frozen
+legacy list exactly, with each legacy table bound to the migration that created it, so a new table
+without an ACL fails CI, a legacy table that is dropped and recreated needs its own ACL, and the
+list can only shrink. Known limits: a grant assembled at run time (`EXECUTE format(...)`) cannot be
+read statically and is not counted, so the table is reported (fails closed); `SET search_path` is
+not modelled, so a migration that changes it must schema-qualify its names. No migration in the
+tree today changes `search_path` at the top level.
 
 It is a new check, not an edit to `scripts/check-supabase-migration-safety.mjs`. The scorer lock
 refuses edits to that existing gate, and that unlock was not taken. The review fixes to this PR's

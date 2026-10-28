@@ -69,8 +69,89 @@ describe("supabase table explicit ACL rule", () => {
     'CREATE TABLE "public" . leaky (id int);',
     "CREATE UNLOGGED TABLE public.leaky (id int);",
     "create table if not exists public.leaky (id int);",
+    "CREATE TABLE leaky (id int);",
+    "CREATE TABLE IF NOT EXISTS leaky (id int);",
+    "COMMENT ON SCHEMA public IS $c$grower's notes$c$;\nCREATE TABLE public.leaky (id int);\nSELECT 'x';",
   ])("flags a new public table with no grant: %s", (sql) => {
     expect(tables(sql)).toEqual(["leaky"]);
+  });
+
+  it("keeps SQL after an unterminated quote visible and indices aligned", () => {
+    expect(tables("SELECT 'oops;\nCREATE TABLE public.leaky (id int);")).toEqual(["leaky"]);
+  });
+
+  it("ignores tables in other schemas", () => {
+    expect(tables("CREATE TABLE private.leaky (id int);")).toEqual([]);
+    expect(
+      tables("CREATE TABLE leaky (id int);\nGRANT SELECT ON private.leaky TO authenticated;"),
+    ).toEqual(["leaky"]);
+  });
+
+  it("resets the ACL when an unqualified drop precedes IF NOT EXISTS", () => {
+    expect(
+      tables(
+        `${CREATE}\nGRANT SELECT ON public.leaky TO authenticated;`,
+        "DROP TABLE leaky;\nCREATE TABLE IF NOT EXISTS public.leaky (id int);",
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("does not count a grant inside an uncalled function body", () => {
+    expect(
+      tables(
+        `${CREATE}\nCREATE OR REPLACE FUNCTION public.later() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN GRANT SELECT ON public.leaky TO authenticated; END $fn$;`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("tracks a table created by dynamic SQL and accepts a dynamic grant that runs", () => {
+    expect(tables("DO $$ BEGIN EXECUTE 'CREATE TABLE public.leaky (id int)'; END $$;")).toEqual([
+      "leaky",
+    ]);
+    expect(
+      tables(
+        "DO $$ BEGIN EXECUTE $ddl$ CREATE TABLE public.leaky (id int) $ddl$; EXECUTE 'GRANT SELECT ON public.leaky TO authenticated'; END $$;",
+      ),
+    ).toEqual([]);
+    // A grant assembled at run time cannot be read statically: fail closed.
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN EXECUTE format($f$GRANT SELECT ON %I TO authenticated$f$, $t$leaky$t$); END $$;`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("counts an unqualified table under SET search_path as public", () => {
+    expect(tables("SET search_path = public;\nCREATE TABLE leaky (id int);")).toEqual(["leaky"]);
+  });
+
+  it("does not count grant prose inside a dollar-quoted COMMENT", () => {
+    expect(
+      tables(
+        `${CREATE}\nCOMMENT ON TABLE public.leaky IS $c$GRANT SELECT ON public.leaky TO authenticated;$c$;`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("scans dollar-quoted bodies as SQL but keeps their literals masked", () => {
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN RAISE NOTICE 'don''t'; GRANT SELECT ON public.leaky TO authenticated; END $$;`,
+      ),
+    ).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN RAISE NOTICE 'GRANT SELECT ON public.leaky TO authenticated;'; END $$;`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("does not let an apostrophe in a quoted identifier open a string literal", () => {
+    expect(
+      tables(
+        `CREATE TABLE public."grower's" (id int);\nGRANT SELECT ON public."grower's" TO authenticated;\n${CREATE}\nSELECT 'x';`,
+      ),
+    ).toEqual(["leaky"]);
   });
 
   it("keeps quoted identifier case distinct from the folded name", () => {
@@ -104,6 +185,26 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky"]);
   });
 
+  it("carries a table's ACL state through ALTER TABLE ... RENAME TO", () => {
+    const renamed = "ALTER TABLE public.leaky RENAME TO renamed;";
+    expect(
+      tables(`${CREATE}\n${renamed}\nGRANT SELECT ON public.renamed TO authenticated;`),
+    ).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nGRANT SELECT ON public.leaky TO authenticated;\nALTER TABLE IF EXISTS ONLY leaky RENAME TO renamed;`,
+      ),
+    ).toEqual([]);
+    expect(tables(`${CREATE}\n${renamed}`)).toEqual(["renamed"]);
+    // A grant on the old name after the rename reaches no table.
+    expect(tables(`${CREATE}\n${renamed}\nGRANT SELECT ON public.leaky TO authenticated;`)).toEqual(
+      ["renamed"],
+    );
+    expect(tables(`${CREATE}\nALTER TABLE public.leaky RENAME COLUMN id TO uid;`)).toEqual([
+      "leaky",
+    ]);
+  });
+
   it("drops every table in a DROP TABLE list", () => {
     expect(
       tables(
@@ -118,7 +219,8 @@ describe("supabase table explicit ACL rule", () => {
     "grant select on table leaky to authenticated, service_role;",
     'GRANT SELECT ON TABLE public."leaky" TO authenticated;',
     "GRANT SELECT ON public.other, public.leaky TO authenticated;",
-    "GRANT INSERT (id) ON public.leaky TO anon;",
+    "GRANT SELECT ON leaky TO authenticated;",
+    "GRANT INSERT, SELECT (id) ON public.leaky TO anon;",
     "REVOKE ALL ON TABLE public.leaky FROM PUBLIC, anon, authenticated, service_role;",
     "REVOKE ALL PRIVILEGES ON public.leaky FROM anon, authenticated;",
     "COMMENT ON TABLE public.leaky IS 'it''s granted below';\nGRANT SELECT ON public.leaky TO anon;",
@@ -151,6 +253,7 @@ describe("supabase table explicit ACL rule", () => {
     ["a grant on another table", "GRANT SELECT ON public.leaky_audit TO authenticated;"],
     ["a function grant", "GRANT EXECUTE ON FUNCTION public.leaky() TO authenticated;"],
     ["a sequence grant", "GRANT USAGE ON SEQUENCE public.leaky TO authenticated;"],
+    ["a column-level grant", "GRANT INSERT (id) ON public.leaky TO anon;"],
     ["a schema-wide grant", "GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;"],
     [
       "a default-privilege grant",

@@ -81,13 +81,13 @@ checkout: git fetch origin ccr-01625fd2-17flsm verdant-grow-diary && git switch 
 pr: NOT_MEASURED at block creation; read it from the branch's open draft PR
 head_sha: read from the PR (this block lands in the first push)
 state: pushed, ready for review (PR #2584); merged base bbc77ae23 to clear a HANDOFF_LOG queue conflict
-current_step: 35/35 required green at d56b35ef3; round-2 review findings (unqualified CREATE/DROP, dollar-quote masking, unterminated quote, column-level GRANT) fixed in a prepared patch that is not yet applied, because both rule files are scorer-locked and the in-session unlock is refused
-next_action: once Matthew unlocks scripts/lib/supabaseTableAclRules.mjs and src/test/supabase-table-explicit-acl.test.ts, apply the round-2 fix, prove red/green, push, reply on the open threads; then route an eligible independent exact-head reviewer
+current_step: round-2 fixes applied under Matthew's 2026-10-28 scorer-lock unlocks (unqualified CREATE/DROP, dollar quotes, quoted identifiers, column-only GRANT, ALTER TABLE RENAME TO); 54/54 in the ACL test file, 13 of them red against the previous rule; CI NOT_MEASURED while GitHub Actions is locked on billing
+next_action: once Actions billing is restored, confirm 35/35 required at the PR head; then route an eligible independent exact-head reviewer
 post_merge_check: NOT_APPLICABLE for production (test-only change); after merge, the required Vitest suite on verdant-grow-diary runs src/test/supabase-table-explicit-acl.test.ts green
 active_writer: Claude session_017UoYKwf4ZrLARR3NCo2iwM
 decisions: no migration needed a correction (pending badge/referral/plants migrations all explicit or no new object); added a NEW check instead of editing scripts/check-supabase-migration-safety.mjs because the scorer lock refuses that edit and the unlock was denied in-session; a partial REVOKE does not count as an ACL decision because reads stay on the inherited default; the 22 legacy tables are frozen in LEGACY_DEFAULT_PRIVILEGE_TABLES and may only shrink
 tried_and_rejected: adding a TABLE_WITHOUT_EXPLICIT_ACL scanner to check-supabase-migration-safety.mjs (scorer-locked; unlock denied by the session permission classifier)
-commands: bunx vitest run src/test/supabase-table-explicit-acl.test.ts; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+commands: bunx vitest run src/test/supabase-table-explicit-acl.test.ts; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; node scripts/scorer-lock.mjs --report
 files_touched: scripts/lib/supabaseTableAclRules.mjs, src/test/supabase-table-explicit-acl.test.ts, docs/audits/supabase-data-api-default-grants-2026-10-28.md, docs/agents/HANDOFF_LOG.md
 files_remaining: none in scope
 blockers: none for the PR; production applied-migration state is NOT_MEASURED (Matthew's surface)
@@ -100,7 +100,7 @@ reviewer_sha: none yet
 session_state: no routines; no paused workflows; migration-touching follow-ups held for Matthew
 claimed_by: Claude session_017UoYKwf4ZrLARR3NCo2iwM, 2026-10-28 02:45 UTC (Matthew's direct assignment in chat; no GitHub claim comment posted)
 owner: Claude
-last_updated: 2026-10-28 05:15 CT, by Claude
+last_updated: 2026-10-28 05:35 CT, by Claude
 ```
 
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540

@@ -43,6 +43,7 @@ import {
   type CultivationCalendarHistoryFact,
 } from "@/lib/cultivationCalendarProjectionRules";
 import { deriveFlowerWindowCalendar } from "@/lib/flowerWindowCalendarRules";
+import { calendarInstantDayKey } from "@/lib/calendarLocalDayRules";
 import {
   readPersistedDiaryCalendarFilter,
   writePersistedDiaryCalendarFilter,
@@ -287,7 +288,7 @@ export default function DiaryCalendarSection({
     );
     setOpenDay(nextGroups[0]?.dateKey ?? null);
   };
-  // Today: jump to the current UTC month, keep active filter, and expand
+  // Today: jump to the viewer's local month, keep active filter, and expand
   // the newest matching day in that month. If no matches exist, close the
   // expanded day so we don't leak stale details.
   const goToToday = () => {
@@ -308,6 +309,9 @@ export default function DiaryCalendarSection({
   const monthLabel = visibleMonth ? formatDiaryCalendarMonthLabel(visibleMonth) : "";
   const activeStagePalette = resolveCultivationCalendarStagePalette(activeStage);
   const nextProjectedReview = visibleProjectedReviews[0] ?? null;
+  const nextProjectedReviewDayKey = nextProjectedReview
+    ? calendarInstantDayKey(nextProjectedReview.scheduledAt)
+    : null;
   const openManualStagePicker = () => {
     if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
     // Reuse the one existing manual stage writer in Quick Log. This calendar
@@ -364,8 +368,8 @@ export default function DiaryCalendarSection({
           role="status"
         >
           <p className="text-[11px] font-medium text-foreground">
-            Upcoming suggested review ·{" "}
-            {formatDateHeader(nextProjectedReview.scheduledAt.slice(0, 10))}
+            Upcoming suggested review
+            {nextProjectedReviewDayKey ? ` · ${formatDateHeader(nextProjectedReviewDayKey)}` : ""}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {nextProjectedReview.advisoryText} This is based on your recent logs, not an automatic

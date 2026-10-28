@@ -1,6 +1,7 @@
 /**
- * cultivationCalendarMonthGridRules — a deterministic, UTC-keyed month-grid
- * projection for the read-only cultivation calendar.
+ * cultivationCalendarMonthGridRules — a deterministic month-grid projection
+ * for the read-only cultivation calendar. Cell labels are civil YYYY-MM-DD
+ * keys. Timestamped review suggestions land on the viewer's local day.
  *
  * The model keeps historical facts and history-derived review suggestions in
  * separate arrays. A suggestion is never promoted to a logged event, task,
@@ -11,6 +12,7 @@
  * match the grower's wall-clock calendar day, not the UTC day (a viewer
  * behind UTC otherwise sees tomorrow highlighted every evening).
  */
+import { calendarInstantDayKey } from "@/lib/calendarLocalDayRules";
 import {
   CULTIVATION_CALENDAR_HISTORY_CATEGORIES,
   CULTIVATION_CALENDAR_SUGGESTED_REVIEW_TITLE,
@@ -293,7 +295,7 @@ function normalizeProjectedReview(value: unknown): CultivationCalendarProjectedR
 
 /**
  * Build a Sunday-first six-week grid for a month. For a valid month it always
- * returns 42 UTC-keyed cells. The caller must inject `today`; this pure helper
+ * returns 42 civil-date cells. The caller must inject `today`; this pure helper
  * never reads the current clock. A `today` Date is resolved to the viewer's
  * local calendar day so the ring matches the grower's wall clock.
  */
@@ -356,7 +358,8 @@ export function buildCultivationCalendarMonthGrid(
     const review = normalizeProjectedReview(rawReview);
     if (!review) continue;
 
-    const cell = cellsByDateKey.get(review.scheduledAt.slice(0, 10));
+    const reviewDay = calendarInstantDayKey(review.scheduledAt);
+    const cell = reviewDay ? cellsByDateKey.get(reviewDay) : undefined;
     if (cell) cell.advisoryReviews.push(review);
   }
 

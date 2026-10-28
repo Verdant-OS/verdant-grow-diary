@@ -299,22 +299,16 @@
     "indexable routes outside the sitemap" FAIL. Owner adjudication on that date
     resolved it in favour of advertising them.
 
-    /breeder-beta is deliberately NOT here, and that is now a resolved decision
-    rather than a deferral. It renders the same <BetaLanding> component as
-    /creator-beta, and its own source header calls the breeder variant a
-    "copy-only difference"; measured overlap is 233 of ~237 unique visible
-    tokens, with identical h1 and h2s. The owner adjudicated on 2026-08-20 that
-    it CANONICALISES to /creator-beta while staying indexable for direct and
-    paid traffic.
+    /breeder-beta is deliberately NOT here. It renders the same <BetaLanding>
+    component as /creator-beta. The owner adjudicated on 2026-08-20 that it
+    CANONICALISES to /creator-beta.
 
-    So it must stay out of this file: advertising a URL whose canonical points
-    elsewhere asks crawlers to index a page that disclaims itself. Do not add it
-    without first restoring its self-canonical in BOTH src/pages/BreederBeta.tsx
-    and the crossCanonicalDocument entry in
-    src/lib/build/staticPublicSeoDocuments.ts. Pinned by
-    src/test/breeder-beta-cross-canonical.test.ts; rationale in
-    scripts/public-route-parity.config.mjs.
+    2026-10-26, owner: hide from search. /creator-beta is removed from this
+    sitemap and both URLs are noindex, follow. Do not add either loc back.
+    Pinned by src/test/breeder-beta-cross-canonical.test.ts and
+    src/test/creator-beta-noindex.test.tsx.
   -->
+
   <url>
     <loc>https://verdantgrowdiary.com/glossary</loc>
     <lastmod>2026-08-20</lastmod>
@@ -335,12 +329,6 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/pheno-comparison</loc>
-    <lastmod>2026-08-20</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/creator-beta</loc>
     <lastmod>2026-08-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>

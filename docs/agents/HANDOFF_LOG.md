@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CREATOR-BETA-NOINDEX-20261026
+
+```text
+TASK CREATOR-BETA-NOINDEX-20261026  priority: other  status: OPEN
+goal: Hide /creator-beta and its /breeder-beta canonical from search engines. Pages, copy, and links stay.
+why: Cheeko, 2026-10-26, hide /creator-beta from search and ship it live as soon as review allows. /breeder-beta canonicalises to /creator-beta, so it is noindex too.
+branch: cursor/creator-beta-noindex-2708
+base: verdant-grow-diary
+checkout: git fetch origin cursor/creator-beta-noindex-2708 verdant-grow-diary && git switch cursor/creator-beta-noindex-2708 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2549 (draft)
+head_sha: 7fec43c20adaa4351f5863ee6e540297d1affe17 is the parent of this base integration; read origin/cursor/creator-beta-noindex-2708 after the push for the new head
+state: draft #2549; merged origin/verdant-grow-diary 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae
+current_step: Resolved the handoff prepend and the sitemap URL count. Both intents kept: noindex on /creator-beta and /breeder-beta, plus the incoming public pages.
+next_action: Stay draft. Do not mark ready, enqueue, merge, or deploy. A new head needs a fresh independent exact-head review. Any reviewer who did not author or repair the PR may accept it, Sour Diesel included.
+post_merge_check: After merge and publish, confirm live HTML for /creator-beta and /breeder-beta returns robots noindex, follow and that public/sitemap.xml on verdantgrowdiary.com omits both locs. NOT_MEASURED until then.
+active_writer: Cursor Grok cloud agent (this session)
+decisions: Same noindex, follow path as other hidden public documents (STATIC_PUBLIC_NOINDEX_DOCUMENTS plus usePageSeo noindex). Keep the 2026-08-20 cross-canonical. Renegotiated scripts/public-route-parity.config.mjs and the SEO tests that required these URLs to stay indexable.
+tried_and_rejected: Leaving the pages inside STATIC_PUBLIC_SEO_DOCUMENTS would fail the indexable-robots pin. Disallow in robots.txt was not requested.
+commands: bun run typecheck; bunx vitest run src/test/creator-beta-noindex.test.tsx src/test/breeder-beta-cross-canonical.test.ts src/test/sitemap-public-route-parity.test.ts src/test/static-public-seo-documents.test.ts src/test/route-indexation-matrix.test.ts src/test/static-social-documents-no-conflicting-robots.test.ts src/test/static-route-head-fidelity.test.ts src/test/creator-beta-page.test.tsx src/test/breeder-beta-page.test.tsx --reporter=dot
+files_touched: src/lib/build/staticPublicSeoDocuments.ts; src/pages/CreatorBeta.tsx; src/pages/BreederBeta.tsx; public/sitemap.xml; scripts/public-route-parity.config.mjs; docs/seo/route-indexation-matrix.md; src/test/creator-beta-noindex.test.tsx; src/test/breeder-beta-cross-canonical.test.ts; src/test/static-public-seo-documents.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none in this slice
+blockers: independent exact-head review of the new merge head is NOT_MEASURED; this session authored the change and cannot accept it
+open_questions: none
+gotchas: A new commit invalidates review. Draft stays draft. No production smoke write. scorer-lock required an unlock for the parity allowlist and the renegotiated tests; the unlock file is git-ignored.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2549
+artifacts: this block
+reviewer_seat: Any independent reviewer who did not author or repair the PR may accept the new head, Sour Diesel included. Raising a finding does not make a reviewer a contributor (OWNERSHIP.md §4.3). Review 5669870588 covers 70d3eb131840248666d729c077acb694253a9682 only.
+reviewer_sha: 70d3eb131840248666d729c077acb694253a9682 (not this merge head)
+session_state: Cursor cloud agent; no paused workflow
+claimed_by: Cursor Grok cloud agent, 2026-10-26 19:20 UTC
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-27 16:05 CT, by Cursor Grok cloud agent
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

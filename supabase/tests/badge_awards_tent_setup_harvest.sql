@@ -319,6 +319,19 @@ BEGIN
   ASSERT v_result->>'status' = 'unchanged',
     'an unlinked photo, or a retracted companion photo, earns nothing';
 
+  -- A photo saved on another event, whose caller-supplied legacy alias names
+  -- this photo-free harvest, is not harvest evidence: the server-written
+  -- linked_grow_event_id points at the note, and it wins.
+  v_result := public.quicklog_save_event(
+    'badge-harvest-alias-0001', v_both_grow, 'note', v_both_tent, v_harvest_plant,
+    'alias points at the harvest', v_both_photo, NULL, NULL,
+    jsonb_build_object('grow_event_id', v_harvest_event::text)
+  );
+  ASSERT (v_result->>'ok')::boolean, 'the note save with a conflicting alias succeeds';
+  v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
+  ASSERT v_result->>'status' = 'unchanged',
+    'a note photo whose legacy alias names the harvest earns nothing';
+
   RESET role;
   PERFORM set_config('role', 'service_role', true);
   UPDATE public.diary_entries SET retracted_at = NULL WHERE id = v_linked_entry;

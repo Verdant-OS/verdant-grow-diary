@@ -137,7 +137,10 @@ BEGIN
                WHERE entry.user_id = uid
                  AND entry.grow_id = event.grow_id
                  AND entry.retracted_at IS NULL
-                 AND event.id::text IN (
+                 -- The server-written link wins; the legacy alias counts only
+                 -- on rows that have no link, so a caller-supplied alias
+                 -- cannot point an unrelated photo at a harvest.
+                 AND event.id::text = coalesce(
                    entry.details ->> 'linked_grow_event_id',
                    entry.details ->> 'grow_event_id'
                  )

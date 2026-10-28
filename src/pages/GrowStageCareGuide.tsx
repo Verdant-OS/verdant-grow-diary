@@ -6,7 +6,7 @@
  * stage/category tabs. Checklist state is local-only (no persistence,
  * no backend, no device control).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
@@ -30,17 +30,6 @@ import {
   type CareChecklistItem,
   type GrowStage,
 } from "@/constants/growStageCareGuide";
-import {
-  VERDANT_GUIDES_BREADCRUMB_ITEMS,
-  VERDANT_SITE_ORIGIN,
-} from "@/constants/verdantSeoContent";
-import {
-  buildBreadcrumbListJsonLd,
-  buildFaqPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
-
-const PAGE_URL = `${VERDANT_SITE_ORIGIN}/guides/grow-stage-care-guide`;
 
 type StageFilter = "all" | GrowStage;
 
@@ -66,30 +55,6 @@ export default function GrowStageCareGuide() {
       "A searchable grow-stage care guide with watering, nutrients, environment, and harvest checklists for seedling, vegetative, and flower stages.",
     path: "/guides/grow-stage-care-guide",
   });
-
-  useEffect(() => {
-    const faq = buildFaqPageJsonLd({
-      pageUrl: PAGE_URL,
-      questions: GROW_STAGE_CARE_FAQ,
-    });
-    const crumbs = buildBreadcrumbListJsonLd({
-      items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: "Grow stage care guide", url: PAGE_URL }],
-    });
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", "grow-stage-care-guide-faq");
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", "grow-stage-care-guide-breadcrumb");
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    return () => {
-      faqScript.remove();
-      crumbScript.remove();
-    };
-  }, []);
 
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
@@ -142,7 +107,7 @@ export default function GrowStageCareGuide() {
       className="min-h-screen bg-background text-foreground"
     >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
@@ -344,7 +309,7 @@ export default function GrowStageCareGuide() {
               </Link>
             </li>
             <li>
-              <Link to="/welcome" className="underline hover:text-foreground text-muted-foreground">
+              <Link to="/" className="underline hover:text-foreground text-muted-foreground">
                 See how Verdant works
               </Link>
             </li>
@@ -364,7 +329,7 @@ export default function GrowStageCareGuide() {
           </p>
           <div className="mt-4">
             <Link
-              to="/welcome"
+              to="/"
               data-testid="guide-demo-cta-link"
               className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
             >

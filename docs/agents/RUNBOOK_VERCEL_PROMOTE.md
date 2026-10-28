@@ -1,5 +1,12 @@
 # Vercel production promotion and rollback
 
+Historical as of 2026-10-10 (Matthew Cheek). Production runs on Cloudflare Workers
+at https://verdantgrowdiary.com. Release evidence is live `/version.json` on that
+host. This runbook describes an earlier Vercel promotion path. Do not use it as the
+current deploy procedure. The Vercel "Account is blocked." status is an owner-side
+account issue. Do not investigate it, rerun it, re-trigger it, or work around it.
+Do not change deploy settings.
+
 Matthew owns the publish decision, promotion, rollback, credentials and Vercel
 configuration. Codex prepares repository fixes and exact-SHA evidence. This runbook
 does not authorize an agent to change production traffic.
@@ -40,10 +47,11 @@ the dependency audit, required-check audit, production safeguards or required
 application checks to obtain a green release.
 
 PR #1778 landed as `674eb480e5e5c2b55c18dd7ac823f088c5e0b424`. In the
-current deploy-branch workflow, `verify-sandbox` runs only on manual
-`workflow_dispatch` for the pinned sandbox target; deploy pushes still run the
-offline manifest-and-files job, but no automatic sandbox database probe.
-`verify-production` remains a separate protected manual lane. An intentionally
+current deploy-branch workflow, the `verify-sandbox` job and the `sandbox`
+dispatch option have since been removed; deploy pushes still run the offline
+manifest-and-files job, and no job probes a sandbox database.
+`verify-production` remains a separate protected manual lane, behind a typed
+`LIVE` confirmation. An intentionally
 unrun database check is `NOT_MEASURED`, not applied-schema proof.
 Reconcile the selected Vercel checks with the workflows that actually report on
 deploy pushes; a PR-only check cannot gate a deploy SHA unless it reports there.

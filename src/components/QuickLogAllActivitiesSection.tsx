@@ -47,6 +47,7 @@ import {
   recordQuickLogPhotoAttachmentRecoveryLock,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
@@ -104,11 +105,18 @@ import {
   buildQuickLogRecoveryScopeKey,
   evaluateQuickLogActivityAvailability,
   evaluateQuickLogPrePersistenceGate,
+  quickLogActivityNoteCharacterCount,
+  quickLogActivityNoteLimitLabel,
   validateQuickLogActivityNote,
+  QUICK_LOG_ACTIVITY_NOTE_MAX_LENGTH,
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
   type QuickLogActivityDraftBinding,
 } from "@/lib/quickLogActivityRules";
 import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
+import {
+  QUICK_LOG_V2_FEED_OPEN_EVENT,
+  buildQuickLogV2FeedOpenIntent,
+} from "@/lib/quickLogV2FeedOpenIntent";
 import { quickLogActivityRequiresTent } from "@/lib/quickLogTentRequirementRules";
 import { QUICK_LOG_TARGET_BLOCKED_COPY } from "@/lib/quickLogTargetIntegrityRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
@@ -144,6 +152,16 @@ export interface QuickLogAllActivitiesSectionProps {
   isSaveBlocked?: () => boolean;
   /** Parent may veto with a nonempty reason; other return values preserve legacy callbacks. */
   onBeforeStructuredWaterOpen?: () => unknown;
+  /**
+   * Daily Check opens the structured Feed sheet instead of the note-only
+   * inline editor. Other mounts keep the existing inline Feeding form.
+   */
+  openStructuredFeeding?: boolean;
+  /**
+   * Daily Check hands Manual sensor snapshot to the page's manual step.
+   * This section never writes a reading and never controls a device.
+   */
+  onOpenManualSensorReading?: () => void;
   /** Caller-owned fail-closed reason that must prevent every persistence path. */
   externalPersistenceBlockReason?: string | null;
   /** Activity-specific tent requirement block shown only for tent-scoped saves. */
@@ -165,6 +183,8 @@ export interface QuickLogAllActivitiesSectionProps {
   reviewedStarterHandoffKey?: string | null;
   /** Fires only after persistence confirms success. */
   onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void;
+  /** Reports whether a selected photo is waiting for this section's own Save. */
+  onPendingPhotoChange?: (pending: boolean) => void;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -232,6 +252,31 @@ interface SavedRecord {
   symptomCheck: boolean;
 }
 
+function ActivityNoteLimit({
+  activityId,
+  note,
+  testIdPrefix,
+}: {
+  activityId: QuickLogActivityId;
+  note: string;
+  testIdPrefix: string;
+}) {
+  const label = quickLogActivityNoteLimitLabel(activityId);
+  if (!label) return null;
+  const count = quickLogActivityNoteCharacterCount(note);
+  const over = count > QUICK_LOG_ACTIVITY_NOTE_MAX_LENGTH;
+  return (
+    <p
+      data-testid={`${testIdPrefix}-note-limit`}
+      className={`text-[11px] ${over ? "text-destructive" : "text-muted-foreground"}`}
+      aria-live="polite"
+    >
+      {count}
+      {label}
+    </p>
+  );
+}
+
 export default function QuickLogAllActivitiesSection({
   growId,
   tentId = null,
@@ -245,6 +290,8 @@ export default function QuickLogAllActivitiesSection({
   saveBlocked = false,
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
+  openStructuredFeeding = false,
+  onOpenManualSensorReading,
   externalPersistenceBlockReason = null,
   tentRequiredBlockReason = null,
   nonNoteArchivedGrowBlockReason = null,
@@ -252,6 +299,7 @@ export default function QuickLogAllActivitiesSection({
   requestedNote = null,
   reviewedStarterHandoffKey = null,
   onSaveSuccess,
+  onPendingPhotoChange,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -279,6 +327,19 @@ export default function QuickLogAllActivitiesSection({
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const photoContentGenerationRef = useRef(0);
+  // A chosen PNG is still pending while its signature is read; photoFile stays
+  // null until that check passes, so track the read separately.
+  const [photoValidating, setPhotoValidating] = useState(false);
+  // Only the Photo activity can save a chosen photo. Switching to another
+  // activity hides the Photo editor without clearing it, so a photo left there
+  // must not hold the dialog's Save log behind a section the grower can't see.
+  const hasPendingPhoto = selected?.id === "photo" && (photoFile !== null || photoValidating);
+  useEffect(() => {
+    if (!onPendingPhotoChange) return;
+    onPendingPhotoChange(hasPendingPhoto);
+    return () => onPendingPhotoChange(false);
+  }, [hasPendingPhoto, onPendingPhotoChange]);
   // A lost diary-insert response cannot prove the uploaded object is orphaned.
   // Keep the object and lock only the exact grow/tent/plant target that owns
   // the uncertain write. A target switch must not disable a different plant's
@@ -361,6 +422,7 @@ export default function QuickLogAllActivitiesSection({
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
   const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
+  const [structuredFeedError, setStructuredFeedError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
   const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
@@ -516,6 +578,34 @@ export default function QuickLogAllActivitiesSection({
     user?.id,
   ]);
 
+  const openStructuredFeed = useCallback((): boolean => {
+    const blockReason = activityPersistenceBlockReason("feeding");
+    if (blockReason) {
+      setStructuredFeedError(blockReason);
+      return false;
+    }
+    if (!growId) {
+      setStructuredFeedError("Missing grow context. Nothing opened.");
+      return false;
+    }
+    const recovery = readPendingQuickLogActivity(user?.id, currentTarget);
+    if (recovery.status !== "empty") {
+      setStructuredFeedError(
+        recovery.status === "blocked"
+          ? ACTIVITY_RECOVERY_UNAVAILABLE
+          : "Resolve the existing activity recovery before logging Feed on this target.",
+      );
+      return false;
+    }
+    const intent = buildQuickLogV2FeedOpenIntent({ plantId, tentId });
+    if (!intent || typeof window === "undefined") {
+      setStructuredFeedError("Choose a plant or tent before logging Feed.");
+      return false;
+    }
+    window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_FEED_OPEN_EVENT, { detail: intent }));
+    return true;
+  }, [activityPersistenceBlockReason, currentTarget, growId, plantId, tentId, user?.id]);
+
   useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;
     previousTargetKeyRef.current = currentTargetKey;
@@ -533,10 +623,13 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomStageConfirmed(false);
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
+    photoContentGenerationRef.current += 1;
+    setPhotoValidating(false);
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
+    setStructuredFeedError(null);
     setRecoveryNotice(null);
     setSaved([]);
   }, [currentTargetKey]);
@@ -555,6 +648,7 @@ export default function QuickLogAllActivitiesSection({
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
+    setStructuredFeedError(null);
     setNote("");
     setHarvestWet("");
     setHarvestDry("");
@@ -565,6 +659,8 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomStageConfirmed(false);
     setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
+    photoContentGenerationRef.current += 1;
+    setPhotoValidating(false);
     setPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
       setSelectedDraft(null);
@@ -575,10 +671,17 @@ export default function QuickLogAllActivitiesSection({
       openStructuredWater();
       return;
     }
+    if (requestedActivity === "feeding" && openStructuredFeeding) {
+      setSelectedDraft(null);
+      openStructuredFeed();
+      return;
+    }
     setSelectedDraft(bindQuickLogActivityDraft(requestedActivity, currentTarget));
     setNote(requestedNote ?? "");
   }, [
     currentTarget,
+    openStructuredFeed,
+    openStructuredFeeding,
     openStructuredWater,
     requestedActivity,
     requestedActivityAvailability?.disabled,
@@ -680,12 +783,17 @@ export default function QuickLogAllActivitiesSection({
       setErrorReason(null);
       setErrorForActivity(null);
       setStructuredWaterError(null);
+      setStructuredFeedError(null);
       setGuidedSymptomCheck(false);
       setGuidedSymptomStage(null);
       setGuidedSymptomStageConfirmed(false);
       setGuidedSymptomNoneObserved(false);
       if (a.id === "watering") {
         openStructuredWater();
+        return;
+      }
+      if (a.id === "feeding" && openStructuredFeeding) {
+        openStructuredFeed();
         return;
       }
       setSelectedDraft(bindQuickLogActivityDraft(a.id, currentTarget));
@@ -695,9 +803,17 @@ export default function QuickLogAllActivitiesSection({
       setHarvestUnit("g");
       setDetailValues({});
       envCheckTempEntryUnitRef.current = null;
+      photoContentGenerationRef.current += 1;
+      setPhotoValidating(false);
       setPhotoFile(null);
     },
-    [currentTarget, isMutationBlocked, openStructuredWater],
+    [
+      currentTarget,
+      isMutationBlocked,
+      openStructuredFeed,
+      openStructuredFeeding,
+      openStructuredWater,
+    ],
   );
 
   const handleStartSymptomCheck = useCallback(() => {
@@ -1376,6 +1492,8 @@ export default function QuickLogAllActivitiesSection({
         setGuidedSymptomStageConfirmed(false);
         setGuidedSymptomNoneObserved(false);
         envCheckTempEntryUnitRef.current = null;
+        photoContentGenerationRef.current += 1;
+        setPhotoValidating(false);
         setPhotoFile(null);
         setSelectedDraft(null);
         setErrorReason(null);
@@ -1548,6 +1666,16 @@ export default function QuickLogAllActivitiesSection({
           data-testid={`${testIdPrefix}-structured-water-error`}
         >
           {structuredWaterError}
+        </p>
+      )}
+
+      {structuredFeedError && (
+        <p
+          role="alert"
+          className="text-xs text-destructive"
+          data-testid={`${testIdPrefix}-structured-feed-error`}
+        >
+          {structuredFeedError}
         </p>
       )}
 
@@ -1781,20 +1909,57 @@ export default function QuickLogAllActivitiesSection({
                       if (isMutationBlocked()) return;
                       const file = e.target.files?.[0] ?? null;
                       if (!file) {
+                        photoContentGenerationRef.current += 1;
+                        setPhotoValidating(false);
                         setPhotoFile(null);
                         return;
                       }
                       const check = validatePlantProfilePhotoFile(file);
                       if (!check.ok) {
+                        photoContentGenerationRef.current += 1;
+                        setPhotoValidating(false);
                         const failure = check as { ok: false; message: string };
                         setPhotoFile(null);
                         setErrorReason(failure.message);
                         setErrorForActivity("photo");
                         return;
                       }
+                      if (!fileClaimsPng(file)) {
+                        photoContentGenerationRef.current += 1;
+                        setPhotoValidating(false);
+                        setErrorReason(null);
+                        setErrorForActivity(null);
+                        setPhotoFile(file);
+                        return;
+                      }
+                      const generation = photoContentGenerationRef.current + 1;
+                      photoContentGenerationRef.current = generation;
+                      setPhotoValidating(true);
+                      setPhotoFile(null);
                       setErrorReason(null);
                       setErrorForActivity(null);
-                      setPhotoFile(file);
+                      void validateQuickLogPngClaim(file).then(
+                        (content) => {
+                          if (generation !== photoContentGenerationRef.current) return;
+                          setPhotoValidating(false);
+                          if (!content.ok) {
+                            setPhotoFile(null);
+                            setErrorReason(content.message);
+                            setErrorForActivity("photo");
+                            return;
+                          }
+                          setErrorReason(null);
+                          setErrorForActivity(null);
+                          setPhotoFile(file);
+                        },
+                        () => {
+                          if (generation !== photoContentGenerationRef.current) return;
+                          setPhotoValidating(false);
+                          setPhotoFile(null);
+                          setErrorReason("That photo could not be read. Try a different file.");
+                          setErrorForActivity("photo");
+                        },
+                      );
                     }}
                     className="text-sm"
                   />
@@ -1824,13 +1989,35 @@ export default function QuickLogAllActivitiesSection({
               )}
 
               {selected.id === "manual_sensor_snapshot" ? (
-                <p
-                  className="text-xs text-muted-foreground"
-                  data-testid={`${testIdPrefix}-manual-sensor-hint`}
-                >
-                  Use the Manual Sensor Snapshot card on this page to record a reading. Manual
-                  snapshots stay labeled manual, not live.
-                </p>
+                onOpenManualSensorReading ? (
+                  <div className="space-y-2" data-testid={`${testIdPrefix}-manual-sensor-hint`}>
+                    <p className="text-xs text-muted-foreground">
+                      Manual snapshots stay labeled manual, not live. This page records a reading
+                      you enter. It does not control a device.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={mutationBlocked}
+                      data-testid={`${testIdPrefix}-manual-sensor-open`}
+                      onClick={() => {
+                        if (isMutationBlocked()) return;
+                        onOpenManualSensorReading();
+                      }}
+                    >
+                      Record a manual sensor reading
+                    </Button>
+                  </div>
+                ) : (
+                  <p
+                    className="text-xs text-muted-foreground"
+                    data-testid={`${testIdPrefix}-manual-sensor-hint`}
+                  >
+                    Use the Manual Sensor Snapshot card on this page to record a reading. Manual
+                    snapshots stay labeled manual, not live.
+                  </p>
+                )
               ) : selected.id === "harvest" ? (
                 <div className="space-y-2" data-testid={`${testIdPrefix}-harvest-fields`}>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1943,6 +2130,11 @@ export default function QuickLogAllActivitiesSection({
                       placeholder="Removed main cola, lower branches…"
                       className="min-h-[64px] text-sm"
                     />
+                    <ActivityNoteLimit
+                      testIdPrefix={testIdPrefix}
+                      note={note}
+                      activityId={selected.id}
+                    />
                   </div>
                 </div>
               ) : requiresNote ? (
@@ -1964,6 +2156,11 @@ export default function QuickLogAllActivitiesSection({
                     disabled={mutationBlocked}
                     placeholder="Short observation…"
                     className="min-h-[64px] text-sm"
+                  />
+                  <ActivityNoteLimit
+                    testIdPrefix={testIdPrefix}
+                    note={note}
+                    activityId={selected.id}
                   />
                 </div>
               ) : (
@@ -2006,6 +2203,9 @@ export default function QuickLogAllActivitiesSection({
                   variant="ghost"
                   onClick={() => {
                     if (isMutationBlocked()) return;
+                    photoContentGenerationRef.current += 1;
+                    setPhotoValidating(false);
+                    setPhotoFile(null);
                     setSelectedDraft(null);
                     setNote("");
                     setGuidedSymptomCheck(false);

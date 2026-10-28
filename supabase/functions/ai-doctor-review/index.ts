@@ -7,7 +7,7 @@
 //    and one protected fresh-review completion RPC are the only persistence.
 //    No ai_doctor_sessions / alerts / action_queue / sensor_readings writes.
 //    No equipment / device control.
-//  - LOVABLE_API_KEY stays server-only. Never echoed to client.
+//  - GEMINI_API_KEY stays server-only. Never echoed to client.
 //  - Response is always { ok: true, result, credit? } or
 //    { ok: false, reason, credit? }.
 //  - Model tier + weight are decided SERVER-SIDE. Client cannot self-discount.
@@ -30,8 +30,6 @@
 // idempotency does not bind the old packet. A future receipt/cache schema
 // marker is required before legacy cache rows can be distinguished as grounded.
 
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 // All src/lib touch-points routed through _shared/ shims. See
 // _shared/unionEntitlementLookup.ts for the re-export convention: this
@@ -61,17 +59,60 @@ import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
   buildAiDoctorPromptMeasurement,
 } from "../_shared/cost.ts";
+import {
+  buildGeminiDirectChatRequest,
+  lookupGeminiDirectRoute,
+  readGeminiDirectApiKey,
+  resolveGeminiDirectChat,
+} from "../_shared/geminiDirectChat.ts";
+
+const SUPABASE_JS_SPECIFIER = "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-retry-count",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+};
+
+type AiDoctorCreateClient = (
+  url: string,
+  key: string,
+  options?: Record<string, unknown>,
+) => {
+  auth: { getUser(): Promise<{ data: { user: { id: string } | null } | null }> };
+  rpc(
+    name: string,
+    params?: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: { message?: string } | null }>;
+};
+
+export type AiDoctorHandlerDeps = {
+  createClient?: AiDoctorCreateClient;
+};
+
+async function loadSupabaseClientFactory(): Promise<AiDoctorCreateClient> {
+  const mod = await import(/* @vite-ignore */ SUPABASE_JS_SPECIFIER);
+  return mod.createClient as AiDoctorCreateClient;
+}
 
 const TIMEOUT_MS = 25_000;
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
 // S2: server-pinned tier/feature. Escalation is deferred.
 const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
+const doctorRoute = lookupGeminiDirectRoute(FEATURE, MODEL_TIER);
+if (!doctorRoute.ok) {
+  throw new Error("ai-doctor-review standard Gemini route is not configured");
+}
+const GATEWAY_URL = doctorRoute.url;
+const MODEL = doctorRoute.recordedModelId;
+const WIRE_MODEL = doctorRoute.geminiModelId;
 const COMPLETION_WRITE_TIMEOUT_MS = 1_500;
 const RESULT_PERSISTENCE_TIMEOUT_MS = 3_000;
 const TOOL_SCHEMA_VERSION = "ai-doctor-review-tool-v1";
-const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v1";
+// v2 signs the native Gemini id in WIRE_MODEL. v1 receipts stay historical:
+// they were signed with the provider-prefixed model id under the same field.
+const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v2";
 const RECEIPT_HMAC_SECRET_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY";
 const RECEIPT_HMAC_KEY_ID_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY_ID";
 
@@ -166,13 +207,12 @@ function isReceiptHmacKeyId(value: unknown): value is string {
  * Neither the prompt text nor the HMAC secret is returned, stored in browser
  * rows, or logged. The HMAC is not used to authorize, price, or select a model.
  */
-async function signAiDoctorPrompt(
+export function buildAiDoctorSigningFrame(
   prompt: ReturnType<typeof buildAiDoctorPromptMessages>,
-  secret: string,
-): Promise<string> {
-  const frame = JSON.stringify({
+): string {
+  return JSON.stringify({
     version: PROMPT_CONTRACT_VERSION,
-    model: MODEL,
+    model: WIRE_MODEL,
     messages: [
       { role: "system", content: prompt.system },
       { role: "user", content: prompt.user },
@@ -180,6 +220,13 @@ async function signAiDoctorPrompt(
     tools: [TOOL_SCHEMA],
     tool_choice: { type: "function", function: { name: "submit_ai_doctor_review" } },
   });
+}
+
+export async function signAiDoctorPrompt(
+  prompt: ReturnType<typeof buildAiDoctorPromptMessages>,
+  secret: string,
+): Promise<string> {
+  const frame = buildAiDoctorSigningFrame(prompt);
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -225,7 +272,7 @@ async function recordFreshAiDoctorReviewCompletion(userId: string, spendId: stri
   }
 
   try {
-    const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
+    const serviceSupabase = (await loadSupabaseClientFactory())(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -260,7 +307,14 @@ async function recordFreshAiDoctorReviewCompletion(userId: string, spendId: stri
   }
 }
 
-Deno.serve(async (req) => {
+if (import.meta.main) {
+  Deno.serve((req) => handleAiDoctorReviewRequest(req));
+}
+
+export async function handleAiDoctorReviewRequest(
+  req: Request,
+  deps: AiDoctorHandlerDeps = {},
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -275,6 +329,7 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return calmFailure("http");
+    const createClient = deps.createClient ?? (await loadSupabaseClientFactory());
     // createClient throws on a missing URL or key, which would surface as an
     // unexpected failure instead of the configuration outage it is.
     const authSupabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -327,9 +382,18 @@ Deno.serve(async (req) => {
     });
     const billingEnvironment = billingEnvironmentResolution.environment;
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
-      console.log("ai-doctor-review status=config_missing missing=lovable_api_key");
+    const apiKey = readGeminiDirectApiKey(Deno.env);
+    const geminiResolution = resolveGeminiDirectChat({
+      feature: FEATURE,
+      tier: MODEL_TIER,
+      apiKey,
+    });
+    if (!geminiResolution.ok || apiKey === null) {
+      const missing =
+        geminiResolution.ok || geminiResolution.reason === "missing_api_key"
+          ? "gemini_api_key"
+          : geminiResolution.reason;
+      console.log(`ai-doctor-review status=config_missing missing=${missing}`);
       return calmFailure("config");
     }
 
@@ -528,15 +592,11 @@ Deno.serve(async (req) => {
     }).measurement;
     let upstream: Response;
     try {
-      upstream = await fetch(GATEWAY_URL, {
-        method: "POST",
+      const providerRequest = buildGeminiDirectChatRequest({
+        apiKey,
+        geminiModelId: WIRE_MODEL,
         signal: ctrl.signal,
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: MODEL,
+        body: {
           messages: [
             { role: "system", content: promptMessages.system },
             { role: "user", content: promptMessages.user },
@@ -546,8 +606,9 @@ Deno.serve(async (req) => {
             type: "function",
             function: { name: "submit_ai_doctor_review" },
           },
-        }),
+        },
       });
+      upstream = await fetch(GATEWAY_URL, providerRequest);
     } catch {
       console.log("ai-doctor-review status=timeout_or_network");
       return failureAfterRefund(spendId, "upstream_timeout", "timeout");
@@ -563,6 +624,16 @@ Deno.serve(async (req) => {
         /* ignore */
       }
       return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
+    }
+
+    if (upstream.status === 429) {
+      console.log("ai-doctor-review status=upstream_credit_exhausted");
+      try {
+        await upstream.text();
+      } catch {
+        /* ignore */
+      }
+      return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
     }
 
     if (!upstream.ok) {
@@ -663,7 +734,7 @@ Deno.serve(async (req) => {
     console.log("ai-doctor-review status=unexpected");
     return calmFailure(creditSpendMayExist ? "result_pending" : "http");
   }
-});
+}
 
 function readToolArguments(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;

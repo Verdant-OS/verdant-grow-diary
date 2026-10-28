@@ -18,6 +18,11 @@ import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Bell, Box, Gauge, ListTodo } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
+import { usePlantManualEnvironmentReadings } from "@/hooks/usePlantManualEnvironmentReadings";
+import {
+  combinePlantEnvironmentReads,
+  mergePlantTentReadingsWithManualEvents,
+} from "@/lib/plantManualEnvironmentEventRules";
 import { useNowTick } from "@/hooks/useNowTick";
 import {
   buildPlantEnvironmentReadView,
@@ -32,16 +37,28 @@ interface Props {
   tentId: string | null | undefined;
   tentName?: string | null;
   growId: string | null | undefined;
+  /** Includes this plant's Quick Log manual readings in the environment strip. */
+  plantId?: string | null;
 }
 
-export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
+export default function PlantStatusStrip({ tentId, tentName, growId, plantId }: Props) {
   const nowMs = useNowTick();
   const hasTent = !!tentId;
   const environmentQuery = usePlantTentLatestReadings(hasTent ? (tentId ?? null) : null);
-  const readings = hasTent ? (environmentQuery.data ?? []) : [];
+  const manualQuery = usePlantManualEnvironmentReadings(
+    hasTent ? (tentId ?? null) : null,
+    plantId ?? null,
+  );
+  const readings = hasTent
+    ? mergePlantTentReadingsWithManualEvents(environmentQuery.data ?? [], manualQuery.data ?? [])
+    : [];
   const env = buildPlantTentEnvironmentView(readings, nowMs);
   const environmentReadView = buildPlantEnvironmentReadView({
-    ...environmentQuery,
+    ...combinePlantEnvironmentReads({
+      sensor: environmentQuery,
+      manual: manualQuery,
+      manualEnabled: hasTent && !!plantId,
+    }),
     enabled: hasTent,
     hasCachedReadings: readings.length > 0,
   });

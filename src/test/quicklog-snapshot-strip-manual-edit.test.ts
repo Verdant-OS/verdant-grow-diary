@@ -10,7 +10,7 @@
  *  - `capturedAtLabel` is a deterministic absolute string when a
  *    snapshot exists; null when no data.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   buildQuickLogSnapshotStrip,
   buildQuickLogStripFromTentState,
@@ -22,6 +22,20 @@ import type { SensorSnapshot as StrictSnapshot } from "@/lib/latestSensorSnapsho
 
 const NOW = new Date("2026-07-07T19:14:00Z");
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
+
+// Time labels follow the viewer's local zone; pin it so pins are deterministic.
+let savedTz: string | undefined;
+beforeEach(() => {
+  savedTz = process.env.TZ;
+});
+afterEach(() => {
+  if (savedTz === undefined) delete process.env.TZ;
+  else process.env.TZ = savedTz;
+});
+function useChicagoZone(): void {
+  process.env.TZ = "America/Chicago";
+  expect(new Date(2026, 9, 21, 10, 53).toISOString()).toBe("2026-10-21T15:53:00.000Z");
+}
 
 function snap(partial: Partial<SensorSnapshot>): SensorSnapshot {
   return {
@@ -97,13 +111,14 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
   });
 
   it("legacy adapter: capturedAtLabel is a deterministic absolute string when data exists", () => {
+    useChicagoZone();
     const v = buildQuickLogSnapshotStrip({
       snapshot: snap({}),
       hasTent: true,
       now: NOW,
       temperatureUnit: "celsius",
     });
-    expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM UTC");
+    expect(v.capturedAtLabel).toBe("Jul 7, 2026, 2:09 PM CDT");
     expect(v.capturedAt).toBe(minutesAgo(5));
   });
 
@@ -129,6 +144,7 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
   });
 
   it("strict adapter: manual fresh snapshot exposes Edit action + captured label", () => {
+    useChicagoZone();
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: strictManualSnap(),
@@ -137,7 +153,7 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
       temperatureUnit: "celsius",
     });
     expect(v.action.kind).toBe("edit");
-    expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM UTC");
+    expect(v.capturedAtLabel).toBe("Jul 7, 2026, 2:09 PM CDT");
   });
 
   it("strict adapter: live snapshot never surfaces edit", () => {

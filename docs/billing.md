@@ -33,15 +33,17 @@ all laws applicable to cultivation in their own jurisdiction.
 
 ## Plans (sandbox)
 
-| Plan             | Price           | Cadence  | Slug               |
-| ---------------- | --------------- | -------- | ------------------ |
-| Pro Monthly      | $12             | / month  | `pro-monthly`      |
-| Pro Annual       | $99             | / year   | `pro-annual`       |
-| Founder Lifetime | $129 (one-time) | one-time | `founder-lifetime` |
+| Plan          | Price | Cadence | Slug            |
+| ------------- | ----- | ------- | --------------- |
+| Pro Monthly   | $12   | / month | `pro-monthly`   |
+| Pro Annual    | $99   | / year  | `pro-annual`    |
+| Craft Monthly | $29   | / month | `craft-monthly` |
+| Craft Annual  | $249  | / year  | `craft-annual`  |
 
-Founder Lifetime is limited to the first 100 buyers. Founder Lifetime includes
-100 AI Doctor credits per month; additional credit packs are planned later but
-are not live yet.
+Founder Lifetime is no longer sold. Existing Founder entitlements stay in
+place until a separate PR and migration remove them. Holders keep Pro-like
+access with AI credits capped at 100 per UTC month. New checkout for
+`founder_lifetime` is refused on the client.
 
 ## Configuration
 
@@ -88,6 +90,13 @@ the shared `verifyWebhook` helper, records into `public.lovable_paddle_events`
 idempotently on `paddle_event_id` (23505 = duplicate no-op), and writes
 `public.subscriptions` directly for recurring plans + calls
 `allocate_lovable_founder_lifetime` for Founder Lifetime.
+
+An approved refund or chargeback (partial refunds included) revokes Founder
+Lifetime and calls `clawback_lovable_credit_pack`, which appends one reversal
+for the full credit-pack grant on that transaction. If credits were already
+spent, the pack balance goes negative and pack-funded AI stops until later
+grants cover it; the monthly allowance is unaffected. A refund that arrives
+before the purchase blocks the grant (`credit_pack_refund_precedes_purchase`).
 
 Audit-only: `paddle-webhook` (BYO lane). Sandbox-only. Still verifies
 signatures and writes `paddle_events` / `paddle_event_processing` /
@@ -144,7 +153,7 @@ the other Paddle gates:
   also revokes authenticated access to the legacy refund function.
 
 The ledger remains append-only. Refunds continue through `ai_credit_refund`,
-and Founder Lifetime remains capped at 100 AI credits per UTC month.
+and an existing Founder Lifetime entitlement remains capped at 100 AI credits per UTC month. Founder Lifetime is no longer sold; removing the entitlement is a separate PR plus migration.
 
 Deployment is an expand/verify/contract sequence across two database releases.
 The expand migration adds service-only overloads but deliberately leaves legacy

@@ -12,7 +12,7 @@ const candidateSha = "a".repeat(40);
 const sources = loadManualDeliverySql();
 
 describe("pinned manual delivery bundle", () => {
-  it("contains all three guarded scripts in order, with reproducible hashes", () => {
+  it("contains all four guarded scripts in order, with reproducible hashes", () => {
     const bundle = buildManualDeliveryBundle({ candidateSha, sources });
     expect(bundle.manifest.order).toEqual(MANUAL_DELIVERY_ORDER);
     expect(bundle.manifest.candidate_sha).toBe(candidateSha);
@@ -44,7 +44,9 @@ describe("pinned manual delivery bundle", () => {
   it("rejects reverse order and an altered last migration before any output is written", () => {
     for (const invalid of [
       [...sources].reverse(),
-      [sources[0], sources[1], `${sources[2]}-- changed\n`],
+      [sources[0], sources[1], sources[2], `${sources[3]}-- changed\n`],
+      // The pre-step-4 three-file plan is no longer a complete delivery.
+      sources.slice(0, 3),
     ]) {
       const mkdir = vi.fn();
       const write = vi.fn();
@@ -70,7 +72,7 @@ describe("pinned manual delivery bundle", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  it("writes only the three scripts and matching manifest from committed source", () => {
+  it("writes only the four scripts and matching manifest from committed source", () => {
     let readIndex = 0;
     const git = vi.fn((args: string[]) =>
       args[0] === "rev-parse" ? candidateSha : sources[readIndex++],
@@ -88,8 +90,8 @@ describe("pinned manual delivery bundle", () => {
       MANUAL_DELIVERY_FILES.map(({ file }) => ["show", `HEAD:supabase/migrations/${file}`]),
     );
     expect(mkdir).toHaveBeenCalledWith(expect.any(String), { recursive: false });
-    expect(write).toHaveBeenCalledTimes(4);
-    expect(JSON.parse(write.mock.calls[3][1])).toEqual(manifest);
+    expect(write).toHaveBeenCalledTimes(5);
+    expect(JSON.parse(write.mock.calls[4][1])).toEqual(manifest);
     for (const call of write.mock.calls) expect(call[2]).toEqual({ encoding: "utf8", flag: "wx" });
   });
 });

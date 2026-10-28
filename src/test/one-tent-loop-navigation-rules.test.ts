@@ -343,7 +343,12 @@ describe("oneTentLoopNavigationRules", () => {
 
   it("routes action-queue to action detail when actionId is present", () => {
     expect(resolveOneTentLoopNextStep("action-queue", { actionId: "x1" }).href).toBe("/actions/x1");
-    expect(resolveOneTentLoopNextStep("action-queue").href).toBe("/actions");
+    const index = resolveOneTentLoopNextStep("action-queue");
+    expect(index.disabled).toBe(true);
+    expect(index.href).toBeNull();
+    const scoped = resolveOneTentLoopNextStep("action-queue", { growId: "g1" });
+    expect(scoped.href).toBeNull();
+    expect(scoped.href ?? "").not.toMatch(/^\/actions/);
   });
 
   it("exposes the six canonical sensor source labels", () => {

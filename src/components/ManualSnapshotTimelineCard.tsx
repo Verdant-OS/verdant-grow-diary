@@ -11,6 +11,7 @@
  *  - No reads, no writes, no Supabase, no automation.
  */
 import { useMemo } from "react";
+import { useNowTick } from "@/hooks/useNowTick";
 import { Link } from "@/lib/react-router-compat";
 import { Gauge, AlertTriangle, XCircle, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,9 @@ import { DERIVED_LABEL, formatSensorValue } from "@/lib/sensorFormat";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { buildManualSensorProvenanceLabels } from "@/lib/manualSensorProvenanceRules";
 import {
+  applySnapshotValidationSeverity,
   evaluateManualSensorSnapshotQuality,
+  isManualSnapshotCurrent,
   type ManualSensorSnapshotInput,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
@@ -49,6 +52,7 @@ const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
   soil_moisture_pct: "soil_moisture_pct",
   soil_ec_mscm: "soil_ec_mscm",
   reservoir_ph: "ph",
+  reservoir_ec_mscm: "reservoir_ec_mscm",
 };
 
 /** Map view-model reading fields to the correction metric namespace. */
@@ -115,6 +119,15 @@ export default function ManualSnapshotTimelineCard({
     });
   }, [card.source, card.readings, card.capturedAt, card.tentId, originalReadingIds]);
 
+  // A snapshot inside the current window (24 h) is a current reading; only
+  // older ones are historical review (production QA 2026-10-14: a snapshot
+  // saved seconds earlier read "Historical review reading").
+  const nowMs = useNowTick();
+  const isCurrentWindow = useMemo(
+    () => isManualSnapshotCurrent(card.capturedAt, nowMs),
+    [card.capturedAt, nowMs],
+  );
+
   const quality = useMemo(() => {
     const fields: Record<string, number> = {};
     for (const r of card.readings) {
@@ -129,8 +142,28 @@ export default function ManualSnapshotTimelineCard({
       captured_at: card.capturedAt,
       ...fields,
     };
-    return evaluateManualSensorSnapshotQuality(snap, { mode: "historical" });
-  }, [card.readings, card.source, card.capturedAt]);
+    // Same tick clock as isCurrentWindow, so the badge and the region label
+    // can never disagree across the 24 h boundary.
+    const mode = isCurrentWindow ? "current" : "historical";
+    // The validator's warnings/errors (e.g. a likely °C/°F mismatch) must
+    // never sit beside a "Usable current reading" badge.
+    return applySnapshotValidationSeverity(
+      evaluateManualSensorSnapshotQuality(snap, { mode, nowMs }),
+      { severity: card.severity, warnings: card.warnings, errors: card.errors },
+      mode,
+    );
+  }, [
+    card.readings,
+    card.source,
+    card.capturedAt,
+    card.severity,
+    card.warnings,
+    card.errors,
+    isCurrentWindow,
+    nowMs,
+  ]);
+  // "Current" freshness copy only for a fresh snapshot that is also usable.
+  const showsCurrent = isCurrentWindow && quality.quality === "usable";
 
   const provenanceLabels = buildManualSensorProvenanceLabels(card.source);
 
@@ -206,7 +239,13 @@ export default function ManualSnapshotTimelineCard({
       <CardContent className="space-y-2 pt-0">
         <section
           data-testid="manual-snapshot-timeline-card-quality"
-          aria-label="Historical snapshot quality"
+          aria-label={
+            showsCurrent
+              ? "Current snapshot quality"
+              : isCurrentWindow
+                ? "Recent snapshot quality, needs review"
+                : "Historical snapshot quality"
+          }
           className="rounded-md border border-border/40 bg-secondary/10 p-2"
         >
           <ManualSensorSnapshotQualityBadge evaluation={quality} />
@@ -224,7 +263,11 @@ export default function ManualSnapshotTimelineCard({
             ))}
           </ul>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Historical reading — quality reflects captured values; not current-room guidance.
+            {showsCurrent
+              ? "Current reading — saved within the last 24 hours."
+              : isCurrentWindow
+                ? "Recent reading — saved within the last 24 hours; review the flagged values before use."
+                : "Historical reading — quality reflects captured values; not current-room guidance."}
           </p>
           {(quality.quality === "invalid" || quality.quality === "needs_review") && (
             <p

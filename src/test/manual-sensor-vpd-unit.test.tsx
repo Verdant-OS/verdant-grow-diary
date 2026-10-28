@@ -7,7 +7,7 @@
  * stored in localStorage.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
@@ -56,9 +56,7 @@ function vpdInput() {
 async function confirmSave() {
   fireEvent.click(screen.getByTestId("manual-reading-save"));
   fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
-  for (let i = 0; i < 25 && insertedRows.length === 0; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
+  await waitFor(() => expect(insertedRows.length).toBeGreaterThan(0));
 }
 
 function savedVpd(): number | undefined {

@@ -16,7 +16,7 @@ import type { ManualEntryValidation } from "@/lib/sensorReadingManualEntryRules"
 export const MANUAL_VPD_UNITS = ["kPa", "hPa", "mbar"] as const;
 export type ManualVpdUnit = (typeof MANUAL_VPD_UNITS)[number];
 
-const KPA_PER_HECTOPASCAL = 10;
+const HPA_PER_KPA = 10;
 const ROUND_DIGITS = 1_000_000;
 
 function assertNever(unit: never): never {
@@ -34,7 +34,7 @@ export function manualVpdToKpa(value: number, unit: ManualVpdUnit): number {
       return value;
     case "hPa":
     case "mbar":
-      return roundScaled(value / KPA_PER_HECTOPASCAL);
+      return roundScaled(value / HPA_PER_KPA);
     default:
       return assertNever(unit);
   }
@@ -46,7 +46,7 @@ function kpaToUnit(kpa: number, unit: ManualVpdUnit): number {
       return kpa;
     case "hPa":
     case "mbar":
-      return roundScaled(kpa * KPA_PER_HECTOPASCAL);
+      return roundScaled(kpa * HPA_PER_KPA);
     default:
       return assertNever(unit);
   }
@@ -129,7 +129,7 @@ const KPA_RANGE = /(-?\d+(?:\.\d+)?)\s*[–-]\s*(-?\d+(?:\.\d+)?)\s*kPa/g;
 const KPA_AMOUNT = /(-?\d+(?:\.\d+)?)\s*kPa/g;
 
 function formatScaledAmount(kpaText: string): string {
-  const scaled = roundScaled(Number(kpaText) * KPA_PER_HECTOPASCAL);
+  const scaled = roundScaled(Number(kpaText) * HPA_PER_KPA);
   return String(Math.round(scaled * 100) / 100);
 }
 

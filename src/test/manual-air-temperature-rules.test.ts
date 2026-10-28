@@ -11,6 +11,11 @@ import { validateManualEntry } from "@/lib/sensorReadingManualEntryRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { assessQuickLogSensorSnapshotGate } from "@/lib/quickLogSensorSnapshotGateRules";
+import {
+  describeQuickLogActivityDetails,
+  getQuickLogActivityDetailFields,
+  validateQuickLogDetailNumberInput,
+} from "@/lib/quickLogActivityDetailFields";
 
 describe("manual air temperature band (owner decision 2026-10-28: -10..50 °C)", () => {
   it("is the same band the manual insert validator uses", () => {
@@ -88,5 +93,26 @@ describe("2,462 °F typed at the tent door (Case Files Ep07)", () => {
   it("is deterministic", () => {
     const input = { airTemp: "2462", airTempUnit: "F" as const };
     expect(validateManualEntry(input)).toEqual(validateManualEntry(input));
+  });
+});
+
+describe("Environment-check history keeps rows saved under the old 60 °C band", () => {
+  it("still displays a stored 55 °C reading while refusing 55 as new input", () => {
+    const lines = describeQuickLogActivityDetails("environment_check", {
+      environment_check: { temp_c: 55 },
+    });
+    expect(lines.find((l) => l.key === "temp_c")?.value).toBe("55 °C");
+
+    const temp = getQuickLogActivityDetailFields("environment_check").find(
+      (f) => f.key === "temp_c",
+    )!;
+    expect(validateQuickLogDetailNumberInput(temp, "55").ok).toBe(false);
+  });
+
+  it("still hides an implausible stored value", () => {
+    const lines = describeQuickLogActivityDetails("environment_check", {
+      environment_check: { temp_c: 999 },
+    });
+    expect(lines.some((l) => l.key === "temp_c")).toBe(false);
   });
 });

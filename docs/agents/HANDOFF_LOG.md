@@ -78,11 +78,11 @@ why: Matthew chose -10..50 °C (2026-10-28) after a source check for the Case Fi
 branch: claude/new-session-gqat8s
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-gqat8s verdant-grow-diary && git switch claude/new-session-gqat8s && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: read from the branch; draft
-head_sha: read the PR head; this commit cannot name itself
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2599 (draft)
+head_sha: 53e59b7e5ae7e90a8aec9ccd4904a00a10682d95 before the CodeRabbit-findings commit (2026-10-28 21:11 UTC); a commit cannot name itself, so compare the fetched head against the PR's current head
 state: pushed draft
-current_step: awaiting CI (35 required) and an independent exact-head review
-next_action: read CI at the PR head; fix any red in the touched files; then request an eligible independent reviewer (not this session)
+current_step: CodeRabbit review 5689831242 addressed (stored Environment-check temp_c up to 60 °C still displays via storedMax; this block now names the PR and last verified head); CI at 53e59b7e was never scheduled (repo-wide Actions runner failure, PR comment 6480825289)
+next_action: once Actions assigns runners again, read CI at the PR head and fix any red in the touched files; then request an eligible independent reviewer (not this session)
 post_merge_check: on https://verdantgrowdiary.com once /version.json reports the merge SHA: Quick Log V2 Note snapshot with 123 °F shows "Temperature must be between 14 and 122 °F." and Save stays disabled (no save needed)
 active_writer: Claude session_017UoYKyF2kKTQuQzkLLpPqT
 decisions: scope "manual entry only" (Matthew, 2026-10-28): new pure src/lib/manualAirTemperatureRules.ts reuses AIR_TEMP_C_RANGE; isTemperatureValid (-10..60, mirrored into supabase/functions/_shared), webhook ingest, readers of stored rows, the environment_events DB guard and water_temp_c bands are unchanged. The unit-agnostic server-reason message names both units.
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKyF2kKTQuQzkLLpPqT, 2026-10-28 16:10 CT (Matthew's decision and scope choice in session)
 owner: Claude session_017UoYKyF2kKTQuQzkLLpPqT
-last_updated: 2026-10-28 16:10 CT, by Claude
+last_updated: 2026-10-28 16:25 CT, by Claude
 ```
 
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540

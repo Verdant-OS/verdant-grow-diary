@@ -99,6 +99,12 @@ export interface QuickLogDetailFieldSpec {
    * temperature field. Never set on non-temperature fields.
    */
   readonly temperatureCelsius?: boolean;
+  /**
+   * Upper bound for DISPLAYING an already-stored value, when it is wider than
+   * the entry bound `max`. Keeps rows saved under an older, wider entry band
+   * visible in history (preserve old rows). Never used to validate new input.
+   */
+  readonly storedMax?: number;
   /** Placeholder shown when the display unit is Fahrenheit (see above). */
   readonly placeholderF?: string;
 }
@@ -272,6 +278,8 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       kind: "number",
       min: MANUAL_AIR_TEMP_MIN_C,
       max: MANUAL_AIR_TEMP_MAX_C,
+      // Entries before 2026-10-28 were accepted up to 60 °C; keep showing them.
+      storedMax: 60,
       unit: "°C",
       placeholder: "e.g. 24",
       placeholderF: "e.g. 75",
@@ -513,7 +521,8 @@ function formatDetailLine(
     }
     if (!Number.isFinite(n)) return null;
     if (typeof spec.min === "number" && n < spec.min) return null;
-    if (typeof spec.max === "number" && n > spec.max) return null;
+    const readMax = spec.storedMax ?? spec.max;
+    if (typeof readMax === "number" && n > readMax) return null;
     const displayValue =
       spec.temperatureCelsius && tempUnit === "fahrenheit" ? celsiusToFahrenheit(n) : n;
     const displayUnit = spec.temperatureCelsius ? getTemperatureUnitSymbol(tempUnit) : spec.unit;

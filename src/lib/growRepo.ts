@@ -13,8 +13,11 @@ import { buildGrowScopedPlantsOrFilter } from "./growAttributionRules";
 import { isUuid } from "./isUuid";
 import { filterValidPlantRows, validatePlantRowResponse } from "./plantPayloadValidation";
 
-function fail(scope: string, error: { message?: string } | null): never {
-  throw new Error(`growRepo.${scope}: ${error?.message ?? "unknown error"}`);
+function fail(scope: string, error: { message?: string; code?: unknown } | null): never {
+  const thrown = new Error(`growRepo.${scope}: ${error?.message ?? "unknown error"}`);
+  // Keep the database code so retry policy can stop on permanent errors (42501).
+  if (typeof error?.code === "string") (thrown as Error & { code?: string }).code = error.code;
+  throw thrown;
 }
 
 export async function fetchTents(growId?: string): Promise<Tent[]> {

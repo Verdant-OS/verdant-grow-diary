@@ -3,17 +3,6 @@
 import { pathToFileURL } from "node:url";
 
 export const DEFAULT_SUBSCRIBER_GROWTH_ORIGIN = "https://verdantgrowdiary.com";
-export const SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL =
-  "https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/founder-slots-remaining";
-export const SUBSCRIBER_GROWTH_FOUNDER_TOTAL = 100;
-
-const FOUNDER_COUNTER_REQUIRED_CORS_HEADERS = Object.freeze([
-  "authorization",
-  "x-client-info",
-  "apikey",
-  "content-type",
-]);
-
 export const SUBSCRIBER_GROWTH_LIVE_ROUTES = Object.freeze([
   "/",
   "/welcome",
@@ -114,153 +103,9 @@ async function readResponse(response) {
   };
 }
 
-function responseStatus(response) {
-  return Number.isFinite(response?.status) ? response.status : 0;
-}
-
-function responseHeader(response, name) {
-  return response?.headers?.get?.(name) ?? null;
-}
-
-function corsOriginAllowed(response, browserOrigin) {
-  const allowedOrigin = responseHeader(response, "access-control-allow-origin");
-  return allowedOrigin === "*" || allowedOrigin === browserOrigin;
-}
-
-function corsHeadersAllowed(response) {
-  const allowedHeaders = responseHeader(response, "access-control-allow-headers");
-  if (typeof allowedHeaders !== "string") return false;
-  const allowed = new Set(
-    allowedHeaders
-      .split(",")
-      .map((header) => header.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  return FOUNDER_COUNTER_REQUIRED_CORS_HEADERS.every((header) => allowed.has(header));
-}
-
-function isExactFounderCounterPayload(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const keys = Object.keys(value).sort();
-  return keys.length === 2 && keys[0] === "remaining" && keys[1] === "total";
-}
-
-/**
- * Public, secret-free production proof for the Founder availability counter.
- * The returned evidence contains only statuses, stable reason codes, and the
- * already-public bounded aggregate after its exact payload contract passes.
- */
-export async function auditFounderCounterLive({
-  fetchImpl = globalThis.fetch,
-  browserOrigin = DEFAULT_SUBSCRIBER_GROWTH_ORIGIN,
-  endpoint = SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL,
-} = {}) {
-  if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
-  const normalizedBrowserOrigin = normalizeOrigin(browserOrigin);
-  const errors = [];
-
-  let optionsStatus = 0;
-  let optionsCorsVerified = false;
-  try {
-    const response = await fetchImpl(endpoint, {
-      method: "OPTIONS",
-      headers: {
-        Origin: normalizedBrowserOrigin,
-        "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": FOUNDER_COUNTER_REQUIRED_CORS_HEADERS.join(", "),
-        "user-agent": "VerdantSubscriberGrowthParity/1.0",
-      },
-    });
-    optionsStatus = responseStatus(response);
-    if (response?.ok !== true) errors.push(`options_status_${optionsStatus}`);
-    if (!corsOriginAllowed(response, normalizedBrowserOrigin)) {
-      errors.push("options_origin_not_allowed");
-    }
-    if (!corsHeadersAllowed(response)) errors.push("options_headers_not_allowed");
-    optionsCorsVerified =
-      response?.ok === true &&
-      corsOriginAllowed(response, normalizedBrowserOrigin) &&
-      corsHeadersAllowed(response);
-  } catch {
-    errors.push("options_request_failed");
-  }
-
-  let postStatus = 0;
-  let postCorsVerified = false;
-  let payloadVerified = false;
-  let verifiedRemaining = null;
-  let verifiedTotal = null;
-  try {
-    const response = await fetchImpl(endpoint, {
-      method: "POST",
-      headers: {
-        Origin: normalizedBrowserOrigin,
-        "Content-Type": "application/json",
-        "user-agent": "VerdantSubscriberGrowthParity/1.0",
-      },
-      body: "{}",
-    });
-    postStatus = responseStatus(response);
-    if (response?.ok !== true) errors.push(`post_status_${postStatus}`);
-    postCorsVerified = corsOriginAllowed(response, normalizedBrowserOrigin);
-    if (!postCorsVerified) errors.push("post_origin_not_allowed");
-
-    const contentType = responseHeader(response, "content-type")?.toLowerCase() ?? "";
-    const mediaType = contentType.split(";", 1)[0].trim();
-    const jsonContentType = mediaType === "application/json" || mediaType.endsWith("+json");
-    if (!jsonContentType) errors.push("post_content_type_not_json");
-
-    let payload = null;
-    let parsed = false;
-    try {
-      payload = JSON.parse(await response.text());
-      parsed = true;
-    } catch {
-      errors.push("post_invalid_json");
-    }
-
-    const exactShape = parsed && isExactFounderCounterPayload(payload);
-    if (parsed && !exactShape) errors.push("post_payload_shape_invalid");
-    const valuesValid =
-      exactShape &&
-      Number.isInteger(payload.remaining) &&
-      payload.remaining >= 0 &&
-      payload.remaining <= SUBSCRIBER_GROWTH_FOUNDER_TOTAL &&
-      Number.isInteger(payload.total) &&
-      payload.total === SUBSCRIBER_GROWTH_FOUNDER_TOTAL;
-    if (exactShape && !valuesValid) errors.push("post_payload_values_invalid");
-
-    payloadVerified = response?.ok === true && jsonContentType && exactShape && valuesValid;
-    if (payloadVerified) {
-      verifiedRemaining = payload.remaining;
-      verifiedTotal = payload.total;
-    }
-  } catch {
-    errors.push("post_request_failed");
-  }
-
-  const ok = optionsCorsVerified && postCorsVerified && payloadVerified && errors.length === 0;
-
-  return {
-    kind: "public_founder_counter_live_check",
-    attempted: true,
-    ok,
-    optionsStatus,
-    postStatus,
-    corsVerified: optionsCorsVerified && postCorsVerified,
-    payloadVerified,
-    remaining: ok ? verifiedRemaining : null,
-    total: ok ? verifiedTotal : null,
-    error: errors[0] ?? null,
-    errors,
-  };
-}
-
 export async function auditSubscriberGrowthLiveParity({
   origin = DEFAULT_SUBSCRIBER_GROWTH_ORIGIN,
   fetchImpl = globalThis.fetch,
-  verifyFounderCounter = false,
-  founderCounterEndpoint = SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL,
 } = {}) {
   if (typeof fetchImpl !== "function") throw new Error("fetch_unavailable");
   const normalizedOrigin = normalizeOrigin(origin);
@@ -360,18 +205,10 @@ export async function auditSubscriberGrowthLiveParity({
 
   const routesPassed = routeResponses.filter((result) => result.ok).length;
   const capabilitiesPassed = capabilityResults.filter((result) => result.ok).length;
-  const founderCounter = verifyFounderCounter
-    ? await auditFounderCounterLive({
-        fetchImpl,
-        browserOrigin: normalizedOrigin,
-        endpoint: founderCounterEndpoint,
-      })
-    : null;
   const ok =
     moduleError === null &&
     routesPassed === routeResponses.length &&
-    capabilitiesPassed === capabilityResults.length &&
-    (!verifyFounderCounter || founderCounter?.ok === true);
+    capabilitiesPassed === capabilityResults.length;
 
   return {
     ok,
@@ -385,7 +222,6 @@ export async function auditSubscriberGrowthLiveParity({
     capabilitiesTotal: capabilityResults.length,
     routes: routeResponses.map(({ parsed: _parsed, ...result }) => result),
     capabilities: capabilityResults,
-    founderCounter,
   };
 }
 
@@ -397,13 +233,6 @@ export function formatSubscriberGrowthLiveParity(result) {
     `Routes: ${result.routesPassed}/${result.routesTotal}`,
     `Growth capabilities: ${result.capabilitiesPassed}/${result.capabilitiesTotal}`,
   ];
-
-  if (result.founderCounter) {
-    lines.push(`Founder counter: ${result.founderCounter.ok ? "PASS" : "FAIL"}`);
-    if (!result.founderCounter.ok) {
-      lines.push(`FAIL founder counter: ${result.founderCounter.errors.join(", ")}`);
-    }
-  }
 
   if (result.moduleError) lines.push(`FAIL module: ${result.moduleError}`);
   for (const route of result.routes) {
@@ -422,7 +251,7 @@ export function formatSubscriberGrowthLiveParity(result) {
 async function main() {
   const originArg = process.argv.find((arg) => arg.startsWith("--origin="));
   const origin = originArg ? originArg.slice("--origin=".length) : DEFAULT_SUBSCRIBER_GROWTH_ORIGIN;
-  const result = await auditSubscriberGrowthLiveParity({ origin, verifyFounderCounter: true });
+  const result = await auditSubscriberGrowthLiveParity({ origin });
   console.log(formatSubscriberGrowthLiveParity(result));
   process.exitCode = result.ok ? 0 : 1;
 }

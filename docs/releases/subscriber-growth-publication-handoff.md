@@ -21,9 +21,9 @@ The release is additive and spans:
 - deterministic launch and live-parity evidence.
 
 The subscriber-growth release requires the reviewed `ai-doctor-review` Edge
-Function version containing the server-side completion recorder and the public,
-read-only `founder-slots-remaining` Edge Function. Source presence alone does
-not prove either function is deployed. Deploy only those two reviewed functions
+Function version containing the server-side completion recorder.
+Source presence alone does
+not prove the reviewed function is deployed. Deploy only that reviewed function
 after the reviewed database migration, and do not redeploy unrelated functions
 merely because the frontend or database changes.
 The database release consists of exactly five migrations.
@@ -88,9 +88,8 @@ Only an authorized operator should perform these steps:
 7. Apply exactly the reviewed database migrations.
 8. Confirm the existing server-side `SUPABASE_SERVICE_ROLE_KEY` secret is
    configured for the linked functions without printing, copying, or exposing
-   it; then deploy only the reviewed `ai-doctor-review` and
-   `founder-slots-remaining` functions from the exact canonical
-   `<release-head-commit>`.
+   it; then deploy only the reviewed `ai-doctor-review` function from the exact
+   canonical `<release-head-commit>`.
 9. Deploy the frontend from that same `<release-head-commit>`.
 10. Run the authenticated remote check through the full gate from the detached
     `<release-head-commit>` checkout against the canonical origin:
@@ -103,9 +102,7 @@ Only an authorized operator should perform these steps:
 
     The authenticated check reads only the linked project identity, remote
     migration IDs, secret names, and downloaded AI Doctor source parity plus
-    recorder markers. The separate public Founder check sends no key and stores
-    only response statuses, stable reason codes, and a bounded aggregate after
-    the entire CORS and payload contract passes. The gate never logs secret
+    recorder markers. The gate never logs secret
     values or stores remote command output in the receipt. Downloaded source is
     temporary only; failed cleanup returns `HOLD`.
 
@@ -165,15 +162,12 @@ reviewed source, or has no configured server-side secret name. It does not
 validate or expose the secret value; that would require a separately authorized
 runtime exercise.
 
-The separate public check requires an unauthenticated browser-shaped `OPTIONS`
-and `POST {}` to the production `founder-slots-remaining` endpoint. It fails
-closed unless CORS permits Verdant's production origin and the Supabase client
-headers, the POST returns HTTP 200 JSON, the payload contains exactly
-`remaining` and `total`, both values are integers, `total === 100`, and
-`remaining` is within `0..100`. A 404, 503, malformed response, extra field, or
-missing CORS evidence prevents `LIVE_VERIFIED`. This is a production-backend
-proof, not a sixth frontend capability marker; local preview stays
-network-free.
+`founder-slots-remaining` was retired from the repository by PR #2570.
+Do not redeploy the retired counter or require its response for this release.
+Hosted undeployment is a separate authorized production action; its status is
+not established by this gate.
+Existing Founder entitlements, the Founders Wall, and refund revocation
+remain unchanged.
 
 Then an authorized operator should open the subscriber-growth page and record
 the authoritative aggregate baseline:

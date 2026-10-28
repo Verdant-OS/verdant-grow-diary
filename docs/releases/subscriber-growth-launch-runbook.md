@@ -7,8 +7,7 @@ specs plus type-check/build/lint/
 diff integrity, verifies formatting across the complete base-relative release
 diff, audits the production build through a local Vite preview, and compares the
 live site with the same capability contract. The full live gate also requires an
-authenticated, read-only Supabase verification of the paid-return measurement path
-and a secret-free browser-shaped production check of the public Founder counter.
+authenticated, read-only Supabase verification of the paid-return measurement path.
 
 Use `subscriber-growth-publication-handoff.md` for the ordered reviewer,
 database, deployment, live-verification, and first-24-hour workflow.
@@ -47,12 +46,12 @@ bun run release:subscriber-growth:gate:local
 The command writes a redacted JSON receipt to:
 
 ```text
-artifacts/release-readiness/subscriber-growth/launch-gate.v3.json
+artifacts/release-readiness/subscriber-growth/launch-gate.v4.json
 ```
 
-Receipt schema v3 is required for this release. A v2 receipt predates the
-public Founder counter deployment, CORS, and bounded-payload proof and cannot
-support a `LIVE_VERIFIED` claim.
+Receipt schema v4 identifies the release contract after Founder sales retirement.
+Existing v3 receipts describe the retired counter requirement and must not be
+relabelled as v4 evidence. Re-run the gate for a new `LIVE_VERIFIED` claim.
 
 The artifact records paths (including any explicitly ignored generated path), counts, statuses, commit identity, and deployment
 identity only. It does not store command output, environment values, account
@@ -100,9 +99,8 @@ Confirm the dry run contains these migrations, in order:
 5. `20260717010000_paid_return_cohort_measurement.sql`
 
 Only after explicit deployment authorization: apply the five migrations, then
-deploy the reviewed `ai-doctor-review` and `founder-slots-remaining` Edge
-Functions and the frontend from `<release-head-commit>`. Before deploying the
-functions, confirm the existing server-side `SUPABASE_SERVICE_ROLE_KEY` secret
+deploy the reviewed `ai-doctor-review` Edge Function and the frontend from
+`<release-head-commit>`. Before deploying the function, confirm the existing server-side `SUPABASE_SERVICE_ROLE_KEY` secret
 is configured in the linked environment; never print, copy, or expose that
 secret. Do not deploy unrelated Edge Functions for this release. Stop if the
 ledger is linked to the wrong project, any migration is unexpectedly
@@ -121,15 +119,12 @@ release receipt. Downloaded source exists only in a temporary directory, and
 a cleanup failure returns `HOLD`. A missing CLI login, wrong linked project,
 unavailable remote source, or incomplete check also returns `HOLD`.
 
-The separate Founder check uses no API key or service-role value. It sends a
-browser-shaped unauthenticated `OPTIONS` preflight and `POST {}` to the fixed
-production `founder-slots-remaining` endpoint. The check requires successful
-CORS for Verdant's production origin and the Supabase client headers, HTTP 200
-JSON, exactly the keys `remaining` and `total`, integer values, `total === 100`,
-and `remaining` within `0..100`. Its receipt records only response statuses,
-stable reason codes, and the bounded public aggregate after the complete
-contract passes. A 404, 503, HTML response, extra field, malformed value, or
-missing CORS evidence returns `HOLD`.
+`founder-slots-remaining` was retired from the repository by PR #2570.
+Do not redeploy the retired counter or require its response for this release.
+Hosted undeployment is a separate authorized production action; its status is
+not established by this gate.
+Existing Founder entitlements, the Founders Wall, and refund revocation
+remain unchanged.
 
 ## After an authorized deployment
 
@@ -146,9 +141,8 @@ bun run release:subscriber-growth:gate -- \
 to pass on a deployment that returns a non-empty deployment identifier, plus
 an authenticated Supabase check of the exact five applied migrations, the
 server-side completion-recorder secret name, and the reviewed
-`ai-doctor-review` source parity and recorder markers. The public Founder
-counter check must also pass its production CORS and exact bounded-payload
-contract. Reachability alone is insufficient.
+`ai-doctor-review` source parity and recorder markers. Reachability alone is
+insufficient.
 
 Do not replace `<release-head-commit>` with a later production head or
 `<release-base-commit>` with the feature branch's original base. Either would
@@ -168,16 +162,16 @@ The current capabilities are deliberately fixed and fail closed:
 - Checkout recovery
 
 Missing, renamed, duplicated, or marker-incomplete assets produce `HOLD`.
-The Founder counter is a separate production-backend proof, not a sixth asset
-marker, so the local Vite parity run remains network-free.
+The local Vite parity run checks local routes and assets only; it makes no
+production-backend request.
 
 ## Decision meanings
 
-| Status          | Meaning                                                                                                         |
-| --------------- | --------------------------------------------------------------------------------------------------------------- |
-| `HOLD`          | Source, validation, local parity, or required live parity is incomplete.                                        |
-| `LOCAL_READY`   | Clean committed source passes the local release contract; live deployment was intentionally not evaluated.      |
-| `LIVE_VERIFIED` | Local contract, identified live capability parity, Founder counter proof, and authenticated backend check pass. |
+| Status          | Meaning                                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------------- |
+| `HOLD`          | Source, validation, local parity, or required live parity is incomplete.                                   |
+| `LOCAL_READY`   | Clean committed source passes the local release contract; live deployment was intentionally not evaluated. |
+| `LIVE_VERIFIED` | Local contract, identified live capability parity, and authenticated backend check pass.                   |
 
 None of these statuses authorizes a push, deployment, merge, billing change,
 or outreach. `LIVE_VERIFIED` also does not prove subscriber count; the

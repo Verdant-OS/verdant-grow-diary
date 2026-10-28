@@ -19,7 +19,7 @@ import { auditSubscriberGrowthMigrationContract } from "./subscriber-growth-migr
 const EXPECTED_REMOTE = "https://github.com/Verdant-OS/verdant-grow-diary.git";
 const DEFAULT_BASE_REF = "origin/verdant-grow-diary";
 const DEFAULT_OUT = path.resolve(
-  "artifacts/release-readiness/subscriber-growth/launch-gate.v3.json",
+  "artifacts/release-readiness/subscriber-growth/launch-gate.v4.json",
 );
 const DEFAULT_PORT = 4187;
 const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
@@ -321,7 +321,6 @@ async function auditLocalPreview(port) {
   try {
     return await auditSubscriberGrowthLiveParity({
       origin: `http://127.0.0.1:${port}`,
-      verifyFounderCounter: false,
     });
   } finally {
     await new Promise((resolve, reject) => {
@@ -377,7 +376,6 @@ export async function runSubscriberGrowthLaunchGate(args) {
     try {
       liveParity = await auditSubscriberGrowthLiveParity({
         origin: args.liveOrigin,
-        verifyFounderCounter: true,
       });
     } catch (error) {
       liveParity = {
@@ -387,13 +385,6 @@ export async function runSubscriberGrowthLaunchGate(args) {
         routesTotal: 4,
         capabilitiesPassed: 0,
         capabilitiesTotal: 5,
-        founderCounter: {
-          kind: "public_founder_counter_live_check",
-          attempted: true,
-          ok: false,
-          error: "live_parity_failed",
-          errors: ["live_parity_failed"],
-        },
         error: error instanceof Error ? error.message : "live_parity_failed",
       };
     }

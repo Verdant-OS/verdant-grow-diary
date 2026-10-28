@@ -41,6 +41,12 @@ const supabaseState = vi.hoisted(() => ({
   selects: [] as Array<{ table: string; columns: string }>,
 }));
 
+// snip:safe — the signed-in owner can change without remounting the page.
+const authState = vi.hoisted(() => ({ userId: "owner-a" as string | null }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: authState.userId ? { id: authState.userId } : null }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
@@ -81,6 +87,7 @@ const PLANT_ACTIVE = "33333333-3333-4333-8333-333333333333";
 const PLANT_ARCHIVED = "66666666-6666-4666-8666-666666666666";
 
 beforeEach(() => {
+  authState.userId = "owner-a";
   supabaseState.tables = {};
   supabaseState.selects = [];
 });
@@ -196,6 +203,25 @@ describe("useAlertTargetNames — archived rows stay readable", () => {
     const { result } = renderHook(() => useAlertTargetNames());
     await waitFor(() => expect(result.current.status).toBe("ok"));
     expect(result.current.readComplete).toBe(false);
+  });
+
+  it("re-reads when the signed-in owner changes and drops the previous owner's maps", async () => {
+    seedOwnerRows();
+    const { result, rerender } = renderHook(() => useAlertTargetNames());
+    await waitFor(() => expect(result.current.tentStateById.get(TENT_ACTIVE)).toBe("active"));
+
+    // Owner B signs in on the same mounted page; their read returns their own tent.
+    authState.userId = "owner-b";
+    supabaseState.tables.tents = {
+      data: [{ id: TENT_GONE, name: "B Tent", grow_id: GROW_ARCHIVED_ONLY, is_archived: false }],
+      error: null,
+    };
+    supabaseState.tables.plants = { data: [], error: null };
+    rerender();
+
+    await waitFor(() => expect(result.current.tentStateById.get(TENT_GONE)).toBe("active"));
+    expect(result.current.tentStateById.has(TENT_ACTIVE)).toBe(false);
+    expect(result.current.tentNameById.has(TENT_ARCHIVED)).toBe(false);
   });
 
   it("a read error clears state maps as well as names", async () => {

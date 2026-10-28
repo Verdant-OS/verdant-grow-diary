@@ -18,6 +18,7 @@ import {
   type AlertTargetRecordState,
 } from "@/lib/alertTargetContextRules";
 import { pickSoleLoadedId } from "@/lib/oneTentLoopHandoffIds";
+import { useAuth } from "@/store/auth";
 
 export type AlertTargetNamesStatus = "idle" | "loading" | "ok" | "unavailable";
 
@@ -106,10 +107,19 @@ export function useAlertTargetNames(): UseAlertTargetNamesState {
   const [status, setStatus] = useState<AlertTargetNamesStatus>("idle");
   const [readComplete, setReadComplete] = useState(false);
 
+  // Re-read per signed-in owner: a previous owner's complete maps would
+  // otherwise mark this owner's real tents as "missing".
+  const ownerId = useAuth().user?.id ?? null;
+
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
     setReadComplete(false);
+    setTentNameById(new Map());
+    setPlantNameById(new Map());
+    setTentStateById(new Map());
+    setPlantStateById(new Map());
+    setSingleTentIdByGrowId(new Map());
     void Promise.all([
       supabase.from("tents").select("id,name,grow_id,is_archived", { count: "exact" }),
       supabase.from("plants").select("id,name,is_archived", { count: "exact" }),
@@ -150,7 +160,7 @@ export function useAlertTargetNames(): UseAlertTargetNamesState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ownerId]);
 
   return {
     tentNameById,

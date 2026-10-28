@@ -25,6 +25,15 @@ import {
   athenaFeedLogWebApplicationJsonLd,
 } from "../athenaFeedLogRules";
 import {
+  AUTOPOT_LOG_DATE_MODIFIED,
+  AUTOPOT_LOG_DESCRIPTION,
+  AUTOPOT_LOG_FAQ,
+  AUTOPOT_LOG_H1,
+  AUTOPOT_LOG_PATH,
+  AUTOPOT_LOG_TITLE,
+  autopotLogWebApplicationJsonLd,
+} from "../autopotFeedLogRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -565,6 +574,42 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
           },
         ],
       }),
+    ],
+  }),
+  publicDocument(AUTOPOT_LOG_PATH, {
+    title: `${AUTOPOT_LOG_TITLE} | Verdant Grow Diary`,
+    description: AUTOPOT_LOG_DESCRIPTION,
+    imageAlt: "AutoPot reservoir and feed log",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${AUTOPOT_LOG_TITLE} | Verdant Grow Diary`,
+        description: AUTOPOT_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${AUTOPOT_LOG_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: AUTOPOT_LOG_H1,
+        description: AUTOPOT_LOG_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${AUTOPOT_LOG_PATH}`,
+        datePublished: AUTOPOT_LOG_DATE_MODIFIED,
+        dateModified: AUTOPOT_LOG_DATE_MODIFIED,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${AUTOPOT_LOG_PATH}`,
+        questions: AUTOPOT_LOG_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "AutoPot + Stash Nutrients Feed Log",
+            url: `${VERDANT_SITE_ORIGIN}${AUTOPOT_LOG_PATH}`,
+          },
+        ],
+      }),
+      autopotLogWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${AUTOPOT_LOG_PATH}`),
     ],
   }),
   publicDocument(ATHENA_FEED_LOG_PATH, {

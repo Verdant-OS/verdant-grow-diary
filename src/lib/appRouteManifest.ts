@@ -227,6 +227,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/guides", access: "public", description: "Grower guides index." },
   { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
   {
+    path: "/guides/autopot-stash-nutrients-feed-log",
+    access: "public",
+    description: "Public AutoPot reservoir and feed log with explicit EC/PPM units. In-memory only.",
+  },
+  {
     path: "/guides/athena-feed-chart-log",
     access: "public",
     description: "Public planned-vs-actual Athena feed log. In-memory only.",

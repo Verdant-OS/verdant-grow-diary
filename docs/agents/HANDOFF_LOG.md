@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-298-QUICKLOG-NOTE-VS-ISSUE
+
+```text
+TASK VER-298-QUICKLOG-NOTE-VS-ISSUE  priority: P2  status: OPEN
+goal: a saved Quick Log note reads "Note" and an issue reads "Issue" on every saved-entry surface, and the two tiles stop sounding the same.
+why: Toad Venom onboarding fix (Cheeko yes, 2026-10-27 3:56 PM CT); VER-298 SENTINEL prompt; Matthew 2026-10-28: option (b) + join, renegotiate tests; widen to the Quick Log history panel; issue heading "Issue"; "Push both".
+branch: claude/quicklog-note-vs-issue-tiles
+base: verdant-grow-diary
+checkout: git fetch origin claude/quicklog-note-vs-issue-tiles verdant-grow-diary && git switch claude/quicklog-note-vs-issue-tiles && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: feature commit a051df41b5fe72f3035b92344692d42058ab8f65; read the head from the PR
+state: pushed draft
+current_step: awaiting CI and an independent exact-head review
+next_action: final tile wording from Cheeko (tiles still show TODO_COPY: placeholders), then route to an eligible non-author reviewer
+post_merge_check: after Publish, on the disposable fixture account, save a Note and an Issue on the fixture plant (tag [smoke <timestamp>]): Timeline card, Quick Log history badge and Dashboard recent row read "Note" and "Issue". NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: new note saves add p_details.quick_log_activity = "note" (V2 payload, useQuickLogActivitySave manual route, legacy unified save for eventType "note"; never water, environment checks or legacy "observation"); one rule: marked row = Note, observation + subtype "issue" = Issue, any other observation (old unmarked notes) = Observation; display-only NOTE/ISSUE kinds in getEventType, kept out of EVENT_TYPES; issues keep the observation history lane; Dashboard/grow-detail read the linked diary mirror already fetched (5-row window; outside it the row stays "Observation"); AI Doctor, ecowitt and diagnostics note builders stay unmarked.
+tried_and_rejected: delegate:builder stopped at the 200k context mark before writing code; implemented in-session. Editing QuickLogHistoryPanels.tsx was not needed (badge flows through resolveEffectiveQuickLogCareType).
+commands: bunx vitest run src/test/quick-log-note-vs-issue-labels.test.ts src/test/quick-log-v2-save-payload.test.ts src/test/quick-log-activity-save-manual-rpc-contract.test.ts src/test/diary-timeline-event-wiring.test.ts src/test/quick-log-activity-types-saved-items.test.ts
+files_touched: src/constants/quickLogActivityTypes.ts; src/lib/{quickLogActivityRules,diary,environmentCheckTimelineViewModel,quickLogEventIdentityRules,quickLogHistoryRules,growDiaryTimelineRules,dailyCheckPostSubmitRules,quickLogV2SavePayload,legacyQuickLogUnifiedSave}.ts; src/hooks/{useQuickLogActivitySave,useDashboardScopedData,useGrowDetailData}.ts; src/test/quick-log-note-vs-issue-labels.test.ts (new); renegotiated (approved): quick-log-v2-save-payload, quick-log-activity-save-manual-rpc-contract, quick-log-activity-types-saved-items, diary-timeline-event-wiring
+files_remaining: tile copy constants once wording is chosen
+blockers: placeholder tile copy must not ship to growers
+open_questions: final wording for the Note and Issue tiles (label + description)
+gotchas: the idempotency request hash covers p_details; pending-note recovery replays stored payloads unchanged, so never rebuild a stored payload; getEventType unknown/null fallback to observation and EVENT_TYPE_MAP size are pinned by locked tests
+links: VER-298
+artifacts: PR checks
+reviewer_seat: not assigned (this session excluded as author)
+reviewer_sha: none
+session_state: safety-net check-in scheduled task trig_01Hi7LCPDNjfdvVBvGoWUhCv; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-28 (Matthew: Push both)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-27 21:45 CT, by Claude
+```
+
 ### PLANT-TIMELINE-PHOTO-THUMBNAIL
 
 ```text

@@ -82,7 +82,7 @@ pr: NOT_MEASURED until opened (draft); read the PR for the exact head
 head_sha: read from the PR; this block is written before the first push
 state: pushed draft (docs only)
 current_step: Audit written to docs/release/paddle-live-webhook-readiness-2026-10-28.md
-next_action: Eligible independent reviewer (OWNERSHIP.md §4.3, billing scope; Claude excluded as author) reviews the doc at the exact head. Separately, the founder decides whether to assign the §3 edge PR (simulation guard in payments-webhook), sequenced after open #2570.
+next_action: Eligible independent reviewer (OWNERSHIP.md §4.3, billing scope; Claude excluded as author) reviews the doc at the exact head. Separately, the founder decides whether to assign the §3 edge PR (simulation guard in payments-webhook). #2570 is merged (bbc77ae2), so nothing blocks its sequencing.
 post_merge_check: NOT_APPLICABLE (docs only; nothing ships)
 active_writer: Claude
 decisions: Docs-only. The simulation predicate is not added as an unwired src/lib module: the edge mirror only copies modules an edge function imports, so it lands with its caller in the edge PR. No supabase/ edits (CURRENT_STATE gate).

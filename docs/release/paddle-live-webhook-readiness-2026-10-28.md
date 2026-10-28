@@ -1,7 +1,8 @@
 # Paddle live webhook readiness — repo audit, 2026-10-28
 
 **Status:** audit only. No application, edge-function, schema, RLS or secret change.
-**Measured at:** deploy tip `d590b2c105435cb2b22d1f265a4dea48948ccd3a` (`verdant-grow-diary`), 2026-10-28.
+**Measured at:** deploy tip `d590b2c105435cb2b22d1f265a4dea48948ccd3a` (`verdant-grow-diary`), 2026-10-28;
+`get-paddle-price` and Founder references re-checked after the base merge of #2570 (`bbc77ae2`).
 **Author:** Claude (author; ineligible for this document's independent acceptance).
 **Supports:** three Paddle-side writes that happen outside the repository:
 A. register the live webhook destination; C. turn off or de-discount checkout recovery;
@@ -39,7 +40,7 @@ equals `sha256sum src/lib/paidPlanAllowlist.ts`. Env wiring: `supabase/functions
 | `pro_annual`       | `PADDLE_PRICE_PRO_ANNUAL`                   | no                | no                    | `pri_01kx3dsf43bjpksghckkbxn4d8`   | FAIL (undocumented)                                    |
 | `craft_monthly`    | `PADDLE_PRICE_CRAFT_MONTHLY`                | no                | no                    | none                               | FAIL (offered, unsellable; §1.2)                       |
 | `craft_annual`     | `PADDLE_PRICE_CRAFT_ANNUAL`                 | no                | no                    | none                               | FAIL (offered, unsellable; §1.2)                       |
-| `founder_lifetime` | `PADDLE_PRICE_FOUNDER_LIFETIME`             | no                | no                    | `pri_01kx3dsezn1d73dghffdxnr2za`   | NOT_APPLICABLE (410 before lookup, `index.ts:183-188`) |
+| `founder_lifetime` | `PADDLE_PRICE_FOUNDER_LIFETIME`             | no                | no                    | `pri_01kx3dsezn1d73dghffdxnr2za`   | NOT_APPLICABLE (410 before lookup, `index.ts:182-187`) |
 | `credit_pack_50`   | `PADDLE_PRICE_CREDIT_PACK_50`               | no                | no                    | `pri_01ky35ab5hdn0pjaj5k4pqnrwp`   | FAIL (undocumented)                                    |
 | `credit_pack_150`  | `PADDLE_PRICE_CREDIT_PACK_150`              | no                | no                    | `pri_01ky35ab1f22xw8rkhdam01sd4`   | FAIL (undocumented)                                    |
 
@@ -51,20 +52,20 @@ equals `sha256sum src/lib/paidPlanAllowlist.ts`. Env wiring: `supabase/functions
   `docs/specs/paddle-live-checkout-runtime-slice.md:653-668`.
 - **Confirmed defect, still open in code (FAIL; blocks live checkout, not A/C/D).** The seven names
   are flat and environment-unaware. `get-paddle-price` rejects any gateway result that differs
-  from the configured value (`index.ts:313-323`). Serving live therefore requires live `pri_` ids
+  from the configured value (`index.ts:281-291`). Serving live therefore requires live `pri_` ids
   in these vars, which breaks sandbox resolution. The legacy sandbox `paddle-webhook` also reads
   three of the same names. The runtime-slice spec already records this as finding 23
   (`docs/specs/paddle-live-checkout-runtime-slice.md:653-668`). Nothing here re-decides it.
 - `PAYMENTS_ENVIRONMENT` selects the gateway. Only an explicit `live` or `sandbox` is accepted;
   anything else returns 503 (`supabase/functions/_shared/unionEntitlementLookup.ts:100-118`,
-  `get-paddle-price/index.ts:268-277`). The measured value is NOT_MEASURED from the repo.
+  `get-paddle-price/index.ts:236-245`). The measured value is NOT_MEASURED from the repo.
 
 ### 1.2 Plans in `PAID_PLAN_IDS` with no Paddle price (Craft)
 
-- **What `get-paddle-price` returns today.** `craft_*` passes the allowlist (`index.ts:172`) and
-  is not a pack or Founder. The gateway is queried by `external_id` (`index.ts:279-282`).
-  - An empty result returns **404 `price_not_configured`** (`index.ts:296-307`).
-  - A gateway error returns 502 `price_resolution_unavailable` (`index.ts:283-294`).
+- **What `get-paddle-price` returns today.** `craft_*` passes the allowlist (`index.ts:171`) and
+  is not a pack or Founder. The gateway is queried by `external_id` (`index.ts:247-250`).
+  - An empty result returns **404 `price_not_configured`** (`index.ts:263-275`).
+  - A gateway error returns 502 `price_resolution_unavailable` (`index.ts:251-262`).
   - Which one the live gateway gives for an unknown external id is NOT_MEASURED, labelled
     `inference: 404`. Either way no price is returned and nothing is charged. PASS for safety.
 - **Does the UI offer it? Yes (FAIL).**
@@ -83,7 +84,7 @@ equals `sha256sum src/lib/paidPlanAllowlist.ts`. Env wiring: `supabase/functions
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------- |
 | CTA → hook        | `Pricing.tsx:303,377,884` → `usePaddleCheckout.openCheckout` (`src/hooks/usePaddleCheckout.ts:145`)                                                                                                                                                          | plan id string (`pro_monthly`, `credit_pack_50`, …) | PASS                                                                        |
 | Client fences     | Founder refusal `usePaddleCheckout.ts:147-150`; sandbox-only gate `:154-157`; `src/lib/paddle.ts:275-285` (Paddle.js init, `Environment.set("sandbox")`); `src/lib/paddle.ts:316-324` (price lookup only when sandbox); `src/lib/paddleEnvironment.ts:87-92` | token class                                         | PASS (fails closed on `live_`; live checkout impossible from the app today) |
-| Price id          | `src/lib/paddle.ts:316-340` → `get-paddle-price` → gateway `/prices?external_id=<plan>` (`index.ts:279-282`), cross-checked against `PADDLE_PRICE_<PLAN>` (`:313-323`)                                                                                       | `import_meta.external_id`                           | PASS                                                                        |
+| Price id          | `src/lib/paddle.ts:316-340` → `get-paddle-price` → gateway `/prices?external_id=<plan>` (`index.ts:247-250`), cross-checked against `PADDLE_PRICE_<PLAN>` (`:281-291`)                                                                                       | `import_meta.external_id`                           | PASS                                                                        |
 | Checkout open     | `usePaddleCheckout.ts:228-231`: `items[0].priceId` = server-resolved id; `customData: { userId: user.id }`                                                                                                                                                   | server `pri_` id                                    | PASS. No hardcoded `pri_` in non-test `src/`                                |
 | Webhook normalize | `payments-webhook/index.ts:101-116` maps `items[].price.import_meta.external_id` → `importMeta.externalId`                                                                                                                                                   | `import_meta.external_id`                           | PASS (merged #2221)                                                         |
 | Webhook decide    | `payments-webhook/eventProcessor.ts:249-257` (subscriptions), `:321-345` (one-time)                                                                                                                                                                          | `importMeta.externalId`                             | PASS                                                                        |
@@ -206,7 +207,8 @@ with `PAYMENTS_LIVE_WEBHOOK_SECRET` and posted to `?env=live`:
 3. Add a signed raw-wire regression to `src/test/payments-webhook-raw-wire.test.ts`, shown RED
    before the fix: a `ntfsimevt_` `subscription.created` carrying a real-looking `userId` writes
    no `lovable_paddle_events` row and no `subscriptions` row.
-4. Sequence it after open PR #2570, which also edits payments edge code. The
+4. #2570 (merged as `bbc77ae2`) already removed the dead Founder slot block from
+   `get-paddle-price`, so nothing is left to sequence behind it. The
    `PADDLE-WIRE-001` handoff block still says #2221 is open; #2221 merged on 2026-10-16.
 
 Without that PR, D is safe only against a destination that is not the production endpoint, or
@@ -216,14 +218,14 @@ with Paddle's demo payload on a destination whose writes you accept as audit noi
 
 - `/founder` redirects to `/pricing` (`src/routes/founder.tsx:4-10`).
 - Purchase UIs use `PURCHASABLE_PRICING_TIERS` (Founder filtered, `src/config/pricing.ts:142-144`).
-- `useFounderSlotsRemaining` (`src/hooks/useFounderSlotsRemaining.ts:51`, which reads
-  `founder-slots-remaining`) has no consumer under `src/pages`, `src/components` or `src/routes`.
-  Open PR #2570 deletes it and the function.
+- #2570 (merged as `bbc77ae2`) deleted the `useFounderSlotsRemaining` hook and the
+  `founder-slots-remaining` function source. Whether the deployed function is gone is
+  NOT_MEASURED; that undeploy is the founder's post-merge step.
 - Every client checkout path goes through `usePaddleCheckout.openCheckout`:
   - it refuses `founder_lifetime` before any network call (`usePaddleCheckout.ts:147-150`;
     `src/lib/founderLifetimeCheckoutGuard.ts:12-16`);
   - otherwise it gets its price only from `get-paddle-price`, which returns 410 `plan_retired`
-    for `founder_lifetime` (`get-paddle-price/index.ts:183-188`).
+    for `founder_lifetime` (`get-paddle-price/index.ts:182-187`).
 - No non-test file under `src/` contains `pri_01kx3dsezn1d73dghffdxnr2za`.
 - **Residual, outside the code:** the Founder price is still active in live Paddle. Anyone
   holding a live client token can call Paddle.js with that `pri_` id directly. The webhook would

@@ -1,6 +1,6 @@
 # Role — Verdante: Chief of Staff
 
-**Sentinel-Version: 2026-10-27.1**
+**Sentinel-Version: 2026-10-28.1**
 
 Verdante is chief of staff and Matthew Cheek's single point of contact
 (Matthew Cheek, 2026-10-10). Verdante does not write the repository.

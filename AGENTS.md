@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-27.1**
+**Sentinel-Version: 2026-10-28.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -53,10 +53,12 @@ rule or OWNERSHIP.md on ownership and review routing.
 ### 0.2 Amendment
 
 Change this constitution only by a reviewed pull request. Bump `Sentinel-Version`
-on all eighteen governed files in that same change, and record the change in §17.
+on every governed file in that same change, and record the change in §17.
 Hooks and agents do not edit instruction files except inside that pull request.
-The eighteen are this file, its platform mirrors, the handoff protocol, the agents
-readme, and the twelve role files. `docs/agents/CURRENT_STATE.md` is not one of them.
+The governed files are this file, its platform mirrors, the handoff protocol, the
+agents readme, and the role files. The `CANONICAL` and `MIRRORS` lists in
+`scripts/check-sentinel-version-parity.mjs` are the single source of that set and
+its count. `docs/agents/CURRENT_STATE.md` is not one of them.
 
 ### 0.3 Periodic review
 
@@ -279,6 +281,11 @@ ran and what you skipped.
   ownership before any write. A task that asks for a non-production target is
   out of date; report it. Local and CI fixtures validate code, not production.
   Identity, tagging, and receipts: `docs/production-only-verification-runbook.md`.
+- QA and smoke use dedicated test accounts only. Their login lives in the vault
+  only: never in a repository file, a pull request, a handoff block, a log, or
+  chat. Data they create is prefixed `QA-SYNTH`. Never the founder's account,
+  never a customer's account, never a real grow. A test account never upgrades,
+  never starts a checkout, and never spends.
 - CI probes production or it probes nothing. No push-triggered job probes a
   non-production database. The production schema verifier runs only by manual
   dispatch from the deploy branch, in its protected environment. A red check
@@ -362,6 +369,20 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
   conflicts. Priority: publish gate, P1, P2, then the rest. Oldest update wins a tie.
 - Closing a merged, superseded, or dropped task moves the block to Closed the
   same day with the reason and the final SHA.
+- A handoff that assigns work is one paste-ready block. It pins the exact commit
+  to branch from, lists the files the change may touch, names the holds, names
+  the required checks, and ends with a `Verified:` line. The result is audited
+  against the block: a file outside the list, a skipped check, a lifted hold, or
+  a claim the `Verified:` line does not cover is a finding.
+
+```text
+HANDOFF <task-id>
+pin: <full 40-character commit SHA the branch starts from>
+files: <paths the change may touch; every other path is forbidden>
+holds: <what stays untouched or draft, and who may lift each hold>
+checks: <required checks, with the exact commands that run them>
+Verified: <what the writer checked and when; what stays UNVERIFIED>
+```
 
 ## 13. Review
 
@@ -381,17 +402,9 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
 - Who may sit the review is the roster, applied to the whole scope, including
   protected files and supplemental evidence.
 - Role files say each seat's default strength. Strength is not rank. Before
-  work beyond the startup read, the seat reads its role file:
-  `docs/agents/roles/codex.md`, `docs/agents/roles/grok.md`,
-  `docs/agents/roles/claude.md`, `docs/agents/roles/gemini.md`,
-  `docs/agents/roles/canopy.md`,
-  `docs/agents/roles/graft.md`,
-  `docs/agents/roles/root-cause.md`,
-  `docs/agents/roles/trellis.md`,
-  `docs/agents/roles/verdante.md`,
-  `docs/agents/roles/chemdawg.md`,
-  `docs/agents/roles/golden-toad.md`,
-  `docs/agents/roles/harvest.md`.
+  work beyond the startup read, the seat reads its role file as listed under
+  Role profiles in `docs/agents/constitution/roster.md`. Seat names live in the
+  roster, not here (§0.4).
 
 ## 14. Startup gate
 
@@ -452,19 +465,20 @@ backlink counts, conversion rates, audience sizes, sensor health, or
 deployment/indexing outcomes. Record the authorized source and provenance
 for every material measurement.
 
+Every deliverable ends with a `Verified:` line: what was checked, against which
+source and head, and what stays `UNVERIFIED`, `BLOCKED`, or `NOT_MEASURED`. A
+deliverable without one is not finished.
+
 ## 16. Environment notes
 
 These notes are environment-specific. A repository check asserts the package-manager
 wording below, so that wording stays here. The runbook is
 `.claude/skills/run-verdant-grow-diary/SKILL.md`.
 
-
-Durable, non-obvious notes for running this app in a Cursor Cloud VM. Full, verified
-runbook lives in `.claude/skills/run-verdant-grow-diary/SKILL.md` — read it for details;
-this section only captures the gotchas that are easy to get wrong. Two independent
-Cursor Cloud sessions have reported on this environment; where they disagreed, both
-observations are kept below rather than one silently overwriting the other, since VM
-snapshots can differ.
+Durable, non-obvious notes for running this app from a local checkout in Cursor or
+Claude Code. Cloud agent sessions ended on 2026-10-27; coding is local. The full,
+verified runbook lives in `.claude/skills/run-verdant-grow-diary/SKILL.md` — read it for
+details; this section only captures the gotchas that are easy to get wrong.
 
 - **Stack & authoritative run guide.** TanStack Start (SSR) on TanStack Router file
   routes, written in React + Vite + TypeScript (port **8080**), backed by a **hosted**
@@ -473,27 +487,18 @@ snapshots can differ.
   `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md` has the overview. Read
   the skill before driving the app — do not duplicate its commands here.
 - **Package manager — check `node_modules` first; don't blindly retry installs.** Repo
-  scripts run under **`bun`** in both observed snapshots. Per
-  `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
-  (managed environments pre-provision it), use it as-is — do not reinstall. If it's
+  scripts run under **`bun`**. Per `.claude/skills/run-verdant-grow-diary/SKILL.md`: if
+  `node_modules` already exists, use it as-is — do not reinstall. If it's
   absent, use `bun install --frozen-lockfile` as the SKILL's supported setup path.
   Historical install observations below do not authorize an unpinned npm fallback:
-  - One session found `bun install --frozen-lockfile` worked fine against the public
-    registry, and the VM startup script already ran it — no reinstall needed unless a
-    run failed on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
-    there, resolving in non-login shells.
-  - A different session found `bun install` **failed**: `bun.lock` pinned ~137 tarball
-    URLs on a private Lovable registry mirror (`*.pkg.dev/lovable-core-prod`) that
-    `403`s outside the Lovable sandbox, and no registry override could rewrite bun's
-    locked URLs. That session's startup script installed via an **npm public-registry
-    override** instead, and `bun` itself was a pre-baked system dependency under
-    `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
-    script.
+  - Earlier environments recorded a frozen install that failed on locked tarball URLs
+    that a registry override could not rewrite; that history and its details live in
+    the skill, not here.
   - Check `node_modules` first. If the frozen install fails, report the exact blocker
     as `BLOCKED`; do not install an unpinned npm tree or regenerate the lockfile.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
   `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
-  not 5173** explicitly — Vite's default host `::` is unreliable in this container.
+  not 5173** explicitly — Vite's default host `::` is unreliable on some machines.
   Signed-out `/` renders the public landing directly through `RootEntry`; signed-in growers
   retain Dashboard inside the authenticated `AppShell`. An HTTP 200 on `/` therefore
   represents the rendered public landing, not merely a client-side shell.
@@ -501,11 +506,10 @@ snapshots can differ.
   pre-existing warnings), `bun run typecheck`, `bun run build` (its postbuild step runs
   the SEO/JSON-LD validators). Unit path is `bunx vitest run <files>` — the full suite
   is very large, prefer targeted files or the `test:full:shard*` scripts.
-- **Browser / e2e.** Playwright chromium installs to `~/.cache/ms-playwright` (baked
-  into the snapshot in one session); `.claude/skills/run-verdant-grow-diary/driver.mjs`
-  falls back to bundled chromium automatically either way — run
-  `bunx playwright install chromium` if a browser is ever missing after a dependency
-  bump. For mocked UI flows use `--project=chromium-mocked` **with an explicit spec
+- **Browser / e2e.** Playwright chromium installs to `~/.cache/ms-playwright`;
+  `.claude/skills/run-verdant-grow-diary/driver.mjs` falls back to bundled chromium
+  automatically — run `bunx playwright install chromium` if a browser is ever missing
+  after a dependency bump. For mocked UI flows use `--project=chromium-mocked` **with an explicit spec
   filter** and set `E2E_BASE_URL=http://127.0.0.1:8080` to reuse the already-running dev
   server — without it, some specs spawn their own server on 5173 (port conflicts) or can
   hit real Supabase. A couple of mocked specs are known-flaky (e.g. a timing/viewport
@@ -521,15 +525,18 @@ snapshots can differ.
   `/welcome`, and `/internal/demo-proof-walkthrough`.
   These count as evidence only when live `/version.json` reports the SHA under test;
   otherwise report `NOT_MEASURED`.
-- **Governance edit gate.** If you change any of the **eighteen versioned governance
-  files** — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`,
-  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the twelve
-  `docs/agents/roles/*.md` — you must bump `Sentinel-Version` in **all eighteen** in the
-  same commit. The `sentinel-version-parity` CI gate enforces PARITY (all versions
-  equal), MIRROR (GEMINI.md's embedded constitution stays byte-equivalent to
-  `AGENTS.md`), and BUMP (changed content requires a new version).
+- **Governance edit gate.** If you change any versioned governance file — `AGENTS.md`,
+  `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`,
+  `docs/agents/HANDOFF_PROTOCOL.md`, and the `docs/agents/roles/*.md` profiles; the
+  `CANONICAL` and `MIRRORS` lists in `scripts/check-sentinel-version-parity.mjs` are the
+  single source of that set and its count — you must bump `Sentinel-Version` in **every
+  file on that list** in the same commit
+  (`node scripts/sync-sentinel-mirror.mjs --set-version=YYYY-MM-DD.N`). The
+  `sentinel-version-parity` CI gate enforces PARITY (all versions equal), MIRROR
+  (GEMINI.md's embedded constitution stays byte-equivalent to `AGENTS.md`), and BUMP
+  (changed content requires a new version).
   **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
-  and is not one of the eighteen: it is the changing shift report, revised several times a
+  and is not on that list: it is the changing shift report, revised several times a
   day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
   Editing `docs/agents/CURRENT_STATE.md` alone requires no bump. Single-file edits
   of `docs/agents/CURRENT_STATE.md` have merged with no version change
@@ -539,6 +546,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-10-28.1** — Local-coding amendment. §16 environment notes rewritten for local Cursor/Claude coding (no cloud agents since 2026-10-27); the package-manager wording the lockfile-policy check asserts is unchanged. §13 points each seat to its role file through `docs/agents/constitution/roster.md` instead of a hardcoded list. §0.2 and §16 drop the hardcoded governed-file count and cite the list in `scripts/check-sentinel-version-parity.mjs`. §12 adds the paste-ready handoff block (pinned commit, allowed files, holds, required checks, closing `Verified:` line; results are audited against it). §11 adds the QA test-account rule (dedicated accounts, vault-only login, `QA-SYNTH` data, never the founder's account or real grows, never upgrade or spend). §15 requires a closing `Verified:` line on every deliverable. No application, schema, billing or production change.
 - **2026-10-27.1** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.
 - **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants
   in the per-item merge rule, matching the roster and ownership policy. No new merge

@@ -89,10 +89,11 @@ describe("Founder Lifetime retired from /pricing", () => {
     expect(JSON.stringify(products)).not.toMatch(/Founder/i);
   });
 
-  it("still honours an existing Founder deep link", () => {
+  it("does not honour a Founder deep link with a purchase card", () => {
     renderPricing("/pricing?plan=founder_lifetime");
-    expect(screen.getByTestId("pricing-card-founder")).toBeInTheDocument();
-    expect(screen.getByTestId("pricing-cta-founder-lifetime")).toBeInTheDocument();
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+    expect(screen.queryByTestId("pricing-cta-founder-lifetime")).toBeNull();
+    expect(screen.queryByText(/\$129/)).toBeNull();
   });
 
   it("keeps Free, Pro and Craft on the public page", () => {

@@ -76,10 +76,10 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(proCard.textContent).toMatch(/\$99/);
   });
 
-  it("still prices Founder Lifetime at $129 on an explicit deep link", () => {
+  it("still prices no Founder Lifetime card on an explicit deep link", () => {
     renderPricing({ founderDeepLink: true });
-    const founderCard = screen.getByTestId("pricing-card-founder");
-    expect(founderCard.textContent).toMatch(/\$129/);
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+    expect(screen.queryByText(/\$129/)).toBeNull();
   });
 
   it("labels the public purchase path as sandbox test-only with no real charges", async () => {
@@ -120,11 +120,10 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(proCard.textContent).toMatch(/\$12/);
   });
 
-  it("Founder Lifetime CTA opens checkout with priceId=founder_lifetime", async () => {
-    const user = userEvent.setup();
+  it("does not open a Founder Lifetime checkout from a deep link", async () => {
     renderPricing({ founderDeepLink: true });
-    await user.click(screen.getByTestId("pricing-cta-founder-lifetime"));
-    expect(openCheckoutMock).toHaveBeenCalledWith({ priceId: "founder_lifetime" });
+    expect(screen.queryByTestId("pricing-cta-founder-lifetime")).toBeNull();
+    expect(openCheckoutMock).not.toHaveBeenCalled();
   });
 
   it("Free CTA opens signup with fixed pricing-page attribution", () => {
@@ -136,12 +135,10 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(freeLink).toBeTruthy();
   });
 
-  it("Founder copy uses manual-close language, not fake countdown", () => {
+  it("a founder deep link does not render Founder sales copy", () => {
     renderPricing({ founderDeepLink: true });
-    const founderCard = screen.getByTestId("pricing-card-founder");
-    expect(founderCard.textContent).toMatch(/may close manually/i);
-    // No timer / countdown UI
-    expect(founderCard.textContent).not.toMatch(/expires in|countdown|timer|hurry/i);
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Founder Lifetime/i);
   });
 
   it("no forbidden marketing claims appear", () => {

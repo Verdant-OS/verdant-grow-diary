@@ -490,6 +490,18 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
 });
 
 const historyFixture = vi.hoisted(() => ({ read: vi.fn() }));
+// No QueryClient here: private photo signing stays unresolved (the pending
+// state). Thumbnail signing is covered in plant-relative-timeline-photo-thumbnail.
+vi.mock("@/hooks/useDiaryPhotoDisplayRows", () => ({
+  useDiaryPhotoDisplayRows: (rows: ReadonlyArray<Record<string, unknown>> | undefined) => ({
+    rows: (rows ?? []).map((row) => ({ ...row, photo_url: null })),
+    isResolvingPrivatePhotos: false,
+    isPrivatePhotoReadPaused: false,
+    hasPrivatePhotoError: false,
+    hasPhotoReference: false,
+    refetchPrivatePhotos: async () => {},
+  }),
+}));
 vi.mock("@/hooks/usePlantRelativeTimelineHistory", () => ({
   usePlantRelativeTimelineHistory: () => {
     const read = historyFixture.read();
@@ -689,9 +701,7 @@ describe("filterRelativeTimelineItems — pure rules", () => {
   });
 
   it("Measurements include Quick Log environment checks", () => {
-    expect(filterRelativeTimelineItems(sample, "measurement").map((i) => i.id)).toEqual([
-      "sensor",
-    ]);
+    expect(filterRelativeTimelineItems(sample, "measurement").map((i) => i.id)).toEqual(["sensor"]);
   });
 
   it("classifies unknown/null event types safely as 'notes'", () => {

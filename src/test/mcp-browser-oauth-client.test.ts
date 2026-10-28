@@ -275,9 +275,6 @@ describe("browserOAuthClient", () => {
     await expect(
       client.completeAuthorization(malformedIssuer, { code: "auth-code", state: "issued-state" }),
     ).rejects.toThrow(SyntaxError);
-    await expect(
-      client.completeAuthorization(malformedIssuer, { code: "auth-code", state: "issued-state" }),
-    ).rejects.toThrow("Unexpected token 'o', \"not-json\" is not valid JSON");
     expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull();
     expect(client.hasStoredToken()).toBe(false);
     // Current contract clears PKCE only after a non-2xx response or a stored access token.

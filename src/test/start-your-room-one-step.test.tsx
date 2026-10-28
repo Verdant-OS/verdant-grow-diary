@@ -1,0 +1,234 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "@/lib/react-router-compat";
+import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
+
+// VER-296: the first grow, tent and plant are created by one submit.
+
+const IDS = {
+  grow: "11111111-1111-4111-8111-111111111111",
+  tent: "22222222-2222-4222-8222-222222222222",
+  plant: "33333333-3333-4333-8333-333333333333",
+} as const;
+
+const testState = vi.hoisted(() => ({
+  grows: [] as Array<{ id: string; name: string }>,
+  tents: [] as Array<{ id: string; name: string; grow_id?: string }>,
+  plantsRead: "ok" as "ok" | "throw",
+  failTable: null as string | null,
+  insert: vi.fn(),
+  nav: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn(async () => undefined) }),
+}));
+
+vi.mock("@/lib/react-router-compat", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
+    "@/lib/react-router-compat",
+  );
+  return { ...actual, useNavigate: () => testState.nav };
+});
+
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
+}));
+
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: testState.grows,
+    loading: false,
+    error: null,
+    activeGrowId: testState.grows[0]?.id ?? null,
+    activeGrow: testState.grows[0] ?? null,
+    setActiveGrowId: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+  }),
+}));
+
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: testState.tents,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    lookupFailed: false,
+    entitlement: { capabilities: FREE_CAPABILITIES },
+    refetch: vi.fn(async () => false),
+  }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: (table: string) => {
+      const insert = (payload: Record<string, unknown>) => {
+        testState.insert(table, payload);
+        return {
+          select: () => ({
+            single: async () =>
+              testState.failTable === table
+                ? { data: null, error: { code: "P0001", message: "relation exploded" } }
+                : {
+                    data: {
+                      id: payload.id,
+                      name: payload.name,
+                      user_id: payload.user_id,
+                      ...(table === "grows" ? {} : { grow_id: payload.grow_id }),
+                      ...(table === "plants" ? { tent_id: payload.tent_id } : {}),
+                    },
+                    error: null,
+                  },
+          }),
+        };
+      };
+      if (table !== "plants") return { insert };
+      const chain = {
+        select: () => {
+          if (testState.plantsRead === "throw") throw new Error("plants unavailable");
+          return chain;
+        },
+        eq: () => chain,
+        then: (resolve: (value: { data: unknown[]; error: null }) => void) =>
+          resolve({ data: [], error: null }),
+        insert,
+      };
+      return chain;
+    },
+  },
+}));
+
+import StartYourRoom from "@/pages/StartYourRoom";
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <StartYourRoom />
+    </MemoryRouter>,
+  );
+}
+
+const insertedTables = () => testState.insert.mock.calls.map(([table]) => table);
+
+describe("Start your room in one submit", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    testState.grows = [];
+    testState.tents = [];
+    testState.plantsRead = "ok";
+    testState.failTable = null;
+    testState.insert.mockReset();
+    testState.nav.mockReset();
+    let n = 0;
+    const order = [IDS.grow, IDS.tent, IDS.plant];
+    vi.stubGlobal("crypto", { randomUUID: () => order[n++] ?? IDS.plant });
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.sessionStorage.clear();
+  });
+
+  it("creates the grow, tent and plant in order from one submit and opens the plant", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(screen.getByTestId("start-your-room-step-room")).toBeInTheDocument();
+    await user.type(screen.getByTestId("start-room-plant-name"), "Plant A");
+    await user.click(screen.getByTestId("start-room-submit"));
+
+    await waitFor(() => expect(testState.nav).toHaveBeenCalledTimes(1));
+    expect(testState.nav).toHaveBeenCalledWith(`/plants/${IDS.plant}?open=quick-log`, {
+      replace: true,
+    });
+    expect(insertedTables()).toEqual(["grows", "tents", "plants"]);
+    const [grow, tent, plant] = testState.insert.mock.calls.map(([, payload]) => payload);
+    // Blank optional names fall back to the defaults the form promises.
+    expect(grow).toMatchObject({ id: IDS.grow, name: "My grow" });
+    expect(tent).toMatchObject({ id: IDS.tent, name: "Tent 1", grow_id: IDS.grow });
+    expect(plant).toMatchObject({
+      id: IDS.plant,
+      name: "Plant A",
+      grow_id: IDS.grow,
+      tent_id: IDS.tent,
+    });
+  });
+
+  it("creates only the missing tent and plant on a Free partial resume", async () => {
+    testState.grows = [{ id: "grow-existing", name: "QA Mid" }];
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent("QA Mid");
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
+    await user.type(screen.getByTestId("start-room-plant-name"), "Plant A");
+    await user.click(screen.getByTestId("start-room-submit"));
+
+    await waitFor(() => expect(testState.nav).toHaveBeenCalledTimes(1));
+    expect(insertedTables()).toEqual(["tents", "plants"]);
+    expect(testState.insert).toHaveBeenCalledWith(
+      "plants",
+      expect.objectContaining({ grow_id: "grow-existing" }),
+    );
+  });
+
+  it("retries a failed tent save on the same row without creating a second grow", async () => {
+    testState.failTable = "tents";
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(screen.getByTestId("start-room-plant-name"), "Plant A");
+    await user.click(screen.getByTestId("start-room-submit"));
+    expect(await screen.findByTestId("start-your-room-error")).toHaveTextContent(
+      "Verdant could not save this tent",
+    );
+    expect(insertedTables()).toEqual(["grows", "tents"]);
+    expect(testState.nav).not.toHaveBeenCalled();
+
+    testState.failTable = null;
+    const retry = screen.getByTestId("start-room-save-retry");
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(testState.nav).toHaveBeenCalledTimes(1));
+    expect(insertedTables()).toEqual(["grows", "tents", "tents", "plants"]);
+    const tentIds = testState.insert.mock.calls
+      .filter(([table]) => table === "tents")
+      .map(([, payload]) => payload.id);
+    expect(tentIds).toEqual([IDS.tent, IDS.tent]);
+  });
+
+  it("shows the Free gate and inserts nothing when a grow exists and cannot be resumed", async () => {
+    testState.grows = [{ id: "grow-existing", name: "QA Mid" }];
+    testState.plantsRead = "throw";
+    renderPage();
+    expect(await screen.findByTestId("start-room-creation-gate")).toHaveTextContent(
+      "Free includes 1 active grow",
+    );
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Plant A" },
+    });
+    const submit = screen.getByTestId("start-room-submit");
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+    fireEvent.submit(submit.closest("form")!);
+    expect(testState.insert).not.toHaveBeenCalled();
+    expect(testState.nav).not.toHaveBeenCalled();
+  });
+
+  it("submits the room on Enter from the plant name", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(screen.getByTestId("start-room-plant-name"), "Plant A{Enter}");
+    await waitFor(() => expect(testState.nav).toHaveBeenCalledTimes(1));
+    expect(insertedTables()).toEqual(["grows", "tents", "plants"]);
+  });
+});

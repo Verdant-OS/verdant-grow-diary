@@ -115,7 +115,8 @@ describe("Start your room save reason and pending-grow adoption (#2541 P2s)", ()
     const user = userEvent.setup();
     renderPage();
     await user.type(screen.getByTestId("start-room-grow-name"), "North tent run");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
+    await user.type(screen.getByTestId("start-room-plant-name"), "North plant");
+    await user.click(screen.getByTestId("start-room-submit"));
     const error = await screen.findByTestId("start-your-room-error");
     expect(error).toHaveTextContent("Verdant could not save this grow");
     expect(error).toHaveTextContent("Reason: relation exploded");
@@ -153,7 +154,8 @@ describe("Start your room save reason and pending-grow adoption (#2541 P2s)", ()
       saveError: null,
     });
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent("North tent run");
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
     expect(testState.insert).not.toHaveBeenCalled();
   });
 });

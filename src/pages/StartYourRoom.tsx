@@ -1,12 +1,13 @@
 /**
- * StartYourRoom — guided first-session path: grow → tent → plant.
+ * StartYourRoom — first-session path: one form, one submit creates
+ * grow → tent → plant (only the items that do not exist yet).
  *
  * Guarantees grow_id (and tent_id) on every write so Plant Detail Quick Log
  * works immediately. No device control, no Action Queue, no Edge Functions.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "@/lib/react-router-compat";
-import { Loader2, Sprout, Box, Leaf, CheckCircle2 } from "lucide-react";
+import { Loader2, Leaf, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -25,15 +26,15 @@ import {
   buildStartRoomGrowPayload,
   buildStartRoomTentPayload,
   buildStartRoomPlantPayload,
-  canProceedGrow,
-  canProceedTent,
-  canProceedPlant,
   canFinish,
-  nextStepAfter,
-  stepIndex,
-  progressLabel,
+  canSubmitRoom,
+  firstMissingStep,
+  oneStepProgressLabel,
+  startRoomFormWithDefaults,
   plantDetailQuickLogHref,
   resolveStartYourRoomResume,
+  START_YOUR_ROOM_DEFAULT_GROW_NAME,
+  START_YOUR_ROOM_DEFAULT_TENT_NAME,
   type StartYourRoomForm,
   type StartYourRoomIds,
   type StartYourRoomResumePlant,
@@ -110,9 +111,10 @@ export default function StartYourRoom() {
     loading: boolean;
     plants: readonly StartYourRoomResumePlant[] | null;
   }>({ loading: false, plants: plantsSelectAvailable() ? null : [] });
-  const [step, setStep] = useState<StartYourRoomStep>("grow");
   const [form, setForm] = useState<StartYourRoomForm>({ ...DEFAULT_START_YOUR_ROOM_FORM });
   const [ids, setIds] = useState<StartYourRoomIds>({ ...EMPTY_START_YOUR_ROOM_IDS });
+  // What this session has confirmed; the draft still records it as `step`.
+  const step: StartYourRoomStep = firstMissingStep(ids);
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
   const [pendingRowIds, setPendingRowIds] = useState<StartYourRoomPendingRowIds>(
@@ -145,7 +147,6 @@ export default function StartYourRoom() {
       parseStartYourRoomDraft,
     );
     if (!draft) {
-      setStep("grow");
       setForm({ ...DEFAULT_START_YOUR_ROOM_FORM });
       setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
       setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
@@ -162,13 +163,7 @@ export default function StartYourRoom() {
     } else {
       setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
     }
-    if (growStillHere) {
-      setIds(draft.ids);
-      setStep(draft.step);
-    } else {
-      setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
-      setStep("grow");
-    }
+    setIds(growStillHere ? draft.ids : { ...EMPTY_START_YOUR_ROOM_IDS });
     setDraftOwnerReady(ownerId);
   }, [ownerId, grows, growsLoading]);
 
@@ -187,7 +182,6 @@ export default function StartYourRoom() {
     setActiveGrowId(adoptId);
     setIds((prev) => ({ ...prev, growId: adoptId }));
     setError(null);
-    setStep(nextStepAfter("grow"));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- releaseRowId/setActiveGrowId are stable for this owner
   }, [ownerId, draftOwnerReady, growsLoading, step, ids.growId, pendingRowIds.grow, grows]);
 
@@ -310,34 +304,32 @@ export default function StartYourRoom() {
     if (!planVerificationReady || growGate.allowed) return null;
     return resume;
   }, [resume, planVerificationReady, growGate.allowed]);
-  const showingResume = appliedResume != null && stepIndex(step) <= stepIndex(appliedResume.step);
-  const shownStep: StartYourRoomStep = showingResume ? appliedResume.step : step;
-  const shownIds: StartYourRoomIds = showingResume
+  // Resume fills in the grow/tent/plant that already exist; the one submit then
+  // creates only what is still missing.
+  const shownIds: StartYourRoomIds = appliedResume
     ? {
-        growId: appliedResume.growId,
-        tentId: appliedResume.tentId,
-        plantId: appliedResume.plantId,
+        growId: ids.growId ?? appliedResume.growId,
+        tentId: ids.tentId ?? appliedResume.tentId,
+        plantId: ids.plantId ?? appliedResume.plantId,
       }
     : ids;
-  const shownForm: StartYourRoomForm = showingResume
+  const shownForm: StartYourRoomForm = appliedResume
     ? {
         ...form,
-        growName: appliedResume.growName || form.growName,
-        tentName: appliedResume.tentName || form.tentName,
-        plantName: appliedResume.plantName || form.plantName,
+        growName: form.growName || appliedResume.growName,
+        tentName: form.tentName || appliedResume.tentName,
+        plantName: form.plantName || appliedResume.plantName,
       }
     : form;
+  const shownStep: StartYourRoomStep = firstMissingStep(shownIds);
   const stepCreationGate =
     shownStep === "grow" ? roomPreflightGate : shownStep === "tent" ? tentGate : null;
   const currentCreationGate = !growGate.allowed ? growGate : stepCreationGate;
-  const progress = useMemo(() => progressLabel(shownStep), [shownStep]);
+  const progress = oneStepProgressLabel(shownStep);
   const showRoomLoading = roomSourcesLoading || creationVerificationLoading;
 
   useEffect(() => {
     if (!appliedResume) return;
-    setStep((current) =>
-      stepIndex(current) < stepIndex(appliedResume.step) ? appliedResume.step : current,
-    );
     setIds((prev) => {
       const next = {
         growId: prev.growId ?? appliedResume.growId,
@@ -425,189 +417,140 @@ export default function StartYourRoom() {
     setPendingRowIds(next);
   }
 
-  async function submitGrow() {
+  async function submitRoom() {
     if (!user || busy || createInFlightRef.current) return;
     if (createOutcomeUnknown) {
       setError("Refresh this page before trying to create another room item.");
       return;
     }
-    if (!roomPreflightGate.allowed) {
+    const needGrow = !shownIds.growId;
+    const needTent = !shownIds.tentId;
+    // Never use up a plan's grow or tent allowance silently: the gate notice
+    // is already on screen, and nothing is inserted while it blocks.
+    if (needGrow && !roomPreflightGate.allowed) {
       setError(roomPreflightGate.blockedCopy);
       return;
     }
-    const payload = buildStartRoomGrowPayload(shownForm);
-    if (!payload) {
-      setError("Enter a grow name to continue.");
-      return;
-    }
-    let growId: string;
-    try {
-      growId = rowIdFor("grow");
-    } catch {
-      setError("Verdant could not start a safe grow save. Refresh and try again.");
-      return;
-    }
-    const attempt = { entity: "grow" as const, rowId: growId, ownerId: user.id };
-    const saveOwnerId = user.id;
-    createInFlightRef.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const confirmed = await persistStartRoomAttempt(attempt, {
-        id: growId,
-        user_id: user.id,
-        ...payload,
-      });
-      if (ownerIdRef.current !== saveOwnerId) return;
-      if (!confirmed) return;
-      releaseRowId("grow");
-      setActiveGrowId(confirmed.row.id);
-      setIds((prev) => ({ ...prev, growId: confirmed.row.id }));
-      toast.success("Grow created");
-      setStep(nextStepAfter("grow"));
-      try {
-        await refresh();
-        if (ownerIdRef.current !== saveOwnerId) return;
-      } catch {
-        // The grow is already confirmed and the wizard is terminal for this
-        // stage. Advance rather than leave the grow form ready to duplicate.
-        toast.error(
-          "Grow created, but the list could not refresh. Refresh the page if it looks out of date.",
-        );
-      }
-    } finally {
-      createInFlightRef.current = false;
-      setBusy(false);
-    }
-  }
-
-  async function submitTent() {
-    if (!user || busy || createInFlightRef.current) return;
-    if (createOutcomeUnknown) {
-      setError("Refresh this page before trying to create another room item.");
-      return;
-    }
-    if (!tentGate.allowed) {
+    if (!needGrow && needTent && !tentGate.allowed) {
       setError(tentGate.blockedCopy);
       return;
     }
-    const payload = buildStartRoomTentPayload(shownForm, shownIds);
-    if (!payload) {
-      setError("Enter a tent name. Grow context is required.");
+    if (!canSubmitRoom(shownForm, shownIds)) {
+      setError("Enter a plant name to continue. Names can be up to 80 characters.");
       return;
     }
-    let tentId: string;
-    try {
-      tentId = rowIdFor("tent");
-    } catch {
-      setError("Verdant could not start a safe tent save. Refresh and try again.");
-      return;
-    }
-    const attempt = {
-      entity: "tent" as const,
-      rowId: tentId,
-      ownerId: user.id,
-      growId: payload.grow_id,
-    };
+    const roomForm = startRoomFormWithDefaults(shownForm);
     const saveOwnerId = user.id;
+    let growId = shownIds.growId;
+    let tentId = shownIds.tentId;
     createInFlightRef.current = true;
     setBusy(true);
     setError(null);
     try {
-      const confirmed = await persistStartRoomAttempt(attempt, {
-        id: tentId,
-        user_id: user.id,
-        ...payload,
-      });
-      if (ownerIdRef.current !== saveOwnerId) return;
-      if (!confirmed) return;
-      releaseRowId("tent");
-      setIds((prev) => ({
-        growId: prev.growId ?? shownIds.growId,
-        tentId: confirmed.row.id,
-        plantId: prev.plantId ?? shownIds.plantId,
-      }));
-      setForm((prev) => ({
-        ...prev,
-        growName: prev.growName || shownForm.growName,
-        tentName: prev.tentName || shownForm.tentName,
-      }));
-      toast.success("Tent created and linked to grow");
-      setStep(nextStepAfter("tent"));
-    } finally {
-      createInFlightRef.current = false;
-      setBusy(false);
-    }
-  }
-
-  async function submitPlant() {
-    if (!user || busy || createInFlightRef.current) return;
-    if (createOutcomeUnknown) {
-      setError("Refresh this page before trying to create another room item.");
-      return;
-    }
-    const payload = buildStartRoomPlantPayload(shownForm, shownIds);
-    if (!payload) {
-      setError("Enter a plant name. Grow and tent must already exist.");
-      return;
-    }
-    let plantId: string;
-    try {
-      plantId = rowIdFor("plant");
-    } catch {
-      setError("Verdant could not start a safe plant save. Refresh and try again.");
-      return;
-    }
-    const attempt = {
-      entity: "plant" as const,
-      rowId: plantId,
-      ownerId: user.id,
-      growId: payload.grow_id,
-      tentId: payload.tent_id,
-    };
-    const saveOwnerId = user.id;
-    createInFlightRef.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const confirmed = await persistStartRoomAttempt(attempt, {
-        id: plantId,
-        user_id: user.id,
-        ...payload,
-      });
-      if (ownerIdRef.current !== saveOwnerId) return;
-      if (!confirmed) return;
+      if (!growId) {
+        const payload = buildStartRoomGrowPayload(roomForm);
+        if (!payload) return;
+        let rowId: string;
+        try {
+          rowId = rowIdFor("grow");
+        } catch {
+          setError("Verdant could not start a safe grow save. Refresh and try again.");
+          return;
+        }
+        const confirmed = await persistStartRoomAttempt(
+          { entity: "grow", rowId, ownerId: user.id },
+          { id: rowId, user_id: user.id, ...payload },
+        );
+        if (ownerIdRef.current !== saveOwnerId || !confirmed) return;
+        releaseRowId("grow");
+        const confirmedGrowId = confirmed.row.id;
+        growId = confirmedGrowId;
+        setActiveGrowId(confirmedGrowId);
+        setIds((prev) => ({ ...prev, growId: confirmedGrowId }));
+        try {
+          await refresh();
+          if (ownerIdRef.current !== saveOwnerId) return;
+        } catch {
+          // The grow is confirmed; continue rather than leave the form ready to
+          // duplicate it.
+          toast.error(
+            "Grow created, but the list could not refresh. Refresh the page if it looks out of date.",
+          );
+        }
+      }
+      if (!tentId) {
+        const payload = buildStartRoomTentPayload(roomForm, {
+          growId,
+          tentId: null,
+          plantId: null,
+        });
+        if (!payload) return;
+        let rowId: string;
+        try {
+          rowId = rowIdFor("tent");
+        } catch {
+          setError("Verdant could not start a safe tent save. Refresh and try again.");
+          return;
+        }
+        const confirmed = await persistStartRoomAttempt(
+          { entity: "tent", rowId, ownerId: user.id, growId: payload.grow_id },
+          { id: rowId, user_id: user.id, ...payload },
+        );
+        if (ownerIdRef.current !== saveOwnerId || !confirmed) return;
+        releaseRowId("tent");
+        const confirmedTentId = confirmed.row.id;
+        const boundGrowId = growId;
+        tentId = confirmedTentId;
+        setIds((prev) => ({
+          ...prev,
+          growId: prev.growId ?? boundGrowId,
+          tentId: confirmedTentId,
+        }));
+      }
+      const plantPayload = buildStartRoomPlantPayload(roomForm, { growId, tentId, plantId: null });
+      if (!plantPayload) return;
+      let plantRowId: string;
+      try {
+        plantRowId = rowIdFor("plant");
+      } catch {
+        setError("Verdant could not start a safe plant save. Refresh and try again.");
+        return;
+      }
+      const confirmedPlant = await persistStartRoomAttempt(
+        {
+          entity: "plant",
+          rowId: plantRowId,
+          ownerId: user.id,
+          growId: plantPayload.grow_id,
+          tentId: plantPayload.tent_id,
+        },
+        { id: plantRowId, user_id: user.id, ...plantPayload },
+      );
+      if (ownerIdRef.current !== saveOwnerId || !confirmedPlant) return;
       releaseRowId("plant");
       // Fail closed if binding somehow dropped (should never happen with payload).
-      if (!confirmed.row.grow_id) {
+      if (!confirmedPlant.row.grow_id) {
         setError(
           "Plant was created without grow context. Use Plant Detail rescue or Lineage Repair.",
         );
         return;
       }
-      // Quick Log is permanently mounted and can still hold the pre-wizard
-      // empty lists. Settle every target selector refresh before exposing the
-      // Finish handoff. A failed refresh remains recoverable inside Quick Log;
-      // it must not create a second plant or strand this completed wizard.
+      // Quick Log is permanently mounted and can still hold the pre-room empty
+      // lists. Settle every target selector refresh before handing off. A failed
+      // refresh stays recoverable inside Quick Log; it must not create a second
+      // plant.
       await Promise.allSettled([
         refresh(),
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);
       if (ownerIdRef.current !== saveOwnerId) return;
-      setIds((prev) => ({
-        growId: prev.growId ?? shownIds.growId,
-        tentId: prev.tentId ?? shownIds.tentId,
-        plantId: confirmed.row.id,
-      }));
-      setForm((prev) => ({
-        ...prev,
-        growName: prev.growName || shownForm.growName,
-        tentName: prev.tentName || shownForm.tentName,
-        plantName: prev.plantName || shownForm.plantName,
-      }));
+      const plantId = confirmedPlant.row.id;
+      setIds({ growId, tentId, plantId });
       toast.success("Plant created and linked");
-      setStep(nextStepAfter("plant"));
+      // Persist diary-first start screen so next login skips empty onboarding.
+      setStartScreenChoice(user.id, "quickLog");
+      nav(plantDetailQuickLogHref(plantId), { replace: true });
     } finally {
       createInFlightRef.current = false;
       setBusy(false);
@@ -621,25 +564,9 @@ export default function StartYourRoom() {
     nav(plantDetailQuickLogHref(shownIds.plantId), { replace: true });
   }
 
-  function retryCurrentSave() {
-    if (shownStep === "grow") void submitGrow();
-    else if (shownStep === "tent") void submitTent();
-    else if (shownStep === "plant") void submitPlant();
-  }
-
-  function submitGrowFromForm(event: { preventDefault: () => void }) {
+  function submitRoomFromForm(event: { preventDefault: () => void }) {
     event.preventDefault();
-    void submitGrow();
-  }
-
-  function submitTentFromForm(event: { preventDefault: () => void }) {
-    event.preventDefault();
-    void submitTent();
-  }
-
-  function submitPlantFromForm(event: { preventDefault: () => void }) {
-    event.preventDefault();
-    void submitPlant();
+    void submitRoom();
   }
 
   return (
@@ -685,101 +612,14 @@ export default function StartYourRoom() {
           </p>
         )}
 
-        {!showRoomLoading && shownStep === "grow" && (
-          <form onSubmit={submitGrowFromForm}>
-            <section className="space-y-3" data-testid="start-your-room-step-grow">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Sprout className="h-4 w-4 text-primary" aria-hidden />
-                {START_YOUR_ROOM_COPY.growTitle}
-              </div>
-              <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.growHelp}</p>
-              <div>
-                <Label htmlFor="start-room-grow-name">Grow name</Label>
-                <Input
-                  id="start-room-grow-name"
-                  data-testid="start-room-grow-name"
-                  value={shownForm.growName}
-                  onChange={(e) => patchForm({ growName: e.target.value })}
-                  placeholder="Spring run · Tent A"
-                  autoComplete="off"
-                  maxLength={80}
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full gradient-leaf text-primary-foreground"
-                disabled={
-                  busy ||
-                  createOutcomeUnknown ||
-                  !roomPreflightGate.allowed ||
-                  !canProceedGrow(shownForm)
-                }
-                data-testid="start-room-grow-submit"
-              >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaGrow}
-              </Button>
-            </section>
-          </form>
-        )}
-
-        {!showRoomLoading && shownStep === "tent" && (
-          <form onSubmit={submitTentFromForm}>
-            <section className="space-y-3" data-testid="start-your-room-step-tent">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Box className="h-4 w-4 text-primary" aria-hidden />
-                {START_YOUR_ROOM_COPY.tentTitle}
-              </div>
-              <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.tentHelp}</p>
-              <p
-                className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
-                data-testid="start-room-bound-grow"
-              >
-                Bound to grow:{" "}
-                <span className="font-medium">{shownForm.growName.trim() || "your grow"}</span>
-              </p>
-              <div>
-                <Label htmlFor="start-room-tent-name">Tent name</Label>
-                <Input
-                  id="start-room-tent-name"
-                  data-testid="start-room-tent-name"
-                  value={shownForm.tentName}
-                  onChange={(e) => patchForm({ tentName: e.target.value })}
-                  placeholder="4×4 flower"
-                  autoComplete="off"
-                  maxLength={80}
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full gradient-leaf text-primary-foreground"
-                disabled={
-                  busy ||
-                  createOutcomeUnknown ||
-                  !tentGate.allowed ||
-                  !canProceedTent(shownForm, shownIds)
-                }
-                data-testid="start-room-tent-submit"
-              >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaTent}
-              </Button>
-            </section>
-          </form>
-        )}
-
-        {!showRoomLoading && shownStep === "plant" && (
-          <form onSubmit={submitPlantFromForm}>
-            <section className="space-y-3" data-testid="start-your-room-step-plant">
+        {!showRoomLoading && shownStep !== "done" && (
+          <form onSubmit={submitRoomFromForm}>
+            <section className="space-y-3" data-testid="start-your-room-step-room">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Leaf className="h-4 w-4 text-primary" aria-hidden />
-                {START_YOUR_ROOM_COPY.plantTitle}
+                {START_YOUR_ROOM_COPY.roomTitle}
               </div>
-              <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.plantHelp}</p>
-              <p className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2">
-                Bound to grow + tent:{" "}
-                <span className="font-medium">
-                  {shownForm.growName.trim()} · {shownForm.tentName.trim()}
-                </span>
-              </p>
+              <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.roomHelp}</p>
               <div>
                 <Label htmlFor="start-room-plant-name">Plant name</Label>
                 <Input
@@ -789,6 +629,7 @@ export default function StartYourRoom() {
                   onChange={(e) => patchForm({ plantName: e.target.value })}
                   placeholder="Plant A"
                   autoComplete="off"
+                  autoFocus
                   maxLength={80}
                 />
               </div>
@@ -808,17 +649,77 @@ export default function StartYourRoom() {
                   ))}
                 </select>
               </div>
+              {shownIds.growId ? (
+                <p
+                  className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
+                  data-testid="start-room-bound-grow"
+                >
+                  Bound to grow:{" "}
+                  <span className="font-medium">{shownForm.growName.trim() || "your grow"}</span>
+                  {shownIds.tentId ? (
+                    <>
+                      {" "}
+                      · tent{" "}
+                      <span className="font-medium">
+                        {shownForm.tentName.trim() || "your tent"}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+              {!shownIds.growId || !shownIds.tentId ? (
+                <details className="text-sm" data-testid="start-room-optional-names">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">
+                    {START_YOUR_ROOM_COPY.optionalNamesSummary}
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      {START_YOUR_ROOM_COPY.optionalNamesHelp}
+                    </p>
+                    {!shownIds.growId ? (
+                      <div>
+                        <Label htmlFor="start-room-grow-name">Grow name</Label>
+                        <Input
+                          id="start-room-grow-name"
+                          data-testid="start-room-grow-name"
+                          value={shownForm.growName}
+                          onChange={(e) => patchForm({ growName: e.target.value })}
+                          placeholder={START_YOUR_ROOM_DEFAULT_GROW_NAME}
+                          autoComplete="off"
+                          maxLength={80}
+                        />
+                      </div>
+                    ) : null}
+                    {!shownIds.tentId ? (
+                      <div>
+                        <Label htmlFor="start-room-tent-name">Tent name</Label>
+                        <Input
+                          id="start-room-tent-name"
+                          data-testid="start-room-tent-name"
+                          value={shownForm.tentName}
+                          onChange={(e) => patchForm({ tentName: e.target.value })}
+                          placeholder={START_YOUR_ROOM_DEFAULT_TENT_NAME}
+                          autoComplete="off"
+                          maxLength={80}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
               <Button
                 type="submit"
                 className="w-full gradient-leaf text-primary-foreground"
-                disabled={busy || createOutcomeUnknown || !canProceedPlant(shownForm, shownIds)}
-                data-testid="start-room-plant-submit"
+                disabled={
+                  busy ||
+                  createOutcomeUnknown ||
+                  (!shownIds.growId && !roomPreflightGate.allowed) ||
+                  (!!shownIds.growId && !shownIds.tentId && !tentGate.allowed) ||
+                  !canSubmitRoom(shownForm, shownIds)
+                }
+                data-testid="start-room-submit"
               >
-                {busy ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  START_YOUR_ROOM_COPY.ctaPlant
-                )}
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaRoom}
               </Button>
             </section>
           </form>
@@ -906,7 +807,7 @@ export default function StartYourRoom() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={retryCurrentSave}
+                  onClick={() => void submitRoom()}
                   disabled={busy}
                   data-testid="start-room-save-retry"
                 >

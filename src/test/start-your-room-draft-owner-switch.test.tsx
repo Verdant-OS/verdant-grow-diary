@@ -145,7 +145,8 @@ describe("Start your room owner changes", () => {
     testState.holdInsert = true;
     const view = renderPage();
     await user.type(screen.getByTestId("start-room-grow-name"), "A room");
-    fireEvent.click(screen.getByTestId("start-room-grow-submit"));
+    await user.type(screen.getByTestId("start-room-plant-name"), "A plant");
+    fireEvent.click(screen.getByTestId("start-room-submit"));
     await waitFor(() => expect(testState.insert).toHaveBeenCalledTimes(1));
 
     testState.userId = "user-2";
@@ -162,7 +163,8 @@ describe("Start your room owner changes", () => {
     });
 
     expect(screen.getByTestId("start-room-grow-name")).toHaveValue("B room");
-    expect(screen.queryByTestId("start-your-room-step-tent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-bound-grow")).not.toBeInTheDocument();
+    expect(testState.insert).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("start-your-room-error")).toHaveTextContent(STORED_ERROR);
     const stored = window.sessionStorage.getItem(draftKey("user-2"));
     expect(stored).toContain("B room");
@@ -171,7 +173,7 @@ describe("Start your room owner changes", () => {
     expect(stored).not.toContain(MINTED_ROW_ID);
   });
 
-  it("drops a tent save error when that grow is gone and the step falls back to grow", async () => {
+  it("drops a tent save error when that grow is gone and the room falls back to creating a grow", async () => {
     writeBrowserSessionFormDraft("user-1", START_YOUR_ROOM_DRAFT_FORM_ID, {
       step: "tent",
       form: {
@@ -190,7 +192,7 @@ describe("Start your room owner changes", () => {
     });
     renderPage();
     expect(await screen.findByTestId("start-room-grow-name")).toHaveValue("");
-    expect(screen.queryByTestId("start-your-room-step-tent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-bound-grow")).not.toBeInTheDocument();
     expect(screen.queryByTestId("start-your-room-error")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(draftKey("user-1"))).not.toContain(TENT_ERROR);
   });

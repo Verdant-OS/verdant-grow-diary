@@ -951,6 +951,40 @@ owner: Claude
 last_updated: 2026-10-28 01:30 UTC, by Claude
 ```
 
+### AHREFS-CSP-REPORT-ONLY
+
+```text
+TASK AHREFS-CSP-REPORT-ONLY  priority: other  status: OPEN
+goal: Add https://analytics.ahrefs.com to the report-only CSP script-src and connect-src so consented Ahrefs Web Analytics visits stop logging CSP violations.
+why: Ahrefs is loaded after consent (src/lib/ahrefsAnalyticsLoader.ts) but the report-only policy omitted its origin. Matthew chose a separate PR from the key swap (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-28).
+branch: claude/ahrefs-csp-report-only
+base: verdant-grow-diary
+checkout: git fetch origin claude/ahrefs-csp-report-only verdant-grow-diary && git switch claude/ahrefs-csp-report-only && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft PR from claude/ahrefs-csp-report-only (link in the PR list)
+head_sha: read the PR head; this commit cannot name itself
+state: pushed draft
+current_step: CI and independent review
+next_action: independent exact-head review of the PR
+post_merge_check: on https://verdantgrowdiary.com the Content-Security-Policy-Report-Only response header lists https://analytics.ahrefs.com in script-src and connect-src; NOT_MEASURED until live /version.json reports the merge SHA and the Worker serves it
+active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
+decisions: report-only stays report-only; no frame-src/default-src widening; new test file instead of editing the scorer-locked security-headers-rules.test.ts
+tried_and_rejected: bundling with the key swap (owner chose separate PRs)
+commands: bunx vitest run src/test/csp-ahrefs-analytics-origin.test.ts src/test/security-headers-rules.test.ts src/test/cloudflare-host-routing-rules.test.ts --reporter=dot
+files_touched: src/lib/securityHeadersRules.ts, src/test/csp-ahrefs-analytics-origin.test.ts, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: this block and AHREFS-WEB-ANALYTICS-KEY-SWAP both append before "## Closed"; whichever PR merges second needs a base merge keeping both blocks
+links: sibling key-swap PR from claude/admiring-dirac-3vaz57
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3; this Claude session excluded
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-10-28 23:20 UTC
+owner: Claude
+last_updated: 2026-10-28 23:22 UTC, by Claude
+```
+
 ## Closed
 
 ### STOP-SELLING-FOUNDER-LIFETIME

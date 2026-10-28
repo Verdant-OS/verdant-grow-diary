@@ -5,7 +5,7 @@ import { BADGE_AWARD_COPY } from "@/constants/badgeAwardCopy";
 describe("badge tent setup harvest migration contract", () => {
   it("earns from earliest subject rows, ignores yield, and keeps evidence scoped", () => {
     const migration = readFileSync(
-      "supabase/migrations/20261011143000_badge_awards_tent_setup_harvest.sql",
+      "supabase/migrations/20261027235500_badge_awards_tent_setup_harvest.sql",
       "utf8",
     );
     expect(migration).toContain(

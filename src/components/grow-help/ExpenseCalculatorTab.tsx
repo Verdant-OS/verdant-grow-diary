@@ -22,23 +22,7 @@ import type {
 } from "@/lib/growHelpToolkitState";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
-
-interface SafeResult<T> {
-  value: T | null;
-  error: string | null;
-}
-
-function attempt<T>(ready: boolean, fn: () => T): SafeResult<T> {
-  if (!ready) return { value: null, error: null };
-  try {
-    return { value: fn(), error: null };
-  } catch (error) {
-    return {
-      value: null,
-      error: error instanceof Error ? error.message : "Check the expense inputs.",
-    };
-  }
-}
+import { calculateWhenReady as attempt } from "@/lib/growHelpToolkitReadiness";
 
 function fmt(value: number, digits = 2): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });

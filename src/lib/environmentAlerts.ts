@@ -46,6 +46,12 @@ export interface AlertInputs {
    * omitted, legacy generic VPD thresholds apply (backward compatibility).
    */
   stage?: string | null;
+  /**
+   * When true, target-comparison breach reasons include the observed value and
+   * configured target range so persisted alert rows self-describe their target
+   * band for AlertWhyContext.
+   */
+  includeConfiguredRangeInTargetBreachReason?: boolean;
 }
 
 const SEVERITY_WEIGHT: Record<AlertSeverity, number> = {
@@ -80,6 +86,59 @@ function isCriticalImplausible(field: string, snapshot: SensorSnapshot | null): 
 
 function fieldLabel(field: string): string {
   return (METRIC_LABELS as Record<string, string>)[field] ?? field;
+}
+
+const TARGET_METRIC_UNITS: Partial<Record<MetricKey, string>> = {
+  temp: "°C",
+  rh: "%",
+  vpd: " kPa",
+  soil: "%",
+  soil_ec: " mS/cm",
+  soil_temp: "°C",
+  ppfd: " µmol",
+};
+
+function fmtTargetNum(v: number, unit: string): string {
+  const s = Number.isInteger(v)
+    ? String(v)
+    : (Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1)).replace(/\.?0+$/, "");
+  // A tiny negative value rounds to "-0"; never render a signed zero.
+  return `${s === "-0" ? "0" : s}${unit}`;
+}
+
+function buildTargetBreachReason(
+  m: {
+    metric: MetricKey;
+    label: string;
+    value: number | null;
+    min: number | null;
+    max: number | null;
+    state: "low" | "high";
+  },
+  includeRange = false,
+): string {
+  const base =
+    m.state === "low"
+      ? `${m.label} is below the configured minimum.`
+      : `${m.label} is above the configured maximum.`;
+  if (!includeRange) return base;
+  const unit = TARGET_METRIC_UNITS[m.metric] ?? "";
+  const obsText = m.value !== null && Number.isFinite(m.value) ? fmtTargetNum(m.value, unit) : null;
+  const rangeText =
+    m.min !== null && m.max !== null
+      ? `${fmtTargetNum(m.min, "")}–${fmtTargetNum(m.max, unit)}`
+      : m.min !== null
+        ? `≥ ${fmtTargetNum(m.min, unit)}`
+        : m.max !== null
+          ? `≤ ${fmtTargetNum(m.max, unit)}`
+          : null;
+  if (obsText && rangeText) {
+    return `${base} Observed ${obsText} (configured target ${rangeText}).`;
+  }
+  if (rangeText) {
+    return `${base} Configured target ${rangeText}.`;
+  }
+  return base;
 }
 
 function nowIso(now: number): string {
@@ -159,10 +218,17 @@ export function buildEnvironmentAlerts(inputs: AlertInputs): EnvironmentAlert[] 
             severity: "warning",
             metric: m.metric,
             title: m.state === "low" ? `${m.label} below target` : `${m.label} above target`,
-            reason:
-              m.state === "low"
-                ? `${m.label} is below the configured minimum.`
-                : `${m.label} is above the configured maximum.`,
+            reason: buildTargetBreachReason(
+              {
+                metric: m.metric,
+                label: m.label,
+                value: m.value,
+                min: m.min,
+                max: m.max,
+                state: m.state,
+              },
+              inputs.includeConfiguredRangeInTargetBreachReason === true,
+            ),
             source: "target_comparison",
             createdAt,
           });

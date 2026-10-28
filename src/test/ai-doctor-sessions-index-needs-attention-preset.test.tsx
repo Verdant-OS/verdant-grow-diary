@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -206,7 +206,9 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge");
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-clear-filters"));
-    expect(screen.queryByTestId("ai-doctor-sessions-index-needs-attention-badge")).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByTestId("ai-doctor-sessions-index-needs-attention-badge")).toBeNull(),
+    );
   });
 
   it("individual filter selects still work after preset is applied", async () => {
@@ -218,9 +220,12 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
       "ai-doctor-sessions-index-filter-confidence",
     )) as HTMLSelectElement;
     fireEvent.change(confSel, { target: { value: "low" } });
-    expect(
-      (screen.getByTestId("ai-doctor-sessions-index-filter-confidence") as HTMLSelectElement).value,
-    ).toBe("low");
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai-doctor-sessions-index-filter-confidence") as HTMLSelectElement)
+          .value,
+      ).toBe("low"),
+    );
   });
 
   it("visible count reflects currently loaded rows only", async () => {

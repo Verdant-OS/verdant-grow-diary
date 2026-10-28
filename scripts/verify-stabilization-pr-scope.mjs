@@ -19,6 +19,8 @@
 
 import { execSync } from "node:child_process";
 
+import { FORBIDDEN_LOCKFILES } from "./check-bun-lockfile-policy.mjs";
+
 // ---------- Pure helpers (exported for unit tests) ----------
 
 /**
@@ -27,14 +29,9 @@ import { execSync } from "node:child_process";
  */
 const ALLOWED_PREFIXES = ["src/test/", "tests/", "scripts/"];
 
-const ALLOWED_EXACT = new Set([
-  "package.json",
-  "bun.lockb",
-  "bun.lock",
-  "package-lock.json",
-  "pnpm-lock.yaml",
-  "yarn.lock",
-]);
+// bun.lock is the only lockfile; scripts/check-bun-lockfile-policy.mjs forbids
+// bun.lockb, package-lock.json, yarn.lock and pnpm-lock.yaml.
+const ALLOWED_EXACT = new Set(["package.json", "bun.lock"]);
 
 const ALLOWED_CONFIG_REGEXES = [/^vitest\.config\.[cm]?[jt]s$/, /^playwright\.config\.[cm]?[jt]s$/];
 
@@ -93,10 +90,24 @@ export function isAllowlistException(filePath) {
 }
 
 /**
+ * True for a lockfile the repository policy forbids (bun.lockb,
+ * package-lock.json, yarn.lock, pnpm-lock.yaml) in any folder, including
+ * below an allowed prefix such as scripts/ or tests/.
+ */
+function isForbiddenLockfile(filePath) {
+  // Normalize Windows separators and drop trailing ones first, so neither
+  // `scripts\\package-lock.json` nor `scripts/package-lock.json/` hides the name.
+  const path = String(filePath).replaceAll("\\", "/").replace(/\/+$/, "");
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return FORBIDDEN_LOCKFILES.includes(name);
+}
+
+/**
  * Returns true if the path matches an always-block rule, regardless of
  * whether it would otherwise match an allowed prefix.
  */
 export function isBlockedStabilizationPath(filePath) {
+  if (isForbiddenLockfile(filePath)) return true;
   if (isAllowlistException(filePath)) return false;
   if (BLOCKED_EXACT.has(filePath)) return true;
   for (const prefix of BLOCKED_PREFIXES) {
@@ -125,6 +136,7 @@ export function isBlockedStabilizationPath(filePath) {
  * to force product-doc changes into separate PRs.
  */
 export function isAllowedStabilizationPath(filePath, options = {}) {
+  if (isForbiddenLockfile(filePath)) return false;
   if (isAllowlistException(filePath)) return true;
   if (isBlockedStabilizationPath(filePath)) return false;
   if (ALLOWED_EXACT.has(filePath)) return true;

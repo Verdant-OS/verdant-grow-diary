@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { TYPED_REUSED_RECEIPT_READ_DEADLINE_MS } from "@/lib/quickLogTypedReusedReceiptService";
 import {
   mapWateringInputToRpcArgs,
   writeQuickLogWateringTypedEvent,
@@ -167,7 +168,8 @@ describe("writeQuickLogWateringTypedEvent — validation", () => {
     [{ grow_id: "  " }, "grow_id:missing"],
     [{ volume_ml: 0 }, "volume_ml:invalid"],
     [{ volume_ml: -1 }, "volume_ml:invalid"],
-    [{ volume_ml: 1_000_001 }, "volume_ml:invalid"],
+    [{ volume_ml: 50_001 }, "volume_ml:invalid"],
+    [{ volume_ml: 1_000_000 }, "volume_ml:invalid"],
     [{ volume_ml: Number.NaN }, "volume_ml:invalid"],
     [{ occurred_at: "not-a-date" }, "occurred_at:invalid"],
     [{ note: "x".repeat(501) }, "note:invalid"],
@@ -215,7 +217,7 @@ describe("writeQuickLogWateringTypedEvent — validation", () => {
     const { client, rpc } = makeClient();
     const result = await writeQuickLogWateringTypedEvent(
       baseInput({
-        volume_ml: 1_000_000,
+        volume_ml: 50_000,
         ph: 0,
         ec_ms_cm: 10,
         runoff_ml: 0,
@@ -325,10 +327,14 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(reusedEventReader).toHaveBeenCalledWith("77777777-7777-4777-8777-000000000001");
+    expect(reusedEventReader).toHaveBeenCalledWith(
+      "77777777-7777-4777-8777-000000000001",
+      expect.any(AbortSignal),
+    );
     expect(reusedChildReader).toHaveBeenCalledWith(
       "watering",
       "77777777-7777-4777-8777-000000000001",
+      expect.any(AbortSignal),
     );
     expect(rpc).toHaveBeenCalledWith("quicklog_save_event", expect.any(Object));
   });
@@ -488,11 +494,74 @@ describe("receipt identity", () => {
       await writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader }),
     ).toEqual({
       ok: false,
+      reason: "idempotency_key_retracted",
+    });
+  });
+
+  it("routes a reused Watering now on another plant to history review", async () => {
+    const { client } = makeClient({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    });
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "watering",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-2",
+      },
+      error: null,
+    });
+    const reusedChildReader = vi.fn();
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), {
+        client,
+        reusedEventReader,
+        reusedChildReader,
+      }),
+    ).toEqual({
+      ok: false,
+      reason: "receipt_target_moved",
+      reviewTarget: { growId: "grow-1", tentId: "tent-1", plantId: "plant-2" },
+    });
+    expect(reusedChildReader).not.toHaveBeenCalled();
+  });
+
+  it("keeps a reused Watering retryable when its receipt cannot be read", async () => {
+    const { client } = makeClient({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    });
+    const reusedEventReader = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: { message: "offline" } });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader }),
+    ).toEqual({
+      ok: false,
       reason: "rpc:receipt_unverified",
     });
   });
 
-  describe("unverifiable reused Watering receipts stay retryable", () => {
+  it("stops waiting for a reused Watering receipt read that never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client } = makeClient({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      });
+      const reusedEventReader = vi.fn(
+        () => new Promise<{ data: unknown; error: unknown }>(() => {}),
+      );
+      const result = writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader });
+      await vi.advanceTimersByTimeAsync(TYPED_REUSED_RECEIPT_READ_DEADLINE_MS);
+      await expect(result).resolves.toEqual({ ok: false, reason: "rpc:receipt_unverified" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe("unverifiable reused Watering receipts", () => {
     const activeEvent = {
       data: {
         id: "77777777-7777-4777-8777-000000000001",
@@ -509,10 +578,23 @@ describe("receipt identity", () => {
       data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     };
 
-    it.each([
-      ["a missing typed child", { data: null, error: null }],
-      ["a child read error", { data: null, error: { message: "read failed" } }],
-    ])("returns rpc:receipt_unverified for %s", async (_label, childRead) => {
+    it("refuses a missing typed child as idempotency_receipt_missing", async () => {
+      // The active parent read back without its typed child: a confirmed
+      // mismatch every same-key Retry would return, so it goes to history review.
+      const { client } = makeClient(reusedReply);
+      const reusedEventReader = vi.fn().mockResolvedValue(activeEvent);
+      const reusedChildReader = vi.fn().mockResolvedValue({ data: null, error: null });
+      expect(
+        await writeQuickLogWateringTypedEvent(baseInput(), {
+          client,
+          reusedEventReader,
+          reusedChildReader,
+        }),
+      ).toEqual({ ok: false, reason: "idempotency_receipt_missing" });
+    });
+
+    it("returns rpc:receipt_unverified for a child read error", async () => {
+      const childRead = { data: null, error: { message: "read failed" } };
       const { client } = makeClient(reusedReply);
       const reusedEventReader = vi.fn().mockResolvedValue(activeEvent);
       const reusedChildReader = vi.fn().mockResolvedValue(childRead);
@@ -526,6 +608,7 @@ describe("receipt identity", () => {
       expect(reusedChildReader).toHaveBeenCalledWith(
         "watering",
         "77777777-7777-4777-8777-000000000001",
+        expect.any(AbortSignal),
       );
     });
 

@@ -449,10 +449,9 @@ describe("production Supabase CA workflow boundary", () => {
     expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
   });
 
-  it("protects the production core verifier without exposing CA material to sandbox", () => {
+  it("protects the production core verifier, which is the only remote job", () => {
     const parsed = workflow(CORE_WORKFLOW_PATH);
     const production = parsed.jobs["verify-production"];
-    const sandbox = parsed.jobs["verify-sandbox"];
 
     expectProtectedCaWorkflow(production);
     for (const step of production.steps.filter((candidate) =>
@@ -461,7 +460,7 @@ describe("production Supabase CA workflow boundary", () => {
       expect(step.env?.SUPABASE_DB_CA_CERT_PATH).toBe(FIXED_WORKFLOW_CA_PATH);
       expect(step.env).not.toHaveProperty("SUPABASE_DB_CA_CERT_B64");
     }
-    expect(JSON.stringify(sandbox)).not.toMatch(/SUPABASE_DB_CA(?:_CERT|_PATH)/);
+    expect(parsed.jobs).not.toHaveProperty("verify-sandbox");
   });
 
   it("keeps raw CA material out of database steps and uploaded evidence", () => {

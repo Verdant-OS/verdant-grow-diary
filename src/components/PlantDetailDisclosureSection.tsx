@@ -43,7 +43,10 @@ export default function PlantDetailDisclosureSection({
           aria-controls={contentId}
           aria-describedby={summaryId}
           data-testid={`plant-detail-disclosure-${group}-trigger`}
-          className="flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left whitespace-normal focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className={cn(
+            "flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left whitespace-normal focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            anchorId && "scroll-mt-16",
+          )}
         >
           <span className="min-w-0">
             <span className="block font-semibold text-foreground">{title}</span>

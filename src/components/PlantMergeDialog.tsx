@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +68,7 @@ import {
   formatMergeTargetHelperText,
   formatMergeTargetReason,
   MERGE_TARGET_EMPTY_STATE,
+  isMergeDuplicateEntryEnabled,
   type MergeTargetClassification,
 } from "@/lib/plantMergeTargetReasonRules";
 
@@ -112,7 +120,11 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   // plants" bug: a database-level `grow_id = X` filter would drop a
   // candidate whose `grow_id` is null even when its assigned tent
   // belongs to the same grow.
-  const { data: allPlants = [] } = useGrowPlants(undefined, undefined);
+  const {
+    data: allPlants = [],
+    isFetched: plantsFetched,
+    isSuccess: plantsSucceeded,
+  } = useGrowPlants(undefined, undefined);
 
   // Normalize once: every plant the user can see (excluding archived
   // by default at the data layer — we still defensively re-check below
@@ -152,6 +164,11 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
 
   // Anything that should render in the picker: selectable + disabled.
   const visibleOptions = useMemo(() => classifications.filter((c) => !c.hidden), [classifications]);
+  const mergeEntryEnabled = isMergeDuplicateEntryEnabled({
+    fetched: plantsFetched,
+    succeeded: plantsSucceeded,
+    selectableOptionCount: classifications.filter((c) => c.selectable).length,
+  });
 
   // Backwards-compatible `candidates` list (PlantForMerge[]) used by
   // the preview/validation/RPC paths below. Only same-grow selectable
@@ -325,11 +342,16 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ?? (
+        {trigger && isValidElement(trigger) ? (
+          cloneElement(trigger as ReactElement<{ disabled?: boolean }>, {
+            disabled: !mergeEntryEnabled,
+          })
+        ) : (
           <Button
             size="sm"
             variant="outline"
             className="gap-1"
+            disabled={!mergeEntryEnabled}
             data-testid="merge-duplicate-trigger"
           >
             <GitMerge className="h-4 w-4" /> Merge Duplicate
@@ -524,7 +546,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 onClick={() => setOpen(false)}
                 data-testid="plant-merge-cancel"
               >
-                Close
+                Cancel
               </Button>
               {canArchiveOnly && (
                 <Button

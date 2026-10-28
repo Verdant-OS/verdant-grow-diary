@@ -1,7 +1,7 @@
 name: Required core schema present
 # Hosted acceptance uses https://verdantgrowdiary.com only (2026-09-28).
-# Existing CI/diagnostic bindings remain unchanged and supply no live acceptance.
-# Any target/status-message alignment requires a separate reviewed CI slice.
+# CI results here supply no live acceptance. The only database job is the manual,
+# protected production verifier; the sandbox lane was removed.
 # See docs/production-only-verification-runbook.md; no dispatch/APPLY here.
 
 on:
@@ -29,17 +29,20 @@ on:
         description: Pinned Supabase database to verify
         type: choice
         required: true
-        default: sandbox
+        default: production
         options:
-          - sandbox
           - production
+      confirm_live:
+        description: "Type LIVE to run the read-only check against the production database"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
   group: required-core-schema-${{ github.event_name }}-${{ github.ref }}-${{ inputs.target_env || 'none' }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # This is the only pull-request job. It is deliberately offline and has no
@@ -60,65 +63,14 @@ jobs:
       - name: Assert migration files remain in history
         run: node scripts/assert-required-core-migrations.mjs
 
-  # Configure this GitHub environment with required reviewers/branch
-  # restrictions and an environment-scoped SUPABASE_DB_URL secret.
-  # Production-only verification policy forbids push-triggered non-production
-  # database probes. Keep this legacy lane manual; offline checks still run on push.
-  verify-sandbox:
-    name: Verify pinned Verdant sandbox schema
-    needs: manifest-and-files
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}
-    runs-on: ubuntu-latest
-    environment: verdant-sandbox
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Install psql
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Prepare audit directory
-        run: mkdir -p "${{ github.workspace }}/audit/core-sandbox"
-      - name: Verify blocking core schema
-        env:
-          TARGET_ENV: sandbox
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          REPORT_PATH: ${{ github.workspace }}/audit/core-sandbox/core-report.md
-          AUDIT_PATH: ${{ github.workspace }}/audit/core-sandbox/core-audit.json
-        run: node scripts/assert-required-core-migrations-applied.mjs
-      - name: Verify advisory schema
-        id: advisory
-        if: always()
-        continue-on-error: true
-        env:
-          TARGET_ENV: sandbox
-          MANIFEST_SCOPE: advisory
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          REPORT_PATH: ${{ github.workspace }}/audit/core-sandbox/advisory-report.md
-          AUDIT_PATH: ${{ github.workspace }}/audit/core-sandbox/advisory-audit.json
-        run: node scripts/assert-required-core-migrations-applied.mjs
-      - name: Publish sanitized reports
-        if: always()
-        run: |
-          for report in "${{ github.workspace }}"/audit/core-sandbox/*-report.md; do
-            if [ -f "$report" ]; then
-              cat "$report" >> "$GITHUB_STEP_SUMMARY"
-            fi
-          done
-          if [ "${{ steps.advisory.outcome }}" = "failure" ]; then
-            echo "::warning title=Advisory schema drift::The pinned sandbox is missing advisory schema. Core release blocking remains determined by the core step."
-          fi
-      - name: Upload sanitized audit
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: required-core-schema-sandbox
-          path: audit/core-sandbox
-          if-no-files-found: error
-
   # Production is reachable only through an explicit manual dispatch from the
-  # trusted deploy branch and uses a separate protected environment.
+  # trusted deploy branch, with a typed LIVE confirmation, and uses a separate
+  # protected environment. AGENTS.md: Verdant has no sandbox; CI probes production
+  # or nothing. The manual verify-sandbox job was removed.
   verify-production:
     name: Verify pinned Verdant production schema
     needs: manifest-and-files
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production' && inputs.confirm_live == 'LIVE' }}
     runs-on: ubuntu-latest
     environment: verdant-production
     steps:

@@ -35,11 +35,14 @@ on:
       target_env:
         description: "Protected target environment"
         required: true
-        default: "sandbox"
+        default: "live"
         type: choice
         options:
-          - sandbox
           - live
+      confirm_live:
+        description: "Type LIVE to run the read-only check against the production database"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -101,87 +104,11 @@ jobs:
       - name: Assert no unreviewed money-adjacent migrations
         run: node scripts/assert-no-unreviewed-money-migrations.mjs
 
-  assert-money-migrations-applied-sandbox:
-    name: Assert money migrations applied in SANDBOX
-    needs: assert-required-money-migrations
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
-    environment: verdant-sandbox
-    runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: ""
-      PGDATABASE: ""
-      PGHOST: ""
-      PGPASSWORD: ""
-      PGPORT: ""
-      PGSERVICE: ""
-      PGSERVICEFILE: ""
-      PGUSER: ""
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Prepare audit dir
-        run: mkdir -p "${{ github.workspace }}/audit/sandbox"
-      - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
-        uses: ./.github/actions/require-ci-secret
-        with:
-          secret-name: SUPABASE_DB_URL_SANDBOX
-          secret-value: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          guard-heading: "Money-critical migration deploy guard — SANDBOX"
-          report-path: ${{ github.workspace }}/audit/sandbox/report.md
-          log-prefix: money-migration-preflight
-          fix-steps-json: >-
-            ["1. Open **Settings → Environments → verdant-sandbox** in this repository.",
-             "2. Add an environment secret named `SUPABASE_DB_URL_SANDBOX` whose value is the pooled Postgres connection string for the SANDBOX database (the same URL used by `supabase db push`).",
-             "3. Re-run this workflow. The gate will run `node scripts/assert-required-money-migrations-applied.mjs` against SANDBOX and confirm every money-critical migration is applied."]
-          reason-lines-json: >-
-            ["Why this is a hard failure: without the DB URL the deploy gate cannot",
-             "confirm that money-critical migrations (credit spends, referrals, entitlements)",
-             "are actually applied. Merging without this check risks silently shipping",
-             "a schema drift into production."]
-      - name: Install psql client
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Fast-fail prefix diff (sandbox)
-        id: prefix_diff_sandbox
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          TARGET_ENV: sandbox
-        run: |
-          set -o pipefail
-          if [ -z "${SUPABASE_DB_URL:-}" ]; then
-            echo "SUPABASE_DB_URL_SANDBOX not configured — skipping fast-fail diff; verify step will emit the missing-secret report."
-            exit 0
-          fi
-          node scripts/diff-money-migration-prefixes.mjs --json \
-            > "${{ github.workspace }}/audit/sandbox/prefix-diff-cli.json"
-          node scripts/diff-money-migration-prefixes.mjs \
-            | tee "${{ github.workspace }}/audit/sandbox/prefix-diff-cli.txt"
-      - name: Verify applied migrations in sandbox DB
-        id: verify_sandbox
-        if: always()
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          TARGET_ENV: sandbox
-          REPORT_PATH: ${{ github.workspace }}/audit/sandbox/report.md
-          AUDIT_PATH: ${{ github.workspace }}/audit/sandbox/applied-audit.json
-          DIFF_PATH: ${{ github.workspace }}/audit/sandbox/prefix-diff.txt
-        # Missing-secret handling lives in the local require-ci-secret
-        # preflight above, which is the single source of truth for that failure.
-        run: node scripts/assert-required-money-migrations-applied.mjs
-      - name: Append report to workflow summary
-        if: always() && hashFiles('audit/sandbox/report.md') != ''
-        run: cat audit/sandbox/report.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload sandbox audit bundle
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: money-migration-audit-sandbox
-          path: audit/sandbox
-          if-no-files-found: warn
-
   assert-money-migrations-applied-live:
     name: Assert money migrations applied in LIVE (pre-deploy gate)
     needs: assert-required-money-migrations
     # Production verification is always a protected, manual run from the trusted base branch.
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' && inputs.confirm_live == 'LIVE' }}
     environment: verdant-production
     runs-on: ubuntu-latest
     env:

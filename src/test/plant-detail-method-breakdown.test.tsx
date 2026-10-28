@@ -90,8 +90,8 @@ describe("buildDailyMethodBreakdown — pure rule", () => {
   it("classifies a day with neither as 'missed'", () => {
     const s = summaryFor({});
     const today = buildDailyMethodBreakdown(s, "newest-first")[0];
-    expect(today.method).toBe("missed");
-    expect(formatDailyMethodBreakdownLabel(today.method)).toBe("Missed");
+    expect(today.method).toBe("pending");
+    expect(formatDailyMethodBreakdownLabel(today.method)).toBe("Not yet");
   });
 
   it("ignores manual snapshots from a different tent", () => {
@@ -99,7 +99,7 @@ describe("buildDailyMethodBreakdown — pure rule", () => {
       manualReadings: [{ ts: iso(2026, 4, 24, 11), id: "m1", tent_id: "other-tent" }],
     });
     const today = buildDailyMethodBreakdown(s, "newest-first")[0];
-    expect(today.method).toBe("missed");
+    expect(today.method).toBe("pending");
   });
 });
 

@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-10-10.3**
+**Sentinel-Version: 2026-10-27.1**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -37,21 +37,27 @@ transfer the current holder first posts a `released_by: <agent>, <YYYY-MM-DD HH:
 to <successor>` comment on the PR (see `AGENTS.md`), and the successor then claims. Keep the same branch,
 confirm its remote head, and merge from base; never rename, recreate or force-push it.
 
-Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
-publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. **Codex** is an equal independent
-exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
-Claude may add peer observations but is not the acceptance reviewer.
-Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
-**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
-PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
-tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
-billing, `.github` workflows, security or auth, and dependency or lockfile changes
-still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
-Mass, or Durban Poison.
-Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
-Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
+Independent acceptance routing: select an **actually available, eligible independent
+reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
+**Blue Dream and Critical Mass are retired from future routing**; preserve historical
+receipts. **Codex** remains eligible on work Codex neither authored nor repaired.
+A **non-contributing Claude or Grok review session** may give independent acceptance,
+including for Codex-authored work; **Durban Poison** remains eligible when available.
+Exclude every author and repairer even after a task transfer. A shared GitHub identity
+alone does not establish independence: record session, role, contributor exclusions,
+full 40-character head SHA, complete scope, evidence and verdict.
+Chemdawg's existing merge gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
+protected or mixed scopes still need an eligible outside reviewer. Required CI and
+supplemental evidence, protected-file gates, holds, merge queue and founder-only
+production controls remain. Codex uses normal pushes only: no force-push, merge,
+Publish, SQL apply or production Supabase writes. Drafts remain draft.
+Check the existing request and receipt before pinging; keep one current review request
+per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
+state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record
+BLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence
+are not PASS. Preserve a still-valid independent review without a duplicate request.
 
 Record the acceptance seat, exact reviewed head and completed/NOT_MEASURED
 review state in the handoff.
@@ -63,9 +69,7 @@ when assigned):
 Grok      product intelligence, research, live-app audit, implement, test, independent review
   -> Claude    architecture / specs (and any peer power when holding the slice)
   -> Codex     build / integration (often; not exclusive) + peer powers when holding
-  -> Security  review trust boundaries, exposure, secrets, infrastructure risk
-  -> Gemini    independently audit quality, scope, evidence, safety, release readiness
-  -> Council   resolve disagreements, give Cheek one recommendation
+  -> QA        independently audit quality, scope, trust boundaries, evidence and safety
   -> Cheek     approve what ships
 ```
 
@@ -89,7 +93,12 @@ sentinel_version:
 date:
 
 task_id:
-independent_reviewer: the seat assigned under OWNERSHIP.md §4.3 (Blue Dream, Critical Mass, Durban Poison, or Codex — not on a PR Codex authored or repaired, for example #1938); Graft's exact-head PASS counts as the outside review on a docs-only or low-risk PR Graft did not author or repair
+independent_reviewer: actually available eligible session under OWNERSHIP.md §4.3; name session and role, not only GitHub identity
+contributor_exclusions: every author/repairer; Codex excluded on Codex-authored or repaired work
+review_head_sha: full 40-character SHA
+review_scope: complete changed scope and required supplemental evidence
+review_request: owner; permalink; requested/running/blocked/verdict/superseded; fallback transfer count
+review_verdict: PASS/PASS-with-P2/FAIL/BLOCKED/NOT_MEASURED, with evidence permalink
 claimed_by:
 last_updated:
 
@@ -121,18 +130,17 @@ files_touched:
 
 The current holder and acceptance reviewer must be independent; changing the claim
 does not erase earlier contributions. Record the reviewer actually assigned under
-`docs/agents/OWNERSHIP.md` §4.3 (Chemdawg's pre-check until the bot is live). Its
-defaults: Blue Dream for .tsx outside src/test/, any P1 or a publish gate; Critical
-Mass otherwise, unless load balancing moves that work to Blue Dream. Durban Poison may
-provide acceptance when independently assigned. Codex is an equal independent exact-head
-reviewer, except on a PR Codex authored or repaired (for example #1938). Graft's
-exact-head PASS counts as the outside review on a docs-only or low-risk PR Graft did
-not author or repair, when every file is on the OWNERSHIP.md allowlist, at that exact
-head. Migrations, payments or billing, `.github` workflows, security or auth, and
-dependency or lockfile changes still need Codex (not on a PR Codex authored or
-repaired), or Blue Dream, Critical Mass, or Durban Poison.
-Security/Gemini/Claude observations do not replace that acceptance. Name the
-exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
+`docs/agents/OWNERSHIP.md` §4.3 (Chemdawg's pre-check until the bot is live). Choose an actually available, eligible independent session
+for the complete scope: Codex on work Codex neither authored nor repaired, or a
+non-contributing Claude/Grok review session (including for Codex-authored work), or
+available Durban Poison. Graft retains only its existing low-risk allowlist; governance,
+protected and mixed scopes require an eligible outside reviewer. Keep all supplemental
+evidence and protected-file gates. QA observations alone are not acceptance.
+Use one current review request per PR/full head and check existing receipts before
+pinging. Record the request owner, permalink and state; transfer an unavailable reviewer
+once to an eligible fallback, otherwise BLOCKED. A new head supersedes the old request
+and invalidates its verdict. Preserve valid existing reviews. Routing, acknowledgments,
+pending requests and silence are not PASS. State NOT_MEASURED if unassigned.
 
 Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
 E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
@@ -178,8 +186,7 @@ finding. Do not expand the slice because you are already in the file.
 Return `STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE` when a required file is missing or
 instructions conflict.
 
-Conflicts between this protocol, a role file, and `AGENTS.md` resolve in that order:
-`AGENTS.md` wins, then the role file, then this protocol. Report the conflict; do not
-silently pick one.
+Conflicts follow `AGENTS.md` §0.1. Report the conflict; do not silently pick one.
 
-Only Cheek approves what ships. The Council Chair recommends; it does not release.
+Who may approve a ship is the founder seat in `docs/agents/constitution/roster.md`.
+The assigned QA reviewer reports evidence; it does not authorize release.

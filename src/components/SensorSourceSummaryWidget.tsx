@@ -141,7 +141,7 @@ export default function SensorSourceSummaryWidget({
         <div>
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
           <p className="text-[11px] text-muted-foreground">
-            {summary.total} {summary.total === 1 ? "reading" : "readings"} in range
+            {summary.total} {summary.total === 1 ? "reading" : "readings"} in this period
           </p>
         </div>
         <SensorSourceLegendTooltip testIdSuffix="summary" />

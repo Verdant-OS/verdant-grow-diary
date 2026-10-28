@@ -3,6 +3,7 @@ import type {
   ExpenseInputs,
   LightInputs,
   NutrientInputs,
+  NutrientMode,
 } from "./growHelpToolkitState";
 
 /**
@@ -118,7 +119,8 @@ export function lightFixturePpfReadiness(light: LightInputs): GrowHelpReadinessR
       missing.push("ppfPerFixture");
     }
   } else {
-    if (!isPresentNumber(light.actualWattsPerFixture) || light.actualWattsPerFixture < 0) {
+    // ppfEstimated requires strictly positive watts; 0 W cannot produce a PPF.
+    if (!isPresentNumber(light.actualWattsPerFixture) || light.actualWattsPerFixture <= 0) {
       missing.push("actualWattsPerFixture");
     }
     if (!isPresentNumber(light.efficacy) || light.efficacy <= 0) {
@@ -290,4 +292,49 @@ export function nutrientInjectorReadiness(nutrient: NutrientInputs): GrowHelpRea
 /** True only when the injector is on and its required planning inputs are complete. */
 export function shouldExportInjectorPlan(nutrient: NutrientInputs): boolean {
   return nutrient.injectorEnabled && nutrientInjectorReadiness(nutrient).ready;
+}
+
+export interface ReadyCalculation<T> {
+  value: T | null;
+  error: string | null;
+}
+
+/** Run a calculator only after its readiness gate is open. */
+export function calculateWhenReady<T>(ready: boolean, calculate: () => T): ReadyCalculation<T> {
+  if (!ready) return { value: null, error: null };
+  try {
+    return { value: calculate(), error: null };
+  } catch (error) {
+    return {
+      value: null,
+      error: error instanceof Error ? error.message : "Check the inputs.",
+    };
+  }
+}
+
+export function hasPositiveCanopyDimensions(light: LightInputs): boolean {
+  return lightCanopyDimensionsReadiness(light).ready;
+}
+
+export function hasCompleteFivePointReading(light: LightInputs): boolean {
+  const points = light.fivePoint;
+  return (
+    isPresentNumber(points.center) &&
+    isPresentNumber(points.frontLeft) &&
+    isPresentNumber(points.frontRight) &&
+    isPresentNumber(points.backLeft) &&
+    isPresentNumber(points.backRight)
+  );
+}
+
+export function isExpenseSummaryReady(expense: ExpenseInputs, cycle: CycleInputs): boolean {
+  return expenseSummaryReadiness(expense, cycle).ready;
+}
+
+/** Active nutrient mode only. Other modes' results do not count. */
+export function hasNutrientPrimaryResult(
+  mode: NutrientMode,
+  resultsByMode: Record<NutrientMode, boolean>,
+): boolean {
+  return resultsByMode[mode] === true;
 }

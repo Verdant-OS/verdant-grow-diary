@@ -21,6 +21,7 @@ import {
 } from "@/constants/csvValidationRanges";
 
 import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "../constants/sensorTiming";
+import { isSoilEcMscmRealistic, isSoilEcUnitMismatchSuspected } from "@/lib/sensorTruthRules";
 /** Default staleness threshold for "current" room confidence. */
 export { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS };
 /** Realistic VPD window for indoor grow rooms (kPa). */
@@ -41,6 +42,8 @@ export interface ManualSensorSnapshotInput {
   readonly soil_moisture_pct?: number | null;
   readonly soil_ec_mscm?: number | null;
   readonly ph?: number | null;
+  /** Reservoir / nutrient-solution EC in mS/cm (a Quick Log diary `ec`). */
+  readonly reservoir_ec_mscm?: number | null;
 }
 
 export interface ManualSensorSnapshotQuality {
@@ -140,6 +143,7 @@ export function evaluateManualSensorSnapshotQuality(
     input.soil_moisture_pct,
     input.soil_ec_mscm,
     input.ph,
+    input.reservoir_ec_mscm,
   ].some((value) => typeof value === "number" && Number.isFinite(value));
 
   if (!hasPresentMetric) {
@@ -192,6 +196,22 @@ export function evaluateManualSensorSnapshotQuality(
     } else if (input.soil_ec_mscm > EC_SUSPICIOUS_MSCM_MAX) {
       invalidFields.push("soil_ec_mscm");
       reasons.push("Soil EC value looks like µS/cm reported as mS/cm.");
+    }
+  }
+
+  if (input.reservoir_ec_mscm != null && Number.isFinite(input.reservoir_ec_mscm)) {
+    if (input.reservoir_ec_mscm < 0) {
+      invalidFields.push("reservoir_ec_mscm");
+      reasons.push("Reservoir EC cannot be negative.");
+    } else if (isSoilEcUnitMismatchSuspected(input.reservoir_ec_mscm)) {
+      invalidFields.push("reservoir_ec_mscm");
+      reasons.push("Reservoir EC value looks like µS/cm reported as mS/cm.");
+    } else if (!isSoilEcMscmRealistic(input.reservoir_ec_mscm)) {
+      // Same bounds as the history list and change-context deltas. The soil
+      // EC range (0–8 mS/cm, sensorTruthRanges) deliberately also covers
+      // nutrient solutions (roughly 0.4–3.0 mS/cm), so no separate reservoir bound.
+      invalidFields.push("reservoir_ec_mscm");
+      reasons.push("Reservoir EC is outside the realistic range.");
     }
   }
 
@@ -428,4 +448,74 @@ export function deriveCurrentSnapshotFromAiDoctorContext(
     captured_at: latestCapturedIso,
     ...(fields as ManualSensorSnapshotInput),
   };
+}
+
+/** Validation outcome a snapshot card already carries (manualSensorSnapshotRules). */
+export interface ManualSnapshotValidationSeverity {
+  readonly severity: "ok" | "warning" | "invalid";
+  readonly warnings: ReadonlyArray<string>;
+  readonly errors: ReadonlyArray<string>;
+}
+
+/**
+ * Fold the snapshot validator's verdict into a range-based quality result.
+ * The range evaluator only sees normalised values, so a value the validator
+ * flags (e.g. 45°F, warned as a likely °C/°F mismatch, is a range-valid
+ * 7.2°C) could otherwise read "Usable current reading" beside its own
+ * warning. Errors make the result invalid; warnings make a usable result
+ * need review. Either one removes current-room support. A worse existing
+ * result is never upgraded. Pure and deterministic.
+ */
+export function applySnapshotValidationSeverity(
+  evaluation: ManualSensorSnapshotQuality,
+  validation: ManualSnapshotValidationSeverity,
+  mode: "current" | "historical" = "current",
+): ManualSensorSnapshotQuality {
+  const hasErrors = validation.severity === "invalid" || validation.errors.length > 0;
+  const hasWarnings = validation.severity === "warning" || validation.warnings.length > 0;
+  if (!hasErrors && !hasWarnings) return evaluation;
+  const historical = mode === "historical";
+  if (hasErrors && (evaluation.quality === "usable" || evaluation.quality === "needs_review")) {
+    return {
+      ...evaluation,
+      quality: "invalid",
+      summary: historical ? "Historical invalid reading — review before use" : "Invalid reading",
+      reasons: [...validation.errors, ...evaluation.reasons],
+      canSupportAiDoctorCurrentContext: false,
+      canSupportActionSuggestionPreview: false,
+    };
+  }
+  if (evaluation.quality === "usable") {
+    return {
+      ...evaluation,
+      quality: "needs_review",
+      summary: historical ? "Historical reading needs review" : "Needs review",
+      reasons: [...validation.warnings, ...evaluation.reasons],
+      canSupportAiDoctorCurrentContext: false,
+      canSupportActionSuggestionPreview: false,
+    };
+  }
+  return {
+    ...evaluation,
+    canSupportAiDoctorCurrentContext: false,
+    canSupportActionSuggestionPreview: false,
+  };
+}
+
+/** Tolerated client clock skew for a snapshot stamped slightly in the future. */
+export const MANUAL_SNAPSHOT_FUTURE_SKEW_MS = 5 * 60_000;
+
+/**
+ * True when a manual snapshot is inside the current window: at most
+ * MANUAL_SNAPSHOT_CURRENT_STALE_HOURS old, and no more than five minutes in
+ * the future (client clock skew). An unparseable timestamp is never current.
+ */
+export function isManualSnapshotCurrent(capturedAt: string, nowMs: number): boolean {
+  const capturedMs = Date.parse(capturedAt);
+  if (!Number.isFinite(capturedMs) || !Number.isFinite(nowMs)) return false;
+  const ageMs = nowMs - capturedMs;
+  return (
+    ageMs >= -MANUAL_SNAPSHOT_FUTURE_SKEW_MS &&
+    ageMs <= MANUAL_SNAPSHOT_CURRENT_STALE_HOURS * 3_600_000
+  );
 }

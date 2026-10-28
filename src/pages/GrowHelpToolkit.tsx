@@ -117,13 +117,13 @@ export default function GrowHelpToolkit() {
       className="min-h-screen min-w-0 bg-background text-foreground"
     >
       <header className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 px-3 py-1.5">
             <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5 text-primary" />
-            No account · no analytics · no upload
+            No account · grow inputs stay local · no grow-data upload
           </span>
           <span
             className="rounded-full border border-border/70 px-3 py-1.5"

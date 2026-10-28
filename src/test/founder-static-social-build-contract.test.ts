@@ -18,14 +18,16 @@ describe("Founder static social document build contract", () => {
     );
     expect(VITE).toContain("tanstackStart");
     expect(VITE).toContain('server: { entry: "server" }');
-    expect(STATIC_PUBLIC_SEO_DOCUMENTS.some((document) => document.path === "/founder")).toBe(true);
+    expect(STATIC_PUBLIC_SEO_DOCUMENTS.some((document) => document.path === "/founder")).toBe(
+      false,
+    );
   });
 
-  it("uses a filesystem-first static entry for /founder before the SPA fallback", () => {
+  it("does not publish a static Founder sales document", () => {
     expect(VERCEL.cleanUrls).toBe(true);
     expect(
-      STATIC_PUBLIC_SEO_DOCUMENTS.find((document) => document.path === "/founder")?.fileName,
-    ).toBe("founder/index.html");
+      STATIC_PUBLIC_SEO_DOCUMENTS.find((document) => document.path === "/founder"),
+    ).toBeUndefined();
     expect(VERCEL.rewrites?.[0]).toEqual({
       source: "/((?!assets/|~oauth).*)",
       destination: "/",

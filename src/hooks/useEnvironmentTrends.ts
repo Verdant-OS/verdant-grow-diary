@@ -12,6 +12,7 @@
  * No external-control surface. No elevated keys. RLS enforces ownership.
  */
 import { useQuery } from "@tanstack/react-query";
+import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
@@ -54,67 +55,72 @@ export function useEnvironmentTrends(
     ],
     enabled: !!user && !!growId,
     retry: false,
-    queryFn: async () => {
-      if (!user || !growId) return EMPTY_TRENDS;
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      let sensorReadFailed = false;
-      if (tentIds.length > 0) {
-        try {
-          // Keep the current window first, then the established historical
-          // fallback only after a successfully completed empty window read.
-          for (const limit of [500, 60]) {
-            let readingsQuery = effectiveSensorReadingsQuery()
-              .select("*")
-              .in("tent_id", tentIds)
-              .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"]);
-            if (limit === 500) {
-              readingsQuery = readingsQuery.or(
-                `captured_at.gte.${since},and(captured_at.is.null,ts.gte.${since})`,
-              );
+    queryFn: () =>
+      withCriticalReadDeadline(
+        (async () => {
+          if (!user || !growId) return EMPTY_TRENDS;
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          let sensorReadFailed = false;
+          if (tentIds.length > 0) {
+            try {
+              // Keep the current window first, then the established historical
+              // fallback only after a successfully completed empty window read.
+              for (const limit of [500, 60]) {
+                let readingsQuery = effectiveSensorReadingsQuery()
+                  .select("*")
+                  .in("tent_id", tentIds)
+                  .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"]);
+                if (limit === 500) {
+                  readingsQuery = readingsQuery.or(
+                    `captured_at.gte.${since},and(captured_at.is.null,ts.gte.${since})`,
+                  );
+                }
+                const { data, error } = await readingsQuery
+                  .order("captured_at", { ascending: false, nullsFirst: false })
+                  .order("ts", { ascending: false })
+                  .limit(limit);
+                if (error) throw error;
+                const readings = requireEffectiveSensorReadings(data);
+                const samples = samplesFromReadings(
+                  readings.map((r) => ({
+                    ts: r.ts,
+                    captured_at: r.captured_at,
+                    metric: r.metric,
+                    value: r.value,
+                    source: r.source,
+                    tent_id: r.tent_id,
+                    raw_payload: r.raw_payload,
+                  })),
+                );
+                if (samples.length > 0) return computeEnvironmentTrends(selectWindow(samples));
+                if (readings.length > 0) break;
+              }
+            } catch {
+              sensorReadFailed = true;
             }
-            const { data, error } = await readingsQuery
-              .order("captured_at", { ascending: false, nullsFirst: false })
-              .order("ts", { ascending: false })
-              .limit(limit);
-            if (error) throw error;
-            const readings = requireEffectiveSensorReadings(data);
-            const samples = samplesFromReadings(
-              readings.map((r) => ({
-                ts: r.ts,
-                captured_at: r.captured_at,
-                metric: r.metric,
-                value: r.value,
-                source: r.source,
-                tent_id: r.tent_id,
-                raw_payload: r.raw_payload,
-              })),
-            );
-            if (samples.length > 0) return computeEnvironmentTrends(selectWindow(samples));
-            if (readings.length > 0) break;
           }
-        } catch {
-          sensorReadFailed = true;
-        }
-      }
-      const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
-        (withRetractionFilter) => {
-          let query = supabase.from("diary_entries").select("entry_at,details,tent_id");
-          if (withRetractionFilter) query = query.is("retracted_at", null);
-          return query.eq("grow_id", growId).order("entry_at", { ascending: false }).limit(50);
-        },
-      );
-      if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
-      const scopedDiaryRows = diaryRows.filter((r) => isDiaryRowInTentScope(r.tent_id, tentIds));
-      const diarySamples = samplesFromDiary(
-        scopedDiaryRows.map((r) => ({
-          entry_at: r.entry_at,
-          details: r.details as Record<string, unknown> | null | undefined,
-        })),
-      );
-      const trends = computeEnvironmentTrends(selectWindow(diarySamples));
-      if (sensorReadFailed && trends.count === 0) throw new Error("unavailable");
-      return trends;
-    },
+          const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
+            (withRetractionFilter) => {
+              let query = supabase.from("diary_entries").select("entry_at,details,tent_id");
+              if (withRetractionFilter) query = query.is("retracted_at", null);
+              return query.eq("grow_id", growId).order("entry_at", { ascending: false }).limit(50);
+            },
+          );
+          if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
+          const scopedDiaryRows = diaryRows.filter((r) =>
+            isDiaryRowInTentScope(r.tent_id, tentIds),
+          );
+          const diarySamples = samplesFromDiary(
+            scopedDiaryRows.map((r) => ({
+              entry_at: r.entry_at,
+              details: r.details as Record<string, unknown> | null | undefined,
+            })),
+          );
+          const trends = computeEnvironmentTrends(selectWindow(diarySamples));
+          if (sensorReadFailed && trends.count === 0) throw new Error("unavailable");
+          return trends;
+        })(),
+      ),
   });
   if (!user || !growId) return { status: "idle", trends: EMPTY_TRENDS };
   // Withhold a cached trend while its correction refresh is pending or paused.

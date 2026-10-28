@@ -41,7 +41,7 @@ function renderPublicPage(testCase: PublicPageCase) {
     <MemoryRouter initialEntries={[testCase.path]}>
       <Routes>
         <Route path={testCase.path} element={testCase.page} />
-        <Route path="/welcome" element={<p data-testid="recovered-home">Verdant home</p>} />
+        <Route path="/" element={<p data-testid="recovered-home">Verdant home</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -59,7 +59,7 @@ describe("standalone public page recovery navigation", () => {
       const terms = within(recovery).getByRole("link", { name: "Terms" });
       const privacy = within(recovery).getByRole("link", { name: "Privacy" });
 
-      expect(home).toHaveAttribute("href", "/welcome");
+      expect(home).toHaveAttribute("href", "/");
       expect(terms).toHaveAttribute("href", "/terms");
       expect(privacy).toHaveAttribute("href", "/privacy");
 

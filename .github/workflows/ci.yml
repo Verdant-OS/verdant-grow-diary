@@ -103,6 +103,7 @@ jobs:
         run: node scripts/notify-edge-shared-drift.mjs
 
   test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Lint, typecheck, test, build
     needs: edge-shared-sync-preflight
     runs-on: ubuntu-latest
@@ -718,6 +719,7 @@ jobs:
   # `fail-fast: false` so one shard failing still reports the others.
   # See docs/testing/ci-full-suite-shards.md.
   full-suite:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Full test suite (shard ${{ matrix.shard }}/32)
     runs-on: ubuntu-latest
     # Matrix shard N covers vitest partitions (8N-7)..(8N) of 256 (eight
@@ -730,6 +732,13 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      # GitHub Team allows 60 concurrent Linux jobs. One ready PR or
+      # merge-queue run must not request all 32 shards at once. Keep all 32
+      # required context names and run at most 16 of this matrix together.
+      # Measured 2026-10-27 on deploy run 40461983713 (head 36b7204faab3):
+      # 32/32 shards, runner time min 91s, median 130s, max 160s. Sixteen at
+      # a time is two short waves and leaves room in the 60-job pool.
+      max-parallel: 16
       matrix:
         shard:
           [
@@ -801,3 +810,43 @@ jobs:
             echo "Running sub-shard ${n}/256 for gate shard ${{ matrix.shard }}/32"
             bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
           done
+
+  quicklog-correction-measured-values:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    name: Quick Log correction measured values
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: verdant-runtime-only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Prove measured corrections and the owner fence
+        run: |
+          node scripts/prove-quicklog-correction-measured-values.mjs
+          node scripts/prove-quicklog-correction-owner-fence.mjs

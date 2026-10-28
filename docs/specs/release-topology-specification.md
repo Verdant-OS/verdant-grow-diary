@@ -10,11 +10,16 @@ files) — Cheek, 2026-09-25. Which seat satisfies peer review is Cheek's decisi
 2026-09-26 for Vercel Rolling Releases (§2.5); amended 2026-10-06 for the blocked publisher account
 and a third build integration (§2.6); evidence-status and hosting-timeline note 2026-10-07 (§2.7, Appendix E); review follow-up
 2026-10-08 (§2.8); review follow-up 2026-10-13 (§2.9); Worker host-routing amendment 2026-10-14
-(§2.10)
+(§2.10); source re-verification at the deploy tip 2026-10-27 (§2.11, §6.3)
 **Slice:** Authoritative Release Topology Specification — docs-only, the second slice of the
 architecture-contract work, sequenced after `#1221` merged (`cb6c3288`, 2026-09-25 00:12 UTC).
 First opened as `#1699`; carried forward on `claude/clever-davinci-hk7o03` after its owning session
 was archived (§2.4)
+**Hosting note (2026-10-10, Matthew Cheek):** production runs on Cloudflare Workers at
+https://verdantgrowdiary.com. Vercel and Lovable measurements in this specification are
+dated records of earlier hosts. Release evidence is live `/version.json`. The Vercel
+"Account is blocked." status is an owner-side account issue. Do not investigate it.
+
 **Status:** **Specification with a measured baseline, one measured incident and one measured
 change of promotion path.** §§3–9 are durable: the topology model, the rules, and the measurement
 procedures. Appendix A is the founding measurement, Appendix B the promotion incident that followed
@@ -38,7 +43,12 @@ of the PR branches' GitHub check runs from 21:12 to 21:20 UTC (Appendix D, D.3),
 03:37:39–03:39:56 UTC read of the 104 first-parent tips between C.6 and 2026-10-02 (D.5).
 **Amended a fourth time** at deploy tip `3700d1eea14ee480c288d2924a15987f21473e92` (the `#1873`
 squash, 2026-10-14) for the Worker host-routing changes (§2.10): its new cites were read from
-source at that SHA. No live, DNS or platform read was taken for it.
+source at that SHA. No live, DNS or platform read was taken for it. **Amended a fifth time** at
+deploy tip `27991451a756d2521df08e26e504776a43c7bbb8` (the `#2283` squash, 2026-10-27) for source
+re-verification (§2.11): every `path:line` cite in §§3–5, §8, §9 and §12 was checked against that
+tree and re-pointed where its line moved, and the fourteen §6.1 conclusions were re-read from
+source there (§6.3). Live, DNS and platform reads were `BLOCKED` from that session on every
+route it had (§2.11); nothing about what the apex serves is asserted from it.
 
 Every claim carries a Sentinel label: `established fact`, `source claim`, `practical observation`,
 `inference`, `uncertainty`, `missing evidence`. Every topology check carries one status from the
@@ -534,6 +544,70 @@ review) adds
 document, so this amendment leaves §2.9 untouched. `#1878` edits the architecture contract, not
 this file.
 
+### 2.11 Source re-verification at the deploy tip — 2026-10-27
+
+This amendment re-reads the document against deploy tip `27991451a756d2521df08e26e504776a43c7bbb8` (`#2283`),
+174 first-parent merges after the contract's `c8523adc` stamp and 13 days after §2.10's
+`3700d1ee`. It is the second slice of the assignment that restamped the architecture contract
+at the same tip (`#2564`, `docs/architecture-contract.md` §15.1, 2026-10-27). It adds no
+appendix: no live, DNS or platform read was possible.
+
+**What was checked** (`established fact`, `git show` at `27991451`):
+
+- Every `path:line` cite in the durable sections (§§3–5, §8, §9, §12) was compared, by line text,
+  against the tree it was dated to and against `27991451`, with a session script that relocates a
+  moved line by its earlier text. Dated sections (§2.4–§2.10, §6.1, §6.2, the appendices) keep
+  the cites of the tree they name; they are history, not current pointers.
+- Re-pointed in this amendment: `package.json:225` → `:226` (`sb:functions:deploy`, §5.3);
+  `scripts/lib/tree-hash.mjs:43-70` → `:43-66` (§5.2); `quicklog-smoke.yml` trigger cites
+  (§5.5) to the lines at `27991451`; `docs/codebase-map.md:419-423` → `:419-426` (§5.4). Every other
+  durable cite holds: `package.json:9`, `:12-13`, `:21-22`, `:102`; `scripts/stamp-version.mjs`
+  (unchanged since §2.6); `apply-pinned-production-migrations.yml:4`, `:59`, `:73`, `:94-95`,
+  `:113`; `quicklog-smoke.yml:485`; `seo-monitoring.yml:23-26`; `lighthouse-ci.yml:13-17`;
+  `Makefile:77`; `supabase/config.toml:1`.
+- The deploy-command re-grep of §5.3, repeated at `27991451` over `.github/workflows/` for
+  `supabase functions deploy`, `supabase db push`, `supabase link`, `vercel deploy`,
+  `vercel --prod`, `wrangler deploy` and `wrangler publish`: three hits, all comment or quoted
+  instruction text (`mcp-local-rls-integration.yml:11-12`, `required-money-migrations.yml:137`).
+  Nine workflows install the Supabase CLI; none runs a remote command. No `wrangler.*` file is
+  tracked and `package.json` carries no `wrangler` script, so the repository still shows no
+  Workers deploy path (D-RT-8 holds; the deployer stays `NOT_MEASURED`).
+- The operator apply paths of §5.4: eleven `apply-*.yml` workflows at `27991451`, the same eleven
+  §5.4 lists. `#2538` added `served-build-monotonic.yml` (every 30 minutes and on dispatch): it
+  reads the public `/version.json` and git ancestry and is a live-host signal under D-RT-10, never
+  a gate. `#2555` added a draft guard and `max-parallel: 16` to `ci.yml`'s required shard matrix;
+  the 35 required context names and `config/required-status-checks.json` are unchanged.
+- `src/lib/cloudflareHostRoutingRules.ts` moved its `/welcome`, `/features` and `/demo`
+  aliases to `/` (`#2023`; `:55-63`), and `src/lib/appRouteManifest.ts` now declares `/welcome`
+  as a redirect. §2.10's cites into that file are dated at `3700d1ee` and are left as written;
+  the current lines for the rules §2.10 names are `:32-38` (global headers), `:40-44`
+  (`/unsubscribe`), `:46` (asset cache), `:55-63` (exact aliases), `:147` (`oauthLocation`),
+  `:168` (`strainSlugLocation`), `:110` (report-only CSP on every shaped response; header name
+  now `src/lib/securityHeadersRules.ts:44`), `:252-263` (`healthResponseFor`), `:265-282`
+  (`redirectResponseFor`) and `:284-300` (`withHostHeaders`). The SSR entry's order is unchanged:
+  redirect, then health, then the app, every non-redirect response through `withHostHeaders`
+  (`src/server.ts:55-68`).
+
+**What could not be checked** (`BLOCKED`, 2026-10-27 22:20–22:40 UTC): M1, M2's DNS read and M7.
+The session's container proxy refuses `verdantgrowdiary.com`, its fetch tool cannot resolve the
+host, and the external fetcher it holds had no credits. One attempt each, nothing routed around.
+What the apex serves, which layer answers a redirect, and whether the served revision carries
+`#1937` and `#1939` stay as the last dated reads in `docs/agents/CURRENT_STATE.md`. This
+document asserts nothing new about production.
+
+**Changed in this amendment:** the header, this section, the §5 re-cites above, §6.3 (the
+fourteen conclusions re-read from source at `27991451`, superseding §6.1's dated verdicts for rows 4
+and 5), one §10 row, one §12 follow-up, one §13 bullet, AT-18 and §15.4. §§3–4, §7, §8, D-RT-1–15,
+M1–M11, the appendices and §6.1–§6.2 stay as dated.
+
+**Collision audit** (`established fact`, GitHub API, 2026-10-27 21:50–22:25 UTC): 105 open PRs
+against `verdant-grow-diary` read over two pages. None edits this document. `#1904` (Cloudflare
+Workers migration plan) adds `docs/release/cloudflare-workers-migration-plan.md` only; `#1972`
+adds `docs/release/vercel-config-removal-inventory-2026-10-10.md` only, and names this document
+as a cleanup candidate that needs Matthew's per-item yes, which this amendment does not take.
+`#2221` (Paddle wire normalisation) touches `payments-webhook` only. `#2555`, `#2553`, `#1971` and
+`#2538`, which the owner named as gates for this slice, merged on 2026-10-27 before it started.
+
 ---
 
 ## 3. The topology model — six axes, one owner each
@@ -716,7 +790,7 @@ side needs no platform access, which is why M5 now starts there.
   at `e1d541e2` (founding count; the amendment's clone is shallow and did not re-count it).
   That is expected: the file is overwritten inside the publisher's build, and its committed copy
   surfaces only as `inherited` (`trusted: false`) when a build has no git identity.
-- `treeHash` covers `TREE_HASH_ROOTS` (`scripts/lib/tree-hash.mjs:43-70`): `src`, `public`,
+- `treeHash` covers `TREE_HASH_ROOTS` (`scripts/lib/tree-hash.mjs:43-66`): `src`, `public`,
   `supabase`, `scripts`, `config`, the four committed env files, `index.html`, `package.json`, both
   lockfiles, `vite.config.ts`, the tsconfigs, `tailwind.config.ts`, `postcss.config.js`,
   `components.json` and `eslint.config.js`. Docs, `e2e/`, and `.github/` do not move it, so one
@@ -734,7 +808,7 @@ side needs no platform access, which is why M5 now starts there.
   `required-money-migrations.yml:133,210` (`:124,201` at `c9bc1df3`). Eight workflows install the Supabase CLI at `cfe09322`
   (`supabase/setup-cli`), and all eight drive disposable local or replay stacks only; none runs
   `link`, `db push`, `functions deploy` or `--project-ref`. `established fact`.
-- `package.json:21-22` and `:225` carry `deploy:functions`, `deploy:functions:all` and
+- `package.json:21-22` and `:226` carry `deploy:functions`, `deploy:functions:all` and
   `sb:functions:deploy` (`supabase functions deploy`); `Makefile:77` carries `functions-deploy`
   with a help comment ("production deployer: docs/agents/CURRENT_STATE.md" since `#1728`; "Lovable
   does this automatically" before it). The comment is comment text (contract §9).
@@ -774,7 +848,7 @@ integrity` gate compares SHA-256 against the base and is not a required context 
   (`:113`). `migration-drift-probe.yml` is the read-only counterpart (`workflow_dispatch`,
   environment `verdant-production`, `psql`). `supabase/config.toml:1` pins the same project ref.
 - Lovable authors migrations under its own naming (157 UUID-slug exports in the ledger per
-  `docs/codebase-map.md:419-423`) and, as a `source claim`, applies what it authors through its
+  `docs/codebase-map.md:419-426`) and, as a `source claim`, applies what it authors through its
   Cloud. Nothing in this repository shows that path.
 - Applied state on production is a `docs/agents/CURRENT_STATE.md` axis (contract AC-9.3) and stays
   `NOT_MEASURED` here; through this session's Supabase tool it is `BLOCKED` (sandbox only). The
@@ -784,7 +858,7 @@ integrity` gate compares SHA-256 against the base and is not a required context 
 
 | Workflow             | Trigger at the tip                                                                                                                                                                                                                                                                   | What it can say                                                                                                                                                                                                                                                                                                                                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `quicklog-smoke.yml` | `push`/`pull_request` on `verdant-grow-diary`, path-filtered to `e2e/**`, `playwright.config.ts`, `scripts/check-playwright-failure-media.mjs` and itself (`:101-114`); a daily cron at 09:17 UTC (`:115-117`, `#1861`); dispatch (`:57`). A `pull_request` run precedes publication | Authenticated smoke against `vars.E2E_BASE_URL`, which is now pinned: the file documents it as `https://verdantgrowdiary.com` only (`:27`), and its `quicklog-smoke` job (`:479`) refuses any other host (`:585-590`). The `one_tent_proof` dispatch sets the same host (`:142`). It probes whatever the apex serves, so it is a live-host signal like the two rows below. `blocked` without owner credentials |
+| `quicklog-smoke.yml` | `push`/`pull_request` on `verdant-grow-diary`, path-filtered to `e2e/**`, `playwright.config.ts`, `scripts/check-playwright-failure-media.mjs` and itself (`:102-114`); a daily cron at 09:17 UTC (`:117-118`, `#1861`); dispatch (`:57`). A `pull_request` run precedes publication | Authenticated smoke against `vars.E2E_BASE_URL`, which is now pinned: the file documents it as `https://verdantgrowdiary.com` only (`:27`), and its `quicklog-smoke` job (`:479`) refuses any other host (`:585-590`). The `one_tent_proof` dispatch sets the same host (`:142`). It probes whatever the apex serves, so it is a live-host signal like the two rows below. `blocked` without owner credentials |
 | `seo-monitoring.yml` | `workflow_run` after `ci` on `verdant-grow-diary` (`:23-26`); dispatch                                                                                                                                                                                                               | Public-surface probes of `verdantgrowdiary.com`, timed by `ci`, not by the publisher — the host may lag the tip (§5.7)                                                                                                                                                                                                                                                                                         |
 | `lighthouse-ci.yml`  | daily `cron`, dispatch (`:13-17`)                                                                                                                                                                                                                                                    | Performance of the live host, not of a commit                                                                                                                                                                                                                                                                                                                                                                  |
 | `test:legal-seo`     | required context; Vitest over source (`package.json:102`)                                                                                                                                                                                                                            | Nothing about production — the Playwright probe is `test:legal-seo:e2e`, not required                                                                                                                                                                                                                                                                                                                          |
@@ -967,6 +1041,31 @@ not on source, and cite those instead.
 | `.github/workflows/lighthouse-ci.yml:4-6`                       | "Verdant publishes locally from Windows"                                                                                   | `FAIL`         | Stale comment, found at the amendment. Contradicted by §4 and Appendix B. **Fixed in `#1728`** (`376ea7c6`): "the publisher of the surface is operating state (docs/agents/CURRENT_STATE.md)"                                                                                                                                                                                    |
 | `.github/workflows/auto-tag-release.yml:86-87`                  | "Production builds may lack git context (history-less Lovable snapshots …)"                                                | `NOT_MEASURED` | Dated, found at the amendment. It hedges ("may lack") about the Lovable path, whose builds are not measured; the measured Vercel builds carry git identity (A.1). Tagging is unaffected. **Fixed in `#1728`** (`376ea7c6`): "a history-less publisher snapshot"                                                                                                                  |
 | `docs/agents/CURRENT_STATE.md:186`                              | "Release Topology Specification stays deferred: `#1175` and `#1221` are both still open"                                   | `FAIL`         | Stale: `#1221` merged and this document exists. **Handed to `#1696`'s owner** (§15); not edited here                                                                                                                                                                                                                                                                             |
+
+### 6.3 The evaluation's conclusions re-read from source at `27991451` — 2026-10-27
+
+§6.1 stays as the dated verdicts at `c9bc1df3`. This table is the same fourteen rows read again
+at `27991451a756d2521df08e26e504776a43c7bbb8`. Rows 1–10 are source claims about the repository and
+were re-read in that tree; rows 11–14 are production assertions and rest on the last dated
+measurement, which this session could not repeat (§2.11), so they carry no new status. Two
+source rows change verdict.
+
+| #   | Conclusion                                                                                                  | Status at `27991451`             | Evidence at `27991451`                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | TanStack Start SSR, TanStack Router, Vite, Nitro                                                            | `PASS`                           | `src/server.ts:20` (Start server entry), `src/start.ts:28` (`createStart`), `src/router.tsx:2` (`createRouter`); `package.json:378-379` (Router `^1.170.41`, Start `^1.168.60`), `:440` (`nitro` `3.0.260603-beta`), `:445` (`vite` `^8.3.3`); resolved `bun.lock:753` Start 1.168.60, `:751` Router 1.170.41, `:2057` Vite 8.3.4, `:1661` Nitro. Nitro reaches the build through the Lovable preset (`vite.config.ts:1-5`, server entry `:31-35`)    |
+| 2   | React 19, Tailwind 4, shadcn/Radix, TanStack Query current                                                  | `PASS`                           | `package.json:393,395` React `^19.2.0` → `bun.lock:1787,1791` 19.2.8; `package.json:401,376` Tailwind `^4.2.1` → `bun.lock:1955,733` 4.3.3; `src/styles.css:1` CSS-first import; `components.json:3` `new-york`; 27 direct `@radix-ui/*` dependencies; `package.json:377` Query `^5.101.1` → `bun.lock:749` 5.101.4. Validation moved from `zod` 3 to 4 (`package.json:406` `^4.6.6`, `bun.lock:2123` 4.6.7; `#2505`), recorded in contract AC-1.8    |
+| 3   | Supabase Postgres, Auth, RLS, RPC and Edge Functions current                                                | `PASS` in source                 | `package.json:375` → `bun.lock:699` supabase-js 2.111.0; `src/integrations/supabase/client.ts:6,3` (client, `sessionStorage`); 34 function directories besides `_shared`; 301 migrations, 95 of them enabling RLS (case-insensitive match; six added since `c8523adc`, none cited); `src/hooks/useHasRole.ts:35` (`.rpc("has_role"`); `supabase/config.toml:1` project ref. Applied schema and deployed functions stay `NOT_MEASURED` (§5.3, §5.4)    |
+| 4   | Bun canonical; npm compatibility may remain                                                                 | **`FAIL` for the second clause** | `bun.lock:2` present, no `bun.lockb`, **no `package-lock.json`**: `#1873` retired it on 2026-10-04 and `scripts/check-bun-lockfile-policy.mjs:75-80` (`FORBIDDEN_LOCKFILES`) rejects it, gated by `src/test/check-bun-lockfile-policy.test.ts`. "npm compatibility may remain" was true at `c9bc1df3` and is false now. Contract AC-8.1 is the current clause                                                                                         |
+| 5   | AI Doctor inference through the Lovable AI gateway                                                          | **`FAIL`**                       | `supabase/functions/ai-doctor-review/index.ts:103` resolves `lookupGeminiDirectRoute(FEATURE, MODEL_TIER)`; `:107` `GATEWAY_URL = doctorRoute.url`, a Google Generative Language endpoint (`supabase/functions/_shared/geminiDirectChat.ts:21`); `:611` `fetch(GATEWAY_URL, …)`; `:10` `GEMINI_API_KEY` server-only. The Lovable gateway path §6.1 cited is gone (`#2070`-era change; contract AC-5.1). Which build production runs is `NOT_MEASURED` |
+| 6   | Server-pinned model selection                                                                               | `PASS`                           | `:101-102` (`FEATURE`, `MODEL_TIER` constants), `:108` (`MODEL`, the recorded id), `:109` (`WIRE_MODEL`, the native id, sent at `:215` and by `geminiDirectChat.ts:108`), `:345` (user from `auth.getUser()`), `:13` (the server-side rule). The pinned values are dated evidence; the invariant is contract AC-5.2                                                                                                                                   |
+| 7   | Validated tool output, credit and idempotency controls, evidence receipts, no Action Queue or device writes | `PASS`                           | Forced tool `:604-608` (`tool_choice`); `JSON.parse` `:675`, `validateAiDoctorReviewResult` `:681`; `ai_credit_spend` `:475` with `p_idempotency_key` `:481`, refund `:498`; `ai_doctor_finalize_review` `:695`. Prohibition `:6-9`. `action_queue`, `device` and `sensor_readings` occur only in the `:8-9` comment; no `.insert(` in the file; the one `.from(` is a receipt read. Contract AC-5.3–5.5, 5.8 (re-read by `#2149`)                    |
+| 8   | Canonical sources `live/manual/csv/demo/stale/invalid`; vendor and transport are provenance                 | `PASS`, two known limits         | `src/lib/sensor/sensorSourceRules.ts:16` (`SENSOR_SOURCES`), `:45` (unknown → `invalid`); `src/constants/sensorIngestProvenance.ts:15,26`; webhook folds the transport label into `raw_payload` (`sensor-ingest-webhook/storageMapping.ts:82-86`). Limits unchanged: `pi_bridge` → `live` (`sensorSourceRules.ts:28`, AC-4.4) and the generic webhook's unknown-label mapping (AC-4.2)                                                                |
+| 9   | VPD EWMA exists                                                                                             | `PASS`                           | `src/lib/vpdDriftRules.ts:56` (α `0.3`), `:57` (minimum 6 readings), `:64-65` (out-of-range α falls back), `:86` (the recurrence). α is documented, not test-pinned (contract AC-10.1, T6)                                                                                                                                                                                                                                                            |
+| 10  | Modified Z-Score / MAD and Nelson Rules not implemented                                                     | `PASS`                           | Case-insensitive grep at `27991451` over `src/`, `supabase/`, `scripts/`, `e2e/`, `tools/`, `plugins/` and `spikes/`: zero hits for each of `nelson`, `modified z`, `modifiedZ`, `median absolute deviation`, `\bMAD\b`, `z-?score`, `zscore`, `robust ?z` (contract AC-10.2, same result)                                                                                                                                                            |
+| 11  | Lovable Cloud is the production publisher                                                                   | `NOT_MEASURED` here              | No platform read this amendment. Last dated status: `FAIL` (§6.1, Appendix A); the 2026-10-10 hosting note names Cloudflare Workers; the measured publisher is a `docs/agents/CURRENT_STATE.md` axis                                                                                                                                                                                                                                                  |
+| 12  | `vercel.json` is inert in production                                                                        | `NOT_MEASURED` here              | No M7 read this amendment. Source at `27991451`: the same aliases and headers now also ship in the SSR entry and `public/_headers` (§2.10), so a `308` alone no longer attributes the layer                                                                                                                                                                                                                                                           |
+| 13  | The Nitro build target is Cloudflare, therefore production is served on Cloudflare                          | `FAIL` as an inference           | Unchanged rule: contract §14 and D-RT-3. The preset still defaults Nitro to `cloudflare-module` (`vite.config.ts:4`, `source claim` for the package); the serving host is measured, never derived                                                                                                                                                                                                                                                     |
+| 14  | A merge to the deploy branch goes live                                                                      | `NOT_MEASURED` here              | No M10 read this amendment. The rule stands (D-RT-12, §5.7): a merge is not a promotion. The only new repository signal is `served-build-monotonic.yml` (`#2538`), a read-only comparison of the served `/version.json` with git ancestry, which is a signal under D-RT-10, not a gate                                                                                                                                                                |
 
 ---
 
@@ -1211,6 +1310,7 @@ candidate follow-up, §14).
 | AT-15 | Rolling Releases is present end to end: path 5 in §5.7 and the §3 diagram, D-RT-12's in-flight clause, D-RT-13's rolling-release actions, M10's rollout-first read, M11's `project-rolling-release-*` events, and the §10 rows it opens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `PASS` (by reading)                                                                                                                                                                                                     |
 | AT-16 | The blocked account, the third build integration and the `Supabase Preview` candidate (D.5) are present end to end: §1, §2.6, the §3 diagram, §4.1's rows, D-RT-4's build-integration sentence, D-RT-15, M4's account-state cause, M5's GitHub-side inventory, the §10 rows, the §12 follow-ups and Appendix D                                                                                                                                                                                                                                                                                                                                                                                                             | `PASS` (by reading)                                                                                                                                                                                                     |
 | AT-17 | Worker host-routing is present end to end: the §1 `vercel.json` bullet, §2.10, D-RT-5's host-layer sentence, M7's attribution and unmatched-path probe with their served-revision prerequisites (verified `#1937` CSP wiring for redirect/asset attribution and a verified `#1939` catch-all for unmatched paths, plus per-response immutable deployment/commit binding with opening/closing stability and complete event coverage; older or unknown builds, drift or unverifiable bindings stay `NOT_MEASURED`), the three §10 rows it opens, the §12 follow-up and §15.3. Every repository `path:line` cite in §2.10 resolves at `3700d1ee`; the preset package cite is a labelled `source claim`, not a resolvable cite | `PASS` (by reading) for the repository cites; the package cite stays a `source claim`                                                                                                                                   |
+| AT-18 | The 2026-10-27 re-verification is present end to end: the header's fifth amendment, §2.11, the §5 re-cites it lists, §6.3 (fourteen rows, rows 4 and 5 `FAIL`, rows 11–14 `NOT_MEASURED` here), the §10 `BLOCKED` row, the §12 follow-up, the §13 bullet and §15.4; every new `path:line` cite resolves at `27991451a756d2521df08e26e504776a43c7bbb8`                                                                                                                                                                                                                                                                                                                                                                      |
 
 ---
 
@@ -1251,6 +1351,7 @@ Stated so nobody reads silence as agreement.
 | **What the `Supabase Preview` integration is linked to, and whether it can apply migrations or deploy edge functions**                           | `BLOCKED`                   | A read of the Supabase project's GitHub integration settings (linked project, branching, what runs on push or merge) by the owner; recorded in `CURRENT_STATE.md` under the production database lock                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **When the Vercel account block began, and its cause**                                                                                           | `NOT_MEASURED`              | The first tip carrying `Account is blocked.` is `5fbaa96b` at 2026-10-01 03:42:34 UTC (D.2); that dates the status, not the block. The owner's billing record                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **Whether `verdant-grow-diary.vercel.app` was retired**                                                                                          | `NOT_MEASURED`              | `get_deployment` returned `404` at 21:02 UTC (D.4), and the project now lists two other `*.vercel.app` aliases. Under M10's inventory rule it stays in the inventory until the owner records its retirement in `CURRENT_STATE.md` and a read confirms it                                                                                                                                                                                                                                                                                                                                                                                               |
+| What the apex served, and which layer answered, at `27991451` (2026-10-27)                                                                       | `BLOCKED`                   | M1, M2 and M7 from a session whose egress reaches the apex; the 2026-10-27 session had none (§2.11)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -1323,6 +1424,7 @@ Owners are Cheek's to assign; each needs an independent reviewer.
 | M1, M2's DNS reads and M7 from a session whose egress reaches the apex and a resolver                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Any session with that egress; this one has neither (D.1)                                                                                                                                                                                                                                                                                                                                                      |
 | M7 with attribution and the unmatched-path probe (§2.10), at the next stamp whose egress reaches the apex; record the layer behind each redirect in `CURRENT_STATE.md`; verify the same-host served revision includes active `#1937` CSP wiring before layer attribution and the `#1939` catch-all before interpreting the unmatched-path response; bind each actual probe response to that immutable deployment/commit and complete its stability/event checks, leaving older/unknown builds, drift or unverifiable bindings `NOT_MEASURED` |
 | Record whether `verdant-grow-diary.vercel.app` is retired                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Owner, in `CURRENT_STATE.md`                                                                                                                                                                                                                                                                                                                                                                                  |
+| §6.1 rows 4 and 5 are superseded by §6.3 at `27991451`: `package-lock.json` is retired and AI Doctor reaches Gemini directly. Downstream text that still quotes "npm compatibility may remain" or "Lovable AI gateway" as current (the assignment text itself does) needs the §6.3 wording                                                                                                                                                                                                                                                   |
 
 ---
 
@@ -1354,6 +1456,10 @@ Owners are Cheek's to assign; each needs an independent reviewer.
   Never KEEP on fixture walks; no owner email recorded.
 - **`docs/agents/CURRENT_STATE.md` is not edited.** `#1696` owns the restamp; the dated measurement
   is handed to it (§15) and lives in Appendix A until then.
+
+- **The 2026-10-27 amendment made no live, DNS or platform read and no publish attempt.** Every
+  such read was `BLOCKED` from its session (§2.11); its only inputs were `git show` at the tip and
+  the GitHub REST API for the collision audit, one attempt each.
 
 Verdict: **safe to merge as documentation.** It changes what readers believe, not what runs.
 
@@ -1675,6 +1781,51 @@ files_touched:
 ```
 
 ---
+
+### 15.4 Amendment handoff — source re-verification, 2026-10-27
+
+```text
+HANDOFF
+from_agent: Claude (session_017UoYKz1FZZdZu9afTV2RhP)
+to_agent: an available eligible non-contributing Grok or Codex session (OWNERSHIP.md §4.3) for
+  exact-head acceptance; then Matthew for the live reads this session could not take
+sentinel_version: 2026-10-26.2 (deploy tip 27991451)
+date: 2026-10-27
+
+slice_owner: Claude (branch claude/amazing-darwin-km8ehw, stacked on the contract restamp, PR #2564)
+independent_reviewer: a non-contributing session; this session authored and cannot PASS
+
+completed:
+  - §2.11: durable-section cites checked against 27991451 and re-pointed where moved; deploy-command
+    re-grep; apply-path count; the two new workflows; host-routing current lines
+  - §6.3: fourteen conclusions re-read from source; rows 4 and 5 FAIL; rows 11-14 NOT_MEASURED here
+  - header, §10 row, §12 follow-up, §13 bullet, AT-18
+  - Collision audit over 105 open PRs; none edits this document
+
+verified_by:
+  - git: every new cite read at 27991451a756d2521df08e26e504776a43c7bbb8
+  - a session script comparing each cited line's text at the dated tree and at the tip
+  - GitHub REST: open PRs (two pages) and the file lists of #1904, #1972, #2221
+
+review_asks:
+  - Re-run AT-4 on any five §6.3 cites at 27991451
+  - Confirm row 5's verdict against ai-doctor-review/index.ts:103-109 and geminiDirectChat.ts:21
+  - Confirm row 4's verdict against check-bun-lockfile-policy.mjs:75-80
+
+not_done:
+  - M1, M2 DNS, M7, M10: BLOCKED (no egress to the apex from this session; §2.11)
+  - No CURRENT_STATE.md, contract clause, checklist or governance edit in this amendment
+  - No publish, promote, rollback, DNS or setting change
+
+next_slice:
+  - Matthew, or a session whose egress reaches the apex: M1, M2, M7 with attribution and M10,
+    recorded in CURRENT_STATE.md
+  - The §12 follow-up on downstream text that still quotes §6.1 rows 4 and 5 as current
+
+files_touched:
+  - docs/specs/release-topology-specification.md (this amendment only)
+  - docs/agents/HANDOFF_LOG.md (the ARCH-CONTRACT-RESTAMP-20261027 block)
+```
 
 ## Appendix A. Baseline measurement — 2026-09-25, dated, superseded by later stamps
 

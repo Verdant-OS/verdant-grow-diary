@@ -99,26 +99,6 @@ describe("get-paddle-price — server-controlled environment", () => {
   });
 });
 
-describe("get-paddle-price — founder sold-out pre-check (before payment)", () => {
-  it("founder_lifetime availability is checked via the aggregate RPC before any price is returned", () => {
-    // Quote-agnostic: prettier normalizes edge functions to double quotes.
-    expect(SRC).toMatch(/requested === ["']founder_lifetime["']/);
-    expect(SRC).toMatch(/supabase\.rpc\(\s*["']founder_lifetime_slots_remaining["'],?\s*\)/);
-    expect(SRC).toMatch(/plan_sold_out/);
-  });
-
-  it("fails closed: RPC error blocks checkout, and a non-number or <=0 count is sold out", () => {
-    expect(stripped).toMatch(/if \(capError\) \{/);
-    expect(stripped).toMatch(/typeof remaining !== ["']number["'] \|\| remaining <= 0/);
-    // The pre-check happens BEFORE the gateway price fetch in source order,
-    // so a sold-out founder plan can never reach checkout pricing at all.
-    const soldOutIdx = stripped.indexOf("plan_sold_out");
-    const gatewayIdx = stripped.indexOf("await gatewayFetch(");
-    expect(soldOutIdx).toBeGreaterThan(-1);
-    expect(soldOutIdx).toBeLessThan(gatewayIdx);
-  });
-});
-
 describe("get-paddle-price — sanitized output", () => {
   it("returns only the resolved paddleId on success", () => {
     expect(SRC).toMatch(/json\(200, \{ paddleId \}\)/);

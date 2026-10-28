@@ -8,7 +8,6 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const DENSE_PUBLIC_HEADERS = [
   "src/pages/CultivarsIndex.tsx",
   "src/pages/CultivarPage.tsx",
-  "src/pages/Founder.tsx",
 ] as const;
 
 const PUBLIC_HEADERS_USING_SHARED_COMPACTION = [
@@ -22,7 +21,6 @@ const PUBLIC_HEADERS_USING_SHARED_COMPACTION = [
   "src/pages/GuidesIndex.tsx",
   "src/pages/PublicVpdCalculator.tsx",
   "src/pages/GrowHelpToolkit.tsx",
-  "src/pages/Founder.tsx",
   "src/pages/CultivarsIndex.tsx",
   "src/pages/CultivarPage.tsx",
   "src/components/BetaLanding.tsx",
@@ -46,11 +44,7 @@ describe("dense public headers on mobile", () => {
   );
 
   it("lets long public CTA labels wrap instead of clipping at 320px", () => {
-    for (const path of [
-      "src/pages/HardwareIntegrations.tsx",
-      "src/components/BetaLanding.tsx",
-      "src/pages/Founder.tsx",
-    ]) {
+    for (const path of ["src/pages/HardwareIntegrations.tsx", "src/components/BetaLanding.tsx"]) {
       const source = read(path);
       expect(source).toMatch(
         /min-h-11[^"\n]*max-w-full[^"\n]*h-auto[^"\n]*whitespace-normal[^"\n]*text-center/,

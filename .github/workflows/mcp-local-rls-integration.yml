@@ -61,7 +61,7 @@ jobs:
     # continue-on-error, so an isolation regression fails the workflow
     # instead of being masked. Enable via workflow_dispatch input
     # run_mcp_rls=true or repository variable ENABLE_MCP_RLS_LANE=true.
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_mcp_rls == true) || vars.ENABLE_MCP_RLS_LANE == 'true' }}
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && ((github.event_name == 'workflow_dispatch' && inputs.run_mcp_rls == true) || vars.ENABLE_MCP_RLS_LANE == 'true') }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

@@ -30,15 +30,17 @@ export function useMyFounderRow(): UseMyFounderRowResult {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("founders")
-      .select("founder_number, display_name, display_style, show_on_wall, optional_link, status")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (error) {
+    try {
+      const { data, error } = await supabase
+        .from("founders")
+        .select("founder_number, display_name, display_style, show_on_wall, optional_link, status")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setRow(error ? null : ((data as MyFounderRow | null) ?? null));
+    } catch {
+      // A thrown request (network) is treated like a lookup error: no row,
+      // and loading still ends instead of spinning forever.
       setRow(null);
-    } else {
-      setRow((data as MyFounderRow | null) ?? null);
     }
     setLoading(false);
   }, [user]);

@@ -34,6 +34,7 @@ concurrency:
 
 jobs:
   irrigation-overflow-smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Irrigation overflow smoke (mocked / non-destructive)
     runs-on: ubuntu-latest
     timeout-minutes: 15

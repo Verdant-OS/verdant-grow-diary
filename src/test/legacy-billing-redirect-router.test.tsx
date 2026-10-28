@@ -81,14 +81,13 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
     expect(openCheckoutSpy).not.toHaveBeenCalled();
   });
 
-  it("/billing/founder-lifetime → /pricing?plan=founder_lifetime (founder preselected, billing untouched)", () => {
+  it("/billing/founder-lifetime → /pricing with no Founder preselect and no checkout", () => {
     renderAt("/billing/founder-lifetime");
-    expect(screen.getByTestId("probe-search").textContent).toBe("?plan=founder_lifetime");
+    expect(screen.getByTestId("probe-search").textContent).toBe("");
     const main = document.querySelector("main");
-    expect(main?.getAttribute("data-preselected-plan")).toBe("founder_lifetime");
-    // Founder is one-time — billing toggle stays at page default (annual).
-    expect(main?.getAttribute("data-preselected-billing")).toBe("");
+    expect(main?.getAttribute("data-preselected-plan")).toBe("");
     expect(openCheckoutSpy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("pricing-cta-founder-lifetime")).toBeNull();
   });
 
   it("clicking the preselected Pro Monthly CTA opens Paddle with pro_monthly", () => {
@@ -106,13 +105,11 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
     expect(openCheckoutSpy.mock.calls[0][0]).toMatchObject({ priceId: "pro_annual" });
   });
 
-  it("clicking the Founder Lifetime CTA opens Paddle with founder_lifetime", () => {
+  it("does not offer a Founder Lifetime checkout after the legacy billing redirect", () => {
     renderAt("/billing/founder-lifetime");
-    fireEvent.click(screen.getByTestId("pricing-cta-founder-lifetime"));
-    expect(openCheckoutSpy).toHaveBeenCalledTimes(1);
-    expect(openCheckoutSpy.mock.calls[0][0]).toMatchObject({
-      priceId: "founder_lifetime",
-    });
+    expect(screen.queryByTestId("pricing-cta-founder-lifetime")).toBeNull();
+    expect(screen.queryByText(/\$129/)).toBeNull();
+    expect(openCheckoutSpy).not.toHaveBeenCalled();
   });
 
   it("preserves a safe same-origin returnTo through the redirect", () => {

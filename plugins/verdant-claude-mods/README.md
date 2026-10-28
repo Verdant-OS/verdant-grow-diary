@@ -16,6 +16,10 @@ They add no new policy: every refusal names the existing rule it enforces.
 guard's Bash and file checks turns two engine tests red. Behaviour inside a live agent
 session is `NOT_MEASURED`.
 
+Production runs on Cloudflare Workers at https://verdantgrowdiary.com (Matthew Cheek,
+2026-10-10). The guard still refuses Vercel and Lovable deploy commands. That refusal
+is a standing safety rule. It is not a claim that either host publishes the site.
+
 The guard is a tripwire against accidents, not a security boundary. It splits shell
 commands on `&&`, `||`, `;`, `|`, a background `&`, `(`, `)` and newlines outside quotes, so a
 quoted pattern such as `grep "a|git push --force"` is one command. A subshell or `$(…)` body is

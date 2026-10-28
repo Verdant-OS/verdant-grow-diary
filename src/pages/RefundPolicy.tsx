@@ -1,10 +1,11 @@
+import { REFUND_PAGE_LAST_UPDATED } from "@/constants/agreements";
 import { LegalPageShell } from "./legal/LegalPageShell";
 
 export default function RefundPolicy() {
   return (
     <LegalPageShell
       title="Refund Policy"
-      lastUpdated="July 9, 2026"
+      lastUpdated={REFUND_PAGE_LAST_UPDATED}
       path="/refund"
       description="Verdant Grow Diary refund policy — 30-day money-back guarantee on paid plans, with refunds through Paddle (paddle.net) as Merchant of Record."
     >
@@ -38,7 +39,7 @@ export default function RefundPolicy() {
       <h2>What is refundable</h2>
       <ul>
         <li>Monthly and annual Pro subscription fees within the 30-day window.</li>
-        <li>One-time purchases (including Founder Lifetime) within the 30-day window.</li>
+        <li>One-time purchases within the 30-day window.</li>
       </ul>
 
       <h2>Subscription cancellation</h2>

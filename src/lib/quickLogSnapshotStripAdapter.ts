@@ -53,7 +53,7 @@ export interface QuickLogSnapshotStripViewModel {
   /** Captured timestamp (ISO) or null when no snapshot is available. */
   capturedAt: string | null;
   /**
-   * Absolute, deterministic captured-at label ("Jul 7, 2026, 7:14 PM UTC")
+   * Absolute, viewer-local captured-at label ("Oct 21, 2026, 3:29 PM CDT")
    * or null when there is no snapshot. Presented alongside the relative
    * age so growers can always see the exact moment captured. Never
    * relabels manual data as live.
@@ -185,38 +185,22 @@ function actionFor(
 }
 
 /**
- * Deterministic absolute-time formatter for the "Captured: …" line.
- * Uses UTC + a fixed format so unit tests are stable across machines.
- * Example: "Jul 7, 2026, 7:14 PM UTC".
+ * Absolute-time formatter for the "Captured: …" line, in the viewer's local
+ * zone with the zone named (same shape as the plant page's local labels).
+ * Example: "Oct 21, 2026, 3:29 PM CDT".
  */
 export function formatCapturedAtAbsolute(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
-  const d = new Date(ms);
-  const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const mo = MONTHS[d.getUTCMonth()];
-  const day = d.getUTCDate();
-  const yr = d.getUTCFullYear();
-  let h = d.getUTCHours();
-  const m = d.getUTCMinutes().toString().padStart(2, "0");
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12;
-  if (h === 0) h = 12;
-  return `${mo} ${day}, ${yr}, ${h}:${m} ${ampm} UTC`;
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(ms));
 }
 
 function formatAge(capturedMs: number, nowMs: number): string {

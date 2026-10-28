@@ -84,9 +84,15 @@ export default function PaywallCta({ vm, className, onPrimaryCtaClick, ...rest }
       ) : null}
 
       <div className="mt-5">
-        <Link to={vm.primaryCtaHref} data-testid={`${testId}-link`} onClick={handlePrimaryCtaClick}>
-          <Button size="lg">{vm.primaryCtaLabel}</Button>
-        </Link>
+        <Button asChild size="lg">
+          <Link
+            to={vm.primaryCtaHref}
+            data-testid={`${testId}-link`}
+            onClick={handlePrimaryCtaClick}
+          >
+            {vm.primaryCtaLabel}
+          </Link>
+        </Button>
       </div>
     </section>
   );

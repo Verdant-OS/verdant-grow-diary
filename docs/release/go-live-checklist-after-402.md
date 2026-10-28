@@ -1,5 +1,10 @@
 # Go-live run sequence for when the Vercel 402 clears
 
+Historical as of 2026-10-10 (Matthew Cheek). Production runs on Cloudflare Workers
+at https://verdantgrowdiary.com. This sequence describes an earlier Vercel-hosted
+period. Do not use it as the current deploy procedure. The Vercel "Account is
+blocked." status is an owner-side account issue. Do not investigate it.
+
 Status: a plan only. Nothing here was dispatched, published, applied or written to
 production when it was drafted. Every trigger below is an owner action (Matthew), or runs
 under the owner's account where the workflow requires it. Handoff item 5. Owner: Grok.
@@ -101,7 +106,7 @@ anything.
    - **(f)** The owner publishes (promotes) that build. See
      `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. Promotion is Matthew only. When to lift the
      fence afterwards is Matthew's call, and goes in the receipt.
-2. `https://verdantgrowdiary.com/version.json` reports the chosen SHA from 1(a) and
+2. `https://verdantgrowdiary.com/version.json` reports the chosen SHA from step 0.1(a) and
    `dirty:false` on the apex. Check `www` too, per the runbook's "Verify every production
    hostname" section.
    **Stop** if any hostname serves a different SHA.
@@ -124,8 +129,29 @@ gh workflow run signed-in-readonly-performance.yml -R Verdant-OS/verdant-grow-di
 Each job runs `bunx playwright test <spec> --project=chromium-authed --workers=1 --retries=0 --reporter=list`
 after its offline contract tests.
 
-**Stop conditions:** any job is red or cancelled; wait-for-deployed-sha times out (the
-build isn't live); the receipt shows a read outside the fixture's own scope; or the Actions
+**Bind every run to the receipt SHA.** None of the jobs dispatched in steps 1, 3 and 4 reads
+an expected-SHA input (`quicklog-smoke.yml`'s `expected_sha` is used only by its
+`one_tent_proof` job, not the `quicklog_smoke` job step 4 runs). Each one pins
+`E2E_EXPECTED_SHA` to its own `github.sha`, which is whatever `verdant-grow-diary` points at
+when it is dispatched, not necessarily the SHA chosen in step 0.1(a). If the branch advances,
+a run measures a different commit. So, for every dispatch in steps 1, 3 and 4:
+
+```bash
+# before dispatching: the branch tip must still be the receipt SHA
+git ls-remote https://github.com/Verdant-OS/verdant-grow-diary refs/heads/verdant-grow-diary
+# after it finishes: the run's own commit must be the receipt SHA
+gh run view <run-id> -R Verdant-OS/verdant-grow-diary --json headSha --jq .headSha
+```
+
+**Stop** if either differs from the receipt SHA: that run is not evidence for the chosen
+build. Record each run's `headSha` in the receipt. A required `expected_sha` workflow input
+that fails closed on a mismatch would replace this manual check. It is a workflow change,
+so it needs its own assigned slice. Until it exists, these checks detect a run at the wrong
+commit; they can't prevent one, because the branch can advance between `git ls-remote` and
+the dispatch.
+
+**Stop conditions:** any job is red or cancelled; a run's `headSha` isn't the receipt SHA;
+wait-for-deployed-sha times out (the build isn't live); the receipt shows a read outside the fixture's own scope; or the Actions
 proof shows any approval-free framing.
 
 ### Step 2: publish the merged server changes, in #1894's order
@@ -139,7 +165,26 @@ database lock knk, HOLD #1250).
 `20260928183000` or `20261001140000` is recorded in production migration history, a single
 version-ordered apply runs `20260927012000` in place, with no skip. Otherwise use the order
 below. Both paths are safe: `20260927160000`/`20260928183000` need only `20260927002000`,
-and `20261001140000` accepts either predecessor.
+and `20261001140000` accepts either predecessor. **In either path, `20261013180000` (#1841)
+is excluded:** a version-ordered apply would run it as a bare file and skip the guarded
+chain's ACL and runner-role checks. It is delivered only as step 4 of the guarded manual
+chain (last bullet of step 1). Whether the owner's apply tool can leave that one file out of
+a version-ordered push is NOT_MEASURED; if it cannot, do not run a version-ordered push while
+`20261013180000` is pending.
+
+**Correction, 2026-10-16 (tip `e136fa44f377cdbfa98c68289c2f05f7007a9a06`).** The list below
+restates #1894. It leaves out three earlier versions that are committed but have no apply
+record: the parked `20260916111000` (#1460) and `20260917183000` (#1545), and
+`20260925090000` (#1704). The parked pair sorts ahead of `20260924120000`: if either is
+pending in production, a version-ordered apply runs it before #1703, so "runs it first" below
+holds only after the owner has checked them. `20260925090000` sorts after #1703 and before
+#1831's `20260927002000`, so a version-ordered apply runs it between those two if it is
+pending. Their applied state is NOT_MEASURED:
+`CURRENT_STATE.md` records no apply for any of them and still lists #1460 and #1545 as
+parked. Before any version-ordered apply, the owner checks production migration history for
+all three. The parked pair is not applied without Matthew's decision. Draft #1901 documents
+`20260925090000` and the parked pair in `docs/release/merged-unshipped-server-changes-2026-10-03.md`.
+This paragraph is dated and leaves the restated list unchanged.
 
 Restated from #1894:
 
@@ -157,7 +202,16 @@ Restated from #1894:
      refuses it as out of order or, with `--include-all`, runs it after #1836. There its
      preflight fails and the push stops. The owner records the skip, e.g.
      `supabase migration repair --status applied 20260927012000`. Agents never run this.
-   - #1836 `20261001140000` last (it accepts either predecessor).
+   - #1836 `20261001140000` (it accepts either predecessor).
+   - #1841 `20261013180000` last. It only replaces the manual wrapper, and its preflight
+     requires the `20260928183000` wrapper, so it fails closed if that file was not applied.
+     Deliver it only as step 4 of the guarded manual chain in
+     `docs/quicklog-manual-delivery-order-contract.md`, never as a bare file or in a
+     version-ordered push (see the pre-step-2 check). **The guarded delivery must be
+     recorded.** Otherwise the file stays pending, and a later `db push` runs it bare; its
+     preflight then fails on the already-replaced wrapper and the push stops. The owner
+     records it, e.g. `supabase migration repair --status applied 20261013180000`. Agents
+     never run this.
 2. Before any edge deploy that includes #1869: confirm `PAYMENTS_ENVIRONMENT=live` in the
    Supabase function secrets. If it's unset, checkout returns 503 by design.
 3. Redeploy the edge functions listed there: `mcp` (#1651, #1655), `ai-doctor-review`
@@ -172,7 +226,7 @@ continue to the write steps with a partially applied server.
 
 ### Step 3: re-run the read-only proofs
 
-Repeat step 1 after step 2. This separates "server publish broke a read" from "new
+Repeat step 1 after step 2, including its receipt-SHA binding. This separates "server publish broke a read" from "new
 frontend broke a read". The same stop conditions apply.
 
 ### Step 4: Quick Log save + readback (#1849), the first deliberate write
@@ -180,9 +234,26 @@ frontend broke a read". The same stop conditions apply.
 If step 0.0 chose (a), the owner re-enables `quicklog-smoke.yml` first (see step 0.0). A
 dispatch on the disabled workflow fails with 422.
 
+**Before dispatching**, run step 1's `git ls-remote` check. **Stop** if the branch tip
+isn't the receipt SHA. Then dispatch right away:
+
 ```bash
 gh workflow run quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary --ref verdant-grow-diary -f run_mode=quicklog_smoke
 ```
+
+After it finishes, run step 1's `headSha` check and record it.
+
+This is a write, and the manual check narrows the risk without closing it. `--ref` takes a
+branch, not a SHA, so the branch can still advance between `git ls-remote` and the
+dispatch. If it does, the job pins `E2E_EXPECTED_SHA` to the newer commit and waits for
+production to serve it ("Wait for the pinned SHA to be live", `quicklog-smoke.yml:621-623`,
+before any fixture or save step). If production still serves only the receipt SHA, the wait
+times out and nothing is written. If production already serves the newer commit, the run
+makes its tagged fixture writes from that commit, and the `headSha` check only catches it
+afterwards. Either way the run is not evidence for the receipt SHA. Record the run link and
+only the `[smoke …]` records that were actually written (none if the wait failed) in the
+receipt, and **stop**. Only the fail-closed `expected_sha` input described in step 1 prevents this.
+Whether to wait for it before step 4 is **Matthew's call**, and goes in the receipt.
 
 The job runs `bun run e2e:fixture-checklist`, `bun run e2e:bootstrap-fixture` (only if
 `E2E_ALLOW_FIXTURE_BOOTSTRAP` allows it), `bun run e2e:verify-fixture`, then

@@ -28,6 +28,12 @@ import {
   type PhenoOnboardingStepId,
 } from "@/lib/phenoHuntOnboardingViewModel";
 import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
+import {
+  describePhenoEvidenceGoalSelection,
+  normalizeEvidenceGoalIds,
+  PHENO_EVIDENCE_GOALS_STEP_INTRO,
+  storedEvidenceGoalsRequireFreshReview,
+} from "@/lib/phenoEvidenceGoalSelectionRules";
 import PhenoHuntOnboardingStepper from "@/components/PhenoHuntOnboardingStepper";
 import PhenoEvidenceGoalsSelector from "@/components/PhenoEvidenceGoalsSelector";
 import PhenoFirstEvidencePacketMapPreview from "@/components/PhenoFirstEvidencePacketMapPreview";
@@ -56,6 +62,10 @@ interface PhenoHuntSetupDraft {
   notes: string;
   selected: string[];
   evidenceGoals: PhenoEvidenceGoalId[];
+  /** True when the saved draft included an evidenceGoals array, including []. */
+  evidenceGoalsSpecified?: boolean;
+  /** True when evidenceGoals was saved as a non-list. Absent key stays legacy. */
+  evidenceGoalsMalformed?: boolean;
   currentStep: PhenoOnboardingStepId;
   /** Evidence goals step opened in this draft (#573). Absent → false. */
   goalsReviewed: boolean;
@@ -71,21 +81,30 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PhenoHuntSetupDraft>;
     if (!parsed || typeof parsed !== "object") return null;
+    const evidenceGoalsIsList = Array.isArray(parsed.evidenceGoals);
+    // A missing field keeps the fresh suggested defaults. A present non-list does not.
+    const evidenceGoalsMalformed =
+      Object.prototype.hasOwnProperty.call(parsed, "evidenceGoals") && !evidenceGoalsIsList;
     return {
       name: typeof parsed.name === "string" ? parsed.name : "",
       notes: typeof parsed.notes === "string" ? parsed.notes : "",
       selected: Array.isArray(parsed.selected)
         ? parsed.selected.filter((v): v is string => typeof v === "string")
         : [],
-      evidenceGoals: Array.isArray(parsed.evidenceGoals)
-        ? (parsed.evidenceGoals as PhenoEvidenceGoalId[])
-        : [],
+      // Unknown/removed ids are dropped so readiness and the summary agree.
+      // A present array that normalizes to [] is an explicit empty selection.
+      evidenceGoalsSpecified: evidenceGoalsIsList,
+      evidenceGoalsMalformed,
+      evidenceGoals: normalizeEvidenceGoalIds(parsed.evidenceGoals),
       currentStep:
         typeof parsed.currentStep === "string" &&
         (PHENO_ONBOARDING_STEP_ORDER as readonly string[]).includes(parsed.currentStep)
           ? (parsed.currentStep as PhenoOnboardingStepId)
           : "basics",
-      goalsReviewed: parsed.goalsReviewed === true,
+      goalsReviewed:
+        parsed.goalsReviewed === true &&
+        !evidenceGoalsMalformed &&
+        !storedEvidenceGoalsRequireFreshReview(parsed.evidenceGoals),
     };
   } catch {
     return null;
@@ -154,10 +173,15 @@ export default function PhenoHuntNew() {
     setName((prev) => (prev.trim() !== "" ? prev : draft.name));
     setNotes((prev) => (prev.trim() !== "" ? prev : draft.notes));
     setSelected((prev) => (prev.size > 0 ? prev : new Set(draft.selected)));
-    if (draft.evidenceGoals.length > 0) setEvidenceGoals(draft.evidenceGoals);
-    setGoalsReviewed(draft.goalsReviewed);
+    if (draft.evidenceGoalsMalformed) setEvidenceGoals([]);
+    else if (draft.evidenceGoalsSpecified) setEvidenceGoals(draft.evidenceGoals);
+    const emptySavedSelection =
+      draft.evidenceGoalsMalformed === true ||
+      (draft.evidenceGoalsSpecified === true && draft.evidenceGoals.length === 0);
+    const goalsReviewedForResume = draft.goalsReviewed && !emptySavedSelection;
+    setGoalsReviewed(goalsReviewedForResume);
     // A draft saved on a locked confirmation step reopens on Goals instead.
-    setCurrentStep(resolvePhenoOnboardingResumeStep(draft.currentStep, draft.goalsReviewed));
+    setCurrentStep(resolvePhenoOnboardingResumeStep(draft.currentStep, goalsReviewedForResume));
     setDraftRestored(true);
   }, [draftKey]);
 
@@ -279,11 +303,16 @@ export default function PhenoHuntNew() {
         tentId: tentId ?? null,
         notes,
         candidateIds,
-        evidenceGoals,
+        evidenceGoals: normalizeEvidenceGoalIds(evidenceGoals),
         setupCompleted: setupConfirmed,
-        goalsReviewed,
+        goalsReviewed: goalsReviewed && evidenceGoals.length > 0,
       }),
     [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed, goalsReviewed],
+  );
+
+  const goalSelection = useMemo(
+    () => describePhenoEvidenceGoalSelection(evidenceGoals),
+    [evidenceGoals],
   );
 
   const canSave = vm.canCreate && !saving && !!user;
@@ -571,9 +600,9 @@ export default function PhenoHuntNew() {
           data-testid="pheno-step-goals"
         >
           <h2 className="text-sm font-semibold">Evidence goals</h2>
-          <p className="text-xs text-muted-foreground">
-            Choose what you plan to track. You decide what matters — Verdant preserves the evidence
-            you record.
+          <p className="text-xs text-muted-foreground">{PHENO_EVIDENCE_GOALS_STEP_INTRO}</p>
+          <p className="text-xs font-medium" data-testid="pheno-evidence-goals-summary">
+            {goalSelection.summary}
           </p>
           <PhenoEvidenceGoalsSelector selected={evidenceGoals} onToggle={toggleGoal} />
         </section>
@@ -629,7 +658,7 @@ export default function PhenoHuntNew() {
             data-testid="pheno-confirmation-summary"
           >
             <li>• Candidates selected: {candidateIds.length}</li>
-            <li>• Evidence goals selected: {evidenceGoals.length}</li>
+            <li>• Evidence goals: {goalSelection.summary}</li>
             <li>• Readiness: {vm.readinessLabel}</li>
           </ul>
           <label className="flex items-start gap-2 text-sm">

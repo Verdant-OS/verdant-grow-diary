@@ -81,9 +81,9 @@ beforeEach(() => {
   deleteSpy.mockClear();
   fetchSpy.mockClear();
   // Intercept any accidental network call (AI gateway, edge fns, etc).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   (globalThis as any).fetch = fetchSpy;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   (Element.prototype as any).scrollIntoView = vi.fn();
 });
 
@@ -184,9 +184,8 @@ describe("ActionQueue — One-Tent Loop landing polish", () => {
     renderPage();
     const card = await screen.findByTestId("action-queue-one-tent-loop-next-step-card");
     expect(card.getAttribute("data-current-step")).toBe("action-queue");
-    expect(card.textContent ?? "").toMatch(/Review approval-required action/);
-    const cta = screen.getByTestId("action-queue-one-tent-loop-next-step-card-cta");
-    expect(cta.getAttribute("href")).toBe("/actions");
+    expect(card.textContent ?? "").toMatch(/Next step unavailable until this record is selected/);
+    expect(screen.queryByTestId("action-queue-one-tent-loop-next-step-card-cta")).toBeNull();
     expect(insertSpy).not.toHaveBeenCalled();
   });
 

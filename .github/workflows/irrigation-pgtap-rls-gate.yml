@@ -38,7 +38,7 @@ on:
 
 concurrency:
   group: irrigation-pgtap-rls-gate-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Cheap gate — reads the PR diff and emits `irrigation=true|false`.
@@ -211,7 +211,8 @@ jobs:
     name: irrigation harness typecheck (tsc --noEmit)
     needs: changes
     if: >-
-      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      && (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
       && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -243,7 +244,8 @@ jobs:
     name: pgTAP irrigation (feeding + watering)
     needs: changes
     if: >-
-      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      && (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
       && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20

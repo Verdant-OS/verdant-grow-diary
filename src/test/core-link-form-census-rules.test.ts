@@ -462,10 +462,10 @@ describe("core link and form census rules", () => {
     // resolving fill() is not persistence when a handler can revert it.
     expect(CENSUS_SPEC_SOURCE).toContain("async function fillAndVerify(");
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "let restored = await fillAndVerify(fillTarget, original);",
+      "let restored = await fillAndVerify(fillTarget, original, pinned);",
     );
     expect(CENSUS_SPEC_SOURCE).toContain(
-      "const restoredReplacement = await fillAndVerify(control, original);",
+      "const restoredReplacement = await fillAndVerify(control, original, replacement);",
     );
     // A name that only settled during the retry window rechecks the pinned
     // node's visibility before any exercise — a control hidden by the same

@@ -33,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { validateGrowTargetForm, type GrowTargetBound } from "@/lib/growTargetValidationRules";
 
 type Field = "temp" | "rh" | "vpd" | "soil_wc" | "soil_ec" | "soil_temp" | "ppfd";
 
@@ -143,6 +144,7 @@ export default function GrowTargetsEditor({
   const { toast } = useToast();
   const unit = useTemperatureUnitPreference();
   const [form, setForm] = useState<FormState>(() => emptyForm());
+  const [badInputs, setBadInputs] = useState<Partial<Record<GrowTargetBound, boolean>>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -153,6 +155,7 @@ export default function GrowTargetsEditor({
     if (!open || !user || !growId) return;
     let cancelled = false;
     setLoading(true);
+    setBadInputs({});
     (async () => {
       const { data, error } = await supabase
         .from("grow_targets")
@@ -173,21 +176,22 @@ export default function GrowTargetsEditor({
     };
   }, [open, user, growId, toast, unit]);
 
-  const invalid = useMemo(() => {
-    for (const f of FIELDS) {
-      const min = parseField(form[`${f.key}_min`]);
-      const max = parseField(form[`${f.key}_max`]);
-      if (min !== null && max !== null && min > max) {
-        return `${f.label} min must be ≤ max`;
-      }
-    }
-    return null;
-  }, [form]);
+  const validation = useMemo(
+    () => validateGrowTargetForm(form, unit, badInputs),
+    [form, unit, badInputs],
+  );
+
+  function handleNumberInput(key: GrowTargetBound, input: HTMLInputElement) {
+    const value = input.value;
+    const isBad = input.validity.badInput;
+    setForm((s) => ({ ...s, [key]: value }));
+    setBadInputs((s) => ({ ...s, [key]: isBad }));
+  }
 
   async function handleSave() {
     if (!user) return;
-    if (invalid) {
-      toast({ title: "Check ranges", description: invalid });
+    if (validation.blocksSave) {
+      toast({ title: "Check ranges", description: "Check the highlighted target bounds." });
       return;
     }
     setSaving(true);
@@ -245,13 +249,17 @@ export default function GrowTargetsEditor({
                     step={f.step}
                     placeholder="min"
                     aria-label={`${f.label} min`}
-                    value={form[`${f.key}_min`]}
-                    onChange={(e) =>
-                      setForm((s) => ({
-                        ...s,
-                        [`${f.key}_min`]: e.target.value,
-                      }))
+                    aria-invalid={!!validation.errors[`${f.key}_min`]}
+                    aria-describedby={
+                      validation.errors[`${f.key}_min`]
+                        ? `grow-target-${f.key}-min-error`
+                        : undefined
                     }
+                    value={form[`${f.key}_min`]}
+                    onChange={(e) => handleNumberInput(`${f.key}_min`, e.currentTarget)}
+                    // Input also reports validity changes whose sanitized value
+                    // stays empty, such as deleting an unfinished minus sign.
+                    onInput={(e) => handleNumberInput(`${f.key}_min`, e.currentTarget)}
                   />
                   <span className="text-xs text-muted-foreground">to</span>
                   <Input
@@ -260,27 +268,39 @@ export default function GrowTargetsEditor({
                     step={f.step}
                     placeholder="max"
                     aria-label={`${f.label} max`}
-                    value={form[`${f.key}_max`]}
-                    onChange={(e) =>
-                      setForm((s) => ({
-                        ...s,
-                        [`${f.key}_max`]: e.target.value,
-                      }))
+                    aria-invalid={!!validation.errors[`${f.key}_max`]}
+                    aria-describedby={
+                      validation.errors[`${f.key}_max`]
+                        ? `grow-target-${f.key}-max-error`
+                        : undefined
                     }
+                    value={form[`${f.key}_max`]}
+                    onChange={(e) => handleNumberInput(`${f.key}_max`, e.currentTarget)}
+                    onInput={(e) => handleNumberInput(`${f.key}_max`, e.currentTarget)}
                   />
                 </div>
+                {(["min", "max"] as const).map((bound) => {
+                  const error = validation.errors[`${f.key}_${bound}`];
+                  return error ? (
+                    <p
+                      key={bound}
+                      id={`grow-target-${f.key}-${bound}-error`}
+                      className="text-xs text-amber-600 mt-1"
+                    >
+                      {f.label} {bound}: {error}
+                    </p>
+                  ) : null;
+                })}
               </div>
             ))}
           </div>
         )}
 
-        {invalid && <p className="text-xs text-amber-600 mt-2">{invalid}</p>}
-
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || loading || !!invalid}>
+          <Button onClick={handleSave} disabled={saving || loading || validation.blocksSave}>
             {saving ? "Saving…" : "Save targets"}
           </Button>
         </DialogFooter>

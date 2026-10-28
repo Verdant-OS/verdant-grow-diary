@@ -18,6 +18,15 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+import {
+  formatRestorationDiagnostics,
+  observeCensusField,
+  observeRestorationFailures,
+  restorationError,
+  restoreCensusField,
+  type OriginalValueRead,
+  type RestorationFailure,
+} from "./lib/censusRestoration";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 import { dashboardPath } from "../src/lib/routes";
@@ -867,35 +876,24 @@ async function controlType(
 async function fillAndVerify(
   target: Locator | ElementHandle<SVGElement | HTMLElement>,
   value: string,
+  report: { failures: RestorationFailure[]; target: RestorationFailure["target"] },
 ): Promise<boolean> {
-  const filled = await target
-    .fill(value, { timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!filled) return false;
-  const matchedOnce = await expect
-    .poll(
-      () =>
-        target.evaluate((element) =>
-          element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
-        ),
-      { timeout: 5_000 },
-    )
-    .toBe(value)
-    .then(() => true)
-    .catch(() => false);
-  if (!matchedOnce) return false;
-  // A first matching sample is not stability — a controlled handler can
-  // accept the value synchronously and normalize or revert it a beat later.
-  // Re-sample after a settle interval and require the value to have held.
-  await new Promise((resolve) => setTimeout(resolve, 250));
-  return await target
-    .evaluate(
-      (element, expected) =>
-        element.isConnected && ((element as HTMLInputElement).value ?? null) === expected,
-      value,
-    )
-    .catch(() => false);
+  return restoreCensusField(
+    target,
+    value,
+    () =>
+      expect
+        .poll(
+          () =>
+            target.evaluate((element) =>
+              element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
+            ),
+          { timeout: 5_000 },
+        )
+        .toBe(value),
+    report.failures,
+    report.target,
+  );
 }
 
 // Select analog of fillAndVerify: dispatch, poll the connected value, then
@@ -1393,7 +1391,17 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     // original recorded as exercised. Verification stays STRICT — a value
     // that does not stick fails the census; only the resolution is pinned.
     const fillTarget = pinnedControl ?? control;
-    const original = await fillTarget.inputValue().catch(() => "");
+    let originalRead: OriginalValueRead;
+    const original = await fillTarget.inputValue().then(
+      (value) => {
+        originalRead = { known: true, value };
+        return value;
+      },
+      (error: unknown) => {
+        originalRead = { known: false, error: restorationError(error) };
+        return ""; // Preserve existing cleanup behavior, but do not label this a measured original.
+      },
+    );
     const field = {
       type,
       accessibleName: name,
@@ -1402,6 +1410,30 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       step: await fillTarget.getAttribute("step"),
     };
     const placeholder = placeholderValueForField(field);
+    const restorationFailures: RestorationFailure[] = [];
+    const pinned = { failures: restorationFailures, target: "pinned" as const };
+    const replacement = { failures: restorationFailures, target: "replacement" as const };
+    // Only failure messages acquire extra observations. These are DOM evidence,
+    // never a claim about React hydration or RHF's unobserved internal state.
+    const restorationDiagnostics = async () => {
+      await observeRestorationFailures(restorationFailures, {
+        pinned: fillTarget,
+        replacement: control,
+      });
+      const live = await observeCensusField(control).catch(() => null);
+      return formatRestorationDiagnostics(
+        {
+          route: route.path,
+          field: name,
+          type,
+          original: originalRead,
+          live,
+          liveMatchesPinned: await liveIndexHoldsPinnedNode(),
+          liveHoldsPlaceholder: live?.connected === true && live.value === placeholder,
+        },
+        restorationFailures,
+      );
+    };
     let fillDispatched = false;
     try {
       await fillTarget.fill(placeholder, { timeout: 5_000 });
@@ -1448,10 +1480,13 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           )
           .catch(() => false);
         if (liveHoldsPlaceholder) {
-          const restoredReplacement = await fillAndVerify(control, original);
+          const restoredReplacement = await fillAndVerify(control, original, replacement);
           expect(
             restoredReplacement,
-            `${route.path} field "${name}" remounted after a fill and its replacement could not be restored`,
+            `${route.path} field "${name}" remounted after a fill and its replacement could not be restored` +
+              (restoredReplacement
+                ? ""
+                : `\nRestoration diagnostics: ${await restorationDiagnostics()}`),
           ).toBe(true);
         }
       }
@@ -1480,7 +1515,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     // that accepted the placeholder but cannot return to its original value
     // is a product defect, and silently leaving placeholder-derived state
     // would corrupt every later field and link audit.
-    let restored = await fillAndVerify(fillTarget, original);
+    let restored = await fillAndVerify(fillTarget, original, pinned);
     if (!restored) {
       const pinnedGone = pinnedControl
         ? !(await pinnedControl.evaluate((element) => element.isConnected).catch(() => false))
@@ -1500,7 +1535,7 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
           )
           .catch(() => false);
         if (liveHoldsPlaceholder) {
-          restored = await fillAndVerify(control, original);
+          restored = await fillAndVerify(control, original, replacement);
         } else {
           restored = true;
           if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
@@ -1509,7 +1544,8 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     }
     expect(
       restored,
-      `${route.path} field "${name}" accepted the census placeholder but could not be restored`,
+      `${route.path} field "${name}" accepted the census placeholder but could not be restored` +
+        (restored ? "" : `\nRestoration diagnostics: ${await restorationDiagnostics()}`),
     ).toBe(true);
     audits.push({ route: route.path, name, type, exercised: true });
   }

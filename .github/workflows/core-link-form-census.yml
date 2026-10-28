@@ -5,6 +5,7 @@ on:
     paths:
       - "src/**"
       - "e2e/core-link-form-census.spec.ts"
+      - "e2e/core-link-form-census-hydration.spec.ts"
       - "e2e/lib/coreLinkFormCensus.ts"
       - "playwright.config.ts"
       - ".github/workflows/core-link-form-census.yml"
@@ -15,6 +16,7 @@ on:
     paths:
       - "src/**"
       - "e2e/core-link-form-census.spec.ts"
+      - "e2e/core-link-form-census-hydration.spec.ts"
       - "e2e/lib/coreLinkFormCensus.ts"
       - "playwright.config.ts"
       - ".github/workflows/core-link-form-census.yml"
@@ -92,6 +94,17 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install Playwright Chromium
         run: bun run e2e:install:ci
+      - name: Run hydration and clearing regressions
+        if: matrix.lane == 'public'
+        env:
+          # Inline fixture: suppress the app webServer; every request is blocked.
+          E2E_BASE_URL: http://127.0.0.1:9
+        run: >-
+          bunx playwright test
+          --project=chromium-mocked
+          e2e/core-link-form-census-hydration.spec.ts
+          --workers=1
+          --reporter=list
       - name: Run hermetic ${{ matrix.lane }} census
         run: >-
           bunx playwright test

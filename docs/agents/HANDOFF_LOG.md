@@ -79,19 +79,19 @@ branch: claude/start-room-one-step (stacked on claude/setup-quicklog-draft-retry
 base: claude/setup-quicklog-draft-retry-p2s; retarget to verdant-grow-diary once #2565 merges
 checkout: git fetch origin claude/start-room-one-step && git switch claude/start-room-one-step && git merge origin/claude/setup-quicklog-draft-retry-p2s
 pr: opened as a draft from this branch; read URL and head from GitHub
-head_sha: feature commit 6f32664205d57373b3049646d731aa34346163f5; read the merged head from the PR
+head_sha: 0e412c911ad3354a62301cc56f2d240ac2148ffc is the last code commit (a handoff merge follows it); read the current head from the PR
 state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
-current_step: review 5677102928 P2 addressed (double-submit and unknown-outcome guard tests); #2565 head b370f30 merged in; awaiting CI and an independent exact-head review
+current_step: #2565 head 6258f8b merged in (every-plan roster gate, plant retry id held until recorded); Copilot 4397135141 fixed in 0e412c9 (setup draft cleared before navigating to the new plant); awaiting CI and an independent exact-head review
 next_action: confirm required checks at the new head; route to an eligible reviewer who neither authored nor repaired this PR after #2565 settles; retarget to verdant-grow-diary once #2565 merges
 post_merge_check: after Publish, on the disposable fixture account with no grow, open Start Your Room, type a plant name, submit once: Plant Detail opens with Quick Log and the grow/tent/plant exist once each. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
 decisions: review 5677102928: start-your-room-one-step pins the submitRoom double-submit guard and the unknown-outcome early return by submitting the form directly (deleting either guard fails its case); the test mock owner is a UUID because the unknown-outcome fence records only UUID owners. blank grow/tent names default to "My grow" / "Tent 1"; a partial resume creates only what is missing; plan gates block before any insert; Retry reuses the same preallocated row ids; Free with an existing grow keeps showing the grow-limit notice (unchanged) while tent+plant creation is allowed; paid with one grow still creates a new grow (unchanged appliedResume behaviour).
 tried_and_rejected: delegate:builder agents stopped at the 200k context mark before writing code; implemented in-session instead.
 commands: bunx vitest run src/test/start-your-room* src/test/start-room* src/test/hierarchy-create-response-loss.test.tsx
-files_touched: src/pages/StartYourRoom.tsx; src/lib/startYourRoomRules.ts; src/test/start-your-room-one-step.test.tsx (new); renegotiated (approved): src/test/hierarchy-create-response-loss.test.tsx and start-your-room-{draft-hydration,draft-owner-switch,draft-retry,enter-submits,entitlement-gate,quick-log-handoff,resume,review-regressions,save-reason-and-adopt}.test.tsx
+files_touched: src/pages/StartYourRoom.tsx; src/lib/startYourRoomRules.ts; src/test/start-your-room-one-step.test.tsx (new); renegotiated (approved): src/test/hierarchy-create-response-loss.test.tsx and start-your-room-{draft-hydration,draft-owner-switch,draft-retry,enter-submits,entitlement-gate,quick-log-handoff,resume,review-regressions,save-reason-and-adopt}.test.tsx; src/test/start-your-room-plant-retry-id.test.tsx and src/test/start-your-room-draft-grows-read-error.test.tsx (adapted to the one-step form)
 files_remaining: none
 blockers: none for repository work
-open_questions: retry help text in startYourRoomDraftRules.ts still says "Retry saves this same step once" (copy left to Cheeko)
+open_questions: retry help text in startYourRoomDraftRules.ts still says "Retry saves this same step once" (copy left to Cheeko); put to Matthew 2026-10-28: Copilot 4397044004/4397135162, after a partial failure the bound line says "your grow" for a grow saved as "My grow" (cosmetic; not changed)
 gotchas: Start Your Room tests must clear sessionStorage in beforeEach (the draft store persists the form across tests); old step test ids (start-room-grow-submit etc.) are gone, use start-room-submit
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
 artifacts: PR checks
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: the prior holder's check-in trig_01Hi7LCPDNjfdvVBvGoWUhCv belongs to that session; no paused workflows
 claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677102928; prior holder told to stop pushing)
 owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
-last_updated: 2026-10-28 04:15 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 05:30 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 ```
 
 ### SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541
@@ -113,19 +113,19 @@ branch: claude/setup-quicklog-draft-retry-p2s (created at 7250689864da30155a4bb8
 base: verdant-grow-diary
 checkout: git fetch origin claude/setup-quicklog-draft-retry-p2s verdant-grow-diary && git switch claude/setup-quicklog-draft-retry-p2s && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: opened as a draft from this branch; read URL and head from GitHub
-head_sha: fix commit 77b2487ac01f6fb33fc0305f8f67feca8769864c; read the merged head from the PR
+head_sha: de0101adf7468abce5d1fe0560d46de5b020ca8d is the last code commit (the handoff commit follows it); read the current head from the PR
 state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
-current_step: review 5677106832 P2 addressed (no-target restore); CodeRabbit 5677337277 Major 1 fixed (hydration waits for a successful grow read); Major 2 (persist Water/Feed inputs) put to Matthew; awaiting CI and an independent exact-head review
+current_step: Codex 2026-10-28 P2s addressed: stale reopen write (3f10b42), every-plan roster gate with step forms hidden until hydration (289b15f), plant retry id held until the plant id is recorded (de0101a); Copilot plantStage validation and sessionStorage test read (de0101a). Awaiting CI and an independent exact-head review
 next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR; then merge this branch into claude/start-room-one-step (#2582)
 post_merge_check: after Publish, on the fixture account, open Quick Log for plant A, type a note, close; open for plant B: no note. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
 decisions: review 5677106832 P2 (Matthew 2026-10-28, "restore text, no target"): with no explicit or route target, restorableQuickLogObservationDraft returns the draft's words with selectedKey null, saveFailed false and no idempotency key (only definitive rejections are stored, so nothing committed under that key); the notice reads QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY; the remembered-target ban holds. CodeRabbit 4395104891: Retry button and retry copy show only for definitive save errors (isStartRoomRetryableSaveError), not validation, gate, safe-save-start or unknown-outcome errors; P2-1 restore only when draft target equals the sheet's explicit/route target, plus a visible restored line; P2-3 append the server reason to the existing plain copy (keeps scorer-locked tests); P2-4 adopt a pending grow id already in the owned grows list after hydrate; P2-2 NOT changed (see tried_and_rejected).
 tried_and_rejected: P2-2 persisting the idempotency key for ambiguous outcomes. It broke quick-log-v2-exact-recovery ("verified but subsequently edited saved note") by resurrecting the old key for a deliberate new entry. Durable Note/Watering recovery already keeps the key across reloads.
-commands: bunx vitest run src/test/quick-log-observation-draft-scope.test.tsx src/test/start-your-room-save-reason-and-adopt.test.tsx src/test/start-room-quick-log-draft-p2-rules.test.ts src/test/quick-log-v2-exact-recovery.test.tsx src/test/start-your-room-draft-retry.test.tsx src/test/start-your-room-draft-hydration.test.tsx
-files_touched: src/components/QuickLogV2Sheet.tsx; src/lib/quickLogObservationDraftRules.ts; src/lib/startYourRoomDraftRules.ts; src/pages/StartYourRoom.tsx; src/test/quick-log-observation-draft-scope.test.tsx; src/test/start-your-room-save-reason-and-adopt.test.tsx; src/test/start-room-quick-log-draft-p2-rules.test.ts
+commands: bunx vitest run $(grep -rlE "StartYourRoom|startYourRoom|QuickLogV2Sheet|quickLogObservationDraft" src/test) (93 files / 970 tests at de0101a); NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/components/QuickLogV2Sheet.tsx; src/lib/quickLogObservationDraftRules.ts; src/lib/startYourRoomDraftRules.ts; src/lib/startYourRoomRules.ts; src/pages/StartYourRoom.tsx; src/test/quick-log-observation-draft-scope.test.tsx; src/test/start-your-room-save-reason-and-adopt.test.tsx; src/test/start-room-quick-log-draft-p2-rules.test.ts; src/test/start-your-room-draft-grows-read-error.test.tsx; src/test/start-your-room-plant-retry-id.test.tsx
 files_remaining: none
 blockers: none for repository work
-open_questions: none
+open_questions: put to Matthew 2026-10-28: (1) Codex 4396973931, a deleted tent restores the plant step and every plant insert fails closed; fix here or in a follow-up? (2) Copilot 4397048019, busy flag can carry across an account switch during one in-flight save; no data crosses accounts; not changed. (3) CodeRabbit Major 2, persist Water/Feed inputs. (4) Copilot 4396952153, keep typed tent/plant names when the stored grow is gone (kept by design)
 gotchas: src/test/start-your-room-draft-retry.test.tsx and start-your-room-draft-hydration.test.tsx are scorer-locked and unchanged; do not add saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignments (counted by quicklog-manual-idempotency-static.test.ts)
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
 artifacts: PR checks
@@ -134,7 +134,7 @@ reviewer_sha: none
 session_state: no routines; no paused workflows
 claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677106832; prior holder told to stop pushing)
 owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
-last_updated: 2026-10-28 04:15 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 05:30 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 ```
 
 ### SETUP-QUICKLOG-DRAFT-RETRY

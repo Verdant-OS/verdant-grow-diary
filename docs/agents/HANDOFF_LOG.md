@@ -69,6 +69,39 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
+
+```text
+TASK SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028  priority: P2  status: OPEN
+goal: Unknown /guides/<slug> never serves "index, follow" (or a canonical to /guides), and the Athena feed log stops linking the unpublished /guides/advanced-nutrients-feeding-chart-log.
+why: Ahrefs indexability audit (2026-10-28, Grok Bot's /workspace/seo/audits/2026-10-28-ahrefs-indexability.md; not readable from this session). On base the dead link rendered a 200 "index, follow" page with no canonical that then redirected to /guides on the client.
+branch: claude/seo-noindex-unknown-guide-slugs
+base: verdant-grow-diary
+checkout: git fetch origin claude/seo-noindex-unknown-guide-slugs verdant-grow-diary && git switch claude/seo-noindex-unknown-guide-slugs && git merge origin/verdant-grow-diary
+pr: draft; read the PR for the exact head
+head_sha: the PR's single commit, whose parent is bbc77ae23164847772de6b53ecf18d7735932342 (a commit cannot name its own SHA; read the PR head)
+state: pushed draft
+current_step: Draft PR opened; awaiting an independent exact-head review
+next_action: Eligible independent reviewer (OWNERSHIP.md §4.3; Claude excluded as author) reviews at the exact head. #2542 re-adds the Athena related link when it ships.
+post_merge_check: Once live /version.json reports the merge SHA, GET https://verdantgrowdiary.com/guides/does-not-exist and confirm one <meta name="robots" content="noindex, follow"> and no rel=canonical; NOT_MEASURED until then.
+active_writer: Claude
+decisions: noindex, follow instead of a real 404 (keeps the existing client redirect to /guides and its tests); head logic in pure src/lib/guideRouteHeadRules.ts; published guides keep their exact staticRouteHead. Optional csv-preview PR skipped (not trivial on top of the scorer-lock decision).
+tried_and_rejected: curl of the built page (blocked by a plugin safety hook) and vite preview (cloudflare-module output cannot run under Node). Verified instead by importing .output/server/index.mjs and calling its fetch handler, as scripts/capture-ssr-head-snapshots-with-server.mjs does.
+commands: bunx vitest run src/test/seo-guide-slug-indexability.test.tsx src/test/athena-feed-log-page.test.tsx ; bun run typecheck ; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/lib/athenaFeedLogRules.ts; src/pages/AthenaFeedLog.tsx; src/routes/guides.$slug.tsx; src/lib/guideRouteHeadRules.ts (new); src/test/seo-guide-slug-indexability.test.tsx (new); src/test/athena-feed-log-page.test.tsx (renegotiated pin, founder-approved); docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: Repo-wide GitHub Actions jobs were failing at start (runner_id 0) on 2026-10-28 from 10:32 UTC; hosted CI is NOT_MEASURED until that clears.
+open_questions: none
+gotchas: bun run build refuses a dirty tree (stamp_dirty); a local build rewrites src/routeTree.gen.ts, public/version.json and src/generated/buildInfo.ts, which must be reverted.
+links: #2542 (re-adds the link); not folded into #2561 or #2549
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3; Claude excluded
+reviewer_sha: none yet
+session_state: Claude Code cloud session; no routines
+claimed_by: Claude, 2026-10-28 12:05 UTC
+owner: Claude
+last_updated: 2026-10-28 07:05 CT, by Claude
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text

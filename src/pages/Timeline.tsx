@@ -148,6 +148,10 @@ import {
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
 import {
+  dropBlankQuickLogPlaceholderRows,
+  projectTimelineDiaryPage,
+} from "@/lib/timelineQuickLogPlaceholderDedupeRules";
+import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
 } from "@/lib/effectiveSensorReadings";
@@ -229,7 +233,11 @@ import {
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
 import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
-import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
+import {
+  diaryEntriesTotalAfterRemoval,
+  diaryRemovalCompletionStillCurrent,
+  isLinkedQuickLogDiaryDetails,
+} from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
   diaryEntryMatchesHighlight,
@@ -289,6 +297,8 @@ interface Entry {
   id: string;
   note: string;
   photo_url: string | null;
+  /** Private object path kept after `photo_url` is replaced by a signed display URL. */
+  photo_object_path?: string | null;
   stage: string | null;
   details: Record<string, unknown>;
   entry_at: string;
@@ -323,6 +333,14 @@ function buildTimelineDiaryPhotoDisplayRows(
     }
     if (reference.kind === "storage") {
       privatePhotoPathById.set(row.id, reference.path);
+      // Keep the private path for blank-mirror dedupe after signing, and the
+      // reference source the initial signer requires before it will apply a URL.
+      return {
+        ...row,
+        photo_url: null,
+        photo_object_path: reference.path,
+        photoReferenceSource,
+      };
     }
 
     return { ...row, photo_url: null, photoReferenceSource };
@@ -589,7 +607,11 @@ export default function Timeline() {
   const [manualSensorHistoryLimited, setManualSensorHistoryLimited] = useState(false);
   // Keyset pagination (audit M1): the diary is unbounded but the page used
   // to silently cap at the newest 100 rows and report "Showing 100 of 100".
+  // Server count minus the blank Quick Log mirrors hidden from fetched pages,
+  // so `entriesTotal > entries.length` means unfetched rows remain (#2094).
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
+  // Keyset cursor: the oldest fetched diary row, even when it is a hidden mirror.
+  const [oldestFetchedEntryAt, setOldestFetchedEntryAt] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
@@ -619,6 +641,7 @@ export default function Timeline() {
   const [directorySensorsLoading, setDirectorySensorsLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
   const readRequestIdRef = useRef(0);
+  const entriesSnapshotRef = useRef<Entry[]>([]);
   const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
@@ -753,6 +776,7 @@ export default function Timeline() {
   });
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
+  entriesSnapshotRef.current = entries;
 
   // Same fail-closed grow-list gate as the owner name directory: no
   // supplemental tents / sensor_readings while ownership proof is
@@ -781,6 +805,7 @@ export default function Timeline() {
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
+      setOldestFetchedEntryAt(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
       setTimelineLinkedRoots([]);
@@ -805,6 +830,7 @@ export default function Timeline() {
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
+      setOldestFetchedEntryAt(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
       setTimelineLinkedRoots([]);
@@ -882,7 +908,10 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
 
-      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const entriesPage = projectTimelineDiaryPage(
+        (entriesResult.data as Entry[]).map((row) => ({ ...row })),
+      );
+      const rows = entriesPage.rows;
       const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
       const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rows,
@@ -925,7 +954,12 @@ export default function Timeline() {
       setDiaryPhotoIds(nextDiaryPhotoIds);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
-      setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
+      setEntriesTotal(
+        typeof entriesResult.count === "number"
+          ? entriesResult.count - entriesPage.hiddenCount
+          : null,
+      );
+      setOldestFetchedEntryAt(entriesPage.oldestFetchedEntryAt);
       setGrowEvents(nextGrowEvents);
       setTimelineSensorEvents(nextSensorEvents);
       setTimelineLinkedRoots([]);
@@ -1228,7 +1262,7 @@ export default function Timeline() {
       entries.length === 0
     )
       return;
-    const cursor = entries[entries.length - 1]?.entry_at;
+    const cursor = oldestFetchedEntryAt;
     if (!cursor) return;
     const requestedGrowId = activeGrowId;
     const requestedReadKey = activeReadKey;
@@ -1258,7 +1292,10 @@ export default function Timeline() {
       });
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
-      const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const olderPage = projectTimelineDiaryPage(
+        ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row })),
+      );
+      const rawOlder = olderPage.rows;
       const olderPhotoIds = collectTimelineDiaryPhotoIds(rawOlder, user);
       const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rawOlder,
@@ -1293,6 +1330,10 @@ export default function Timeline() {
         }
       }
       if (isCurrentPage() && older.length) {
+        setOldestFetchedEntryAt(olderPage.oldestFetchedEntryAt);
+        if (olderPage.hiddenCount > 0) {
+          setEntriesTotal((total) => (total === null ? null : total - olderPage.hiddenCount));
+        }
         setDiaryPhotoIds((current) => unionTimelineDiaryPhotoIds(current, olderPhotoIds));
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
@@ -1425,19 +1466,6 @@ export default function Timeline() {
     };
   }, [load]);
 
-  const stageCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    entries.forEach((e) => {
-      const stage = resolveTimelineDiaryEntryStage(e);
-      if (stage) m[stage] = (m[stage] || 0) + 1;
-    });
-    return m;
-  }, [entries]);
-  const stageTaggedEntryCount = STAGES.reduce(
-    (total, stage) => total + (stageCounts[stage.value] || 0),
-    0,
-  );
-
   const enrichedEntries = useMemo(() => {
     const knownGrowEvents =
       supplementalLinkedGrowEvents.length === 0
@@ -1492,13 +1520,28 @@ export default function Timeline() {
 
   const displayEntries = useMemo(
     () =>
-      mergeTimelineMeasurementDisplayEntries(
-        enrichedEntries,
-        manualSensorMeasurementEntries.map((entry) =>
-          formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+      dropBlankQuickLogPlaceholderRows(
+        mergeTimelineMeasurementDisplayEntries(
+          enrichedEntries,
+          manualSensorMeasurementEntries.map((entry) =>
+            formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
+          ),
         ),
       ),
     [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
+  );
+
+  const stageCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    displayEntries.forEach((e) => {
+      const stage = resolveTimelineDiaryEntryStage(e);
+      if (stage) m[stage] = (m[stage] || 0) + 1;
+    });
+    return m;
+  }, [displayEntries]);
+  const stageTaggedEntryCount = STAGES.reduce(
+    (total, stage) => total + (stageCounts[stage.value] || 0),
+    0,
   );
 
   // Canonical Action Response Memory (read-only). One grower response renders
@@ -3174,11 +3217,42 @@ export default function Timeline() {
                                       plantId={e.plant_id ?? null}
                                       tentId={e.tent_id ?? null}
                                       showFollowUp
-                                      onRemoved={(removedId) => {
-                                        setEntries((rows) =>
-                                          rows.filter((r) => r.id !== removedId),
-                                        );
-                                      }}
+                                      onRemoved={(
+                                        (origin: { requestId: number; readKey: string | null }) =>
+                                        (removedId: string) => {
+                                          if (
+                                            !diaryRemovalCompletionStillCurrent(origin, {
+                                              requestId: readRequestIdRef.current,
+                                              readKey: activeReadKeyRef.current,
+                                            })
+                                          ) {
+                                            if (
+                                              origin.readKey !== null &&
+                                              origin.readKey === activeReadKeyRef.current
+                                            ) {
+                                              // A same-scope refresh may still include this deletion
+                                              // or already count it. Reload after confirmation instead
+                                              // of guessing, superseding any older in-flight read.
+                                              void load();
+                                            }
+                                            return;
+                                          }
+                                          const rows = entriesSnapshotRef.current;
+                                          if (!rows.some((row) => row.id === removedId)) return;
+                                          const next = rows.filter((row) => row.id !== removedId);
+                                          // Snapshot of the rows this completion already counted, so a
+                                          // second completion of the same read sees the id as gone.
+                                          // It is not the list React renders.
+                                          entriesSnapshotRef.current = next;
+                                          setEntries((current) =>
+                                            current.filter((row) => row.id !== removedId),
+                                          );
+                                          setEntriesTotal(diaryEntriesTotalAfterRemoval);
+                                        }
+                                      )({
+                                        requestId: readRequestIdRef.current,
+                                        readKey: activeReadKey,
+                                      })}
                                     />
                                   </>
                                 ) : null}

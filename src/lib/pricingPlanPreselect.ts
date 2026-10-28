@@ -17,16 +17,14 @@ import { CREDIT_PACK_IDS, type CreditPackId } from "@/lib/paidPlanAllowlist";
 
 export type PricingBillingPeriod = "monthly" | "annual";
 
-export type PricingPreselectPlan =
-  "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual" | "founder_lifetime";
+export type PricingPreselectPlan = "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual";
 
 export interface PricingPlanPreselect {
   /** Canonical plan id chosen by the query param, or `null` when absent/unknown. */
   plan: PricingPreselectPlan | null;
   /**
    * Billing toggle that should be set on mount. `null` = do not override the
-   * page default. Founder Lifetime is a one-time plan and does not change
-   * the toggle.
+   * page default.
    */
   billing: PricingBillingPeriod | null;
 }
@@ -40,7 +38,6 @@ const PLAN_PARAM_MAP: Readonly<Record<string, PricingPreselectPlan>> = Object.fr
   pro_annual: "pro_annual",
   craft_monthly: "craft_monthly",
   craft_annual: "craft_annual",
-  founder_lifetime: "founder_lifetime",
 });
 
 const BILLING_FOR_PLAN: Readonly<Record<PricingPreselectPlan, PricingBillingPeriod | null>> =
@@ -49,7 +46,6 @@ const BILLING_FOR_PLAN: Readonly<Record<PricingPreselectPlan, PricingBillingPeri
     pro_annual: "annual",
     craft_monthly: "monthly",
     craft_annual: "annual",
-    founder_lifetime: null,
   });
 
 export function resolvePricingPlanPreselect(
@@ -69,8 +65,7 @@ export function isPreselectPlanId(value: unknown): value is PricingPreselectPlan
     value === "pro_monthly" ||
     value === "pro_annual" ||
     value === "craft_monthly" ||
-    value === "craft_annual" ||
-    value === "founder_lifetime"
+    value === "craft_annual"
   );
 }
 

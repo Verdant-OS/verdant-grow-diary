@@ -80,10 +80,8 @@ describe("SoftwareApplication offers match the publicly purchasable SKU list", (
     expect(HEAD_INVARIANTS).not.toContain('"Founder Lifetime"');
   });
 
-  it("the premise holds: Pricing.tsx gates the Founder card behind the deep link", () => {
-    // If the Founder card ever returns to the default public grid, this test
-    // must be revisited together with the offers list.
-    expect(PRICING_PAGE).toContain("showFounderOffer &&");
-    expect(PRICING_PAGE).toContain('"pricing-card-founder"');
+  it("Pricing.tsx no longer mounts a Founder card", () => {
+    expect(PRICING_PAGE).not.toContain("showFounderOffer");
+    expect(PRICING_PAGE).not.toContain('"pricing-card-founder"');
   });
 });

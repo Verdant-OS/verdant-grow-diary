@@ -78,9 +78,9 @@ why: Cheeko approved 2026-10-28 11:14 CT ("Yes, have OG Kush write the Claude pr
 branch: claude/agents-md-amendment-2026-10-28 (created at bbc77ae23164847772de6b53ecf18d7735932342)
 base: verdant-grow-diary
 checkout: git fetch origin claude/agents-md-amendment-2026-10-28 verdant-grow-diary && git switch claude/agents-md-amendment-2026-10-28 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED (the draft PR is opened right after this commit is pushed; the follow-up commit records its URL)
-head_sha: NOT_MEASURED until pushed; the follow-up commit records the pushed SHA and its observation time
-state: implemented / local only (draft PR pending)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2598 (draft; stay draft)
+head_sha: 5d944d9431858b0cbcc167129c87383e4a4e68c0 observed on origin/claude/agents-md-amendment-2026-10-28 at 2026-10-28 11:38 CT; the commit that records this line moves the head past it, so read the current head from the PR before any current-head claim
+state: pushed draft
 current_step: AGENTS.md six changes applied; all 18 governed files stamped 2026-10-28.1 by scripts/sync-sentinel-mirror.mjs; GEMINI.md SENTINEL-CORE re-embedded; roster.md Role profiles map every seat; local parity/BUMP/mirror PASS; vitest BLOCKED (see blockers)
 next_action: independent review, Sour Diesel then Jack Herer, at the exact head
 post_merge_check: NOT_APPLICABLE (governance docs only; no feature release). After merge, confirm node scripts/check-sentinel-version-parity.mjs reports 2026-10-28.1 across 18 files on verdant-grow-diary and that docs/agents/roles/* all still exist.
@@ -89,18 +89,18 @@ decisions: §16 keeps the three sentences src/test/check-bun-lockfile-policy.tes
 tried_and_rejected: bun install --frozen-lockfile in this container (the SKILL's supported path): failed with ProxyConnectFailed 403 on pinned tarballs, so vitest cannot run here; no unpinned install and no lockfile change, per AGENTS.md §16. Hand-editing GEMINI.md: rejected, the sync script owns the mirror.
 commands: node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary; node --test scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; bunx vitest run src/test/check-bun-lockfile-policy.test.ts src/test/sentinel-mirror-prettier-fence.test.ts; git diff --name-only bbc77ae23164847772de6b53ecf18d7735932342...HEAD; grep -n "eighteen\|twelve" AGENTS.md; grep -n "roles/canopy" AGENTS.md
 files_touched: AGENTS.md; GEMINI.md; CLAUDE.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/grok.md; docs/agents/roles/claude.md; docs/agents/roles/codex.md; docs/agents/roles/gemini.md; docs/agents/roles/canopy.md; docs/agents/roles/graft.md; docs/agents/roles/root-cause.md; docs/agents/roles/trellis.md; docs/agents/roles/verdante.md; docs/agents/roles/chemdawg.md; docs/agents/roles/golden-toad.md; docs/agents/roles/harvest.md; docs/agents/constitution/roster.md; docs/agents/HANDOFF_LOG.md (this block only)
-files_remaining: docs/agents/HANDOFF_LOG.md (this block: pr URL and head_sha after the push)
+files_remaining: none
 blockers: GitHub Actions billing lock (reported ~03:28 CT 2026-10-28): CI is NOT_MEASURED until the founder clears it. Local vitest BLOCKED: node_modules absent and the frozen install 403s on pinned tarballs; the lockfile-policy AGENTS assertions were replicated with plain node instead (PASS), the prettier-fence test's mirror check is covered by the parity script's MIRROR PASS.
 open_questions: none
 gotchas: AGENTS.md and GEMINI.md are Prettier-ignored; never run a formatter on them. A new head invalidates any review. Keep the PR draft; merge needs Cheeko's per-item yes at the exact head. CLAUDE.md's Repository traps still say "eighteen" in prose; CLAUDE.md is version-line-only in this PR, so that wording is a later amendment.
-links: prompt AGENTS-MD-AMENDMENT-2026-10-28 (OG Kush, 2026-10-28 11:25 CT); PR URL in the follow-up commit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2598; prompt AGENTS-MD-AMENDMENT-2026-10-28 (OG Kush, 2026-10-28 11:25 CT)
 artifacts: this branch's diff against bbc77ae23164847772de6b53ecf18d7735932342; local check output pasted in the PR body
 reviewer_seat: Sour Diesel, then Jack Herer (OG Kush routes; this session is excluded as author)
 reviewer_sha: none
 session_state: Claude cloud session session_017UoYKurnCoBn2fCcpFWXMS; no routines; no paused workflows; pending human decision: Cheeko's per-item yes at the final reviewed head
 claimed_by: Claude session_017UoYKurnCoBn2fCcpFWXMS, 2026-10-28 11:32 CT (OG Kush prompt, Cheeko approval 2026-10-28 11:14 CT)
 owner: Claude session_017UoYKurnCoBn2fCcpFWXMS
-last_updated: 2026-10-28 11:32 CT, by Claude
+last_updated: 2026-10-28 11:38 CT, by Claude
 ```
 
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540

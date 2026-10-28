@@ -112,7 +112,9 @@ describe("Start your room draft hydration after a failed grow read", () => {
     testState.growsError = null;
     view.rerender(page());
 
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    // One-step form (VER-296): the resumed draft stays bound to its grow.
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent("North run");
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(draftKey)).toContain(PENDING_TENT_ID);
   });
 });

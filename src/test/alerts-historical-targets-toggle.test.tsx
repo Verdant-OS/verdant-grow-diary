@@ -8,6 +8,8 @@
  *   - Alerts are never resolved or changed by hiding (presentation only).
  *   - An incomplete name read hides nothing it cannot prove is removed.
  *   - No toggle when nothing is historical.
+ *   - A visible "N hidden for archived tents/plants" count while hidden; none at zero.
+ *   - The loop card never auto-queues after a failed name read.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -53,7 +55,7 @@ const ALERTS = [
 const state = vi.hoisted(() => ({
   alerts: [] as unknown[],
   readComplete: true,
-  namesStatus: "ok" as "ok" | "loading",
+  namesStatus: "ok" as "ok" | "loading" | "unavailable",
   writes: vi.fn(),
   queue: vi.fn(),
 }));
@@ -168,6 +170,9 @@ describe("/alerts — archived and removed targets hidden by default", () => {
     const toggle = screen.getByTestId("alerts-historical-targets-toggle");
     expect(toggle.textContent).toBe("Show archived targets (2)");
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByTestId("alerts-historical-targets-hidden-count").textContent).toBe(
+      "2 hidden for archived tents/plants",
+    );
   });
 
   it("the toggle reveals them, labelled, and hides them again", () => {
@@ -180,6 +185,8 @@ describe("/alerts — archived and removed targets hidden by default", () => {
     const toggle = screen.getByTestId("alerts-historical-targets-toggle");
     expect(toggle.textContent).toBe("Hide archived targets (2)");
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    // Nothing is hidden while they are shown.
+    expect(screen.queryByTestId("alerts-historical-targets-hidden-count")).toBeNull();
 
     fireEvent.click(toggle);
     expect(screen.queryByText("Archived tent humidity high")).toBeNull();
@@ -200,12 +207,16 @@ describe("/alerts — archived and removed targets hidden by default", () => {
     expect(screen.getByTestId("alerts-historical-targets-toggle").textContent).toBe(
       "Show archived targets (1)",
     );
+    expect(screen.getByTestId("alerts-historical-targets-hidden-count").textContent).toBe(
+      "1 hidden for archived tents/plants",
+    );
   });
 
   it("no toggle when every alert is on a current target", () => {
     state.alerts = ALERTS.slice(0, 2);
     renderAlerts();
     expect(screen.queryByTestId("alerts-historical-targets-toggle")).toBeNull();
+    expect(screen.queryByTestId("alerts-historical-targets-hidden-count")).toBeNull();
   });
 
   it("all-historical list shows the empty state plus the toggle", () => {
@@ -236,6 +247,15 @@ describe("/alerts — archived and removed targets hidden by default", () => {
     state.namesStatus = "loading";
     renderAlerts();
     expect(screen.queryByTestId("loop-card")).toBeNull();
+    expect(state.queue).not.toHaveBeenCalled();
+  });
+
+  it("a failed name read: the loop card still navigates but never auto-queues", async () => {
+    state.alerts = ALERTS.slice(2, 3); // only an archived-tent alert, now unprovable
+    state.namesStatus = "unavailable";
+    renderAlerts();
+    fireEvent.click(screen.getByTestId("loop-card"));
+    await Promise.resolve();
     expect(state.queue).not.toHaveBeenCalled();
   });
 });

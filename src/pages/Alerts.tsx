@@ -51,6 +51,7 @@ import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
 import { useAlertLinkedTargetEvidence } from "@/hooks/useAlertLinkedTargetEvidence";
 import {
+  alertTargetHiddenCountLabel,
   alertTargetHistoricalToggleLabel,
   buildAlertTargetPresenterInput,
   deriveAlertTargetContext,
@@ -236,6 +237,9 @@ export default function Alerts() {
   // so it neither flashes nor auto-queues on an unverified target.
   const targetsSettled =
     targetNames.status !== "loading" && targetNames.status !== "idle" && !linkedTargets.idsLoading;
+  // A failed name read can't prove a target is current, so the loop card
+  // still navigates but never auto-queues on it.
+  const targetNamesRead = targetNames.status === "ok";
   // Loop next-step card only ever counts alerts on current targets.
   const currentOpenAlerts = useMemo(
     () => targetHistory.current.filter((a) => a.status === "open"),
@@ -276,7 +280,7 @@ export default function Alerts() {
     // chooses via the per-row "Add to Action Queue" buttons.
     if (!singleUnlinkedOpenAlert) return;
     // Defense in depth: the card is not rendered until targets settle.
-    if (!targetsSettled) return;
+    if (!targetsSettled || !targetNamesRead) return;
     const res = await queueOpenAlertToActionQueue(singleUnlinkedOpenAlert);
     if (!res.ok) return false;
     if (res.actionQueueId) {
@@ -431,7 +435,15 @@ export default function Alerts() {
       </div>
 
       {!hasInvalidScope && status === "ok" && targetHistory.historical.length > 0 ? (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex items-center justify-end gap-3">
+          {showHistoricalTargets ? null : (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="alerts-historical-targets-hidden-count"
+            >
+              {alertTargetHiddenCountLabel(targetHistory.historical.length)}
+            </p>
+          )}
           <Button
             size="sm"
             variant="outline"

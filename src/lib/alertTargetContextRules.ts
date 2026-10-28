@@ -52,6 +52,11 @@ export function alertTargetHistoricalToggleLabel(shown: boolean, count: number):
   return `${shown ? "Hide" : "Show"} archived targets (${count})`;
 }
 
+/** Visible count beside the toggle while those alerts are hidden; null when nothing is hidden. */
+export function alertTargetHiddenCountLabel(hiddenCount: number): string | null {
+  return hiddenCount > 0 ? `${hiddenCount} hidden for archived tents/plants` : null;
+}
+
 /** Read state of a tent/plant row for target labelling. */
 export type AlertTargetRecordState = "active" | "archived" | "missing";
 

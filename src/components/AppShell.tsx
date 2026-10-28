@@ -15,6 +15,7 @@ import {
   SIGNED_OUT_LANDING,
 } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import RouteTransitionSkeleton from "./RouteTransitionSkeleton";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
@@ -279,11 +280,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     (!hydrated || loading || authStatus === "loading") &&
     (!hydrated || authStatus !== "revalidation_failed")
   )
-    return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
-    );
+    return <RouteTransitionSkeleton label="Verdant" testId="app-shell-auth-pending" />;
   // getUser transport/server error is not signed-out. Stay on this URL, do not
   // mount pageContent (no private REST), do not bounce to /welcome. But never
   // a dead end either: a bare loading shell left a grower with no way out.

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import RouteTransitionSkeleton from "@/components/RouteTransitionSkeleton";
 import { useAuth } from "@/store/auth";
 import {
   resolveRootEntrySurface,
@@ -13,11 +14,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Landing = lazy(() => import("@/pages/Landing"));
 
 function RootEntryLoader() {
-  return (
-    <div role="status" aria-live="polite" className="flex min-h-[60vh] items-center justify-center">
-      <span className="sr-only">Loading…</span>
-    </div>
-  );
+  return <RouteTransitionSkeleton label="Verdant" testId="root-entry-skeleton" />;
 }
 
 /**

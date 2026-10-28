@@ -23,8 +23,9 @@ export const SITE_SOFTWARE_APPLICATION_JSON_LD = {
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   url: VERDANT_SITE_ORIGIN,
+  publisher: { "@id": `${VERDANT_SITE_ORIGIN}/#organization` },
   description:
-    "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.",
+    "Verdant Grow Diary is a web-based Grow OS for indoor cultivation, combining plant logs, photos, timelines and source-labeled sensor readings with cautious AI and grower-approved decisions.",
   offers: [
     { "@type": "Offer", name: "Free", price: String(PRICING.free.price), priceCurrency: "USD" },
     {

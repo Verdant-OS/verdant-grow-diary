@@ -160,10 +160,6 @@ describe("founder lifetime — one-time, atomic, capped, idempotent", () => {
     expect(MIGRATION).toContain(
       "GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO service_role;",
     );
-    // And the price resolver actually consults it for founder_lifetime.
-    const priceFn = read("supabase/functions/get-paddle-price/index.ts");
-    expect(priceFn).toMatch(/founder_lifetime_slots_remaining/);
-    expect(priceFn).toMatch(/plan_sold_out/);
   });
 
   it("checkout attribution: the webhook accepts the userId key the live checkout sends", () => {

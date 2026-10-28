@@ -26,15 +26,15 @@ Evidence labels follow `CLAUDE.md` § Evidence discipline. Status words: `PASS`,
 
 ## 2. Requirements and assumptions
 
-| #   | Requirement (from the assignment)                                     | How it is met                                                                                       |
-| --- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| R1  | Audit the deploy branch, not `main`                                   | Every read is at `604274a7` on `verdant-grow-diary`; local HEAD fast-forwarded to it                |
-| R2  | Reuse merged architecture documentation instead of duplicating it     | `#2564` is the deliverable; this file is a receipt and review brief, not a second contract          |
-| R3  | Separate permanent architecture from CURRENT_STATE operational facts  | Contract §0.1 already fences this; nothing operational is written into the contract by this session |
-| R4  | Rejected/deferred alternatives                                        | Contract §12–§13 and spec §14 carry them; §10 below lists what this session adds to that record     |
-| R5  | Release topology only after overlapping PRs resolve                   | Gates `#2555`, `#2553`, `#1971`, `#2538` merged 2026-10-27; Matthew approved the stacked slice      |
-| R6  | No application code in the specification slice                        | `PASS`: one new Markdown file and one handoff-log block                                             |
-| R7  | PASS/FAIL/BLOCKED/NOT_MEASURED/NOT_APPLICABLE; one calibrated verdict | §12 and §14                                                                                         |
+| #   | Requirement (from the assignment)                                     | How it is met                                                                                                                                                        |
+| --- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | Audit the deploy branch, not `main`                                   | Every read is at `604274a7` on `verdant-grow-diary`; local HEAD fast-forwarded to it                                                                                 |
+| R2  | Reuse merged architecture documentation instead of duplicating it     | `#2564` is the deliverable; this file is a receipt and review brief, not a second contract                                                                           |
+| R3  | Separate permanent architecture from CURRENT_STATE operational facts  | Contract §0.1 already fences this; nothing operational is written into the contract by this session                                                                  |
+| R4  | Rejected/deferred alternatives                                        | Contract §12–§13 and spec §14 carry them; §10 below lists what this session adds to that record                                                                      |
+| R5  | Release topology only after overlapping PRs resolve                   | Gates `#2555`, `#2553`, `#1971`, `#2538` merged 2026-10-27; Matthew approved the stacked slice                                                                       |
+| R6  | No application code in the specification slice                        | `PASS`: one new Markdown file, seven corrected lines in `handoff-verdant-architecture-contract.md` (on Matthew's instruction, 2026-10-28), and one handoff-log block |
+| R7  | PASS/FAIL/BLOCKED/NOT_MEASURED/NOT_APPLICABLE; one calibrated verdict | §12 and §14                                                                                                                                                          |
 
 Assumptions, each labelled:
 
@@ -62,8 +62,9 @@ Assumptions, each labelled:
 | Quick Log remembered-target recovery | No open PR reintroduces remembered-target or only-plant auto-selection; `#2529` (merged) narrows auto-open to a selected plant                                                                                                            | Ban stands; not touched      |
 | Billing                              | `#2028` merged (`0200d255`, stop selling Founder Lifetime); `#2570` (retire Founder sales machinery, draft) and `#2221` (Paddle wire, Codex P1) open                                                                                      | Out of scope; not touched    |
 
-Result: **no competing implementation was created.** The only repository write from this session is
-this file and its handoff-log block.
+Result: **no competing implementation was created.** The repository writes from this session are
+this file, its handoff-log block, and the three assignment-text corrections in
+`handoff-verdant-architecture-contract.md` that Matthew asked for after reading §5.
 
 ## 4. Current architecture — what the merged documents now say, and what this session re-read
 
@@ -94,8 +95,8 @@ No file in the repository carries that title (`grep -rli "optimal tech stack"` o
 repository root at `604274a7`: only the topology spec's own §6 note). The spec treats the
 assignment's list of "non-negotiable conclusions" as the evaluation, and §6.3 (merged in `#2564`)
 re-read all fourteen rows at `27991451`. This session re-read the eight source rows again at
-`604274a7`, independently, from the files named. Rows 11–14 are production assertions and are not
-re-measured here.
+`604274a7`, independently, from the files named. The spec's §6.1/§6.3 rows 11–14 are production assertions (row 10 in
+this table) and are not re-measured here.
 
 | #   | Conclusion                                                                                   | Status at `604274a7`                   | Evidence (`established fact`, read this session)                                                                                                                                                                                                                                                                                                                                                              |
 | --- | -------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -151,10 +152,13 @@ rows 4 and 5 as current. This session could not take those reads (§8) and did n
 
 ## 9. File-level plan
 
-This slice (docs only, one branch `claude/new-session-u6kn52`, one draft PR):
+This slice (docs only, one branch `claude/new-session-u6kn52`, one PR, `#2572`, ready for review on
+Matthew's instruction):
 
 - `docs/audits/architecture-contract-post-merge-verification-2026-10-28.md` — this file.
 - `docs/agents/HANDOFF_LOG.md` — one block, `ARCH-CONTRACT-POST-MERGE-20261028`.
+- `handoff-verdant-architecture-contract.md` — rules 8 and 13, §5, Q2/Q4 and the lineage line: the
+  three assignment-text corrections, on Matthew's instruction (2026-10-28).
 
 Not touched, by design: `docs/architecture-contract.md`, `docs/specs/release-topology-specification.md`
 (both merged via `#2564` 60 minutes before this audit; the two merges past the stamp, `#2559` and
@@ -245,7 +249,8 @@ not_done:
   - M1, M2, M7, M10 (BLOCKED, §8)
   - No CURRENT_STATE.md, contract, spec or governance edit
 
-disposition: draft PR, docs only; no merge, enqueue, publish or production action from this session.
+disposition: PR #2572, ready for review on Matthew's instruction, docs only; no merge, enqueue, publish
+  or production action from this session.
 ```
 
 ## 14. Calibrated verdict

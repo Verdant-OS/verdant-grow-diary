@@ -85,7 +85,7 @@ current_step: Receipt written: AC-3.2 610 at 27991451 -> 609 at the tip (#2028 d
 next_action: Independent read by an available non-contributing Grok session per the receipt's section 13; then close this block. No merge, enqueue, publish or production action from this session.
 post_merge_check: NOT_APPLICABLE (receipt; the next contract restamp owns the 609 / 941-940 figures)
 active_writer: Claude session_017UoYKvojgRxESWUyQyGEmj on claude/new-session-u6kn52
-decisions: No second contract or spec (AGENTS.md section 9; #2564 merged 23:51 UTC). No closure edit of the ARCH-CONTRACT-RESTAMP / FIX-2146 blocks (#2571 already carries it). Contract and spec left untouched for the two docs-only merges past the stamp.
+decisions: No second contract or spec (AGENTS.md section 9; #2564 merged 23:51 UTC). No closure edit of the ARCH-CONTRACT-RESTAMP / FIX-2146 blocks (#2571 already carries it). Contract and spec left untouched: the two merges past the stamp (#2559, #2028) are application changes whose moved cites #2564 re-read; the next restamp owns the census deltas.
 tried_and_rejected: Live /version.json read: curl blocked by the session bash safety hook; Firecrawl out of credits; fetch tool ENOTFOUND (host outside allowed domains). One attempt each; not routed around.
 commands: git ls-tree -r --name-only 604274a7 -- src/lib | grep -E '^src/lib/[^/]*Rules\.ts$' | wc -l; grep -rhoE 'from "@/lib/react-router-compat"' src --include=*.ts --include=*.tsx | wc -l; grep -rliE 'nelson|modified ?z|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' src supabase scripts e2e tools plugins spikes; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs
 files_touched: docs/audits/architecture-contract-post-merge-verification-2026-10-28.md (new); handoff-verdant-architecture-contract.md (rules 8 and 13, corrections log, Q2/Q4, lineage: the three assignment-text corrections, on Matthew's instruction 2026-10-28); docs/agents/HANDOFF_LOG.md (this block only)
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: Claude cloud session; no cron, watcher, comment, review request, ready-state change, merge or production action
 claimed_by: Claude session_017UoYKvojgRxESWUyQyGEmj, 2026-10-28 00:20 UTC (Matthew's assignment prompt; no GitHub claim comment posted)
 owner: Claude (this session); default inheritor OG Kush
-last_updated: 2026-10-28 00:40 UTC, by Claude
+last_updated: 2026-10-28 00:26 UTC, by Claude (sour diesel should-fix round at 4ca59f23)
 ```
 
 ### ARCH-CONTRACT-RESTAMP-20261027

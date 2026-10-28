@@ -13,7 +13,7 @@ import { createElement } from "react";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { buildCultivationCalendarMonthGrid } from "@/lib/cultivationCalendarMonthGridRules";
-import { calendarStartDateDayKey } from "@/lib/calendarLocalDayRules";
+import { calendarInstantDayKey, calendarStartDateDayKey } from "@/lib/calendarLocalDayRules";
 import { buildDiaryCalendarViewModel, currentMonthKey } from "@/lib/diaryCalendarViewModel";
 import { deriveFlowerWindowCalendar } from "@/lib/flowerWindowCalendarRules";
 import {
@@ -204,5 +204,12 @@ describe("calendar local-day grouping (America/Chicago)", () => {
     expect(upcoming).toHaveTextContent(/Upcoming suggested review/);
     expect(upcoming).toHaveTextContent(/Oct 11/);
     expect(upcoming.textContent).not.toMatch(/Oct 12/);
+  });
+});
+
+describe("calendarInstantDayKey date-only year range", () => {
+  it("rejects a bare date outside years 1000-9999, matching the instant path", () => {
+    expect(calendarInstantDayKey("0500-06-01")).toBeNull();
+    expect(calendarInstantDayKey("2026-06-01")).toBe("2026-06-01");
   });
 });

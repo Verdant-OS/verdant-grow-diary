@@ -36,6 +36,7 @@ function isStrictDateOnly(value: string): boolean {
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
+  if (year < 1000 || year > 9999) return false;
   const probe = new Date(Date.UTC(year, month - 1, day));
   return (
     probe.getUTCFullYear() === year &&

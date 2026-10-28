@@ -118,15 +118,15 @@ export interface QuickLogActivityDefinition {
 export const QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON =
   "Harvest logging is not enabled on this backend yet.";
 
-/** Tile copy is still being worded; placeholders stay greppable until then. */
+/** Tile copy chosen by Matthew on 2026-10-28 (review 5677116739, P3). */
 export const QUICK_LOG_NOTE_TILE_COPY = {
-  label: "TODO_COPY: Quick note",
-  description: "TODO_COPY: Anything you want to remember.",
+  label: "Note",
+  description: "Anything you want to remember.",
 } as const;
 
 export const QUICK_LOG_ISSUE_TILE_COPY = {
-  label: "TODO_COPY: Problem spotted",
-  description: "TODO_COPY: Something looks off (leaves, pests, smell).",
+  label: "Problem spotted",
+  description: "Something looks off: leaves, pests, smell.",
 } as const;
 
 /** Heading for any other observation, including old unmarked notes. */

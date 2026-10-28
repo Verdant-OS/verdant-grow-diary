@@ -287,8 +287,11 @@ export function summarizeHarvestPlants(
       `Change between first and latest check: Amber ${formatSignedPoints(latest.amber - first.amber)} over ${checkWord}; Cloudy ${formatSignedPoints(latest.cloudy - first.cloudy)} over ${checkWord}.`,
       `Your latest check is ${position} the window you chose. Confirm on several bud sites before you harvest.`,
     ];
-    const projection = projectAmberDate(items, ranges[target].amberMin);
-    if (projection.hasProjection && projection.text) lines.push(projection.text);
+    // Once amber has reached the lower edge, a projection would name a date in the past.
+    if (latest.amber < ranges[target].amberMin) {
+      const projection = projectAmberDate(items, ranges[target].amberMin);
+      if (projection.hasProjection && projection.text) lines.push(projection.text);
+    }
     return { key, heading: `${name} (${checkWord})`, lines };
   });
 }
@@ -345,13 +348,22 @@ export function buildHarvestCsv(
     .join("\r\n");
 }
 
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+
+/** TSV cell for pasting into a spreadsheet: one line, and never a live formula. */
+function tsvCell(value: string): string {
+  const flat = String(value ?? "").replace(/[\t\r\n]+/g, " ");
+  const leadingSignIsFormula = /^[+-]/.test(flat) && !PLAIN_NUMBER.test(flat);
+  return /^[=@]/.test(flat) || leadingSignIsFormula ? `'${flat}` : flat;
+}
+
 export function buildHarvestTsv(
   checks: readonly HarvestCheck[],
   target: HarvestTarget,
   ranges: HarvestRanges,
 ): string {
   return buildHarvestExportMatrix(checks, target, ranges)
-    .map((row) => row.map((cell) => String(cell ?? "").replace(/[\t\r\n]+/g, " ")).join("\t"))
+    .map((row) => row.map((cell) => tsvCell(cell)).join("\t"))
     .join("\n");
 }
 

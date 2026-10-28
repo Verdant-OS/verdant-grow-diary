@@ -115,9 +115,8 @@ describe("public harvest window tracker page", () => {
     expect(within(table).getByText("Before window")).toBeInTheDocument();
     expect(within(table).getByText("In window")).toBeInTheDocument();
     expect(screen.getByText("Plant A (2 checks)")).toBeInTheDocument();
-    expect(
-      screen.getByText(/amber would reach the lower edge of your window around 2026-11-04/),
-    ).toBeInTheDocument();
+    // Amber 14% is already past the peak window's 10% edge, so no past-date projection.
+    expect(screen.queryByText(/amber would reach the lower edge/)).not.toBeInTheDocument();
     expect(trackHarvestTrackerEvent).toHaveBeenLastCalledWith("harvest_tracker_check_added", {
       check_count: 2,
       plant_count: 1,
@@ -148,6 +147,29 @@ describe("public harvest window tracker page", () => {
         "In window",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("prints inside a visible print section and keeps blank mode until afterprint", () => {
+    vi.useFakeTimers();
+    const print = vi.fn();
+    vi.stubGlobal("print", print);
+    renderPage();
+    expect(screen.getByTestId("harvest-window-page")).toHaveAttribute(
+      "data-print-section",
+      "public-guide-tool",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Print blank check sheet" }));
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(print).toHaveBeenCalledTimes(1);
+    const sheet = screen.getByText("Verdant Grow Diary — Blank Trichome Check Sheet").parentElement;
+    expect(sheet?.className).toContain("print:block");
+    act(() => {
+      window.dispatchEvent(new Event("afterprint"));
+    });
+    expect(sheet?.className).not.toContain("print:block");
+    vi.useRealTimers();
   });
 
   it("clears only after confirmation", () => {

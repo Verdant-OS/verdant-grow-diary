@@ -272,6 +272,19 @@ describe("CSV and TSV export (source self-test 8)", () => {
     expect(lines[1].split("\t")[10]).toBe("a b c");
   });
 
+  it("neutralizes spreadsheet formulas in the copied TSV without CSV quoting", () => {
+    const tsv = buildHarvestTsv(
+      [check({ plant: "=1+1", pistils: '@sum, "x"', photoNote: "-2+3" })],
+      "peak",
+      ranges,
+    );
+    const cells = tsv.split("\n")[1].split("\t");
+    expect(cells[5]).toBe("'=1+1");
+    expect(cells[10]).toBe('\'@sum, "x"');
+    expect(cells[11]).toBe("'-2+3");
+    expect(cells[6]).toBe("20");
+  });
+
   it("names the file from an injected date", () => {
     expect(harvestCsvFilename("2026-10-28")).toBe("harvest-checks-2026-10-28.csv");
     expect(localIsoDate(new Date(2028, 1, 29, 23, 59))).toBe("2028-02-29");
@@ -322,10 +335,25 @@ describe("plants, sorting and summaries", () => {
           "Latest check (2026-11-06): In window — Clear 6%, Cloudy 80%, Amber 14%.",
           "Change between first and latest check: Amber +10 points over 2 checks; Cloudy +10 points over 2 checks.",
           "Your latest check is within the window you chose. Confirm on several bud sites before you harvest.",
-          "At the pace you've logged, amber would reach the lower edge of your window around 2026-11-04. This is a rough projection from your own entries, not a prediction.",
         ],
       },
     ]);
+  });
+
+  it("projects only while the latest amber is still below the window's lower edge", () => {
+    const ranges = createDefaultHarvestRanges();
+    const rising = (first: number, latest: number) => [
+      check({ id: 1, date: "2026-11-01", clear: 20, cloudy: 80 - first, amber: first }),
+      check({ id: 2, date: "2026-11-05", clear: 20, cloudy: 80 - latest, amber: latest }),
+    ];
+    const energetic = summarizeHarvestPlants(rising(2, 6), "energetic", ranges)[0];
+    expect(energetic.lines.some((line) => line.includes("would reach"))).toBe(false);
+    const inPeak = summarizeHarvestPlants(rising(12, 20), "peak", ranges)[0];
+    expect(inPeak.lines.some((line) => line.includes("would reach"))).toBe(false);
+    const belowPeak = summarizeHarvestPlants(rising(4, 8), "peak", ranges)[0];
+    expect(belowPeak.lines[3]).toBe(
+      "At the pace you've logged, amber would reach the lower edge of your window around 2026-11-07. This is a rough projection from your own entries, not a prediction.",
+    );
   });
 
   it("uses singular wording and no projection for one check", () => {

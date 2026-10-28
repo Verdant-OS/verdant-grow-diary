@@ -282,10 +282,8 @@ export default function HarvestWindowTracker() {
         : "Opening print dialog for your trichome check log.",
     );
     trackHarvestTrackerEvent("harvest_tracker_print", {});
-    window.setTimeout(() => {
-      window.print();
-      setPrintMode("log");
-    }, 30);
+    window.addEventListener("afterprint", () => setPrintMode("log"), { once: true });
+    window.setTimeout(() => window.print(), 30);
   }
 
   function clearLog() {
@@ -322,7 +320,11 @@ export default function HarvestWindowTracker() {
   const hideForBlankPrint = printMode === "blank" ? "print:hidden" : "";
 
   return (
-    <div data-testid="harvest-window-page" className="min-h-screen bg-[#f6f8f5] text-emerald-950">
+    <div
+      data-testid="harvest-window-page"
+      data-print-section="public-guide-tool"
+      className="min-h-screen bg-[#f6f8f5] text-emerald-950"
+    >
       <header className="border-b border-emerald-900/10 bg-white print:hidden">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4">
           <a href="https://verdantgrowdiary.com/" aria-label="Verdant Grow Diary">

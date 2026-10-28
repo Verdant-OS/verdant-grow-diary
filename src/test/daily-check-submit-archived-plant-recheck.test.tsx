@@ -15,6 +15,7 @@ import {
   DAILY_CHECK_SUBMIT_SAVE_TEST_IDS,
   classifyDailyCheckPlantArchiveRead,
   dailyCheckSubmitBlockForPlantArchive,
+  dailyCheckSavePlantId,
   isDailyCheckSubmitSaveTestId,
 } from "@/lib/dailyCheckPlantSelectionRules";
 
@@ -321,6 +322,15 @@ describe("daily check archived-plant submit decision", () => {
         }),
       ),
     ).toEqual(retry);
+  });
+
+  it("re-checks the save control's own plant, and no plant for a tent-only save", () => {
+    expect(dailyCheckSavePlantId({ hintedPlantId: "Q", selectedPlantId: "P" })).toBe("Q");
+    // An empty hint is a tent-only save: there is no plant to re-check, so an
+    // unrelated archived page plant must not block it.
+    expect(dailyCheckSavePlantId({ hintedPlantId: "", selectedPlantId: "P" })).toBe("");
+    // Only a control without the hint attribute falls back to the page plant.
+    expect(dailyCheckSavePlantId({ hintedPlantId: null, selectedPlantId: "P" })).toBe("P");
   });
 
   it("recognizes the Daily Check save controls and ignores other buttons", () => {

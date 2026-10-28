@@ -1804,6 +1804,7 @@ function QuickLogV2SheetForOwner({
       archivedGrowIds,
     });
     if (archivedSaveBlock) {
+      if (pendingSubmission) keepSubmissionLockedRef.current = true;
       setLocalError(archivedSaveBlock);
       return;
     }

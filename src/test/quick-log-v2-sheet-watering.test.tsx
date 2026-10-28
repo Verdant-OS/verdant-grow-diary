@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY } from "@/lib/archivedGrowQuickLogRules";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import {
   claimPendingQuickLogWatering,
@@ -38,6 +39,7 @@ const toastError = vi.fn();
 const videoValidationMock = vi.fn();
 const RECENT_TARGET_KEY = "verdant.quickLog.lastTarget.v2.11111111-1111-4111-8111-111111111111";
 const authState = vi.hoisted(() => ({ ownerId: "11111111-1111-4111-8111-111111111111" }));
+const growState = vi.hoisted(() => ({ archivedGrows: [] as { id: string; name: string }[] }));
 const plantContextState = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
@@ -151,6 +153,7 @@ vi.mock("@/hooks/use-tents", () => ({
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
     grows: [{ id: "66666666-6666-4666-8666-666666666666", name: "Home Run", stage: "seedling" }],
+    archivedGrows: growState.archivedGrows,
   }),
 }));
 
@@ -832,6 +835,27 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(wateringWriterMock).toHaveBeenCalledTimes(2);
     expect(wateringWriterMock.mock.calls[1][0].volume_ml).toBe(750);
     expect(wateringWriterMock.mock.calls[1][0].idempotency_key).not.toBe(rejectedKey);
+  });
+
+  it("keeps the Water retry locked when an archived grow blocks it", async () => {
+    wateringWriterMock.mockResolvedValueOnce({ ok: false, reason: "rpc:receipt_unverified" });
+    const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+    await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+    growState.archivedGrows = [{ id: "66666666-6666-4666-8666-666666666666", name: "Home Run" }];
+    try {
+      view.rerenderOpen(true);
+      fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+      await waitFor(() =>
+        expect(screen.getAllByText(ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY).length).toBeGreaterThan(0),
+      );
+      expect(wateringWriterMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible();
+      expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+    } finally {
+      growState.archivedGrows = [];
+    }
   });
 
   it("keeps the Water key and claim when a reused receipt cannot be verified", async () => {

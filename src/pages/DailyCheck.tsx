@@ -320,7 +320,7 @@ export default function DailyCheck() {
           const currentPlantId = dailyCheckSavePlantId({
             hintedPlantId: button.isConnected
               ? button.getAttribute("data-daily-check-save-plant")
-              : "",
+              : null,
             selectedPlantId: selectedPlantIdRef.current,
           });
           if (dailyCheckArchiveCheckIsStale(checkedPlantId, currentPlantId)) return;

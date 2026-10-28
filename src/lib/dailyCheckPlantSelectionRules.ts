@@ -197,13 +197,17 @@ export function isDailyCheckSubmitSaveTestId(
   return (DAILY_CHECK_SUBMIT_SAVE_TEST_IDS as readonly string[]).includes(testId);
 }
 
-/** The plant named on the save control wins. Otherwise Daily Check's selection is used. */
+/**
+ * The plant named on the save control wins, including an explicit empty hint:
+ * that is a tent-only save with no plant to re-check. Only a control with no
+ * hint attribute at all falls back to Daily Check's selection.
+ */
 export function dailyCheckSavePlantId(input: {
   readonly hintedPlantId: string | null | undefined;
   readonly selectedPlantId: string;
 }): string {
-  const hinted = input.hintedPlantId?.trim() ?? "";
-  return hinted || input.selectedPlantId;
+  if (input.hintedPlantId == null) return input.selectedPlantId;
+  return input.hintedPlantId.trim();
 }
 
 /** A read is stale when the plant that would be saved changed while it was in flight. */

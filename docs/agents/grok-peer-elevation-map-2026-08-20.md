@@ -1,5 +1,9 @@
 # Grok peer-elevation map (2026-08-20)
 
+Historical record from 2026-08-20. The live role list is in `AGENTS.md`. There is no
+Council Chair role and no Security role (Matthew Cheek, 2026-10-10). Rows below that
+name those files stay as the record of that day's parity set.
+
 **Slice:** docs-only governance. Not an One-Tent product fix.
 **Approval:** Cheek (Matthew), in session 2026-08-20 — elevate Grok as a peer to
 Codex and Claude. **Refined charter (same day):** title **Product Intelligence,

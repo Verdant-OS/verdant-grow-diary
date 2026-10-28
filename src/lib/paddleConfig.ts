@@ -44,7 +44,7 @@ export interface PaddleConfig {
   environment: string | null;
   reason?: PaddleConfigUnavailableReason;
   clientToken?: string;
-  priceIds?: Record<PaddlePlanSlug, string>;
+  priceIds?: Partial<Record<PaddlePlanSlug, string>>;
 }
 
 interface PaddleEnvSource {
@@ -96,7 +96,7 @@ export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv(
   const proAnnual = (source.VITE_PADDLE_PRICE_PRO_ANNUAL ?? "").trim();
   const founderLifetime = (source.VITE_PADDLE_PRICE_FOUNDER_LIFETIME ?? "").trim();
 
-  if (!proMonthly || !proAnnual || !founderLifetime) {
+  if (!proMonthly || !proAnnual) {
     return { available: false, reason: "missing_price_id", environment: env };
   }
 
@@ -107,7 +107,7 @@ export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv(
     priceIds: {
       "pro-monthly": proMonthly,
       "pro-annual": proAnnual,
-      "founder-lifetime": founderLifetime,
+      ...(founderLifetime ? { "founder-lifetime": founderLifetime } : {}),
     },
   };
 }

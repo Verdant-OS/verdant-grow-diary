@@ -135,6 +135,7 @@ import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
   FEEDING_SAVE_SUCCESS_MESSAGE,
+  assessFeedingEcFields,
   buildFeedingFormPayload,
   feedingFormReasonToHelper,
   findFeedingPayloadRangeViolation,
@@ -168,6 +169,7 @@ import {
   buildFeedingDefaults,
   applyFeedingDefaultsToForm,
   feedingDefaultsPrefillSettled,
+  feedingRecipeMatches,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
 import {
@@ -566,6 +568,9 @@ function QuickLogV2SheetForOwner({
   const [videoChecking, setVideoChecking] = useState(false);
   const [photoChecking, setPhotoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  // The recipe the one-shot prefill wrote, so a target change can tell an
+  // untouched prefill (re-derive for the new plant) from grower edits (keep).
+  const appliedFeedingDefaultsRef = useRef<QuickLogFeedingFormState | null>(null);
   const [feedingDefaultsRefetchAfterByPlant, setFeedingDefaultsRefetchAfterByPlant] = useState<
     Record<string, number>
   >({});
@@ -884,6 +889,28 @@ function QuickLogV2SheetForOwner({
     [recentFeedingsQ.data, resolvedContext.plantId],
   );
 
+  // #2172 / VER-195: a target change must not carry plant A's prefilled recipe
+  // into plant B. An untouched prefill is cleared so B's own defaults (or none)
+  // apply; a recipe the grower edited is theirs and stays.
+  const feedingDefaultsPlantRef = useRef(resolvedContext.plantId);
+  // After a retarget reset only the recipe must be pristine for B's defaults.
+  const feedingRecipeRetargetedRef = useRef(false);
+  useEffect(() => {
+    if (feedingDefaultsPlantRef.current === resolvedContext.plantId) return;
+    feedingDefaultsPlantRef.current = resolvedContext.plantId;
+    const applied = appliedFeedingDefaultsRef.current;
+    if (!feedingDefaultsApplied || !applied) return;
+    if (!feedingRecipeMatches(feedingForm, applied)) return;
+    appliedFeedingDefaultsRef.current = null;
+    feedingRecipeRetargetedRef.current = true;
+    setFeedingForm((previous) => ({
+      ...previous,
+      lineId: EMPTY_QUICKLOG_FEEDING_FORM.lineId,
+      products: EMPTY_QUICKLOG_FEEDING_FORM.products.map((row) => ({ ...row })),
+    }));
+    setFeedingDefaultsApplied(false);
+  }, [resolvedContext.plantId, feedingDefaultsApplied, feedingForm]);
+
   const recentWateringsQ = useRecentWateringsForVolumeDefaults({
     plantId: resolvedContext.plantId,
   }) as { data?: unknown[] };
@@ -961,6 +988,11 @@ function QuickLogV2SheetForOwner({
   const waterFieldMessage = retryPending
     ? null
     : (waterSaveGate?.footerMessage ?? snapshotGate?.footerMessage ?? null);
+  // #2159: a negative feeding EC is named under its field and blocks Save
+  // while typed, not only when the save is attempted.
+  const feedingEcGate =
+    form.action === "feed" && !retryPending ? assessFeedingEcFields(feedingForm) : null;
+  const feedingFieldMessage = feedingEcGate?.footerMessage ?? null;
   const largeWaterAssessment =
     form.action === "water" && !retryPending
       ? assessLargeWaterAmount({
@@ -1037,6 +1069,7 @@ function QuickLogV2SheetForOwner({
           selectedTargetMissing,
           volumeMissing,
           waterFieldMessage,
+          feedingFieldMessage,
           largeWaterMessage: largeWaterAssessment?.needsConfirmation
             ? largeWaterAssessment.message
             : null,
@@ -1198,11 +1231,21 @@ function QuickLogV2SheetForOwner({
     // Defaults affect only the recipe. A note handed off from Note/Water (for
     // example a selected Better/Same/Worse response) must neither block those
     // defaults nor be overwritten by them.
-    if (!isFeedingFormPristine({ ...feedingForm, note: "" })) return;
-    setFeedingForm((previous) => ({
-      ...applyFeedingDefaultsToForm(feedingDefaults),
-      note: previous.note,
-    }));
+    const retargeted = feedingRecipeRetargetedRef.current;
+    if (
+      retargeted
+        ? !feedingRecipeMatches(feedingForm, EMPTY_QUICKLOG_FEEDING_FORM)
+        : !isFeedingFormPristine({ ...feedingForm, note: "" })
+    )
+      return;
+    const applied = applyFeedingDefaultsToForm(feedingDefaults);
+    appliedFeedingDefaultsRef.current = applied;
+    feedingRecipeRetargetedRef.current = false;
+    setFeedingForm((previous) =>
+      retargeted
+        ? { ...previous, lineId: applied.lineId, products: applied.products }
+        : { ...applied, note: previous.note },
+    );
     setFeedingDefaultsApplied(true);
   }, [
     open,
@@ -2076,6 +2119,14 @@ function QuickLogV2SheetForOwner({
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
+        // New manual Note saves only. Feed returns above this call. Water
+        // builds its own payload and skips this builder. A retry replays the
+        // stored payload, so a later stage change does not rewrite it.
+        // Pass the stage stored on the resolved target: the plant's stage for
+        // a plant, the tent's stage for a tent. Neither target borrows the
+        // other's stage. The builder keeps a canonical stage and omits a
+        // missing or unknown one.
+        stage: targetStage,
         volumeMl: form.volumeMl,
         note: form.note,
         temperatureC: typedTempToCelsiusInput(
@@ -2811,9 +2862,13 @@ function QuickLogV2SheetForOwner({
     setPostSave(null);
     setLocalError(null);
     setSaveStatus("");
+    // Keep the activity as well as the target (#2172): a grower logging a
+    // second Feed should land on the Feed form. The cleared feeding form and
+    // defaults flag below let the post-save recipe prefill apply again.
     setForm((prev) => ({
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
+      action: prev.action,
     }));
     setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
@@ -3297,6 +3352,7 @@ function QuickLogV2SheetForOwner({
                 disabled={feedingSaving || wateringSaving || saving || submissionLocked}
                 defaultsApplied={feedingDefaultsApplied}
                 entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
+                ecFieldErrors={feedingEcGate?.fields}
               />
             </div>
           )}
@@ -3945,6 +4001,7 @@ function QuickLogV2SheetForOwner({
                       (selectedTargetStale && !retryPending) ||
                       (criticalContentMissing && !retryPending) ||
                       (Boolean(waterFieldMessage) && !retryPending) ||
+                      Boolean(feedingFieldMessage) ||
                       Boolean(largeWaterAssessment?.needsConfirmation) ||
                       Boolean(archivedGrowActionBlock)
                     }
@@ -3975,6 +4032,7 @@ function getSaveHelperMessage(input: {
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
   waterFieldMessage: string | null;
+  feedingFieldMessage?: string | null;
   largeWaterMessage?: string | null;
   criticalContentMissing: boolean;
   saving: boolean;
@@ -3985,6 +4043,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.waterFieldMessage) return input.waterFieldMessage;
+  if (input.feedingFieldMessage) return input.feedingFieldMessage;
   if (input.largeWaterMessage) return input.largeWaterMessage;
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;

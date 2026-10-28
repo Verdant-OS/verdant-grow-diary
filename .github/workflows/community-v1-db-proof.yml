@@ -1,0 +1,161 @@
+name: Community V1 DB proof
+
+# Manual dispatch only. No push or pull_request trigger: per AGENTS.md, no
+# push-triggered job may probe a non-production database. The database here is
+# a disposable local Supabase on the runner; nothing reaches a hosted project.
+on:
+  workflow_dispatch:
+    inputs:
+      expect:
+        description: "red = Task 2A receipt (no migration); green = Task 2B proof"
+        type: choice
+        options: [red, green]
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: community-v1-db-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  community-v1-db-proof:
+    name: community-v1-db-proof (${{ inputs.expect }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECT: ${{ inputs.expect }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
+        with:
+          version: 2.109.1
+
+      - name: Restore pinned CLI public registry fallback
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
+      - name: Prepare immutable migration replay workspace
+        run: |
+          set -eo pipefail
+          REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-supabase-replay"
+          node scripts/prepare-local-supabase-replay.mjs --output="${REPLAY_WORKDIR}" --json \
+            | tee migration-replay-compatibility.json
+          echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
+
+      # Proof-only auth settings, written to the runner's disposable replay copy
+      # only; the committed supabase/config.toml is never edited. The anonymous
+      # caller case needs anonymous sign-ins, and the 37-case run signs in more
+      # fixture users than the local default of 30 per 5 minutes allows
+      # (Codex P1s on #2419 at 79e2256b; owner-approved).
+      - name: Enable proof-only auth in the disposable config
+        run: |
+          set -eo pipefail
+          CONFIG="${SUPABASE_REPLAY_WORKDIR}/supabase/config.toml"
+          test -f "$CONFIG"
+          # Any auth table, dotted ones like [auth.external.google] included
+          # (Copilot on #2448 at dab18959).
+          if grep -Eq '^[[:space:]]*\[auth(\.[^]]*)?\]' "$CONFIG"; then
+            echo "::error::the replay config already declares [auth]; merge the proof settings instead of appending."
+            exit 1
+          fi
+          printf '\n[auth]\nenable_anonymous_sign_ins = true\n\n[auth.rate_limit]\nsign_in_sign_ups = 1000\n' >> "$CONFIG"
+
+      - name: Start local Supabase
+        id: supabase-start
+        run: |
+          set -eo pipefail
+          # `supabase start` prints local keys and the DB URL. Capture it to a file that
+          # is never printed or uploaded; masks are registered in the next step.
+          if supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" > supabase-start.log 2>&1; then
+            echo "started=true" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            echo "::error::supabase start failed (exit ${status}); sanitized tail follows."
+            tail -n 40 supabase-start.log \
+              | sed -E -e 's#postgres(ql)?://[^[:space:]]+#postgresql://[redacted]#g' \
+                       -e 's#eyJ[A-Za-z0-9_.-]+#[redacted-jwt]#g' \
+                       -e 's#sb_(publishable|secret)_[A-Za-z0-9_-]+#[redacted-key]#g' \
+                       -e 's#(([Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Tt][Oo][Kk][Ee][Nn])[^:=]*[:=][[:space:]]*)[^[:space:]]+#\1[redacted]#g'
+            exit "$status"
+          fi
+
+      - name: Export local Supabase env
+        run: |
+          set -e
+          STATUS_JSON="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json 2>/dev/null)"
+          SUPABASE_URL="$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // empty')"
+          SUPABASE_ANON_KEY="$(echo "$STATUS_JSON" | jq -r '.ANON_KEY // .anon_key // empty')"
+          SUPABASE_SERVICE_ROLE_KEY="$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')"
+          SUPABASE_DB_URL="$(echo "$STATUS_JSON" | jq -r '.DB_URL // .db_url // empty')"
+          # Local-only values. Mask before any later output can carry them.
+          for value in "$SUPABASE_ANON_KEY" "$SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_DB_URL"; do
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$SUPABASE_DB_URL" ]; then
+            echo "BLOCKED: local Supabase did not expose the required local values."
+            exit 2
+          fi
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "SUPABASE_DB_URL=$SUPABASE_DB_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Apply migrations (db reset with grant-parity seed)
+        run: |
+          set -o pipefail
+          supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-db-reset.log
+
+      # Catalog runs on the db reset state, before the runtime suite's teardown
+      # (which disables community_feature_state) can mask a wrong seeded default.
+      - name: Community V1 catalog proof
+        run: |
+          set +e
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
+            -f supabase/tests/community_v1_permissions.sql > community-v1-catalog.log 2>&1
+          status=$?
+          set -e
+          cat community-v1-catalog.log
+          if [ "$EXPECT" = "red" ]; then
+            # RED: the very first block must stop on the missing community relation.
+            [ "$status" -ne 0 ] && grep -q 'relation "public.community_profiles" does not exist' community-v1-catalog.log
+          else
+            passed="$(grep -c '✓ T-CAT-0' community-v1-catalog.log || true)"
+            [ "$status" -eq 0 ] && [ "$passed" -eq 6 ]
+          fi
+
+      - name: Community V1 runtime proof
+        run: |
+          set -o pipefail
+          if [ "$EXPECT" = "red" ]; then
+            node scripts/security/run-community-v1-db-security.mjs --expect-red 2>&1 | tee community-v1-runtime.log
+          else
+            node scripts/security/run-community-v1-db-security.mjs 2>&1 | tee community-v1-runtime.log
+          fi
+
+      - name: Upload receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: community-v1-db-proof-${{ inputs.expect }}
+          path: |
+            migration-replay-compatibility.json
+            community-v1-runtime.log
+            community-v1-catalog.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase
+        if: always() && steps.supabase-start.outputs.started == 'true'
+        run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true

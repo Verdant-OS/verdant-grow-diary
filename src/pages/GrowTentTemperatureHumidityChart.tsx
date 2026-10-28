@@ -145,6 +145,7 @@ export default function GrowTentTemperatureHumidityChart() {
   const [copyFallback, setCopyFallback] = useState<string | null>(null);
   const [printMode, setPrintMode] = useState<"log" | "blank">("log");
   const lastCheckedAt = useRef<number | null>(null);
+  const dateEdited = useRef(false);
 
   usePageSeo({
     title: `${GROW_TENT_CLIMATE_TITLE} | Verdant Grow Diary`,
@@ -214,14 +215,15 @@ export default function GrowTentTemperatureHumidityChart() {
       nextId,
       inputs,
       lights,
-      formatGrowTentDateTime(dateTime, new Date()),
+      formatGrowTentDateTime(dateEdited.current ? dateTime : "", new Date()),
       note,
     );
     const next = [...readings, entry];
     setReadings(next);
     setNextId((id) => id + 1);
     setNote("");
-    setDateTime("");
+    setDateTime(growTentLocalDateTimeInput(new Date()));
+    dateEdited.current = false;
     setCopyFallback(null);
     announce(
       `Logged reading for ${entry.dateTime} (${entry.vpd.toFixed(2)} kPa, ${entry.statusText}).`,
@@ -473,7 +475,10 @@ export default function GrowTentTemperatureHumidityChart() {
                     type="datetime-local"
                     className={inputClass}
                     value={dateTime}
-                    onChange={(e) => setDateTime(e.target.value)}
+                    onChange={(e) => {
+                      dateEdited.current = true;
+                      setDateTime(e.target.value);
+                    }}
                   />
                 </label>
                 <fieldset className="min-w-0">

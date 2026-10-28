@@ -210,11 +210,15 @@ describe("public grow tent temperature and humidity page", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 28, 8, 0));
     renderPage();
+    vi.setSystemTime(new Date(2026, 9, 28, 9, 30));
     fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
     vi.setSystemTime(new Date(2026, 9, 28, 20, 30));
     fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
-    expect(within(logTable()).getByText("2026-10-28 08:00")).toBeInTheDocument();
+    expect(within(logTable()).getByText("2026-10-28 09:30")).toBeInTheDocument();
     expect(within(logTable()).getByText("2026-10-28 20:30")).toBeInTheDocument();
+    setField("Date & time (local)", "2026-10-27T18:00");
+    fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
+    expect(within(logTable()).getByText("2026-10-27 18:00")).toBeInTheDocument();
     vi.useRealTimers();
   });
 

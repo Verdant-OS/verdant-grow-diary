@@ -13,7 +13,6 @@
     { "name": "edge-metrics-alert-check", "classification": "cron target", "signal": "referenced in supabase/migrations SQL (scheduled)", "outcome": "left" },
     { "name": "edge-metrics-latest", "classification": "unknown", "signal": "no src/ call sites; operator dashboard read", "outcome": "left" },
     { "name": "environment-summary-report-entitlement", "classification": "unknown", "signal": "1 src/ call site; entitlement authority", "outcome": "left" },
-    { "name": "founder-slots-remaining", "classification": "cron target", "signal": "referenced in supabase/migrations SQL", "outcome": "left" },
     { "name": "get-paddle-price", "classification": "cron target", "signal": "referenced in SQL; Paddle catalog preflight CI binds to it", "outcome": "left" },
     { "name": "handle-email-suppression", "classification": "webhook receiver", "signal": "signature-verified email provider callback", "outcome": "left" },
     { "name": "handle-email-unsubscribe", "classification": "webhook receiver", "signal": "unsubscribe link target, fixed public URL", "outcome": "left" },

@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { CRITICAL_READ_DEADLINE_MS } from "@/lib/boundedReadRules";
-import { GROW_READ_BUDGET_MS } from "@/lib/growsReadRetryRules";
+import { GROW_READ_BUDGET_MS, GROW_READ_RETRY_DELAYS_MS } from "@/lib/growsReadRetryRules";
 import { isDashboardSupplementalLoading } from "@/lib/dashboardSupplementalLoadingRules";
 import { resolveTimelineFetchScope } from "@/lib/timelinePageReadStateRules";
 
@@ -306,8 +306,18 @@ describe("plant list and environment trends", () => {
       wrapper: ({ children }) => wrap(children),
     });
     expect(result.current.isPending).toBe(true);
+    // A hung plant read retries inside GROW_READ_BUDGET_MS. The first 8s
+    // deadline plus the first backoff still leaves the query pending. The
+    // next attempt is capped at the time left, so the error is up by 12s.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(CRITICAL_READ_DEADLINE_MS + GROW_READ_RETRY_DELAYS_MS[0]);
+    });
+    expect(result.current.isError).toBe(false);
+    expect(result.current.isPending).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(
+        GROW_READ_BUDGET_MS - CRITICAL_READ_DEADLINE_MS - GROW_READ_RETRY_DELAYS_MS[0],
+      );
     });
     expect(result.current.isError).toBe(true);
     expect(result.current.isPending).toBe(false);

@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-10-26.2**
+**Sentinel-Version: 2026-10-27.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-26.2**
+**Sentinel-Version: 2026-10-27.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -220,7 +220,9 @@ It is not guessed.
   the payments environment to sandbox. The legacy billing-subscriptions surface
   never grants entitlement. No entitling row means Free.
 - Client entitlement reads are presentation. The server decides paid and costly features.
-- Founder lifetime is pro-like access with capped credits, never unlimited.
+- Founder lifetime is no longer sold. Existing Founder entitlements stay until a
+  separate PR and migration remove them. While those rows remain, founder
+  lifetime is pro-like access with capped credits, never unlimited.
 - Do not add checkout, webhooks, provider SDKs, pricing copy, paywall calls, or
   UI gates unless the task asks.
 - Capability checks live under `src/lib/entitlements/`. Do not hardcode a plan
@@ -230,8 +232,8 @@ It is not guessed.
 - Do not reuse profile tier for billing, and do not put the service role in client code.
 
 Meter `ai-doctor-review` and `ai-coach` before the model call. Free: 3 credits
-per grow. Paid monthly, paid annual, and founder lifetime: 100 credits per UTC
-calendar month, capped. The client cannot set user id, weight, model tier, or
+per grow. Paid monthly, paid annual, and founder lifetime (no longer sold; existing rows
+only): 100 credits per UTC calendar month, capped. The client cannot set user id, weight, model tier, or
 plan. The edge function decides tier and weight. Refund a failed call with an
 append-only reversal. Quota denial is a calm response. Do not add a paywall
 during a backend enforcement slice unless the task asks. Use a runtime harness
@@ -545,6 +547,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-10-27.1** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.
 - **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants
   in the per-item merge rule, matching the roster and ownership policy. No new merge
   authority, review waiver or production permission is created.

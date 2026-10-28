@@ -155,9 +155,9 @@ describe("/refund disclosures", () => {
     expect(REFUND_SRC).toMatch(/Merchant of Record/);
   });
 
-  it("explains cancellation vs refund and covers Founder Lifetime consistently", () => {
+  it("explains cancellation vs refund without selling Founder Lifetime", () => {
     expect(REFUND_SRC).toMatch(/Subscription cancellation/i);
-    expect(REFUND_SRC).toMatch(/Founder Lifetime/);
+    expect(REFUND_SRC).not.toMatch(/Founder Lifetime/);
     expect(REFUND_SRC).toMatch(/within the 30-day window/i);
   });
 

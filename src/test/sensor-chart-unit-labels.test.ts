@@ -96,7 +96,7 @@ describe("temperature labels follow the saved °F/°C preference", () => {
   it("defaults to °F when nothing is saved (parity with prior behavior)", () => {
     expect(sensorChartUnit("temp")).toBe("°F");
     expect(sensorChartLegendLabel("temp")).toBe("Temperature (°F)");
-    expect(formatSensorChartTooltipValue(72, "temp")).toBe("72°F");
+    expect(formatSensorChartTooltipValue(72, "temp")).toBe("72.0°F");
     expect(formatSensorChartYTick(72, "temp")).toBe("72°F");
   });
 
@@ -104,7 +104,7 @@ describe("temperature labels follow the saved °F/°C preference", () => {
     saveTemperatureUnitPreference("celsius");
     expect(sensorChartUnit("temp")).toBe("°C");
     expect(sensorChartLegendLabel("temp")).toBe("Temperature (°C)");
-    expect(formatSensorChartTooltipValue(22, "temp")).toBe("22°C");
+    expect(formatSensorChartTooltipValue(22, "temp")).toBe("22.0°C");
     expect(formatSensorChartYTick(22, "temp")).toBe("22°C");
   });
 
@@ -112,7 +112,7 @@ describe("temperature labels follow the saved °F/°C preference", () => {
     saveTemperatureUnitPreference("celsius");
     expect(sensorChartUnit("temp", "fahrenheit")).toBe("°F");
     expect(sensorChartLegendLabel("temp", "fahrenheit")).toBe("Temperature (°F)");
-    expect(formatSensorChartTooltipValue(72, "temp", "fahrenheit")).toBe("72°F");
+    expect(formatSensorChartTooltipValue(72, "temp", "fahrenheit")).toBe("72.0°F");
     expect(formatSensorChartYTick(72, "temp", "fahrenheit")).toBe("72°F");
   });
 

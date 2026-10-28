@@ -436,15 +436,11 @@ describe("Safety: no private data on public page", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
     // Allowed: usePageSeo (SEO <head> only), usePaddleCheckout
     // (auth-state + Paddle overlay; signed-out users bounce to /auth), and
-    // useFounderSlotsRemaining (public slot counter via edge function;
-    // fails soft, never grants entitlement). useMyEntitlements is the
-    // presentation-only, select-own/RLS billing read needed to avoid selling
-    // an AI credit pack the current plan cannot spend. It renders only a
-    // generic eligibility state; no subscription fields. Any other @/hooks
-    // import (dashboard data hooks) remains forbidden.
-    expect(PAGE).not.toMatch(
-      /@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useFounderSlotsRemaining\b|useMyEntitlements\b)/,
-    );
+    // useMyEntitlements, the presentation-only, select-own/RLS billing read
+    // needed to avoid selling an AI credit pack the current plan cannot spend.
+    // It renders only a generic eligibility state; no subscription fields.
+    // Any other @/hooks import (dashboard data hooks) remains forbidden.
+    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useMyEntitlements\b)/);
     // And the checkout hook itself must stay free of private data reads —
     // it may read auth session state, never tables or the supabase client.
     const CHECKOUT_HOOK = readSrc("hooks/usePaddleCheckout.ts");
@@ -462,18 +458,6 @@ describe("Safety: no private data on public page", () => {
     expect(entitlementHook).not.toMatch(/service_role/);
     for (const table of PRIVATE_TABLES) {
       expect(entitlementHook).not.toMatch(new RegExp(`\\.from\\(["']${table}["']`));
-    }
-    // The founder-slots hook may invoke ONLY its public edge function —
-    // no table reads, no service_role, no other function invocations.
-    const slotsHook = readSrc("hooks/useFounderSlotsRemaining.ts");
-    const invokes = [...slotsHook.matchAll(/functions\.invoke\(\s*["']([^"']+)["']/g)].map(
-      (match) => match[1],
-    );
-    expect(invokes).toEqual(["founder-slots-remaining"]);
-    expect(slotsHook).not.toMatch(/supabase\s*\.\s*from\(/);
-    expect(slotsHook).not.toMatch(/service_role/);
-    for (const table of PRIVATE_TABLES) {
-      expect(slotsHook).not.toMatch(new RegExp(`\\.from\\(["']${table}["']`));
     }
   });
 

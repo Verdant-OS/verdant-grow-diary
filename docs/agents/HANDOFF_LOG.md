@@ -79,9 +79,9 @@ branch: claude/alert-archived-tent-display-dg3dq4
 base: verdant-grow-diary
 checkout: git fetch origin claude/alert-archived-tent-display-dg3dq4 verdant-grow-diary && git switch claude/alert-archived-tent-display-dg3dq4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the branch's draft PR (opened right after the first push)
-head_sha: ca2a72886fdf87c2aa8d0ad97fa7b263529e05be carried the exact-head PASS and 35/35 required green; the base-merge commit that resolves this file's conflict moves the head past it, so read the PR head before any current-head claim
-state: pushed, ready; enqueued 2026-10-28 06:17 UTC, dequeued 06:45 UTC on MERGE_CONFLICT (this file only); base merged back in to resolve it
-current_step: round 5: base merge to clear the HANDOFF_LOG conflict (both blocks kept, nothing else changed); 35/35 required checks re-run on the new head
+head_sha: ceb66fba8509fd60bfc74343d6ca6cf84d836d7c carried 35/35 required green (re-review requested); the second base-merge commit, resolving this file's conflict with #2562/#2570, moves the head past it, so read the PR head before any current-head claim
+state: pushed, ready; enqueued 2026-10-28 06:17 UTC, dequeued 06:45 UTC on MERGE_CONFLICT; base merged at ceb66fba8 (06:50) and again for #2562/#2570 (this file only both times)
+current_step: round 6: second base merge (HANDOFF_LOG conflict only; every Open block kept); 35/35 required re-run on the new head
 next_action: confirm 35/35 required checks at the new head; the PASS at ca2a728 is invalidated by the new head, so get an exact-head re-review (Jack Herer or another eligible non-contributing seat), then re-queue only with Matthew's per-item yes. Open P3 (Jack Herer 5678566277): the "Show archived targets (n)" label also counts removed targets; folds into Matthew's pending copy decision ("N hidden for archived tents/plants").
 post_merge_check: after Publish, on verdantgrowdiary.com the fixture account's Alerts list hides alerts on archived tents by default; the "Show archived targets (n)" toggle reveals them as "Archived tent: <name>" with the Historical target note. Until live /version.json reports the merge SHA: NOT_MEASURED.
 active_writer: Claude session_017UoYKyX1Beo5tnXmkJp17C
@@ -95,12 +95,80 @@ open_questions: none in scope; server-side auto-resolve of alerts on archived te
 gotchas: alerts.tent_id/plant_id are ON DELETE SET NULL, so a hard-deleted tent shows the "unavailable" copy (or the sole active tent fallback), not "Removed"; the client cannot tell deleted from not-accessible; src/lib/stabilityWhyContext.ts still says "Target context unavailable." (stability card, out of scope)
 links: https://linear.app/verdantgrowdiary/issue/VER-300/alerts-tent-name-unavailable-for-alerts-on-archived-tents-misleading
 artifacts: PR checks
-reviewer_seat: Jack Herer (review 5678566277, PASS P1x0 P2x0 P3x2 at ca2a72886fdf87c2aa8d0ad97fa7b263529e05be; superseded by the base merge)
-reviewer_sha: ca2a72886fdf87c2aa8d0ad97fa7b263529e05be (stale after the base merge)
+reviewer_seat: Jack Herer PASS 5678566277 at ca2a72886fdf87c2aa8d0ad97fa7b263529e05be (stale); re-review requested at ceb66fba8 (comment 6463032437), superseded by this merge; Sour Diesel peer observation at ceb66fba8: no blocking findings
+reviewer_sha: none valid at the current head
 session_state: Claude cloud session session_017UoYKyX1Beo5tnXmkJp17C watching the PR; no routines; no paused workflows
 claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
 owner: Claude
-last_updated: 2026-10-28 01:50 CT, by Claude
+last_updated: 2026-10-28 04:20 CT, by Claude
+```
+
+### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
+
+```text
+TASK ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540  priority: P2  status: OPEN
+goal: supersede draft #2540 (head b92cbcd186f3c157814916d06deaa9e5350774a5) with Sour Diesel review 5674522946's P2 fixed: a null/non-array grows read shows the error + Try again state, never the start screen/StartYourRoom; plus P3 Try again works without a provider refresh.
+why: a malformed read could spend the Free plan's one grow. Matthew (2026-10-27) asked for separate PRs while Cursor is down.
+branch: claude/onboarding-grows-read-error (created at b92cbcd186f3c157814916d06deaa9e5350774a5)
+base: verdant-grow-diary
+checkout: git fetch origin claude/onboarding-grows-read-error verdant-grow-diary && git switch claude/onboarding-grows-read-error && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2562 (ready for review since 2026-10-28; auto-merge off since the 06:21Z base merge, re-queue is the merge seat's call)
+head_sha: dde99eb008a0e38338edf47a6c9456b01046e43d before the Codex-findings commit; read the current head from the PR
+state: ready for review
+current_step: awaiting CI and an independent exact-head review
+next_action: re-review at the current head (Jack Herer PASS-pending-CI at dde99eb0 no longer covers it); Codex P2s fixed: growRepo keeps database error codes so permanent errors stop retrying, and Sign in again handles a failed sign-out via performSafeSignOut
+post_merge_check: NOT_APPLICABLE for production without a forced malformed read; covered by onboarding-null-grows-render.test.tsx
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: malformed settled list -> existing error state (sentinel growsError); Try again falls back to window.location.reload() via pure retryOnboardingGrowsRead; abort of timed-out attempts deferred (growRepo fetchTents/fetchPlants take no AbortSignal; reviewer rated it bounded). PGRST301 (Matthew 2026-10-27: yes): the store keeps retrying it, and only after retries run out reports error "session_expired" (pure growsReadErrorValue); Onboarding then shows "Sign in again", which calls signOut so the existing !user branch routes to /auth. Explicit button, not an automatic sign-out.
+tried_and_rejected: making PGRST301 non-retryable unilaterally (source comment says it is retried for the post-sign-in race).
+commands: bunx vitest run src/test/onboarding-null-grows-render.test.tsx src/test/onboarding-grows-retry-rules.test.ts src/test/starter-setup-onboarding.test.tsx src/test/onboarding-grows-session-expired.test.tsx
+files_touched: src/pages/Onboarding.tsx; src/lib/onboardingGrowsRetryRules.ts; src/test/onboarding-null-grows-render.test.tsx; src/test/onboarding-grows-retry-rules.test.ts; src/test/starter-setup-onboarding.test.tsx; src/lib/growsReadRetryRules.ts; src/store/grows.tsx; src/test/onboarding-grows-session-expired.test.tsx
+files_remaining: src/lib/growsReadRetryRules.ts (PGRST301, abort) pending decision
+blockers: PGRST301 design decision (Matthew)
+open_questions: this PR modifies four scorer-locked tests relative to base (grow-data-deadline-late-meta, slow-loading-screen-gates, starter-setup-onboarding, tent-detail-plant-list-read-state); they need Matthew's OK or a revert before merge
+gotchas: starter-setup-onboarding mock now passes grows: [] explicitly (a missing list now reads as malformed)
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2540
+artifacts: PR checks
+reviewer_seat: not assigned (OG Kush routes; this session excluded as author)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 17:00 CT (Matthew: separate PRs)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-27 18:20 CT, by Claude
+```
+
+### GROWER-DEAD-ENDS-VER-287-VER-276
+
+```text
+TASK GROWER-DEAD-ENDS-VER-287-VER-276  priority: P2  status: OPEN
+goal: One draft PR. Dashboard recovers from one transient tent or plant read instead of sticking on "grow data unavailable". Onboarding renders when the grows list is null.
+why: VER-287 is an intermittent dashboard dead end after a single failed read. VER-276 is Sentry VERDANT-WEB-1, a TypeError on /onboarding whose message and stack are redacted.
+branch: cursor/grower-dead-end-retries-4922
+base: verdant-grow-diary
+checkout: git fetch origin cursor/grower-dead-end-retries-4922 verdant-grow-diary && git switch cursor/grower-dead-end-retries-4922 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2540 (draft)
+head_sha: 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3
+state: pushed draft after the 12s budget cap. Jack Herer review 5669711049 FAILed b16b6277de4e2ab913086f943f2be232687dbf9f. Do not merge.
+current_step: Each tent and plant attempt is capped with growReadAttemptDeadlineMs. A hung read errors inside GROW_READ_BUDGET_MS. Onboarding calls refreshGrows only when it is present. A log-only commit may follow this head_sha.
+next_action: Confirm 35/35 required checks at the pushed head. Keep the PR draft. No merge, auto-merge, or deploy.
+post_merge_check: After merge, a signed-out check is NOT_APPLICABLE. On the next production deploy, confirm /onboarding renders for a new account and the dashboard does not stick on the unavailable card after one slow tent or plant read. Until that deploy, NOT_MEASURED.
+active_writer: Cursor Grok cloud agent
+decisions: Retry inside useGrowTents and useGrowPlants so the dashboard stays on the loading state until the bounded sequence finishes, then shows the existing Try again button. Do not retry permission or other non-retryable codes. Do not create a grow. Onboarding null-safety is local to the page because Sentry has no stack.
+tried_and_rejected: Sentry issue VERDANT-WEB-1 has no stacktrace and a redacted message, so a line-level production cause is unconfirmed. The grows list already retried; the card still appears when tents or plants fail once.
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/dashboard-transient-grow-read-retry.test.tsx src/test/onboarding-null-grows-render.test.tsx src/test/grow-data-deadline-late-meta.test.tsx --reporter=dot
+files_touched: src/lib/growsReadRetryRules.ts; src/hooks/useGrowData.ts; src/pages/Onboarding.tsx; src/test/dashboard-transient-grow-read-retry.test.tsx; src/test/onboarding-null-grows-render.test.tsx; src/test/grow-data-deadline-late-meta.test.tsx; src/test/slow-loading-screen-gates.test.tsx; src/test/tent-detail-plant-list-read-state.test.tsx; src/test/grow-data-retry-budget-hooks.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none planned
+blockers: none for the repository change. Independent exact-head review is not requested. GitHub comments stay unposted.
+open_questions: production cause of VER-287 is unconfirmed (one timed-out or dropped tent/plant read is the code path that matches the card). VERDANT-WEB-1 stack remains unavailable.
+gotchas: grow-data-deadline-late-meta now advances past the first deadline plus one backoff before it expects isError. Scorer unlock is local and git-ignored; name the pin in the PR body.
+links: https://linear.app/verdantgrowdiary/issue/VER-287 ; https://linear.app/verdantgrowdiary/issue/VER-276 ; https://verdant-grow-diary.sentry.io/issues/VERDANT-WEB-1
+artifacts: this block
+reviewer_seat: Jack Herer failed review 5669711049 at b16b6277de4e2ab913086f943f2be232687dbf9f. A new exact-head review is required after 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3.
+reviewer_sha: NOT_MEASURED for 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3
+session_state: Cursor cloud agent; no paused workflow
+claimed_by: Cursor Grok cloud agent, 2026-10-26
+owner: Cursor Grok cloud agent
+last_updated: 2026-10-27 10:28 CT, by Cursor Grok cloud agent
 ```
 
 ### PR-CLEANUP-2026-10-27-INVENTORY
@@ -881,6 +949,40 @@ artifacts: PR body
 reviewer_seat: Blue Dream (route layout .tsx) and Critical Mass (rules and tests)
 claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
+```
+
+### RETIRE-FOUNDER-SALES-MACHINERY
+
+```text
+TASK RETIRE-FOUNDER-SALES-MACHINERY  priority: P2  status: OPEN
+goal: PR A of two. Remove the code that existed only to sell Founder Lifetime: the public founder-slots-remaining edge function, the useFounderSlotsRemaining hook, the dead founder_lifetime slot block in get-paddle-price, and the tests and config that only cover them. No migration; PR B carries the SQL.
+why: #2028 (merged 0200d255) stopped selling Founder Lifetime. Matthew decided 2026-10-27 (session_01U9xQZcQhgrfTPEcjzgvjkb): existing holders keep access forever, the Founders Wall stays, a refund still revokes access, and a late pre-cutoff purchase event still grants.
+branch: claude/retire-founder-sales-machinery
+base: verdant-grow-diary
+checkout: git fetch origin claude/retire-founder-sales-machinery verdant-grow-diary && git switch claude/retire-founder-sales-machinery && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 (ready, marked by Matthew 2026-10-28)
+head_sha: read the PR head; this commit cannot name itself
+state: ready; 35/35 required checks green at 4789f612 (base merge of 4ec39869); Codex code review clean at 4ec39869; Matthew review no blocking findings at 4789f612; Codex security review not run (usage limit)
+current_step: approval and merge queue (Matthew)
+next_action: request independent review at the PR head; Matthew decides ready; after merge Matthew undeploys founder-slots-remaining; then draft PR B (migration)
+post_merge_check: Matthew deletes the deployed founder-slots-remaining function; GET .../functions/v1/founder-slots-remaining then returns 404
+active_writer: Claude (session_01U9xQZcQhgrfTPEcjzgvjkb)
+decisions: keep allocate_lovable_founder_lifetime and revoke_lovable_founder_lifetime_by_transaction (late grants and refund revocation stay); keep the founders table, founders_wall_public, the immutables trigger and founder_number; SQL drops and cap/slot body edits go to PR B (migration, Matthew's receipt). Matthew approved the scorer-lock unlocks listed in the PR body (2026-10-27, extended 2026-10-28 to the deleted function's Deno tests, package.json, domain-reach and credit-pack-eligibility's anchor).
+tried_and_rejected: one combined PR with the migration; rejected so the code slice is not held behind the migration receipt
+commands: bunx vitest run <touched tests> --reporter=dot; bun run typecheck; node scripts/verify-edge-shared-in-sync.mjs
+files_touched: see the PR diff (37 files: 36 code, config and test files plus this log; deletions dominate)
+files_remaining: none for PR A
+blockers: none for PR A; PR B needs Matthew's migration receipt
+open_questions: none
+gotchas: vi.mock of a deleted module path fails at import, so drop every useFounderSlotsRemaining mock with the hook; existing tests are scorer-locked, so edit only the unlocked list
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing and Edge scope); all contributors excluded
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-10-28 00:00 UTC
+owner: Claude
+last_updated: 2026-10-28 01:30 UTC, by Claude
 ```
 
 ## Closed

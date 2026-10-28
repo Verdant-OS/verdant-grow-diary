@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Link, MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
+import { GROW_READ_RETRY_DELAYS_MS } from "@/lib/growsReadRetryRules";
 import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import type { Tent, Plant } from "@/mock";
 
@@ -230,12 +231,16 @@ describe("Tent plant list reads using real queries", () => {
     fixture.fetchPlants.mockResolvedValue([plant]);
     fireEvent.click(screen.getByRole("button", { name: "Retry plant list" }));
     expect(await screen.findByTestId("tent-detail-plant-name")).toHaveTextContent(plant.name);
+    // Each list query retries a transient failure before the button is shown.
+    // The click then succeeds on the first attempt, so the count is the
+    // automatic attempts plus that one manual retry.
+    const callsPerList = GROW_READ_RETRY_DELAYS_MS.length + 2;
     expect(
       fixture.fetchPlants.mock.calls.filter((c) => c[2].includeArchived === false),
-    ).toHaveLength(2);
+    ).toHaveLength(callsPerList);
     expect(
       fixture.fetchPlants.mock.calls.filter((c) => c[2].includeArchived === true),
-    ).toHaveLength(2);
+    ).toHaveLength(callsPerList);
   });
   it.each([false, true])(
     "retains the survivor when includeArchived=%s fails",

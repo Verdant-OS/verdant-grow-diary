@@ -289,6 +289,52 @@ Matthew, 2026-10-27: "keep the #2032 badge stack", then "approved, take over #20
 
 **Status: pushed.** On Matthew's approval ("approved, declare the scorer unlocks and push #2032"), the scorer unlocks were declared, and `scorer-lock --report --strict` passes (8 changed, 0 locked). That push put #2032 at `06f4238c0d7f37843b1d7d6b165c0e46051a4aa3` (historical: a fast-forward from `5fc40d16c`). Later pushes moved it on; at 2026-10-27T23:40Z its head was `e69de87b23863de95874628f27ddf23e58757629`. Re-read the PR head before resuming. Evidence, open items and the scorer list are in #2032's PR body (takeover section) and its resume-here comment. Stacked PRs #2343 and #2362 now trail their base; they belong to other holders and were not touched.
 
+## Phase 4 log (survivors), 2026-10-28
+
+Matthew, 2026-10-28: "Close 2140, go ahead with phase 4, and go with your best judgment on the rest."
+Then: "The log-only conflicts can go to one agent like it says, as long as it's not a cloud agent."
+
+Every base merge was a normal merge commit pushed to the PR's existing branch: no rebase, force-push,
+draft or ready toggle, or queue action. Each push came after a claim comment and a check that the
+remote head had not moved.
+
+**Closed:** #2140 (comment first; branch `cursor/plants-health-not-assessed-6187` kept at `373fd1628780`).
+
+**Merged since Phase 4 started:** #2556 (this inventory), #1972, #1901. #2103 was closed by Cheek
+without merging, because #2254 had already fixed its flake on base.
+
+**Base merged by this session (28):** clean merges #2536 #2307 #2261 #2258 #2251 #2193 #2103 #2048
+#2046 #2041 #2029 #2026 #1972; HANDOFF_LOG-only conflicts #2534 #2286 #2262 #2259 #2052 #2025 #1963
+#1962 #1952; others #1948 #1942 #2050 #1934 #1901 #2287 (#2287 also resolved
+`docs/seo/route-indexation-matrix.md` against the merged manifest: 149 routes, 23 redirects).
+
+**Review fixes pushed:** #1963 (VPD hPa range gate), #1952 (calendar day-key edge cases), #2251
+(archived-plant re-check on retries; tent-level sensor snapshots no longer blocked by an archived
+page plant, which Matthew confirmed on 2026-10-28).
+
+**Correction, #2251.** Phase 4 added cases to two scorer-locked test files without declaring the
+unlock, and a PR comment wrongly said `scorer-lock --report --strict` passed. The unlock was declared
+afterwards, and strict now exits 0 (both files additive only, +54/−0). The PR body and the comment
+were corrected.
+
+**PR bodies:** 13 bodies that named an old head as current got a one-line current-head banner. The
+authors' text is otherwise unchanged.
+
+**Re-conflicted after #2556/#1972/#1901 merged (HANDOFF_LOG only; routing is Matthew's, to a
+non-cloud agent):** #2534 #2286 #2262 #2259 #2052 #2025 #1963 #1962 #1952 #1934, plus #2291 #2293
+#1925.
+
+**Needs Matthew:**
+
+- #1949: Codex's sole-writer claim lapsed, and there is a five-file code conflict. Not taken over.
+- #2137: the test change already shipped in #2254. Only its #2072 handoff-block close remains, and
+  Cheek's note there says not to treat it as superseded.
+- #2251: unlink #2015 in the Development sidebar.
+
+**CI note:** `Fail extracting tarball for "xlsx"` killed installs on #2262, #1952, #2251, #2193 and
+#1942. `xlsx` is pinned to a `cdn.sheetjs.com` tarball. Each job passed on one re-run. A durable fix
+is filed as a separate task.
+
 ## Verified
 
 Verified: open PR count (127), the head SHA of every PR, behind/conflict per PR (`git merge-tree`), touched files and protected-path tags, the share of each PR's added lines present on base, the base commits named as superseding, and required-check status at each current head (read 2026-10-27 via `gh api`).

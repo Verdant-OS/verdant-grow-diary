@@ -31,6 +31,11 @@ are recorded in the 2026-10-16 receipt below.
 migration has landed since `e136fa44`: `20261014210000_quicklog_correction_editable_values.sql`.
 It sorts after every version named here, so the order below is unchanged. The 2026-10-16 receipt below does not cover it, and no production
 measurement of it is recorded, so its production state is **NOT_MEASURED**. The receipt is complete only for the versions it names.
+The receipt's three bundle failures (`_shared/paddle.ts:14` importing
+`../paddle-webhook/verifyPaddleSignature.ts`) describe the 2026-10-16 source. #2229
+(`4287c56b1`) has since moved the verifier into `_shared/` in source. Whether
+`payments-webhook`, `delete-account` and `paddle-portal-session` were redeployed after that is
+**NOT_MEASURED**.
 
 **Production receipt, 2026-10-16 (supersedes the `NOT_MEASURED` labels below for the
 versions it names).** See "Production measurement and apply, 2026-10-16" at the end. In
@@ -102,7 +107,8 @@ server changes that are also not recorded as shipped, and they interact with thi
 | #1703 | 2026-09-26 01:55 | `4ddb23225918ee1fdfb238ab84708a2e765adb43` | Migration                 | `A migrations/20260924120000_plants_health_unassessed_default.sql` (BUG-009)                                                                                                                     |
 | #1683 | 2026-09-26 04:19 | `dccaf7324055b91cad0a5b51a40c449bb3b6bcf2` | Edge functions (16 files) | including `M functions/ai-doctor-review/index.ts`, `functions/_shared/lib/*` mirror, `auth-email-hook/index.ts`, `sensor-ingest-webhook/index.ts`, `operator-ggs-real-payload-commit/handler.ts` |
 
-- **Applied/published state:** `CURRENT_STATE.md` :448 (written while #1683 still carried
+- **Applied/published state:** `CURRENT_STATE.md` :788 (:448 when this was
+  written, while #1683 still carried
   the migration) says only "Committed is not applied". Applied state of `20260924120000` and
   publish state of #1683's functions are **NOT_MEASURED**. _(Superseded 2026-10-16 for
   `20260924120000`: the receipt below measured it APPLIED, with no history row.)_

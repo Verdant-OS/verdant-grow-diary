@@ -16,7 +16,14 @@
  *    future / pen-entered snapshots benefit without a schema change.
  */
 
-import { classifyManualMetric } from "@/lib/sensorTruthRules";
+import {
+  classifyManualMetric,
+  isSoilEcMscmRealistic,
+  isSoilEcUnitMismatchSuspected,
+  TRUTH_REASON_CHIP,
+  type ManualMetricTruth,
+} from "@/lib/sensorTruthRules";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 export type ChangeContextMetric =
   | "temperature_c"
@@ -25,7 +32,8 @@ export type ChangeContextMetric =
   | "co2_ppm"
   | "soil_moisture_pct"
   | "soil_ec_ms_cm"
-  | "reservoir_ph";
+  | "reservoir_ph"
+  | "reservoir_ec_ms_cm";
 
 export interface ChangeContextReading {
   ts: string | number | Date | null | undefined;
@@ -33,9 +41,21 @@ export interface ChangeContextReading {
   value: number | null | undefined;
   source?: string | null;
   tent_id?: string | null;
+  /**
+   * Optional identity of the save this row belongs to. Rows that carry one
+   * group by (ts, snapshot_id), so two saves at the same instant stay two
+   * snapshots. Rows without one (sensor_readings) group by ts as before.
+   */
+  snapshot_id?: string | null;
 }
 
 export interface ChangeContextSnapshot {
+  /**
+   * Stable, unique grouping key: the ISO ts, plus "#<snapshot_id>" when
+   * present. Always set by groupManualReadingsToSnapshots; optional so
+   * hand-built snapshots (ts-only) stay valid and fall back to ts.
+   */
+  key?: string;
   ts: string;
   metrics: Partial<Record<ChangeContextMetric, number>>;
 }
@@ -81,6 +101,7 @@ const DISPLAY_ORDER: ChangeContextMetric[] = [
   "soil_moisture_pct",
   "soil_ec_ms_cm",
   "reservoir_ph",
+  "reservoir_ec_ms_cm",
 ];
 
 const METRIC_LABEL: Record<ChangeContextMetric, string> = {
@@ -91,6 +112,7 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   soil_moisture_pct: "Soil",
   soil_ec_ms_cm: "Soil EC",
   reservoir_ph: "pH",
+  reservoir_ec_ms_cm: "Reservoir EC",
 };
 
 const KNOWN_METRICS: ReadonlySet<string> = new Set(DISPLAY_ORDER);
@@ -132,8 +154,11 @@ export function groupManualReadingsToSnapshots(
     if (t === null) continue;
     const v = toFiniteNumber(r.value);
     if (v === null) continue;
-    const key = new Date(t).toISOString();
-    const snap = buckets.get(key) ?? { ts: key, metrics: {} };
+    const iso = new Date(t).toISOString();
+    const snapshotId =
+      typeof r.snapshot_id === "string" && r.snapshot_id !== "" ? r.snapshot_id : null;
+    const key = snapshotId ? `${iso}#${snapshotId}` : iso;
+    const snap = buckets.get(key) ?? { key, ts: iso, metrics: {} };
     // First-write-wins per metric per snapshot — sensor_readings stores
     // one row per metric so duplicates would only come from upstream noise.
     if (snap.metrics[r.metric as ChangeContextMetric] === undefined) {
@@ -141,24 +166,36 @@ export function groupManualReadingsToSnapshots(
     }
     buckets.set(key, snap);
   }
-  return [...buckets.values()].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+  return [...buckets.values()].sort((a, b) => {
+    const dt = new Date(b.ts).getTime() - new Date(a.ts).getTime();
+    if (dt !== 0) return dt;
+    const ka = a.key ?? a.ts;
+    const kb = b.key ?? b.ts;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
 }
 
 function formatDelta(
   key: ChangeContextMetric,
   latest: number,
   previous: number,
+  temperatureUnit: TemperatureUnitPreference = "fahrenheit",
 ): ChangeContextDelta | null {
   let delta: number;
   let label: string;
   let formatted: string;
   switch (key) {
     case "temperature_c": {
-      // Stored in °C, displayed in °F to match the rest of the grow UI.
-      const dF = celsiusToFahrenheit(latest) - celsiusToFahrenheit(previous);
-      delta = Math.round(dF * 10) / 10;
-      label = "Temp";
-      formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}°F`;
+      if (temperatureUnit === "celsius") {
+        delta = Math.round((latest - previous) * 10) / 10;
+        label = "Temp";
+        formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}°C`;
+      } else {
+        const dF = celsiusToFahrenheit(latest) - celsiusToFahrenheit(previous);
+        delta = Math.round(dF * 10) / 10;
+        label = "Temp";
+        formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}°F`;
+      }
       break;
     }
     case "humidity_pct": {
@@ -197,10 +234,38 @@ function formatDelta(
       formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
       break;
     }
+    case "reservoir_ec_ms_cm": {
+      delta = Math.round((latest - previous) * 100) / 100;
+      label = "Reservoir EC";
+      formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)} mS/cm`;
+      break;
+    }
   }
   if (!Number.isFinite(delta)) return null;
   const direction: ChangeContextDelta["direction"] = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
   return { key, label, delta, formatted, direction };
+}
+
+/**
+ * Truth check for one change-context metric. Reservoir EC (mS/cm) uses the
+ * same plausibility bounds as soil EC with its own label; it lives here, not
+ * in the edge-mirrored sensorTruthRules. Every other metric uses the shared
+ * classifier.
+ */
+export function classifyChangeContextMetric(
+  key: ChangeContextMetric,
+  value: number,
+): ManualMetricTruth {
+  if (key !== "reservoir_ec_ms_cm") return classifyManualMetric(key, value);
+  if (isSoilEcMscmRealistic(value)) return { valid: true };
+  if (isSoilEcUnitMismatchSuspected(value)) {
+    return {
+      valid: false,
+      chip: TRUTH_REASON_CHIP.unit_mismatch_suspected,
+      reasonCode: "unit_mismatch_suspected",
+    };
+  }
+  return { valid: false, chip: "Invalid reservoir EC" };
 }
 
 /**
@@ -211,8 +276,10 @@ function formatDelta(
 export function buildManualSnapshotChangeContext(input: {
   latest: ChangeContextSnapshot | null | undefined;
   previous: ChangeContextSnapshot | null | undefined;
+  temperatureUnit?: TemperatureUnitPreference;
 }): ChangeContextResult {
   const { latest, previous } = input;
+  const temperatureUnit = input.temperatureUnit ?? "fahrenheit";
   if (!latest) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
   if (!previous) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
 
@@ -225,8 +292,8 @@ export function buildManualSnapshotChangeContext(input: {
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
     // Per-metric truth filter: if either side is impossible, suppress the
     // delta and emit a reason chip instead of a fabricated swing.
-    const aTruth = classifyManualMetric(key, a);
-    const bTruth = classifyManualMetric(key, b);
+    const aTruth = classifyChangeContextMetric(key, a);
+    const bTruth = classifyChangeContextMetric(key, b);
     if (!aTruth.valid || !bTruth.valid) {
       const chip = (aTruth.chip ?? bTruth.chip) as string;
       const side: ChangeContextSuppressedDelta["side"] =
@@ -239,7 +306,7 @@ export function buildManualSnapshotChangeContext(input: {
       });
       continue;
     }
-    const d = formatDelta(key, a, b);
+    const d = formatDelta(key, a, b, temperatureUnit);
     if (d) deltas.push(d);
   }
   return { firstSnapshot: false, deltas, suppressedDeltas };
@@ -251,11 +318,12 @@ export function buildManualSnapshotChangeContext(input: {
  */
 export function deriveChangeContextFromReadings(
   rows: ReadonlyArray<ChangeContextReading>,
-  opts: { tentId?: string | null } = {},
+  opts: { tentId?: string | null; temperatureUnit?: TemperatureUnitPreference } = {},
 ): ChangeContextResult {
   const snapshots = groupManualReadingsToSnapshots(rows, opts);
   return buildManualSnapshotChangeContext({
     latest: snapshots[0] ?? null,
     previous: snapshots[1] ?? null,
+    temperatureUnit: opts.temperatureUnit,
   });
 }

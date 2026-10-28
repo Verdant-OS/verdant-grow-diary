@@ -17,6 +17,7 @@ import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions
 import type { PlantAssignedTentActionRow } from "@/lib/plantAssignedTentActionRules";
 import { actionsPath } from "@/lib/routes";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 interface Props {
   tentId: string | null | undefined;
@@ -105,7 +106,7 @@ function ActionRowItem({ row }: { row: PlantAssignedTentActionRow }) {
       ) : null}
       {row.reason ? (
         <p className="mt-1 text-xs text-muted-foreground leading-snug">
-          {stripBackPointerTokens(row.reason)}
+          {localizeReadingAtTimestamps(stripBackPointerTokens(row.reason))}
         </p>
       ) : null}
       {row.createdAt ? (

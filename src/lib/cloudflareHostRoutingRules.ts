@@ -54,12 +54,15 @@ export const SEO_SNAPSHOT_HEADER_VALUE = "1";
 
 const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/strains": "/cultivars",
-  "/features": "/welcome",
-  "/demo": "/welcome",
+  "/welcome": "/",
+  "/features": "/",
+  "/demo": "/",
   "/refunds": "/refund",
   "/refund-policy": "/refund",
   "/terms-of-service": "/terms",
   "/privacy-policy": "/privacy",
+  // Founder Lifetime is no longer sold (#2028); the retired page is permanent.
+  "/founder": "/pricing",
 };
 
 export type HostHeader = [string, string];

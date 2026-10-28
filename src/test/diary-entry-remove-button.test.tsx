@@ -244,13 +244,21 @@ describe("DiaryEntryRemoveButton — confirmation + mutation", () => {
   });
 
   it("does not claim success when the delete returns zero rows", async () => {
+    const onRemoved = vi.fn();
     deleteMaybeSingle.mockImplementationOnce(() => Promise.resolve({ data: null, error: null }));
-    render(<DiaryEntryRemoveButton entry={{ id: "e6", kind: "diary" }} viewer={VIEWER} />);
+    render(
+      <DiaryEntryRemoveButton
+        entry={{ id: "e6", kind: "diary" }}
+        viewer={VIEWER}
+        onRemoved={onRemoved}
+      />,
+    );
     fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
     fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith("Couldn't remove this log. Please try again."),
     );
     expect(toastSuccess).not.toHaveBeenCalled();
+    expect(onRemoved).not.toHaveBeenCalled();
   });
 });

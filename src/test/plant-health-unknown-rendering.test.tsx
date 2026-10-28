@@ -165,9 +165,11 @@ describe("mapped unknown health stays honest in plant summaries", () => {
     (health) => {
       plants = [sourcePlant("A", health)];
       renderPage("plants");
-      expect(screen.getByText("Plant health: unknown")).toBeInTheDocument();
+      // #2171: never assessed reads "Not assessed yet", not "unknown".
+      expect(screen.getByText("Plant health: Not assessed yet")).toBeInTheDocument();
+      expect(screen.queryByText("Plant health: unknown")).not.toBeInTheDocument();
       const chip = screen.getByLabelText(
-        "Plant health status: unknown. Sensor status is shown separately.",
+        "Plant health status: Not assessed yet. Sensor status is shown separately.",
       );
       const dot = chip.querySelector('[aria-hidden="true"]');
       expect(dot).not.toBeNull();

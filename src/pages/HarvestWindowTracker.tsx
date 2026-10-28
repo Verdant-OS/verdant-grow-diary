@@ -424,8 +424,8 @@ export default function HarvestWindowTracker() {
           </h2>
           <div className={`mt-3 rounded-xl bg-white p-4 shadow-sm ${hideForBlankPrint}`}>
             <p className="rounded-md bg-amber-50 p-3 text-sm print:hidden" role="note">
-              Nothing is saved in your browser. Download CSV or copy your log before leaving this
-              page.
+              Nothing is saved in your browser unless you click &ldquo;Keep this log in
+              Verdant&rdquo;. Download CSV or copy your log before leaving this page.
             </p>
 
             <fieldset className="mt-4 min-w-0 print:hidden">

@@ -123,6 +123,12 @@ describe("public harvest window tracker page", () => {
     });
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+    // The storage note names the one action that does keep the log.
+    expect(
+      screen.getByText(
+        /Nothing is saved in your browser unless you click .Keep this log in Verdant./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows the source validation message and adds nothing for a bad total", () => {

@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,6 +15,7 @@ import {
 import { SUBSCRIBER_GROWTH_MIGRATION_CONTRACT } from "../../scripts/releases/subscriber-growth-migration-contract.mjs";
 import {
   buildChangedE2eCommandArgs,
+  collectSubscriberGrowthReleaseScope,
   buildTargetedTestCommandArgs,
   formattableChangedFiles,
   parseGitPorcelainPaths,
@@ -494,6 +499,76 @@ describe("subscriber growth launch gate", () => {
       functionSourceVerified: false,
       verified: false,
     });
+  });
+
+  it("keeps deletions in source evidence but excludes them from executable validation", () => {
+    const root = mkdtempSync(join(tmpdir(), "subscriber-growth-diff-"));
+    const runGit = (args: string[]) =>
+      execFileSync("git", args, {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }).trim();
+    const write = (file: string, text: string) => {
+      mkdirSync(dirname(join(root, file)), { recursive: true });
+      writeFileSync(join(root, file), text);
+    };
+    const commit = (message: string) => {
+      runGit(["add", "."]);
+      runGit([
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-qm",
+        message,
+      ]);
+    };
+    const deleted = [
+      "docs/founder-slots-remaining-response.md",
+      "docs/schemas/founder-slots-remaining.response.schema.json",
+      "src/test/retired.test.ts",
+      "e2e/retired.spec.ts",
+    ];
+    try {
+      runGit(["init", "--quiet"]);
+      for (const file of deleted) write(file, "retired fixture\n");
+      write("src/old.ts", "export const retained = true;\n");
+      write("docs/retained.md", "Before\n");
+      commit("base fixture");
+      const base = runGit(["rev-parse", "HEAD"]);
+      for (const file of deleted) rmSync(join(root, file));
+      renameSync(join(root, "src/old.ts"), join(root, "src/renamed.ts"));
+      write("docs/retained.md", "After\n");
+      write("src/test/current.test.ts", "// current fixture\n");
+      write("e2e/current.spec.ts", "// current fixture\n");
+      commit("release fixture");
+
+      const scope = collectSubscriberGrowthReleaseScope(base, runGit);
+      expect(scope.files).toEqual(expect.arrayContaining(deleted));
+      expect(scope.tests).toEqual(["src/test/current.test.ts"]);
+      expect(scope.e2eSpecs).toEqual(["e2e/current.spec.ts"]);
+      expect(scope.lintable).toEqual([
+        "e2e/current.spec.ts",
+        "src/renamed.ts",
+        "src/test/current.test.ts",
+      ]);
+      expect(scope.formattable).toEqual([
+        "docs/retained.md",
+        "e2e/current.spec.ts",
+        "src/renamed.ts",
+        "src/test/current.test.ts",
+      ]);
+      // An unexpected missing file must still reach the validators and fail;
+      // only committed deletions are removed from their input, not missing paths.
+      rmSync(join(root, "docs/retained.md"));
+      expect(collectSubscriberGrowthReleaseScope(base, runGit).formattable).toContain(
+        "docs/retained.md",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("format-checks the complete base-relative release diff instead of only the tip commit", () => {

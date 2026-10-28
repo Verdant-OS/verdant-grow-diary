@@ -36,6 +36,8 @@ bun run release:subscriber-growth:gate:local
 5. Type-check, production build, branch-wide changed-code ESLint, base-relative
    changed-file Prettier, and branch diff integrity passing. A merge commit must
    not substitute newly arrived default-branch files for the release diff.
+   Committed deletions remain in the source inventory but are excluded from
+   test, lint, and format inputs; unexpected missing working-tree files still fail.
 6. All five fixed subscriber-growth migrations passing the source, RLS,
    operator-only aggregate, active-paid, attribution, and activation contract.
 7. All public subscriber-growth routes and all fixed capability markers

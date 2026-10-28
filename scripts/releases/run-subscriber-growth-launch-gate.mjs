@@ -103,9 +103,21 @@ function normalizeOrigin(value) {
   }
 }
 
-function changedFiles(baseRef) {
-  const output = git(["diff", "--name-only", `${baseRef}...HEAD`]);
-  return output ? output.split(/\r?\n/).filter(Boolean) : [];
+export function collectSubscriberGrowthReleaseScope(baseRef, runGit = git) {
+  const diff = `${baseRef}...HEAD`;
+  const readPaths = (args) => runGit(args).split(/\r?\n/).filter(Boolean);
+  const files = readPaths(["diff", "--name-only", diff]);
+  // Keep deletions in source evidence, but validators need the surviving paths.
+  // Git's deletion filter preserves unexpected missing working-tree files so
+  // they still fail validation; do not replace this with an existsSync filter.
+  const validationFiles = readPaths(["diff", "--name-only", "--diff-filter=d", diff]);
+  return {
+    files,
+    tests: runnableChangedTests(validationFiles),
+    e2eSpecs: runnableChangedE2e(validationFiles),
+    lintable: lintableChangedFiles(validationFiles),
+    formattable: formattableChangedFiles(validationFiles),
+  };
 }
 
 function runnableChangedTests(files) {
@@ -335,11 +347,9 @@ function writeReceipt(out, receipt) {
 }
 
 export async function runSubscriberGrowthLaunchGate(args) {
-  const files = changedFiles(args.baseRef);
-  const tests = runnableChangedTests(files);
-  const e2eSpecs = runnableChangedE2e(files);
-  const lintable = lintableChangedFiles(files);
-  const formattable = formattableChangedFiles(files);
+  const { files, tests, e2eSpecs, lintable, formattable } = collectSubscriberGrowthReleaseScope(
+    args.baseRef,
+  );
   const source = inspectSource(args, files, tests, e2eSpecs, formattable);
 
   const commands = [

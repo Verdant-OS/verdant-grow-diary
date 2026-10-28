@@ -79,7 +79,7 @@ elementPrototype.scrollIntoView ??= () => {};
 afterAll(() => {
   for (const [name, descriptor] of originalElementMethods) {
     if (descriptor) Object.defineProperty(Element.prototype, name, descriptor);
-    else delete (elementPrototype as Record<string, unknown>)[name];
+    else Reflect.deleteProperty(Element.prototype, name);
   }
 });
 

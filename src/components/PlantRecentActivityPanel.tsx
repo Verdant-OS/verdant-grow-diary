@@ -26,6 +26,7 @@ import {
 } from "@/lib/quickLogActivityDetailFields";
 import { enrichPlantFeedingDiaryRows } from "@/lib/plantFeedingDisplayRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -189,13 +190,20 @@ function EntryRow({
   );
 }
 
+function withLocalReadingTimestamp<T>(row: T): T {
+  const note = (row as { note?: unknown })?.note;
+  return typeof note === "string" ? { ...row, note: localizeReadingAtTimestamps(note) } : row;
+}
+
 export default function PlantRecentActivityPanel({ plantId, plantName }: Props) {
   const enabled = !!plantId;
   const temperatureUnit = useTemperatureUnitPreference();
   const { data, isLoading, isError, isFetching, refetch, isPending, fetchStatus } =
     usePlantRecentActivity(plantId);
   const rawRows = enabled ? enrichPlantFeedingDiaryRows(data ?? []) : [];
-  const rows = buildPlantRecentActivity(rawRows, {
+  // Localize "Reading at <ISO>." on the full note: the rules layer clips the
+  // preview at 140 characters, which can split the timestamp.
+  const rows = buildPlantRecentActivity(rawRows.map(withLocalReadingTimestamp), {
     plantId: plantId ?? null,
   });
   // Structured activity detail (e.g. training technique) is recovered from the
@@ -215,7 +223,7 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
     <Card
       id="plant-recent-activity"
       data-testid="plant-recent-activity-panel"
-      className="mt-4 scroll-mt-20"
+      className="mt-4 scroll-mt-16"
     >
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">

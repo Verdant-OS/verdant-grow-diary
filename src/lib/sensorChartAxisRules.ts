@@ -8,8 +8,8 @@
  * safe gutter width per metric and a compact tick formatter that keeps
  * units visible without overflowing.
  *
- * Pure rules only. No React, no Recharts. Tooltip behavior and stored data
- * semantics are unchanged.
+ * Pure rules only. No React, no Recharts. Stored values stay exact; tooltip
+ * strings use the Environment card's display decimals.
  *
  * Temperature labels follow the saved °F/°C display preference. Callers should
  * pass the unit explicitly (from useTemperatureUnitPreference) to keep these
@@ -36,6 +36,13 @@ export interface SensorChartMetricMeta {
   color: string;
   /** Default decimal places for tick values. */
   tickDecimals: number;
+  /**
+   * Decimal places for hover tooltips. Temperature, RH, and VPD use the
+   * same counts as the Environment card (1, 1, and 2). Soil moisture is
+   * one decimal on the chart only; the card does not render it. CO₂ and
+   * PPFD stay whole numbers. Axis ticks stay on `tickDecimals`. Display only.
+   */
+  displayDecimals: number;
   /** Reserved YAxis gutter width in px — sized to fit the widest tick label. */
   yAxisWidth: number;
 }
@@ -46,18 +53,41 @@ export const SENSOR_CHART_METRIC_META: Record<SensorChartMetricKey, SensorChartM
     unit: "°F",
     color: "hsl(var(--warning))",
     tickDecimals: 0,
+    displayDecimals: 1,
     yAxisWidth: 48,
   },
-  rh: { label: "Humidity", unit: "%", color: "hsl(var(--info))", tickDecimals: 0, yAxisWidth: 44 },
-  vpd: { label: "VPD", unit: "kPa", color: "hsl(var(--primary))", tickDecimals: 2, yAxisWidth: 64 },
+  rh: {
+    label: "Humidity",
+    unit: "%",
+    color: "hsl(var(--info))",
+    tickDecimals: 0,
+    displayDecimals: 1,
+    yAxisWidth: 44,
+  },
+  vpd: {
+    label: "VPD",
+    unit: "kPa",
+    color: "hsl(var(--primary))",
+    tickDecimals: 2,
+    displayDecimals: 2,
+    yAxisWidth: 64,
+  },
   co2: {
     label: "CO₂",
     unit: "ppm",
     color: "hsl(var(--leaf-glow))",
     tickDecimals: 0,
+    displayDecimals: 0,
     yAxisWidth: 64,
   },
-  soil: { label: "Soil", unit: "%", color: "hsl(var(--accent))", tickDecimals: 0, yAxisWidth: 44 },
+  soil: {
+    label: "Soil",
+    unit: "%",
+    color: "hsl(var(--accent))",
+    tickDecimals: 0,
+    displayDecimals: 1,
+    yAxisWidth: 44,
+  },
   ppfd: {
     label: "PPFD",
     // Canonical user-facing unit; matches PPFD_UNIT_LONG in ppfdRules.
@@ -66,6 +96,7 @@ export const SENSOR_CHART_METRIC_META: Record<SensorChartMetricKey, SensorChartM
     tickUnit: "µmol",
     color: "hsl(var(--success))",
     tickDecimals: 0,
+    displayDecimals: 0,
     yAxisWidth: 72,
   },
 };
@@ -124,6 +155,19 @@ export function formatSensorChartYTick(
   return `${rounded}${sep}${unit}`;
 }
 
+/**
+ * Display-only rounding. Does not change the plotted or stored number.
+ * A value that rounds to negative zero renders as unsigned zero.
+ */
+export function formatSensorChartDisplayNumber(
+  value: number,
+  metric: SensorChartMetricKey,
+): string {
+  if (!Number.isFinite(value)) return "";
+  const shown = value.toFixed(SENSOR_CHART_METRIC_META[metric].displayDecimals);
+  return Object.is(Number(shown), -0) ? shown.slice(1) : shown;
+}
+
 /** Tooltip-side formatter — uses the long unit (legend-consistent). */
 export function formatSensorChartTooltipValue(
   value: number,
@@ -134,7 +178,7 @@ export function formatSensorChartTooltipValue(
   const m = SENSOR_CHART_METRIC_META[metric];
   const unit = displayUnitOf(m, metric, temperatureUnit);
   const sep = /^[A-Za-zµ]/.test(unit) ? " " : "";
-  return `${value}${sep}${unit}`;
+  return `${formatSensorChartDisplayNumber(value, metric)}${sep}${unit}`;
 }
 
 /**

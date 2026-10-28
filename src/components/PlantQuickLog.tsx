@@ -31,12 +31,17 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import { QUICK_LOG_MANUAL_READINGS_NOTE } from "@/constants/quickLogGeneratedNoteCopy";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
   buildManualSensorSnapshot,
   parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
+import {
+  PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER,
+  plantQuickLogEcError,
+} from "@/lib/plantQuickLogSensorInputRules";
 import {
   computeChronologyDelta,
   type ChronologyDelta,
@@ -135,7 +140,7 @@ function buildTimelineNote(rawNote: string, hasPhoto: boolean, hasManualReadings
   const note = rawNote.trim();
   if (note) return note;
   if (hasPhoto) return "Photo attached from Quick Log.";
-  if (hasManualReadings) return "Manual readings captured from Quick Log.";
+  if (hasManualReadings) return QUICK_LOG_MANUAL_READINGS_NOTE;
   return "";
 }
 
@@ -337,12 +342,13 @@ export default function PlantQuickLog({
     [sensors, tempUnit],
   );
   const hasManualReadings = !!buildManualSensorSnapshot(sensorsForPayload);
+  const ecError = plantQuickLogEcError(sensors.ec);
   const hasPhoto = !!photoFile;
   const hasPlantResponseCheck = hasResponseCheck(note);
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
   const hasAnyContent = timelineNote.trim().length > 0;
   const canSave =
-    hasAnyContent && !busy && !photoAttachmentUnconfirmed && !photoChecking && !!growId;
+    hasAnyContent && !ecError && !busy && !photoAttachmentUnconfirmed && !photoChecking && !!growId;
 
   const saveHelper = !growId
     ? "Missing grow context. This plant needs a grow before saving."
@@ -352,13 +358,15 @@ export default function PlantQuickLog({
         ? "Saving this log to the timeline…"
         : !hasAnyContent
           ? "Tap what changed, add a photo, or add a manual reading."
-          : hasPlantResponseCheck
-            ? "Ready to save this plant response follow-up."
-            : hasPhoto
-              ? "Ready to save this photo and log to the timeline."
-              : hasManualReadings
-                ? "Ready to save these manual readings to the timeline."
-                : "Ready to save what changed to the timeline.";
+          : ecError
+            ? PLANT_QUICK_LOG_EC_SAVE_BLOCKED_HELPER
+            : hasPlantResponseCheck
+              ? "Ready to save this plant response follow-up."
+              : hasPhoto
+                ? "Ready to save this photo and log to the timeline."
+                : hasManualReadings
+                  ? "Ready to save these manual readings to the timeline."
+                  : "Ready to save what changed to the timeline.";
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
@@ -496,6 +504,9 @@ export default function PlantQuickLog({
       setError("Add what changed, a photo, or a reading before saving.");
       return;
     }
+
+    // #2159: the inline EC error names the field; never save a negative EC.
+    if (ecError) return;
 
     if (photoFile && !user) {
       setError("Sign in to attach photos.");
@@ -1181,6 +1192,7 @@ export default function PlantQuickLog({
                 inputMode="decimal"
                 step="0.01"
                 delta={deltaFor("ec", sensors.ec)}
+                error={ecError}
               />
             </fieldset>
           </section>
@@ -1242,9 +1254,20 @@ interface SensorFieldProps {
   inputMode: "decimal" | "numeric";
   step: string;
   delta: ChronologyDelta | null;
+  error?: string | null;
 }
 
-function SensorField({ id, label, value, onChange, inputMode, step, delta }: SensorFieldProps) {
+function SensorField({
+  id,
+  label,
+  value,
+  onChange,
+  inputMode,
+  step,
+  delta,
+  error,
+}: SensorFieldProps) {
+  const errorId = `${id}-error`;
   const deltaTone =
     delta?.direction === "up"
       ? "text-primary"
@@ -1266,7 +1289,14 @@ function SensorField({ id, label, value, onChange, inputMode, step, delta }: Sen
         onChange={(e) => onChange(e.target.value)}
         placeholder="—"
         className="text-base"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
       />
+      {error && (
+        <span id={errorId} role="alert" className="text-xs text-destructive">
+          {error}
+        </span>
+      )}
       {delta && (
         <span
           data-testid={`${id}-delta`}

@@ -14,6 +14,7 @@
  */
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { formatSnapshotCapturedAt } from "@/lib/alertReasonDisplayRules";
 import {
   isTrustedTimelineEventSource,
   originatingTimelineEventLabel,
@@ -60,7 +61,7 @@ export interface EvidenceLinkageBadgesProps {
 
 function formatOccurredAt(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  return iso;
+  return formatSnapshotCapturedAt(iso);
 }
 
 export default function EvidenceLinkageBadges({

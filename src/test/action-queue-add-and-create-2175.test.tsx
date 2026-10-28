@@ -220,8 +220,8 @@ describe("Issue #2175 — Add to Action Queue creates approval-required item and
       expect(screen.getByTestId("action-queue-pagination-range")).toHaveTextContent("0 of 0"),
     );
 
-    // Must not show "Not confirmed yet" on an empty queue before any transition is attempted
-    expect(screen.queryByText("Not confirmed yet")).not.toBeInTheDocument();
+    // Must not show "Status updates unverified" on an empty queue before any transition is attempted
+    expect(screen.queryByText("Status updates unverified")).not.toBeInTheDocument();
 
     const createBtn = screen.getByTestId("action-queue-create-button");
     expect(createBtn).toBeInTheDocument();
@@ -262,7 +262,7 @@ describe("Issue #2175 — Add to Action Queue creates approval-required item and
   it("ActionQueueRpcStatusPill still renders all states in isolation, while /actions hides the unconfirmed pill when 0 pending actions exist", async () => {
     const { unmount } = render(<ActionQueueRpcStatusPill availability="unknown" />);
     expect(screen.getByTestId("action-queue-transition-rpc-status-pill")).toHaveTextContent(
-      "Not confirmed yet",
+      "Status updates unverified",
     );
     unmount();
 

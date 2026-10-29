@@ -172,6 +172,17 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
   });
 
+  it("tracks SELECT INTO when an alias is named insert or merge", () => {
+    expect(tables('SELECT 1 AS "insert" INTO TABLE public.leaky;')).toEqual(["leaky"]);
+    expect(tables('SELECT 1 AS "merge" INTO TABLE public.leaky;')).toEqual(["leaky"]);
+    expect(tables("SELECT 1 AS insert INTO TABLE public.leaky;")).toEqual(["leaky"]);
+    expect(
+      tables(
+        "WITH x AS (SELECT 1 AS id) MERGE INTO public.leaky t USING x ON t.id = x.id WHEN MATCHED THEN DO NOTHING;",
+      ),
+    ).toEqual([]);
+  });
+
   it("ignores tables in other schemas", () => {
     expect(tables("CREATE TABLE private.leaky (id int);")).toEqual([]);
     expect(

@@ -24,7 +24,9 @@
 // A top-level SELECT ... INTO [UNLOGGED] [TABLE] name is also a create. It is
 // read from a third masked view in which DO and function bodies stay blank, so
 // a PL/pgSQL SELECT ... INTO n is not a table. INTO TEMP / TEMPORARY is
-// skipped, and INSERT INTO / MERGE INTO after a WITH ... SELECT is not a match.
+// skipped. INSERT INTO / MERGE INTO after a WITH ... SELECT is skipped only
+// when INTO comes directly after ) INSERT or ) MERGE. An alias named insert
+// or merge, quoted or unquoted, is not a skip.
 // Everything that can clear a table's requirement (a removal, a rename, a
 // GRANT or REVOKE) counts only where it runs at migration time: top-level
 // statements, DO blocks, and a literal string handed straight to EXECUTE.
@@ -59,11 +61,13 @@ const QUALIFIED_AT_RE = new RegExp(String.raw`^${QUALIFIED}`);
 const CREATE_TARGET_END_RE = /^\s*(?:\(|AS\b|OF\b|PARTITION\b|;|$)/i;
 // SQL SELECT ... INTO [UNLOGGED] [TABLE] name creates a table. INTO TEMP /
 // TEMPORARY is a session table and is skipped. INSERT/MERGE INTO after a
-// SELECT (including WITH ... SELECT) is not this form.
+// WITH ... SELECT is skipped only when INTO comes directly after ) INSERT or
+// ) MERGE, so an alias named insert or merge does not suppress detection.
 const SELECT_INTO_RE = new RegExp(
-  String.raw`\bSELECT\b(?:(?!\b(?:INSERT|MERGE)\b)[^;])*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?${QUALIFIED}`,
+  String.raw`\bSELECT\b[^;]*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?${QUALIFIED}`,
   "gi",
 );
+const SELECT_INTO_CTE_DML_RE = /\)\s+(?:INSERT|MERGE)\s+INTO\b/i;
 // ALTER TABLE ... RENAME TO keeps the table and its grants under the new name.
 // RENAME TO takes no schema; RENAME COLUMN and RENAME CONSTRAINT do not match.
 const RENAME_RE = new RegExp(
@@ -342,6 +346,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     for (const match of topLevel.matchAll(SELECT_INTO_RE)) {
       if (quotedTopLevel[match.index]) continue;
+      if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
       const table = publicTable(match[1], match[2]);
       if (table) events.push({ kind: "create", conditional: false, table, index: match.index });
     }

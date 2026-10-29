@@ -14,6 +14,8 @@ import { composeActionFollowUpTitle } from "./actionFollowUpEvidenceViewModel";
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
 import type { CanonicalQuickLogStage } from "@/lib/grow";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
+import { QUICK_LOG_ISSUE_TIMELINE_LABEL } from "@/constants/quickLogActivityTypes";
+import { hasQuickLogNoteMarker, isQuickLogIssueSubtype } from "@/lib/quickLogActivityRules";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -235,6 +237,12 @@ function titleForEventType(eventType: string, extras?: Record<string, unknown> |
   const key = (eventType || "").toLowerCase().trim();
   if (key === "action_followup") {
     return composeActionFollowUpTitle(extras?.outcome);
+  }
+  // Note and Issue both persist as observations: the note marker and the
+  // issue subtype tell them apart; an unmarked observation stays as it is.
+  if (hasQuickLogNoteMarker(extras)) return EVENT_TYPE_TITLES.note;
+  if (key === "observation" && isQuickLogIssueSubtype(extras?.subtype)) {
+    return QUICK_LOG_ISSUE_TIMELINE_LABEL;
   }
   if (key && EVENT_TYPE_TITLES[key]) return EVENT_TYPE_TITLES[key];
   if (!key) return "Diary entry";

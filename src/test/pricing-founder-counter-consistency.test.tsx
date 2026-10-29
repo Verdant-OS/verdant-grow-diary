@@ -4,13 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   openCheckout: vi.fn(),
-  founderSlots: {
-    status: "ready",
-    remaining: 42,
-    total: 100,
-    claimed: 58,
-    soldOut: false,
-  },
 }));
 
 vi.mock("@/hooks/usePaddleCheckout", () => ({
@@ -21,10 +14,6 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
     unavailableMessage: null,
     blockedReason: null,
   }),
-}));
-
-vi.mock("@/hooks/useFounderSlotsRemaining", () => ({
-  useFounderSlotsRemaining: () => mocks.founderSlots,
 }));
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
@@ -47,13 +36,6 @@ function renderPricing() {
 
 beforeEach(() => {
   mocks.openCheckout.mockReset();
-  Object.assign(mocks.founderSlots, {
-    status: "ready",
-    remaining: 42,
-    total: 100,
-    claimed: 58,
-    soldOut: false,
-  });
 });
 
 describe("Pricing Founder counter is not a sales surface", () => {

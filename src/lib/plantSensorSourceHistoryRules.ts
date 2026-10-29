@@ -1,4 +1,5 @@
 import type { SensorSourceSummaryReading } from "@/lib/sensorSourceSummaryRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 interface DiaryRow {
   entry_at: string;
@@ -24,13 +25,22 @@ export function buildPlantSensorSourceReadings(
     const snap = canonical ?? record(details.sensor_snapshot) ?? record(details.sensor);
     if (!snap) continue;
     const source = typeof snap.source === "string" && snap.source.trim() ? snap.source : null;
-    const ts = typeof snap.ts === "string" && snap.ts ? snap.ts : null;
+    // The snapshot's own observation time wins: `captured_at` (historical or
+    // imported rows) before `ts`, as every freshness consumer resolves it. The
+    // diary entry time is only the fallback for snapshots that carry neither,
+    // where the entry was the capture (Copilot on #2586 at 12f1e03fe).
+    const observedAt = resolveSensorObservationTime(snap);
     out.push({
       // Dedicated manual snapshots require their explicit source. Only the
       // existing legacy grower-entry shape keeps its historical manual default.
       source: source ?? (canonical ? "invalid" : "manual"),
-      captured_at: ts ?? row.entry_at ?? null,
+      captured_at: observedAt ?? row.entry_at ?? null,
       ts: row.entry_at,
+      // A diary row stores a copy of the reading. Its `live` claim is never
+      // corroborated here, so freshness applies the Timeline's persisted-
+      // snapshot fence; the provenance row still reports what the row claims
+      // (Codex P1 on #2586 at 60b20d9c8).
+      context: "persisted_snapshot",
     });
   }
   return out;

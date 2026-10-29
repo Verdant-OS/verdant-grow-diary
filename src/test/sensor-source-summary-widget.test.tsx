@@ -19,8 +19,10 @@ describe("SensorSourceSummaryWidget", () => {
 
   it("renders all six source rows with correct counts", () => {
     const ts = "2025-06-01T12:00:00Z";
+    const now = Date.parse("2025-06-01T12:01:00Z");
     render(
       <SensorSourceSummaryWidget
+        options={{ now }}
         readings={[
           { source: "live", captured_at: ts },
           { source: "live", captured_at: ts },

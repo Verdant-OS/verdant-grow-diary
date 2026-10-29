@@ -1,12 +1,15 @@
 /**
  * SensorSourceSummaryWidget — read-only summary card that shows how
  * many sensor readings came from each canonical source for the supplied
- * readings/date range.
+ * readings/date range, plus a separate freshness line (Fresh / Stale /
+ * Unknown) computed by the same rule as the Dashboard badges (VER-299).
  *
  * Rows with count > 0 link to the Timeline filtered by that source
  * (and optional date range / plant). Rows with count = 0 stay visible
  * but render as accessible-disabled non-links so growers can still see
- * the full legend at a glance.
+ * the full legend at a glance. The Stale row is a freshness aggregate and
+ * never links: the Timeline's `sensorSources=stale` filter matches persisted
+ * provenance only, so it could not show the readings this row counts.
  *
  * Pure presenter. No I/O. No writes. No AI calls.
  */
@@ -18,6 +21,10 @@ import {
 } from "@/constants/sensorSourceLabels";
 import {
   SENSOR_SOURCE_SUMMARY_EMPTY_TEXT,
+  SENSOR_SOURCE_SUMMARY_FRESHNESS_LABEL,
+  SENSOR_SOURCE_SUMMARY_FRESHNESS_LEGEND,
+  SENSOR_SOURCE_SUMMARY_FRESHNESS_ORDER,
+  SENSOR_SOURCE_SUMMARY_STALE_ROW_NOTE,
   summarizeSensorSources,
   type SensorSourceSummaryOptions,
   type SensorSourceSummaryReading,
@@ -69,7 +76,10 @@ export default function SensorSourceSummaryWidget({
   function renderRow(kind: TimelineSensorSourceKind) {
     const count = summary.counts[kind];
     const label = SENSOR_SOURCE_SHORT_LABEL[kind];
-    const legend = SENSOR_SOURCE_LEGEND[kind];
+    const isAggregate = kind === "stale";
+    const legend = isAggregate
+      ? `${SENSOR_SOURCE_LEGEND[kind]} ${SENSOR_SOURCE_SUMMARY_STALE_ROW_NOTE}`
+      : SENSOR_SOURCE_LEGEND[kind];
     const baseCls = cn(
       "flex items-center justify-between rounded-lg border bg-background/40 px-2.5 py-1.5 text-xs",
       TONE[kind],
@@ -94,12 +104,13 @@ export default function SensorSourceSummaryWidget({
       title: legend,
     } as const;
 
-    if (!enableLinks || count <= 0) {
+    if (!enableLinks || count <= 0 || isAggregate) {
       return (
         <li
           key={kind}
           {...sharedAttrs}
           data-clickable="false"
+          data-aggregate={isAggregate ? "true" : undefined}
           aria-disabled={count <= 0 ? "true" : undefined}
           className={cn(baseCls, count <= 0 && "opacity-60")}
         >
@@ -143,6 +154,26 @@ export default function SensorSourceSummaryWidget({
           <p className="text-[11px] text-muted-foreground">
             {summary.total} {summary.total === 1 ? "reading" : "readings"} in this period
           </p>
+          {!summary.isEmpty && (
+            <p
+              className="text-[11px] text-muted-foreground"
+              data-testid="sensor-source-summary-freshness"
+              aria-label="Reading freshness"
+            >
+              {SENSOR_SOURCE_SUMMARY_FRESHNESS_ORDER.map((bucket, i) => (
+                <span key={bucket} title={SENSOR_SOURCE_SUMMARY_FRESHNESS_LEGEND[bucket]}>
+                  {i > 0 ? " · " : null}
+                  {SENSOR_SOURCE_SUMMARY_FRESHNESS_LABEL[bucket]}{" "}
+                  <span
+                    className="tabular-nums font-semibold"
+                    data-testid={`sensor-source-summary-freshness-count-${bucket}`}
+                  >
+                    {summary.freshness[bucket]}
+                  </span>
+                </span>
+              ))}
+            </p>
+          )}
         </div>
         <SensorSourceLegendTooltip testIdSuffix="summary" />
       </header>

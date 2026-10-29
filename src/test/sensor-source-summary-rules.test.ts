@@ -25,7 +25,7 @@ describe("summarizeSensorSources", () => {
         { source: "demo", captured_at: ts },
         { source: "invalid", captured_at: ts },
       ],
-      { now, staleMs: 60_000 },
+      { now },
     );
     expect(r.total).toBe(6);
     expect(r.counts.live).toBe(2);
@@ -54,20 +54,21 @@ describe("summarizeSensorSources", () => {
     expect(r.counts.invalid).toBe(0);
   });
 
-  it("downgrades old live readings to stale when staleMs is set", () => {
+  it("keeps provenance for an old live reading and counts it as stale freshness", () => {
     const now = Date.parse("2025-01-01T12:00:00Z");
     const r = summarizeSensorSources(
       [
         { source: "live", captured_at: "2025-01-01T11:59:30Z" },
         { source: "live", captured_at: "2025-01-01T00:00:00Z" },
       ],
-      { now, staleMs: 60_000 },
+      { now },
     );
-    expect(r.counts.live).toBe(1);
+    expect(r.counts.live).toBe(2);
     expect(r.counts.stale).toBe(1);
+    expect(r.freshness).toEqual({ fresh: 1, stale: 1, unknown: 0 });
   });
 
-  it("does not downgrade explicit csv/manual/demo to stale", () => {
+  it("keeps csv/manual/demo provenance; old manual is stale, csv/demo are unknown freshness", () => {
     const now = Date.parse("2025-06-01T12:00:00Z");
     const old = "2020-01-01T00:00:00Z";
     const r = summarizeSensorSources(
@@ -76,12 +77,13 @@ describe("summarizeSensorSources", () => {
         { source: "manual", captured_at: old },
         { source: "demo", captured_at: old },
       ],
-      { now, staleMs: 1000 },
+      { now },
     );
     expect(r.counts.csv).toBe(1);
     expect(r.counts.manual).toBe(1);
     expect(r.counts.demo).toBe(1);
-    expect(r.counts.stale).toBe(0);
+    expect(r.counts.stale).toBe(1);
+    expect(r.freshness).toEqual({ fresh: 0, stale: 1, unknown: 2 });
   });
 
   it("filters by half-open date range [from, to)", () => {
@@ -94,7 +96,6 @@ describe("summarizeSensorSources", () => {
     const r = summarizeSensorSources(data, {
       range: { from: "2025-01-02T00:00:00Z", to: "2025-01-10T00:00:00Z" },
       now,
-      staleMs: 24 * 60 * 60 * 1000,
     });
     expect(r.total).toBe(1);
     expect(r.counts.live).toBe(1);

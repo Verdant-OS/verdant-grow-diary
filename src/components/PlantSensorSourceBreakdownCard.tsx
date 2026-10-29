@@ -17,6 +17,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useNowTick } from "@/hooks/useNowTick";
 import { supabase } from "@/integrations/supabase/client";
 import { summarizeSensorSources } from "@/lib/sensorSourceSummaryRules";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
@@ -78,12 +79,15 @@ export default function PlantSensorSourceBreakdownCard({
     () => buildPlantSensorSourceReadings(providedRows ?? query.data ?? []),
     [providedRows, query.data],
   );
+  // Same injected clock as the Sensors page so freshness agrees across surfaces.
+  const nowMs = useNowTick();
 
   // When the plant has no sensor-derived diary entries at all in the
   // selected range we render an honest empty state — never invent a
   // healthy "live" classification.
   const summary = summarizeSensorSources(readings, {
     range: range ?? null,
+    now: nowMs,
     // Unknown explicit source strings stay flagged as "invalid" rather
     // than being silently relabeled as healthy live/manual data.
     fallback: "invalid",
@@ -155,7 +159,7 @@ export default function PlantSensorSourceBreakdownCard({
       ) : (
         <SensorSourceSummaryWidget
           readings={readings}
-          options={{ range: range ?? null, fallback: "invalid" }}
+          options={{ range: range ?? null, now: nowMs, fallback: "invalid" }}
           title="Sensor sources for this plant"
           dateRange={
             range

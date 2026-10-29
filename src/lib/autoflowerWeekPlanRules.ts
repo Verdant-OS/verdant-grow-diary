@@ -90,6 +90,16 @@ const MONTH_SHORT = [
   "Dec",
 ] as const;
 
+export const AUTOFLOWER_INVALID_ESTIMATE_MESSAGE =
+  "Enter a whole number of weeks from 6 to 16. Download, copy and print are paused until then." as const;
+
+/** True when a typed breeder estimate is a whole number of weeks from 6 to 16. */
+export function isValidAutoflowerEstimateDraft(value: string): boolean {
+  if (value.trim() === "") return false;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 6 && n <= 16;
+}
+
 export const AUTOFLOWER_SHORT_ESTIMATE_MESSAGE =
   "Short estimate: adjust the stage weeks to your breeder's description." as const;
 

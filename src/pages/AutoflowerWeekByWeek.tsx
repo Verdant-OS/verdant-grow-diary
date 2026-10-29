@@ -8,6 +8,7 @@ import {
   type AutoflowerPlannerCtaLocation,
 } from "@/lib/autoflowerWeekPlanAnalytics";
 import {
+  AUTOFLOWER_INVALID_ESTIMATE_MESSAGE,
   AUTOFLOWER_SHORT_ESTIMATE_MESSAGE,
   AUTOFLOWER_SOURCES,
   AUTOFLOWER_WEEK_PLAN_CTA_HREF,
@@ -39,6 +40,7 @@ import {
   type LightCode,
   type MilestoneKey,
   type StageWeeks,
+  isValidAutoflowerEstimateDraft,
 } from "@/lib/autoflowerWeekPlanRules";
 
 const ILGM = AUTOFLOWER_SOURCES[0].url;
@@ -47,7 +49,8 @@ const AUTOSEEDS = AUTOFLOWER_SOURCES[2].url;
 
 const inputClass =
   "mt-1 w-full min-w-0 rounded-md border border-emerald-900/20 bg-white px-2 py-1.5 text-sm text-emerald-950";
-const buttonClass = "min-h-11 rounded-md border border-emerald-900/20 bg-white px-3 text-sm";
+const buttonClass =
+  "min-h-11 rounded-md border border-emerald-900/20 bg-white px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50";
 const sectionClass = "mt-8 max-w-3xl leading-7";
 const tableWrapClass =
   "mt-4 max-w-full overflow-x-auto rounded-md border bg-white print:overflow-visible";
@@ -207,10 +210,14 @@ export default function AutoflowerWeekByWeek() {
     if (trimmed && parseIsoDateUtc(trimmed) !== null) updatePlan({ sproutDate: trimmed }, true);
   }
 
+  // While the typed estimate is invalid the plan still holds the last valid one,
+  // so exports are paused rather than silently using a plan the field no longer shows.
+  const estimateInvalid = !isValidAutoflowerEstimateDraft(estimateDraft);
+
   function changeEstimate(value: string) {
     setEstimateDraft(value);
+    if (!isValidAutoflowerEstimateDraft(value)) return;
     const raw = Number(value);
-    if (!Number.isInteger(raw) || raw < 6 || raw > 16) return;
     const outline = getDefaultStageOutline(raw);
     const stages = stagesFromOutline(outline);
     setStageDrafts(toDrafts(stages, outline.trichomeWeek));
@@ -245,6 +252,7 @@ export default function AutoflowerWeekByWeek() {
   }
 
   function downloadCsv() {
+    if (estimateInvalid) return;
     const filename = autoflowerPlanCsvFilename(todayLocalIso());
     let url: string | null = null;
     let link: HTMLAnchorElement | null = null;
@@ -275,6 +283,7 @@ export default function AutoflowerWeekByWeek() {
   }
 
   async function copyPlan() {
+    if (estimateInvalid) return;
     const tsv = buildAutoflowerPlanTsv(plan);
     trackAutoflowerPlannerEvent("autoflower_planner_copy", { week_count: plan.estimateWeeks });
     const generation = copyGeneration.current;
@@ -291,6 +300,7 @@ export default function AutoflowerWeekByWeek() {
   }
 
   function printPlan() {
+    if (estimateInvalid) return;
     announce("Opening print dialog for your autoflower week-by-week plan.");
     trackAutoflowerPlannerEvent("autoflower_planner_print", {});
     window.print();
@@ -416,8 +426,19 @@ export default function AutoflowerWeekByWeek() {
                     required
                     className={inputClass}
                     value={estimateDraft}
+                    aria-invalid={estimateInvalid}
+                    aria-describedby={estimateInvalid ? "estimate-weeks-error" : undefined}
                     onChange={(event) => changeEstimate(event.target.value)}
                   />
+                  {estimateInvalid ? (
+                    <p
+                      id="estimate-weeks-error"
+                      role="alert"
+                      className="mt-1 rounded-md bg-red-50 p-2 text-xs text-red-900"
+                    >
+                      {AUTOFLOWER_INVALID_ESTIMATE_MESSAGE}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs">
                     Use the number on your seed pack or breeder&apos;s page.
                   </p>
@@ -725,13 +746,28 @@ export default function AutoflowerWeekByWeek() {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2 print:hidden">
-              <button type="button" className={buttonClass} onClick={downloadCsv}>
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={downloadCsv}
+                disabled={estimateInvalid}
+              >
                 Download CSV
               </button>
-              <button type="button" className={buttonClass} onClick={() => void copyPlan()}>
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={() => void copyPlan()}
+                disabled={estimateInvalid}
+              >
                 Copy plan
               </button>
-              <button type="button" className={buttonClass} onClick={printPlan}>
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={printPlan}
+                disabled={estimateInvalid}
+              >
                 Print / Save as PDF
               </button>
               <button

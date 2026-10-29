@@ -79,16 +79,16 @@ branch: claude/guide-autoflower-week-by-week
 base: verdant-grow-diary
 checkout: git fetch origin claude/guide-autoflower-week-by-week verdant-grow-diary && git switch claude/guide-autoflower-week-by-week && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/guide-autoflower-week-by-week
-head_sha: 89d21afe698a6e05d44a996242b3ad1fa8591d4f before the unmount-timer and stale-copy fix; read the current head from the PR
+head_sha: 90e90d815b014db71aaf084306af5b28d2c46f75 before the breeder-estimate validation fix; read the current head from the PR
 state: pushed, PR ready for review
-current_step: the same status-timer defect failed shard 18 on the sibling harvest page (#2592), and the #2594 review found a stale clipboard race; both were present here. The status timer is now cleared on unmount, and a clipboard result that arrives after the plan changed is ignored. Pinned by src/test/autoflower-week-plan-page-async.test.tsx (RED 3 failed / 1 passed). Earlier: awaiting CI and an independent exact-head review
+current_step: Codex P2 at 90e90d8 (comment 4417202188): an invalid breeder estimate (blank, 17, 9.5) left the old plan in place while Download, Copy and Print stayed enabled and exported it. Now an inline error shows, the field is aria-invalid, and the three exports are disabled and guarded until the estimate is a whole number 6-16 (isValidAutoflowerEstimateDraft). Pinned by src/test/autoflower-week-plan-estimate-validation.test.tsx (RED 3 failed / 2 passed). Earlier: the same status-timer defect failed shard 18 on the sibling harvest page (#2592), and the #2594 review found a stale clipboard race; both were present here. The status timer is now cleared on unmount, and a clipboard result that arrives after the plan changed is ignored. Pinned by src/test/autoflower-week-plan-page-async.test.tsx (RED 3 failed / 1 passed). Earlier: awaiting CI and an independent exact-head review
 next_action: independent exact-head review of the PR head (author: this Claude session; exclude it)
 post_merge_check: after Publish, https://verdantgrowdiary.com/guides/autoflower-week-by-week returns the H1 "Autoflower Week by Week: Your Schedule, Light and Feeding Planner" and /version.json reports the merge SHA; else NOT_MEASURED
 active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
 decisions: copy, title, meta, FAQ and JSON-LD come verbatim from the source HTML; the brief was context only. Date math is UTC calendar arithmetic with today injected from the component. Strict YYYY-MM-DD parsing rejects rollover dates the source accepted. autoflower_planner_generated is throttled (leading edge, 1 per 2 s) instead of the source's 2 s trailing debounce, as Matthew asked. CSV reuses the Athena escapeCsvField formula guard. CTAs use the relative /auth URL Matthew specified.
 tried_and_rejected: finishing the port in a subagent; it handed back after the rules module because of its context budget.
 commands: bun run typecheck (NODE_OPTIONS=--max-old-space-size=8192 here); bunx vitest run src/test/autoflower-week-plan-*.ts* --reporter=dot; TZ=Pacific/Auckland bunx vitest run src/test/autoflower-week-plan-rules.test.ts
-files_touched: src/lib/autoflowerWeekPlanRules.ts src/lib/autoflowerWeekPlanAnalytics.ts src/pages/AutoflowerWeekByWeek.tsx src/test/autoflower-week-plan-page-async.test.tsx src/routes/guides.autoflower-week-by-week.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/constants/verdantSeoContent.ts src/pages/GuidesIndex.tsx public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts src/test/autoflower-week-plan-rules.test.ts src/test/autoflower-week-plan-export.test.ts src/test/autoflower-week-plan-analytics.test.ts src/test/autoflower-week-plan-page.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx docs/agents/HANDOFF_LOG.md
+files_touched: src/lib/autoflowerWeekPlanRules.ts src/lib/autoflowerWeekPlanAnalytics.ts src/pages/AutoflowerWeekByWeek.tsx src/test/autoflower-week-plan-page-async.test.tsx src/test/autoflower-week-plan-estimate-validation.test.tsx src/routes/guides.autoflower-week-by-week.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/constants/verdantSeoContent.ts src/pages/GuidesIndex.tsx public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts src/test/autoflower-week-plan-rules.test.ts src/test/autoflower-week-plan-export.test.ts src/test/autoflower-week-plan-analytics.test.ts src/test/autoflower-week-plan-page.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: none
 open_questions: none
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: no routines, no paused workflows
 claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-28 09:00 UTC
 owner: Claude
-last_updated: 2026-10-29 18:15 UTC, by Claude
+last_updated: 2026-10-29 20:05 UTC, by Claude
 ```
 
 ### SEO-GSC-AHREFS-RECONCILIATION-20261028

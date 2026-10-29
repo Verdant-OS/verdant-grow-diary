@@ -161,7 +161,7 @@ describe("credit pack server gate", () => {
     const start = PRICE_FN.indexOf(
       "if ((CREDIT_PACK_IDS as readonly string[]).includes(requested))",
     );
-    const end = PRICE_FN.indexOf("// 2b. Founder Lifetime", start);
+    const end = PRICE_FN.indexOf("// 3. Server-controlled environment.", start);
     const block = PRICE_FN.slice(start, end);
 
     expect(start).toBeGreaterThan(-1);

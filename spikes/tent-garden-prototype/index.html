@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Tent Garden — prototype (sample data)</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <!--
+      Three.js is loaded as a pinned ES module from a CDN because the root package.json does
+      not yet declare it (adding it changes bun.lock, which needs owner + outside-reviewer
+      approval — see README). No other third-party code is loaded.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#details">Skip to plant details</a>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__name">Tent Garden</span>
+        <span class="pill pill--sample" title="Every plant, note and photo here is fictional">
+          Sample data · prototype
+        </span>
+      </div>
+      <div class="topbar__status" id="viewStatus" aria-live="polite">Today · View</div>
+    </header>
+
+    <main class="layout">
+      <section class="stage" aria-label="Tent diorama">
+        <div class="toolbar" role="toolbar" aria-label="Scene controls">
+          <div class="seg" role="group" aria-label="Mode">
+            <button id="modeView" class="seg__btn is-active" aria-pressed="true">View</button>
+            <button id="modeEdit" class="seg__btn" aria-pressed="false">Edit Layout</button>
+          </div>
+          <button id="rotateLeft" class="btn" title="Rotate view 90° left (key: [)">⟲ 90°</button>
+          <button id="rotateRight" class="btn" title="Rotate view 90° right (key: ])">⟳ 90°</button>
+          <button id="resetView" class="btn" title="Reset view (key: R)">Reset View</button>
+          <label class="field">
+            <span>Tent</span>
+            <select id="gardenSelect" aria-label="Sample tent"></select>
+          </label>
+          <label class="field">
+            <span>Pots</span>
+            <select
+              id="potSize"
+              aria-label="Pot size for this tent"
+              aria-describedby="potSizeNote"
+            ></select>
+          </label>
+          <span id="potSizeNote" class="muted small pot-note" aria-live="polite"></span>
+          <label class="toggle" title="Device-local setting. Reduced-motion users default to off.">
+            <input type="checkbox" id="animToggle" />
+            <span>Animation</span>
+          </label>
+          <button id="showList" class="btn btn--ghost" aria-pressed="false">List view</button>
+        </div>
+
+        <div class="canvas-wrap" id="canvasWrap">
+          <div
+            id="sceneHost"
+            class="scene-host"
+            tabindex="0"
+            aria-label="3D tent. Arrow keys nudge the selected plant in Edit mode."
+          ></div>
+          <div id="historyBanner" class="history-banner" hidden>
+            <span id="historyBannerText"></span>
+            <button id="returnToday" class="btn btn--small">Return To Today</button>
+          </div>
+          <div id="editHint" class="edit-hint" hidden>
+            Drag a pot to a free grid cell. Drop on another pot to swap. Nothing is recorded until
+            you Save.
+          </div>
+          <div id="fallback" class="fallback" hidden>
+            <p><strong>3D view unavailable.</strong> <span id="fallbackReason"></span></p>
+            <p>The list view below shows the same recorded layout.</p>
+          </div>
+        </div>
+
+        <div class="history" aria-label="Tent time travel">
+          <button id="histPrev" class="btn btn--small" aria-label="Earlier snapshot">◀</button>
+          <div class="history__slider">
+            <label for="histRange" class="history__label" id="histLabel">Today</label>
+            <input
+              id="histRange"
+              type="range"
+              min="0"
+              max="3"
+              step="1"
+              value="3"
+              list="histTicks"
+              aria-describedby="histNote"
+            />
+            <datalist id="histTicks"></datalist>
+            <div class="history__ticks" id="histTickLabels"></div>
+          </div>
+          <button id="histNext" class="btn btn--small" aria-label="Later snapshot">▶</button>
+          <p id="histNote" class="history__note">
+            Snaps to recorded dates only. Nothing between two dates is invented.
+          </p>
+        </div>
+
+        <div id="saveBar" class="savebar" hidden>
+          <span id="draftSummary">No changes</span>
+          <button id="undoDraft" class="btn btn--small" disabled>Undo</button>
+          <button id="cancelEdit" class="btn btn--small btn--ghost">Cancel</button>
+          <button id="saveBtn" class="btn btn--small btn--primary" disabled>Save…</button>
+        </div>
+
+        <section id="listView" class="listview" hidden aria-label="Plant list">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Stage</th>
+                <th>Position</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="listBody"></tbody>
+          </table>
+        </section>
+      </section>
+
+      <aside id="details" class="details" aria-label="Plant details">
+        <div class="details__handle" aria-hidden="true"></div>
+        <div id="detailsBody" class="details__body">
+          <p class="muted">Tap or click a plant to see its recorded details.</p>
+        </div>
+        <section class="events" aria-label="Simulated timeline events">
+          <h3>Simulated Timeline events</h3>
+          <p class="muted small">Prototype-local. Nothing here is written to a real diary.</p>
+          <ol id="eventList" class="events__list"></ol>
+          <button id="undoSaved" class="btn btn--small" hidden>Undo last saved move</button>
+        </section>
+      </aside>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <dialog id="dlgSwap" class="dlg">
+      <form method="dialog">
+        <h2>Swap pots?</h2>
+        <p id="dlgSwapText"></p>
+        <menu>
+          <button value="cancel" class="btn">Keep Editing</button>
+          <button value="swap" class="btn btn--primary">Swap</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="dlgSave" class="dlg">
+      <form method="dialog" id="saveForm">
+        <h2>Save layout</h2>
+        <p class="muted small">
+          Final net changes only. For each one, say whether the pot really moved.
+        </p>
+        <ul id="saveItems" class="save-items"></ul>
+        <label class="toggle small"
+          ><input type="checkbox" id="simulateFail" /> Simulate a failed save (keeps the draft for
+          Retry)</label
+        >
+        <menu>
+          <button value="cancel" class="btn">Keep Editing</button>
+          <button value="save" class="btn btn--primary" id="confirmSave">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="dlgCancel" class="dlg">
+      <form method="dialog">
+        <h2>Discard draft changes?</h2>
+        <p id="dlgCancelText"></p>
+        <menu>
+          <button value="keep" class="btn btn--primary" autofocus>Keep Editing</button>
+          <button value="discard" class="btn btn--danger">Discard</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script type="module" src="./src/ui/app.js"></script>
+  </body>
+</html>

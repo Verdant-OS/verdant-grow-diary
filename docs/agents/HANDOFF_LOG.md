@@ -69,6 +69,41 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-2231-EARLIER-BOUNDARY
+
+```text
+TASK PR-2231-EARLIER-BOUNDARY  priority: P2  status: OPEN
+goal: Earlier at the oldest fictional snapshot stays there; preserve pointAt(-1) -> Today and all nine existing checks.
+why: The bound Earlier caller requested index -1, which the intentionally pinned history rule resolves to Today.
+branch: claude/tent-garden-prototype-v0
+base: verdant-grow-diary integrated at 81f6aa728a46bb86b4acddcf2ffd7d7529ed1d9a
+checkout: Fetch this existing branch and deploy base; verify the full current PR head and effective holder before using an isolated authorized checkout. Do not overwrite another writer.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2231 (draft)
+head_sha: ab3a262f1c8e4f5245e0077b3e906bf470359c2f, published source checkpoint before this normal base integration; the resulting pushed full integration head belongs in the PR receipt.
+state: Published caller repair preserved byte-for-byte during normal base integration; resulting-head CI and outside acceptance require fresh evidence.
+current_step: Resolve only this own HANDOFF insertion against incoming VER-285; retain every unrelated incoming log byte, the complete prototype and README, and all ten check scripts exactly at the published ab3a262f1c8e4f5245e0077b3e906bf470359c2f source.
+next_action: Confirm the current pushed full head and fresh required/supplemental checks, then obtain eligible non-contributing outside review. Keep draft; no queue or independent acceptance by this writer.
+post_merge_check: After a separately authorized release, verify that Earlier remains on the oldest snapshot. Browser/phone/production checks are NOT_MEASURED here.
+active_writer: Codex closeout root delegates one bounded normal-integration writer /root/preflight_1949 under accepted handoff and claim issuecomment-6427062744; source writer stops after normal publication. Claude ceased source writes; original authorship remains attributed.
+decisions: Preserve pointAt's invalid-index fallback and repair only the Earlier caller. Root approved resolving the ordinary .gitignore base conflict to current deploy byte-for-byte; resolved blob e435a534ce4f249eee930ebb56dd7c587f1c47da, with no authored ignore-policy delta.
+tried_and_rejected: Changing pointAt would break its intentional existing contract. Direct app.js import would initialize the DOM/CDN scene, so the new Node check executes its real navigation function and bound controls with the real history rules and narrow DOM/render/toast doubles.
+commands: node --test spikes/tent-garden-prototype/test/*.check.mjs
+validation: Published baseline 67bc60eff04b470afa8979dd743fc228a34082e7: 89 PASS / 0 FAIL / 0 SKIP. New real-handler regression on unchanged integrated prototype: 1 FAIL / 4 PASS. Caller repair: 94 PASS / 0 FAIL / 0 SKIP across all ten scripts. Current 2026-10-27 base integration: the unchanged ten scripts execute 94 PASS / 0 FAIL / 0 SKIP; docs/release safety, strict scorer, Sentinel parity, scoped format and whitespace pass. New-head hosted CI and outside acceptance remain NOT_MEASURED.
+files_touched: Current integration authors only docs/agents/HANDOFF_LOG.md (this block only). Historical caller repair, new regression and README remain unchanged; all prototype source and all ten checks preserve the published source blobs.
+files_remaining: No additional source repair planned within this slice; current-head evidence and PR metadata remain.
+blockers: Fresh current-head hosted checks and independent outside acceptance remain pending. Codex authored the repair and cannot accept it. Browser/phone/production behavior remains NOT_MEASURED.
+open_questions: Child #2240 and D1-D4 integration decisions retain their existing holds and owners; no work on them is authorized here.
+gotchas: A passing published baseline did not catch the defect: its history check intentionally expects pointAt(points, -1) to return Today. The new regression must keep the actual caller/control binding under execution.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2231#issuecomment-6427062744
+artifacts: Prototype README records reproducible commands and RED/GREEN evidence; current PR carries the exact pushed head. Cloud scratch receipts are supplementary, not production acceptance.
+reviewer_seat: Actually available eligible non-contributing outside session under current OWNERSHIP.md; exclude Claude prototype authors and Codex repair writer.
+reviewer_sha: NOT_MEASURED for the resulting repair head; no acceptance inherited.
+session_state: One bounded cloud writer; no deployment, browser, device control, dependency/lock change, child #2240 or D1-D4 work.
+claimed_by: Codex #2231 prototype-boundary writer, 2026-10-26 20:53 UTC (issuecomment-6427062744).
+owner: Codex #2231 prototype-boundary writer for this bounded repair only.
+last_updated: 2026-10-27 05:55 UTC, by Codex closeout /root/preflight_1949 (bounded base integration)
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

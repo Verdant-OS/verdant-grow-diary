@@ -37,7 +37,8 @@
 // public would be credited to the public table. Schema-qualify names in any
 // migration that changes search_path.
 
-const IDENT = String.raw`(?:"(?:[^"]|"")+"|[a-zA-Z_][a-zA-Z0-9_$]*)`;
+// Unquoted identifiers: PostgreSQL reads every non-ASCII character as a letter.
+const IDENT = String.raw`(?:"(?:[^"]|"")+"|[a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_$\u0080-\uFFFF]*)`;
 // Optional schema, then the name: group 1 is the schema, group 2 the table.
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`;
 const CREATE_RE = new RegExp(
@@ -61,13 +62,34 @@ const DROP_RE = /\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
 const ACL_RE =
   /\b(GRANT|REVOKE)\b([^;]*?)\bON\s+(?!(?:ALL\s+)?(?:TABLES|FUNCTIONS?|ROUTINES?|PROCEDURES?|SEQUENCES?|SCHEMAS?|TYPES?|DOMAINS?|LANGUAGE|FOREIGN|LARGE|DATABASE|TABLESPACE)\b)(?:TABLE\s+)?([^;]*?)\s+(?:TO|FROM)\b/gi;
 const TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*$`);
-const DROP_TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}`);
+const DROP_TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*(?:CASCADE|RESTRICT)?\s*$`, "i");
 const REVOKE_ALL_RE = /^\s*ALL(?:\s+PRIVILEGES)?\s*$/i;
 const DOLLAR_TAG_RE = /\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/y;
 // A statement prefix that ends by handing the next string to EXECUTE, after
 // any block keywords (BEGIN, THEN, ELSE, LOOP) that open the statement.
 const EXECUTES_RE = /^\s*(?:(?:BEGIN|THEN|ELSE|LOOP)\s+)*EXECUTE\s*$/i;
 const RUNS_NOW_RE = /^\s*DO\b/i;
+// What may follow a string handed to EXECUTE for that string to be the whole
+// command. Anything else (EXECUTE 'DROP ...' || suffix) builds the command at
+// run time, so the string is not read as the statement (fails closed).
+const EXECUTE_ENDS_RE = /^\s*(?:;|$|USING\b|INTO\b)/i;
+
+// Split a target list on the commas outside quoted identifiers, so
+// public."a,b" stays one name.
+function splitTargets(list) {
+  const targets = [];
+  let start = 0;
+  let quoted = false;
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] === '"') quoted = !quoted;
+    else if (list[i] === "," && !quoted) {
+      targets.push(list.slice(start, i));
+      start = i + 1;
+    }
+  }
+  targets.push(list.slice(start));
+  return targets;
+}
 
 // True when every privilege in a GRANT list has a column list ("INSERT (id)").
 // A mixed list ("INSERT, SELECT (id)") still grants a table-level privilege.
@@ -175,6 +197,9 @@ function maskSql(sql, executableOnly) {
     for (let d = 0; d < decoded.length; d++) {
       if (masked[d] !== decoded[d]) for (const k of origin[d]) blank(k, k + 1);
     }
+    // The quotes delimit the command; they are not part of it.
+    blank(open, open + 1);
+    blank(close, close + 1);
   };
   const mask = (start, end) => {
     let i = start;
@@ -218,7 +243,9 @@ function maskSql(sql, executableOnly) {
           else j++;
         }
         if (j < end) {
-          const executes = EXECUTES_RE.test(code.slice(stmtStart, i).join(""));
+          const executes =
+            EXECUTES_RE.test(code.slice(stmtStart, i).join("")) &&
+            EXECUTE_ENDS_RE.test(sql.slice(j + 1, end));
           if (executableOnly && !executes) blank(i, j + 1);
           else if (executableOnly) maskExecutedLiteral(i, j, escapes);
           i = j + 1;
@@ -233,7 +260,9 @@ function maskSql(sql, executableOnly) {
           // A DO body runs now, and so does a string handed straight to EXECUTE
           // inside one (EXECUTE $ddl$ ... $ddl$).
           const prefix = code.slice(stmtStart, i).join("");
-          const runsNow = RUNS_NOW_RE.test(prefix) || EXECUTES_RE.test(prefix);
+          const runsNow =
+            RUNS_NOW_RE.test(prefix) ||
+            (EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(close + tag.length, end)));
           if (!executableOnly || runsNow) mask(i + tag.length, close);
           else blank(i, close + tag.length);
           i = close + tag.length;
@@ -284,7 +313,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     for (const match of executed.matchAll(DROP_RE)) {
       if (quoted[match.index]) continue;
-      for (const target of match[1].split(",")) {
+      for (const target of splitTargets(match[1])) {
         const name = DROP_TARGET_RE.exec(target);
         const table = name && publicTable(name[1], name[2]);
         if (table) events.push({ kind: "drop", table, index: match.index });
@@ -296,7 +325,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
       // Column-level ACLs (a privilege list with a column list) leave the rest
       // of the table on the default, so they are not a table-level decision.
       if (isRevoke ? !REVOKE_ALL_RE.test(match[2]) : columnLevelOnly(match[2])) continue;
-      for (const target of match[3].split(",")) {
+      for (const target of splitTargets(match[3])) {
         const name = TARGET_RE.exec(target);
         const table = name && publicTable(name[1], name[2]);
         if (table) events.push({ kind: "acl", table, index: match.index });

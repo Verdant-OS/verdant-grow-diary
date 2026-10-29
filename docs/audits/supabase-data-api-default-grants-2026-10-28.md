@@ -49,7 +49,10 @@ default-privilege statement, or a function/sequence grant does not count. A top-
 removal or `ALTER TABLE ... RENAME TO` clears a table: one written in a comment, a literal or an
 uncalled function body does not. A string handed to `EXECUTE` is decoded and read the same way, so
 a literal or comment nested inside it does not count either. A keyword inside a quoted identifier
-(a policy named `"Admins grant access"`) is not a statement. Quoted names (`"public"."x"`),
+(a policy named `"Admins grant access"`) is not a statement. A string handed to `EXECUTE` counts only when it is
+the whole command; one joined to more text at run time (`EXECUTE '...' || x`) does not. A list of
+targets splits only on commas outside quoted names, and each removal target must be a complete name.
+Unquoted names may use non-ASCII letters, as in PostgreSQL. Quoted names (`"public"."x"`),
 unqualified names (read as `public`), `CREATE UNLOGGED TABLE` and `ALTER TABLE ... RENAME TO` are
 recognised. `ALTER TABLE ... SET SCHEMA public` brings a table into scope and it then needs its own
 ACL; a move out of `public` takes it out of scope. A `CREATE TABLE IF NOT EXISTS` of a table that
@@ -68,7 +71,7 @@ unconditional. Treating everything inside `DO` as not run would flag
 
 It is a new check, not an edit to `scripts/check-supabase-migration-safety.mjs`. The scorer lock
 refuses edits to that existing gate, and that unlock was not taken. The review fixes to this PR's
-own two files were made under unlocks Matthew approved on 2026-10-28 and 2026-10-29.
+own two files were made under unlocks Matthew approved on 2026-10-28 and 2026-10-29 (rounds 1 to 6).
 
 ## Not verified
 

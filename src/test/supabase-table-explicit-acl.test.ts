@@ -277,6 +277,39 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky", "other"]);
   });
 
+  it("reads a removal target list only as complete names", () => {
+    // A comma inside a quoted name does not split it into the tracked table.
+    expect(tables(`${CREATE}\nDROP TABLE IF EXISTS public."unused,leaky";`)).toEqual(["leaky"]);
+    expect(tables(`${CREATE}\nDROP TABLE IF EXISTS public."unused,leaky", public.leaky;`)).toEqual(
+      [],
+    );
+    expect(tables(`${CREATE}\nDROP TABLE public.leaky CASCADE;`)).toEqual([]);
+  });
+
+  it("counts an EXECUTE string only when it is the whole command", () => {
+    // The command is built at run time and names leaky_backup, not leaky.
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN\n  EXECUTE 'DROP TABLE IF EXISTS public.leaky' || '_backup';\nEND $$;`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN\n  EXECUTE 'GRANT SELECT ON public.leaky TO ' || quote_ident('authenticated');\nEND $$;`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(`${CREATE}\nDO $$ BEGIN\n  EXECUTE 'DROP TABLE IF EXISTS public.leaky';\nEND $$;`),
+    ).toEqual([]);
+  });
+
+  it("reads non-ASCII unquoted identifiers", () => {
+    expect(tables("CREATE TABLE α (id int);")).toEqual(["α"]);
+    expect(
+      tables("CREATE TABLE public.café (id int);\nGRANT SELECT ON café TO authenticated;"),
+    ).toEqual([]);
+  });
+
   it("drops every table in a DROP TABLE list", () => {
     expect(
       tables(

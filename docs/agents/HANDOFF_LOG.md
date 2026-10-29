@@ -69,6 +69,29 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SPEC-2503-VPD-CORRECTION-TENT-HISTORY-DEDUPE
+
+```text
+TASK SPEC-2503-VPD-CORRECTION-TENT-HISTORY-DEDUPE  priority: P2  status: OPEN
+goal: Specification only (Matthew approved writing it 2026-10-23) for the additive fix behind #2503: a VPD correction must not double a Plant Quick Log save in tent history. No migration written or applied.
+branch: claude/vibrant-heisenberg-njd6r3
+base: verdant-grow-diary; PR base SHA observed 2026-10-26: 37202b540d00cafd3d31848136225e7cd147d1d3
+checkout: git fetch origin claude/vibrant-heisenberg-njd6r3 verdant-grow-diary && git switch claude/vibrant-heisenberg-njd6r3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2508 (ready for review; Matthew took it out of draft 2026-10-28 ~04:47 UTC and armed auto-merge on 6edc7366, which the later head move voided; re-arming at the new head is Matthew's call)
+head_sha: 97e8b1bc6b93f738fa44539b31d2c1e85d365135 (pushed 2026-10-28 16:36 UTC by Claude session 017UoYKzMaRpizq4Exut1zbK as a base merge; every check failed in seconds with no logs, reported as a GitHub Actions billing lock). The commit that records this block merges the base on top of it and fixes the review findings below; compare against the PR's current head before resuming.
+state: spec recommends A1 (correction writes manual_sensor_snapshot.vpd_kpa) + C (client links by the server's existing created_at sibling key). A1's mirror UPDATE guards on jsonb_typeof(p_sensor -> 'vpd_kpa') = 'number' (P9 tests that expression in isolation; the unchanged :278 sensor_snapshot write is not null-safe, so quicklog_correct_entry's rejection of a null value is pinned by P11). Postflight starts at the UPDATE public.diary_entries immediately before '{manual_sensor_snapshot,temp_f}', so the guard is inside the slice (P10). Slice 1 (migration + harness) does not ship ahead of Matthew's per-PR migration decision; slice 2 is gated on the committed harness fixture, not on the production apply.
+current_step: One push on Matthew's "fix all" (2026-10-29): base merge to clear the HANDOFF_LOG conflict, plus the Jack Herer P3s and Copilot nits at 6edc7366: ci.yml refs corrected to the quicklog-correction-measured-values job (:814-852, proof at :851); quickLogRevisionRules.ts path and sensorFromDetails lines corrected (src/lib/quick-log/, :381-403, precedence :384-388); P10 now listed before P11; this block's pr/head_sha refreshed. No migration or client implementation is included.
+next_action: Once GitHub Actions billing is unlocked, get 35/35 required checks at the new head and one eligible independent exact-head review; then Matthew re-arms auto-merge on that head. Do not push or merge the base in between, so the head and its review stay valid.
+files: docs/specs/quicklog-vpd-correction-tent-history-dedupe.md; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: GitHub Actions billing lock (all checks fail in seconds); eligible independent acceptance at the new head (Jack Herer's PASS-pending-CI covered 6edc7366 only). Slice 2 is blocked on its real-write-path fixture, which only the separately authorized slice 1 harness can produce. Applying 20261014210000 stays blocked by #2503 and Matthew's separate production-apply authorization.
+artifacts: the spec file above
+reviewer_seat: unassigned at the new head; an eligible independent session under OWNERSHIP.md §4.3 (Jack Herer reviewed 6edc7366 and remains eligible). Excluded: author Claude session 01QxMpAHgnpV65y3Yykv8CvE; the Grok cloud review-fix session (commits 6a30b7ae, e29a451f, ab9c90a8, authored as Cursor Agent); the unverified writer of f05e0106; Codex /root ChatGPT Work Mode documentation repair session of 2026-10-26; Claude session 017UoYKzMaRpizq4Exut1zbK (pushed base merge 97e8b1bc); and any later repairer.
+review_request: to be requested once at the new head after CI can run; prior verdicts: Jack Herer PASS-pending-CI and Sour Diesel no-blocking at 6edc7366 (both superseded by the head move); fallback transfers 0
+active_writer: Claude session 01QxMpAHgnpV65y3Yykv8CvE, retaken on Matthew's instruction 2026-10-27; spec documentation only, no migration or client implementation
+claimed_by: Claude (session 01QxMpAHgnpV65y3Yykv8CvE), 2026-10-27 18:16 UTC; https://github.com/Verdant-OS/verdant-grow-diary/pull/2508#issuecomment-6450080975. Codex /root held the bounded repair claim of 2026-10-26 (#issuecomment-6423583100) and remains an excluded repairer.
+last_updated: 2026-10-29 05:05 UTC, by Claude (session 01QxMpAHgnpV65y3Yykv8CvE)
+```
+
 ### SEO-GSC-AHREFS-RECONCILIATION-20261028
 
 ```text

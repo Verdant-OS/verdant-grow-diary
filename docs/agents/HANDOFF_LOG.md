@@ -72,35 +72,35 @@ active checkout has the branch open; inspect worktree ownership before selecting
 ### MANUAL-AIR-TEMP-BAND-50C
 
 ```text
-TASK MANUAL-AIR-TEMP-BAND-50C  priority: P2  status: OPEN
+TASK MANUAL-AIR-TEMP-BAND-50C  priority: P1  status: OPEN
 goal: Every grower-typed air temperature (Quick Log v1/v2 snapshot, Water form snapshot, Environment-check detail field, Sensors/Daily Check manual card) is refused outside -10..50 °C (14–122 °F), with copy in the grower's unit. The card refuses before Confirm instead of reporting "save is unconfirmed".
 why: Matthew chose -10..50 °C (2026-10-28) after a source check for the Case Files Ep07 handoff found two bands (-10..60 Quick Log, -10..50 card insert/correction RPC/quality badge). 2,462 °F on the card surfaced as "unconfirmed, retry", not a refusal.
 branch: claude/new-session-gqat8s
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-gqat8s verdant-grow-diary && git switch claude/new-session-gqat8s && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2599 (ready for review since 2026-10-29, Matthew)
-head_sha: 2952e88f436d05721f41f4da260de45688d022b8 before the base merge of 2026-10-29 17:10 UTC; a commit cannot name itself, so compare the fetched head against the PR's current head
-state: pushed, ready for review
-current_step: Matthew marked the PR ready 2026-10-29; base verdant-grow-diary merged again 2026-10-29 17:10 UTC (HANDOFF_LOG append conflict with VER-300 only, both blocks kept); earlier base merge 02:10 UTC; Actions runners recovered by 01:48 UTC; CodeRabbit review 5689831242 addressed (stored Environment-check temp_c up to 60 °C still displays via storedMax; this block now names the PR and last verified head); CI at 53e59b7e was never scheduled (repo-wide Actions runner failure, PR comment 6480825289)
-next_action: confirm 35/35 required checks at the new head (first non-draft run) and fix any red in the touched files; then an eligible independent exact-head reviewer (not this session); merge needs Matthew's per-item yes
+head_sha: 345a29cc80af0eec1f4fa075d0d01a3d5368dc59, verified remote 2026-10-29 20:39 UTC before this repair; local base merge db9464d27 adds deploy a6254b56d52a9ebb2a78dc9192d2c259c4174baf. This commit follows that merge; read and record the resulting full remote head from the PR.
+state: local bounded repair validated; normal push, fresh hosted CI and independent complete-head acceptance remain pending at this checkpoint
+current_step: Matthew explicitly reassigned sole writer from usage-exhausted Claude to Codex at 20:22 UTC, confirmed by parent coordinator; claim https://github.com/Verdant-OS/verdant-grow-diary/pull/2599#issuecomment-6507631557, fresh readback with no conflicting newer claim. P1 legacy recovery validator is separated from new-entry eligibility; P2 comments describe both bounds. Base merge preserves the exact deploy log plus this complete task block. Cursor tests-only #2624 stays untouched.
+next_action: normal-push the bounded repair to the existing branch after fresh head/claim checks; then verify the resulting full SHA, hosted CI and eligible independent full-scope acceptance. Do not merge, deploy or treat this repair session as independent acceptance.
 post_merge_check: on https://verdantgrowdiary.com once /version.json reports the merge SHA: Quick Log V2 Note snapshot with 123 °F shows "Temperature must be between 14 and 122 °F." and Save stays disabled (no save needed)
-active_writer: Claude session_017UoYKyF2kKTQuQzkLLpPqT
-decisions: scope "manual entry only" (Matthew, 2026-10-28): new pure src/lib/manualAirTemperatureRules.ts reuses AIR_TEMP_C_RANGE; isTemperatureValid (-10..60, mirrored into supabase/functions/_shared), webhook ingest, readers of stored rows, the environment_events DB guard and water_temp_c bands are unchanged. The unit-agnostic server-reason message names both units.
+active_writer: Codex replacement sole writer; original Claude session_017UoYKyF2kKTQuQzkLLpPqT stopped by owner-directed handover
+decisions: scope "manual entry only" (Matthew, 2026-10-28): new pure src/lib/manualAirTemperatureRules.ts reuses AIR_TEMP_C_RANGE; isTemperatureValid (-10..60, mirrored into supabase/functions/_shared), webhook ingest, readers of stored rows, the environment_events DB guard and water_temp_c bands are unchanged. The unit-agnostic server-reason message names both units. Recovery validation now keeps legacy temperatures readable without changing insert eligibility. The existing explicit-edit retirement path clears only the exact prior identity; no hook/UI behavior was changed.
 tried_and_rejected: tightening isTemperatureValid itself (would change Edge mirror, webhook ingest and old-row readers); suppressing the typical-range warning when refused (unneeded behavior change)
-commands: bun test src/test/manual-air-temperature-rules.test.ts (bun's vitest shim; the frozen bun install 403s on the Lovable registry, vitest/tsc are not runnable locally)
-files_touched: src/lib/manualAirTemperatureRules.ts (new); src/lib/{quickLogSensorSnapshotGateRules,quickLogV2SavePayload,quickLogSaveErrorMessage,quickLogWaterSaveGateRules,quickLogWateringFormViewModel,environmentCheckQuickLogRules,quickLogActivityDetailFields,sensorReadingManualEntryRules}.ts; src/test/manual-air-temperature-rules.test.ts (new); 13 existing tests re-pinned (listed in the PR body; quick-log-save-error-message.test.ts and manual-sensor-restored-draft-unit-preference.test.tsx added 2026-10-29 after shards 15/32 and 23/32 caught them)
-files_remaining: none unless CI finds more pins
-blockers: none for the PR; local typecheck/vitest BLOCKED (registry 403)
+commands: node_modules/.bin/vitest run src/test/manual-sensor-legacy-pending-store-upgrade.test.ts src/test/manual-sensor-legacy-pending-upgrade.test.tsx src/test/manual-sensor-pending-snapshot-store.test.ts src/test/manual-sensor-restored-draft-unit-preference.test.tsx src/test/sensors-page-session-rules.test.ts src/test/sensors-quick-log-manual-clock-recovery.test.tsx src/test/manual-air-temperature-rules.test.ts src/test/environment-check-quick-log-rules.test.ts --reporter=dot (8 files, 160 PASS / 0 FAIL / 0 SKIP; 2026-10-29 20:40 UTC). New suites RED with original store restored: 8 FAIL / 6 PASS; repaired: 14 PASS. Full-project tsgo --noEmit: PASS (0 diagnostics); tsc --noEmit still running at this checkpoint. Scoped ESLint: 0 errors/warnings. node scripts/scorer-lock.mjs --report --base db9464d27 --strict: PASS, no tracked scorer changed by this repair.
+files_touched: src/lib/manualAirTemperatureRules.ts (new); src/lib/{quickLogSensorSnapshotGateRules,quickLogV2SavePayload,quickLogSaveErrorMessage,quickLogWaterSaveGateRules,quickLogWateringFormViewModel,environmentCheckQuickLogRules,quickLogActivityDetailFields,sensorReadingManualEntryRules}.ts; src/test/manual-air-temperature-rules.test.ts (new); 13 existing tests re-pinned (listed in the PR body; quick-log-save-error-message.test.ts and manual-sensor-restored-draft-unit-preference.test.tsx added 2026-10-29 after shards 15/32 and 23/32 caught them); bounded Codex repair: src/lib/manualSensorPendingSnapshotStore.ts; src/lib/environmentCheckQuickLogRules.ts (comments); src/test/manual-sensor-legacy-pending-store-upgrade.test.ts (new); src/test/manual-sensor-legacy-pending-upgrade.test.tsx (new); docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
+files_remaining: none in the bounded repair; fresh CI/review gates remain
+blockers: pristine frozen install remains HTTP 403 on the private Lovable registry. Local targeted tools restored only from public artifacts with exact bun.lock versions and SHA-512 verification, no manifest/lock edits. Fresh hosted CI and an actually available eligible independent outside reviewer are pending; no repair-session self-PASS.
 open_questions: harmonizing Edge/webhook/DB guard to 50 is a separate owner decision (Edge + migration)
-gotchas: three re-pinned .tsx component tests and the canonical-guards mock test do not run under bun; only CI verifies them
-links: Case Files handoff 2026-10-28 §07 (owner document, not in repo)
-artifacts: PR body
-reviewer_seat: not assigned (this session excluded as author)
-reviewer_sha: none
-session_state: no routines; no paused workflows
-claimed_by: Claude session_017UoYKyF2kKTQuQzkLLpPqT, 2026-10-28 16:10 CT (Matthew's decision and scope choice in session)
-owner: Claude session_017UoYKyF2kKTQuQzkLLpPqT
-last_updated: 2026-10-29 17:10 UTC, by Claude
+gotchas: recovery read/clear accepts the old finite two-decimal temperature representation, retaining identity and provenance; claim still validates all values against current new-entry rules. Old 200 °F remains refused until the grower explicitly edits it. Never auto-delete an uncertain record. Existing offline restore fixture and all fourteen original test files stay unchanged by this repair; #2624 remains separate.
+links: independent FAIL at prior head https://github.com/Verdant-OS/verdant-grow-diary/pull/2599#issuecomment-6505189381; owner-directed claim https://github.com/Verdant-OS/verdant-grow-diary/pull/2599#issuecomment-6507631557; stacked tests https://github.com/Verdant-OS/verdant-grow-diary/pull/2624
+artifacts: PR body and review ledger; local supplemental receipts /tmp/pr2599-readonly/{red-vitest-new,green-vitest-new,targeted-vitest,lint,typecheck}.log (private workspace only; hosted CI is the durable remote evidence)
+reviewer_seat: eligible non-contributing outside session under OWNERSHIP §4.3; no available Claude/Grok reviewer confirmed. Original Claude author and this Codex repairer are excluded from acceptance.
+reviewer_sha: none for the repaired head; Bloomer independent FAIL at 345a29cc80af0eec1f4fa075d0d01a3d5368dc59 remains historical until complete re-review
+session_state: Codex replacement repair session; no routines or paused workflows; Cursor child #2624 preserved unchanged
+claimed_by: Codex, 2026-10-29 20:30 UTC, Matthew direct replacement assignment; durable claim comment 6507631557
+owner: Codex replacement owner for PR #2599 only
+last_updated: 2026-10-29 20:42 UTC, by Codex
 ```
 
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028

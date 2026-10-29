@@ -11,10 +11,10 @@
  *    through the EXISTING quicklog_save_manual RPC. No schema change.
  *  - Does NOT store the EC @25°C preview as a canonical value. The
  *    preview remains read-only at display time only.
- *  - Air-sensor plausibility (room temp / humidity / VPD) is reconciled
- *    onto the SINGLE canonical band in sensorReadingNormalizationRules,
- *    the same guards Quick Log v2 uses. Pure import (no I/O) so v1 and v2
- *    can never disagree on what counts as a physically real reading.
+ *  - New manual air temperatures use manualAirTemperatureRules (-10..50 °C),
+ *    matching Quick Log v2. The envelope builder retains the wider stored-row
+ *    plausibility guard in sensorReadingNormalizationRules (-10..60 °C).
+ *    Humidity and VPD share that module's canonical guards in both paths.
  */
 import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
 import { isManualAirTemperatureValid } from "./manualAirTemperatureRules";
@@ -82,11 +82,9 @@ export const ENVIRONMENT_CHECK_HELPER_COPY =
 /** Section heading rendered above the Environment Check form. */
 export const ENVIRONMENT_CHECK_SECTION_TITLE = "Environment check" as const;
 
-// Room temperature, humidity, and VPD deliberately have NO local bounds here.
-// They are the three air-sensor metrics shared with Quick Log v2, so their
-// plausibility comes from the canonical guards imported above (temperature
-// -10..60°C, humidity 0..100, VPD 0..10). Only the v1-specific fields with no
-// canonical counterpart keep local bounds.
+// Imported guards own the air-sensor bounds: new manual temperature -10..50°C;
+// builder temperature plausibility -10..60°C; humidity 0..100; VPD 0..10.
+// Only the v1-specific fields with no canonical counterpart keep local bounds.
 /** Plausible water temperature bounds (root-zone, not an air-sensor metric). */
 const WATER_TEMP_F_MIN = 32;
 const WATER_TEMP_F_MAX = 110;
@@ -148,12 +146,10 @@ export function celsiusToFahrenheit(c: number): number {
 export function buildEnvironmentCheckDetails(
   input: EnvironmentCheckFormInput,
 ): EnvironmentCheckEnvelope | null {
-  // Air-sensor metrics: keep the value only when it clears the canonical
-  // band, else drop to null. This is the pure builder's defensive floor —
-  // the UI save path blocks out-of-band values up front via
-  // validateEnvironmentCheckSensorBand, so in the real flow build only ever
-  // sees in-band values; this guard just guarantees the builder can never
-  // emit an out-of-band reading even if called ungated.
+  // Keep the wider temperature plausibility bound in this pure builder.
+  // The UI save path applies the stricter new-manual-entry band first via
+  // validateEnvironmentCheckSensorBand. Ungated builder callers may still
+  // represent earlier readings up to 60°C; humidity/VPD keep canonical bounds.
   const roomRaw = parseFinite(input.roomTempF);
   const roomUnit = input.roomTempUnit ?? "F";
   let room_temp_f: number | null = null;
@@ -231,8 +227,8 @@ export type EnvironmentCheckSensorBandResult =
   { ok: true } | { ok: false; reason: EnvironmentCheckSensorBandReason };
 
 /**
- * Blocking plausibility gate for the three air-sensor metrics, reconciled
- * onto the canonical band shared with Quick Log v2. Returns the FIRST
+ * Blocking new-entry gate: manual temperature -10..50 °C plus the canonical
+ * humidity/VPD guards, shared with Quick Log v2. Returns the FIRST
  * offending metric so the surfaced copy is deterministic. Empty / omitted
  * fields are "not provided" and pass — a note-only environment check is
  * always allowed.

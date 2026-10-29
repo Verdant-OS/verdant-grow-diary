@@ -22,7 +22,7 @@ describe("buildDailyCheckSavedItems (v1a activity source extension)", () => {
     ["environment_check", "environment_check", "Environment check"],
     ["training", "training", "Training"],
     ["defoliation", "defoliation", "Defoliation"],
-    ["issue_observation", "issue_observation", "Issue / observation"],
+    ["issue_observation", "issue_observation", "Problem spotted"],
   ] as const)("returns [%s] item on confirmed save", (_name, source, label) => {
     const items = buildDailyCheckSavedItems({
       source: source as DailyCheckSavedSource,

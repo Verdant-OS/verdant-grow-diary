@@ -2,15 +2,11 @@
  * Pure unit tests for /guides/$slug SSR head selection.
  * Integration with the route module lives in seo-guide-slug-indexability.test.tsx.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import { guideRouteHead, UNKNOWN_GUIDE_ROBOTS } from "@/lib/guideRouteHeadRules";
-
-const REPO = resolve(__dirname, "../..");
-const GUIDE_SLUG_ROUTE = readFileSync(resolve(REPO, "src/routes/guides.$slug.tsx"), "utf8");
+import { Route } from "@/routes/guides.$slug";
 
 function robotsContent(head: ReturnType<typeof guideRouteHead>): string | undefined {
   return head.meta.find((m) => m.name === "robots")?.content;
@@ -55,7 +51,9 @@ describe("guideRouteHeadRules", () => {
   });
 
   it("keeps the route wired through guideRouteHead, not raw staticRouteHead(slug)", () => {
-    expect(GUIDE_SLUG_ROUTE).toContain("guideRouteHead");
-    expect(GUIDE_SLUG_ROUTE).not.toMatch(/staticRouteHead\(\s*`\/guides\/\$\{/);
+    const head = Route.options.head as unknown as (ctx: { params: { slug: string } }) => unknown;
+    for (const slug of ["advanced-nutrients-feeding-chart-log", VERDANT_GUIDE_SLUGS[0]]) {
+      expect(head({ params: { slug } })).toEqual(guideRouteHead(slug));
+    }
   });
 });

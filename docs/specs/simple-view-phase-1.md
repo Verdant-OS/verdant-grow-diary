@@ -1,8 +1,8 @@
 # Simple View — Phase 1 (foundation + view switch)
 
-**Status: IMPLEMENTED on branch `claude/verdant-simplification-ki5ccn`; awaiting Matthew's Phase 1 review.**
+**Status: IMPLEMENTED on branch `claude/verdant-simplification-ki5ccn` (PR #2615); Phase 1 approved by Matthew 2026-10-29 ("approved. phase 2"). Phase approval is not deployment approval; the PR still needs its merge gate.**
 **Owner:** Claude (assigned by Matthew, 2026-10-29). Matthew is the per-phase approver.
-**Program:** four phases (Simple View foundation → easy setup/pause/recovery → persistent guidance → full-journey polish). Only Phase 1 is built; Phases 2–4 are not started.
+**Program:** four phases (Simple View foundation → easy setup/pause/recovery → persistent guidance → full-journey polish). Phase 1 is built and approved; Phase 2 is next (its spec lands as `docs/specs/simple-view-phase-2.md`).
 
 ## 1. Goal
 
@@ -18,13 +18,13 @@ A tired grower opens Verdant, understands the screen, saves a useful observation
 
 ## 3. What Phase 1 adds
 
-| Surface                                  | Behaviour                                                                                                                                                                                                                                                                |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/`                                      | Renders `src/pages/Home.tsx`, which mounts `SimpleHome` or the existing `Dashboard` from the account-backed preference. `?growId=` scope is honoured by both.                                                                                                            |
-| `/dashboard`                             | A direct link to the Dashboard is an explicit destination: always the Advanced view, with the Simple/Advanced bar above it. Choosing Simple there saves the choice and goes to `/`. Existing `dashboardPath()` links and the browser-census e2e spec keep their meaning. |
-| Simple home (`src/pages/SimpleHome.tsx`) | My plants (name, strain, stage, tent link), one prominent **Add an observation**, recent entries that reopen the saved entry on its Timeline anchor, and **Switch to Advanced view**.                                                                                    |
-| Advanced (Dashboard)                     | Unchanged page. A one-line bar above it names the view and offers **Switch to Simple view**.                                                                                                                                                                             |
-| Account › Preferences                    | A "Home view" card with both choices and the real save outcome.                                                                                                                                                                                                          |
+| Surface                                  | Behaviour                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                      | Renders `src/pages/Home.tsx`, which mounts `SimpleHome` or the existing `Dashboard` from the account-backed preference. `?growId=` scope is honoured by both.                                                                                                                                                                                |
+| `/dashboard`                             | A direct link to the Dashboard is an explicit destination: always the Advanced view, with the Simple/Advanced bar above it. Choosing Simple there saves the choice and goes to `/` with the same `?growId=` query, so the working grow does not change. Existing `dashboardPath()` links and the browser-census e2e spec keep their meaning. |
+| Simple home (`src/pages/SimpleHome.tsx`) | My plants (name, strain, stage, tent link), one prominent **Add an observation**, recent entries that reopen the saved entry on its Timeline anchor, and **Switch to Advanced view**.                                                                                                                                                        |
+| Advanced (Dashboard)                     | Unchanged page. A one-line bar above it names the view and offers **Switch to Simple view**.                                                                                                                                                                                                                                                 |
+| Account › Preferences                    | A "Home view" card with both choices and the real save outcome.                                                                                                                                                                                                                                                                              |
 
 ### Quick Log targets
 
@@ -32,7 +32,7 @@ The big button opens Quick Log V2 with **no preselected target**; the sheet asks
 
 ### Honest states
 
-Loading stays loading. A failed grows/tents/plants read is an error with **Try again** (grows store refresh, React Query refetch). A setup gap leads into the existing flow: no grow → `/start-room`, no tent → `/tents?growId=`, no plant → `/plants?growId=`. Several grows with no active or URL scope asks the grower which grow; nothing is picked for them. "No entries yet" appears only after a successful empty read.
+Loading stays loading. A failed grows/tents/plants read is an error with **Try again** (grows store refresh, React Query refetch). A setup gap leads into the existing flow: no grow → `/start-room`, no tents and no plants → `/tents?growId=`, tents but no plant → `/plants?growId=`. Plants are read before any gap is declared: a grow with active plants and no tent is a supported state and renders ready ("Tent not set" on the row). A legacy plant with no `grow_id` of its own stays visible but gets no Quick Log button (the sheet fails closed on it); its row links to Plant Detail, where the grow-context rescue card repairs it. Several grows with no active or URL scope asks the grower which grow; nothing is picked for them. "No entries yet" appears only after a successful empty read.
 
 ## 4. Account-backed preference — smallest extension found
 
@@ -43,7 +43,8 @@ Loading stays loading. A failed grows/tents/plants read is an error with **Try a
 - **Precedence:** a settled account read wins; otherwise the session user's own metadata copy, then a per-user device cache (`verdant:uiView:<userId>`), then the default. The default is never reported as explicit.
 - **Loading:** when nothing explicit is known on this device, Home shows a short loading state (bounded at 4 s) instead of flashing Simple at a grower who chose Advanced elsewhere.
 - **Failure:** a failed read keeps the device's last confirmed value and labels it "couldn't check your account". A failed write keeps the chosen view for this session, reports "couldn't save", and leaves the cache untouched. Nothing ever resets an explicit choice silently.
-- **Cross-device:** the account read happens once per sign-in per device (first Home mount). Device B sees a change made on device A on its next load or sign-in, not live. Documented as a Phase 1 limitation.
+- **Cross-device:** the account read happens once per sign-in per device (first Home mount). Sign-out forgets the in-memory account state (the device cache stays), so a re-sign-in in the same tab reads the account again. Device B sees a change made on device A on its next load or sign-in, not live. Documented as a Phase 1 limitation.
+- **Concurrent choices:** saves are sequenced per user; only the latest save settles the pending choice, and the switch is disabled while any save is in flight.
 
 ## 5. Out of scope here
 

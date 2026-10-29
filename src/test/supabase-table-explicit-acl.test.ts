@@ -446,6 +446,31 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky"]);
   });
 
+  it("scans a single-quoted DO body as SQL but keeps other literals masked", () => {
+    expect(
+      tables(`${CREATE}\nDO 'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`),
+    ).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nDO LANGUAGE plpgsql 'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`,
+      ),
+    ).toEqual([]);
+    expect(tables(`${CREATE}\nDO 'BEGIN DROP TABLE public.leaky; END';`)).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nDO 'BEGIN RAISE NOTICE ''GRANT SELECT ON public.leaky TO authenticated;''; END';`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(
+        `${CREATE}\nCOMMENT ON TABLE public.leaky IS 'GRANT SELECT ON public.leaky TO authenticated;';`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(`${CREATE}\nDO E'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`),
+    ).toEqual(["leaky"]);
+  });
+
   it("does not let an apostrophe in a quoted identifier open a string literal", () => {
     expect(
       tables(
@@ -601,6 +626,24 @@ describe("supabase table explicit ACL rule", () => {
     expect(tables(CREATE, "GRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
   });
 
+  it.each(["functions", "sequence", "schema"])(
+    "accepts GRANT SELECT ON unqualified table %s",
+    (name) => {
+      expect(
+        tables(`CREATE TABLE public.${name} (id int);\nGRANT SELECT ON ${name} TO authenticated;`),
+      ).toEqual([]);
+    },
+  );
+
+  it.each(["functions", "sequence", "schema"])(
+    "accepts REVOKE ALL ON unqualified table %s",
+    (name) => {
+      expect(
+        tables(`CREATE TABLE public.${name} (id int);\nREVOKE ALL ON ${name} FROM PUBLIC;`),
+      ).toEqual([]);
+    },
+  );
+
   it.each([
     ["a partial revoke", "REVOKE INSERT, UPDATE, DELETE ON public.leaky FROM anon, authenticated;"],
     ["a column-level revoke", "REVOKE ALL PRIVILEGES (id) ON TABLE public.leaky FROM anon;"],
@@ -621,8 +664,17 @@ describe("supabase table explicit ACL rule", () => {
     ["a grant on another table", "GRANT SELECT ON public.leaky_audit TO authenticated;"],
     ["a function grant", "GRANT EXECUTE ON FUNCTION public.leaky() TO authenticated;"],
     ["a sequence grant", "GRANT USAGE ON SEQUENCE public.leaky TO authenticated;"],
+    ["a schema grant", "GRANT USAGE ON SCHEMA public TO authenticated;"],
     ["a column-level grant", "GRANT INSERT (id) ON public.leaky TO anon;"],
     ["a schema-wide grant", "GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;"],
+    [
+      "a schema-wide sequence grant",
+      "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;",
+    ],
+    [
+      "a schema-wide function grant",
+      "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;",
+    ],
     [
       "a default-privilege grant",
       "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO authenticated;",

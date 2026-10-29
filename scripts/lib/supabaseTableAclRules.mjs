@@ -14,7 +14,12 @@
 // see the gap; this static rule is the only check that does.
 //
 // Schema-wide statements (GRANT ... ON ALL TABLES IN SCHEMA, ALTER DEFAULT
-// PRIVILEGES ... ON TABLES) are not a decision about one table and do not count.
+// PRIVILEGES ... ON TABLES) and grants on other object types (FUNCTION,
+// SEQUENCE, SCHEMA, TYPE, ...) are not a decision about one table and do
+// not count. A non-table ON clause is recognised only as ALL TABLES|
+// SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or an object keyword
+// followed by that object's name. A keyword followed by TO, FROM or a
+// comma is a table name, so GRANT SELECT ON functions TO … counts.
 //
 // The scan fails closed. CREATE is read from the SQL with only comments
 // removed, so a table created anywhere, even in a function body, is tracked.
@@ -45,7 +50,8 @@
 // into a semicolon.
 // Everything that can clear a table's requirement (a removal, a rename, a
 // GRANT or REVOKE) counts only where it runs at migration time: top-level
-// statements, DO blocks, and a literal string handed straight to EXECUTE.
+// statements, DO blocks (dollar-quoted or a single-quoted body, including
+// DO LANGUAGE ... '...'), and a literal string handed straight to EXECUTE.
 // Text in comments, string literals, function or procedure bodies, and other
 // dollar-quoted strings (COMMENT ... IS $c$...$c$) never clears it. A statement
 // assembled at run time (EXECUTE format(...)) cannot be read, so the table is
@@ -102,8 +108,19 @@ const SET_SCHEMA_RE = new RegExp(
   "gi",
 );
 const DROP_RE = /\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
-const ACL_RE =
-  /\b(GRANT|REVOKE)\b([^;]*?)\bON\s+(?!(?:ALL\s+)?(?:TABLES|FUNCTIONS?|ROUTINES?|PROCEDURES?|SEQUENCES?|SCHEMAS?|TYPES?|DOMAINS?|LANGUAGE|FOREIGN|LARGE|DATABASE|TABLESPACE)\b)(?:TABLE\s+)?([^;]*?)\s+(?:TO|FROM)\b/gi;
+// Table GRANT/REVOKE. Skip only a complete non-table clause: ALL TABLES|
+// SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or FUNCTION|SEQUENCE|SCHEMA|
+// TYPE|… followed by that object's name. A keyword followed by TO, FROM or
+// a comma is a table name.
+const ACL_RE = new RegExp(
+  String.raw`\b(GRANT|REVOKE)\b([^;]*?)\bON\s+` +
+    String.raw`(?!ALL\s+(?:TABLES|SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES)\s+IN\b)` +
+    String.raw`(?!(?:FUNCTION|PROCEDURE|ROUTINE|SEQUENCE|SCHEMA|TYPE|DOMAIN|LANGUAGE|DATABASE|TABLESPACE)\b(?!\s*(?:TO|FROM|,)))` +
+    String.raw`(?!FOREIGN\s+(?:DATA\s+WRAPPER|SERVER)\b)` +
+    String.raw`(?!LARGE\s+OBJECT\b)` +
+    String.raw`(?:TABLE\s+)?([^;]*?)\s+(?:TO|FROM)\b`,
+  "gi",
+);
 const TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*$`);
 const DROP_TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*(?:CASCADE|RESTRICT)?\s*$`, "i");
 const REVOKE_ALL_RE = /^\s*ALL(?:\s+PRIVILEGES)?\s*$/i;
@@ -447,8 +464,10 @@ function identName(raw) {
 //
 // executableOnly = false: only comments are blanked; literals and dollar
 // bodies stay visible (CREATE/DROP tracking). executableOnly = true: literals
-// are blanked too, a DO block's body is masked recursively, and every other
-// dollar-quoted span (function bodies, prose) is blanked (GRANT/REVOKE).
+// are blanked too, a DO block's body (dollar-quoted or single-quoted) is
+// masked recursively, and every other dollar-quoted span (function bodies,
+// prose) is blanked (GRANT/REVOKE). An E'' DO body is blanked whole because
+// its escapes are not decoded (fails closed).
 // scanDoBodies = false (with executableOnly true): DO and function bodies stay
 // blank so a PL/pgSQL SELECT ... INTO n is not read as a table create.
 // Whole-command EXECUTE payloads recorded during the executable pass are
@@ -458,10 +477,11 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) 
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (code[k] !== "\n") code[k] = " ";
   };
-  // A literal handed straight to EXECUTE runs as SQL. Decode it ('' -> '),
-  // mask that SQL the same way, and blank the raw characters behind every
-  // masked one, so a literal or comment nested in the payload never counts.
-  // An E'' payload is blanked whole: its escapes are not decoded (fails closed).
+  // A literal handed straight to EXECUTE, or a single-quoted DO body, runs as
+  // SQL. Decode it ('' -> '), mask that SQL the same way, and blank the raw
+  // characters behind every masked one, so a literal or comment nested in the
+  // payload never counts. An E'' payload is blanked whole: its escapes are not
+  // decoded (fails closed).
   const maskExecutedLiteral = (open, close, escapes) => {
     if (escapes) {
       blank(open, close + 1);
@@ -531,13 +551,16 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) 
           else j++;
         }
         if (j < end) {
+          const prefix = code.slice(stmtStart, i).join("");
           const executes =
-            EXECUTES_RE.test(code.slice(stmtStart, i).join("")) &&
+            EXECUTES_RE.test(prefix) &&
             EXECUTE_ENDS_RE.test(sql.slice(j + 1, end));
-          if (executableOnly && !executes) blank(i, j + 1);
+          // A single-quoted DO body runs now, matching dollar-quoted DO.
+          const doBody = scanDoBodies && RUNS_NOW_RE.test(prefix);
+          if (executableOnly && !executes && !doBody) blank(i, j + 1);
           else if (executableOnly) {
             maskExecutedLiteral(i, j, escapes);
-            if (executeSpans && !escapes) executeSpans.push({ start: i + 1, end: j });
+            if (executeSpans && executes && !escapes) executeSpans.push({ start: i + 1, end: j });
           }
           i = j + 1;
         } else {

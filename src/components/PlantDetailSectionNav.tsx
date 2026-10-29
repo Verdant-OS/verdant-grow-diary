@@ -15,14 +15,11 @@ import type { PlantDetailRevealAndNavigate } from "@/hooks/usePlantDetailDisclos
 const FOCUS_CLASSES =
   "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-function scrollToAnchor(targetId: string) {
+function scrollToAnchor(targetId: string, block: ScrollLogicalPosition) {
   if (typeof document === "undefined") return;
   const el = document.getElementById(targetId);
   if (!el) return;
-  // "center" keeps the target near the middle of the viewport instead of
-  // snapping the page all the way down when the target sits near the
-  // bottom of a long page (the "jarring auto-scroll to bottom" report).
-  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.scrollIntoView({ behavior: "smooth", block });
   if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
   (el as HTMLElement).focus({ preventScroll: true });
 }
@@ -38,6 +35,9 @@ function renderEntry(
   entry: PlantDetailSectionEntry,
   onRevealAndNavigate?: PlantDetailRevealAndNavigate,
 ) {
+  // Overview contains many cards and can be much taller than the viewport.
+  // Centering that region hides its beginning; retain other links' alignment.
+  const block: ScrollLogicalPosition = entry.kind === "overview" ? "start" : "center";
   if (entry.disabled) {
     return (
       <div key={entry.kind} className="flex min-w-0 max-w-full flex-col gap-0.5">
@@ -74,7 +74,9 @@ function renderEntry(
       data-testid={entry.testId}
       aria-label={ariaLabelFor(entry)}
       onClick={() =>
-        onRevealAndNavigate ? onRevealAndNavigate(entry.anchorId) : scrollToAnchor(entry.anchorId)
+        onRevealAndNavigate
+          ? onRevealAndNavigate(entry.anchorId, undefined, { block })
+          : scrollToAnchor(entry.anchorId, block)
       }
     >
       {entry.label}

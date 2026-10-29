@@ -279,7 +279,10 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(preSecret).toContain("evaluatePublicDeploymentIdentity");
     expect(preSecret).toContain("expectedTreeHash: process.env.E2E_EXPECTED_TREE_HASH");
     expect(preSecret).toContain("version: parsed");
-    expect(preSecret).toContain("resolveCanonicalPaddleSandboxToken");
+    // Production carries the committed live_ token since #2230, so the
+    // smoke reads the production token (test_ or live_), not sandbox-only.
+    expect(preSecret).toContain("resolveCanonicalPaddleProductionToken");
+    expect(preSecret).not.toContain("resolveCanonicalPaddleSandboxToken");
     expect(preSecret).toContain("resolvePublicMainModuleAsset");
     expect(preSecret).toContain("evaluateBoundedPublicAssetResponseMetadata");
     expect(preSecret).toContain("consumeBoundedPublicAssetResponse");
@@ -427,8 +430,8 @@ describe("temporary authenticated One-Tent Actions lane", () => {
       return;
     }
 
-    const sandboxToken = `test_${"s".repeat(16)}`;
-    const liveOverride = `live_${"l".repeat(16)}`;
+    const sandboxToken = `test_${"s".repeat(27)}`;
+    const liveOverride = `live_${"l".repeat(27)}`;
     const resolvedToken = resolveCanonicalPaddleSandboxToken(
       `VITE_PAYMENTS_CLIENT_TOKEN=${sandboxToken}\n`,
     );
@@ -439,13 +442,13 @@ describe("temporary authenticated One-Tent Actions lane", () => {
         canonicalToken: sandboxToken,
         bundle: `${sandboxToken} ${liveOverride}`,
       }),
-    ).toEqual({ ok: false, reason: "public_paddle_live_token_present" });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
     expect(
       evaluatePublicPaddleBundle({
         canonicalToken: sandboxToken,
         bundle: "paddle sandbox bundle without committed credential bytes",
       }),
-    ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_missing" });
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
 
     expect(
       evaluateBoundedPublicAssetResponseMetadata({
@@ -493,7 +496,47 @@ describe("temporary authenticated One-Tent Actions lane", () => {
         canonicalToken: sandboxToken,
         bundle: `public bundle ${sandboxToken}`,
       }),
+    ).toEqual({ ok: false, reason: "public_paddle_canonical_not_live" });
+  });
+
+  it("accepts exactly the committed live production token and rejects other live bytes", () => {
+    const resolveProductionToken = (
+      materializeCore as typeof materializeCore & {
+        resolveCanonicalPaddleProductionToken?: CanonicalPaddleTokenResolver;
+      }
+    ).resolveCanonicalPaddleProductionToken;
+    expect(resolveProductionToken).toBeTypeOf("function");
+    expect(evaluatePublicPaddleBundle).toBeTypeOf("function");
+    if (!resolveProductionToken || !evaluatePublicPaddleBundle) return;
+
+    const liveToken = `live_${"c".repeat(27)}`;
+    const otherLive = `live_${"x".repeat(27)}`;
+    expect(
+      resolveProductionToken(`VITE_PAYMENTS_CLIENT_TOKEN=${liveToken}
+`).ok,
+    ).toBe(true);
+
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: liveToken,
+        bundle: `public bundle "${liveToken}"`,
+      }),
     ).toEqual({ ok: true });
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: liveToken,
+        bundle: `"${liveToken}" "${otherLive}"`,
+      }),
+    ).toEqual({ ok: false, reason: "public_paddle_live_token_mismatch" });
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: liveToken,
+        bundle: "public bundle without the committed live credential bytes",
+      }),
+    ).toEqual({ ok: false, reason: "public_paddle_live_token_missing" });
+    expect(
+      evaluatePublicPaddleBundle({ canonicalToken: "pk_not_paddle", bundle: liveToken }),
+    ).toEqual({ ok: false, reason: "public_paddle_contract_invalid" });
   });
 
   it("serializes dispatches and rejects re-runs", () => {

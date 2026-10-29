@@ -78,8 +78,8 @@ describe("public Athena feed chart log page", () => {
       ATHENA_FEED_LOG_CTA_HREF,
     ]);
     expect(
-      screen.getByRole("link", { name: "Advanced Nutrients feeding chart log" }),
-    ).toHaveAttribute("href", "/guides/advanced-nutrients-feeding-chart-log");
+      screen.queryByRole("link", { name: "Advanced Nutrients feeding chart log" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("table").closest("[data-layout]")).toHaveAttribute(
       "data-layout",
       "desktop",

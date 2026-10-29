@@ -29,8 +29,6 @@ export const ATHENA_BLENDED_ALL_LANGUAGES_URL =
 
 export const ATHENA_PRO_LINE_PRODUCT_URL = "https://www.athenaag.com/pro-line" as const;
 
-export const ATHENA_RELATED_FEED_LOG_PATH = "/guides/advanced-nutrients-feeding-chart-log" as const;
-
 export const FEED_LOG_MIN_PRODUCTS = 1;
 export const FEED_LOG_MAX_PRODUCTS = 8;
 export const FEED_LOG_MIN_WEEKS = 1;

@@ -103,6 +103,7 @@ jobs:
         run: node scripts/notify-edge-shared-drift.mjs
 
   test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Lint, typecheck, test, build
     needs: edge-shared-sync-preflight
     runs-on: ubuntu-latest
@@ -718,6 +719,7 @@ jobs:
   # `fail-fast: false` so one shard failing still reports the others.
   # See docs/testing/ci-full-suite-shards.md.
   full-suite:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Full test suite (shard ${{ matrix.shard }}/32)
     runs-on: ubuntu-latest
     # Matrix shard N covers vitest partitions (8N-7)..(8N) of 256 (eight
@@ -730,6 +732,13 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      # GitHub Team allows 60 concurrent Linux jobs. One ready PR or
+      # merge-queue run must not request all 32 shards at once. Keep all 32
+      # required context names and run at most 16 of this matrix together.
+      # Measured 2026-10-27 on deploy run 40461983713 (head 36b7204faab3):
+      # 32/32 shards, runner time min 91s, median 130s, max 160s. Sixteen at
+      # a time is two short waves and leaves room in the 60-job pool.
+      max-parallel: 16
       matrix:
         shard:
           [
@@ -803,6 +812,7 @@ jobs:
           done
 
   quicklog-correction-measured-values:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Quick Log correction measured values
     permissions:
       contents: read

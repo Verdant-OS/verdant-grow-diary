@@ -38,6 +38,7 @@ describe("quickLogV2SavePayload", () => {
     if (!result.ok) throw new Error("expected a sensor-bearing payload");
     expect(result.payload.p_details).toEqual({
       ...details,
+      quick_log_activity: "note",
       manual_provenance: {
         source: "manual",
         source_identity: "manual_entry",
@@ -74,7 +75,8 @@ describe("quickLogV2SavePayload", () => {
     expect(r.payload.p_note).toBe("hello");
     expect(r.payload.p_target_type).toBe("plant");
     expect(r.payload.p_target_id).toBe("p1");
-    expect(r.payload).not.toHaveProperty("p_details");
+    // VER-298: a new note always carries the note marker.
+    expect(r.payload.p_details).toEqual({ quick_log_activity: "note" });
   });
 
   it("treats supplied zero humidity as manual evidence and replaces conflicting provenance", () => {
@@ -85,6 +87,7 @@ describe("quickLogV2SavePayload", () => {
     if (!r.ok) throw new Error("expected valid zero humidity");
     expect(r.payload.p_humidity_pct).toBe(0);
     expect(r.payload.p_details).toEqual({
+      quick_log_activity: "note",
       manual_provenance: {
         source: "manual",
         source_identity: "manual_entry",
@@ -105,7 +108,7 @@ describe("quickLogV2SavePayload", () => {
     expect(r.payload.p_temperature_c).toBeNull();
     expect(r.payload.p_humidity_pct).toBeNull();
     expect(r.payload.p_vpd_kpa).toBeNull();
-    expect(r.payload.p_details).toEqual(details);
+    expect(r.payload.p_details).toEqual({ ...details, quick_log_activity: "note" });
     expect(r.payload.p_details).not.toHaveProperty("manual_sensor_snapshot");
   });
 
@@ -114,6 +117,7 @@ describe("quickLogV2SavePayload", () => {
     if (!r.ok) throw new Error("expected valid VPD-only payload");
     expect(r.payload.p_vpd_kpa).toBe(1.1);
     expect(r.payload.p_details).toEqual({
+      quick_log_activity: "note",
       manual_provenance: {
         source: "manual",
         source_identity: "manual_entry",
@@ -128,6 +132,7 @@ describe("quickLogV2SavePayload", () => {
     if (!r.ok) throw new Error("expected valid humidity-only payload");
     expect(r.payload.p_humidity_pct).toBe(55);
     expect(r.payload.p_details).toEqual({
+      quick_log_activity: "note",
       manual_provenance: {
         source: "manual",
         source_identity: "manual_entry",
@@ -142,6 +147,7 @@ describe("quickLogV2SavePayload", () => {
     if (!r.ok) throw new Error("expected valid temperature-only payload");
     expect(r.payload.p_temperature_c).toBe(24.5);
     expect(r.payload.p_details).toEqual({
+      quick_log_activity: "note",
       manual_provenance: {
         source: "manual",
         source_identity: "manual_entry",
@@ -270,7 +276,7 @@ describe("quickLogV2SavePayload", () => {
     const r = buildQuickLogV2SavePayload(base({ details }));
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("expected ok");
-    expect(r.payload.p_details).toEqual(details);
+    expect(r.payload.p_details).toEqual({ ...details, quick_log_activity: "note" });
   });
 });
 

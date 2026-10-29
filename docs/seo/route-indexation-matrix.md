@@ -2,7 +2,7 @@
 
 **Source of truth:** `src/lib/appRouteManifest.ts` in this commit, checked against the mounted route modules by `src/test/helpers/routeManifestSyncHarness.ts`.<br>
 **Live index status:** **NOT_MEASURED.** This file records repository metadata, `public/sitemap.xml`, and `public/robots.txt`. It is not a Search Console measurement and it does not claim what `https://verdantgrowdiary.com` returns.<br>
-**Coverage:** 145 of 145 manifest routes — 42 public, 46 authenticated, 32 operator, 6 internal, and 19 redirects.
+**Coverage:** 146 of 146 manifest routes — 42 public, 46 authenticated, 32 operator, 6 internal, and 20 redirects.
 
 ## Reading the matrix
 
@@ -20,7 +20,6 @@
 
 One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that exact path is a `<loc>`. Canonical is the pathname of `metadata.url`.
 
-- `/founder` — robots `index, follow`; sitemap yes; canonical `/founder`
 - `/` — robots `index, follow`; sitemap yes; canonical `/`
 - `/pricing` — robots `index, follow`; sitemap yes; canonical `/pricing`
 - `/guides/grow-stage-care-guide` — robots `index, follow`; sitemap yes; canonical `/guides/grow-stage-care-guide`
@@ -28,6 +27,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/tools/blueprint-targets` — robots `index, follow`; sitemap yes; canonical `/tools/blueprint-targets`
 - `/tools/grow-help-toolkit` — robots `index, follow`; sitemap yes; canonical `/tools/grow-help-toolkit`
 - `/tools/vpd-calculator` — robots `index, follow`; sitemap yes; canonical `/tools/vpd-calculator`
+- `/vpd-chart` — robots `index, follow`; sitemap yes; canonical `/vpd-chart`
 - `/hardware-integrations` — robots `index, follow`; sitemap yes; canonical `/hardware-integrations`
 - `/how-ai-doctor-works` — robots `index, follow`; sitemap yes; canonical `/how-ai-doctor-works`
 - `/ai-doctor-readiness-check` — robots `index, follow`; sitemap yes; canonical `/ai-doctor-readiness-check`
@@ -118,20 +118,20 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 
 These manifest paths are public and are not in `STATIC_PUBLIC_OUTPUT_DOCUMENTS`.
 
-| Route                                        | SSR / route head                                           | Client head                                                                                               | Sitemap | robots.txt                                                                                                                                                    |
-| -------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*`                                          | None. Root shell `index, follow`.                          | `src/pages/NotFound.tsx` sets `noindex: true` (`noindex, follow`) and a canonical for the requested path. | No      | No matching Disallow in `public/robots.txt`.                                                                                                                  |
-| `/.lovable/oauth/consent`                    | `src/routes/[.]lovable.oauth.consent.tsx` has no `head()`. | `src/pages/OAuthConsent.tsx` does not call `usePageSeo`.                                                  | No      | `Disallow: /.lovable/`                                                                                                                                        |
-| `/auth`                                      | No route `head()`.                                         | `src/pages/Auth.tsx` sets `noindex: true`.                                                                | No      | `Disallow: /auth`                                                                                                                                             |
-| `/reset-password`                            | No route `head()`.                                         | `src/pages/ResetPassword.tsx` sets `noindex: true`.                                                       | No      | `Disallow: /reset-password`                                                                                                                                   |
+| Route                                        | SSR / route head                                           | Client head                                                                                               | Sitemap | robots.txt                                                                                                                                                                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `*`                                          | None. Root shell `index, follow`.                          | `src/pages/NotFound.tsx` sets `noindex: true` (`noindex, follow`) and a canonical for the requested path. | No      | No matching Disallow in `public/robots.txt`.                                                                                                                                                                                   |
+| `/.lovable/oauth/consent`                    | `src/routes/[.]lovable.oauth.consent.tsx` has no `head()`. | `src/pages/OAuthConsent.tsx` does not call `usePageSeo`.                                                  | No      | `Disallow: /.lovable/`                                                                                                                                                                                                         |
+| `/auth`                                      | No route `head()`.                                         | `src/pages/Auth.tsx` sets `noindex: true`.                                                                | No      | `Disallow: /auth`                                                                                                                                                                                                              |
+| `/reset-password`                            | No route `head()`.                                         | `src/pages/ResetPassword.tsx` sets `noindex: true`.                                                       | No      | `Disallow: /reset-password`                                                                                                                                                                                                    |
 | `/unsubscribe`                               | No route `head()`.                                         | `src/pages/Unsubscribe.tsx` sets `noindex: true`.                                                         | No      | `Disallow: /unsubscribe`. Historical `vercel.json` (earlier host, not the live Cloudflare configuration) also sets `X-Robots-Tag` to `noindex, nofollow, noarchive` for this path. Live response headers are **NOT_MEASURED**. |
-| `/partners/csv-preview`                      | No route `head()`.                                         | `src/pages/PartnerCsvPreviewLanding.tsx` sets `noindex: true` and path `/partners/csv-preview`.           | No      | Allowed by `Allow: /`.                                                                                                                                        |
-| `/sensors/csv-preview`                       | No route `head()`.                                         | `src/pages/SensorCsvPreview.tsx` sets `noindex: true` and path `/sensors/csv-preview`.                    | No      | `Allow: /sensors/csv-preview` before `Disallow: /sensors`.                                                                                                    |
-| `/pheno-hunts/:id/compare`                   | `src/routes/pheno-hunts.$id.compare.tsx` has no `head()`.  | `src/pages/PhenoHuntCompare.tsx` does not call `usePageSeo`.                                              | No      | `Disallow: /pheno-hunts`                                                                                                                                      |
-| `/pheno-hunts/:id/showcase`                  | `src/routes/pheno-hunts.$id.showcase.tsx` has no `head()`. | `src/pages/PhenoHuntShowcase.tsx` does not call `usePageSeo`.                                             | No      | `Disallow: /pheno-hunts`                                                                                                                                      |
-| `/internal/demo-proof-walkthrough`           | Route `head()` meta `noindex, nofollow`.                   | Page module has no `usePageSeo` call.                                                                     | No      | `Disallow: /internal/`                                                                                                                                        |
-| `/internal/contextual-pheno-comparison-demo` | No route `head()`.                                         | `src/pages/ContextualPhenoComparisonDemo.tsx` does not call `usePageSeo`.                                 | No      | `Disallow: /internal/`                                                                                                                                        |
-| `/internal/pheno-hunt-demo`                  | No route `head()`.                                         | `src/pages/PhenoHuntDemo.tsx` does not call `usePageSeo`.                                                 | No      | `Disallow: /internal/`                                                                                                                                        |
+| `/partners/csv-preview`                      | No route `head()`.                                         | `src/pages/PartnerCsvPreviewLanding.tsx` sets `noindex: true` and path `/partners/csv-preview`.           | No      | Allowed by `Allow: /`.                                                                                                                                                                                                         |
+| `/sensors/csv-preview`                       | No route `head()`.                                         | `src/pages/SensorCsvPreview.tsx` sets `noindex: true` and path `/sensors/csv-preview`.                    | No      | `Allow: /sensors/csv-preview` before `Disallow: /sensors`.                                                                                                                                                                     |
+| `/pheno-hunts/:id/compare`                   | `src/routes/pheno-hunts.$id.compare.tsx` has no `head()`.  | `src/pages/PhenoHuntCompare.tsx` does not call `usePageSeo`.                                              | No      | `Disallow: /pheno-hunts`                                                                                                                                                                                                       |
+| `/pheno-hunts/:id/showcase`                  | `src/routes/pheno-hunts.$id.showcase.tsx` has no `head()`. | `src/pages/PhenoHuntShowcase.tsx` does not call `usePageSeo`.                                             | No      | `Disallow: /pheno-hunts`                                                                                                                                                                                                       |
+| `/internal/demo-proof-walkthrough`           | Route `head()` meta `noindex, nofollow`.                   | Page module has no `usePageSeo` call.                                                                     | No      | `Disallow: /internal/`                                                                                                                                                                                                         |
+| `/internal/contextual-pheno-comparison-demo` | No route `head()`.                                         | `src/pages/ContextualPhenoComparisonDemo.tsx` does not call `usePageSeo`.                                 | No      | `Disallow: /internal/`                                                                                                                                                                                                         |
+| `/internal/pheno-hunt-demo`                  | No route `head()`.                                         | `src/pages/PhenoHuntDemo.tsx` does not call `usePageSeo`.                                                 | No      | `Disallow: /internal/`                                                                                                                                                                                                         |
 
 `/checkout/success` and `/checkout/cancel` are in the inventory (`noindex, follow`, not in the sitemap) and their pages also set `noindex: true`. `public/robots.txt` does not disallow `/checkout`.
 
@@ -141,7 +141,7 @@ Every public manifest path, with or without a static document. `/cultivars/:slug
 
 Manifest paths (`access: "public"`, 42):
 
-`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/feedback`; `/founder`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/athena-feed-chart-log`; `/guides/grow-stage-care-guide`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`.
+`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/feedback`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/athena-feed-chart-log`; `/guides/grow-stage-care-guide`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/vpd-chart`.
 
 ## Authenticated routes — sitemap excluded, robots.txt disallowed
 
@@ -193,11 +193,12 @@ Manifest paths (`access: "internal"`, 6):
 
 ## Redirect aliases
 
-These 19 manifest paths are `access: "redirect"`. They are not sitemap `<loc>` values. They have no independent index document except the strain aliases in the inventory, which are `noindex, follow` and canonical to the cultivar URL.
+These 20 manifest paths are `access: "redirect"`. `/founder` redirects to `/pricing`. Founder Lifetime is no longer sold. They are not sitemap `<loc>` values. They have no independent index document except the strain aliases in the inventory, which are `noindex, follow` and canonical to the cultivar URL.
 
 Permanent Cloudflare Worker redirects (`src/lib/cloudflareHostRoutingRules.ts`, HTTP 308, query preserved; live application **NOT_MEASURED**):
 
 - `/welcome`, `/features` and `/demo` to `/`
+- `/founder` to `/pricing`
 
 Permanent `vercel.json` redirects (historical repository config from the earlier Vercel host, stale and unedited; production is Cloudflare Workers at https://verdantgrowdiary.com; live application **NOT_MEASURED**):
 
@@ -212,14 +213,15 @@ Client redirects in route modules:
 
 - `/welcome`, `/features`, `/demo` (all `/`), `/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`, `/login` (`/auth`), `/register` and `/signup` (`/auth?mode=signup`), `/logs` (`/timeline`), `/action-queue` and `/tasks` (`/actions`), `/ai-doctor` (`/doctor`), `/grow-room` (`/`), `/strains` (`/cultivars`) use `RouteAliasRedirect`.
 - `/strains/:slug` renders `LegacyStrainSlugRedirect` and also calls `staticRouteHead` for the alias document.
-- `/billing/:plan` renders `LegacyBillingRedirect` (`/pricing` with a canonical plan query).
+- `/billing/:plan` renders `LegacyBillingRedirect` (`/pricing` with a canonical plan query). `founder-lifetime` resolves to bare `/pricing`.
+- `/founder` redirects to `/pricing`.
 - `/upgrade` renders `LegacyUpgradeRedirect` (`/pricing` with allow-listed plan, acquisition, and return intent).
 
 `Disallow` lines also name `/login`, `/signup`, `/register`, `/logs`, `/tasks`, `/action-queue`, and `/billing/`.
 
-Manifest paths (`access: "redirect"`, 19):
+Manifest paths (`access: "redirect"`, 20):
 
-`/action-queue`; `/ai-doctor`; `/billing/:plan`; `/demo`; `/features`; `/grow-room`; `/login`; `/logs`; `/privacy-policy`; `/refund-policy`; `/refunds`; `/register`; `/signup`; `/strains`; `/strains/:slug`; `/tasks`; `/terms-of-service`; `/upgrade`; `/welcome`.
+`/action-queue`; `/ai-doctor`; `/billing/:plan`; `/demo`; `/features`; `/founder`; `/grow-room`; `/login`; `/logs`; `/privacy-policy`; `/refund-policy`; `/refunds`; `/register`; `/signup`; `/strains`; `/strains/:slug`; `/tasks`; `/terms-of-service`; `/upgrade`; `/welcome`.
 
 ## Retired routes
 

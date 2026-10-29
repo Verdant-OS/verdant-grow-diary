@@ -77,29 +77,29 @@ goal: Tent Detail imported CSV history follows the saved temperature unit, inclu
 why: Fahrenheit CSV readings displayed as Celsius after reload (VER-302).
 branch: codex/ver-302-imported-history-temperature-units
 base: verdant-grow-diary at 9b60f907e8e13b7dc6501b2406b96ab922530241
-pr: NOT_MEASURED (draft creation follows this handoff commit)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2610
 head_sha: NOT_MEASURED (read current remote branch before resuming)
-state: prepared; implementation and regression tests pending
-current_step: establish draft and fail-first temperature regression
-next_action: implement display-only preference plumbing and run focused tests
+state: implementation complete locally; draft source push follows; CI and independent review pending
+current_step: publish tested display-only correction; obtain exact-head CI and outside review
+next_action: fetch #2610 head, verify required CI, then obtain one eligible independent exact-head review
 post_merge_check: after separately authorized release, verify both settings and hard reload against the four VER-302 CSV readings
 active_writer: Codex /root, ChatGPT Work Mode, workspace d0359f63e637; user assigned VER-302 on 2026-10-29
 decisions: reuse useTemperatureUnitPreference and convertCelsiusForDisplay; keep stored values, timestamps, source selection and metric ids unchanged
 tried_and_rejected: no new conversion implementation, data rewrite or duplicate VER-183 work
 commands: node node_modules/vitest/vitest.mjs run src/test/imported-sensor-history-temperature-units.test.tsx --reporter=dot
-files_touched: docs/agents/HANDOFF_LOG.md (this entry only)
-files_remaining: src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; focused temperature regression; directly affected existing display assertions
-blockers: eligible independent outside reviewer availability not yet established; production verification awaits separately authorized release
+files_touched: src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; src/test/imported-sensor-history-temperature-units.test.tsx; src/test/imported-sensor-history-panel.test.tsx; src/test/imported-sensor-history-read-honesty.test.tsx; src/test/imported-sensor-history-paused-read.test.tsx; src/test/csv-history-ai-doctor-full-chain.test.tsx; docs/agents/HANDOFF_LOG.md (this entry only)
+files_remaining: none planned; writer addresses verified review or CI findings
+blockers: eligible outside reviewer not available through current connected routes (desktop offline; no Claude CLI or matching Linear reviewer); local full typecheck killed exit 137 without diagnostics (tsc and tsgo); actual browser hard reload not measured (no installed browser); production verification awaits separately authorized release
 open_questions: none for implementation
 gotchas: #2536 owns a separate pagination browser; do not edit its branch; its new view-model caller must later pass the preference. VER-183 Canopy scope stays untouched. Existing tests pin Celsius presentation and require explicit Celsius setup and updated temperature labels; no assertion removal.
 links: https://linear.app/verdantgrowdiary/issue/VER-302/tent-page-imported-sensor-history-shows-csv-temperatures-in-c; https://linear.app/verdantgrowdiary/issue/VER-183/cf-setting-not-applied-everywhere-dashboard-strip-950f-in-c-mode; https://github.com/Verdant-OS/verdant-grow-diary/pull/2536#issuecomment-6489045891
-artifacts: draft PR receipts will record RED/GREEN, complete file scope and full head
+artifacts: same final regression on original production modules: 9 FAIL / 5 PASS; candidate focused set: 11 files / 163 PASS / 0 FAIL / 0 SKIP. Includes real CSV parser -> 12 metric inserts -> preferred display, both units, real saved preference across remount, reactive unit/filter changes, null/nonfinite, canonical boundaries, unrelated metrics and V0 contract. Lint, formatter, sensor safety and scorer-lock strict PASS. This is local fixture evidence, not a browser reload or production result. Reused installed React 19.2.8, Vite 8.3.4, Vitest 4.1.12 match bun.lock; no install/lockfile change.
 reviewer_seat: eligible non-contributing Claude/Grok session; unassigned; writer and every contributor excluded
 reviewer_sha: NOT_MEASURED
 session_state: no subagents, routines, workflow changes, merge or deployment; draft-only hold
-claimed_by: Codex /root, 2026-10-29 05:50 UTC
+claimed_by: Codex /root, 2026-10-29 05:47 UTC (initial draft receipt)
 owner: Codex /root
-last_updated: 2026-10-29 00:50 CT, by Codex
+last_updated: 2026-10-29 00:52 CT, by Codex
 ```
 
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE

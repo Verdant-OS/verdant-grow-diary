@@ -2,6 +2,7 @@
  * imported-sensor-history-panel — render tests for the Tent Detail
  * Imported Sensor History section. Read-only UI only.
  */
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
@@ -35,6 +36,7 @@ const eligibleRows = (): ImportedSensorHistoryInputRow[] => [
 ];
 
 beforeEach(() => {
+  saveTemperatureUnitPreference("celsius");
   trackFunnelEvent.mockClear();
 });
 
@@ -148,7 +150,7 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(screen.getByTestId("imported-history-total")).toHaveTextContent("2");
     const filters = screen.getByTestId("imported-history-metric-filters");
     expect(filters).toHaveTextContent("humidity_pct");
-    expect(filters).toHaveTextContent("temperature_c");
+    expect(filters).toHaveTextContent("Temperature (°C)");
     // Live row never leaks into the metric filter list.
     expect(filters.textContent ?? "").not.toContain("co2_ppm");
   });
@@ -174,7 +176,7 @@ describe("ImportedSensorHistoryPanel", () => {
       ]),
     );
     expect(values).toEqual({
-      temperature_c: "24.4 °C",
+      "Temperature (°C)": "24.4 °C",
       humidity_pct: "52%",
       vpd_kpa: "1.11 kPa",
     });
@@ -270,7 +272,7 @@ describe("ImportedSensorHistoryPanel", () => {
     );
     expect(
       within(group).getByTestId("imported-history-metric-filter-temperature_c"),
-    ).toHaveTextContent("temperature_c");
+    ).toHaveTextContent("Temperature (°C)");
   });
 
   it("updates visible rows and visible count when a metric filter is selected", () => {

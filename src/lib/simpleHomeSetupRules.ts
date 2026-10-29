@@ -82,7 +82,7 @@ export const SIMPLE_HOME_SETUP_COPY = {
   allowanceOneInUse: (growName: string) =>
     `Your plan includes 1 active grow, and “${growName}” is it. Finish setting it up here, or rename it.`,
   allowanceMany: (limit: number, inUse: number) =>
-    `Your plan includes ${limit} active grows (${inUse} in use).`,
+    `Your plan includes ${limit} active ${limit === 1 ? "grow" : "grows"} (${inUse} in use).`,
   renameToggle: "Rename grow",
   renameLabel: "Grow name",
   renameSave: "Save name",
@@ -146,7 +146,7 @@ export function explainGrowAllowance(input: {
   if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) return null;
   const inUse = Math.max(0, Math.floor(input.activeGrowCount));
   if (limit === 1) {
-    if (inUse >= 1 && input.growName) {
+    if (inUse === 1 && input.growName) {
       return SIMPLE_HOME_SETUP_COPY.allowanceOneInUse(input.growName);
     }
     if (inUse === 0) return SIMPLE_HOME_SETUP_COPY.allowanceOneFree;

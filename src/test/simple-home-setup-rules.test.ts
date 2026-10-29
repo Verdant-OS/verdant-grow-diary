@@ -285,6 +285,11 @@ describe("explainGrowAllowance", () => {
       SIMPLE_HOME_SETUP_COPY.allowanceMany(1, 1),
     );
   });
+  it("a one-grow plan holding several grows never names one of them as the grow; the count reads singular", () => {
+    expect(
+      explainGrowAllowance({ capabilities: FREE, activeGrowCount: 2, growName: "Starter Grow" }),
+    ).toBe("Your plan includes 1 active grow (2 in use).");
+  });
   it("larger limits report the count; negative counts clamp to zero", () => {
     expect(
       explainGrowAllowance({

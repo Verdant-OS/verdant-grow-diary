@@ -23,6 +23,11 @@
  */
 import type { NormalizedDiaryDetails, NormalizedDiaryEntry } from "./diaryEntryRules";
 import { classifyTimelineEntry } from "./timelineEntryClassification";
+import {
+  QUICK_LOG_ISSUE_TIMELINE_LABEL,
+  hasQuickLogNoteMarker,
+  isQuickLogIssueSubtype,
+} from "./quickLogNoteMarkerRules";
 
 /**
  * Envelope event-type strings that indicate a Quick Log wrapper row
@@ -91,6 +96,7 @@ const DISPLAY_LABELS: Record<string, string> = {
   reminder: "Reminder",
   note: "Note",
   quick_log: "Note",
+  issue: QUICK_LOG_ISSUE_TIMELINE_LABEL,
   // Defensive: a row whose ENVELOPE literally carries the sentinel must also
   // render neutrally, not title-case into "Invalid Event Type".
   [INVALID_EVENT_TYPE_IDENTITY]: INVALID_EVENT_TYPE_NEUTRAL_LABEL,
@@ -197,6 +203,24 @@ function isRecognizedDeclaredMarker(declared: string): boolean {
 }
 
 /**
+ * Note and Issue both persist as observations. A marked new note reads
+ * "Note" and an observation with subtype "issue" reads "Issue"; any other
+ * observation (old unmarked notes included) keeps its label.
+ */
+function noteOrIssueLabel(
+  effective: string,
+  details: NormalizedDiaryDetails | null | undefined,
+): string | null {
+  if (effective !== "observation" && !QUICK_LOG_WRAPPER_ENVELOPES.has(effective)) return null;
+  const extras = details?.extras;
+  if (hasQuickLogNoteMarker(extras)) return DISPLAY_LABELS.note;
+  if (effective === "observation" && isQuickLogIssueSubtype(extras?.subtype)) {
+    return QUICK_LOG_ISSUE_TIMELINE_LABEL;
+  }
+  return null;
+}
+
+/**
  * Resolve the effective identity of a normalized diary entry.
  *
  * Rules (deterministic, in order):
@@ -235,7 +259,10 @@ export function resolveQuickLogEventIdentity(
     };
   }
   const effective = promote ? declared : envelope || declared || "note";
-  const label = DISPLAY_LABELS[effective] ?? titleCase(effective);
+  const label =
+    noteOrIssueLabel(effective, entry?.details) ??
+    DISPLAY_LABELS[effective] ??
+    titleCase(effective);
   const fromQuickLog = promote || (wrapper && envelope === "quick_log") || declared !== "";
   return {
     effectiveEventType: effective,

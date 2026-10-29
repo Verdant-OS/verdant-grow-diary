@@ -433,11 +433,15 @@ export function buildGrowTentClimateCsv(readings: readonly GrowTentClimateReadin
 
 const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
 
-/** TSV cell for pasting into a spreadsheet: one line, and never a live formula. */
+/**
+ * TSV cell for pasting into a spreadsheet: one line, never a live formula, and
+ * a double quote can't open a quoted field that swallows the following cells.
+ */
 function tsvCell(value: string): string {
   const flat = String(value ?? "").replace(/[\t\r\n]+/g, " ");
   const leadingSignIsFormula = /^[+-]/.test(flat) && !PLAIN_NUMBER.test(flat);
-  return /^[=@]/.test(flat) || leadingSignIsFormula ? `'${flat}` : flat;
+  const safe = /^[=@]/.test(flat) || leadingSignIsFormula ? `'${flat}` : flat;
+  return safe.includes('"') ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 export function buildGrowTentClimateTsv(readings: readonly GrowTentClimateReading[]): string {

@@ -77,7 +77,7 @@ goal: re-verify docs/architecture-contract.md against deploy tip 479cadb3032ddc3
 why: the founder chose option A (docs-only refresh) on 2026-10-29, after a collision audit found that the contract (#2564) and docs/specs/release-topology-specification.md already exist, so a new contract would duplicate them.
 branch: claude/new-session-kulf08
 base: verdant-grow-diary
-checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge origin/verdant-grow-diary
+checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head; only the writer then runs git merge origin/verdant-grow-diary and pushes a new head)
 pr: NOT_MEASURED (opened after the first push)
 head_sha: a commit cannot record its own SHA; read the full head from the PR
 state: pushed draft
@@ -87,7 +87,7 @@ post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
 active_writer: Claude
 decisions: (1) no new contract and no topology edit; slice C (topology) waits for #2539, #2609 and #2589. (2) the six moved cites inside the 27991451 header record stay as that tree's lines, because a stamp record describes its own tree. (3) the counts were reproduced at 27991451 before measuring 479cadb, so the same method gives both. (4) the stale CLAUDE.md lockfile wording (option B) is out of scope; it would need the 18-file Sentinel bump.
 tried_and_rejected: a first cite pass that ignored bare `:NN` cites missed the AC-8.1 drift; the binder now ties each bare cite to the last full path in the same paragraph. Comparing topology-spec cites against 0200d255 gave false drift; 604274a7 is the right base because #2564 merged the spec and the contract together.
-commands: node <scratch>/cites2.mjs 604274a; bash <scratch>/measure.sh 27991451 && bash <scratch>/measure.sh HEAD; node <scratch>/ac43.mjs 27991451 && node <scratch>/ac43.mjs HEAD. The scripts are not committed; the PR body has the method, so a reviewer can re-derive them. bunx prettier --check docs/architecture-contract.md; node scripts/assert-docs-safety.mjs
+commands: format and safety: bunx prettier --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs. Counts, run at both 27991451 and the head (replace REF): rules=$(git ls-tree --name-only REF src/lib/ | grep -E 'Rules\.ts$'); echo "$rules" | wc -l; git grep -l 'Date\.now()' REF -- $rules | wc -l; git grep -l 'Math\.random()' REF -- $rules | wc -l; git grep -h -o 'from "@/lib/react-router-compat"' REF -- src | wc -l; git grep -liE 'nelson|modified z|modifiedZ|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' REF -- src supabase scripts e2e tools plugins spikes | wc -l. The cite re-read and the AC-4.3 pair count used session-local scripts that are not committed; their method is in the contract header and the PR body. SKIPPED, not passed: Vitest, bun run typecheck and the pre-commit full tsc, because this session has no node_modules and no test reads either file.
 files_touched: docs/architecture-contract.md, docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: none

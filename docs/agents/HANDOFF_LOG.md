@@ -69,6 +69,39 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
+
+```text
+TASK SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028  priority: P2  status: OPEN
+goal: Unknown /guides/<slug> never serves "index, follow" (or a canonical to /guides), and the Athena feed log stops linking the unpublished /guides/advanced-nutrients-feeding-chart-log.
+why: Ahrefs indexability audit (2026-10-28, Grok Bot's /workspace/seo/audits/2026-10-28-ahrefs-indexability.md; not readable from this session). On base the dead link rendered a 200 "index, follow" page with no canonical that then redirected to /guides on the client.
+branch: claude/seo-noindex-unknown-guide-slugs
+base: verdant-grow-diary
+checkout: git fetch origin claude/seo-noindex-unknown-guide-slugs verdant-grow-diary && git switch claude/seo-noindex-unknown-guide-slugs && git merge origin/verdant-grow-diary
+pr: draft; read the PR for the exact head
+head_sha: parent of this commit is 8101fa97bc5c87356bb679c0dd886543d85a079c (Cursor Agent test commit on 2b80c76918af614da5cc298494fbad5e3718aa66, the 479cadb base merge); feature commit 80ec001f2e4abc5676b53a662524969ee62553f6. A commit cannot record its own SHA: the reviewed head is this commit, and review must name its full SHA from the PR
+state: ready for review. PASS (session_017UoYKwL7nbjQYSesoeniiR) and founder yes were both at 96901cea4e0e92fe3644a33a151a60e30e995939; the merge queue dequeued it on a HANDOFF_LOG.md conflict after #2539 (d55c557) merged, so this block's commit is a base merge that keeps both blocks. Both the PASS and the founder yes are stale at the new head and must be renewed there
+current_step: Codex review at 8101fa9 addressed: P1 (GuidePage hydration flipped unknown slugs to index, follow) fixed with noindex: !guide; P2 source-scan route test replaced with a resolved Route.options.head assertion (founder-approved scorer unlock); P2 head_sha precision answered here
+next_action: Eligible independent reviewer (OWNERSHIP.md §4.3; Claude excluded as author) reviews at the exact head. #2542 re-adds the Athena related link when it ships.
+post_merge_check: Once live /version.json reports the merge SHA, GET https://verdantgrowdiary.com/guides/does-not-exist and confirm one <meta name="robots" content="noindex, follow"> and no rel=canonical; NOT_MEASURED until then.
+active_writer: Claude
+decisions: noindex, follow instead of a real 404 (keeps the existing client redirect to /guides and its tests); head logic in pure src/lib/guideRouteHeadRules.ts; published guides keep their exact staticRouteHead. Optional csv-preview PR skipped (not trivial on top of the scorer-lock decision).
+tried_and_rejected: curl of the built page (blocked by a plugin safety hook) and vite preview (cloudflare-module output cannot run under Node). Verified instead by importing .output/server/index.mjs and calling its fetch handler, as scripts/capture-ssr-head-snapshots-with-server.mjs does.
+commands: bunx vitest run src/test/seo-guide-slug-indexability.test.tsx src/test/athena-feed-log-page.test.tsx ; bun run typecheck ; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/lib/athenaFeedLogRules.ts; src/pages/AthenaFeedLog.tsx; src/routes/guides.$slug.tsx; src/lib/guideRouteHeadRules.ts (new); src/test/seo-guide-slug-indexability.test.tsx (new); src/test/athena-feed-log-page.test.tsx (renegotiated pin, founder-approved); docs/agents/HANDOFF_LOG.md; src/pages/GuidePage.tsx (noindex while redirecting); src/test/guide-page-unknown-slug-client-head.test.tsx (new); src/test/guideRouteHeadRules.test.ts (added by Cursor Agent in 8101fa9; source scan replaced by Claude, founder-approved unlock)
+files_remaining: none
+blockers: none for repository work. The 2026-10-28 Actions outage cleared; non-required Dependency & Security CI is red on the base's @hono/node-server advisory until #2605 lands; required ci.yml checks skip while draft.
+open_questions: none
+gotchas: bun run build refuses a dirty tree (stamp_dirty); a local build rewrites src/routeTree.gen.ts, public/version.json and src/generated/buildInfo.ts, which must be reverted.
+links: #2542 (re-adds the link); not folded into #2561 or #2549
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3; excluded: Claude (author) and the Cursor Agent session that pushed 8101fa9
+reviewer_sha: none yet
+session_state: Claude Code cloud session; no routines
+claimed_by: Claude, 2026-10-28 12:05 UTC
+owner: Claude
+last_updated: 2026-10-29 16:40 UTC, by Claude (Codex P1/P2 fixes on top of 8101fa9)
+```
+
 ### SEO-GSC-AHREFS-RECONCILIATION-20261028
 
 ```text
@@ -101,40 +134,6 @@ session_state: no routines, no paused workflows; pending owner decision on GSC p
 claimed_by: Claude, 2026-10-28 17:45 CT (first push of this block)
 owner: Claude
 last_updated: 2026-10-29 13:58 CT, by Claude (second base merge after #2539)
-```
-
-### VER-300-ALERT-ARCHIVED-TARGETS
-
-```text
-TASK VER-300-ALERT-ARCHIVED-TARGETS  priority: P2  status: OPEN
-goal: per VER-300 acceptance, an alert on an archived tent/plant reads "Archived tent: <name>" / "Archived plant: <name>" instead of "Tent: Name unavailable"; an id the complete owner read did not return reads "Tent removed" / "Plant removed"; the default /alerts list hides those alerts behind a "Show archived targets (n)" toggle with a visible "N hidden for archived tents/plants" count; "Why this alert?" says "Target range not recorded for this alert." instead of "Target context unavailable".
-why: Linear VER-300 (Toad Venom QA sweep, 2026-10-27): 3 of 5 open alerts read "Tent: Name unavailable". Cause in source: src/hooks/useAlertTargetNames.ts filtered tents and plants on is_archived = false.
-branch: claude/alert-archived-tent-display-dg3dq4
-base: verdant-grow-diary
-checkout: git fetch origin claude/alert-archived-tent-display-dg3dq4 verdant-grow-diary && git switch claude/alert-archived-tent-display-dg3dq4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: read from the branch's draft PR (opened right after the first push)
-head_sha: read from the PR; the base merge follows c80a505ab52b6576f172e2bb94d702d81fd41b7d (round-7 test pin)
-state: pushed, ready; enqueued 2026-10-28 06:17 UTC, dequeued 06:45 UTC on MERGE_CONFLICT; base merged at ceb66fba8 (06:50), again for #2562/#2570, and again 2026-10-29 after runners recovered (this file only each time)
-current_step: round 7: Matthew approved (2026-10-28) the "N hidden for archived tents/plants" count and gating the loop card on a failed name read; both pushed. the 2026-10-28 repo-wide Actions outage (PR comment 6465270630) is fixed (Matthew, 2026-10-29); base merged again so CI runs on a fresh head
-next_action: confirm 35/35 required checks at the new head; the PASS at ca2a728 is invalidated by the new head, so get an exact-head re-review (Jack Herer or another eligible non-contributing seat), then re-queue only with Matthew's per-item yes. Open P3 (Jack Herer 5678566277): the "Show archived targets (n)" label also counts removed targets; folds into Matthew's pending copy decision ("N hidden for archived tents/plants").
-post_merge_check: after Publish, on verdantgrowdiary.com the fixture account's Alerts list hides alerts on archived tents by default; the "Show archived targets (n)" toggle reveals them as "Archived tent: <name>" with the Historical target note. Until live /version.json reports the merge SHA: NOT_MEASURED.
-active_writer: Claude session_017UoYKyX1Beo5tnXmkJp17C
-decisions: read archived rows (RLS SELECT stays auth.uid() = user_id; no schema/RLS change); sole-tent fallback still counts non-archived tents only; "missing" is inferred only from a complete read (select with count "exact" and rows >= count), never while loading, after an error, or from a capped response; callers/mocks without the new maps keep the old "Name unavailable" copy; the default list hides alerts on archived/removed targets behind a count toggle (VER-300 acceptance; presentation only, nothing resolved), and the One-Tent Loop next-step card counts only open alerts not known to be on archived/removed targets and is not shown until target reads settle; after a failed name read the card still navigates but never auto-queues (Matthew, 2026-10-28); a capped read keeps base behaviour (gating it needs realistic tent fixtures in two locked scorers, action-queue-add-and-create-2175 and alerts-action-queue-handoff-p1-fixes); target inputs are not built while the scope is invalid (no card renders, old behavior kept); copy uses the VER-300 spec strings; stored alerts are never modified.
-tried_and_rejected: unbounded read without a count (fresh-context review P2: PostgREST max-rows can cap it and falsely mark a live plant removed); .in("id", alertIds) lookups (would need a hook signature change in two pages and a second sole-tent read; larger than the fix needs).
-commands: bunx vitest run src/test/alert-target-archived-removed.test.tsx src/test/alert-target-context.test.tsx src/test/alert-target-io-hooks.test.tsx src/test/alert-why-context.test.tsx src/test/alert-why-context-legacy-vpd.test.tsx --reporter=dot ; NODE_OPTIONS=--max-old-space-size=12288 bunx tsc -p tsconfig.json --noEmit
-files_touched: src/test/alerts-historical-targets-toggle.test.tsx; src/hooks/useAlertTargetNames.ts; src/lib/alertTargetContextRules.ts; src/lib/alertWhyContext.ts; src/components/AlertTargetContext.tsx; src/pages/Alerts.tsx; src/pages/AlertDetail.tsx; src/test/alert-target-archived-removed.test.tsx; src/test/alert-target-context.test.tsx; src/test/alert-why-context.test.tsx; src/test/alert-why-context-legacy-vpd.test.tsx; docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: independent exact-head acceptance needs a non-contributing session; merge needs Matthew's per-item yes
-open_questions: none in scope; server-side auto-resolve of alerts on archived tents stays Matthew's call (would be a migration/trigger, out of scope)
-gotchas: alerts.tent_id/plant_id are ON DELETE SET NULL, so a hard-deleted tent shows the "unavailable" copy (or the sole active tent fallback), not "Removed"; the client cannot tell deleted from not-accessible; src/lib/stabilityWhyContext.ts still says "Target context unavailable." (stability card, out of scope)
-links: https://linear.app/verdantgrowdiary/issue/VER-300/alerts-tent-name-unavailable-for-alerts-on-archived-tents-misleading
-artifacts: PR checks
-reviewer_seat: Jack Herer PASS 5678566277 at ca2a72886fdf87c2aa8d0ad97fa7b263529e05be (stale); re-review requested at ceb66fba8 (comment 6463032437), superseded by this merge; Sour Diesel peer observation at ceb66fba8: no blocking findings
-reviewer_sha: none valid at the current head
-session_state: Claude cloud session session_017UoYKyX1Beo5tnXmkJp17C watching the PR; no routines; no paused workflows
-claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
-owner: Claude
-last_updated: 2026-10-29 01:05 UTC, by Claude
 ```
 
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
@@ -951,40 +950,6 @@ claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
 ```
 
-### RETIRE-FOUNDER-SALES-MACHINERY
-
-```text
-TASK RETIRE-FOUNDER-SALES-MACHINERY  priority: P2  status: OPEN
-goal: PR A of two. Remove the code that existed only to sell Founder Lifetime: the public founder-slots-remaining edge function, the useFounderSlotsRemaining hook, the dead founder_lifetime slot block in get-paddle-price, and the tests and config that only cover them. No migration; PR B carries the SQL.
-why: #2028 (merged 0200d255) stopped selling Founder Lifetime. Matthew decided 2026-10-27 (session_01U9xQZcQhgrfTPEcjzgvjkb): existing holders keep access forever, the Founders Wall stays, a refund still revokes access, and a late pre-cutoff purchase event still grants.
-branch: claude/retire-founder-sales-machinery
-base: verdant-grow-diary
-checkout: git fetch origin claude/retire-founder-sales-machinery verdant-grow-diary && git switch claude/retire-founder-sales-machinery && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 (ready, marked by Matthew 2026-10-28)
-head_sha: read the PR head; this commit cannot name itself
-state: ready; 35/35 required checks green at 4789f612 (base merge of 4ec39869); Codex code review clean at 4ec39869; Matthew review no blocking findings at 4789f612; Codex security review not run (usage limit)
-current_step: approval and merge queue (Matthew)
-next_action: request independent review at the PR head; Matthew decides ready; after merge Matthew undeploys founder-slots-remaining; then draft PR B (migration)
-post_merge_check: Matthew deletes the deployed founder-slots-remaining function; GET .../functions/v1/founder-slots-remaining then returns 404
-active_writer: Claude (session_01U9xQZcQhgrfTPEcjzgvjkb)
-decisions: keep allocate_lovable_founder_lifetime and revoke_lovable_founder_lifetime_by_transaction (late grants and refund revocation stay); keep the founders table, founders_wall_public, the immutables trigger and founder_number; SQL drops and cap/slot body edits go to PR B (migration, Matthew's receipt). Matthew approved the scorer-lock unlocks listed in the PR body (2026-10-27, extended 2026-10-28 to the deleted function's Deno tests, package.json, domain-reach and credit-pack-eligibility's anchor).
-tried_and_rejected: one combined PR with the migration; rejected so the code slice is not held behind the migration receipt
-commands: bunx vitest run <touched tests> --reporter=dot; bun run typecheck; node scripts/verify-edge-shared-in-sync.mjs
-files_touched: see the PR diff (37 files: 36 code, config and test files plus this log; deletions dominate)
-files_remaining: none for PR A
-blockers: none for PR A; PR B needs Matthew's migration receipt
-open_questions: none
-gotchas: vi.mock of a deleted module path fails at import, so drop every useFounderSlotsRemaining mock with the hook; existing tests are scorer-locked, so edit only the unlocked list
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028
-artifacts: PR body
-reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing and Edge scope); all contributors excluded
-reviewer_sha: none yet
-session_state: none
-claimed_by: Claude, 2026-10-28 00:00 UTC
-owner: Claude
-last_updated: 2026-10-28 01:30 UTC, by Claude
-```
-
 ### HONO-NODE-SERVER-GHSA-RMXM
 
 ```text
@@ -1044,7 +1009,7 @@ files_touched: .env.example; .env.production; .github/workflows/checkout-disable
 files_remaining: none in the code slice. Outside the repo, Matthew: production secrets (PAYMENTS_ENVIRONMENT=live, PADDLE_LIVE_API_KEY, PAYMENTS_LIVE_WEBHOOK_SECRET, the four live PADDLE_PRICE_* values), deploy of get-paddle-price and payments-webhook, the live webhook destination (traffic_source platform, per #2589), archiving the live Founder price, Publish, the approved purchase and any refund.
 blockers: Paddle-side: archiving the live Founder price pri_01kx3dsezn1d73dghffdxnr2za was ordered by Matthew (2026-10-29) but this session's Paddle MCP connection lacks price.write (request 2ea301d4-42f5-49a7-bcde-5527f1e29163); Matthew archives it in the Paddle dashboard or grants price.write at vendors.paddle.com/mcps. Webhook destinations (read-only inventory 2026-10-29 ~15:36 UTC; all three show zero notifications in 30 days): "Test" (simulation traffic to the website root, all 57 events, sensitive fields on); the Lovable relay (platform traffic, 20 events); the direct payments-webhook?env=live destination (platform traffic, 5 events: transaction.completed, transaction.payment_failed, subscription.created/updated/canceled; it misses adjustment.created, the refund event the function handles). Recommendation, each its own approval: widen the direct destination to the 13 handled types; deactivate "Test" after the purchase; keep the relay until the first purchase proves the direct path. Matthew (2026-10-29): review exact events and destinations before approving; nothing applied. Production deployed-function receipts for get-paddle-price and payments-webhook: BLOCKED from this session (Supabase MCP sees only bzatgtgjvuojpoxcknaa). Dependency-audit lane red repo-wide on @hono/node-server (fix PR #2605), UNSTABLE not blocking.
 open_questions: Matthew: apply the webhook recommendation (one word); archive the Founder price or grant price.write; production secrets and the two Edge deploys with receipts; the exact purchase (plan, tax-inclusive total, method, refund plan) before any charge.
-gotchas: Drafts skip the 32 shard contexts (#2555), so a draft's green header is not required CI. assert-paddle-production-sandbox and restore-env-production-from-head run in prebuild; the committed .env.production holds the live client token, which is public by design. Local DB proofs (founder-*-db, founder-refund-grant-concurrency) are BLOCKED as root or without PostgreSQL tools; that is environment, not a code result. Three merge bases exist with the tip; a plain merge-tree overstates conflicts. The husky pre-commit tsc needs NODE_OPTIONS=--max-old-space-size=8192 on this box. The 82a3d25 conflict resolution left this block's code fence unclosed (an opening four-backtick fence with no closer, so the VER-300 block rendered inside it); the close-out PR restores the 3-backtick pair on both blocks.
+gotchas: Drafts skip the 32 shard contexts (#2555), so a draft's green header is not required CI. assert-paddle-production-sandbox and restore-env-production-from-head run in prebuild; the committed .env.production holds the live client token, which is public by design. Local DB proofs (founder-*-db, founder-refund-grant-concurrency) are BLOCKED as root or without PostgreSQL tools; that is environment, not a code result. Three merge bases exist with the tip; a plain merge-tree overstates conflicts. The husky pre-commit tsc needs NODE_OPTIONS=--max-old-space-size=8192 on this box. The 82a3d25 conflict resolution left this block's code fence unclosed (an opening four-backtick fence with no closer, so the VER-300 block rendered inside it); the base repaired the fences before this close-out landed.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2497 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2589 (webhook readiness audit) ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 ; docs/specs/paddle-live-checkout-runtime-slice.md
 artifacts: PR body and checks; checkout-disabled-rollback-receipt artifact from the rollback workflow at the pushed head
 reviewer_seat: Codex (named by Matthew 2026-10-29) as independent exact-head reviewer under OWNERSHIP.md section 4.3; excluded: the Cursor Grok cloud agent (author), Claude session_017UoYKz9AZWshNbyKnd1ck6 (repairer)
@@ -1052,8 +1017,43 @@ reviewer_sha: 82a3d2525d4f71a9bbea4f602238b516a9c27596: Codex code review comple
 session_state: Claude Code cloud session session_017UoYKz9AZWshNbyKnd1ck6; no routines; no paused workflows; pending Matthew decisions listed under open_questions
 claimed_by: Claude session_017UoYKz9AZWshNbyKnd1ck6, 2026-10-29 (Matthew's direct assignment)
 owner: Claude session_017UoYKz9AZWshNbyKnd1ck6
-last_updated: 2026-10-29 19:30 UTC, by Claude session_017UoYKz9AZWshNbyKnd1ck6 (closure)
+last_updated: 2026-10-29 21:20 UTC, by Claude session_017UoYKz9AZWshNbyKnd1ck6 (closure)
 closure: #2539 merged as d55c5575ba79b4602c394423f5acde25c16ec5e1 at 2026-10-29 18:54:04 UTC via the merge queue (squash) from final head 82a3d2525d4f71a9bbea4f602238b516a9c27596 onto base dcf39fdb605de7ea89884e5a884978857f99b18a (#2605); GitHub API: merged true, merged_by cheekhimself. Required checks at the final head: 35/35 SUCCESS (run 40908126103, 17:01 UTC); merge-queue CI run 40929303961 on queue head d55c5575ba79b4602c394423f5acde25c16ec5e1: success at 18:53:47 UTC. Independent acceptance: Codex at the exact head (reviewer_sha). Enqueued at ~18:16 UTC on Matthew's reaffirmed "merge" (first "merge" ~17:28 UTC, held on this session's concern) with the Founder price still active in live Paddle and no receipt for PAYMENTS_ENVIRONMENT=live, the live secrets or the two function deploys; recorded on the PR body and merge-receipt comment 6505641503. Post-merge live check at closure: live /version.json reported d55c5575ba79 (buildTime 2026-10-29T18:54:34Z) at 18:56 UTC, publish PASS. Signed-out read-only probe of /pricing on verdantgrowdiary.com at 18:58 UTC (HTTP 200, same commit, no console errors): "Secure checkout by Paddle" copy shown; no test-mode banner; no paused or unavailable copy; Founder Lifetime absent; Pro $99/year and Craft $249/year CTAs on the default Annual toggle; credit packs read unavailable while signed out; Paddle.js not loaded before a checkout attempt (lazy by design): PASS for the signed-out surface. Opening live checkout for pro_monthly needs a signed-in owner session and is the first step of the not-yet-approved test purchase: NOT_MEASURED; it reopens this block with the same owner if it fails. Closed by this follow-up PR.
+```
+
+### VER-300-ALERT-ARCHIVED-TARGETS
+
+```text
+TASK VER-300-ALERT-ARCHIVED-TARGETS  priority: P2  status: CLOSED
+goal: per VER-300 acceptance, an alert on an archived tent/plant reads "Archived tent: <name>" / "Archived plant: <name>" instead of "Tent: Name unavailable"; an id the complete owner read did not return reads "Tent removed" / "Plant removed"; the default /alerts list hides those alerts behind a "Show archived targets (n)" toggle with a visible "N hidden for archived tents/plants" count; "Why this alert?" says "Target range not recorded for this alert." instead of "Target context unavailable".
+why: Linear VER-300 (Toad Venom QA sweep, 2026-10-27): 3 of 5 open alerts read "Tent: Name unavailable". Cause in source: src/hooks/useAlertTargetNames.ts filtered tents and plants on is_archived = false.
+branch: claude/alert-archived-tent-display-dg3dq4
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin claude/alert-archived-tent-display-dg3dq4 verdant-grow-diary && git switch claude/alert-archived-tent-display-dg3dq4 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2581 (merged)
+head_sha: d03f73e8239c0f7b1fe2bb009d37edf779593029 (final PR head; base merge after the round-7 test pin c80a505ab); merge commit 479cadb3032ddc3ad80d93f105283609179d6c0a on the deploy branch
+state: CLOSED (merged). Enqueued 2026-10-29 15:47 UTC on Matthew's instruction ("Enqueue"); an earlier 2026-10-28 06:17 UTC enqueue was dequeued on a HANDOFF_LOG MERGE_CONFLICT
+current_step: Closed.
+next_action: None; closed. The post_merge_check below stays owned by this block: if the live /alerts check fails after Publish, this work reopens with the same owner. Optional follow-ups from review 5693098121 (P3): the Alerts.tsx empty-state copy when every alert is historical, and the vacuous not.toContain("Target context unavailable") in src/test/alerts-single-created-and-target-range.test.tsx:293.
+post_merge_check: after Publish, on verdantgrowdiary.com the fixture account's Alerts list hides alerts on archived tents by default; the "Show archived targets (n)" toggle reveals them as "Archived tent: <name>" with the Historical target note. Until live /version.json reports the merge SHA: NOT_MEASURED.
+active_writer: none; closed
+decisions: read archived rows (RLS SELECT stays auth.uid() = user_id; no schema/RLS change); sole-tent fallback still counts non-archived tents only; "missing" is inferred only from a complete read (select with count "exact" and rows >= count), never while loading, after an error, or from a capped response; callers/mocks without the new maps keep the old "Name unavailable" copy; the default list hides alerts on archived/removed targets behind a count toggle (VER-300 acceptance; presentation only, nothing resolved), and the One-Tent Loop next-step card counts only open alerts not known to be on archived/removed targets and is not shown until target reads settle; after a failed name read the card still navigates but never auto-queues (Matthew, 2026-10-28); a capped read keeps base behaviour (gating it needs realistic tent fixtures in two locked scorers, action-queue-add-and-create-2175 and alerts-action-queue-handoff-p1-fixes); target inputs are not built while the scope is invalid (no card renders, old behavior kept); copy uses the VER-300 spec strings; stored alerts are never modified.
+tried_and_rejected: unbounded read without a count (fresh-context review P2: PostgREST max-rows can cap it and falsely mark a live plant removed); .in("id", alertIds) lookups (would need a hook signature change in two pages and a second sole-tent read; larger than the fix needs).
+commands: bunx vitest run src/test/alert-target-archived-removed.test.tsx src/test/alert-target-context.test.tsx src/test/alert-target-io-hooks.test.tsx src/test/alert-why-context.test.tsx src/test/alert-why-context-legacy-vpd.test.tsx --reporter=dot ; NODE_OPTIONS=--max-old-space-size=12288 bunx tsc -p tsconfig.json --noEmit
+files_touched: src/test/alerts-historical-targets-toggle.test.tsx; src/hooks/useAlertTargetNames.ts; src/lib/alertTargetContextRules.ts; src/lib/alertWhyContext.ts; src/components/AlertTargetContext.tsx; src/pages/Alerts.tsx; src/pages/AlertDetail.tsx; src/test/alert-target-archived-removed.test.tsx; src/test/alert-target-context.test.tsx; src/test/alert-why-context.test.tsx; src/test/alert-why-context-legacy-vpd.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work; Publish and the live check are Matthew's
+open_questions: none in scope; server-side auto-resolve of alerts on archived tents stays Matthew's call (would be a migration/trigger, out of scope)
+gotchas: alerts.tent_id/plant_id are ON DELETE SET NULL, so a hard-deleted tent shows the "unavailable" copy (or the sole active tent fallback), not "Removed"; the client cannot tell deleted from not-accessible; src/lib/stabilityWhyContext.ts still says "Target context unavailable." (stability card, out of scope)
+links: https://linear.app/verdantgrowdiary/issue/VER-300/alerts-tent-name-unavailable-for-alerts-on-archived-tents-misleading
+artifacts: PR checks
+reviewer_seat: Claude session_017UoYKz1NkXjBqrRtYSUvMz, a non-contributing Claude review session (OWNERSHIP.md section 4.3), transferred once from the first request (comment 6463032437) after no response. Excluded: Claude session_017UoYKyX1Beo5tnXmkJp17C (author and repairer). Earlier: Jack Herer PASS 5678566277 at ca2a7288 (stale); Sour Diesel peer reviews, no blocking findings.
+reviewer_sha: d03f73e8239c0f7b1fe2bb009d37edf779593029, review 5693098121 at 2026-10-29 05:05 UTC: PASS (P1x0, P2x0, P3x2); 9 files, 126/126 tests; 35/35 required checks
+session_state: no routines; no paused workflows; PR subscription ended at merge
+claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
+owner: Claude
+last_updated: 2026-10-29 16:05 UTC, by Claude session_017UoYKyX1Beo5tnXmkJp17C (closure)
+closure: #2581 merged as 479cadb3032ddc3ad80d93f105283609179d6c0a on 2026-10-29 (merged_at 15:59:38 UTC) via the merge queue as a merge commit (parents 9b60f907e8e13b7dc6501b2406b96ab922530241 and d03f73e8239c0f7b1fe2bb009d37edf779593029) from final head d03f73e8239c0f7b1fe2bb009d37edf779593029. At that head: required checks 35/35 SUCCESS (32 Full test suite shards, "Lint, typecheck, test, build", "Preflight — edge shared-lib mirror in sync", test:legal-seo); the non-required Dependency & Security CI failed on the @hono/node-server advisory, identical on the deploy tip (fix #2605, comment 6485635426). Independent acceptance: review 5693098121 at the exact head. Founder per-item yes: Matthew, 2026-10-29, at that SHA. Post-merge live check NOT_MEASURED at closure. Closed by this follow-up PR.
 ```
 
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
@@ -1089,6 +1089,41 @@ claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassig
 owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
 last_updated: 2026-10-29 00:55 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (closed after #2583 merged)
 closure: #2583 merged as b5230474d94fe39fe6c3ac0f64b43c88c4fe0cc2 (merge-queue commit dated 2026-10-29 00:26:25 UTC) from final head 2c7b282896c19022fad5a7fc77897220d77dac8d
+```
+
+### RETIRE-FOUNDER-SALES-MACHINERY
+
+```text
+TASK RETIRE-FOUNDER-SALES-MACHINERY  priority: P2  status: CLOSED
+goal: PR A of two. Remove the code that existed only to sell Founder Lifetime: the public founder-slots-remaining edge function, the useFounderSlotsRemaining hook, the dead founder_lifetime slot block in get-paddle-price, and the tests and config that only cover them. No migration; PR B carries the SQL.
+why: #2028 (merged 0200d255) stopped selling Founder Lifetime. Matthew decided 2026-10-27 (session_01U9xQZcQhgrfTPEcjzgvjkb): existing holders keep access forever, the Founders Wall stays, a refund still revokes access, and a late pre-cutoff purchase event still grants.
+branch: claude/retire-founder-sales-machinery
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin claude/retire-founder-sales-machinery verdant-grow-diary && git switch claude/retire-founder-sales-machinery && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 (merged)
+head_sha: 824379f1e4f901daf53afc40c9a3db91f4313476 (final PR head; base merge over 795e3765 after #2567 merged). Base last merged into the head: 26113a1b68b928d6cc46d0662c011d424f15267b (second parent of 824379f1). Target-branch tip at merge: d590b2c105435cb2b22d1f265a4dea48948ccd3a (first parent of merge commit bbc77ae2; #2562 landed between)
+state: CLOSED (merged). At final head 824379f1: 35/35 required checks green, mergeable clean, independent PASS review 5679386107 (P1 0 / P2 0 / P3 1), Codex no major issues at ab329b80 (same net diff; 795e3765 and 824379f1 are base merges only); Matthew queued it 2026-10-28 07:51 UTC
+current_step: None; closed
+next_action: None; closed. Outside this task: Matthew undeploys the live founder-slots-remaining function (production action); then PR B (migration) is drafted and held for Matthew's migration receipt; docs/audit follow-up retires docs/founder-slots-remaining-response.md, its schema and the endpoint URL in scripts/audit-subscriber-growth-live-parity.mjs (the review P3)
+post_merge_check: Pending Matthew: delete the deployed founder-slots-remaining function; GET .../functions/v1/founder-slots-remaining then returns 404. Production delivery of bbc77ae2 is NOT_MEASURED until live /version.json reports it
+active_writer: none; branch claude/retire-founder-sales-machinery retired after merge
+decisions: keep allocate_lovable_founder_lifetime and revoke_lovable_founder_lifetime_by_transaction (late grants and refund revocation stay); keep the founders table, founders_wall_public, the immutables trigger and founder_number; SQL drops and cap/slot body edits go to PR B (migration, Matthew's receipt). Matthew approved the scorer-lock unlocks listed in the PR body (2026-10-27, extended 2026-10-28 to the deleted function's Deno tests, package.json, domain-reach and credit-pack-eligibility's anchor).
+tried_and_rejected: one combined PR with the migration; rejected so the code slice is not held behind the migration receipt
+commands: bunx vitest run <touched tests> --reporter=dot; bun run typecheck; node scripts/verify-edge-shared-in-sync.mjs
+files_touched: see the PR diff (37 files: 36 code, config and test files plus this log; deletions dominate)
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: vi.mock of a deleted module path fails at import, so drop every useFounderSlotsRemaining mock with the hook; existing tests are scorer-locked, so edit only the unlocked list
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing and Edge scope); all contributors excluded
+reviewer_sha: 824379f1e4f901daf53afc40c9a3db91f4313476 (PASS, review 5679386107, 2026-10-28 07:50 UTC)
+session_state: none
+claimed_by: Claude, 2026-10-28 00:00 UTC (closed 2026-10-28 08:00 UTC)
+owner: Claude
+last_updated: 2026-10-28 08:00 UTC, by Claude
+closure: #2570 merged as bbc77ae23164847772de6b53ecf18d7735932342 at 2026-10-28 07:58:27 UTC from final head 824379f1e4f901daf53afc40c9a3db91f4313476 via the merge queue (GitHub API: merged true, merged_by cheekhimself); worktree and local branch removed
 ```
 
 ### STOP-SELLING-FOUNDER-LIFETIME

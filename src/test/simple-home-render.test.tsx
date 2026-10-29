@@ -133,6 +133,9 @@ vi.mock("@/lib/growRenameService", () => ({
   renameGrow: (...args: unknown[]) => rename.renameGrow(...args),
 }));
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
+vi.mock("@/components/PublicQuickLogHandoffCard", () => ({
+  default: () => <div data-testid="public-quick-log-handoff-stub" />,
+}));
 vi.mock("@/components/QuickLogV2Sheet", () => ({
   default: (props: Record<string, unknown>) => {
     sheetProps.calls.push(props);
@@ -252,6 +255,17 @@ describe("SimpleHome — ready", () => {
       within(legacy).getByRole("link", { name: /Link to a grow before logging/ }),
     ).toHaveAttribute("href", `/plants/p1?tentId=${TENT}`);
     expect(screen.getAllByTestId("simple-home-plant-log")).toHaveLength(1);
+  });
+
+  it("offers a saved public Quick Log draft for review, in the ready and the setup states", () => {
+    renderHome();
+    expect(screen.getByTestId("public-quick-log-handoff-stub")).toBeInTheDocument();
+    cleanup();
+    tentsQuery.data = [];
+    plantsQuery.data = [];
+    renderHome();
+    expect(screen.getByTestId("simple-home-no-tent")).toBeInTheDocument();
+    expect(screen.getByTestId("public-quick-log-handoff-stub")).toBeInTheDocument();
   });
 
   it("closing the sheet clears the launch target so nothing is remembered", () => {

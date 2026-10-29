@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
+import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import SimpleHomeSetupCard from "@/components/SimpleHomeSetupCard";
 import UiViewSwitch from "@/components/UiViewSwitch";
@@ -125,6 +126,10 @@ export default function SimpleHome() {
           />
         }
       />
+
+      {/* A fresh public Quick Log draft is offered here for explicit review, as
+          on the Dashboard; the card renders nothing when there is no draft. */}
+      <PublicQuickLogHandoffCard className="mb-4" />
 
       {state.kind === "loading" ? (
         <GrowDataLoadingState

@@ -197,6 +197,21 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
   });
 
+  it("tracks SELECT INTO from a whole-command EXECUTE string", () => {
+    expect(tables("DO $$ BEGIN EXECUTE 'SELECT 1 INTO TABLE public.leaky'; END $$;")).toEqual([
+      "leaky",
+    ]);
+    expect(tables("DO $$ BEGIN EXECUTE $q$ SELECT 1 INTO TABLE public.leaky $q$; END $$;")).toEqual(
+      ["leaky"],
+    );
+    expect(
+      tables(
+        "DO $$ BEGIN EXECUTE 'SELECT 1 INTO TABLE public.leaky; GRANT SELECT ON public.leaky TO authenticated'; END $$;",
+      ),
+    ).toEqual([]);
+    expect(tables("DO $$ DECLARE n int; BEGIN SELECT 1 INTO n; END $$;")).toEqual([]);
+  });
+
   it("ignores tables in other schemas", () => {
     expect(tables("CREATE TABLE private.leaky (id int);")).toEqual([]);
     expect(

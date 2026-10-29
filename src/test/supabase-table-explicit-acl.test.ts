@@ -283,6 +283,18 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
   });
 
+  it("still tracks CREATE TABLE after a quote inside a string literal", () => {
+    expect(tables(`COMMENT ON SCHEMA public IS 'a " b';\n${CREATE}`)).toEqual(["leaky"]);
+  });
+
+  it("still tracks CREATE TABLE after a quote inside a dollar-quoted body", () => {
+    expect(
+      tables(
+        `CREATE FUNCTION public.f() RETURNS text LANGUAGE sql AS $$ SELECT '"' $$;\n${CREATE}`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
   it("tracks a table moved into public with ALTER TABLE ... SET SCHEMA", () => {
     const moveIn =
       "CREATE TABLE private.leaky (id int);\nALTER TABLE private.leaky SET SCHEMA public;";

@@ -40,6 +40,19 @@ const plantArchive = vi.hoisted(() => ({
 
 const ARCHIVED_PLANT_MESSAGE = DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE;
 
+// Wrap the real archive service so a test can see every page read go through it.
+const archiveService = vi.hoisted(() => ({ check: vi.fn(), read: vi.fn() }));
+vi.mock("@/lib/dailyCheckPlantArchiveReadService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/dailyCheckPlantArchiveReadService")>();
+  archiveService.check.mockImplementation(actual.checkDailyCheckPlantArchiveBeforeSave);
+  archiveService.read.mockImplementation(actual.readDailyCheckPlantArchive);
+  return {
+    ...actual,
+    checkDailyCheckPlantArchiveBeforeSave: archiveService.check,
+    readDailyCheckPlantArchive: archiveService.read,
+  };
+});
+
 vi.mock("@/integrations/supabase/client", () => {
   function plantsRead() {
     const state = { id: "" };
@@ -364,6 +377,8 @@ describe("Daily Check submit re-checks an archived plant", () => {
     plantArchive.byId = {};
     plantArchive.mode = "row";
     plantArchive.reads = 0;
+    archiveService.check.mockClear();
+    archiveService.read.mockClear();
     saveInsert.mockClear();
     const proto = window.HTMLElement.prototype;
     proto.scrollIntoView = () => {};
@@ -402,6 +417,21 @@ describe("Daily Check submit re-checks an archived plant", () => {
     expect(screen.queryByTestId("daily-grow-check-post-submit-plant")).not.toBeInTheDocument();
     expect(screen.getByTestId("daily-grow-check-choose")).toHaveAttribute("data-plant-id", "P");
     expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it("reads the plant archive flag only through the archive service", async () => {
+    renderCheck();
+    await reachQuickLogSave();
+    plantArchive.byId.P = true;
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    expect(await screen.findByText(ARCHIVED_PLANT_MESSAGE)).toBeInTheDocument();
+    const serviceCalls = [...archiveService.check.mock.calls, ...archiveService.read.mock.calls];
+    expect(serviceCalls.length).toBeGreaterThan(0);
+    expect(serviceCalls.every(([plantId]) => plantId === "P")).toBe(true);
+    // Each service call makes one plants read; any read beyond that bypassed the service.
+    expect(plantArchive.reads).toBe(serviceCalls.length);
   });
 
   it("keeps the Quick Log note on screen when the saved plant was archived", async () => {

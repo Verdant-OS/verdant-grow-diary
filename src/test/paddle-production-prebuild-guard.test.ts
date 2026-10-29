@@ -6,10 +6,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const TOKEN_NAME = "VITE_PAYMENTS_CLIENT_TOKEN";
-const TEST_SANDBOX_TOKEN = "test_sandboxfixture";
-const OTHER_SANDBOX_TOKEN = "test_sandboxfixture_other";
-const TEST_LIVE_TOKEN = "live_livefixture";
-const OTHER_LIVE_TOKEN = "live_livefixture_other";
+const TEST_SANDBOX_TOKEN = "test_sandboxfixture0000000000000";
+const OTHER_SANDBOX_TOKEN = "test_sandboxfixtureother00000000";
+const TEST_LIVE_TOKEN = "live_livefixture0000000000000000";
+const OTHER_LIVE_TOKEN = "live_livefixtureother00000000000";
 const GARBAGE_TOKEN = "pk_not_a_paddle_client_token";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const GUARD_SCRIPT = resolve(REPO_ROOT, "scripts/assert-paddle-production-sandbox.mjs");
@@ -115,15 +115,16 @@ describe("Paddle production prebuild guard", () => {
     expect(combinedOutput(result)).not.toContain("VITE_PAYMENTS_CLIENT_TOKEN=");
   });
 
-  it("accepts an identical mode-local sandbox value", () => {
+  it("rejects a well-formed sandbox canonical token, even with a matching mode-local value", () => {
     const root = createEnvRoot(
       [`${TOKEN_NAME}=${TEST_SANDBOX_TOKEN}`],
       [`${TOKEN_NAME}=${TEST_SANDBOX_TOKEN}`],
     );
     const result = runGuard(root);
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe("[paddle-production-policy] production client token verified.\n");
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("[paddle-production-policy] canonical_paddle_token_not_live\n");
     expect(combinedOutput(result)).not.toContain(TEST_SANDBOX_TOKEN);
   });
 
@@ -204,18 +205,17 @@ describe("Paddle production prebuild guard", () => {
 
   it.each([
     {
-      name: "live mode-local override of sandbox",
-      localToken: TEST_LIVE_TOKEN,
+      name: "sandbox mode-local override of live",
+      localToken: TEST_SANDBOX_TOKEN,
       expectedReason: "effective_paddle_token_mismatch",
     },
     {
-      name: "different sandbox mode-local override",
+      name: "other sandbox mode-local override",
       localToken: OTHER_SANDBOX_TOKEN,
       expectedReason: "effective_paddle_token_mismatch",
     },
     {
       name: "different live mode-local override",
-      canonical: TEST_LIVE_TOKEN,
       localToken: OTHER_LIVE_TOKEN,
       expectedReason: "effective_paddle_token_mismatch",
     },
@@ -226,7 +226,8 @@ describe("Paddle production prebuild guard", () => {
     },
   ])(
     "rejects a $name without logging credential bytes",
-    ({ localToken, expectedReason, canonical = TEST_SANDBOX_TOKEN }) => {
+    ({ localToken, expectedReason }) => {
+      const canonical = TEST_LIVE_TOKEN;
       const root = createEnvRoot([`${TOKEN_NAME}=${canonical}`], [`${TOKEN_NAME}=${localToken}`]);
       const result = runGuard(root, undefined, "vite:env");
 
@@ -239,46 +240,46 @@ describe("Paddle production prebuild guard", () => {
   );
 
   it.each([
-    { name: "live", token: TEST_LIVE_TOKEN, reason: "effective_paddle_token_mismatch" },
+    { name: "sandbox", token: TEST_SANDBOX_TOKEN, reason: "effective_paddle_token_mismatch" },
     { name: "empty", token: "", reason: "effective_paddle_token_invalid" },
     {
-      name: "different sandbox",
-      token: OTHER_SANDBOX_TOKEN,
+      name: "different live",
+      token: OTHER_LIVE_TOKEN,
       reason: "effective_paddle_token_mismatch",
     },
     { name: "garbage", token: GARBAGE_TOKEN, reason: "effective_paddle_token_invalid" },
   ])("rejects a $name ambient build override", ({ token, reason }) => {
-    const root = createEnvRoot([`${TOKEN_NAME}=${TEST_SANDBOX_TOKEN}`]);
+    const root = createEnvRoot([`${TOKEN_NAME}=${TEST_LIVE_TOKEN}`]);
     const result = runGuard(root, token);
 
     expect(result.status).toBe(1);
     expect(result.stderr).toBe(`[paddle-production-policy] ${reason}\n`);
-    expect(combinedOutput(result)).not.toContain(TEST_SANDBOX_TOKEN);
+    expect(combinedOutput(result)).not.toContain(TEST_LIVE_TOKEN);
     if (token) expect(combinedOutput(result)).not.toContain(token);
   });
 
   it("suppresses cached Vite debug output during effective resolution", () => {
-    const root = createEnvRoot([`${TOKEN_NAME}=${TEST_SANDBOX_TOKEN}`]);
+    const root = createEnvRoot([`${TOKEN_NAME}=${TEST_LIVE_TOKEN}`]);
     const result = runGuard(root, undefined, "vite:env", true);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("[paddle-production-policy] production client token verified.\n");
     expect(result.stderr).toBe("");
-    expect(combinedOutput(result)).not.toContain(TEST_SANDBOX_TOKEN);
+    expect(combinedOutput(result)).not.toContain(TEST_LIVE_TOKEN);
   });
 
   it("keeps both canonical and override bytes private with cached Vite", () => {
     const root = createEnvRoot(
-      [`${TOKEN_NAME}=${TEST_SANDBOX_TOKEN}`],
-      [`${TOKEN_NAME}=${OTHER_SANDBOX_TOKEN}`],
+      [`${TOKEN_NAME}=${TEST_LIVE_TOKEN}`],
+      [`${TOKEN_NAME}=${OTHER_LIVE_TOKEN}`],
     );
     const result = runGuard(root, undefined, "vite:env", true);
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe("[paddle-production-policy] effective_paddle_token_mismatch\n");
-    expect(combinedOutput(result)).not.toContain(TEST_SANDBOX_TOKEN);
-    expect(combinedOutput(result)).not.toContain(OTHER_SANDBOX_TOKEN);
+    expect(combinedOutput(result)).not.toContain(TEST_LIVE_TOKEN);
+    expect(combinedOutput(result)).not.toContain(OTHER_LIVE_TOKEN);
   });
 });
 

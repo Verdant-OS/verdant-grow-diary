@@ -190,9 +190,27 @@ export default function GrowTentTemperatureHumidityChart() {
     if (liveCode === "above") setOpenPanels((p) => ({ ...p, rh_low: true, rh_high: false }));
   }, [liveCode]);
 
+  // Timers that update state or call window are cleared on unmount, so none fires after the page is gone.
+  const pendingTimers = useRef(new Set<number>());
+  useEffect(() => {
+    const timers = pendingTimers.current;
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      timers.clear();
+    };
+  }, []);
+
+  function later(callback: () => void, delayMs: number) {
+    const id = window.setTimeout(() => {
+      pendingTimers.current.delete(id);
+      callback();
+    }, delayMs);
+    pendingTimers.current.add(id);
+  }
+
   function announce(message: string) {
     setStatus("");
-    window.setTimeout(() => setStatus(message), 20);
+    later(() => setStatus(message), 20);
   }
 
   function changeInput(setter: (value: string) => void, value: string, nextField: object) {
@@ -302,7 +320,7 @@ export default function GrowTentTemperatureHumidityChart() {
     );
     trackClimateToolEvent("climate_tool_print", {});
     window.addEventListener("afterprint", () => setPrintMode("log"), { once: true });
-    window.setTimeout(() => window.print(), 30);
+    later(() => window.print(), 30);
   }
 
   function clearLog() {

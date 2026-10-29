@@ -29,6 +29,10 @@
  *   structured detail fields for `note` or `water` actions.
  */
 
+import {
+  QUICK_LOG_NOTE_MARKER_KEY,
+  QUICK_LOG_NOTE_MARKER_VALUE,
+} from "@/constants/quickLogActivityTypes";
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
@@ -243,6 +247,10 @@ export function buildLegacyQuickLogUnifiedPayload(
     : {};
   if (input.eventType === "environment") {
     envelopeFields.event_type = "environment";
+  }
+  if (input.eventType === "note") {
+    // Tells a new note apart from an issue/observation on saved entries.
+    envelopeFields[QUICK_LOG_NOTE_MARKER_KEY] = QUICK_LOG_NOTE_MARKER_VALUE;
   }
   if (input.sensorAttachPayload != null) {
     envelopeFields.sensor = input.sensorAttachPayload;

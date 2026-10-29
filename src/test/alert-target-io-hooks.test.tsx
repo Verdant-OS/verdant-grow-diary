@@ -24,7 +24,11 @@ const supabaseState = vi.hoisted(() => ({
       eq: () => builder,
       in: () => builder,
       then: (resolve: (value: TablePayload) => unknown) =>
-        Promise.resolve({ data: payload.data, error: payload.error }).then(resolve),
+        Promise.resolve({
+          data: payload.data,
+          error: payload.error,
+          count: Array.isArray(payload.data) ? payload.data.length : null,
+        }).then(resolve),
     };
     return builder;
   }),
@@ -51,7 +55,11 @@ beforeEach(() => {
       eq: () => builder,
       in: () => builder,
       then: (resolve: (value: TablePayload) => unknown) =>
-        Promise.resolve({ data: payload.data, error: payload.error }).then(resolve),
+        Promise.resolve({
+          data: payload.data,
+          error: payload.error,
+          count: Array.isArray(payload.data) ? payload.data.length : null,
+        }).then(resolve),
     };
     return builder;
   });

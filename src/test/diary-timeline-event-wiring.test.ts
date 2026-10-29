@@ -53,10 +53,12 @@ describe("Insert payload builders ↔ diary EVENT_TYPES alignment", () => {
     },
   );
 
-  it("'note' is a legacy alias and is allowed even though it isn't in EVENT_TYPES (handled by getEventType fallback)", () => {
-    // Guard rail: if this ever flips, update the alias mapping intentionally.
+  it("'note' stays out of EVENT_TYPES and resolves to its own display-only Note kind", () => {
+    // Guard rail: VER-298 intentionally flipped the alias so a saved note
+    // reads "Note"; legacy pickers still never offer it.
     expect(DIARY_VALUES.has("note")).toBe(false);
-    expect(getEventType("note").value).toBe("observation");
+    expect(getEventType("note").value).toBe("note");
+    expect(getEventType("note").label).toBe("Note");
   });
 });
 

@@ -27,7 +27,7 @@ const observations = [
 const row = (
   metric: string,
   value: number | null,
-  capturedAt = observations[0][0],
+  capturedAt: string = observations[0][0],
 ): ImportedSensorHistoryInputRow => ({
   tent_id: "ver-302-tent",
   source: "csv",
@@ -199,12 +199,10 @@ function expectTemperatureRows(unit: TemperatureUnitPreference) {
   const cells = within(screen.getByTestId("imported-history-recent-rows"));
   for (const observation of observations) {
     expect(
-      cells.getByRole("cell", { name: observation[unit === "fahrenheit" ? 3 : 4], exact: true }),
+      cells.getByRole("cell", { name: observation[unit === "fahrenheit" ? 3 : 4] }),
     ).toBeInTheDocument();
   }
-  expect(cells.getAllByRole("cell", { name: `Temperature (${symbol})`, exact: true })).toHaveLength(
-    4,
-  );
+  expect(cells.getAllByRole("cell", { name: `Temperature (${symbol})` })).toHaveLength(4);
   expect(screen.getByTestId("imported-history-visible")).toHaveTextContent("4");
 }
 

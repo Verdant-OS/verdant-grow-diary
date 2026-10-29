@@ -784,6 +784,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
             label: "Measure grow-light distance, PPFD, DLI, and schedule",
             to: "/guides/cannabis-grow-light-distance-and-schedule",
           },
+          {
+            label: "Plan an autoflower week by week from your sprout date",
+            to: "/guides/autoflower-week-by-week",
+          },
           { label: "Log the baseline before changing it", to: "/quick-log" },
         ],
       },

@@ -176,6 +176,17 @@ export default function GuidesIndex() {
             </Link>
           </li>
           <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/autoflower-week-by-week" className="block">
+              <h3 className="font-semibold text-lg">
+                Autoflower Week by Week: Schedule and Milestone Planner
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Build a week-by-week plan from your sprout date and breeder estimate, then log
+                planned vs actual milestones. Nothing is saved in your browser.
+              </p>
+            </Link>
+          </li>
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
             <Link to="/guides/grow-stage-care-guide" className="block">
               <h3 className="font-semibold text-lg">
                 Grow-stage care guide: seedling, veg, and flower checklists

@@ -38,6 +38,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/guides/athena-feed-chart-log`,
   },
   {
+    path: "/guides/autoflower-week-by-week",
+    expectTitle: /Autoflower Week by Week: Free Schedule Planner/,
+    canonical: `${ORIGIN}/guides/autoflower-week-by-week`,
+  },
+  {
     path: "/tools/vpd-calculator",
     expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
     canonical: `${ORIGIN}/tools/vpd-calculator`,

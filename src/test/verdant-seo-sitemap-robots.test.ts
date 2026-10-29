@@ -56,12 +56,14 @@ const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/cannabis-plant-care",
   "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
   "https://verdantgrowdiary.com/guides/athena-feed-chart-log",
+  "https://verdantgrowdiary.com/guides/autoflower-week-by-week",
 ];
 
 /** Custom interactive guide pages that are not in the generic SEO guide slug list. */
 const CUSTOM_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
   "https://verdantgrowdiary.com/guides/athena-feed-chart-log",
+  "https://verdantgrowdiary.com/guides/autoflower-week-by-week",
 ];
 
 function manifestEntryFor(pathname: string) {

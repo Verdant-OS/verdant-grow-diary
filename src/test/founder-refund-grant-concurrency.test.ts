@@ -742,6 +742,49 @@ describe("Founder Lifetime grant/refund concurrency — native PostgreSQL", () =
     );
   });
 
+  it("reopens a cap-skipped delivery so its redelivery reaches the allocator and grants", async () => {
+    // Before PR B the orchestrator stored a cap refusal as terminal
+    // (skipped / founder_cap_reached) and a Paddle redelivery short-circuits to
+    // duplicate_skipped before the allocator runs. The migration reopens exactly
+    // those rows; nothing is granted until the webhook re-runs the event.
+    const capSkipped = "evt_cap_skipped_before_pr_b";
+    const seed = (id: string, status: string, skip: string | null, tx = TX) =>
+      `INSERT INTO public.lovable_paddle_events (paddle_event_id, event_type, environment, user_id, paddle_transaction_id, price_external_id, processing_status, processed_ok, skip_reason, payload)
+       VALUES (${[id, "transaction.completed", "live", OWNER, tx, "founder_lifetime", status, status === "processed", skip].map(literal).join(",")}, '{}'::jsonb);`;
+    serviceSql(seed(capSkipped, "skipped", "founder_cap_reached"));
+    serviceSql(
+      seed("evt_barrier_skip", "skipped", "founder_refund_precedes_purchase", "txn_other"),
+    );
+    serviceSql(seed("evt_already_granted", "processed", null, "txn_granted"));
+    expect(eventState(capSkipped)).toBe("skipped|f|founder_cap_reached");
+
+    // Replaying the migration is idempotent and reopens only the cap refusal.
+    sql(readFileSync(resolve("supabase/migrations", capRetiredMigration), "utf8"));
+    expect(eventState(capSkipped)).toBe("failed|f|");
+    expect(
+      sql(
+        `SELECT last_error FROM public.lovable_paddle_events WHERE paddle_event_id = ${literal(capSkipped)};`,
+      ),
+    ).toBe("founder_cap_retired_20261029: cap refusal reopened for replay");
+    expect(eventState("evt_barrier_skip")).toBe("skipped|f|founder_refund_precedes_purchase");
+    expect(eventState("evt_already_granted")).toBe("processed|t|");
+    expect(activeCount()).toBe(0);
+
+    // The same Paddle event delivered again now passes the duplicate check,
+    // reaches the allocator and grants the lifetime entitlement.
+    const replay = await deliver(purchase(capSkipped));
+    expect(replay).toEqual({ httpStatus: 200, reason: "processed:record_lifetime" });
+    expect(eventState(capSkipped)).toBe("processed|t|");
+    expect(activeCount()).toBe(1);
+    expect(sql("SELECT founder_number, status FROM public.founders;")).toBe("1|confirmed");
+    // A second redelivery is the ordinary processed duplicate.
+    expect(await deliver(purchase(capSkipped))).toEqual({
+      httpStatus: 200,
+      reason: "duplicate_processed",
+    });
+    expect(activeCount()).toBe(1);
+  });
+
   it("rolls back a failed protected reconciliation and retries without acknowledging a purchase", async () => {
     serviceSql(allocationSql());
     const failedRefund = deps();

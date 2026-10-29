@@ -16,6 +16,16 @@
 --     violated. Signature, SECURITY DEFINER, search_path, advisory lock,
 --     refund barrier, idempotent replay and grants are unchanged
 --     (CREATE OR REPLACE keeps the existing ACL).
+--   * lovable_paddle_events: deliveries the old cap refused were recorded as
+--     terminal (processing_status 'skipped', skip_reason 'founder_cap_reached')
+--     and a Paddle redelivery short-circuits to duplicate_skipped before the
+--     allocator runs (payments-webhook/orchestrator.ts). Exactly those rows are
+--     reopened as retryable ('failed', with last_error naming this migration)
+--     so a redelivery or operator replay reaches the allocator and grants.
+--     Nothing is granted by this file: the webhook still re-runs the event.
+--     Paddle live carried zero transactions on 2026-10-29, so this is a no-op
+--     in production today; it is kept so the contract holds anywhere such a
+--     row exists.
 --   * DROP FUNCTION public.founder_lifetime_slots_remaining(): nothing in the
 --     repository calls it after #2570; the deployed edge function is deleted
 --     by the operator before this migration is applied.
@@ -154,6 +164,16 @@ BEGIN
   );
 END;
 $$;
+
+-- Reopen only the historical cap refusals. Other skipped and processed rows
+-- (refund barriers, credit-pack skips, successful grants) are untouched.
+UPDATE public.lovable_paddle_events
+SET processing_status = 'failed',
+    processed_ok      = false,
+    skip_reason       = NULL,
+    last_error        = 'founder_cap_retired_20261029: cap refusal reopened for replay'
+WHERE processing_status = 'skipped'
+  AND skip_reason = 'founder_cap_reached';
 
 DROP FUNCTION IF EXISTS public.founder_lifetime_slots_remaining();
 

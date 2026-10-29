@@ -6,7 +6,7 @@ production step requires Matthew's explicit approval.
 
 ## Current policy: live checkout on the production hostname only
 
-With the live checkout change (#2230), the tracked production client token is
+With the live checkout change (#2539, replaying #2230 and #2497), the tracked production client token is
 live-class. A live token opens checkout only on `verdantgrowdiary.com` and
 `www.verdantgrowdiary.com`; every other host is unavailable before script
 loading, price resolution, authentication redirects, session writes, or
@@ -191,7 +191,7 @@ Rollback order, before any production publish:
 
 ## Live checkout release
 
-Merging #2230 into `verdant-grow-diary` makes it the build the configured
+Merging #2539 into `verdant-grow-diary` makes it the build the configured
 publisher deploys to production. Customer exposure starts when the live
 `/version.json` reports the merge SHA; from then the live token opens checkout,
 and there is no operator-only gate. So backend readiness is verified first, in
@@ -227,7 +227,7 @@ verification:
    Choose the canonical destination from evidence. A live test event is a
    production write and needs its own authorization.
 5. Build and verify the rollback artifact (below).
-6. Post-merge: merge #2230 through the queue. Measure the publisher deployment for the
+6. Post-merge: merge #2539 through the queue. Measure the publisher deployment for the
    merge commit; exposure and live verification start only when the live
    `/version.json` names it. Then confirm `/pricing` shows "Secure checkout by
    Paddle". A
@@ -251,7 +251,8 @@ prebuild step (`restore-env-production-from-head.mjs`) resets
 `.env.production` to `HEAD` before every build, so an uncommitted switch is
 silently discarded. Build it like this:
 
-1. Before the merge, start from the exact reviewed #2230 head (the merge commit
+1. Before the merge, start from the exact reviewed head of #2539 (the full
+   SHA the independent exact-head review passed; the merge commit
    does not exist yet).
 2. Add one commit, on a branch that is never merged, that only appends
    `VITE_CHECKOUT_DISABLED="true"` to `.env.production`, next to the unchanged
@@ -282,7 +283,7 @@ loads or any price lookup runs, and shows "Checkout paused". It changes no
 token, secret, entitlement read, webhook or portal path, so existing live
 subscribers keep access and billing management.
 
-Verify it before the #2230 merge:
+Verify it before the #2539 merge:
 
 1. `src/test/paddle-live-checkout-production-host.test.tsx` (page URL
    `https://verdantgrowdiary.com/`): the switch blocks init, price lookup and

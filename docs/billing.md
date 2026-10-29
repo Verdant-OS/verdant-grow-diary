@@ -282,7 +282,9 @@ is done; step 6 is the merge followed by post-merge deployment verification.
    its fingerprint and live receipt the same way.
 3. **Every sellable SKU resolves.** From a signed-in production session, call
    `get-paddle-price` once for each SKU the pricing page sells and record its
-   HTTP status and log line (`reason`, `stage`, `env_var_configured`):
+   HTTP status. A success returns only `{ paddleId }` and writes no catalog
+   log; record the status and the returned id. A failure also logs `reason`,
+   `stage` and `env_var_configured`; record that line:
    `pro_monthly`, `pro_annual`, `craft_monthly`, `craft_annual`,
    `founder_lifetime`, `credit_pack_50`, `credit_pack_150` (packs need a
    session whose paid plan includes a monthly AI allowance, such as Pro).
@@ -293,12 +295,26 @@ is done; step 6 is the merge followed by post-merge deployment verification.
    `PADDLE_PRICE_*` secret is empty or holds a sandbox ID) blocks: the client
    cannot tell that from a shared failure, so one click on it closes checkout
    for every plan on the page.
-4. **Webhook path decided, read-only.** Paddle notification logs for both live
-   destinations, live rows in `lovable_paddle_events`, and `payments-webhook`
-   logs. Choose the canonical destination from that evidence. A live test
-   event is a production write and needs its own authorization.
-5. **Rollback artifact built and verified** (below) before the merge.
-6. **Merge, then confirm the deploy (post-merge verification).** Measure the configured publisher and its
+4. **Founder price archived in live Paddle.** The retired Founder price must
+   be `archived` before customer exposure, verified by a read-only price list
+   that shows that status. The client and server refusals do not stop a caller
+   who passes the price id to Paddle.js directly, and the webhook still
+   allocates a seat for such a purchase; archiving makes Paddle refuse it.
+   This is an owner-approved Paddle-side write.
+5. **Webhook path decided, read-only.** Paddle notification logs for every live
+   destination, live rows in `lovable_paddle_events`, and `payments-webhook`
+   logs. Choose the canonical destination from that evidence and confirm its
+   endpoint secret is the one the function reads. A live test event is a
+   production write and needs its own authorization. Logs do not prove
+   delivery, signature verification or entitlement processing: that proof is
+   the first owner-approved purchase (step 7), made right after the deploy and
+   before any announcement, whose `lovable_paddle_events` row must read
+   `processed_ok` and whose `subscriptions` row must grant. Paddle retries a
+   non-2xx delivery with backoff for about three days (`source claim`, Paddle
+   docs), so a defect found by that purchase can be fixed and the event
+   replays; the release stays on hold until the row is processed.
+6. **Rollback artifact built and verified** (below) before the merge.
+7. **Merge, then confirm the deploy (post-merge verification).** Measure the configured publisher and its
    deployment for the merge commit. Until the live `/version.json` names that
    commit, production still runs the previous build and no live verification
    applies. Once it does, confirm `/pricing` shows "Secure checkout by Paddle".
@@ -345,9 +361,12 @@ silently discarded. Build it like this:
    tree that differs from the verified artifact's parent.
 6. After the merge, confirm `git diff <reviewed head> <merge commit>` is
    empty. This is a check of step 5, not a recovery path: a non-empty diff
-   means step 5 failed. Treat it as a release incident, ship the one-line
-   switch on top of the merge commit as the emergency action, and rebuild and
-   verify the artifact on the merge commit before closing it.
+   means step 5 failed. Treat it as a release incident: prepare the one-line
+   switch on top of the merge commit as an emergency release packet (SHA,
+   build receipt, effect on live subscribers), and deploy it only on the
+   founder's per-item approval; agents never publish, promote or roll back on
+   their own. Rebuild and verify the artifact on the merge commit before
+   closing the incident.
 
 On every host, including the production
 hostname, it resolves checkout to unavailable before Paddle.js loads, before
@@ -373,7 +392,11 @@ on production that `/pricing` shows "Checkout paused" and no Paddle.js
 request is made.
 
 Keep it deployable as a pinned commit. To roll back, state the action and its
-effect on live subscriptions, then deploy that commit.
+effect on live subscriptions, then deploy that commit. The pinned commit is
+valid only while production serves this PR's merge commit: after any later
+release, deploying it would also remove that release. Whenever production
+advances, build, review and verify a new switch commit on the currently
+deployed SHA before relying on it.
 
 Do **not** use these as a generic rollback:
 

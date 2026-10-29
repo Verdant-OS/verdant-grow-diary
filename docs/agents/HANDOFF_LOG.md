@@ -1003,8 +1003,8 @@ post_merge_check: on https://verdantgrowdiary.com the Content-Security-Policy-Re
 active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
 decisions: report-only stays report-only; no frame-src/default-src widening; new test file instead of editing the scorer-locked security-headers-rules.test.ts
 tried_and_rejected: bundling with the key swap (owner chose separate PRs)
-commands: bunx vitest run src/test/csp-ahrefs-analytics-origin.test.ts src/test/security-headers-rules.test.ts src/test/cloudflare-host-routing-rules.test.ts --reporter=dot
-files_touched: src/lib/securityHeadersRules.ts, src/test/csp-ahrefs-analytics-origin.test.ts, docs/agents/HANDOFF_LOG.md
+commands: bunx vitest run src/test/csp-ahrefs-analytics-origin.test.ts src/test/csp-ahrefs-report-only-contract.test.ts src/test/security-headers-rules.test.ts src/test/cloudflare-host-routing-rules.test.ts --reporter=dot
+files_touched: src/lib/securityHeadersRules.ts, src/test/csp-ahrefs-analytics-origin.test.ts, src/test/csp-ahrefs-report-only-contract.test.ts (new, fe37c87c by Cursor Agent with Matthew), docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: none
 open_questions: none
@@ -1016,7 +1016,7 @@ reviewer_sha: none yet
 session_state: none
 claimed_by: Claude, 2026-10-28 23:20 UTC
 owner: Claude
-last_updated: 2026-10-28 23:22 UTC, by Claude
+last_updated: 2026-10-29 18:12 UTC, by Claude (base merge of dcf39fdb; added fe37c87c's contract test to files_touched and commands)
 ```
 
 ### HONO-NODE-SERVER-GHSA-RMXM

@@ -41,13 +41,18 @@
 // read from a third masked view in which DO and function bodies stay blank, so
 // a PL/pgSQL SELECT ... INTO n is not a table. A whole-command EXECUTE string
 // is recorded while masking and scanned as plain SQL, so EXECUTE 'SELECT ...
-// INTO TABLE name' (or the $q$ form) inside a DO block is a create. INTO TEMP
-// / TEMPORARY is skipped. INSERT INTO / MERGE INTO after a WITH ... SELECT is
-// skipped only when INTO comes directly after ) INSERT or ) MERGE. An alias
-// named insert or merge, quoted or unquoted, is not a skip. A semicolon inside
-// a quoted identifier is carried as a placeholder in every masked view so
-// [^;]* statement patterns run past it; identName turns the placeholder back
-// into a semicolon.
+// INTO TABLE name' (or the $q$ form) inside a DO block is a create. CREATE
+// [GLOBAL|LOCAL] TEMP|TEMPORARY TABLE and SELECT ... INTO TEMP|TEMPORARY are
+// session tables: they are tracked by name across migrations. While a temp of
+// that name exists, an unqualified removal, rename or GRANT/REVOKE acts on the
+// temp table and leaves the public table's state alone. DROP of pg_temp.name,
+// or the first unqualified DROP of that name, ends the shadow. A schema-
+// qualified public name is unaffected. INSERT INTO / MERGE INTO after a WITH
+// ... SELECT is skipped only when INTO comes directly after ) INSERT or )
+// MERGE. An alias named insert or merge, quoted or unquoted, is not a skip.
+// A semicolon inside a quoted identifier is carried as a placeholder in every
+// masked view so [^;]* statement patterns run past it; identName turns the
+// placeholder back into a semicolon.
 // Everything that can clear a table's requirement (a removal, a rename, a
 // GRANT or REVOKE) counts only where it runs at migration time: top-level
 // statements, DO blocks (dollar-quoted or a single-quoted body, including
@@ -76,17 +81,26 @@ const CREATE_HEAD_RE = new RegExp(
   String.raw`\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`,
   "gi",
 );
+const CREATE_TEMP_HEAD_RE = new RegExp(
+  String.raw`\bCREATE\s+(?:(?:GLOBAL|LOCAL)\s+)?TEMP(?:ORARY)?\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`,
+  "gi",
+);
 const QUALIFIED_AT_RE = new RegExp(String.raw`^${QUALIFIED}`);
 // Complete CREATE TABLE names end at the column list, a typed/partitioned
 // table, a CTAS, a statement end, or EOF. Anything else (%I, concatenation)
 // cannot be named statically.
 const CREATE_TARGET_END_RE = /^\s*(?:\(|AS\b|OF\b|PARTITION\b|;|$)/i;
 // SQL SELECT ... INTO [UNLOGGED] [TABLE] name creates a table. INTO TEMP /
-// TEMPORARY is a session table and is skipped. INSERT/MERGE INTO after a
-// WITH ... SELECT is skipped only when INTO comes directly after ) INSERT or
-// ) MERGE, so an alias named insert or merge does not suppress detection.
+// TEMPORARY is a session table and is tracked separately. INSERT/MERGE INTO
+// after a WITH ... SELECT is skipped only when INTO comes directly after )
+// INSERT or ) MERGE, so an alias named insert or merge does not suppress
+// detection.
 const SELECT_INTO_RE = new RegExp(
   String.raw`\bSELECT\b[^;]*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?${QUALIFIED}`,
+  "gi",
+);
+const SELECT_INTO_TEMP_RE = new RegExp(
+  String.raw`\bSELECT\b[^;]*?\bINTO\s+TEMP(?:ORARY)?\s+(?:TABLE\s+)?${QUALIFIED}`,
   "gi",
 );
 const SELECT_INTO_CTE_DML_RE = /\)\s+(?:INSERT|MERGE)\s+INTO\b/i;
@@ -411,6 +425,21 @@ function publicTable(schema, name) {
   return identName(name);
 }
 
+// Folded schema, or null when the name is unqualified.
+function schemaName(schema) {
+  return schema === undefined ? null : identName(schema);
+}
+
+function inTrackedSchema(schema) {
+  return schema === null || schema === "public" || schema === "pg_temp";
+}
+
+// Unqualified names search pg_temp first. A pg_temp-qualified name always
+// names the session table, even after it has already been dropped.
+function actsOnTemp(temps, schema, table) {
+  return schema === "pg_temp" || (schema === null && temps.has(table));
+}
+
 /**
  * Tables created before this rule existed that still inherit the hosted
  * project's legacy default privileges, each bound to the migration that
@@ -618,6 +647,9 @@ function overlayExecutePayloads(topLevel, executed, spans) {
  */
 export function findTablesWithoutExplicitAcl(migrations) {
   const tables = new Map(); // table -> { migration, acl }
+  // Session temp names outlive a single migration file: if two migrations share
+  // a session, the shadow still holds (fails closed).
+  const temps = new Set();
   for (const m of migrations) {
     const ddl = maskSql(m.sql, false);
     const executeSpans = [];
@@ -646,34 +678,71 @@ export function findTablesWithoutExplicitAcl(migrations) {
         events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
       }
     }
+    for (const match of ddl.matchAll(CREATE_TEMP_HEAD_RE)) {
+      if (quotedDdl[match.index]) continue;
+      const after = ddl.slice(match.index + match[0].length);
+      const name = QUALIFIED_AT_RE.exec(after);
+      const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
+      if (!complete) continue;
+      events.push({
+        kind: "temp-create",
+        conditional: Boolean(match[1]),
+        table: identName(name[2]),
+        index: match.index,
+      });
+    }
     for (const match of selectIntoSql.matchAll(SELECT_INTO_RE)) {
       if (quotedSelectInto[match.index]) continue;
       if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
       const table = publicTable(match[1], match[2]);
       if (table) events.push({ kind: "create", conditional: false, table, index: match.index });
     }
+    for (const match of selectIntoSql.matchAll(SELECT_INTO_TEMP_RE)) {
+      if (quotedSelectInto[match.index]) continue;
+      if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
+      events.push({
+        kind: "temp-create",
+        conditional: false,
+        table: identName(match[2]),
+        index: match.index,
+      });
+    }
     for (const event of collectDynamicExecuteEvents(ddl)) events.push(event);
     for (const match of executed.matchAll(RENAME_RE)) {
       if (quoted[match.index]) continue;
-      const table = publicTable(match[1], match[2]);
-      if (table)
-        events.push({ kind: "rename", table, to: identName(match[3]), index: match.index });
+      const schema = schemaName(match[1]);
+      if (!inTrackedSchema(schema)) continue;
+      events.push({
+        kind: "rename",
+        table: identName(match[2]),
+        to: identName(match[3]),
+        schema,
+        index: match.index,
+      });
     }
     for (const match of executed.matchAll(SET_SCHEMA_RE)) {
       if (quoted[match.index]) continue;
+      const schema = schemaName(match[1]);
       const name = identName(match[2]);
-      const fromPublic = publicTable(match[1], match[2]) !== null;
+      const fromPublic = schema === null || schema === "public";
       const toPublic = identName(match[3]) === "public";
       if (fromPublic !== toPublic) {
-        events.push({ kind: toPublic ? "move-in" : "drop", table: name, index: match.index });
+        events.push({
+          kind: toPublic ? "move-in" : "move-out",
+          table: name,
+          schema,
+          index: match.index,
+        });
       }
     }
     for (const match of executed.matchAll(DROP_RE)) {
       if (quoted[match.index]) continue;
       for (const target of splitTargets(match[1])) {
         const name = DROP_TARGET_RE.exec(target);
-        const table = name && publicTable(name[1], name[2]);
-        if (table) events.push({ kind: "drop", table, index: match.index });
+        if (!name) continue;
+        const schema = schemaName(name[1]);
+        if (!inTrackedSchema(schema)) continue;
+        events.push({ kind: "drop", table: identName(name[2]), schema, index: match.index });
       }
     }
     for (const match of executed.matchAll(ACL_RE)) {
@@ -684,12 +753,28 @@ export function findTablesWithoutExplicitAcl(migrations) {
       if (isRevoke ? !REVOKE_ALL_RE.test(match[2]) : columnLevelOnly(match[2])) continue;
       for (const target of splitTargets(match[3])) {
         const name = TARGET_RE.exec(target);
-        const table = name && publicTable(name[1], name[2]);
-        if (table) events.push({ kind: "acl", table, index: match.index });
+        if (!name) continue;
+        const schema = schemaName(name[1]);
+        if (!inTrackedSchema(schema)) continue;
+        events.push({ kind: "acl", table: identName(name[2]), schema, index: match.index });
       }
     }
     events.sort((a, b) => a.index - b.index);
     for (const event of events) {
+      if (event.kind === "temp-create") {
+        if (event.conditional && temps.has(event.table)) continue;
+        temps.add(event.table);
+        continue;
+      }
+      if (event.kind !== "create" && actsOnTemp(temps, event.schema, event.table)) {
+        if (event.kind === "drop") temps.delete(event.table);
+        else if (event.kind === "rename") {
+          if (temps.has(event.to) && event.to !== event.table) continue;
+          temps.delete(event.table);
+          temps.add(event.to);
+        }
+        continue;
+      }
       if (event.kind === "create") {
         // CREATE TABLE IF NOT EXISTS on a table that already exists is a no-op
         // and keeps that table's grants.
@@ -700,7 +785,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
         // PostgreSQL rejects it, or IF EXISTS with a missing source is a no-op.
         if (tables.has(event.table)) continue;
         tables.set(event.table, { migration: m.name, acl: false });
-      } else if (event.kind === "drop") {
+      } else if (event.kind === "drop" || event.kind === "move-out") {
         tables.delete(event.table);
       } else if (event.kind === "rename") {
         // A rename onto a still-tracked name does not run: PostgreSQL

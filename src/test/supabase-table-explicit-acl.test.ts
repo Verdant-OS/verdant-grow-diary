@@ -695,6 +695,85 @@ describe("supabase table explicit ACL rule", () => {
     expect(tables(CREATE, "DROP TABLE IF EXISTS public.leaky;")).toEqual([]);
   });
 
+  it("does not let a same-name temp table's unqualified drop clear a public table", () => {
+    expect(tables(`${CREATE}\nCREATE TEMP TABLE leaky (id int);\nDROP TABLE leaky;`)).toEqual([
+      "leaky",
+    ]);
+    expect(tables(`${CREATE}\nCREATE TEMPORARY TABLE leaky (id int);\nDROP TABLE leaky;`)).toEqual([
+      "leaky",
+    ]);
+    expect(tables(`${CREATE}\nCREATE LOCAL TEMP TABLE leaky (id int);\nDROP TABLE leaky;`)).toEqual(
+      ["leaky"],
+    );
+    expect(
+      tables(`${CREATE}\nCREATE GLOBAL TEMPORARY TABLE leaky (id int);\nDROP TABLE leaky;`),
+    ).toEqual(["leaky"]);
+    expect(tables(`${CREATE}\nSELECT 1 INTO TEMP TABLE leaky;\nDROP TABLE leaky;`)).toEqual([
+      "leaky",
+    ]);
+    expect(tables(`${CREATE}\nSELECT 1 INTO TEMPORARY leaky;\nDROP TABLE leaky;`)).toEqual([
+      "leaky",
+    ]);
+  });
+
+  it("does not credit an unqualified grant, revoke or rename while a temp of that name exists", () => {
+    expect(
+      tables(
+        `${CREATE}\nCREATE TEMP TABLE leaky (id int);\nGRANT SELECT ON leaky TO authenticated;`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(`${CREATE}\nCREATE TEMP TABLE leaky (id int);\nREVOKE ALL ON leaky FROM PUBLIC;`),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(`${CREATE}\nCREATE TEMP TABLE leaky (id int);\nALTER TABLE leaky RENAME TO other;`),
+    ).toEqual(["leaky"]);
+  });
+
+  it("still applies schema-qualified public statements while a temp of that name exists", () => {
+    expect(
+      tables(`${CREATE}\nCREATE TEMP TABLE leaky (id int);\nDROP TABLE public.leaky;`),
+    ).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nCREATE TEMP TABLE leaky (id int);\nGRANT SELECT ON public.leaky TO authenticated;`,
+      ),
+    ).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nCREATE TEMP TABLE leaky (id int);\nALTER TABLE public.leaky RENAME TO renamed;`,
+      ),
+    ).toEqual(["renamed"]);
+  });
+
+  it("ends the temp shadow on DROP of pg_temp.name so a later unqualified drop hits public", () => {
+    expect(
+      tables(
+        `${CREATE}\nGRANT SELECT ON public.leaky TO authenticated;\nCREATE TEMP TABLE leaky (id int);\nDROP TABLE pg_temp.leaky;\nDROP TABLE leaky;`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("ends the temp shadow on the first unqualified drop so a second unqualified drop hits public", () => {
+    expect(
+      tables(
+        `${CREATE}\nGRANT SELECT ON public.leaky TO authenticated;\nCREATE TEMP TABLE leaky (id int);\nDROP TABLE leaky;\nDROP TABLE leaky;`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps temp names across migrations so a later unqualified drop still shadows", () => {
+    expect(tables(`${CREATE}\nCREATE TEMP TABLE leaky (id int);`, "DROP TABLE leaky;")).toEqual([
+      "leaky",
+    ]);
+  });
+
+  it("does not let an unqualified SET SCHEMA clear a public table while a temp of that name exists", () => {
+    expect(
+      tables(`${CREATE}\nCREATE TEMP TABLE leaky (id int);\nALTER TABLE leaky SET SCHEMA private;`),
+    ).toEqual(["leaky"]);
+  });
+
   it("returns a stable, sorted result for the same input", () => {
     const sql = "CREATE TABLE public.zeta (id int);\nCREATE TABLE public.alpha (id int);";
     expect(tables(sql)).toEqual(["alpha", "zeta"]);

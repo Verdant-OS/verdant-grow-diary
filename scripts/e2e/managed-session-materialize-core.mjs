@@ -76,9 +76,11 @@ export function evaluatePublicDeploymentIdentity({ version, expectedSha, expecte
   return { ok: true };
 }
 
-const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9_-]+$/;
-const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_|live_)[A-Za-z0-9_-]+$/;
-const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9_-]+/;
+// Paddle client tokens: the prefix plus exactly 27 letters/digits.
+const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9]{27}$/;
+// A production client token must have Paddle's documented shape: `test_` or
+// `live_` plus exactly 27 letters/digits. A malformed value fails the gate.
+const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_|live_)[A-Za-z0-9]{27}$/;
 
 /**
  * Parse the single VITE_PAYMENTS_CLIENT_TOKEN assignment from dotenv text.
@@ -121,11 +123,15 @@ export function resolveCanonicalPaddleSandboxToken(envText) {
 }
 
 /**
- * Read the single production Paddle client token from dotenv text.
- * Standing production gate: accepts test_ or live_ so publishable builds pass
- * prebuild (Lovable injects live_ at publish; preview may stay test_ for test
- * cards). Fails closed only on missing, multiple, malformed, empty, or
- * non-Paddle values — never because the token is live_.
+ * Shape-only parser for the single Paddle client token in dotenv text.
+ * Accepts a well-formed test_ or live_ token (prefix + 27 letters/digits) and
+ * fails closed on missing, multiple, malformed, empty, or non-Paddle values.
+ * It does NOT decide what production may ship: the production prebuild gate
+ * (scripts/assert-paddle-production-sandbox.mjs) and the public-bundle
+ * attestation (evaluatePublicPaddleBundle) additionally refuse any token that
+ * is not live_. Callers that only report a token's class (for example the
+ * publish provenance report) use this parser; never treat its acceptance of
+ * test_ as permission for a sandbox production build.
  */
 export function resolveCanonicalPaddleProductionToken(envText) {
   const parsed = parseCanonicalPaddleClientTokenAssignment(envText);
@@ -319,20 +325,57 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
   }
 }
 
-/** Compare the bounded deployed entry bundle with the committed token class. */
+// Bundle scans match only Paddle's exact live client-token shape, and only as a
+// whole string literal: `live_` plus exactly 27 letters/digits, wrapped in one
+// matching `'`, `"` or backtick pair. Ordinary app identifiers that start with
+// `live_` (`live_confirmed`, snake_case names, shorter or longer runs) are not
+// tokens, and neither is a token-shaped identifier or property name
+// (`const ${token}=1`, `obj.${token}`, `$${token}`): Paddle is initialised with a
+// string, so only a string literal can be the deployed credential. Anything
+// inside the quotes besides the token (`"x-${token}"`, `"${token}b"`) makes it a
+// larger value.
+const PADDLE_LIVE_TOKEN_GLOBAL_PATTERN = /(["'`])(live_[A-Za-z0-9]{27})\1/g;
+// A sandbox client token as a whole string literal (same shape and quoting). A
+// production bundle must carry none: a live bundle with any sandbox token is mixed.
+const PADDLE_SANDBOX_TOKEN_STANDALONE_PATTERN = /(["'`])test_[A-Za-z0-9]{27}\1/;
+
+/**
+ * Compare the bounded deployed entry bundle with the committed production
+ * token. The bundle must carry exactly the committed token bytes:
+ * - committed `test_` token: refused (`public_paddle_canonical_not_live`);
+ *   production ships live checkout;
+ * - committed `live_` token: any standalone `test_` token or any OTHER `live_`
+ *   token in the bundle fails, and the committed token must appear as a
+ *   standalone value.
+ * Fixed reason codes only; token bytes never leave this function.
+ */
 export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
   if (
     typeof canonicalToken !== "string" ||
-    !PADDLE_SANDBOX_TOKEN_PATTERN.test(canonicalToken) ||
+    !PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN.test(canonicalToken) ||
     typeof bundle !== "string"
   ) {
     return { ok: false, reason: "public_paddle_contract_invalid" };
   }
-  if (PADDLE_LIVE_TOKEN_PATTERN.test(bundle)) {
-    return { ok: false, reason: "public_paddle_live_token_present" };
+  // Production ships live checkout: a sandbox canonical token is refused, so
+  // the smoke cannot pass a production that reopened sandbox checkout.
+  if (!canonicalToken.startsWith("live_")) {
+    return { ok: false, reason: "public_paddle_canonical_not_live" };
   }
-  if (!bundle.includes(canonicalToken)) {
-    return { ok: false, reason: "public_paddle_sandbox_token_missing" };
+  if (PADDLE_SANDBOX_TOKEN_STANDALONE_PATTERN.test(bundle)) {
+    return { ok: false, reason: "public_paddle_sandbox_token_present" };
+  }
+  let foundCanonical = false;
+  for (const match of bundle.matchAll(PADDLE_LIVE_TOKEN_GLOBAL_PATTERN)) {
+    if (match[2] !== canonicalToken) {
+      return { ok: false, reason: "public_paddle_live_token_mismatch" };
+    }
+    foundCanonical = true;
+  }
+  // Presence comes from the same string-literal scan, never a substring check:
+  // `"${canonicalToken}b"` is a malformed 28-character value, not the token.
+  if (!foundCanonical) {
+    return { ok: false, reason: "public_paddle_live_token_missing" };
   }
   return { ok: true };
 }

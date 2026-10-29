@@ -6,10 +6,11 @@ import {
   LEGACY_DEFAULT_PRIVILEGE_TABLES,
 } from "../../scripts/lib/supabaseTableAclRules.mjs";
 
-// From 2026-10-30 Supabase stops granting new public tables to
-// anon/authenticated/service_role by default. supabase/seed.sql grants every
-// table on local replay, so only this static rule sees a migration that
-// forgets its GRANT before it reaches the hosted project.
+// @source-scan-justified: From 2026-10-30 Supabase stops granting new public
+// tables to anon/authenticated/service_role by default. supabase/seed.sql
+// grants every table on local and CI replay, so only this static scan of
+// migration SQL sees a CREATE that forgets its GRANT before it reaches the
+// hosted project.
 
 const MIGRATIONS_DIR = resolve(__dirname, "../../supabase/migrations");
 

@@ -81,8 +81,11 @@ own two files were made under unlocks Matthew approved on 2026-10-28 and 2026-10
 - Whether the platform change also revokes the built-in `PUBLIC` `EXECUTE` on new functions:
   `uncertainty`. All called RPCs grant explicitly, so the answer changes nothing today.
 - Function, sequence, view and materialized-view grants for future migrations are not enforced by
-  a check yet. Only `CREATE [UNLOGGED] TABLE` is tracked, so a new `CREATE VIEW public.v ...` with
-  no GRANT passes the rule. The same pattern applies when a new client-called RPC, client-inserted
-  serial column or client-read view appears.
+  a check yet. Persistent table-producing forms are tracked: `CREATE [UNLOGGED] TABLE`,
+  `CREATE TABLE ... AS`, and `SELECT ... INTO` at the top level or as a whole top-level `EXECUTE`
+  string. The rule reports unreadable `CREATE TABLE` targets and unreadable `EXECUTE`s of
+  `CREATE TABLE`. A new `CREATE VIEW public.v ...` with no GRANT still passes the rule. The same
+  pattern applies when a new client-called RPC, client-inserted serial column or client-read view
+  appears.
 - The 22 legacy tables still depend on default privileges in any fresh schema without `seed.sql`.
   Giving them explicit grants is a separate, additive migration and needs Matthew's decision.

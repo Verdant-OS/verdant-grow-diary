@@ -79,7 +79,7 @@ branch: claude/guide-autopot-stash-nutrients-feed-log
 base: verdant-grow-diary
 checkout: git fetch origin claude/guide-autopot-stash-nutrients-feed-log verdant-grow-diary && git switch claude/guide-autopot-stash-nutrients-feed-log && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/guide-autopot-stash-nutrients-feed-log
-head_sha: read the current head from the PR (first push follows this line)
+head_sha: a16b48f80da98f5450a93291bf4c880355cfe79b before the manifest sort-order fix; read the current head from the PR
 state: pushed, draft PR
 current_step: draft; awaiting founder decision on the /guides index card, then CI and an independent exact-head review
 next_action: founder decides whether to unlock src/test/verdant-seo-guides-public-links.test.tsx for the GuidesIndex card; then independent exact-head review (author: this Claude session; exclude it)

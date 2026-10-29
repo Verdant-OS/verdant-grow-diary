@@ -1237,14 +1237,17 @@ function QuickLogV2SheetForOwner({
       observationDraftResetPendingRef.current = false;
       return;
     }
+    // Feed shows and submits feedingForm.note, so while Feed is active that is
+    // the note the grower sees; persist it, not the hidden form.note.
+    const draftForm = form.action === "feed" ? { ...form, note: feedingForm.note } : form;
     if (observationDraftSuppressedRef.current) {
-      if (open && isQuickLogObservationDraftEmpty(form)) {
+      if (open && isQuickLogObservationDraftEmpty(draftForm)) {
         observationDraftSuppressedRef.current = false;
       }
       return;
     }
     if (!open || postSave) return;
-    if (isQuickLogObservationDraftEmpty(form)) {
+    if (isQuickLogObservationDraftEmpty(draftForm)) {
       if (observationDraftOwnedRef.current) {
         clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
         observationDraftOwnedRef.current = false;
@@ -1253,7 +1256,7 @@ function QuickLogV2SheetForOwner({
     }
     observationDraftOwnedRef.current = true;
     writeBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
-      form,
+      form: draftForm,
       saveFailed: observationUnconfirmedRef.current,
       idempotencyKey: observationUnconfirmedRef.current ? saveIdempotencyKeyRef.current : null,
       tempEntryUnit: manualTempEntryUnitRef.current,
@@ -1261,7 +1264,7 @@ function QuickLogV2SheetForOwner({
     });
     // localError is a trigger, not an input: when only the error flips, this
     // re-persists the ref-held saveFailed flag even though the form is unchanged.
-  }, [user?.id, open, form, postSave, localError]);
+  }, [user?.id, open, form, feedingForm.note, postSave, localError]);
 
   // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
   // Only when selectedKey is still empty/unset — never rewrite an explicit

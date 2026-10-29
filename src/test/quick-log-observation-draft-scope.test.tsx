@@ -249,6 +249,38 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     expect(writeFeedingMock.mock.calls[0][0].note).toBe("Runoff looked cloudy");
   });
 
+  it("restores the Feed note as last edited, not the note typed before Feed (Codex review)", async () => {
+    renderSheet("plant:plant-1");
+    fireEvent.change(await screen.findByTestId("qlv2-note"), {
+      target: { value: "Runoff looked cloudy" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    fireEvent.change(screen.getByLabelText("Feeding note (optional)"), {
+      target: { value: "Runoff ran clear after the second flush" },
+    });
+    await waitFor(() => expect(storedDraftText()).toContain("second flush"));
+    cleanup();
+    renderSheet("plant:plant-1");
+    expect(await screen.findByLabelText("Feeding note (optional)")).toHaveValue(
+      "Runoff ran clear after the second flush",
+    );
+  });
+
+  it("forgets a Feed note the grower cleared before closing (Codex review)", async () => {
+    renderSheet("plant:plant-1");
+    fireEvent.change(await screen.findByTestId("qlv2-note"), {
+      target: { value: "Runoff looked cloudy" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    await waitFor(() => expect(storedDraftText()).toContain("Runoff looked cloudy"));
+    fireEvent.change(screen.getByLabelText("Feeding note (optional)"), { target: { value: "" } });
+    await waitFor(() => expect(storedDraftText()).not.toContain("Runoff looked cloudy"));
+    cleanup();
+    renderSheet("plant:plant-1");
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("");
+    expect(screen.queryByTestId("qlv2-draft-restored")).toBeNull();
+  });
+
   it("keeps a restored temperature in the unit it was typed in (Codex review)", async () => {
     unitState.unit = "celsius";
     renderSheet("plant:plant-1");

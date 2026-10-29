@@ -48,7 +48,7 @@ export interface AlertWhyStageContext {
 
 export interface AlertWhyUnavailable {
   kind: "unavailable";
-  text: "Target context unavailable for this alert.";
+  text: "Target range not recorded for this alert.";
 }
 
 export interface AlertWhyContextOnly {
@@ -74,7 +74,7 @@ export type AlertWhyContext =
 
 const UNAVAILABLE: AlertWhyUnavailable = {
   kind: "unavailable",
-  text: "Target context unavailable for this alert.",
+  text: "Target range not recorded for this alert.",
 };
 
 const STAGE_DISPLAY: Record<EnvStage, string> = {

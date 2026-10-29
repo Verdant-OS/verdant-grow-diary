@@ -45,16 +45,26 @@ describe("PaymentTestModeBanner", () => {
     expect(banner).toHaveTextContent("Sandbox test checkout is currently unavailable.");
   });
 
-  it("fails a live presenter state closed instead of announcing live payments", () => {
+  it("renders nothing for a resolved live environment (resolved only on a production host)", () => {
     paddleState.environment = "live";
-    paddleState.unavailableMessage =
-      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
+    paddleState.unavailableMessage = null;
+
+    const { container } = render(createElement(PaymentTestModeBanner));
+
+    expect(screen.queryByText(/Live payments enabled/i)).toBeNull();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("announces the off-host block for a live token outside the production hosts", () => {
+    // A live token on any non-production host resolves "unavailable".
+    paddleState.environment = "unavailable";
+    paddleState.unavailableMessage = "Live checkout is only available on verdantgrowdiary.com.";
 
     render(createElement(PaymentTestModeBanner));
 
-    expect(screen.queryByText(/Live payments enabled/i)).toBeNull();
     const banner = screen.getByRole("complementary", { name: "Payment availability" });
     expect(banner).toHaveAttribute("data-payment-env", "unavailable");
-    expect(banner).toHaveTextContent("sandbox testing only");
+    expect(banner).toHaveTextContent("only available on verdantgrowdiary.com");
   });
 });

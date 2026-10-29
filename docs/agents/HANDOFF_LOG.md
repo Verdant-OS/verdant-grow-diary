@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-301-OVERVIEW-JUMP
+
+```text
+TASK VER-301-OVERVIEW-JUMP  priority: P2  status: OPEN
+goal: clicking Jump to Overview section places the beginning of Overview below the sticky header, including on a tall plant page.
+why: Blue Dream QA reproduced an approximately 2000px overshoot on two plants at bbc77ae23164847772de6b53ecf18d7735932342 on 2026-10-28; merged offset PR #2544 did not address whole-region centering.
+branch: codex/ver-301-overview-jump
+base: verdant-grow-diary; inspected base 9b60f907e8e13b7dc6501b2406b96ab922530241
+checkout: fetch this branch and verdant-grow-diary; compare the fetched full head with the draft PR's current head and its resume receipt before selecting an unoccupied checkout; normal pushes only.
+pr: draft PR from codex/ver-301-overview-jump; URL and full head recorded in its description after creation
+head_sha: local pre-push handoff; resolve the draft PR's full remote head and compare origin/codex/ver-301-overview-jump before resuming; no hosted CI or review claim
+state: implemented; local regression/typecheck/build validation passed; draft publication authorized
+current_step: publish the requested draft and record full-head validation receipts in its description; keep draft
+next_action: on a browser-equipped runner at the verified PR head, run the six credential-free desktop/mobile cases with E2E_BASE_URL=http://127.0.0.1:8080 node node_modules/playwright/cli.js test e2e/plant-overview-jump.spec.ts --project=chromium-mocked --workers=1
+post_merge_check: only after separately authorized merge/Publish, verify production /version.json and retest the VER-301 disposable fixture plants at desktop 1280x800 and mobile 390x844; repeat fresh loads, Overview and other section links; record heading bounds, focus and console errors. NOT_MEASURED.
+active_writer: Codex Work Mode session for VER-301, assigned by the user on 2026-10-29; does not claim Claude's #2285 or Cursor's #2380 branches
+decisions: nav passes block:start only for Overview through the existing coordinator/fallback; other links retain block:center. Keep scroll-mt-16, disclosure timing, hash follow and user-cancellation behavior. Tall-region centering explains the reported scale without requiring async growth; production geometry is not measured.
+tried_and_rejected: larger header offsets, timers, new observers and global top alignment are not justified. Chromium download returned a Site Unavailable HTML page; the cloud browser cannot reach the loopback fixture. Do not treat missing-browser launch failure as product evidence.
+commands: node node_modules/vitest/vitest.mjs run src/test/plant-detail-overview-jump.test.tsx src/test/plant-detail-section-nav.test.tsx src/test/plant-detail-disclosure-navigation.test.tsx src/test/plant-detail-disclosure-rules.test.ts src/test/plant-detail-disclosure-section.test.tsx src/test/plant-detail-hash-scroll-offset.test.tsx src/test/plant-detail-hash-scroll-follow.test.tsx src/test/plant-detail-hash-follow-pointer-cancel.test.tsx src/test/plant-detail-hash-follow-user-interaction-cancel.test.tsx src/test/v0-operating-loop-contract.test.ts --reporter=dot (104 tests/10 files PASS); node --max-old-space-size=8192 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit (PASS); node node_modules/vite/bin/vite.js build (PASS, direct build only); changed-file ESLint (PASS); node scripts/scorer-lock.mjs --report --strict (PASS).
+files_touched: src/components/PlantDetailSectionNav.tsx; src/hooks/usePlantDetailDisclosureNavigation.ts; new src/test/plant-detail-overview-jump.test.tsx; new e2e/fixtures/plant-overview-jump.tsx; new e2e/plant-overview-jump.spec.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned
+blockers: native browser execution needs an available Chromium binary; current production UI is signed out, so authenticated QA reproduction is NOT_MEASURED; 35/35 required hosted checks and eligible independent exact-head review remain required; merge and Publish remain owner-controlled and unauthorized
+open_questions: confirm actual heading bounds on the latest production build with the disposable QA session; no live fixed-behavior claim before release
+gotchas: #2285 (Claude head 4f079010195e52c8274680521188bcb66d1a9b93) addresses hash landing only; #2380 (Cursor head 61571d8dc65c3d032014e74dd299fbcc349c0a69) targets that branch. The hook combines cleanly in a local three-way merge; combined regression run 23 tests/6 files PASS, including their hash/start and default/center contracts. Revalidate whichever head changes; no branch transfer or acceptance implied. Existing scorer files and CI definitions untouched.
+links: https://linear.app/verdantgrowdiary/issue/VER-301/plant-detail-jump-to-overview-section-scrolls-far-past-overview; https://github.com/Verdant-OS/verdant-grow-diary/pull/2544; https://github.com/Verdant-OS/verdant-grow-diary/pull/2285; https://github.com/Verdant-OS/verdant-grow-diary/pull/2380
+artifacts: new tests and draft PR description; red receipt on base was 3 failures/4 passes in the new regression file, then 7/7 passed after the fix; production version observation at 2026-10-29 05:52 UTC reported 9b60f907e8e13b7dc6501b2406b96ab922530241
+reviewer_seat: UNASSIGNED / BLOCKED; an actually available non-contributing Claude, Grok or other eligible session must review the complete exact head; this Codex author is excluded
+reviewer_sha: none
+session_state: no external review request, PR/Linear comment, merge, Publish or production write submitted; receipt is in the draft body, subject to the owner's comment gate
+claimed_by: Codex, 2026-10-29 00:56 CT, explicit user assignment
+owner: Codex Work Mode VER-301 writer; founder controls merge/Publish
+last_updated: 2026-10-29 00:56 CT, by Codex
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

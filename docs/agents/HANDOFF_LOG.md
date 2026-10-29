@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GUIDES-MALE-TC-SAB-CLIMATE-2026-10-28
+
+```text
+TASK GUIDES-MALE-TC-SAB-CLIMATE-2026-10-28  priority: P3  status: OPEN
+goal: four indexable public article guides at /guides/isolate-male-cannabis-plant, /guides/cannabis-tissue-culture, /guides/still-air-box-vs-flow-hood and /guides/steady-climate-multiple-grow-tents.
+why: four-guides brief 2026-10-28; the QA'd source HTML was never uploaded, so Matthew chose "Four guide pages, from scratch" on 2026-10-29. Copy is new and source-cited, not the QA'd copy.
+branch: claude/guides-male-tc-sab-climate-2026-10-28
+base: verdant-grow-diary
+checkout: git fetch origin claude/guides-male-tc-sab-climate-2026-10-28 verdant-grow-diary && git switch claude/guides-male-tc-sab-climate-2026-10-28 && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: read the head from the PR
+state: draft; awaiting CI and an independent exact-head review
+current_step: content in src/lib/publicGrowGuideArticles.ts, one presenter src/pages/PublicGrowGuideArticle.tsx, four thin route files, registration in manifest, GuidesIndex, staticPublicSeoDocuments, sitemap, matrix, smoke list, e2e list and the three unlocked tests (additions only)
+next_action: confirm required checks; route to an eligible reviewer who did not author this PR; after #2592, #2593 and #2594 land, merge the base and union-resolve the shared registration files
+post_merge_check: after Publish, each of the four URLs returns 200 with index, follow, a self canonical and three signup CTAs. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+decisions: custom routes, not VERDANT_SEO_GUIDES entries, because verdant-seo-guides.test.ts pins the template slug list and is outside the standing unlock; no WebApplication JSON-LD because these pages have no tool; no analytics events; climate page cites no external source (its claims are operational practice, linked to /vpd-chart and sensor-truth)
+tried_and_rejected: template-guide entries (would need an unapproved locked-test edit)
+commands: bunx vitest run src/test/public-grow-guide-articles.test.tsx src/test/route-indexation-matrix.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx
+files_touched: src/lib/publicGrowGuideArticles.ts (new); src/pages/PublicGrowGuideArticle.tsx (new); src/routes/guides.{isolate-male-cannabis-plant,cannabis-tissue-culture,still-air-box-vs-flow-hood,steady-climate-multiple-grow-tents}.tsx (new); src/routeTree.gen.ts (generated); src/lib/appRouteManifest.ts; src/pages/GuidesIndex.tsx; src/lib/build/staticPublicSeoDocuments.ts; public/sitemap.xml; docs/seo/route-indexation-matrix.md; scripts/seo-runtime-smoke.mjs; e2e/auth-route-protection-mobile.spec.ts; src/test/{static-public-seo-documents,verdant-seo-guides-public-links,verdant-seo-sitemap-robots}.test.*; src/test/public-grow-guide-articles.test.tsx (new)
+files_remaining: none
+blockers: none for repository work; content accuracy needs a human read; Publish is Matthew's
+open_questions: whether Matthew wants the QA'd copy swapped in later if the source HTML turns up
+gotchas: bun run build refuses a dirty tree (stamp_dirty); bunx vite build regenerates routeTree.gen.ts. RED without registration: 12 failed / 19 passed in public-grow-guide-articles.test.tsx
+links: none
+artifacts: PR checks
+reviewer_seat: not assigned (excluded: session_017UoYKuwk7Z3wSC7syg3jnF as author)
+reviewer_sha: none
+session_state: no paused workflows
+claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-29
+owner: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+last_updated: 2026-10-29 15:30 UTC, by Claude session_017UoYKuwk7Z3wSC7syg3jnF
+```
+
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
 
 ```text

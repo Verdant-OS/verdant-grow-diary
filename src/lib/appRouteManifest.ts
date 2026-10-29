@@ -232,9 +232,29 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public planned-vs-actual Athena feed log. In-memory only.",
   },
   {
+    path: "/guides/cannabis-tissue-culture",
+    access: "public",
+    description: "Cannabis tissue culture stages, common failures and what to record. Public article; stores nothing.",
+  },
+  {
     path: "/guides/grow-stage-care-guide",
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",
+  },
+  {
+    path: "/guides/isolate-male-cannabis-plant",
+    access: "public",
+    description: "Identify and isolate a male cannabis plant before pollen spreads. Public article; stores nothing.",
+  },
+  {
+    path: "/guides/steady-climate-multiple-grow-tents",
+    access: "public",
+    description: "Keep a steady climate across multiple grow tents in one room. Public article; stores nothing.",
+  },
+  {
+    path: "/guides/still-air-box-vs-flow-hood",
+    access: "public",
+    description: "Still air box vs laminar flow hood for clean tissue-culture work. Public article; stores nothing.",
   },
   { path: "/hardware-integrations", access: "public" },
   { path: "/health", access: "auth", description: "Authenticated app health page." },

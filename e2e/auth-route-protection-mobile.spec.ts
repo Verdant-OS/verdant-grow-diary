@@ -98,6 +98,10 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/guides/:slug",
   "/guides/grow-stage-care-guide",
   "/guides/athena-feed-chart-log",
+  "/guides/isolate-male-cannabis-plant",
+  "/guides/cannabis-tissue-culture",
+  "/guides/still-air-box-vs-flow-hood",
+  "/guides/steady-climate-multiple-grow-tents",
   // Exact ID-free Customer Mode guide: static/noindex and must make no
   // private-table requests. Dynamic /customer/:shareId remains retired.
   "/customer/guide/oreoz-vs-gelonade-comparison",

@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { usePlants } from "@/hooks/use-plants";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import { useAuth } from "@/store/auth";
 import {
   bindHarvestCheckHandoffPlant,
   buildHarvestHandoffNote,
   clearHarvestCheckHandoff,
+  clearHarvestCheckHandoffIfOwned,
   harvestHandoffCountBucket,
   harvestHandoffIdempotencyKey,
   harvestHandoffOccurredAt,
@@ -43,6 +45,21 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
   const [error, setError] = useState("");
   // Bound before the first save: retries, lost responses and reloads stay on this plant.
   const [boundPlantId, setBoundPlantId] = useState(handoff.plantId ?? null);
+  // An import belongs to this mounted prompt and this signed-in account. Leaving the
+  // shell or switching accounts makes it stale: it schedules no further saves and
+  // never clears or rebinds storage, which may by then hold a newer handoff.
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const operation = useRef(0);
+  useEffect(() => {
+    operation.current += 1;
+  }, [userId]);
+  useEffect(() => {
+    const current = operation;
+    return () => {
+      current.current += 1;
+    };
+  }, []);
   const count = handoff.checks.length;
   const noun = count === 1 ? "harvest check" : "harvest checks";
   const list = plants.data ?? [];
@@ -70,6 +87,8 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
 
   async function importChecks() {
     if (!selected || busy) return;
+    const owner = operation.current;
+    const stale = () => owner !== operation.current;
     setBusy(true);
     setError("");
     if (!boundPlantId) {
@@ -82,6 +101,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
     }
     let saved = 0;
     for (const [index, check] of handoff.checks.entries()) {
+      if (stale()) return;
       const result = await save({
         p_target_type: "plant",
         p_target_id: selected.id,
@@ -94,6 +114,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
         p_occurred_at: harvestHandoffOccurredAt(check.date, new Date(handoff.createdAt)),
         p_idempotency_key: harvestHandoffIdempotencyKey(handoff, selected.id, index),
       });
+      if (stale()) return;
       if (!result.ok) break;
       saved += 1;
     }
@@ -111,7 +132,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
       );
       return;
     }
-    clearHarvestCheckHandoff();
+    clearHarvestCheckHandoffIfOwned(handoff);
     trackHarvestTrackerEvent("harvest_tracker_handoff_imported", {
       count_bucket: harvestHandoffCountBucket(count),
     });

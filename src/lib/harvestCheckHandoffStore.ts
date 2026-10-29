@@ -64,6 +64,23 @@ function resolveStorage(storage?: HarvestHandoffStorage | null): HarvestHandoffS
   return storage === undefined ? sessionStore() : storage;
 }
 
+/** Size in UTF-8 bytes, the unit the caps are stated in; `length` counts UTF-16 code units. */
+export function harvestHandoffByteLength(raw: string): number {
+  return new TextEncoder().encode(raw).length;
+}
+
+/** The `createdAt` of the handoff stored now, or null when none (or an unreadable one) is stored. */
+function storedHandoffCreatedAt(store: HarvestHandoffStorage): string | null {
+  try {
+    const raw = store.getItem(HARVEST_HANDOFF_STORAGE_KEY);
+    if (raw === null) return null;
+    const value: unknown = JSON.parse(raw);
+    return object(value) && typeof value.createdAt === "string" ? value.createdAt : null;
+  } catch {
+    return null;
+  }
+}
+
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -191,7 +208,7 @@ export function saveHarvestCheckHandoff(
   const raw = JSON.stringify(handoff);
   if (
     !parseHarvestCheckHandoff(handoff, now) ||
-    raw.length > HARVEST_HANDOFF_MAX_BYTES - HARVEST_HANDOFF_BIND_RESERVE_BYTES
+    harvestHandoffByteLength(raw) > HARVEST_HANDOFF_MAX_BYTES - HARVEST_HANDOFF_BIND_RESERVE_BYTES
   ) {
     // A refused log must not leave an older handoff behind to be imported instead.
     clearHarvestCheckHandoff(store);
@@ -211,7 +228,8 @@ export function saveHarvestCheckHandoff(
  * Record the plant an import targets before its first save. Retries, a lost
  * response or a reload then stay on that plant, so the idempotency keys replay
  * instead of copying checks onto another plant. `null` removes the binding.
- * Returns false, leaving the stored value as it was, if it cannot be stored.
+ * Returns false, leaving the stored value as it was, if it cannot be stored or
+ * if a different (newer) handoff now occupies the key.
  */
 export function bindHarvestCheckHandoffPlant(
   handoff: HarvestCheckHandoff,
@@ -220,9 +238,11 @@ export function bindHarvestCheckHandoffPlant(
 ): boolean {
   const store = resolveStorage(storage);
   if (!store) return false;
+  const current = storedHandoffCreatedAt(store);
+  if (current !== null && current !== handoff.createdAt) return false;
   const { plantId: _previous, ...unbound } = handoff;
   const raw = JSON.stringify(plantId ? { ...unbound, plantId } : unbound);
-  if (raw.length > HARVEST_HANDOFF_MAX_BYTES) return false;
+  if (harvestHandoffByteLength(raw) > HARVEST_HANDOFF_MAX_BYTES) return false;
   try {
     store.setItem(HARVEST_HANDOFF_STORAGE_KEY, raw);
     return store.getItem(HARVEST_HANDOFF_STORAGE_KEY) === raw;
@@ -246,7 +266,7 @@ export function readHarvestCheckHandoff(
   }
   if (raw === null) return null;
   let parsed: HarvestCheckHandoff | null = null;
-  if (raw.length <= HARVEST_HANDOFF_MAX_BYTES) {
+  if (harvestHandoffByteLength(raw) <= HARVEST_HANDOFF_MAX_BYTES) {
     try {
       parsed = parseHarvestCheckHandoff(JSON.parse(raw), now);
     } catch {
@@ -265,6 +285,20 @@ export function clearHarvestCheckHandoff(storage?: HarvestHandoffStorage | null)
   } catch {
     // Storage can be unavailable; nothing else depends on this key.
   }
+}
+
+/**
+ * Remove the stored handoff only if it is still `handoff` (same `createdAt`).
+ * A newer handoff saved while an import was running is left in place.
+ */
+export function clearHarvestCheckHandoffIfOwned(
+  handoff: HarvestCheckHandoff,
+  storage?: HarvestHandoffStorage | null,
+): void {
+  const store = resolveStorage(storage);
+  if (!store) return;
+  if (storedHandoffCreatedAt(store) !== handoff.createdAt) return;
+  clearHarvestCheckHandoff(store);
 }
 
 /** The signup link that brings the grower back to the import prompt. */

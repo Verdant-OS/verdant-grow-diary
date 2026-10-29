@@ -21,6 +21,7 @@ import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLo
 import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import SimpleHomeSetupCard from "@/components/SimpleHomeSetupCard";
+import SimpleHomeGuidance from "@/components/SimpleHomeGuidance";
 import UiViewSwitch from "@/components/UiViewSwitch";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -29,6 +30,8 @@ import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useUiViewPreference } from "@/hooks/useUiViewPreference";
+import { useGuidance } from "@/hooks/useGuidance";
+import { buildWhatNextSteps, selectGuidanceCardStep } from "@/lib/simpleHomeGuidanceRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { renameGrow } from "@/lib/growRenameService";
 import { buildSimpleHomeSetupProgress } from "@/lib/simpleHomeSetupRules";
@@ -106,6 +109,29 @@ export default function SimpleHome() {
     setLaunchTargetKey(targetKey);
     setSheetOpen(true);
   }, []);
+
+  // Tips: a separate account preference from the view. Steps come only from
+  // reads that succeeded; the clock is fixed for this visit.
+  const guidance = useGuidance(user);
+  const [visitNow] = useState(() => new Date());
+  const guidanceSteps =
+    state.kind === "ready"
+      ? buildWhatNextSteps({
+          growId: state.growId,
+          plants: state.plants,
+          observationTimes:
+            recent.status === "ok"
+              ? recent.items.filter((item) => item.kind === "diary").map((item) => item.ts)
+              : null,
+          now: visitNow,
+        })
+      : [];
+  const guidanceCardStep = selectGuidanceCardStep({
+    steps: guidanceSteps,
+    state: guidance.state,
+    status: guidance.status,
+    now: visitNow,
+  });
 
   return (
     <div data-testid="simple-home" data-simple-home-state={state.kind}>
@@ -221,6 +247,18 @@ export default function SimpleHome() {
               {SIMPLE_HOME_COPY.addObservationHelp}
             </p>
           </section>
+
+          <SimpleHomeGuidance
+            steps={guidanceSteps}
+            cardStep={guidanceCardStep}
+            cardDismissCount={
+              guidanceCardStep
+                ? (guidance.state.notices[guidanceCardStep.id]?.dismissCount ?? 0)
+                : 0
+            }
+            onAct={guidance.act}
+            onQuickLog={() => openQuickLog(null)}
+          />
 
           <section aria-labelledby="simple-home-plants-heading">
             <h2

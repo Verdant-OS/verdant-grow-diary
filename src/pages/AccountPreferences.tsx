@@ -24,10 +24,13 @@ import { CheckCircle2, AlertTriangle } from "lucide-react";
 import UiViewSwitch from "@/components/UiViewSwitch";
 import { useUiViewPreference } from "@/hooks/useUiViewPreference";
 import { UI_VIEW_COPY } from "@/lib/uiViewPreferenceRules";
+import { useGuidance } from "@/hooks/useGuidance";
+import { GUIDANCE_COPY } from "@/lib/simpleHomeGuidanceRules";
 
 export default function AccountPreferences() {
   const { user } = useAuth();
   const viewPreference = useUiViewPreference(user);
+  const guidance = useGuidance(user);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [optIn, setOptIn] = useState(false);
@@ -194,6 +197,78 @@ export default function AccountPreferences() {
                 accountUnavailable={viewPreference.status === "unavailable"}
               />
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="glass rounded-2xl border-0 shadow-none" data-testid="tips-card">
+          <CardHeader className="p-5 pb-0">
+            <CardTitle className="font-display font-semibold text-base">
+              {GUIDANCE_COPY.tipsSettingTitle}
+            </CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              {GUIDANCE_COPY.tipsSettingDescription}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5 space-y-3">
+            {guidance.status === "loading" ? (
+              <Skeleton className="h-8 w-full" />
+            ) : guidance.status === "unavailable" ? (
+              <div role="alert" className="text-sm">
+                <p className="text-muted-foreground">{GUIDANCE_COPY.accountUnavailable}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 min-h-11"
+                  onClick={() => void guidance.retryRead()}
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-4">
+                  <label htmlFor="tips-switch" className="text-sm font-medium">
+                    {GUIDANCE_COPY.tipsSettingLabel}
+                  </label>
+                  <Switch
+                    id="tips-switch"
+                    checked={guidance.state.tips === "on"}
+                    onCheckedChange={(checked) => void guidance.setTips(checked ? "on" : "off")}
+                    disabled={guidance.save.kind === "saving"}
+                    data-testid="tips-switch"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-11"
+                  disabled={
+                    guidance.save.kind === "saving" ||
+                    Object.keys(guidance.state.notices).length === 0
+                  }
+                  onClick={() => void guidance.restoreAll()}
+                  data-testid="tips-restore"
+                >
+                  {GUIDANCE_COPY.restoreHidden}
+                </Button>
+              </>
+            )}
+            <p
+              role="status"
+              aria-live="polite"
+              className="text-xs text-muted-foreground"
+              data-testid="tips-save-status"
+            >
+              {guidance.save.kind === "saving"
+                ? GUIDANCE_COPY.saving
+                : guidance.save.kind === "saved"
+                  ? GUIDANCE_COPY.saved
+                  : guidance.save.kind === "failed"
+                    ? GUIDANCE_COPY.writeFailed
+                    : null}
+            </p>
           </CardContent>
         </Card>
 

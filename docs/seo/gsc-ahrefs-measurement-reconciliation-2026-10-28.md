@@ -28,12 +28,13 @@ code, no SEO markup, no GA4/GSC setting and no Ahrefs project setting.
 
 ## What this changes in the review's priorities
 
-1. **Find out why October is missing before reading any trend.** Every October conclusion
-   drawn from Ahrefs' GSC view is about September data. Why the rows stop at 2026-10-01 is
-   `NOT_MEASURED`; a stalled sync is the likely cause (`inference`), not a confirmed one. The
-   owner checks the Search Console connection in Ahrefs project `10225273`, re-syncs it if it
-   has stalled, and names the linked property. Until then, GSC impressions and clicks in any
-   weekly scorecard are `NOT_MEASURED` for October, not zero.
+1. **Find out why October is missing before reading any trend.** Ahrefs' GSC view holds one
+   October day: 2026-10-01 (2 impressions, 0 clicks). 2026-10-02 → 2026-10-28 is
+   `NOT_MEASURED`, so any October total or trend from this source is too. Why the rows stop
+   is also `NOT_MEASURED`; a stalled sync is the likely cause (`inference`), not a confirmed
+   one. The owner checks the Search Console connection in Ahrefs project `10225273`, re-syncs
+   it if it has stalled, and names the linked property. Until then, a weekly scorecard reports
+   October 2 onward as `NOT_MEASURED`, not zero.
 2. **Use `10225273` as the Ahrefs project of record** for this connector, unless the owner
    says `10204962` should be. Record the choice once; never mix their audits.
 3. **The comparison page carries most of the attributable impressions** (25 of 36; the home

@@ -8,6 +8,11 @@
  * failed read keeps the device cache and says the account was unreachable.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
@@ -75,7 +80,7 @@ function accountAnswer(view: string | null) {
 
 beforeEach(() => {
   resetUiViewPreferenceStoreForTest();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   auth.user = { id: USER, user_metadata: {} };
   auth.getUser.mockReset();
   auth.updateUser.mockReset();
@@ -130,7 +135,7 @@ describe("Home view routing", () => {
     await waitFor(() => expect(auth.updateUser).toHaveBeenCalledTimes(1));
     expect(auth.updateUser.mock.calls[0][0]).toMatchObject({ data: { [META_KEY]: "simple" } });
     expect(await screen.findByTestId("simple-home-stub")).toBeInTheDocument();
-    expect(window.localStorage.getItem(`verdant:uiView:${USER}`)).toBe("simple");
+    expect(getLocalStorageItemForTest(`verdant:uiView:${USER}`)).toBe("simple");
   });
 
   it("a failed write keeps the chosen view for this session and reports it, never a silent reset", async () => {
@@ -144,11 +149,11 @@ describe("Home view routing", () => {
     fireEvent.click(screen.getByTestId("ui-view-switch-to-simple"));
     expect(await screen.findByTestId("simple-home-stub")).toBeInTheDocument();
     await waitFor(() => expect(auth.updateUser).toHaveBeenCalledTimes(1));
-    expect(window.localStorage.getItem(`verdant:uiView:${USER}`)).toBe("advanced");
+    expect(getLocalStorageItemForTest(`verdant:uiView:${USER}`)).toBe("advanced");
   });
 
   it("a failed account read keeps the device's last confirmed choice and labels it", async () => {
-    window.localStorage.setItem(`verdant:uiView:${USER}`, "advanced");
+    setLocalStorageItemForTest(`verdant:uiView:${USER}`, "advanced");
     auth.getUser.mockResolvedValue({ data: { user: null }, error: new Error("network") });
     renderHome();
     expect(await screen.findByTestId("dashboard-stub")).toBeInTheDocument();

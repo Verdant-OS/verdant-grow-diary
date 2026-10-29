@@ -7,6 +7,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
+import {
   ensureUiViewPreferenceLoaded,
   forgetUiViewPreferenceState,
   getUiViewPreferenceGeneration,
@@ -41,7 +46,7 @@ function fakeClient(overrides: Partial<UiViewAuthClient> = {}): UiViewAuthClient
 
 beforeEach(() => {
   resetUiViewPreferenceStoreForTest();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 afterEach(() => {
@@ -88,11 +93,11 @@ describe("account read", () => {
       explicit: true,
       status: "ready",
     });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBe("advanced");
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBe("advanced");
   });
 
   it("a confirmed absence on the account is Simple by default and clears a stale cache", async () => {
-    window.localStorage.setItem(CACHE_KEY, "advanced");
+    setLocalStorageItemForTest(CACHE_KEY, "advanced");
     const client = fakeClient();
     await ensureUiViewPreferenceLoaded(client, USER);
     expect(getUiViewSnapshot(USER, {})).toMatchObject({
@@ -101,7 +106,7 @@ describe("account read", () => {
       explicit: false,
       status: "ready",
     });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBeNull();
   });
 
   it("the session's own metadata renders immediately while the account read is pending", () => {
@@ -115,7 +120,7 @@ describe("account read", () => {
   });
 
   it("a failed read keeps the device cache and reports unavailable, never a reset", async () => {
-    window.localStorage.setItem(CACHE_KEY, "advanced");
+    setLocalStorageItemForTest(CACHE_KEY, "advanced");
     const client = fakeClient({
       getUser: vi.fn(async () => ({ data: { user: null }, error: new Error("network") })) as never,
     });
@@ -126,7 +131,7 @@ describe("account read", () => {
       explicit: true,
       status: "unavailable",
     });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBe("advanced");
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBe("advanced");
   });
 
   it("a failed read with no cache shows the default as unavailable, not as a saved choice", async () => {
@@ -179,7 +184,7 @@ describe("account read", () => {
     });
     await ensureUiViewPreferenceLoaded(client, USER);
     expect(getUiViewSnapshot(USER, {})).toMatchObject({ view: "simple", status: "unavailable" });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBeNull();
   });
 
   it("retry re-runs a failed read", async () => {
@@ -222,7 +227,7 @@ describe("account write", () => {
       explicit: true,
       save: { kind: "saved", view: "advanced" },
     });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBe("advanced");
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBe("advanced");
   });
 
   it("holds the chosen view for this session but reports failure when the write throws", async () => {
@@ -237,7 +242,7 @@ describe("account write", () => {
     const snapshot = getUiViewSnapshot(USER, {});
     expect(snapshot.view).toBe("advanced");
     expect(snapshot.save).toEqual({ kind: "failed", view: "advanced", message: "write_failed" });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBeNull();
   });
 
   it("treats a read-back that lacks the new value as unconfirmed, not saved", async () => {
@@ -255,7 +260,7 @@ describe("account write", () => {
       view: "advanced",
       message: "unconfirmed",
     });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBeNull();
   });
 
   it("rejects an unknown view without touching the account", async () => {
@@ -305,7 +310,7 @@ describe("account write", () => {
       view: "simple",
       save: { kind: "saving", view: "simple" },
     });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBeNull();
     // Second write fails: the grower keeps the view they chose, and is told it was not saved.
     releases[1]({ data: { user: null }, error: new Error("offline") });
     expect(await second).toBe(false);
@@ -322,7 +327,7 @@ describe("account write", () => {
     const generation = getUiViewPreferenceGeneration();
     forgetUiViewPreferenceState();
     expect(getUiViewPreferenceGeneration()).toBe(generation + 1);
-    expect(window.localStorage.getItem(CACHE_KEY)).toBe("advanced");
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBe("advanced");
     // The device cache is the honest fallback (ready, not loading) while the account is read again.
     expect(getUiViewSnapshot(USER, {})).toMatchObject({ view: "advanced", status: "ready" });
     client.getUser.mockResolvedValueOnce({
@@ -332,7 +337,7 @@ describe("account write", () => {
     await ensureUiViewPreferenceLoaded(client, USER);
     expect(client.getUser).toHaveBeenCalledTimes(2);
     expect(getUiViewSnapshot(USER, {})).toMatchObject({ view: "simple", status: "ready" });
-    expect(window.localStorage.getItem(CACHE_KEY)).toBe("simple");
+    expect(getLocalStorageItemForTest(CACHE_KEY)).toBe("simple");
   });
 
   it("keeps two users' states apart", async () => {

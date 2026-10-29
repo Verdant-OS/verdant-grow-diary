@@ -96,6 +96,29 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky"]);
   });
 
+  it("keeps tracking a table whose removal or rename never runs", () => {
+    // An uncalled function body.
+    expect(
+      tables(
+        CREATE,
+        "CREATE FUNCTION public.reset() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN DROP TABLE IF EXISTS public.leaky; END $fn$;",
+      ),
+    ).toEqual(["leaky"]);
+    // Prose inside a string literal.
+    expect(
+      tables(`${CREATE}\nCOMMENT ON TABLE public.leaky IS 'never drop table leaky by hand';`),
+    ).toEqual(["leaky"]);
+    // A rename onto the tracked name inside an uncalled function body.
+    expect(
+      tables(
+        `${CREATE}\nCREATE FUNCTION public.r() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN ALTER TABLE public.other RENAME TO leaky; END $fn$;`,
+      ),
+    ).toEqual(["leaky"]);
+    // Removals that do run still clear tracking.
+    expect(tables(CREATE, "DO $$ BEGIN DROP TABLE public.leaky; END $$;")).toEqual([]);
+    expect(tables(CREATE, "DO $$ BEGIN EXECUTE 'DROP TABLE public.leaky'; END $$;")).toEqual([]);
+  });
+
   it("does not count a grant inside an uncalled function body", () => {
     expect(
       tables(

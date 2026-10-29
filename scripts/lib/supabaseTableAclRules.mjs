@@ -16,13 +16,15 @@
 // Schema-wide statements (GRANT ... ON ALL TABLES IN SCHEMA, ALTER DEFAULT
 // PRIVILEGES ... ON TABLES) are not a decision about one table and do not count.
 //
-// The scan fails closed. CREATE and DROP are read from the SQL with only
-// comments removed, so a table created by dynamic SQL (EXECUTE '...') or by a
-// function body is still tracked. GRANT and REVOKE count only where they run at
-// migration time: top-level statements and DO blocks. Text in comments, string
-// literals, function or procedure bodies, and other dollar-quoted strings
-// (COMMENT ... IS $c$...$c$) does not count. So a table granted only through
-// dynamic SQL is reported; give it a plain GRANT statement.
+// The scan fails closed. CREATE is read from the SQL with only comments
+// removed, so a table created anywhere, even in a function body, is tracked.
+// Everything that can clear a table's requirement (a removal, a rename, a
+// GRANT or REVOKE) counts only where it runs at migration time: top-level
+// statements, DO blocks, and a literal string handed straight to EXECUTE.
+// Text in comments, string literals, function or procedure bodies, and other
+// dollar-quoted strings (COMMENT ... IS $c$...$c$) never clears it. A statement
+// assembled at run time (EXECUTE format(...)) cannot be read, so the table is
+// reported; give it a plain GRANT statement.
 //
 // Precondition: migrations run with public first on search_path, so an
 // unqualified name is read as public. SET search_path is not modelled. Under
@@ -213,12 +215,12 @@ export function findTablesWithoutExplicitAcl(migrations) {
         events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
       }
     }
-    for (const match of ddl.matchAll(RENAME_RE)) {
+    for (const match of executed.matchAll(RENAME_RE)) {
       const table = publicTable(match[1], match[2]);
       if (table)
         events.push({ kind: "rename", table, to: identName(match[3]), index: match.index });
     }
-    for (const match of ddl.matchAll(DROP_RE)) {
+    for (const match of executed.matchAll(DROP_RE)) {
       for (const target of match[1].split(",")) {
         const name = DROP_TARGET_RE.exec(target);
         const table = name && publicTable(name[1], name[2]);

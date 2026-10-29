@@ -45,7 +45,9 @@ its latest `CREATE`, a table-level `GRANT` or a full `REVOKE ALL`. A partial or 
 a GRANT whose every privilege has a column list, a statement inside a comment (nested block
 comments included), a string literal, a function body or other dollar-quoted text, a schema-wide or
 default-privilege statement, or a function/sequence grant does not count. A top-level statement, a
-`DO` block and a string handed straight to `EXECUTE` do count. Quoted names (`"public"."x"`),
+`DO` block and a string handed straight to `EXECUTE` do count, and the same rule decides whether a
+removal or `ALTER TABLE ... RENAME TO` clears a table: one written in a comment, a literal or an
+uncalled function body does not. Quoted names (`"public"."x"`),
 unqualified names (read as `public`), `CREATE UNLOGGED TABLE` and `ALTER TABLE ... RENAME TO` are
 recognised; a `CREATE TABLE IF NOT EXISTS` of a table that already exists keeps its ACL. The test
 runs against the real migration tree in the required Vitest suite. The result must equal the frozen

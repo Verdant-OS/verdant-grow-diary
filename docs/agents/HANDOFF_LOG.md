@@ -81,8 +81,8 @@ checkout: git fetch origin ccr-01625fd2-17flsm verdant-grow-diary && git switch 
 pr: NOT_MEASURED at block creation; read it from the branch's open draft PR
 head_sha: read from the PR (this block lands in the first push)
 state: pushed, ready for review (PR #2584); merged base bbc77ae23 to clear a HANDOFF_LOG queue conflict
-current_step: round-2 fixes pushed in e82d0dd42; round-3 fix (removal/rename read only from executed SQL, per the collaborator re-review at e82d0dd4 and Codex thread 4399551800) is prepared but blocked: the in-session scorer-lock unlock for the two rule files was refused; Actions billing restored 2026-10-29, base merged to clear a HANDOFF_LOG conflict
-next_action: confirm 35/35 required at the PR head; apply the round-3 fix once Matthew unlocks scripts/lib/supabaseTableAclRules.mjs and src/test/supabase-table-explicit-acl.test.ts; then route an eligible independent exact-head reviewer
+current_step: round-3 fix applied under Matthew's 2026-10-29 unlocks: removal and rename events are read only from executed SQL (top level, DO bodies, literal EXECUTE strings), so a removal in a comment, literal or uncalled function body no longer clears tracking; 55/55 in the ACL test file, the new test red with the fix set aside
+next_action: confirm 35/35 required at the PR head (Actions billing restored 2026-10-29); then route an eligible independent exact-head reviewer
 post_merge_check: NOT_APPLICABLE for production (test-only change); after merge, the required Vitest suite on verdant-grow-diary runs src/test/supabase-table-explicit-acl.test.ts green
 active_writer: Claude session_017UoYKwf4ZrLARR3NCo2iwM
 decisions: no migration needed a correction (pending badge/referral/plants migrations all explicit or no new object); added a NEW check instead of editing scripts/check-supabase-migration-safety.mjs because the scorer lock refuses that edit and the unlock was denied in-session; a partial REVOKE does not count as an ACL decision because reads stay on the inherited default; the 22 legacy tables are frozen in LEGACY_DEFAULT_PRIVILEGE_TABLES and may only shrink

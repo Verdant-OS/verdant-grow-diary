@@ -81,7 +81,7 @@ checkout: git fetch origin ccr-01625fd2-17flsm verdant-grow-diary && git switch 
 pr: NOT_MEASURED at block creation; read it from the branch's open draft PR
 head_sha: read from the PR (this block lands in the first push)
 state: pushed, ready for review (PR #2584); merged base bbc77ae23 to clear a HANDOFF_LOG queue conflict
-current_step: round-4 fix applied under Matthew's 2026-10-29 unlocks: literals nested in an EXECUTE string are decoded and masked, keywords inside quoted identifiers are skipped, ALTER TABLE ... SET SCHEMA into public is tracked; 58/58 in the ACL test file, the 3 new tests red with the fix set aside. Conditional DO control flow is a documented known limit (Matthew accepted 2026-10-29); the @hono/node-server advisory is left to #2605. Round 5 (17d174352, pushed by a Cursor Agent automation co-authored by Matthew's account, matching the fix this session prepared): a rename onto a still-tracked name is skipped; 59/59, the new test red with the fix set aside, verified by this session. Cursor Agent is now a contributor and is excluded from independent acceptance. Round 6 (Codex adverse evidence at ecec6e5f6): target lists split only outside quoted names with complete removal targets, an EXECUTE string counts only as the whole command, non-ASCII identifiers read; 62/62, the 3 new tests red with the fix set aside. The founder yes and the Claude PASS at ecec6e5f6 are void at the new head
+current_step: round-4 fix applied under Matthew's 2026-10-29 unlocks: literals nested in an EXECUTE string are decoded and masked, keywords inside quoted identifiers are skipped, ALTER TABLE ... SET SCHEMA into public is tracked; 58/58 in the ACL test file, the 3 new tests red with the fix set aside. Conditional DO control flow is a documented known limit (Matthew accepted 2026-10-29); the @hono/node-server advisory is left to #2605. Round 5 (17d174352, pushed by a Cursor Agent automation co-authored by Matthew's account, matching the fix this session prepared): a rename onto a still-tracked name is skipped; 59/59, the new test red with the fix set aside, verified by this session. Cursor Agent is now a contributor and is excluded from independent acceptance. Round 6 (Codex adverse evidence at ecec6e5f6): target lists split only outside quoted names with complete removal targets, an EXECUTE string counts only as the whole command, non-ASCII identifiers read; 62/62, the 3 new tests red with the fix set aside. The founder yes and the Claude PASS at ecec6e5f6 are void at the new head. Rounds 7-8 (pushed by the Cursor Agent automation, each verified by this session against its repro scripts with red/green): dollar-quote tags blanked on exposed bodies (e1addc615); audit RPC count corrected to 44 (78888e453); legacy allowlist pinned to its 22 tuples (1a25653f7); no-op SET SCHEMA keeps a tracked destination (0c512e21d); top-level SELECT ... INTO tracked as a create (8955bdfce); unreadable CREATE TABLE targets reported (a16202539). ACL test file 73/73; real tree equals the legacy list; 0 open review threads at a16202539
 next_action: confirm 35/35 required at the new PR head; then a fresh founder yes and a fresh independent exact-head review (excluded: this session, the Cursor Agent automation)
 post_merge_check: NOT_APPLICABLE for production (test-only change); after merge, the required Vitest suite on verdant-grow-diary runs src/test/supabase-table-explicit-acl.test.ts green
 active_writer: Claude session_017UoYKwf4ZrLARR3NCo2iwM
@@ -95,12 +95,12 @@ open_questions: explicit grants for the 22 legacy tables (new additive migration
 gotchas: node_modules was absent; bun install --frozen-lockfile worked and left bun.lock unchanged; full tsc needs a larger heap in this container
 links: docs/audits/supabase-data-api-default-grants-2026-10-28.md; https://supabase.com/docs/guides/api/securing-your-api
 artifacts: the draft PR's checks
-reviewer_seat: eligible independent reviewer under OWNERSHIP.md §4.3 (excluded: this Claude session as author, the Cursor Agent automation as repairer)
+reviewer_seat: eligible independent reviewer under OWNERSHIP.md §4.3 (excluded: this Claude session as author, the Cursor Agent automation as repairer, Codex session /root/review_pr_2584 whose findings drove round 6)
 reviewer_sha: none yet
 session_state: no routines; no paused workflows; migration-touching follow-ups held for Matthew
 claimed_by: Claude session_017UoYKwf4ZrLARR3NCo2iwM, 2026-10-28 02:45 UTC (Matthew's direct assignment in chat; no GitHub claim comment posted)
 owner: Claude
-last_updated: 2026-10-29 (round 6), by Claude
+last_updated: 2026-10-29 (round 8), by Claude
 ```
 
 ### LIVE-CHECKOUT-2497-REBASE

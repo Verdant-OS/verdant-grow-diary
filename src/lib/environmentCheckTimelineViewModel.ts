@@ -22,6 +22,7 @@ import {
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 import { ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS } from "@/lib/environmentCheckQuickLogRules";
+import { hasQuickLogNoteMarker, isQuickLogIssueSubtype } from "@/lib/quickLogActivityRules";
 import type { EnvironmentCheckEntryInput } from "@/lib/environmentCheckViewModel";
 import { isAirTempCRealistic, isHumidityRealistic, isVpdRealistic } from "@/lib/sensorTruthRules";
 
@@ -85,6 +86,10 @@ function asString(v: unknown): string | null {
  * envelope is authoritative only for generic note/observation rows. A real
  * typed care event such as Watering stays Watering even when it carries
  * sensor or environment context.
+ *
+ * Note and Issue both persist as observations: a marked new note resolves to
+ * "note" and an observation with details.subtype "issue" to "issue". An old
+ * unmarked note keeps its current kind.
  */
 export function resolveEffectiveQuickLogCareType(
   entry: EnvironmentCheckTimelineRawEntry | null | undefined,
@@ -109,18 +114,24 @@ export function resolveEffectiveQuickLogCareType(
     return ENV_KIND_ALIASES.has(directKind) ? "environment" : directKind;
   }
 
+  const environmentEnvelope = details?.environment_check;
+  const hasEnvironmentEnvelope =
+    !!environmentEnvelope &&
+    typeof environmentEnvelope === "object" &&
+    !Array.isArray(environmentEnvelope);
+
+  // A new note carries the note marker. Its unstamped mirror still says
+  // event_type "quick_log", so the marker is read before that wrapper type.
+  if (!hasEnvironmentEnvelope && hasQuickLogNoteMarker(details)) return "note";
+
   if (detailKind && detailKind !== "observation" && detailKind !== "note") {
     return ENV_KIND_ALIASES.has(detailKind) ? "environment" : detailKind;
   }
 
-  const environmentEnvelope = details?.environment_check;
-  if (
-    environmentEnvelope &&
-    typeof environmentEnvelope === "object" &&
-    !Array.isArray(environmentEnvelope)
-  ) {
-    return "environment";
-  }
+  if (hasEnvironmentEnvelope) return "environment";
+
+  const isObservation = directKind === "observation" || detailKind === "observation";
+  if (isObservation && isQuickLogIssueSubtype(details?.subtype)) return "issue";
 
   if (directKind) return directKind;
   if (detailKind) return detailKind;

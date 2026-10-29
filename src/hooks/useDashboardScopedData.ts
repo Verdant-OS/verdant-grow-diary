@@ -24,7 +24,10 @@ import {
   type ConnectedActivationDiaryEntryRow,
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
-import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import {
+  indexQuickLogMirrorDetailsByGrowEventId,
+  resolveQuickLogGrowEventLabel,
+} from "@/lib/quickLogActivityRules";
 import { formatActionReasonForDisplay } from "@/lib/actionQueueRowView";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
@@ -117,8 +120,11 @@ async function readDashboardRecent(growId: string): Promise<RecentState> {
     detail: d.note ? localizeReadingAtTimestamps(d.note) : d.note,
   }));
 
+  // Note and Issue both persist as observations; the linked diary mirror
+  // (deduped out of the list above) carries the marker or subtype.
+  const mirrorDetails = indexQuickLogMirrorDetailsByGrowEventId(diaryRes ?? []);
   const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
-    const label = resolveQuickLogEventTimelineLabel({ eventType: e.event_type });
+    const label = resolveQuickLogGrowEventLabel(e, mirrorDetails);
     return {
       id: `grow-event-${e.id}`,
       kind: "diary",

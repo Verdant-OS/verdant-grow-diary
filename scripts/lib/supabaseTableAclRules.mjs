@@ -18,6 +18,10 @@
 //
 // The scan fails closed. CREATE is read from the SQL with only comments
 // removed, so a table created anywhere, even in a function body, is tracked.
+// A top-level SELECT ... INTO [UNLOGGED] [TABLE] name is also a create. It is
+// read from a third masked view in which DO and function bodies stay blank, so
+// a PL/pgSQL SELECT ... INTO n is not a table. INTO TEMP / TEMPORARY is
+// skipped, and INSERT INTO / MERGE INTO after a WITH ... SELECT is not a match.
 // Everything that can clear a table's requirement (a removal, a rename, a
 // GRANT or REVOKE) counts only where it runs at migration time: top-level
 // statements, DO blocks, and a literal string handed straight to EXECUTE.
@@ -43,6 +47,13 @@ const IDENT = String.raw`(?:"(?:[^"]|"")+"|[a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_$\u0
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`;
 const CREATE_RE = new RegExp(
   String.raw`\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?${QUALIFIED}`,
+  "gi",
+);
+// SQL SELECT ... INTO [UNLOGGED] [TABLE] name creates a table. INTO TEMP /
+// TEMPORARY is a session table and is skipped. INSERT/MERGE INTO after a
+// SELECT (including WITH ... SELECT) is not this form.
+const SELECT_INTO_RE = new RegExp(
+  String.raw`\bSELECT\b(?:(?!\b(?:INSERT|MERGE)\b)[^;])*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?${QUALIFIED}`,
   "gi",
 );
 // ALTER TABLE ... RENAME TO keeps the table and its grants under the new name.
@@ -172,7 +183,9 @@ function identName(raw) {
 // bodies stay visible (CREATE/DROP tracking). executableOnly = true: literals
 // are blanked too, a DO block's body is masked recursively, and every other
 // dollar-quoted span (function bodies, prose) is blanked (GRANT/REVOKE).
-function maskSql(sql, executableOnly) {
+// scanDoBodies = false (with executableOnly true): DO and function bodies stay
+// blank so a PL/pgSQL SELECT ... INTO n is not read as a table create.
+function maskSql(sql, executableOnly, scanDoBodies = true) {
   const code = sql.split("");
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (code[k] !== "\n") code[k] = " ";
@@ -195,7 +208,7 @@ function maskSql(sql, executableOnly) {
       } else origin.push([k]);
       decoded += sql[k];
     }
-    const masked = maskSql(decoded, true);
+    const masked = maskSql(decoded, true, scanDoBodies);
     for (let d = 0; d < decoded.length; d++) {
       if (masked[d] !== decoded[d]) for (const k of origin[d]) blank(k, k + 1);
     }
@@ -263,7 +276,7 @@ function maskSql(sql, executableOnly) {
           // inside one (EXECUTE $ddl$ ... $ddl$).
           const prefix = code.slice(stmtStart, i).join("");
           const runsNow =
-            RUNS_NOW_RE.test(prefix) ||
+            (scanDoBodies && RUNS_NOW_RE.test(prefix)) ||
             (EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(close + tag.length, end)));
           if (!executableOnly || runsNow) {
             mask(i + tag.length, close);
@@ -297,13 +310,20 @@ export function findTablesWithoutExplicitAcl(migrations) {
   for (const m of migrations) {
     const ddl = maskSql(m.sql, false);
     const executed = maskSql(m.sql, true);
+    const topLevel = maskSql(m.sql, true, false);
     const quoted = quotedIdentifierPositions(executed);
+    const quotedTopLevel = quotedIdentifierPositions(topLevel);
     const events = [];
     for (const match of ddl.matchAll(CREATE_RE)) {
       const table = publicTable(match[2], match[3]);
       if (table) {
         events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
       }
+    }
+    for (const match of topLevel.matchAll(SELECT_INTO_RE)) {
+      if (quotedTopLevel[match.index]) continue;
+      const table = publicTable(match[1], match[2]);
+      if (table) events.push({ kind: "create", conditional: false, table, index: match.index });
     }
     for (const match of executed.matchAll(RENAME_RE)) {
       if (quoted[match.index]) continue;

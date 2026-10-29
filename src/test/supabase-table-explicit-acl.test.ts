@@ -132,12 +132,44 @@ describe("supabase table explicit ACL rule", () => {
     "CREATE TABLE leaky (id int);",
     "CREATE TABLE IF NOT EXISTS leaky (id int);",
     "COMMENT ON SCHEMA public IS $c$grower's notes$c$;\nCREATE TABLE public.leaky (id int);\nSELECT 'x';",
+    "SELECT 1 AS id INTO TABLE public.leaky;",
+    "SELECT 1 INTO public.leaky;",
+    "SELECT 1 INTO UNLOGGED TABLE public.leaky;",
+    "SELECT 1 INTO UNLOGGED public.leaky;",
+    "SELECT 1 AS id INTO TABLE leaky;",
+    "WITH x AS (SELECT 1 AS id) SELECT * INTO TABLE public.leaky FROM x;",
   ])("flags a new public table with no grant: %s", (sql) => {
     expect(tables(sql)).toEqual(["leaky"]);
   });
 
   it("keeps SQL after an unterminated quote visible and indices aligned", () => {
     expect(tables("SELECT 'oops;\nCREATE TABLE public.leaky (id int);")).toEqual(["leaky"]);
+  });
+
+  it("tracks a top-level SELECT INTO table and ignores PL/pgSQL INTO", () => {
+    expect(tables("SELECT 1 AS id INTO TABLE public.leaky;")).toEqual(["leaky"]);
+    expect(
+      tables(
+        "SELECT 1 AS id INTO TABLE public.leaky;\nGRANT SELECT ON public.leaky TO authenticated;",
+      ),
+    ).toEqual([]);
+    expect(tables("SELECT 1 INTO TEMP TABLE public.leaky;")).toEqual([]);
+    expect(tables("SELECT 1 INTO TEMPORARY TABLE public.leaky;")).toEqual([]);
+    expect(tables("SELECT 1 INTO TABLE private.leaky;")).toEqual([]);
+    expect(tables("WITH x AS (SELECT 1 AS id) INSERT INTO public.leaky SELECT * FROM x;")).toEqual(
+      [],
+    );
+    expect(
+      tables(
+        "WITH x AS (SELECT 1 AS id) MERGE INTO public.leaky t USING x ON t.id = x.id WHEN MATCHED THEN DO NOTHING;",
+      ),
+    ).toEqual([]);
+    expect(tables("DO $$ DECLARE n int; BEGIN SELECT 1 INTO n; END $$;")).toEqual([]);
+    expect(
+      tables(
+        "CREATE FUNCTION public.later() RETURNS void LANGUAGE plpgsql AS $fn$ DECLARE n int; BEGIN SELECT 1 INTO n; END $fn$;",
+      ),
+    ).toEqual([]);
   });
 
   it("ignores tables in other schemas", () => {

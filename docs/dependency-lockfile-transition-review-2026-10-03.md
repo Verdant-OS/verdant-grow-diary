@@ -123,7 +123,9 @@ the transition ends. `bun.lock` is now the only lockfile.
   removed, with nothing left to check.
 - `scripts/check-dependency-security.mjs` audits with `bun audit` only. The npm audit
   source, the `--npm-input` and `--npm-lockfile` flags, and the npm-lock reads are gone.
-  The npm graph comparison runs only if a caller passes an npm lock explicitly.
+  The npm graph comparison is removed as well: exceptions bind to `bun.lock` only, the
+  retired `expectedNpm*` exception fields are rejected, and `--lockfile` must name a
+  `bun.lock` file, so no caller can trigger a second dependency-graph check (#1879).
 - `.gitignore` ignores `package-lock.json`. The original retirement revision deleted
   the lock written by the npm bootstrap; that fallback was unpinned and bypassed
   Bun’s minimum-age delay and locked security floors. It is replaced below.
@@ -139,7 +141,9 @@ Follow-ups not done here:
 - `docs/architecture-contract.md` AC-8.1 states the old two-lockfile rule. Correcting it
   needs a §15 restamp.
 - The reviewed-exception schema still carries npm-specific fields. There are no
-  exceptions today, so nothing exercises them.
+  exceptions today, so nothing exercises them. _Done in a later stacked change:_
+  `config/dependency-security-exceptions.json` moves to `schemaVersion: 2`, which binds an
+  exception to `bun.lock` only and rejects the six retired `expectedNpm*` fields.
 
 ## Addendum — locked local setup and review corrections (2026-10-04)
 

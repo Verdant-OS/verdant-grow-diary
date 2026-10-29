@@ -69,6 +69,41 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-1879-BUN-ONLY-EXCEPTION-CLOSEOUT
+
+```text
+TASK PR-1879-BUN-ONLY-EXCEPTION-CLOSEOUT  priority: P2  status: OPEN
+goal: Complete the existing Bun-only reviewed-exception schema/checker change on #1879 without reviving shipped #1873 changes.
+why: The branch retained a stale dependency-retirement stack and conflicted with current deploy content; schema 2 is still absent from the recorded base.
+branch: claude/dependency-security-exception-bun-only
+base: verdant-grow-diary, verified be6d009dcf0110b92901b85bc8212b560e45cf62
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1879
+head_sha: 115be213800b928b9d126662a8fa925007273fba was the remote starting checkpoint observed 2026-10-27 01:10 UTC; not a claim of the later tip.
+state: Implemented integration checkpoint; verify actual local/remote publication and current full head before resuming. This source entry does not attest a future push.
+current_step: Normal base integration with four existing feature paths retained; every other inherited path preserved exactly from the recorded base.
+next_action: Compare the live full PR head with the local branch and publication receipt, preserve any unpublished commit, then obtain current hosted checks and eligible outside full-scope acceptance. Only this holder may make a needed normal publication.
+post_merge_check: Existing closeout coordinator verifies the resulting merged source and any separately authorized served-version provenance; release and live behavior remain NOT_MEASURED.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd; one isolated cloud writer.
+decisions: Preserve schema 2, fail closed on all six retired npm fields and non-bun.lock CLI overrides; keep every Bun resolution, parent, ancestor, import and script-reachability guard. Add no exception entry.
+tried_and_rejected: Do not restore obsolete npm graph checks or old governance/lockfile/workflow content. Initial restore sequencing error was corrected locally before validation; no hook bypass or push resulted.
+commands: Canonical Bun 1.3.14 frozen install; node node_modules/vitest/vitest.mjs run src/test/check-dependency-security.test.ts src/test/check-bun-lockfile-policy.test.ts src/test/dependency-security-phase-a-contract.test.ts src/test/dependency-security-ci-workflow.test.ts src/test/verify-stabilization-pr-scope.test.ts --maxWorkers=1; node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit; node scripts/scorer-lock.mjs --report --strict --base be6d009dcf0110b92901b85bc8212b560e45cf62.
+measured_validation: Unchanged integrated regression hash against the base checker/schema: 21 failed, 25 passed. Reconciled tree: five focused files, 293 passed, zero failed. Typecheck, scoped lint/format, docs/release safety and declared-scorer report passed.
+broader_validation: The bare project test command with one worker and bail=1 reached its 180-second bound without a terminal suite result. Full-suite outcome/counts NOT_MEASURED; partial stderr contains jsdom navigation-not-implemented warnings. No test/assertion/skip was weakened.
+whitespace: Authored diff against the base is clean. HEAD-relative staged check identifies only an unchanged base migration blank line at EOF; the migration is byte-identical to base and untouched.
+files_touched: config/dependency-security-exceptions.json; scripts/check-dependency-security.mjs; src/test/check-dependency-security.test.ts; docs/dependency-lockfile-transition-review-2026-10-03.md; this own handoff block only.
+scorer_declarations: Exactly the config, checker and existing checker test above, using official path/branch/time-bound unlocks; preserve all other scorers and re-lock at task end.
+blockers: Fresh hosted exact-head checks and eligible independent acceptance are not supplied by local validation. Historical review threads require honest current-scope reassessment; no inherited architecture-provenance repair is claimed.
+open_questions: Actual reviewer availability/pickup is NOT_MEASURED. No private fleet/process state beyond accessible claims is asserted.
+gotchas: #1873 is shipped history; its squash merge makes the old merge-base diff look much larger than the remaining feature. The complete authored delta after integration is the four feature paths plus this own block. Do not infer deployment, close an underlying issue or accept the repair from an author account.
+links: Claim https://github.com/Verdant-OS/verdant-grow-diary/pull/1879#issuecomment-6431210133; preserve all previous review receipts as history.
+reviewer_seat: Actually available non-contributing outside session under OWNERSHIP 4.3; exclude all Claude/Canopy/Cursor and Codex contributors. Another Codex session cannot accept this Codex-repaired PR.
+reviewer_sha: NOT_MEASURED; must name the final current full remote head and complete PR scope.
+session_state: Saved cloud work only. No PC, production, secrets, SQL apply, deployment, settings change, ready transition or queue action.
+claimed_by: Codex closeout coordinator; verified claim6431210133, 2026-10-27 01:10 UTC.
+owner: Codex closeout coordinator until an explicit accepted handoff or terminal recorded outcome.
+last_updated: 2026-10-27T01:20:17.648Z, by Codex closeout coordinator.
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

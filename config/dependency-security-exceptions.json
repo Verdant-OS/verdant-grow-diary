@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
-  "notes": "Exact, temporary exceptions for audit findings that cannot be removed safely in Phase A. New package/advisory pairs or lockfile resolution drift fail closed.",
+  "schemaVersion": 2,
+  "notes": "Exact, temporary exceptions for audit findings that cannot be removed safely in Phase A. New package/advisory pairs or lockfile resolution drift fail closed. Schema 2 binds each exception to bun.lock only; the npm fields of schema 1 were retired with package-lock.json on 2026-10-03 and are rejected.",
   "exceptions": []
 }

@@ -303,6 +303,8 @@ export interface GrowTentClimateReading {
   readonly statusCode: GrowTentBandStatusCode;
   readonly statusText: string;
   readonly note: string;
+  /** Every reading on this page is typed in by the grower; never live sensor data. */
+  readonly source: "manual";
 }
 
 /** `YYYY-MM-DDTHH:mm` in the caller's local time, for a datetime-local input. */
@@ -341,6 +343,7 @@ export function buildGrowTentClimateReading(
     statusCode: status.code,
     statusText: status.fullText,
     note: note.trim(),
+    source: "manual",
   };
 }
 
@@ -401,6 +404,7 @@ const EXPORT_HEADERS = [
   "VPD (kPa)",
   "Status",
   "Note",
+  "Source",
 ] as const;
 
 function exportMatrix(readings: readonly GrowTentClimateReading[]): string[][] {
@@ -416,6 +420,7 @@ function exportMatrix(readings: readonly GrowTentClimateReading[]): string[][] {
       r.vpd.toFixed(2),
       r.statusText,
       r.note,
+      r.source,
     ]),
   ];
 }

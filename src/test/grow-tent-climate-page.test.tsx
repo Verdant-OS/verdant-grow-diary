@@ -125,6 +125,16 @@ describe("public grow tent temperature and humidity page", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("labels the live result and every logged row as manual, never as sensor data", () => {
+    renderPage();
+    expect(screen.getByTestId("climate-live-result")).toHaveTextContent(
+      "Source: manual (typed in, not a sensor reading)",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
+    expect(within(logTable()).getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
+    expect(within(logTable()).getByRole("cell", { name: "manual" })).toBeInTheDocument();
+  });
+
   it("shows the range message and logs nothing for an out-of-range input", () => {
     renderPage();
     setField("Air temperature (°F)", "120");
@@ -253,7 +263,7 @@ describe("public grow tent temperature and humidity page", () => {
       fireEvent.click(screen.getByRole("button", { name: "Copy log" }));
     });
     expect(screen.getByLabelText(/Clipboard access was unavailable/)).toHaveValue(
-      "Date & Time\tLights\tAir Temp (°F)\tRH (%)\tLeaf Offset (°F)\tStage\tVPD (kPa)\tStatus\tNote",
+      "Date & Time\tLights\tAir Temp (°F)\tRH (%)\tLeaf Offset (°F)\tStage\tVPD (kPa)\tStatus\tNote\tSource",
     );
     fireEvent.click(screen.getByRole("button", { name: "Log this reading" }));
     expect(screen.queryByLabelText(/Clipboard access was unavailable/)).not.toBeInTheDocument();

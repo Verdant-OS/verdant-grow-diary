@@ -83,6 +83,7 @@ const LOG_HEADERS = [
   "VPD",
   "Status",
   "Note",
+  "Source",
 ] as const;
 
 const DEFAULTS = { air: "77", rh: "60", stage: "veg", offset: "-2" } as const;
@@ -546,6 +547,7 @@ export default function GrowTentTemperatureHumidityChart() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <span className="text-3xl font-semibold">{live.vpd.toFixed(2)} kPa</span>
+                    <p className="mt-1 text-sm">Source: manual (typed in, not a sensor reading)</p>
                     <p className="mt-1 text-sm">
                       Selected stage band: {band.name} ({bandRange}, common grower targets rather
                       than strict rules)
@@ -793,7 +795,7 @@ export default function GrowTentTemperatureHumidityChart() {
                 <tbody>
                   {readings.length === 0 ? (
                     <tr>
-                      <th scope="row" colSpan={10} className={`${cellClass} font-normal`}>
+                      <th scope="row" colSpan={11} className={`${cellClass} font-normal`}>
                         No climate readings logged yet. Click &quot;Log this reading&quot; above to
                         record your tent&apos;s °F, RH, and VPD over time.
                       </th>
@@ -820,6 +822,7 @@ export default function GrowTentTemperatureHumidityChart() {
                           </span>
                         </td>
                         <td className={`${cellClass} break-words`}>{r.note || "—"}</td>
+                        <td className={cellClass}>{r.source}</td>
                         <td className={`${cellClass} print:hidden`}>
                           <button
                             type="button"

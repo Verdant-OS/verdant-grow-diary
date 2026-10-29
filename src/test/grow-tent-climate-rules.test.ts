@@ -265,7 +265,7 @@ describe("climate readings and summary", () => {
 
 describe("climate log exports", () => {
   const header =
-    "Date & Time,Lights,Air Temp (°F),RH (%),Leaf Offset (°F),Stage,VPD (kPa),Status,Note";
+    "Date & Time,Lights,Air Temp (°F),RH (%),Leaf Offset (°F),Stage,VPD (kPa),Status,Note,Source";
 
   it("writes the source CSV header and quotes notes with commas, quotes and newlines", () => {
     const note = 'Raised exhaust, "lights off" check\ndrop 2F';
@@ -273,7 +273,7 @@ describe("climate log exports", () => {
     const [first, ...rest] = csv.split("\r\n");
     expect(first).toBe(header);
     expect(rest.join("\r\n")).toBe(
-      '2026-10-28 09:00,Lights on,77,60,-2,Veg,1.06,Within your Veg band,"Raised exhaust, ""lights off"" check\ndrop 2F"',
+      '2026-10-28 09:00,Lights on,77,60,-2,Veg,1.06,Within your Veg band,"Raised exhaust, ""lights off"" check\ndrop 2F",manual',
     );
     expect(buildGrowTentClimateCsv([])).toBe(header);
   });
@@ -297,8 +297,9 @@ describe("climate log exports", () => {
       "1.06",
       "Within your Veg band",
       "'=SUM(1,2)",
+      "manual",
     ]);
-    expect(lines[2].split("\t").at(-1)).toBe("'+4 days later");
+    expect(lines[2].split("\t").at(-2)).toBe("'+4 days later");
   });
 
   it("names the CSV by local date", () => {

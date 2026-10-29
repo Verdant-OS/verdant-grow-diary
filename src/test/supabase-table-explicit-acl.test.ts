@@ -286,6 +286,21 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky"]);
   });
 
+  it("fails closed when a CREATE TABLE target cannot be read", () => {
+    const formatSql = "DO $$ BEGIN EXECUTE format('CREATE TABLE %I (id int)', 'leaky'); END $$;";
+    const concatSql = "DO $$ BEGIN EXECUTE 'CREATE TABLE ' || quote_ident('leaky'); END $$;";
+    const phantomSql = "CREATE TABLE public.%I (id int);";
+    expect(tables(formatSql)).toEqual([
+      `(unreadable CREATE TABLE target at offset ${formatSql.indexOf("CREATE TABLE")})`,
+    ]);
+    expect(tables(concatSql)).toEqual([
+      `(unreadable CREATE TABLE target at offset ${concatSql.indexOf("CREATE TABLE")})`,
+    ]);
+    expect(tables(phantomSql)).toEqual([
+      `(unreadable CREATE TABLE target at offset ${phantomSql.indexOf("CREATE TABLE")})`,
+    ]);
+  });
+
   it("counts an unqualified table under SET search_path as public", () => {
     expect(tables("SET search_path = public;\nCREATE TABLE leaky (id int);")).toEqual(["leaky"]);
   });

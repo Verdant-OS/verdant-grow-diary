@@ -18,6 +18,9 @@
 //
 // The scan fails closed. CREATE is read from the SQL with only comments
 // removed, so a table created anywhere, even in a function body, is tracked.
+// A CREATE TABLE target counts only as a complete name followed by (, AS, OF,
+// PARTITION, ; or the end. Any other CREATE TABLE keyword is reported as
+// (unreadable CREATE TABLE target at offset N) for that migration.
 // A top-level SELECT ... INTO [UNLOGGED] [TABLE] name is also a create. It is
 // read from a third masked view in which DO and function bodies stay blank, so
 // a PL/pgSQL SELECT ... INTO n is not a table. INTO TEMP / TEMPORARY is
@@ -45,10 +48,15 @@
 const IDENT = String.raw`(?:"(?:[^"]|"")+"|[a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_$\u0080-\uFFFF]*)`;
 // Optional schema, then the name: group 1 is the schema, group 2 the table.
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`;
-const CREATE_RE = new RegExp(
-  String.raw`\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?${QUALIFIED}`,
+const CREATE_HEAD_RE = new RegExp(
+  String.raw`\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`,
   "gi",
 );
+const QUALIFIED_AT_RE = new RegExp(String.raw`^${QUALIFIED}`);
+// Complete CREATE TABLE names end at the column list, a typed/partitioned
+// table, a CTAS, a statement end, or EOF. Anything else (%I, concatenation)
+// cannot be named statically.
+const CREATE_TARGET_END_RE = /^\s*(?:\(|AS\b|OF\b|PARTITION\b|;|$)/i;
 // SQL SELECT ... INTO [UNLOGGED] [TABLE] name creates a table. INTO TEMP /
 // TEMPORARY is a session table and is skipped. INSERT/MERGE INTO after a
 // SELECT (including WITH ... SELECT) is not this form.
@@ -314,8 +322,20 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const quoted = quotedIdentifierPositions(executed);
     const quotedTopLevel = quotedIdentifierPositions(topLevel);
     const events = [];
-    for (const match of ddl.matchAll(CREATE_RE)) {
-      const table = publicTable(match[2], match[3]);
+    for (const match of ddl.matchAll(CREATE_HEAD_RE)) {
+      const after = ddl.slice(match.index + match[0].length);
+      const name = QUALIFIED_AT_RE.exec(after);
+      const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
+      if (!complete) {
+        events.push({
+          kind: "create",
+          conditional: false,
+          table: `(unreadable CREATE TABLE target at offset ${match.index})`,
+          index: match.index,
+        });
+        continue;
+      }
+      const table = publicTable(name[1], name[2]);
       if (table) {
         events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
       }

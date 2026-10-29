@@ -6,10 +6,11 @@ import {
   LEGACY_DEFAULT_PRIVILEGE_TABLES,
 } from "../../scripts/lib/supabaseTableAclRules.mjs";
 
-// From 2026-10-30 Supabase stops granting new public tables to
-// anon/authenticated/service_role by default. supabase/seed.sql grants every
-// table on local replay, so only this static rule sees a migration that
-// forgets its GRANT before it reaches the hosted project.
+// @source-scan-justified: From 2026-10-30 Supabase stops granting new public
+// tables to anon/authenticated/service_role by default. supabase/seed.sql
+// grants every table on local and CI replay, so only this static scan of
+// migration SQL sees a CREATE that forgets its GRANT before it reaches the
+// hosted project.
 
 const MIGRATIONS_DIR = resolve(__dirname, "../../supabase/migrations");
 
@@ -183,6 +184,34 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
   });
 
+  it("carries a quoted semicolon through masked statement scans", () => {
+    expect(tables('SELECT 1 AS "semi;colon" INTO TABLE public.leaky;')).toEqual(["leaky"]);
+    expect(tables('CREATE TABLE public."semi;name" (id int);')).toEqual(["semi;name"]);
+    expect(
+      tables(
+        'CREATE TABLE public."semi;name" (id int);\nGRANT SELECT ON public."semi;name" TO authenticated;',
+      ),
+    ).toEqual([]);
+    expect(
+      tables('CREATE TABLE public."semi;name" (id int);\nDROP TABLE public."semi;name";'),
+    ).toEqual([]);
+  });
+
+  it("tracks SELECT INTO from a whole-command EXECUTE string", () => {
+    expect(tables("DO $$ BEGIN EXECUTE 'SELECT 1 INTO TABLE public.leaky'; END $$;")).toEqual([
+      "leaky",
+    ]);
+    expect(tables("DO $$ BEGIN EXECUTE $q$ SELECT 1 INTO TABLE public.leaky $q$; END $$;")).toEqual(
+      ["leaky"],
+    );
+    expect(
+      tables(
+        "DO $$ BEGIN EXECUTE 'SELECT 1 INTO TABLE public.leaky; GRANT SELECT ON public.leaky TO authenticated'; END $$;",
+      ),
+    ).toEqual([]);
+    expect(tables("DO $$ DECLARE n int; BEGIN SELECT 1 INTO n; END $$;")).toEqual([]);
+  });
+
   it("ignores tables in other schemas", () => {
     expect(tables("CREATE TABLE private.leaky (id int);")).toEqual([]);
     expect(
@@ -223,6 +252,34 @@ describe("supabase table explicit ACL rule", () => {
       tables(
         'CREATE TABLE public."table with spaces" (id int);\nGRANT SELECT ON public."table with spaces" TO authenticated;',
       ),
+    ).toEqual([]);
+  });
+
+  it("does not invent a table from CREATE TABLE inside a quoted identifier", () => {
+    expect(
+      tables('CREATE POLICY "CREATE TABLE public.leaky (" ON public.existing USING (true);'),
+    ).toEqual([]);
+  });
+
+  it("does not invent a second table when a policy name contains CREATE TABLE", () => {
+    expect(
+      tables(
+        `${CREATE}\nCREATE POLICY "CREATE TABLE public.other (" ON public.leaky USING (true);`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("does not invent a table from CREATE UNLOGGED TABLE inside a quoted identifier", () => {
+    expect(
+      tables(
+        'CREATE POLICY "CREATE UNLOGGED TABLE public.leaky (" ON public.existing USING (true);',
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not report an unreadable CREATE TABLE target that starts inside a quoted identifier", () => {
+    expect(
+      tables('CREATE POLICY "CREATE TABLE public.%I (" ON public.existing USING (true);'),
     ).toEqual([]);
   });
 

@@ -18,6 +18,8 @@
 //
 // The scan fails closed. CREATE is read from the SQL with only comments
 // removed, so a table created anywhere, even in a function body, is tracked.
+// A CREATE TABLE that starts inside a quoted identifier (CREATE POLICY
+// "CREATE TABLE public.leaky (" ...) is skipped, like GRANT/DROP/RENAME.
 // A CREATE TABLE target counts only as a complete name followed by (, AS, OF,
 // PARTITION, ; or the end. Any other CREATE TABLE keyword is reported as
 // (unreadable CREATE TABLE target at offset N) for that migration.
@@ -29,10 +31,15 @@
 // trigger EXECUTE FUNCTION are not reported.
 // A top-level SELECT ... INTO [UNLOGGED] [TABLE] name is also a create. It is
 // read from a third masked view in which DO and function bodies stay blank, so
-// a PL/pgSQL SELECT ... INTO n is not a table. INTO TEMP / TEMPORARY is
-// skipped. INSERT INTO / MERGE INTO after a WITH ... SELECT is skipped only
-// when INTO comes directly after ) INSERT or ) MERGE. An alias named insert
-// or merge, quoted or unquoted, is not a skip.
+// a PL/pgSQL SELECT ... INTO n is not a table. A whole-command EXECUTE string
+// is recorded while masking and scanned as plain SQL, so EXECUTE 'SELECT ...
+// INTO TABLE name' (or the $q$ form) inside a DO block is a create. INTO TEMP
+// / TEMPORARY is skipped. INSERT INTO / MERGE INTO after a WITH ... SELECT is
+// skipped only when INTO comes directly after ) INSERT or ) MERGE. An alias
+// named insert or merge, quoted or unquoted, is not a skip. A semicolon inside
+// a quoted identifier is carried as a placeholder in every masked view so
+// [^;]* statement patterns run past it; identName turns the placeholder back
+// into a semicolon.
 // Everything that can clear a table's requirement (a removal, a rename, a
 // GRANT or REVOKE) counts only where it runs at migration time: top-level
 // statements, DO blocks, and a literal string handed straight to EXECUTE.
@@ -74,6 +81,10 @@ const SELECT_INTO_RE = new RegExp(
   "gi",
 );
 const SELECT_INTO_CTE_DML_RE = /\)\s+(?:INSERT|MERGE)\s+INTO\b/i;
+// Semicolons inside quoted identifiers would terminate [^;]* statement
+// patterns. Carry them as this placeholder through every masked view;
+// identName turns it back into a semicolon when a name is read.
+const QUOTED_SEMICOLON = "\u0001";
 // ALTER TABLE ... RENAME TO keeps the table and its grants under the new name.
 // RENAME TO takes no schema; RENAME COLUMN and RENAME CONSTRAINT do not match.
 const RENAME_RE = new RegExp(
@@ -359,7 +370,8 @@ function columnLevelOnly(privileges) {
 }
 
 // Positions of sql that sit inside a double-quoted identifier, so a keyword
-// in a name (CREATE POLICY "Admins grant access" ...) never starts a match.
+// in a name (CREATE POLICY "CREATE TABLE public.leaky (" / "Admins grant
+// access") never starts a CREATE, GRANT, DROP, RENAME, or SET SCHEMA match.
 // Run on masked SQL, where comments and literals are already blank.
 function quotedIdentifierPositions(sql) {
   const inside = new Uint8Array(sql.length);
@@ -417,7 +429,8 @@ export const LEGACY_DEFAULT_PRIVILEGE_TABLES = Object.freeze(
 
 // Unquoted identifiers fold to lower case; quoted ones keep their case.
 function identName(raw) {
-  return raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.toLowerCase();
+  const name = raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.toLowerCase();
+  return name.replaceAll(QUOTED_SEMICOLON, ";");
 }
 
 // Blank SQL to spaces of the same length, so match indices line up with the
@@ -435,7 +448,9 @@ function identName(raw) {
 // dollar-quoted span (function bodies, prose) is blanked (GRANT/REVOKE).
 // scanDoBodies = false (with executableOnly true): DO and function bodies stay
 // blank so a PL/pgSQL SELECT ... INTO n is not read as a table create.
-function maskSql(sql, executableOnly, scanDoBodies = true) {
+// Whole-command EXECUTE payloads recorded during the executable pass are
+// copied back onto that view so they are scanned as SQL.
+function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) {
   const code = sql.split("");
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (code[k] !== "\n") code[k] = " ";
@@ -490,12 +505,17 @@ function maskSql(sql, executableOnly, scanDoBodies = true) {
         i = j;
       } else if (sql[i] === '"') {
         // A quoted identifier stays visible, but an apostrophe inside it
-        // ("grower's") must not open a string literal.
+        // ("grower's") must not open a string literal. A semicolon inside
+        // it is replaced with QUOTED_SEMICOLON so statement patterns that
+        // stop at ';' still see the rest of the statement.
         let j = i + 1;
         while (j < end) {
           if (sql[j] === '"' && sql[j + 1] === '"') j += 2;
           else if (sql[j] === '"') break;
-          else j++;
+          else {
+            if (sql[j] === ";") code[j] = QUOTED_SEMICOLON;
+            j++;
+          }
         }
         i = j < end ? j + 1 : i + 1;
       } else if (sql[i] === "'") {
@@ -512,7 +532,10 @@ function maskSql(sql, executableOnly, scanDoBodies = true) {
             EXECUTES_RE.test(code.slice(stmtStart, i).join("")) &&
             EXECUTE_ENDS_RE.test(sql.slice(j + 1, end));
           if (executableOnly && !executes) blank(i, j + 1);
-          else if (executableOnly) maskExecutedLiteral(i, j, escapes);
+          else if (executableOnly) {
+            maskExecutedLiteral(i, j, escapes);
+            if (executeSpans && !escapes) executeSpans.push({ start: i + 1, end: j });
+          }
           i = j + 1;
         } else {
           i++; // unterminated within these bounds: prose, not a literal
@@ -525,9 +548,9 @@ function maskSql(sql, executableOnly, scanDoBodies = true) {
           // A DO body runs now, and so does a string handed straight to EXECUTE
           // inside one (EXECUTE $ddl$ ... $ddl$).
           const prefix = code.slice(stmtStart, i).join("");
-          const runsNow =
-            (scanDoBodies && RUNS_NOW_RE.test(prefix)) ||
-            (EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(close + tag.length, end)));
+          const isExecute =
+            EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(close + tag.length, end));
+          const runsNow = (scanDoBodies && RUNS_NOW_RE.test(prefix)) || isExecute;
           if (!executableOnly || runsNow) {
             mask(i + tag.length, close);
             // Tags delimit the body; they are not part of it. Blank them so an
@@ -536,6 +559,9 @@ function maskSql(sql, executableOnly, scanDoBodies = true) {
             // single-quoted EXECUTE payload.
             blank(i, i + tag.length);
             blank(close, close + tag.length);
+            if (executeSpans && executableOnly && isExecute) {
+              executeSpans.push({ start: i + tag.length, end: close });
+            }
           } else blank(i, close + tag.length);
           i = close + tag.length;
         } else {
@@ -550,6 +576,15 @@ function maskSql(sql, executableOnly, scanDoBodies = true) {
   return code.join("");
 }
 
+function overlayExecutePayloads(topLevel, executed, spans) {
+  if (spans.length === 0) return topLevel;
+  const out = topLevel.split("");
+  for (const { start, end } of spans) {
+    for (let k = start; k < end && k < executed.length; k++) out[k] = executed[k];
+  }
+  return out.join("");
+}
+
 /**
  * @param {{ name: string, sql: string }[]} migrations in apply order
  * @returns {{ table: string, migration: string }[]} persistent public tables
@@ -559,12 +594,16 @@ export function findTablesWithoutExplicitAcl(migrations) {
   const tables = new Map(); // table -> { migration, acl }
   for (const m of migrations) {
     const ddl = maskSql(m.sql, false);
-    const executed = maskSql(m.sql, true);
+    const executeSpans = [];
+    const executed = maskSql(m.sql, true, true, executeSpans);
     const topLevel = maskSql(m.sql, true, false);
+    const selectIntoSql = overlayExecutePayloads(topLevel, executed, executeSpans);
     const quoted = quotedIdentifierPositions(executed);
-    const quotedTopLevel = quotedIdentifierPositions(topLevel);
+    const quotedDdl = quotedIdentifierPositions(ddl);
+    const quotedSelectInto = quotedIdentifierPositions(selectIntoSql);
     const events = [];
     for (const match of ddl.matchAll(CREATE_HEAD_RE)) {
+      if (quotedDdl[match.index]) continue;
       const after = ddl.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
@@ -582,8 +621,8 @@ export function findTablesWithoutExplicitAcl(migrations) {
         events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
       }
     }
-    for (const match of topLevel.matchAll(SELECT_INTO_RE)) {
-      if (quotedTopLevel[match.index]) continue;
+    for (const match of selectIntoSql.matchAll(SELECT_INTO_RE)) {
+      if (quotedSelectInto[match.index]) continue;
       if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
       const table = publicTable(match[1], match[2]);
       if (table) events.push({ kind: "create", conditional: false, table, index: match.index });

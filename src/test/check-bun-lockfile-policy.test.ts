@@ -303,7 +303,7 @@ describe("evaluatePolicy", () => {
   });
 
   it.each([
-    ["@hono/node-server", "2.0.9"],
+    ["@hono/node-server", "2.1.2"],
     ["@modelcontextprotocol/sdk", "1.29.0"],
     ["hono", "4.12.33"],
     ["hono", "4.13.4"],

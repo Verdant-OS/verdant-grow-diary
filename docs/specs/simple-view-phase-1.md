@@ -18,12 +18,13 @@ A tired grower opens Verdant, understands the screen, saves a useful observation
 
 ## 3. What Phase 1 adds
 
-| Surface                                  | Behaviour                                                                                                                                                                               |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/` and `/dashboard`                     | Render `src/pages/Home.tsx`, which mounts `SimpleHome` or the existing `Dashboard` from the account-backed preference. Direct links keep working; `?growId=` scope is honoured by both. |
-| Simple home (`src/pages/SimpleHome.tsx`) | My plants (name, strain, stage, tent link), one prominent **Add an observation**, recent entries that reopen the saved entry on its Timeline anchor, and **Switch to Advanced view**.   |
-| Advanced (Dashboard)                     | Unchanged page. A one-line bar above it names the view and offers **Switch to Simple view**.                                                                                            |
-| Account › Preferences                    | A "Home view" card with both choices and the real save outcome.                                                                                                                         |
+| Surface                                  | Behaviour                                                                                                                                                                                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`                                      | Renders `src/pages/Home.tsx`, which mounts `SimpleHome` or the existing `Dashboard` from the account-backed preference. `?growId=` scope is honoured by both.                                                                                                            |
+| `/dashboard`                             | A direct link to the Dashboard is an explicit destination: always the Advanced view, with the Simple/Advanced bar above it. Choosing Simple there saves the choice and goes to `/`. Existing `dashboardPath()` links and the browser-census e2e spec keep their meaning. |
+| Simple home (`src/pages/SimpleHome.tsx`) | My plants (name, strain, stage, tent link), one prominent **Add an observation**, recent entries that reopen the saved entry on its Timeline anchor, and **Switch to Advanced view**.                                                                                    |
+| Advanced (Dashboard)                     | Unchanged page. A one-line bar above it names the view and offers **Switch to Simple view**.                                                                                                                                                                             |
+| Account › Preferences                    | A "Home view" card with both choices and the real save outcome.                                                                                                                                                                                                          |
 
 ### Quick Log targets
 

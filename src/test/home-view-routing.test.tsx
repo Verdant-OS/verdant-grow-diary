@@ -9,6 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
 const USER = "user-home-1";
 const META_KEY = "verdant_ui_view";
@@ -40,6 +41,17 @@ vi.mock("@/pages/Dashboard", () => ({
 import Home from "@/pages/Home";
 import { resetUiViewPreferenceStoreForTest } from "@/lib/uiViewPreferenceService";
 
+function renderHome(initialPath = "/") {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Home forceView="advanced" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 function accountAnswer(view: string | null) {
   return {
     data: { user: { id: USER, user_metadata: view ? { [META_KEY]: view } : {} } },
@@ -64,7 +76,7 @@ afterEach(() => cleanup());
 describe("Home view routing", () => {
   it("a grower with no explicit choice lands on Simple once the account confirms it", async () => {
     auth.getUser.mockResolvedValue(accountAnswer(null));
-    render(<Home />);
+    renderHome();
     expect(await screen.findByTestId("simple-home-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("dashboard-stub")).toBeNull();
   });
@@ -72,7 +84,7 @@ describe("Home view routing", () => {
   it("waits for the account answer instead of flashing Simple when nothing is known on this device", async () => {
     let release: (value: unknown) => void = () => {};
     auth.getUser.mockImplementation(() => new Promise((resolve) => (release = resolve)));
-    render(<Home />);
+    renderHome();
     expect(screen.getByTestId("home-view-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("simple-home-stub")).toBeNull();
     await act(async () => {
@@ -85,20 +97,20 @@ describe("Home view routing", () => {
   it("an Advanced choice carried by the session renders Advanced immediately", async () => {
     auth.user = { id: USER, user_metadata: { [META_KEY]: "advanced" } };
     auth.getUser.mockImplementation(() => new Promise(() => {}));
-    render(<Home />);
+    renderHome();
     expect(screen.getByTestId("dashboard-stub")).toBeInTheDocument();
   });
 
   it("switching to Advanced writes the account and flips the view; switching back works too", async () => {
     auth.getUser.mockResolvedValue(accountAnswer(null));
-    render(<Home />);
+    renderHome();
     await screen.findByTestId("simple-home-stub");
     // The Simple page is stubbed here; drive the switch through the preference card
     // path instead: render Home's own bar after an account-side Advanced value.
     cleanup();
     resetUiViewPreferenceStoreForTest();
     auth.getUser.mockResolvedValue(accountAnswer("advanced"));
-    render(<Home />);
+    renderHome();
     await screen.findByTestId("dashboard-stub");
     fireEvent.click(screen.getByTestId("ui-view-switch-to-simple"));
     await waitFor(() => expect(auth.updateUser).toHaveBeenCalledTimes(1));
@@ -113,7 +125,7 @@ describe("Home view routing", () => {
       data: { user: null },
       error: new Error("offline"),
     }));
-    render(<Home />);
+    renderHome();
     await screen.findByTestId("dashboard-stub");
     fireEvent.click(screen.getByTestId("ui-view-switch-to-simple"));
     expect(await screen.findByTestId("simple-home-stub")).toBeInTheDocument();
@@ -124,14 +136,34 @@ describe("Home view routing", () => {
   it("a failed account read keeps the device's last confirmed choice and labels it", async () => {
     window.localStorage.setItem(`verdant:uiView:${USER}`, "advanced");
     auth.getUser.mockResolvedValue({ data: { user: null }, error: new Error("network") });
-    render(<Home />);
+    renderHome();
     expect(await screen.findByTestId("dashboard-stub")).toBeInTheDocument();
     expect(await screen.findByTestId("ui-view-switch-account-unavailable")).toBeInTheDocument();
   });
 
   it("a failed account read with nothing cached shows Simple as the honest default", async () => {
     auth.getUser.mockRejectedValue(new Error("boom"));
-    render(<Home />);
+    renderHome();
     expect(await screen.findByTestId("simple-home-stub")).toBeInTheDocument();
+  });
+  it("a direct /dashboard link always renders Advanced, without waiting on the account read", async () => {
+    auth.getUser.mockImplementation(() => new Promise(() => {}));
+    renderHome("/dashboard");
+    expect(screen.getByTestId("dashboard-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("home-advanced-view")).toHaveAttribute(
+      "data-forced-view",
+      "advanced",
+    );
+    expect(screen.queryByTestId("home-view-loading")).toBeNull();
+  });
+
+  it("choosing Simple on /dashboard saves the choice and goes home to the Simple view", async () => {
+    auth.getUser.mockResolvedValue(accountAnswer(null));
+    renderHome("/dashboard");
+    fireEvent.click(screen.getByTestId("ui-view-switch-to-simple"));
+    await waitFor(() => expect(auth.updateUser).toHaveBeenCalledTimes(1));
+    expect(auth.updateUser.mock.calls[0][0]).toMatchObject({ data: { [META_KEY]: "simple" } });
+    expect(await screen.findByTestId("simple-home-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).toBeNull();
   });
 });

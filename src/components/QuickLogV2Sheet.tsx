@@ -2050,9 +2050,13 @@ function QuickLogV2SheetForOwner({
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
-      observationDraftSuppressedRef.current = true;
-      if (user?.id) {
-        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+      // A Feed's fields live in feedingForm, so the stored observation draft
+      // may still be another plant's unsaved note; only clear one this sheet owns.
+      if (observationDraftOwnedRef.current) {
+        observationDraftSuppressedRef.current = true;
+        if (user?.id) {
+          clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+        }
       }
       const savedPlantId = resolved.plantId ?? null;
       if (savedPlantId) {

@@ -51,6 +51,15 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const writeFeedingMock = vi.fn();
+vi.mock("@/lib/writeFeedingTypedEvent", () => ({
+  writeFeedingTypedEvent: (...args: unknown[]) => writeFeedingMock(...args),
+}));
+
+vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
+  useRecentFeedingsForDefaults: () => ({ data: [] }),
+}));
+
 const unitState = vi.hoisted(() => ({ unit: "fahrenheit" as "fahrenheit" | "celsius" }));
 vi.mock("@/hooks/useTemperatureUnitPreference", () => ({
   useTemperatureUnitPreference: () => unitState.unit,
@@ -138,6 +147,7 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
   beforeEach(() => {
     window.sessionStorage.clear();
     rpcMock.mockReset();
+    writeFeedingMock.mockReset();
     unitState.unit = "fahrenheit";
   });
 
@@ -193,6 +203,24 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     await failNoteOn("plant:plant-1", "invalid_details");
     renderSheet("plant:plant-2");
     expect(await screen.findByTestId("qlv2-note")).toHaveValue("");
+    cleanup();
+    renderSheet("plant:plant-1");
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("First leaves look pale");
+  });
+
+  it("keeps plant A's draft when a Feed is saved for plant B (Codex review)", async () => {
+    await failNoteOn("plant:plant-1", "invalid_details");
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-feed-b", reused: false });
+    renderSheet("plant:plant-2");
+    fireEvent.click(await screen.findByRole("button", { name: "Feed" }));
+    fireEvent.change(screen.getByLabelText("Nutrient line"), { target: { value: "veg-week-3" } });
+    fireEvent.change(screen.getByLabelText("Product 1 name"), { target: { value: "Base A" } });
+    fireEvent.change(screen.getByLabelText("Product 1 amount"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Applied volume (ml)"), { target: { value: "750" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
+    expect(storedDraftText()).toContain("First leaves look pale");
     cleanup();
     renderSheet("plant:plant-1");
     expect(await screen.findByTestId("qlv2-note")).toHaveValue("First leaves look pale");

@@ -69,6 +69,42 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-2057-SPEC-INHERITED-ENVIRONMENT
+
+```text
+TASK CODEX-2057-SPEC-INHERITED-ENVIRONMENT  priority: P2  status: OPEN
+goal: Close the two remaining specification gaps: inherited workflow environment coverage and current prospective implementation-review routing.
+why: A verifier's exact step env does not rule out inherited workflow-level secret bindings; the prospective route also named retired seats.
+branch: claude/proof-expected-sha-spec
+base: verdant-grow-diary at 59fd56421f57b23366258d1a9ed907699054103b (fresh remote tip verified 2026-10-27 UTC).
+checkout: Fetch the existing branch and base; verify current full PR head and scoped writer claim before adopting it in an isolated authorized cloud worktree. Use normal merges and pushes only.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2057
+head_sha: 656b5a3fbec8d26996972b4d69834425e439c75c is the verified source parent. This normal base-integration commit cannot name its own SHA; read the resulting full head from draft #2057 before checking CI/review.
+state: Documentation-only specification retained byte-for-byte from source 656b5a3fbec8d26996972b4d69834425e439c75c. One normal base merge resolves only this log insertion conflict and preserves every incoming base byte outside this own block. Hosted CI and independent acceptance must be fresh at the resulting head.
+current_step: Fresh previously uninvolved writer reproduced the HANDOFF_LOG-only conflict with merge-tree, merged the current deploy tip normally and retained the complete incoming log. Local validation PASS: 4 contract files/337 tests/0 failures/0 skips; all 3 docs-safety categories; 9 release docs; 2-file format; 12-file Sentinel parity with 0 governance edits; base-relative whitespace and strict scorer checks. Normal hooks run at commit; no executable proof implementation is added.
+next_action: Coordinator verifies the published resulting full head and fresh required/supplemental CI, then returns the complete resulting spec/log/body to the existing non-contributing Sour Diesel session 48794c65-be1c-45f8-97e0-a89952916747 for another review. Preserve draft; no duplicate review request, automatic requeue, ready, merge or production action.
+post_merge_check: Confirm the landed spec retains the inheritance mutation requirement, dated exception and explicit protected implementation gates. Production proof execution remains NOT_MEASURED and requires separate authorization.
+active_writer: Fresh Codex PR #2057 conflict writer, delegated by the closeout coordinator under Matthew's 2026-10-27 03:57 UTC instruction for a previously uninvolved writer. Sole source writer for this bounded base merge; after verified push, explicitly STOP and hand source back to the coordinator before metadata publication.
+decisions: Preserve dated citations and the one-time Graft exception; prospective implementation review uses actual available eligible independent sessions and excludes contributors. Review eligibility does not unlock workflows/scorers or authorize production.
+tried_and_rejected: Treating an exact step mapping as proof of no inherited secret; claiming existing job-env checks are absent; rejecting accurate dated citations solely due to age; assigning retired reviewers or accepting our own repair.
+commands: PATH=/workspace/scratch/claude-closeout-20261026/tools/bun-1.3.14:$PATH; git merge-tree --write-tree 656b5a3fbec8d26996972b4d69834425e439c75c 59fd56421f57b23366258d1a9ed907699054103b; git merge --no-commit --no-ff 59fd56421f57b23366258d1a9ed907699054103b; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 59fd56421f57b23366258d1a9ed907699054103b --strict; node scripts/check-sentinel-version-parity.mjs 59fd56421f57b23366258d1a9ed907699054103b; node node_modules/vitest/vitest.mjs run src/test/actions-production-readonly-proof.test.ts src/test/settings-account-production-proof.test.ts src/test/signed-in-readonly-proof.test.ts src/test/one-tent-authenticated-proof-workflow.test.ts --pool=forks --maxWorkers=1; node node_modules/prettier/bin/prettier.cjs --check docs/specs/proof-dispatch-expected-sha.md docs/agents/HANDOFF_LOG.md; git diff --check 59fd56421f57b23366258d1a9ed907699054103b.
+validation_scope: Canonical Bun1.3.14; existing own-worktree dependencies reused only after package.json and bun.lock hashes matched the successful 918-package frozen-install receipt and incoming base. Source-relative strict scorer exits2 with 26 locked scorer imports; each and all 78 imported nonlog paths are exactly the deploy-base blob, so no authored scorer change or new unlock is claimed. Full app suite/build and production proof remain NOT_MEASURED; fresh hosted CI and independent acceptance remain required.
+files_touched: Manual change: docs/agents/HANDOFF_LOG.md, this own block only. docs/specs/proof-dispatch-expected-sha.md stays exactly the source blob. Normal merge imports unrelated incoming base files without authoring or altering them.
+files_remaining: None planned for this specification repair; future protected workflow/script/test implementation is outside this slice.
+blockers: Sour Diesel final FAIL review 5661894793 at 656b5a3fbec8d26996972b4d69834425e439c75c found only the merge conflict (P1:1/P2:0/P3:0). This repair requires fresh resulting-head CI and full independent re-review; neither an old review nor local success is acceptance. Future implementation mutation execution and production behavior remain NOT_MEASURED.
+open_questions: None for the bounded conflict repair; coordinator owns current-head CI/review follow-through. Shared live-session registry is unavailable; explicit sole-writer delegation and supplied holds control this slice.
+gotchas: Prior queue entry was normally removed and verified at 2026-10-26 18:23:51 UTC. No repeat dequeue, automatic requeue, real secret access or production dispatch.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2057#issuecomment-6421533419; https://github.com/Verdant-OS/verdant-grow-diary/pull/2057#discussion_r4380374686
+artifacts: Current PR description and hosted checks; compact local source/merge/validation/push receipts in /workspace/scratch/claude-closeout-20261026/2057-fresh-required-base-integration/. Older 2057 receipts are dated history.
+reviewer_seat: Existing non-contributing Sour Diesel Grok session 48794c65-be1c-45f8-97e0-a89952916747. Exclude original Claude contributors, every actual author/repairer and all Codex sessions including this fresh conflict writer. Historical one-time Graft specification exception remains history; future protected implementation needs separate authorization and eligible acceptance.
+reviewer_sha: NOT_MEASURED for the resulting merge head. Sour Diesel FAIL 5661894793 binds only to source 656b5a3fbec8d26996972b4d69834425e439c75c and remains historical evidence until fresh review.
+session_state: Fresh isolated conflict writer; no prior involvement in #2057. No external comment/body/review request, workflow dispatch, secret read, scorer unlock, queue or production operation. Coordinator handles metadata only after explicit source STOP/handoff.
+ownership_history: Earlier Codex claim 01a16de3-1885-74b8-8142-25b4c333d0cd at 2026-10-26 19:16 UTC prematurely treated the October16 named Claude transfer (receipt6222263704) as expired ordinary coverage; that was not a released holder. Matthew explicitly accepted retaining the already-published two-file repair under Codex at 2026-10-26 20:50 UTC and confirmed Claude stopped. This resolves the current assignment; it does not retroactively authorize or erase the earlier mistake. Historical premature-claim correction and actual handoff stay in the PR body.
+claimed_by: Fresh Codex #2057 conflict writer, 2026-10-27 UTC, under the explicit coordinator delegation of Matthew's 03:57 UTC instruction; earlier Codex claim and accepted handoff preserved in ownership_history.
+owner: Codex closeout coordinator; sole source repair delegated to this fresh writer until explicit STOP/handoff. Independent acceptance and normal merge authority remain separate.
+last_updated: 2026-10-27 04:05 UTC, by fresh Codex #2057 conflict writer
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

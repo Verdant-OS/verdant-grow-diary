@@ -77,6 +77,12 @@ const scoped = vi.hoisted(() => ({
   reload: vi.fn(async () => {}),
 }));
 const sheetProps = vi.hoisted(() => ({ calls: [] as Record<string, unknown>[] }));
+const entitlements = vi.hoisted(() => ({
+  loading: false,
+  lookupFailed: false,
+  maxActiveGrows: 1 as number | null,
+}));
+const rename = vi.hoisted(() => ({ renameGrow: vi.fn() }));
 const viewPreference = vi.hoisted(() => ({
   view: "simple",
   source: "default",
@@ -114,6 +120,17 @@ vi.mock("@/hooks/useDashboardScopedData", () => ({
 }));
 vi.mock("@/hooks/useUiViewPreference", () => ({
   useUiViewPreference: () => viewPreference,
+}));
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: entitlements.loading,
+    lookupFailed: entitlements.lookupFailed,
+    entitlement: { capabilities: { maxActiveGrows: entitlements.maxActiveGrows } },
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock("@/lib/growRenameService", () => ({
+  renameGrow: (...args: unknown[]) => rename.renameGrow(...args),
 }));
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 vi.mock("@/components/QuickLogV2Sheet", () => ({
@@ -167,6 +184,10 @@ beforeEach(() => {
   tentsQuery.refetch.mockClear();
   plantsQuery.refetch.mockClear();
   sheetProps.calls.length = 0;
+  entitlements.loading = false;
+  entitlements.lookupFailed = false;
+  entitlements.maxActiveGrows = 1;
+  rename.renameGrow.mockReset();
 });
 
 afterEach(() => cleanup());
@@ -335,13 +356,25 @@ describe("SimpleHome — setup, loading and error states", () => {
     expect(screen.getByTestId("simple-home")).toHaveAttribute("data-simple-home-state", "ready");
   });
 
-  it("no tent and no plant each link to the matching existing page", () => {
+  it("no tent and no plant each resume the existing setup flow, with the plain page second", () => {
     tentsQuery.data = [];
     plantsQuery.data = [];
     renderHome();
-    expect(screen.getByTestId("simple-home-no-tent-cta")).toHaveAttribute(
+    expect(screen.getByTestId("simple-home-no-tent")).toHaveAttribute(
+      "data-setup-kind",
+      "continue",
+    );
+    expect(screen.getByTestId("simple-home-no-tent-step-grow")).toHaveAttribute(
+      "data-done",
+      "true",
+    );
+    expect(screen.getByTestId("simple-home-no-tent-cta")).toHaveAttribute("href", "/start-room");
+    expect(screen.getByTestId("simple-home-no-tent-secondary")).toHaveAttribute(
       "href",
       `/tents?growId=${GROW}`,
+    );
+    expect(screen.getByTestId("simple-home-no-tent-allowance")).toHaveTextContent(
+      "“Grow one” is it",
     );
     cleanup();
     tentsQuery.data = [
@@ -358,10 +391,58 @@ describe("SimpleHome — setup, loading and error states", () => {
     ];
     plantsQuery.data = [];
     renderHome();
-    expect(screen.getByTestId("simple-home-no-plant-cta")).toHaveAttribute(
+    expect(screen.getByTestId("simple-home-no-plant-step-tent")).toHaveAttribute(
+      "data-done",
+      "true",
+    );
+    expect(screen.getByTestId("simple-home-no-plant-cta")).toHaveAttribute("href", "/start-room");
+    expect(screen.getByTestId("simple-home-no-plant-secondary")).toHaveAttribute(
       "href",
       `/plants?growId=${GROW}`,
     );
+  });
+
+  it("with several grows the setup card sends to the scoped plain page, not the wizard", () => {
+    growsState.grows = [
+      { id: GROW, name: "Grow one" },
+      { id: "22222222-2222-4222-8222-222222222222", name: "Grow two" },
+    ];
+    growsState.activeGrowId = GROW;
+    tentsQuery.data = [];
+    plantsQuery.data = [];
+    renderHome();
+    expect(screen.getByTestId("simple-home-no-tent-cta")).toHaveAttribute(
+      "href",
+      `/tents?growId=${GROW}`,
+    );
+    expect(screen.queryByTestId("simple-home-no-tent-secondary")).toBeNull();
+    expect(screen.queryByTestId("simple-home-no-tent-rename")).toBeNull();
+  });
+
+  it("an unknown plan makes no allowance claim; the no-grow card says nothing is created by visiting", () => {
+    entitlements.lookupFailed = true;
+    growsState.grows = [];
+    renderHome();
+    expect(screen.getByTestId("simple-home-no-grow")).toHaveAttribute("data-setup-kind", "start");
+    expect(screen.queryByTestId("simple-home-no-grow-allowance")).toBeNull();
+    expect(screen.getByTestId("simple-home-no-grow")).toHaveTextContent(
+      /Nothing is created by visiting this page/,
+    );
+    expect(screen.getByTestId("simple-home-no-grow-cta")).toHaveAttribute("href", "/start-room");
+  });
+
+  it("renaming the one existing grow writes through the service and refreshes the grows read", async () => {
+    tentsQuery.data = [];
+    plantsQuery.data = [];
+    rename.renameGrow.mockResolvedValue({ ok: true, name: "Veg room" });
+    renderHome();
+    fireEvent.click(screen.getByTestId("simple-home-no-tent-rename-toggle"));
+    fireEvent.change(screen.getByTestId("simple-home-no-tent-rename-input"), {
+      target: { value: "Veg room" },
+    });
+    fireEvent.click(screen.getByTestId("simple-home-no-tent-rename-save"));
+    await waitFor(() => expect(growsState.refresh).toHaveBeenCalledTimes(1));
+    expect(rename.renameGrow).toHaveBeenCalledWith(GROW, "Veg room");
   });
 
   it("loading never reads as empty", () => {

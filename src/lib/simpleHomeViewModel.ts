@@ -25,18 +25,8 @@ export const SIMPLE_HOME_COPY = {
   recentHeading: "Recent entries",
   openEntry: "Open this entry",
   viewTimeline: "See the full timeline",
-  noGrowTitle: "Set up your grow",
-  noGrowBody:
-    "Verdant keeps your notes by grow → tent → plant. Set up your first grow, tent and plant, then come back here to log.",
-  noGrowCta: "Start setup",
   chooseGrowTitle: "Which grow do you want to work in?",
   chooseGrowBody: "You have more than one grow. Pick the one you are tending now.",
-  noTentTitle: "Add a tent",
-  noTentBody: "Your grow has no tent yet. Add one, then add the plants that live in it.",
-  noTentCta: "Add a tent",
-  noPlantTitle: "Add your first plant",
-  noPlantBody: "Your tent is ready. Add a plant so your observations have somewhere to live.",
-  noPlantCta: "Add a plant",
   recentEmpty: "No entries yet. Your first observation will show up here.",
   recentUnavailable: "Couldn't load recent entries.",
   recentLoading: "Loading recent entries…",
@@ -48,6 +38,7 @@ export const SIMPLE_HOME_COPY = {
     "This plant isn't linked to a grow yet, so Quick Log can't file its notes.",
 } as const;
 
+/** The existing Start Your Room flow; it resumes a partial single-grow room. Setup card copy lives in simpleHomeSetupRules. */
 export const SIMPLE_HOME_SETUP_ROUTE = "/start-room" as const;
 
 export interface SimpleHomePlantRow {

@@ -2,7 +2,7 @@
 
 **Status: IMPLEMENTED on branch `claude/verdant-simplification-ki5ccn` (PR #2615); Phase 1 approved by Matthew 2026-10-29 ("approved. phase 2"). Phase approval is not deployment approval; the PR still needs its merge gate.**
 **Owner:** Claude (assigned by Matthew, 2026-10-29). Matthew is the per-phase approver.
-**Program:** four phases (Simple View foundation → easy setup/pause/recovery → persistent guidance → full-journey polish). Phase 1 is built and approved; Phase 2 is next (its spec lands as `docs/specs/simple-view-phase-2.md`).
+**Program:** four phases (Simple View foundation → easy setup/pause/recovery → persistent guidance → full-journey polish). Phase 1 is built and approved; Phase 2 is built and specified in `docs/specs/simple-view-phase-2.md`.
 
 ## 1. Goal
 
@@ -32,7 +32,7 @@ The big button opens Quick Log V2 with **no preselected target**; the sheet asks
 
 ### Honest states
 
-Loading stays loading. A failed grows/tents/plants read is an error with **Try again** (grows store refresh, React Query refetch). A setup gap leads into the existing flow: no grow → `/start-room`, no tents and no plants → `/tents?growId=`, tents but no plant → `/plants?growId=`. Plants are read before any gap is declared: a grow with active plants and no tent is a supported state and renders ready ("Tent not set" on the row). A legacy plant with no `grow_id` of its own stays visible but gets no Quick Log button (the sheet fails closed on it); its row links to Plant Detail, where the grow-context rescue card repairs it. Several grows with no active or URL scope asks the grower which grow; nothing is picked for them. "No entries yet" appears only after a successful empty read.
+Loading stays loading. A failed grows/tents/plants read is an error with **Try again** (grows store refresh, React Query refetch). A setup gap renders the setup card (Phase 1 linked straight to `/start-room`, `/tents?growId=` and `/plants?growId=`; Phase 2 replaces those three cards with the Continue-setup card in `docs/specs/simple-view-phase-2.md`). Plants are read before any gap is declared: a grow with active plants and no tent is a supported state and renders ready ("Tent not set" on the row). A legacy plant with no `grow_id` of its own stays visible but gets no Quick Log button (the sheet fails closed on it); its row links to Plant Detail, where the grow-context rescue card repairs it. Several grows with no active or URL scope asks the grower which grow; nothing is picked for them. "No entries yet" appears only after a successful empty read.
 
 ## 4. Account-backed preference — smallest extension found
 

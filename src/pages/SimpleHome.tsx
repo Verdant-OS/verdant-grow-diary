@@ -19,6 +19,7 @@ import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import SimpleHomeSetupCard from "@/components/SimpleHomeSetupCard";
 import UiViewSwitch from "@/components/UiViewSwitch";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -27,12 +28,14 @@ import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useUiViewPreference } from "@/hooks/useUiViewPreference";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { renameGrow } from "@/lib/growRenameService";
+import { buildSimpleHomeSetupProgress } from "@/lib/simpleHomeSetupRules";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import { timelinePath } from "@/lib/routes";
 import {
   buildSimpleHomeState,
   SIMPLE_HOME_COPY,
-  SIMPLE_HOME_SETUP_ROUTE,
   resolveSimpleHomeGrowId,
   selectSimpleHomeRecentEntries,
   type SimpleHomeReadStatus,
@@ -57,6 +60,15 @@ export default function SimpleHome() {
   const { grows, activeGrowId, loading: growsLoading, error: growsError, refresh } = useGrows();
   const { scopedGrow } = useScopedGrow();
   const scopedGrowId = scopedGrow?.id ?? null;
+  // Presentation only: the allowance line on the setup card. The server still
+  // decides every create; unknown capabilities render no allowance claim.
+  const {
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+  } = useMyEntitlements();
+  const capabilities =
+    entitlementLoading || entitlementLookupFailed ? null : entitlement.capabilities;
 
   // Resolve the grow first so tent and plant reads are scoped to it.
   const growId = growsLoading
@@ -145,31 +157,19 @@ export default function SimpleHome() {
         />
       ) : null}
 
-      {state.kind === "no-grow" ? (
-        <SetupCard
-          testId="simple-home-no-grow"
-          title={SIMPLE_HOME_COPY.noGrowTitle}
-          body={SIMPLE_HOME_COPY.noGrowBody}
-          cta={SIMPLE_HOME_COPY.noGrowCta}
-          href={SIMPLE_HOME_SETUP_ROUTE}
-        />
-      ) : null}
-      {state.kind === "no-tent" ? (
-        <SetupCard
-          testId="simple-home-no-tent"
-          title={SIMPLE_HOME_COPY.noTentTitle}
-          body={SIMPLE_HOME_COPY.noTentBody}
-          cta={SIMPLE_HOME_COPY.noTentCta}
-          href={state.href}
-        />
-      ) : null}
-      {state.kind === "no-plant" ? (
-        <SetupCard
-          testId="simple-home-no-plant"
-          title={SIMPLE_HOME_COPY.noPlantTitle}
-          body={SIMPLE_HOME_COPY.noPlantBody}
-          cta={SIMPLE_HOME_COPY.noPlantCta}
-          href={state.href}
+      {state.kind === "no-grow" || state.kind === "no-tent" || state.kind === "no-plant" ? (
+        <SimpleHomeSetupCard
+          key={state.kind}
+          testId={`simple-home-${state.kind}`}
+          progress={buildSimpleHomeSetupProgress({
+            state,
+            grows,
+            activeGrowId,
+            tentCount: Array.isArray(tentsQuery.data) ? tentsQuery.data.length : 0,
+            capabilities,
+          })}
+          onRename={renameGrow}
+          onRenamed={() => void refresh()}
         />
       ) : null}
 
@@ -318,41 +318,6 @@ export default function SimpleHome() {
         defaultAction="note"
       />
     </div>
-  );
-}
-
-function SetupCard({
-  testId,
-  title,
-  body,
-  cta,
-  href,
-}: {
-  testId: string;
-  title: string;
-  body: string;
-  cta: string;
-  href: string;
-}) {
-  return (
-    <section
-      data-testid={testId}
-      className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center md:p-8"
-      aria-label={title}
-    >
-      <h2 className="font-display text-xl font-semibold md:text-2xl">{title}</h2>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-        {body}
-      </p>
-      <div className="mt-5 flex justify-center">
-        <Button asChild size="lg" className="min-h-12 gradient-leaf text-primary-foreground">
-          <Link to={href} data-testid={`${testId}-cta`}>
-            {cta}
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </Button>
-      </div>
-    </section>
   );
 }
 

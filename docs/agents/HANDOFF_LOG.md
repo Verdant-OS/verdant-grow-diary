@@ -69,6 +69,62 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES
+
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES  priority: other  status: OPEN
+goal: Finish #1934's existing dashboard spec/helper closeout while preserving approved E2E changes and #1933's separate #1927 receipt closure.
+why: The prior log still requested an already-granted scorer decision and retired reviewer, and the spec prohibited normal queue waiting despite current policy.
+branch: claude/dashboard-single-log-entry-coderabbit-fixes
+base: verdant-grow-diary at e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+checkout: git fetch origin claude/dashboard-single-log-entry-coderabbit-fixes verdant-grow-diary; verify the PR's full current head before checkout or normal integration
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1934 (draft)
+head_sha: 21dd957ef5b35df1d82d4b6b7759f9d1265839f6; verified published source checkpoint before this docs repair, not the resulting commit SHA
+state: Existing approved helper move and E2E behavior retained. Normal base integration and bounded docs repair; read the PR for resulting head and fresh CI. Old source CI/reviews do not cover it.
+next_action: Verify/publish the resulting head when existing normal Git authentication is restored, finish local checks and hosted CI, then route one full-scope eligible outside review. Keep draft; no self-acceptance or queue from this handoff.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd; accepted Matthew handoff/Claude cessation2026-10-26 20:50UTC; serialized after1933 local receipt repair
+claimed_by: Codex2026-10-26 21:01UTC, issuecomment-6427225779. Original Claude Terminal[b6d701] attribution remains historical below.
+files: docs/specs/dashboard-single-log-entry-readiness-marker.md; docs/agents/HANDOFF_LOG.md (own block); existing approved helper and two E2E files remain in complete PR scope but receive no new manual edit.
+scorer_approval: Existing Matthew Oct16 approval at source21dd957e for e2e/core-link-form-census.spec.ts and e2e/dashboard-mobile-overflow.spec.ts is preserved by issuecomment-6223031423; no new/broader unlock or test assertion change.
+decisions: Current eligible-session routing and normal protected queue wording replace retired prospective seats/no-auto-merge. Preserve dated #1844 decisions and #1933's division of log work.
+tried_and_rejected: Do not reask the granted scorer approval, edit locked tests, infer current review from old no-findings automation, or manufacture another PR for blocked pushes.
+commands: bunx vitest run src/test/loop-engineering-doc.test.ts src/test/core-link-form-census-rules.test.ts src/test/measure-test-estate-rules.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts --reporter=dot; node scripts/assert-docs-safety.mjs; node scripts/check-sentinel-version-parity.mjs e18e067af80fcb3eb32b37f1e046fa725bba8a9d
+blockers: Existing cloud Git authentication is unavailable; preserve local work, no auth/ref workaround. Fresh resulting-head CI and eligible outside exact-head acceptance remain pending.
+open_questions: Required/supplemental results and actually available eligible outside session after CI precheck.
+gotchas: Full mixed scope includes both previously approved E2E scorers and shared helper. Review the whole PR; Codex repaired docs and cannot accept it. No production/authenticated live E2E operation granted.
+artifacts: #1934 claim6427225779, historical scorer receipt6223031423, existing source review history. Local docs/check receipts supplement the published packet.
+reviewer_seat: Available eligible non-contributing outside session under OWNERSHIP4.3; no new request or PASS implied.
+post_merge_check: Verify retained helper and closed #1844 receipt, current routing and complete #1933 receipt stack after their serialized integrations. Release/live NOT_MEASURED.
+owner: Codex bounded closeout; named product/protected/production holds unchanged
+last_updated: 2026-10-26 16:03 CT, by Codex closeout
+historical_snapshot_20261016: Full prior own block retained below; fields are dated history, not current blockers or routes.
+historical_20261016_goal: land CodeRabbit's findings on #1844's merged head 2df60a64 (#1844 was in the merge queue and
+historical_20261016_  could not take the push): spec §7 records the D1.1-A/D1.2-A outcome; spec §6/§9 name the
+historical_20261016_  merge-queue owner role; visibleLogControls moves to e2e/lib with no behavior change. Docs and
+historical_20261016_  e2e helper only; no product code, supabase/, lockfile or governance file.
+historical_20261016_branch: claude/dashboard-single-log-entry-coderabbit-fixes
+historical_20261016_base: verdant-grow-diary
+historical_20261016_checkout: git switch claude/dashboard-single-log-entry-coderabbit-fixes && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+historical_20261016_pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1934 (open, not draft)
+historical_20261016_head_sha: parent of the commit that records this line. Observed remote head before this update:
+historical_20261016_  a0157543409e9a515c2daa87ad805182e788a0bd (2026-10-16 18:40 UTC), 35/35 required SUCCESS there.
+historical_20261016_  This update adds a base-merge commit (aff3a19b6, merging e136fa44f) and this fix commit; read
+historical_20261016_  the PR for the current head and re-measure CI there.
+historical_20261016_state: pushed. Codex outside review at a01575434: BLOCKED (two existing e2e specs are locked
+historical_20261016_  scorers; editing them needs Matthew's per-item approval). This update fixes Codex's P2 (full
+historical_20261016_  head SHA) and CodeRabbit's minors at a01575434 (block order, stale head, spec §5.2 mobile count).
+historical_20261016_  Closing CLAUDE-CODE-ACTION-002 is left to #1933 so the two PRs do not both edit it.
+historical_20261016_next_action: Matthew's per-item scorer approval for e2e/core-link-form-census.spec.ts and
+historical_20261016_  e2e/dashboard-mobile-overflow.spec.ts; then Critical Mass exact-head review at the current head.
+historical_20261016_files: docs/specs/dashboard-single-log-entry-readiness-marker.md; e2e/lib/visibleLogControls.ts (new);
+historical_20261016_  e2e/core-link-form-census.spec.ts; e2e/dashboard-mobile-overflow.spec.ts; docs/agents/HANDOFF_LOG.md
+historical_20261016_blockers: scorer approval (Matthew); independent exact-head PASS (Critical Mass). #1924 has merged.
+historical_20261016_artifacts: PR #1934 body and comments
+historical_20261016_reviewer_seat: Critical Mass (docs and e2e)
+historical_20261016_claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:39 UTC (PR #1934 issuecomment-6222276433; Matthew's 2026-10-16 transfer)
+historical_20261016_last_updated: 2026-10-16 13:45 CT, by Claude (close-out session)
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text
@@ -842,27 +898,6 @@ claimed_by: bc-9958d146, 2026-10-14 13:18 CT
 last_updated: 2026-10-14 13:18 CT, by bc-9958d146
 ```
 
-```text
-TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: OPEN
-goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,
-  D1.2-A, decided 2026-10-06); add the dashboard-ready readiness marker; renegotiate E1-E4 and
-  U1-U4 per docs/specs/dashboard-single-log-entry-readiness-marker.md
-branch: claude/dashboard-single-log-entry
-base: verdant-grow-diary
-checkout: git switch claude/dashboard-single-log-entry && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1844
-head_sha: read from the PR (a commit cannot contain its own SHA); implementation commit follows 42d195f01
-state: pushed draft, CI pending
-next_action: drive 35/35 required checks green; request Blue Dream (Dashboard.tsx) and Critical Mass (tests, e2e)
-files: src/pages/Dashboard.tsx; src/test/dashboard-single-log-entry.test.tsx (new); U1-U4 and the
-  D1.1-A pins (first-plant-memory-cta, onboarding-checklist-view-model); e2e E1-E4; the spec
-blockers: none
-artifacts: PR #1844 body (RED/GREEN counts, e2e runs)
-reviewer_seat: Blue Dream (Dashboard.tsx), Critical Mass (tests, e2e)
-claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
-last_updated: 2026-10-06 16:05 CT, by Claude
-```
-
 ### HANDOFF-CONTINUITY-20261024
 
 ```text
@@ -952,6 +987,35 @@ last_updated: 2026-10-28 01:30 UTC, by Claude
 ```
 
 ## Closed
+
+### DASHBOARD-SINGLE-LOG-ENTRY
+
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: CLOSED
+goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,
+  D1.2-A, decided 2026-10-06); add the dashboard-ready readiness marker; renegotiate E1-E4 and
+  U1-U4 per docs/specs/dashboard-single-log-entry-readiness-marker.md
+branch: claude/dashboard-single-log-entry
+base: verdant-grow-diary
+checkout: None; closed (merged)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1844 (merged)
+head_sha: 2df60a6423bbf0898c3a7c8dbc42498dad59e6de, the merged head
+state: Merged via #1844 as 1209caaba6044fa0de790505a9ed28d79593e2bd at 2026-10-06 22:33 UTC
+  (merge queue; enqueued by the cheekhimself account). On that head: required checks 35/35
+  PASS; Codex code and security review no findings; CodeRabbit 3 minor + 1 nitpick. Blue Dream
+  and Critical Mass verdicts at that head: NOT_MEASURED (none posted before the merge).
+next_action: None; closed. CodeRabbit's findings at 2df60a64 land in the follow-up branch
+  claude/dashboard-single-log-entry-coderabbit-fixes (docs and e2e helper only).
+files: src/pages/Dashboard.tsx; src/test/dashboard-single-log-entry.test.tsx (new); U1-U4 and the
+  D1.1-A pins; grow-scoped-cta-growid; e2e E1-E4; the spec
+blockers: None for this closed task.
+artifacts: PR #1844 body (RED/GREEN counts, e2e runs)
+reviewer_seat: Blue Dream (Dashboard.tsx), Critical Mass (tests, e2e)
+claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
+last_updated: 2026-10-06 22:40 UTC, by Claude
+closure: Merged as 1209caaba from head 2df60a64. Production behavior NOT_MEASURED: a merge is not a
+  release until live /version.json reports the SHA.
+```
 
 ### STOP-SELLING-FOUNDER-LIFETIME
 

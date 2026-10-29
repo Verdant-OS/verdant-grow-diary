@@ -76,6 +76,8 @@ export type PendingState =
 export interface UseDashboardScopedData {
   recent: RecentState;
   pending: PendingState;
+  /** Re-run both reads for the current scope (same guards as the initial load). */
+  reload: () => Promise<void>;
 }
 
 async function readDashboardRecent(growId: string): Promise<RecentState> {
@@ -238,7 +240,7 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
     load();
   }, [load]);
 
-  return { recent, pending };
+  return { recent, pending, reload: load };
 }
 
 export default useDashboardScopedData;

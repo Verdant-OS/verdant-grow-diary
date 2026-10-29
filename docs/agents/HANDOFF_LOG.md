@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SIMPLE-VIEW-PHASE-1
+
+```text
+TASK SIMPLE-VIEW-PHASE-1  priority: P2  status: OPEN
+goal: Phase 1 of the four-phase simplification: Simple View is the home surface at / and /dashboard for every grower with no explicit choice (plants with tent context, one Add an observation button, recent entries that reopen the saved entry), with an obvious Advanced View switch and an account-backed explicit view preference that phone and desktop share.
+why: Matthew's 2026-10-29 brief: make the shallow end ankle-deep; a tired grower should understand the screen, save an observation and find it again. Phase approvals are Matthew's, one phase at a time; Brain In Jar/Codex is not an approval gate or relay for this work.
+branch: claude/verdant-simplification-ki5ccn
+base: verdant-grow-diary
+checkout: git fetch origin claude/verdant-simplification-ki5ccn verdant-grow-diary && git switch claude/verdant-simplification-ki5ccn && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft PR from this branch; read URL and head from GitHub
+head_sha: read origin/claude/verdant-simplification-ki5ccn
+state: pushed draft; awaiting Matthew's Phase 1 review, CI and an independent exact-head review
+current_step: Phase 1 implemented with tests; Phases 2-4 not started by design (each needs Matthew's explicit approval of the prior phase).
+next_action: Matthew reviews docs/specs/simple-view-phase-1.md section 7 and the PR; on approval, start Phase 2 (easy setup, pause and recovery) on the same branch or a stacked branch as Matthew prefers. Until then: keep CI green and answer review threads only.
+post_merge_check: after Publish, sign in on the disposable fixture account (no saved view): / renders the Simple home, a plant row's Add an observation saves a note tagged [smoke <timestamp>] and Open this entry lands on that Timeline anchor; Switch to Advanced view persists across a reload and a second device. NOT_MEASURED until live /version.json reports the merged SHA.
+active_writer: Claude session_017UoYKwd1Xq18V6DhSBjxFc
+decisions: preference stored in the user's own auth metadata key verdant_ui_view via auth.updateUser/getUser (no table, column, RLS, migration or auth-config change; profiles has no preference column and a migration needs Matthew to name it); settled account read > session copy > per-user device cache > default, and the default is never reported as explicit; Home waits (bounded 4 s) when nothing explicit is known on the device instead of flashing Simple; failed read keeps the device cache and says so, failed write keeps the chosen view for the session and reports it; the big button opens Quick Log V2 with no target and each plant row's own button opens it on that plant (explicit; remembered-target and only-plant auto-selection stay banned); several grows with no scope is a choice, never a pick; Dashboard.tsx is untouched and Advanced is reached through a one-line bar above it; Settings.tsx, Onboarding.tsx and StartYourRoom.tsx are not edited (open PRs #2032/#1979 consolidations, #2582, #2565).
+tried_and_rejected: wrapping the view switch inside Dashboard.tsx (pinned source tests and a 2,104-line file; a separate Home page keeps Dashboard byte-identical); extending the Quick Log V2 open-intent contract to a note action (it is a closed Water contract; the Simple home owns its own QuickLogV2Sheet instead, the same pattern PlantDetail uses); a localStorage-only preference (fails the cross-device requirement).
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/ui-view-preference-rules.test.ts src/test/ui-view-preference-service.test.ts src/test/simple-home-view-model.test.ts src/test/simple-home-render.test.tsx src/test/home-view-routing.test.tsx src/test/root-entry-routing.test.tsx src/test/account-preferences.test.tsx --reporter=dot
+files_touched: src/lib/uiViewPreferenceRules.ts (new); src/lib/uiViewPreferenceService.ts (new); src/lib/simpleHomeViewModel.ts (new); src/hooks/useUiViewPreference.ts (new); src/components/UiViewSwitch.tsx (new); src/pages/SimpleHome.tsx (new); src/pages/Home.tsx (new); src/components/RootEntry.tsx (lazy import Home); src/routes/_app/dashboard.tsx (renders Home); src/pages/AccountPreferences.tsx (Home view card); src/hooks/useDashboardScopedData.ts (additive reload); src/test/root-entry-routing.test.tsx (mock path renegotiated: pages/Dashboard -> pages/Home); new tests src/test/{ui-view-preference-rules,ui-view-preference-service,simple-home-view-model}.test.ts and src/test/{simple-home-render,home-view-routing}.test.tsx; docs/specs/simple-view-phase-1.md (new); docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: none for Phase 1
+blockers: Matthew's Phase 1 approval before Phase 2; independent exact-head review by an eligible non-contributing session (not Codex per Matthew's brief for this work)
+open_questions: (1) Should the sidebar "Dashboard" label become "Home" now that / opens the chosen view (deferred to Phase 4 copy pass unless Matthew wants it now)? (2) Playwright post-deploy specs assume the Advanced layout at /; the Simple home carries the dashboard-ready marker but census counts will differ after deploy.
+gotchas: open PR #2558 edits RootEntry.tsx's loader two lines below the lazy import this PR changes; forward-merge, do not rebase. Page tests that mock @/integrations/supabase/client without an auth surface read the preference as unavailable by design (resolveUiViewAuthClient). The typecheck needs NODE_OPTIONS=--max-old-space-size=8192 in this container.
+links: docs/specs/simple-view-phase-1.md
+artifacts: PR checks; docs/specs/simple-view-phase-1.md
+reviewer_seat: not assigned (this session excluded as author; Codex excluded by Matthew's brief for this work)
+reviewer_sha: none
+session_state: Claude cloud session session_017UoYKwd1Xq18V6DhSBjxFc; no routines; no paused workflows; pending human decision: Phase 1 approval
+claimed_by: Claude session_017UoYKwd1Xq18V6DhSBjxFc, 2026-10-29 (Matthew's direct assignment in this session)
+owner: Claude session_017UoYKwd1Xq18V6DhSBjxFc (default inheritor OG Kush)
+last_updated: 2026-10-29 10:00 CT, by Claude
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

@@ -6,10 +6,11 @@ import {
   shouldTrackRootLandingPageView,
 } from "@/lib/rootEntryRules";
 
-// Keep the signed-out apex light: the protected shell and dashboard chunks are
-// only requested after AuthProvider resolves an authenticated user.
+// Keep the signed-out apex light: the protected shell and home chunks are
+// only requested after AuthProvider resolves an authenticated user. Home picks
+// the grower's Simple or Advanced (Dashboard) view from their saved preference.
 const AppShell = lazy(() => import("@/components/AppShell"));
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Home = lazy(() => import("@/pages/Home"));
 const Landing = lazy(() => import("@/pages/Landing"));
 
 function RootEntryLoader() {
@@ -24,8 +25,9 @@ function RootEntryLoader() {
  * Session-aware apex boundary.
  *
  * Signed-out visitors see the public acquisition page directly at `/`, with no
- * redirect through the private shell. Signed-in growers retain the existing
- * dashboard-at-apex behavior and the AppShell's server session revalidation.
+ * redirect through the private shell. Signed-in growers get their home view at
+ * the apex (Simple by default, Advanced Dashboard when chosen) and the
+ * AppShell's server session revalidation.
  */
 export default function RootEntry() {
   const { user, loading } = useAuth();
@@ -58,7 +60,7 @@ export default function RootEntry() {
         <Landing canonicalPath="/" trackPageView={trackLandingPageView} />
       ) : (
         <AppShell>
-          <Dashboard />
+          <Home />
         </AppShell>
       )}
     </Suspense>

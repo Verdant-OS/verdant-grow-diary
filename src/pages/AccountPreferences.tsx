@@ -21,9 +21,13 @@ import {
 } from "@/lib/agreementAcceptanceService";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
+import UiViewSwitch from "@/components/UiViewSwitch";
+import { useUiViewPreference } from "@/hooks/useUiViewPreference";
+import { UI_VIEW_COPY } from "@/lib/uiViewPreferenceRules";
 
 export default function AccountPreferences() {
   const { user } = useAuth();
+  const viewPreference = useUiViewPreference(user);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [optIn, setOptIn] = useState(false);
@@ -168,6 +172,31 @@ export default function AccountPreferences() {
       />
 
       <div className="grid lg:grid-cols-2 gap-4">
+        <Card className="glass rounded-2xl border-0 shadow-none" data-testid="home-view-card">
+          <CardHeader className="p-5 pb-0">
+            <CardTitle className="font-display font-semibold text-base">Home view</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Choose how Verdant opens. Both views use the same records and the same plan; this only
+              changes what you see first. Saved to your account, so your phone and desktop agree.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5">
+            {viewPreference.status === "loading" ? (
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                {UI_VIEW_COPY.loading}
+              </p>
+            ) : (
+              <UiViewSwitch
+                layout="cards"
+                current={viewPreference.view}
+                onChoose={viewPreference.setView}
+                save={viewPreference.save}
+                accountUnavailable={viewPreference.status === "unavailable"}
+              />
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="glass rounded-2xl border-0 shadow-none">
           <CardHeader className="p-5 pb-0">
             <CardTitle className="font-display font-semibold text-base">

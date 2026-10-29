@@ -434,6 +434,31 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky"]);
   });
 
+  it("scans a single-quoted DO body as SQL but keeps other literals masked", () => {
+    expect(
+      tables(`${CREATE}\nDO 'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`),
+    ).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nDO LANGUAGE plpgsql 'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`,
+      ),
+    ).toEqual([]);
+    expect(tables(`${CREATE}\nDO 'BEGIN DROP TABLE public.leaky; END';`)).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nDO 'BEGIN RAISE NOTICE ''GRANT SELECT ON public.leaky TO authenticated;''; END';`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(
+        `${CREATE}\nCOMMENT ON TABLE public.leaky IS 'GRANT SELECT ON public.leaky TO authenticated;';`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(`${CREATE}\nDO E'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`),
+    ).toEqual(["leaky"]);
+  });
+
   it("does not let an apostrophe in a quoted identifier open a string literal", () => {
     expect(
       tables(

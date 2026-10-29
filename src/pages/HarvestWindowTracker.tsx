@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@/lib/react-router-compat";
 
 import BrandLogo from "@/components/BrandLogo";
@@ -183,9 +183,34 @@ export default function HarvestWindowTracker() {
     [checks, target, ranges],
   );
 
+  // Timers that update state or call window are cleared on unmount, so none fires after the page is gone.
+  const pendingTimers = useRef(new Set<number>());
+  // A copy started before the log changed (or the page closed) must not report or restore an outdated log.
+  const copyGeneration = useRef(0);
+  useEffect(() => {
+    copyGeneration.current += 1;
+  }, [checks, target, ranges]);
+  useEffect(() => {
+    const timers = pendingTimers.current;
+    const generation = copyGeneration;
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      timers.clear();
+      generation.current += 1;
+    };
+  }, []);
+
+  function later(callback: () => void, delayMs: number) {
+    const id = window.setTimeout(() => {
+      pendingTimers.current.delete(id);
+      callback();
+    }, delayMs);
+    pendingTimers.current.add(id);
+  }
+
   function announce(message: string) {
     setStatus("");
-    window.setTimeout(() => setStatus(message), 20);
+    later(() => setStatus(message), 20);
   }
 
   function changeTarget(next: HarvestTarget) {
@@ -284,11 +309,14 @@ export default function HarvestWindowTracker() {
   async function copyLog() {
     const tsv = buildHarvestTsv(checks, target, ranges);
     trackHarvestTrackerEvent("harvest_tracker_copy", { check_count: checks.length });
+    const generation = copyGeneration.current;
     try {
       await navigator.clipboard.writeText(tsv);
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(null);
       announce(`Copied ${checks.length} check(s) to clipboard as tab-separated text.`);
     } catch {
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(tsv);
       announce("Clipboard unavailable. Select and copy the tab-separated log shown below.");
     }
@@ -303,7 +331,7 @@ export default function HarvestWindowTracker() {
     );
     trackHarvestTrackerEvent("harvest_tracker_print", {});
     window.addEventListener("afterprint", () => setPrintMode("log"), { once: true });
-    window.setTimeout(() => window.print(), 30);
+    later(() => window.print(), 30);
   }
 
   function clearLog() {

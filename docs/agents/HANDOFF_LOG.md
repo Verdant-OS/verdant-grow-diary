@@ -79,16 +79,16 @@ branch: claude/youthful-franklin-n0mg0f
 base: verdant-grow-diary
 checkout: git fetch origin claude/youthful-franklin-n0mg0f verdant-grow-diary && git switch claude/youthful-franklin-n0mg0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: read from the PR list for branch claude/youthful-franklin-n0mg0f
-head_sha: c376ccfc97cd9eb2229b8cb4a6b6186a5d26c364 before the plantsPath route-helper fix; read the current head from the PR
+head_sha: 4aed2e240597f3c545271fa8f40d4d6ce69b2023 before the unmount-timer and stale-copy fix; read the current head from the PR
 state: pushed, PR ready for review
-current_step: "Keep this log in Verdant" now carries the visitor's checks through signup (sessionStorage key verdant:harvest-handoff:v1, 24 h TTL) to an AppShell import prompt that saves them as plant Notes through useQuickLogV2Save on an explicit click. src/test/funnel-events-wiring.test.ts (scorer-locked) gains one QUICK_LOG_V2_SAVE_CALLERS entry for src/components/HarvestCheckImportPrompt.tsx, unlocked by the user on 2026-10-28
+current_step: shard 18 at 4aed2e2 failed on an uncaught `window is not defined`: the status timer fired after the page test unmounted. Page timers (announce, print) are now cleared on unmount, and a clipboard result that arrives after checks, target or ranges changed is ignored (same defect class as the #2594 review finding). Pinned by src/test/harvest-window-page-async.test.tsx (RED 4 failed / 1 passed). Earlier: "Keep this log in Verdant" now carries the visitor's checks through signup (sessionStorage key verdant:harvest-handoff:v1, 24 h TTL) to an AppShell import prompt that saves them as plant Notes through useQuickLogV2Save on an explicit click. src/test/funnel-events-wiring.test.ts (scorer-locked) gains one QUICK_LOG_V2_SAVE_CALLERS entry for src/components/HarvestCheckImportPrompt.tsx, unlocked by the user on 2026-10-28
 next_action: independent exact-head review of the PR head (author: this Claude session; exclude it)
 post_merge_check: after Publish, https://verdantgrowdiary.com/guides/when-to-harvest-cannabis returns the page with the H1 "When to Harvest Cannabis: Track Your Trichomes and Harvest Window" and /version.json reports the merge SHA; else NOT_MEASURED
 active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
 decisions: copy, title, meta, FAQ and JSON-LD come verbatim from the source HTML (no separate brief was attached). CTAs use the relative /auth?...utm_content=when-to-harvest-cannabis URL the founder specified (the HTML had an absolute one). CSV reuses the Athena escapeCsvField, which adds a formula-injection guard the source lacked. Article JSON-LD uses datePublished = dateModified = 2026-10-28 because buildArticleJsonLd requires datePublished and the source only had dateModified. Breadcrumb uses the shared VERDANT_GUIDES_BREADCRUMB_ITEMS.
 tried_and_rejected: delegating the port to subagents; each started past its context budget and handed back.
 commands: bun run typecheck (NODE_OPTIONS=--max-old-space-size=8192 here); bunx vitest run src/test/harvest-window-*.ts* src/test/route-indexation-matrix.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx --reporter=dot
-files_touched: src/lib/harvestWindowRules.ts src/lib/harvestWindowAnalytics.ts src/pages/HarvestWindowTracker.tsx src/routes/guides.when-to-harvest-cannabis.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/constants/verdantSeoContent.ts src/pages/GuidesIndex.tsx public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts src/test/harvest-window-rules.test.ts src/test/harvest-window-analytics.test.ts src/test/harvest-window-page.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx docs/agents/HANDOFF_LOG.md
+files_touched: src/lib/harvestWindowRules.ts src/lib/harvestWindowAnalytics.ts src/pages/HarvestWindowTracker.tsx src/test/harvest-window-page-async.test.tsx src/routes/guides.when-to-harvest-cannabis.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/constants/verdantSeoContent.ts src/pages/GuidesIndex.tsx public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts src/test/harvest-window-rules.test.ts src/test/harvest-window-analytics.test.ts src/test/harvest-window-page.test.tsx src/test/verdant-seo-sitemap-robots.test.ts src/test/static-public-seo-documents.test.ts src/test/verdant-seo-guides-public-links.test.tsx docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: none
 open_questions: none
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: no routines, no paused workflows
 claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-28 08:30 UTC
 owner: Claude
-last_updated: 2026-10-28 03:30 CT, by Claude
+last_updated: 2026-10-29 18:10 UTC, by Claude
 ```
 
 ### VER-300-ALERT-ARCHIVED-TARGETS

@@ -929,7 +929,7 @@ branch: claude/quicklog-note-vs-issue-tiles
 base: verdant-grow-diary
 checkout: None; closed (merged). Historical: git fetch origin claude/quicklog-note-vs-issue-tiles verdant-grow-diary && git switch claude/quicklog-note-vs-issue-tiles && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2583 (merged)
-head_sha: 2c7b282896c19022fad5a7fc77897220d77dac8d (final PR head; merge of base d590b2c1 resolving the HANDOFF_LOG conflict); merge commit b5230474d94fe39fe6c3ac0f64b43c88c4fe0cc2 on the deploy branch, squashed by the merge queue onto base bbc77ae2
+head_sha: 2c7b282896c19022fad5a7fc77897220d77dac8d (final PR head; merge of base d590b2c1 resolving the HANDOFF_LOG conflict); merge commit b5230474d94fe39fe6c3ac0f64b43c88c4fe0cc2 on the deploy branch, made by the merge queue with parents bbc77ae2 (integration base) and 2c7b2828 (final PR head)
 state: CLOSED (merged). At final head 2c7b2828: 35/35 required checks green; Cheek re-review no blocking findings; Codex no findings; founder per-item yes recorded at this SHA (PR comment 6469011705). First queue attempt 2026-10-28 19:38 UTC was removed for CI_FAILURE that hit every PR (jobs failed before a runner started; PR comment 6478808603); re-queued by cheekhimself 2026-10-29 00:26 UTC and merged
 current_step: Closed
 next_action: None; closed. The post_merge_check below stays owned by this block: if the live Note/Issue check fails after Publish, this work reopens with the same owner

@@ -6,7 +6,8 @@
  */
 import { Link } from "@/lib/react-router-compat";
 import {
-  ALERT_TARGET_NAME_UNAVAILABLE_LABEL,
+  ALERT_TARGET_HISTORICAL_BADGE,
+  ALERT_TARGET_HISTORICAL_NOTE,
   ALERT_TARGET_PREFIX,
   deriveAlertTargetContext,
   type AlertTargetContextInput,
@@ -48,6 +49,8 @@ export function AlertTargetContext({
   idsLoading,
   linkedEvidence,
   singleTentId,
+  tentState,
+  plantState,
   variant = "compact",
   tentHref,
   plantHref,
@@ -61,41 +64,71 @@ export function AlertTargetContext({
     idsLoading,
     linkedEvidence,
     singleTentId,
+    tentState,
+    plantState,
   });
+
+  const historicalNote = target.historical ? (
+    <p data-testid="alert-target-historical-note" className="text-[11px] text-muted-foreground">
+      <span className="mr-1 rounded border border-border/60 px-1 py-px font-medium uppercase tracking-wider">
+        {ALERT_TARGET_HISTORICAL_BADGE}
+      </span>
+      {ALERT_TARGET_HISTORICAL_NOTE}
+    </p>
+  ) : null;
 
   if (variant === "compact") {
     return (
-      <p
-        data-testid="alert-target-compact"
-        data-kind={target.kind}
-        className="text-[11px] text-muted-foreground/90"
-      >
-        <span className="font-medium">{ALERT_TARGET_PREFIX}</span> <span>{target.text}</span>
-      </p>
+      <>
+        <p
+          data-testid="alert-target-compact"
+          data-kind={target.kind}
+          data-historical={target.historical ? "true" : "false"}
+          className="text-[11px] text-muted-foreground/90"
+        >
+          <span className="font-medium">{ALERT_TARGET_PREFIX}</span> <span>{target.text}</span>
+        </p>
+        {historicalNote}
+      </>
     );
   }
 
-  const tentDisplay = target.tentId
-    ? (target.tentLabel ?? ALERT_TARGET_NAME_UNAVAILABLE_LABEL)
-    : ALERT_TARGET_UNAVAILABLE_FIELD;
-  const plantDisplay = target.plantId
-    ? (target.plantLabel ?? ALERT_TARGET_NAME_UNAVAILABLE_LABEL)
-    : ALERT_TARGET_UNAVAILABLE_FIELD;
+  const tentDisplay = target.tentValue ?? ALERT_TARGET_UNAVAILABLE_FIELD;
+  const plantDisplay = target.plantValue ?? ALERT_TARGET_UNAVAILABLE_FIELD;
 
   return (
-    <div data-testid="alert-target-detailed" data-kind={target.kind} className="contents">
+    <div
+      data-testid="alert-target-detailed"
+      data-kind={target.kind}
+      data-historical={target.historical ? "true" : "false"}
+      className="contents"
+    >
       <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
         <dt className="uppercase tracking-wider text-muted-foreground">Tent</dt>
         <dd className="font-medium">
-          <TargetValue href={tentHref} label={tentDisplay} testId="alert-detail-tent-label" />
+          <TargetValue
+            href={target.tentState === "missing" ? null : tentHref}
+            label={tentDisplay}
+            testId="alert-detail-tent-label"
+          />
         </dd>
       </div>
       <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
         <dt className="uppercase tracking-wider text-muted-foreground">Plant</dt>
         <dd className="font-medium">
-          <TargetValue href={plantHref} label={plantDisplay} testId="alert-detail-plant-label" />
+          <TargetValue
+            href={target.plantState === "missing" ? null : plantHref}
+            label={plantDisplay}
+            testId="alert-detail-plant-label"
+          />
         </dd>
       </div>
+      {historicalNote ? (
+        <div className="sm:col-span-2">
+          <dt className="sr-only">Target status</dt>
+          <dd>{historicalNote}</dd>
+        </div>
+      ) : null}
     </div>
   );
 }

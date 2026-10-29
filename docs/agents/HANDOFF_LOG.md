@@ -929,7 +929,7 @@ branch: claude/retire-founder-sales-machinery
 base: verdant-grow-diary
 checkout: None; closed (merged). Historical: git fetch origin claude/retire-founder-sales-machinery verdant-grow-diary && git switch claude/retire-founder-sales-machinery && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 (merged)
-head_sha: 824379f1e4f901daf53afc40c9a3db91f4313476 (final PR head; base merge over 795e3765 after #2567 merged); base at merge 26113a1b68b928d6cc46d0662c011d424f15267b
+head_sha: 824379f1e4f901daf53afc40c9a3db91f4313476 (final PR head; base merge over 795e3765 after #2567 merged). Base last merged into the head: 26113a1b68b928d6cc46d0662c011d424f15267b (second parent of 824379f1). Target-branch tip at merge: d590b2c105435cb2b22d1f265a4dea48948ccd3a (first parent of merge commit bbc77ae2; #2562 landed between)
 state: CLOSED (merged). At final head 824379f1: 35/35 required checks green, mergeable clean, independent PASS review 5679386107 (P1 0 / P2 0 / P3 1), Codex no major issues at ab329b80 (same net diff; 795e3765 and 824379f1 are base merges only); Matthew queued it 2026-10-28 07:51 UTC
 current_step: None; closed
 next_action: None; closed. Outside this task: Matthew undeploys the live founder-slots-remaining function (production action); then PR B (migration) is drafted and held for Matthew's migration receipt; docs/audit follow-up retires docs/founder-slots-remaining-response.md, its schema and the endpoint URL in scripts/audit-subscriber-growth-live-parity.mjs (the review P3)

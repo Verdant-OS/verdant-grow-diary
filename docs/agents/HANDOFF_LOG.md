@@ -962,15 +962,15 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/hono-node-server-2-1-3 verdant-grow-diary && git switch claude/hono-node-server-2-1-3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: draft PR from claude/hono-node-server-2-1-3 (link in the PR list)
 head_sha: read the PR head; this commit cannot name itself
-state: pushed draft
-current_step: CI and independent review
-next_action: independent exact-head review; the same three-file change is ported into #2602 and #2603
+state: pushed; marked ready for review
+current_step: fresh exact-head review and 35/35 required CI at the head after this handoff fix
+next_action: independent exact-head review at the new head (session_017UoYKuwk7Z3wSC7syg3jnF offered); then 35/35 required CI, the founder's per-item yes and the merge queue. The same three-file dependency change is ported into #2602 and #2603
 post_merge_check: Dependency & Security CI check:deps passes on the deploy branch tip after merge
 active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
 decisions: 2.1.3 is the first fixed release in major 2 (advisory range <2.1.3); follow the ip-address 10.7.4 precedent (6f937d3): override + floor + bun.lock only
 tried_and_rejected: a dependency-security exception; the advisory has a fixed release, so a bump is the right fix
-commands: node scripts/check-dependency-security.mjs; node scripts/check-bun-lockfile-policy.mjs; bunx vitest run src/test/check-bun-lockfile-policy.test.ts src/test/check-dependency-security.test.ts src/test/dependency-security-phase-a-contract.test.ts src/test/modelcontextprotocol-sdk-advisory-security-floor.test.ts --reporter=dot
-files_touched: package.json, bun.lock, scripts/check-bun-lockfile-policy.mjs, docs/agents/HANDOFF_LOG.md
+commands: node scripts/check-dependency-security.mjs; node scripts/check-bun-lockfile-policy.mjs; bunx vitest run src/test/check-bun-lockfile-policy.test.ts src/test/check-dependency-security.test.ts src/test/dependency-security-phase-a-contract.test.ts src/test/modelcontextprotocol-sdk-advisory-security-floor.test.ts src/test/hono-node-server-advisory-security-floor.test.ts --reporter=dot
+files_touched: package.json, bun.lock, scripts/check-bun-lockfile-policy.mjs, src/test/hono-node-server-advisory-security-floor.test.ts (new, 87999663c), src/test/check-bun-lockfile-policy.test.ts and src/test/dependency-security-phase-a-contract.test.ts (02f83c7e1, Cursor Agent), docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: none
 open_questions: none
@@ -978,11 +978,11 @@ gotchas: regenerate bun.lock with bun 1.3.14 (CI pin), not a newer local bun; pa
 links: https://github.com/advisories/GHSA-rmxm-3fg6-px4f
 artifacts: PR body
 reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (dependency/lockfile scope); this Claude session excluded
-reviewer_sha: none yet
+reviewer_sha: none valid. session_017UoYKuwk7Z3wSC7syg3jnF: PASS for code scope at 4d9defc1c, then FAIL at 02f83c7e1 on this block's files_touched and commands (comment 6500943336); this commit fixes that and needs a fresh review
 session_state: none
 claimed_by: Claude, 2026-10-29 00:24 UTC
 owner: Claude
-last_updated: 2026-10-29 00:24 UTC, by Claude
+last_updated: 2026-10-29 16:08 UTC, by Claude
 ```
 
 ## Closed

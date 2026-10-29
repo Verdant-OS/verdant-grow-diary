@@ -4,10 +4,11 @@
  *
  * Checks the built assets only. Does not deploy, does not print tokens.
  *
- * Expects:
- *  - the paused checkout copy in the client bundle
- *  - the constant-folded kill switch to have removed Paddle.Initialize and
- *    Paddle.Checkout.open from the client bundle
+ * Expects, across every emitted bundle (client `.js` and the Nitro server
+ * `.mjs`, both constant-folded by the same build):
+ *  - the paused checkout copy to be present
+ *  - the kill switch to have removed Paddle.Initialize and
+ *    Paddle.Checkout.open
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -22,7 +23,7 @@ function walk(dir, out = []) {
     const path = join(dir, name);
     const stat = statSync(path);
     if (stat.isDirectory()) walk(path, out);
-    else if (name.endsWith(".js")) out.push(path);
+    else if (name.endsWith(".js") || name.endsWith(".mjs")) out.push(path);
   }
   return out;
 }
@@ -62,5 +63,5 @@ if (!receipt.pass) {
 }
 
 console.log(
-  `checkout-disabled bundle verification passed: paused copy in ${pausedHits} file(s), no Paddle init/open in ${files.length} client js files`,
+  `checkout-disabled bundle verification passed: paused copy in ${pausedHits} file(s), no Paddle init/open in ${files.length} bundle files across ${roots.length} root(s)`,
 );

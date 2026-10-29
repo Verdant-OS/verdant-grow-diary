@@ -9,8 +9,9 @@ production step requires Matthew's explicit approval.
 With the live checkout change (#2539, replaying #2230 and #2497), the tracked production client token is
 live-class. A live token opens checkout only on `verdantgrowdiary.com` and
 `www.verdantgrowdiary.com`; every other host is unavailable before script
-loading, price resolution, authentication redirects, session writes, or
-overlay opening. A `test_` token stays sandbox everywhere. The build-time
+loading, price resolution, or overlay opening. Authentication redirects and
+session writes are not part of the checkout gate and keep their own rules. A
+`test_` token stays sandbox everywhere. The build-time
 switch `VITE_CHECKOUT_DISABLED="true"` makes checkout unavailable on every
 host, production included. This runbook does not itself authorize or perform
 a settings change; backend readiness is verified before the live build ships

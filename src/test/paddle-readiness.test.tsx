@@ -20,7 +20,7 @@ import { resolvePaddleConfig, unavailableMessage, PADDLE_SANDBOX_ENV } from "@/l
 
 const SANDBOX_ENV = {
   VITE_PADDLE_ENVIRONMENT: "sandbox",
-  VITE_PADDLE_CLIENT_TOKEN: "test_token_abc",
+  VITE_PADDLE_CLIENT_TOKEN: "test_tokenabc0000000000000000000",
   VITE_PADDLE_PRICE_PRO_MONTHLY: "pri_sandbox_pro_monthly",
   VITE_PADDLE_PRICE_PRO_ANNUAL: "pri_sandbox_pro_annual",
   VITE_PADDLE_PRICE_FOUNDER_LIFETIME: "pri_sandbox_founder",

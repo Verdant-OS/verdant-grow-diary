@@ -303,6 +303,28 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
   });
 
+  it("blanks dollar-quote tags around an exposed EXECUTE or DO body", () => {
+    // No semicolon inside the payload; the closing tag sits on the identifier.
+    expect(
+      tables(`${CREATE}\nDO $$ BEGIN EXECUTE $ddl$DROP TABLE public.leaky$ddl$; END $$;`),
+    ).toEqual([]);
+    expect(tables(`${CREATE}\nEXECUTE $ddl$DROP TABLE public.leaky$ddl$;`)).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN EXECUTE $ddl$ALTER TABLE public.leaky RENAME TO renamed$ddl$; END $$;`,
+      ),
+    ).toEqual(["renamed"]);
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN EXECUTE $ddl$ALTER TABLE public.leaky RENAME TO renamed$ddl$; END $$;\nGRANT SELECT ON public.renamed TO authenticated;`,
+      ),
+    ).toEqual([]);
+    // A payload joined to more text is not the whole command (fails closed).
+    expect(
+      tables(`${CREATE}\nDO $$ BEGIN EXECUTE $d$DROP TABLE public.leaky$d$ || '_x'; END $$;`),
+    ).toEqual(["leaky"]);
+  });
+
   it("reads non-ASCII unquoted identifiers", () => {
     expect(tables("CREATE TABLE α (id int);")).toEqual(["α"]);
     expect(

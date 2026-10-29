@@ -164,7 +164,9 @@ function identName(raw) {
 // Single-quoted literals (standard and E'' escapes) are lexed so comment
 // markers inside them are ignored. A dollar-quoted body that is scanned is
 // lexed within its own bounds, so a quote it leaves open never reaches past
-// its closing tag.
+// its closing tag. Opening and closing tags on an exposed body (a DO body,
+// or an EXECUTE payload that is the whole command) are blanked, matching
+// the quotes on a single-quoted EXECUTE path.
 //
 // executableOnly = false: only comments are blanked; literals and dollar
 // bodies stay visible (CREATE/DROP tracking). executableOnly = true: literals
@@ -263,8 +265,15 @@ function maskSql(sql, executableOnly) {
           const runsNow =
             RUNS_NOW_RE.test(prefix) ||
             (EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(close + tag.length, end)));
-          if (!executableOnly || runsNow) mask(i + tag.length, close);
-          else blank(i, close + tag.length);
+          if (!executableOnly || runsNow) {
+            mask(i + tag.length, close);
+            // Tags delimit the body; they are not part of it. Blank them so an
+            // identifier sitting against the closing tag (leaky$ddl$) does not
+            // pick up the tag as part of the name, matching the quotes on a
+            // single-quoted EXECUTE payload.
+            blank(i, i + tag.length);
+            blank(close, close + tag.length);
+          } else blank(i, close + tag.length);
           i = close + tag.length;
         } else {
           i++;

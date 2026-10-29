@@ -192,11 +192,18 @@ export default function GrowTentTemperatureHumidityChart() {
 
   // Timers that update state or call window are cleared on unmount, so none fires after the page is gone.
   const pendingTimers = useRef(new Set<number>());
+  // A copy started before the log changed (or the page closed) must not report or restore an outdated log.
+  const copyGeneration = useRef(0);
+  useEffect(() => {
+    copyGeneration.current += 1;
+  }, [readings]);
   useEffect(() => {
     const timers = pendingTimers.current;
+    const generation = copyGeneration;
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
       timers.clear();
+      generation.current += 1;
     };
   }, []);
 
@@ -301,11 +308,14 @@ export default function GrowTentTemperatureHumidityChart() {
   async function copyLog() {
     const tsv = buildGrowTentClimateTsv(readings);
     trackClimateToolEvent("climate_tool_copy", { reading_count: readings.length });
+    const generation = copyGeneration.current;
     try {
       await navigator.clipboard.writeText(tsv);
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(null);
       announce(`Copied ${readings.length} reading(s) to clipboard as tab-separated text.`);
     } catch {
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(tsv);
       announce("Clipboard unavailable. Select and copy the tab-separated log shown below.");
     }

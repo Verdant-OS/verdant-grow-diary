@@ -38,9 +38,6 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
   }),
 }));
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
-vi.mock("@/hooks/useFounderSlotsRemaining", () => ({
-  useFounderSlotsRemaining: () => ({ status: "unavailable" }),
-}));
 vi.mock("@/lib/pricingAnalytics", () => ({ trackPricingEvent: vi.fn() }));
 vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent: vi.fn() }));
 

@@ -64,6 +64,22 @@ describe("Ahrefs Web Analytics consent loader", () => {
     expect(isAhrefsAnalyticsLoaded()).toBe(true);
   });
 
+  it("does not treat a superseded Ahrefs property key as loaded", () => {
+    const existing = document.createElement("script");
+    existing.src = AHREFS_WEB_ANALYTICS_SCRIPT_SRC;
+    existing.dataset.key = "GRdwmweqUZoPO7SfmEsPZg";
+    document.head.appendChild(existing);
+
+    expect(isAhrefsAnalyticsLoaded()).toBe(false);
+    loadAhrefsAnalytics();
+
+    const scripts = document.querySelectorAll<HTMLScriptElement>(
+      `script[src="${AHREFS_WEB_ANALYTICS_SCRIPT_SRC}"]`,
+    );
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).toHaveAttribute("data-key", "GRdwmweqUZoPO7SfmEsPZg");
+  });
+
   it("does not replace or duplicate an existing tag carrying another property key", () => {
     const existing = document.createElement("script");
     existing.src = AHREFS_WEB_ANALYTICS_SCRIPT_SRC;

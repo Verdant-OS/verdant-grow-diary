@@ -1,6 +1,7 @@
 import { useHasRole } from "@/hooks/useHasRole";
 import { shouldShowPaddleSandboxTestModeBanner } from "@/lib/paymentTestModeBannerVisibilityRules";
-import { getCheckoutUnavailableMessage, resolvePaddleCheckout } from "@/lib/paddle";
+import { getCheckoutUnavailableMessage } from "@/lib/paddle";
+import { useRenderedPaddleCheckoutEnvironment } from "@/hooks/useRenderedPaddleCheckoutEnvironment";
 import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
 
 /**
@@ -21,7 +22,9 @@ export function PaymentTestModeBanner({
 }: {
   showSandboxTestMode?: boolean;
 } = {}) {
-  const env = resolvePaddleCheckout();
+  // Hydration-stable: matches the server markup, then applies the host rule.
+  const env = useRenderedPaddleCheckoutEnvironment();
+  if (env === "live") return null;
 
   if (env === "sandbox") {
     if (!showSandboxTestMode) return null;

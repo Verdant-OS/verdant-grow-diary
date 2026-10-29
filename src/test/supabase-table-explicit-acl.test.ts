@@ -21,6 +21,54 @@ function tables(...sqls: string[]): string[] {
 
 const CREATE = "CREATE TABLE public.leaky (id uuid primary key);";
 
+// Independent freeze of the 22-entry exception list. The exported array may
+// shrink (a later GRANT + removal), but a new tuple must not appear here.
+const PINNED_LEGACY_DEFAULT_PRIVILEGE_TABLES = [
+  { table: "alert_events", migration: "20260520234331_06b08698-1358-48b4-9c91-335d8913458a.sql" },
+  { table: "alerts", migration: "20260520233437_40d368dc-f696-42ac-bd37-7efcb94eccb1.sql" },
+  { table: "diary_entries", migration: "20260515173341_0c573a48-5b45-4310-897b-4a65f8a4ecdb.sql" },
+  {
+    table: "environment_events",
+    migration: "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql",
+  },
+  { table: "feeding_events", migration: "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql" },
+  { table: "grow_events", migration: "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql" },
+  { table: "grow_targets", migration: "20260520225333_57f23225-fcb9-4173-9715-1d52904d9487.sql" },
+  { table: "grows", migration: "20260515173341_0c573a48-5b45-4310-897b-4a65f8a4ecdb.sql" },
+  { table: "harvests", migration: "20260515205725_3c724eb0-98de-4c17-a571-59e7b8b1a584.sql" },
+  { table: "nug_events", migration: "20260515204616_dba9604f-080f-4b98-a10f-5bd0f73dbae7.sql" },
+  {
+    table: "observation_events",
+    migration: "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql",
+  },
+  { table: "photo_events", migration: "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql" },
+  {
+    table: "pi_ingest_bridge_credentials",
+    migration: "20260523062559_300cfcfa-46b2-45f7-84f4-0df1db6bd605.sql",
+  },
+  {
+    table: "pi_ingest_idempotency_keys",
+    migration: "20260523060642_98031981-ea3e-49d2-a147-f9fcddb4c7e7.sql",
+  },
+  { table: "plants", migration: "20260516204601_eb069c76-870d-4f19-8d23-800be7bbfe01.sql" },
+  { table: "profiles", migration: "20260515204616_dba9604f-080f-4b98-a10f-5bd0f73dbae7.sql" },
+  {
+    table: "sensor_readings",
+    migration: "20260516204601_eb069c76-870d-4f19-8d23-800be7bbfe01.sql",
+  },
+  { table: "tents", migration: "20260516204601_eb069c76-870d-4f19-8d23-800be7bbfe01.sql" },
+  {
+    table: "training_events",
+    migration: "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql",
+  },
+  { table: "unlocks", migration: "20260515204616_dba9604f-080f-4b98-a10f-5bd0f73dbae7.sql" },
+  { table: "user_quests", migration: "20260515204616_dba9604f-080f-4b98-a10f-5bd0f73dbae7.sql" },
+  {
+    table: "watering_events",
+    migration: "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql",
+  },
+] as const;
+
 describe("supabase table explicit ACL rule", () => {
   it("the real migrations tree leaves exactly the legacy default-privilege tables", () => {
     const migrations = readdirSync(MIGRATIONS_DIR)
@@ -45,6 +93,18 @@ describe("supabase table explicit ACL rule", () => {
     expect(Object.isFrozen(LEGACY_DEFAULT_PRIVILEGE_TABLES)).toBe(true);
     expect(LEGACY_DEFAULT_PRIVILEGE_TABLES.every((e: object) => Object.isFrozen(e))).toBe(true);
     expect(names).toEqual([...new Set(names)].sort());
+  });
+
+  it("does not let the legacy allowlist grow past the pinned tuples", () => {
+    expect(PINNED_LEGACY_DEFAULT_PRIVILEGE_TABLES).toHaveLength(22);
+    expect(PINNED_LEGACY_DEFAULT_PRIVILEGE_TABLES).toEqual(
+      expect.arrayContaining(
+        LEGACY_DEFAULT_PRIVILEGE_TABLES.map((e: { table: string; migration: string }) => ({
+          table: e.table,
+          migration: e.migration,
+        })),
+      ),
+    );
   });
 
   it("does not let a legacy name cover a table dropped and recreated without an ACL", () => {

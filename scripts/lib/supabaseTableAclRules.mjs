@@ -18,6 +18,8 @@
 //
 // The scan fails closed. CREATE is read from the SQL with only comments
 // removed, so a table created anywhere, even in a function body, is tracked.
+// A CREATE TABLE that starts inside a quoted identifier (CREATE POLICY
+// "CREATE TABLE public.leaky (" ...) is skipped, like GRANT/DROP/RENAME.
 // A CREATE TABLE target counts only as a complete name followed by (, AS, OF,
 // PARTITION, ; or the end. Any other CREATE TABLE keyword is reported as
 // (unreadable CREATE TABLE target at offset N) for that migration.
@@ -128,7 +130,8 @@ function columnLevelOnly(privileges) {
 }
 
 // Positions of sql that sit inside a double-quoted identifier, so a keyword
-// in a name (CREATE POLICY "Admins grant access" ...) never starts a match.
+// in a name (CREATE POLICY "CREATE TABLE public.leaky (" / "Admins grant
+// access") never starts a CREATE, GRANT, DROP, RENAME, or SET SCHEMA match.
 // Run on masked SQL, where comments and literals are already blank.
 function quotedIdentifierPositions(sql) {
   const inside = new Uint8Array(sql.length);
@@ -337,9 +340,11 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const executed = maskSql(m.sql, true);
     const topLevel = maskSql(m.sql, true, false);
     const quoted = quotedIdentifierPositions(executed);
+    const quotedDdl = quotedIdentifierPositions(ddl);
     const quotedTopLevel = quotedIdentifierPositions(topLevel);
     const events = [];
     for (const match of ddl.matchAll(CREATE_HEAD_RE)) {
+      if (quotedDdl[match.index]) continue;
       const after = ddl.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));

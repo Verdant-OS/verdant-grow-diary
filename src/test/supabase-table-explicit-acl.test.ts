@@ -240,6 +240,34 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
   });
 
+  it("does not invent a table from CREATE TABLE inside a quoted identifier", () => {
+    expect(
+      tables('CREATE POLICY "CREATE TABLE public.leaky (" ON public.existing USING (true);'),
+    ).toEqual([]);
+  });
+
+  it("does not invent a second table when a policy name contains CREATE TABLE", () => {
+    expect(
+      tables(
+        `${CREATE}\nCREATE POLICY "CREATE TABLE public.other (" ON public.leaky USING (true);`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
+  it("does not invent a table from CREATE UNLOGGED TABLE inside a quoted identifier", () => {
+    expect(
+      tables(
+        'CREATE POLICY "CREATE UNLOGGED TABLE public.leaky (" ON public.existing USING (true);',
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not report an unreadable CREATE TABLE target that starts inside a quoted identifier", () => {
+    expect(
+      tables('CREATE POLICY "CREATE TABLE public.%I (" ON public.existing USING (true);'),
+    ).toEqual([]);
+  });
+
   it("tracks a table moved into public with ALTER TABLE ... SET SCHEMA", () => {
     const moveIn =
       "CREATE TABLE private.leaky (id int);\nALTER TABLE private.leaky SET SCHEMA public;";

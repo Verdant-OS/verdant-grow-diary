@@ -2830,6 +2830,7 @@ export default function Timeline() {
           rawEntries={scopedRecentLaneRawEntries}
           limit={10}
           growId={activeGrowId ?? null}
+          dateFiltered={Boolean(effectiveStartDate || effectiveEndDate)}
           onEntryChanged={() => {
             void load();
           }}

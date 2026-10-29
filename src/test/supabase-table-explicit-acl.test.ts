@@ -183,6 +183,19 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
   });
 
+  it("carries a quoted semicolon through masked statement scans", () => {
+    expect(tables('SELECT 1 AS "semi;colon" INTO TABLE public.leaky;')).toEqual(["leaky"]);
+    expect(tables('CREATE TABLE public."semi;name" (id int);')).toEqual(["semi;name"]);
+    expect(
+      tables(
+        'CREATE TABLE public."semi;name" (id int);\nGRANT SELECT ON public."semi;name" TO authenticated;',
+      ),
+    ).toEqual([]);
+    expect(
+      tables('CREATE TABLE public."semi;name" (id int);\nDROP TABLE public."semi;name";'),
+    ).toEqual([]);
+  });
+
   it("ignores tables in other schemas", () => {
     expect(tables("CREATE TABLE private.leaky (id int);")).toEqual([]);
     expect(

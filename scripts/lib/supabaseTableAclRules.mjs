@@ -26,7 +26,10 @@
 // a PL/pgSQL SELECT ... INTO n is not a table. INTO TEMP / TEMPORARY is
 // skipped. INSERT INTO / MERGE INTO after a WITH ... SELECT is skipped only
 // when INTO comes directly after ) INSERT or ) MERGE. An alias named insert
-// or merge, quoted or unquoted, is not a skip.
+// or merge, quoted or unquoted, is not a skip. A semicolon inside a quoted
+// identifier is carried as a placeholder in every masked view so [^;]*
+// statement patterns run past it; identName turns the placeholder back into
+// a semicolon.
 // Everything that can clear a table's requirement (a removal, a rename, a
 // GRANT or REVOKE) counts only where it runs at migration time: top-level
 // statements, DO blocks, and a literal string handed straight to EXECUTE.
@@ -68,6 +71,10 @@ const SELECT_INTO_RE = new RegExp(
   "gi",
 );
 const SELECT_INTO_CTE_DML_RE = /\)\s+(?:INSERT|MERGE)\s+INTO\b/i;
+// Semicolons inside quoted identifiers would terminate [^;]* statement
+// patterns. Carry them as this placeholder through every masked view;
+// identName turns it back into a semicolon when a name is read.
+const QUOTED_SEMICOLON = "\u0001";
 // ALTER TABLE ... RENAME TO keeps the table and its grants under the new name.
 // RENAME TO takes no schema; RENAME COLUMN and RENAME CONSTRAINT do not match.
 const RENAME_RE = new RegExp(
@@ -179,7 +186,8 @@ export const LEGACY_DEFAULT_PRIVILEGE_TABLES = Object.freeze(
 
 // Unquoted identifiers fold to lower case; quoted ones keep their case.
 function identName(raw) {
-  return raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.toLowerCase();
+  const name = raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.toLowerCase();
+  return name.replaceAll(QUOTED_SEMICOLON, ";");
 }
 
 // Blank SQL to spaces of the same length, so match indices line up with the
@@ -252,12 +260,17 @@ function maskSql(sql, executableOnly, scanDoBodies = true) {
         i = j;
       } else if (sql[i] === '"') {
         // A quoted identifier stays visible, but an apostrophe inside it
-        // ("grower's") must not open a string literal.
+        // ("grower's") must not open a string literal. A semicolon inside
+        // it is replaced with QUOTED_SEMICOLON so statement patterns that
+        // stop at ';' still see the rest of the statement.
         let j = i + 1;
         while (j < end) {
           if (sql[j] === '"' && sql[j + 1] === '"') j += 2;
           else if (sql[j] === '"') break;
-          else j++;
+          else {
+            if (sql[j] === ";") code[j] = QUOTED_SEMICOLON;
+            j++;
+          }
         }
         i = j < end ? j + 1 : i + 1;
       } else if (sql[i] === "'") {

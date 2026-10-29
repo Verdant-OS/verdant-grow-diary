@@ -259,9 +259,10 @@ the live-token change into `verdant-grow-diary` makes it the build the
 configured publisher deploys to production; customer exposure starts when the
 live `/version.json` reports the merge SHA, and from then the live token opens
 checkout. Nothing in this document treats the merge itself as the release. The
-merge waits until steps 1–5 are green **and** every standing check in
+merge waits until steps 1–6 are green **and** every standing check in
 [What must be true before live payments open to customers](#what-must-be-true-before-live-payments-open-to-customers)
-is done; step 6 is the merge followed by post-merge deployment verification.
+is done; step 7 is the merge followed by post-merge deployment verification
+and the first owner-approved purchase.
 
 1. **#2229 merged and `payments-webhook` redeployed.** Merge the shared
    webhook-verifier packaging repair through the queue. Confirm Lovable has

@@ -10,6 +10,8 @@ import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ensureUiViewPreferenceLoaded,
+  forgetUiViewPreferenceState,
+  getUiViewPreferenceGeneration,
   getUiViewPreferenceVersion,
   getUiViewSnapshot,
   resolveUiViewAuthClient,
@@ -30,6 +32,25 @@ export interface UseUiViewPreference extends UiViewSnapshot {
   retryRead: () => Promise<void>;
 }
 
+let authEventsBound = false;
+
+/**
+ * Sign-out must forget the in-memory account state, or a re-sign-in in the
+ * same tab would skip the account read and show a stale choice. Bound lazily
+ * from the first mounted hook (never at import, so SSR and client-less tests
+ * are untouched) and kept for the module's lifetime. Feature-detected: a test
+ * double without `onAuthStateChange` simply gets no sign-out handling.
+ */
+function bindAuthEventsOnce(): void {
+  if (authEventsBound) return;
+  const auth = (supabase as { auth?: { onAuthStateChange?: unknown } } | null | undefined)?.auth;
+  if (!auth || typeof auth.onAuthStateChange !== "function") return;
+  authEventsBound = true;
+  (auth.onAuthStateChange as (cb: (event: string) => void) => unknown)((event) => {
+    if (event === "SIGNED_OUT") forgetUiViewPreferenceState();
+  });
+}
+
 export function useUiViewPreference(
   user: UiViewPreferenceUser | null | undefined,
 ): UseUiViewPreference {
@@ -38,13 +59,20 @@ export function useUiViewPreference(
     getUiViewPreferenceVersion,
     getUiViewPreferenceVersion,
   );
+  const generation = useSyncExternalStore(
+    subscribeUiViewPreference,
+    getUiViewPreferenceGeneration,
+    getUiViewPreferenceGeneration,
+  );
   const userId = user?.id ?? null;
   const sessionMetadata = user?.user_metadata;
 
   useEffect(() => {
+    bindAuthEventsOnce();
     if (!userId) return;
     void ensureUiViewPreferenceLoaded(resolveUiViewAuthClient(supabase), userId);
-  }, [userId]);
+    // `generation` changes when sign-out forgot the settled state; read again.
+  }, [userId, generation]);
 
   const snapshot = useMemo(
     () => getUiViewSnapshot(userId, sessionMetadata),

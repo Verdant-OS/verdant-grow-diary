@@ -117,7 +117,7 @@ describe("buildSimpleHomeState — honest states", () => {
       ],
     });
   });
-  it("tents pending → loading tents; tents error → error; no tents → add a tent", () => {
+  it("tents pending → loading tents; tents error → error; no tents and no plants → add a tent", () => {
     expect(buildSimpleHomeState(input({ tents: { status: "pending", rows: undefined } }))).toEqual({
       kind: "loading",
       resource: "tents",
@@ -126,11 +126,44 @@ describe("buildSimpleHomeState — honest states", () => {
       kind: "tents-error",
       growId: GROW,
     });
-    expect(buildSimpleHomeState(input({ tents: { status: "success", rows: [] } }))).toEqual({
+    expect(
+      buildSimpleHomeState(
+        input({
+          tents: { status: "success", rows: [] },
+          plants: { status: "success", rows: [] },
+        }),
+      ),
+    ).toEqual({
       kind: "no-tent",
       growId: GROW,
       href: `/tents?growId=${GROW}`,
     });
+  });
+  it("a grow with active plants but no tent is ready, not a setup gap (tentless plants are supported)", () => {
+    const state = buildSimpleHomeState(
+      input({
+        tents: { status: "success", rows: [] },
+        plants: { status: "success", rows: [plant({ id: "p1", name: "Bertha", tentId: "" })] },
+      }),
+    );
+    expect(state.kind).toBe("ready");
+    if (state.kind !== "ready") return;
+    expect(state.tentCount).toBe(0);
+    expect(state.plants[0]).toMatchObject({
+      id: "p1",
+      tentId: null,
+      tentName: null,
+      quickLogTargetKey: "plant:p1",
+    });
+    // Plants are still read while tents are empty: a pending plants read is loading, not no-tent.
+    expect(
+      buildSimpleHomeState(
+        input({
+          tents: { status: "success", rows: [] },
+          plants: { status: "pending", rows: undefined },
+        }),
+      ),
+    ).toEqual({ kind: "loading", resource: "plants" });
   });
   it("plants pending → loading plants; plants error → error; none active → add a plant", () => {
     expect(buildSimpleHomeState(input({ plants: { status: "pending", rows: undefined } }))).toEqual(
@@ -201,6 +234,23 @@ describe("buildSimpleHomePlantRows", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ id: "c", name: "Unnamed plant", tentId: null, tentHref: null });
+  });
+  it("a legacy row with no grow of its own stays visible but gets no Quick Log target", () => {
+    // Quick Log fails closed on a null/blank grow_id (quickLogV2Rules admitGrow), so the row
+    // must not offer a button that cannot save; it keeps its Plant Detail link for repair.
+    const rows = buildSimpleHomePlantRows(
+      [
+        plant({ id: "legacy", name: "Legacy", growId: null }),
+        plant({ id: "linked", name: "Linked" }),
+      ],
+      [tent],
+      GROW,
+    );
+    expect(rows.map((r) => [r.id, r.quickLogTargetKey])).toEqual([
+      ["legacy", null],
+      ["linked", "plant:linked"],
+    ]);
+    expect(rows[0].href).toBe(`/plants/legacy?tentId=${TENT}`);
   });
   it("is deterministic", () => {
     const plants = [plant({ id: "p2", name: "B" }), plant({ id: "p1", name: "A" })];

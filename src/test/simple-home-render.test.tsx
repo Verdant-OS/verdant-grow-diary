@@ -71,6 +71,7 @@ const plantsQuery = vi.hoisted(() => ({
   ] as unknown[] | undefined,
   refetch: vi.fn(),
 }));
+const PLANTS_DEFAULT = JSON.stringify(plantsQuery.data);
 const scoped = vi.hoisted(() => ({
   recent: { status: "ok", items: [] as unknown[] } as Record<string, unknown>,
   reload: vi.fn(async () => {}),
@@ -159,6 +160,7 @@ beforeEach(() => {
   ];
   plantsQuery.isPending = false;
   plantsQuery.isError = false;
+  plantsQuery.data = JSON.parse(PLANTS_DEFAULT) as unknown[];
   scoped.recent = { status: "ok", items: [] };
   scoped.reload.mockClear();
   growsState.refresh.mockClear();
@@ -202,6 +204,33 @@ describe("SimpleHome — ready", () => {
     renderHome();
     fireEvent.click(screen.getByRole("button", { name: "Add an observation for Bertha" }));
     expect(screen.getByTestId("qlv2-stub")).toHaveAttribute("data-target", "plant:p1");
+  });
+
+  it("tentless plants stay loggable instead of hiding behind an Add a tent card", () => {
+    tentsQuery.data = [];
+    plantsQuery.data = [{ ...(plantsQuery.data![0] as Record<string, unknown>), tentId: null }];
+    renderHome();
+    expect(screen.getByTestId("simple-home")).toHaveAttribute("data-simple-home-state", "ready");
+    expect(screen.queryByTestId("simple-home-no-tent")).toBeNull();
+    expect(screen.getByText("Tent not set")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add an observation for Bertha" }));
+    expect(screen.getByTestId("qlv2-stub")).toHaveAttribute("data-target", "plant:p1");
+  });
+
+  it("a legacy plant with no grow of its own shows the repair link, not a Quick Log button", () => {
+    plantsQuery.data = [
+      { ...(plantsQuery.data![0] as Record<string, unknown>), growId: null },
+      plantsQuery.data![1],
+    ];
+    renderHome();
+    const rows = screen.getAllByTestId("simple-home-plant");
+    expect(rows).toHaveLength(2);
+    const legacy = rows.find((row) => row.getAttribute("data-plant-id") === "p1")!;
+    expect(within(legacy).queryByTestId("simple-home-plant-log")).toBeNull();
+    expect(
+      within(legacy).getByRole("link", { name: /Link to a grow before logging/ }),
+    ).toHaveAttribute("href", `/plants/p1?tentId=${TENT}`);
+    expect(screen.getAllByTestId("simple-home-plant-log")).toHaveLength(1);
   });
 
   it("closing the sheet clears the launch target so nothing is remembered", () => {
@@ -308,6 +337,7 @@ describe("SimpleHome — setup, loading and error states", () => {
 
   it("no tent and no plant each link to the matching existing page", () => {
     tentsQuery.data = [];
+    plantsQuery.data = [];
     renderHome();
     expect(screen.getByTestId("simple-home-no-tent-cta")).toHaveAttribute(
       "href",

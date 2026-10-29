@@ -253,17 +253,34 @@ export default function SimpleHome() {
                     </div>
                     <StageBadge stage={plant.stage} />
                   </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="mt-3 w-full min-h-11 gap-2"
-                    onClick={() => openQuickLog(plant.quickLogTargetKey)}
-                    aria-label={SIMPLE_HOME_COPY.addObservationFor(plant.name)}
-                    data-testid="simple-home-plant-log"
-                  >
-                    <Sprout className="h-4 w-4" aria-hidden="true" />
-                    {SIMPLE_HOME_COPY.addObservation}
-                  </Button>
+                  {plant.quickLogTargetKey ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-3 w-full min-h-11 gap-2"
+                      onClick={() => openQuickLog(plant.quickLogTargetKey)}
+                      aria-label={SIMPLE_HOME_COPY.addObservationFor(plant.name)}
+                      data-testid="simple-home-plant-log"
+                    >
+                      <Sprout className="h-4 w-4" aria-hidden="true" />
+                      {SIMPLE_HOME_COPY.addObservation}
+                    </Button>
+                  ) : (
+                    // A legacy row with no grow of its own: Quick Log fails closed
+                    // on it, so offer the Plant Detail repair surface instead of
+                    // a button that cannot save.
+                    <div className="mt-3" data-testid="simple-home-plant-repair">
+                      <Button asChild variant="outline" className="w-full min-h-11 gap-2">
+                        <Link to={plant.href}>
+                          {SIMPLE_HOME_COPY.repairGrowContext}
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                      </Button>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {SIMPLE_HOME_COPY.repairGrowContextHelp}
+                      </p>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

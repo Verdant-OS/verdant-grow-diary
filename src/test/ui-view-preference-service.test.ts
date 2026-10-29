@@ -8,6 +8,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ensureUiViewPreferenceLoaded,
+  forgetUiViewPreferenceState,
+  getUiViewPreferenceGeneration,
   getUiViewPreferenceVersion,
   getUiViewSnapshot,
   resetUiViewPreferenceStoreForTest,
@@ -279,6 +281,58 @@ describe("account write", () => {
     expect(listener).toHaveBeenCalled();
     expect(getUiViewPreferenceVersion()).toBeGreaterThan(before);
     unsubscribe();
+  });
+
+  it("an earlier save that completes later cannot clear a newer pending choice", async () => {
+    const releases: Array<(v: unknown) => void> = [];
+    const client = fakeClient({
+      updateUser: vi.fn(() => new Promise((resolve) => releases.push(resolve))) as never,
+    });
+    await ensureUiViewPreferenceLoaded(client, USER);
+    const first = saveUiViewPreference(client, USER, "advanced");
+    const second = saveUiViewPreference(client, USER, "simple");
+    expect(getUiViewSnapshot(USER, {})).toMatchObject({
+      view: "simple",
+      save: { kind: "saving", view: "simple" },
+    });
+    // First write succeeds after the second was requested.
+    releases[0]({
+      data: { user: { id: USER, user_metadata: { [UI_VIEW_METADATA_KEY]: "advanced" } } },
+      error: null,
+    });
+    expect(await first).toBe(true);
+    expect(getUiViewSnapshot(USER, {})).toMatchObject({
+      view: "simple",
+      save: { kind: "saving", view: "simple" },
+    });
+    expect(window.localStorage.getItem(CACHE_KEY)).toBeNull();
+    // Second write fails: the grower keeps the view they chose, and is told it was not saved.
+    releases[1]({ data: { user: null }, error: new Error("offline") });
+    expect(await second).toBe(false);
+    expect(getUiViewSnapshot(USER, {})).toMatchObject({
+      view: "simple",
+      save: { kind: "failed", view: "simple", message: "unconfirmed" },
+    });
+  });
+
+  it("forgetting on sign-out keeps the device cache and makes the next read hit the account", async () => {
+    const client = fakeClient();
+    await ensureUiViewPreferenceLoaded(client, USER);
+    await saveUiViewPreference(client, USER, "advanced");
+    const generation = getUiViewPreferenceGeneration();
+    forgetUiViewPreferenceState();
+    expect(getUiViewPreferenceGeneration()).toBe(generation + 1);
+    expect(window.localStorage.getItem(CACHE_KEY)).toBe("advanced");
+    // The device cache is the honest fallback (ready, not loading) while the account is read again.
+    expect(getUiViewSnapshot(USER, {})).toMatchObject({ view: "advanced", status: "ready" });
+    client.getUser.mockResolvedValueOnce({
+      data: { user: { id: USER, user_metadata: { [UI_VIEW_METADATA_KEY]: "simple" } } },
+      error: null,
+    });
+    await ensureUiViewPreferenceLoaded(client, USER);
+    expect(client.getUser).toHaveBeenCalledTimes(2);
+    expect(getUiViewSnapshot(USER, {})).toMatchObject({ view: "simple", status: "ready" });
+    expect(window.localStorage.getItem(CACHE_KEY)).toBe("simple");
   });
 
   it("keeps two users' states apart", async () => {

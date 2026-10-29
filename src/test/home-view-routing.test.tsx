@@ -18,6 +18,7 @@ const auth = vi.hoisted(() => ({
   getUser: vi.fn(),
   updateUser: vi.fn(),
   user: { id: "user-home-1", user_metadata: {} as Record<string, unknown> },
+  authListeners: [] as Array<(event: string) => void>,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -25,15 +26,28 @@ vi.mock("@/integrations/supabase/client", () => ({
     auth: {
       getUser: (...args: unknown[]) => auth.getUser(...args),
       updateUser: (...args: unknown[]) => auth.updateUser(...args),
+      onAuthStateChange: (cb: (event: string) => void) => {
+        auth.authListeners.push(cb);
+        return { data: { subscription: { unsubscribe: () => {} } } };
+      },
     },
   },
 }));
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: auth.user, loading: false, signOut: vi.fn() }),
 }));
-vi.mock("@/pages/SimpleHome", () => ({
-  default: () => <div data-testid="simple-home-stub">Simple</div>,
-}));
+vi.mock("@/pages/SimpleHome", async () => {
+  const { useLocation } = await import("@/lib/react-router-compat");
+  function SimpleHomeStub() {
+    const location = useLocation();
+    return (
+      <div data-testid="simple-home-stub" data-search={location.search}>
+        Simple
+      </div>
+    );
+  }
+  return { default: SimpleHomeStub };
+});
 vi.mock("@/pages/Dashboard", () => ({
   default: () => <div data-testid="dashboard-stub">Advanced dashboard</div>,
 }));
@@ -155,6 +169,30 @@ describe("Home view routing", () => {
       "advanced",
     );
     expect(screen.queryByTestId("home-view-loading")).toBeNull();
+  });
+
+  it("choosing Simple on /dashboard?growId= keeps the grow scope on the way home", async () => {
+    auth.getUser.mockResolvedValue(accountAnswer(null));
+    renderHome("/dashboard?growId=grow-b");
+    fireEvent.click(screen.getByTestId("ui-view-switch-to-simple"));
+    const stub = await screen.findByTestId("simple-home-stub");
+    expect(stub).toHaveAttribute("data-search", "?growId=grow-b");
+  });
+
+  it("sign-out forgets the settled account state so a re-sign-in in the same tab reads again", async () => {
+    auth.getUser.mockResolvedValue(accountAnswer(null));
+    const first = renderHome();
+    await screen.findByTestId("simple-home-stub");
+    expect(auth.getUser).toHaveBeenCalledTimes(1);
+    first.unmount();
+    // Advanced was chosen on another device while this tab was signed out.
+    auth.getUser.mockResolvedValue(accountAnswer("advanced"));
+    act(() => {
+      for (const listener of auth.authListeners) listener("SIGNED_OUT");
+    });
+    renderHome();
+    expect(await screen.findByTestId("dashboard-stub")).toBeInTheDocument();
+    expect(auth.getUser).toHaveBeenCalledTimes(2);
   });
 
   it("choosing Simple on /dashboard saves the choice and goes home to the Simple view", async () => {

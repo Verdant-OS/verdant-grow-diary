@@ -16,6 +16,10 @@
  *    grower is not bounced, the cache is left untouched, and nothing claims the
  *    choice was saved.
  *  - One in-flight read per user; a late answer for a previous user is dropped.
+ *  - Saves are sequenced per user: only the latest save may settle the pending
+ *    choice, so a slow earlier write cannot clear a newer one.
+ *  - Sign-out forgets the in-memory account state (the device cache stays), so
+ *    the next sign-in in the same tab reads the account again.
  */
 import {
   DEFAULT_UI_VIEW,
@@ -78,12 +82,22 @@ export interface UiViewSnapshot extends UiViewResolution {
 
 const states = new Map<string, UserViewState>();
 const inFlightReads = new Map<string, Promise<void>>();
+const saveSequence = new Map<string, number>();
 const listeners = new Set<() => void>();
 let version = 0;
+let generation = 0;
 
 /** Monotonic change counter; a stable primitive for useSyncExternalStore. */
 export function getUiViewPreferenceVersion(): number {
   return version;
+}
+
+/**
+ * Bumped whenever settled account state is forgotten (sign-out). Hooks key
+ * their read effect on it so a mounted surface reads the account again.
+ */
+export function getUiViewPreferenceGeneration(): number {
+  return generation;
 }
 
 function emit(): void {
@@ -272,14 +286,26 @@ export async function saveUiViewPreference(
     patch(userId, { save: { kind: "failed", view, message: "auth_unavailable" } });
     return false;
   }
+  const seq = (saveSequence.get(userId) ?? 0) + 1;
+  saveSequence.set(userId, seq);
+  // Only the latest save for this user may settle the pending choice. An
+  // earlier write that completes later would otherwise clear a newer choice or
+  // report its own outcome over the grower's current one.
+  const isLatest = () => saveSequence.get(userId) === seq;
   try {
     const { data, error } = await client.updateUser({
       data: { [UI_VIEW_METADATA_KEY]: view, [UI_VIEW_METADATA_SET_AT_KEY]: now() },
     });
     const confirmed = !error && readUiViewFromMetadata(data?.user?.user_metadata) === view;
     if (!confirmed) {
-      patch(userId, { save: { kind: "failed", view, message: "unconfirmed" } });
+      if (isLatest()) patch(userId, { save: { kind: "failed", view, message: "unconfirmed" } });
       return false;
+    }
+    if (!isLatest()) {
+      // The account now holds this value, but a newer choice is in flight and
+      // owns the pending state; it will write over this one.
+      patch(userId, { account: view, accountUnavailable: false });
+      return true;
     }
     writeCache(userId, view);
     patch(userId, {
@@ -291,14 +317,35 @@ export async function saveUiViewPreference(
     });
     return true;
   } catch {
-    patch(userId, { save: { kind: "failed", view, message: "write_failed" } });
+    if (isLatest()) patch(userId, { save: { kind: "failed", view, message: "write_failed" } });
     return false;
   }
+}
+
+/**
+ * Forget settled in-memory account state (one user, or every user when
+ * `userId` is omitted). The per-user device cache is kept: it is the last
+ * confirmed value and the honest fallback until the account answers again.
+ * Called on sign-out so a re-sign-in in the same tab reads the account afresh.
+ */
+export function forgetUiViewPreferenceState(userId?: string): void {
+  if (userId) {
+    states.delete(userId);
+    inFlightReads.delete(userId);
+    saveSequence.delete(userId);
+  } else {
+    states.clear();
+    inFlightReads.clear();
+    saveSequence.clear();
+  }
+  generation += 1;
+  emit();
 }
 
 /** Test seam: forget every in-memory state (the local cache is cleared by the caller). */
 export function resetUiViewPreferenceStoreForTest(): void {
   states.clear();
   inFlightReads.clear();
+  saveSequence.clear();
   emit();
 }

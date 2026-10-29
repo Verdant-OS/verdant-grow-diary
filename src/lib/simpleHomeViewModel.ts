@@ -43,6 +43,9 @@ export const SIMPLE_HOME_COPY = {
   retry: "Try again",
   inTent: (tentName: string) => `in ${tentName}`,
   tentUnknown: "Tent not set",
+  repairGrowContext: "Link to a grow before logging",
+  repairGrowContextHelp:
+    "This plant isn't linked to a grow yet, so Quick Log can't file its notes.",
 } as const;
 
 export const SIMPLE_HOME_SETUP_ROUTE = "/start-room" as const;
@@ -56,8 +59,14 @@ export interface SimpleHomePlantRow {
   tentName: string | null;
   href: string;
   tentHref: string | null;
-  /** Explicit Quick Log launch target for this row's own button. */
-  quickLogTargetKey: `plant:${string}`;
+  /**
+   * Explicit Quick Log launch target for this row's own button. `null` for a
+   * legacy row with no `grow_id` of its own: it is shown (it was attributed to
+   * this grow through its tent) but Quick Log fails closed on such rows, so the
+   * row offers the Plant Detail repair surface instead of a button that cannot
+   * save.
+   */
+  quickLogTargetKey: `plant:${string}` | null;
 }
 
 export type SimpleHomeReadStatus = "pending" | "error" | "success";
@@ -125,6 +134,7 @@ export function buildSimpleHomePlantRows(
     .map((p) => {
       const tentId = typeof p.tentId === "string" && p.tentId.length > 0 ? p.tentId : null;
       const name = typeof p.name === "string" && p.name.trim() ? p.name.trim() : "Unnamed plant";
+      const hasGrowContext = typeof p.growId === "string" && p.growId.trim().length > 0;
       return {
         id: p.id,
         name,
@@ -134,7 +144,7 @@ export function buildSimpleHomePlantRows(
         tentName: tentId ? (tentNames.get(tentId) ?? null) : null,
         href: plantDetailPath(p.id, { tentId }),
         tentHref: tentId ? tentDetailPath(tentId) : null,
-        quickLogTargetKey: `plant:${p.id}` as const,
+        quickLogTargetKey: hasGrowContext ? (`plant:${p.id}` as const) : null,
       };
     })
     .sort(compareRows);
@@ -161,17 +171,22 @@ export function buildSimpleHomeState(input: SimpleHomeInput): SimpleHomeState {
   if (input.tents.status === "error" || !Array.isArray(input.tents.rows)) {
     return { kind: "tents-error", growId };
   }
-  if (input.tents.rows.length === 0) {
-    return { kind: "no-tent", growId, href: tentsPath(growId) };
-  }
 
+  // Plants are read before any setup gap is declared: a grow with active plants
+  // and no tent is a supported state ("No tent" is allowed when creating a
+  // plant), and those plants must stay loggable, not hidden behind a setup card.
   if (input.plants.status === "pending") return { kind: "loading", resource: "plants" };
   if (input.plants.status === "error" || !Array.isArray(input.plants.rows)) {
     return { kind: "plants-error", growId };
   }
 
   const rows = buildSimpleHomePlantRows(input.plants.rows, input.tents.rows, growId);
-  if (rows.length === 0) return { kind: "no-plant", growId, href: plantsPath(growId) };
+  if (rows.length === 0) {
+    if (input.tents.rows.length === 0) {
+      return { kind: "no-tent", growId, href: tentsPath(growId) };
+    }
+    return { kind: "no-plant", growId, href: plantsPath(growId) };
+  }
 
   const grow = input.grows.find((g) => g.id === growId);
   return {

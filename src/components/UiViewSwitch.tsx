@@ -34,10 +34,14 @@ export default function UiViewSwitch({
   className,
 }: Props) {
   const [busy, setBusy] = useState(false);
+  // The shared save status also disables the switch: when the view flips the
+  // other presenter mounts a fresh switch with no local state, and it must not
+  // accept a second choice while the first write is still in flight.
+  const disabled = busy || save.kind === "saving";
   const other: UiView = current === "simple" ? "advanced" : "simple";
 
   async function choose(view: UiView) {
-    if (busy) return;
+    if (disabled) return;
     setBusy(true);
     try {
       await onChoose(view);
@@ -56,7 +60,7 @@ export default function UiViewSwitch({
           type="button"
           variant="outline"
           className="min-h-11 gap-2"
-          disabled={busy}
+          disabled={disabled}
           onClick={() => void choose(other)}
           data-testid={`ui-view-switch-to-${other}`}
         >
@@ -76,7 +80,7 @@ export default function UiViewSwitch({
                 key={view}
                 type="button"
                 aria-pressed={selected}
-                disabled={busy}
+                disabled={disabled}
                 onClick={() => void choose(view)}
                 data-testid={`ui-view-choice-${view}`}
                 className={`min-h-16 rounded-xl border p-3 text-left transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${

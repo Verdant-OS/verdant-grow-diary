@@ -13,7 +13,7 @@
  * who chose Advanced on their phone would be a reset they did not ask for.
  */
 import { lazy, Suspense, useCallback } from "react";
-import { useNavigate } from "@/lib/react-router-compat";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 import { useUiViewPreference } from "@/hooks/useUiViewPreference";
 import { UI_VIEW_COPY, type UiView } from "@/lib/uiViewPreferenceRules";
@@ -50,7 +50,11 @@ export default function Home({ forceView }: Props = {}) {
   const { user } = useAuth();
   const preference = useUiViewPreference(user);
   const nav = useNavigate();
+  const location = useLocation();
   const forcedAdvanced = forceView === "advanced";
+  // `/dashboard?growId=…` is an explicit grow scope; switching the view must
+  // not change the working grow, so the query travels with the navigation.
+  const search = location.search ?? "";
 
   const choose = useCallback(
     async (view: UiView) => {
@@ -58,10 +62,10 @@ export default function Home({ forceView }: Props = {}) {
       // A direct Dashboard link cannot show Simple; take the grower home so
       // the view they chose is the view they see, even if the save failed
       // (the failure notice travels with the pending choice).
-      if (forcedAdvanced && view === "simple") nav(HOME_ROUTE);
+      if (forcedAdvanced && view === "simple") nav(`${HOME_ROUTE}${search}`);
       return saved;
     },
-    [forcedAdvanced, nav, preference],
+    [forcedAdvanced, nav, preference, search],
   );
 
   if (!forcedAdvanced && preference.status === "loading") {

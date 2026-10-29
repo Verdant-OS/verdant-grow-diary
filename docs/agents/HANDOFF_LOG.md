@@ -71,7 +71,7 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ### LIVE-CHECKOUT-2497-REBASE
 
-```text
+````text
 TASK LIVE-CHECKOUT-2497-REBASE  priority: P1  status: OPEN
 goal: Finish Paddle live billing on PR #2539 through a verified live purchase: live checkout opens only with a well-formed live_ client token on verdantgrowdiary.com / www.verdantgrowdiary.com, every other host and token fails closed, a build-time kill switch (VITE_CHECKOUT_DISABLED="true") is the deployable rollback, and get-paddle-price reads its catalog through the pure helper.
 why: Live checkout code existed only on closed #2497; this draft replays it. Matthew (2026-10-29, direct instruction to this Claude session) owns the release decisions and asked Claude to own investigation, repair, validation, coordination and the release packet, with every production, payment and refund action approved by him per item at the verified head.
@@ -101,7 +101,40 @@ session_state: Claude Code cloud session session_017UoYKz9AZWshNbyKnd1ck6; no ro
 claimed_by: Claude session_017UoYKz9AZWshNbyKnd1ck6, 2026-10-29 (Matthew's direct assignment)
 owner: Claude session_017UoYKz9AZWshNbyKnd1ck6
 last_updated: 2026-10-29 ~15:45 UTC by Claude session_017UoYKz9AZWshNbyKnd1ck6 (Codex P2s fixed in 01c26b0; Founder archive still BLOCKED on price.write at 15:34 UTC, Matthew routes it to the Paddle operator; Pro Monthly read-only tax preview for US 64154: $12.00 subtotal, $0.00 tax, $12.00 USD total; no charge made)
-```
+
+### VER-300-ALERT-ARCHIVED-TARGETS
+
+```text
+TASK VER-300-ALERT-ARCHIVED-TARGETS  priority: P2  status: OPEN
+goal: per VER-300 acceptance, an alert on an archived tent/plant reads "Archived tent: <name>" / "Archived plant: <name>" instead of "Tent: Name unavailable"; an id the complete owner read did not return reads "Tent removed" / "Plant removed"; the default /alerts list hides those alerts behind a "Show archived targets (n)" toggle with a visible "N hidden for archived tents/plants" count; "Why this alert?" says "Target range not recorded for this alert." instead of "Target context unavailable".
+why: Linear VER-300 (Toad Venom QA sweep, 2026-10-27): 3 of 5 open alerts read "Tent: Name unavailable". Cause in source: src/hooks/useAlertTargetNames.ts filtered tents and plants on is_archived = false.
+branch: claude/alert-archived-tent-display-dg3dq4
+base: verdant-grow-diary
+checkout: git fetch origin claude/alert-archived-tent-display-dg3dq4 verdant-grow-diary && git switch claude/alert-archived-tent-display-dg3dq4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: read from the branch's draft PR (opened right after the first push)
+head_sha: read from the PR; the base merge follows c80a505ab52b6576f172e2bb94d702d81fd41b7d (round-7 test pin)
+state: pushed, ready; enqueued 2026-10-28 06:17 UTC, dequeued 06:45 UTC on MERGE_CONFLICT; base merged at ceb66fba8 (06:50), again for #2562/#2570, and again 2026-10-29 after runners recovered (this file only each time)
+current_step: round 7: Matthew approved (2026-10-28) the "N hidden for archived tents/plants" count and gating the loop card on a failed name read; both pushed. the 2026-10-28 repo-wide Actions outage (PR comment 6465270630) is fixed (Matthew, 2026-10-29); base merged again so CI runs on a fresh head
+next_action: confirm 35/35 required checks at the new head; the PASS at ca2a728 is invalidated by the new head, so get an exact-head re-review (Jack Herer or another eligible non-contributing seat), then re-queue only with Matthew's per-item yes. Open P3 (Jack Herer 5678566277): the "Show archived targets (n)" label also counts removed targets; folds into Matthew's pending copy decision ("N hidden for archived tents/plants").
+post_merge_check: after Publish, on verdantgrowdiary.com the fixture account's Alerts list hides alerts on archived tents by default; the "Show archived targets (n)" toggle reveals them as "Archived tent: <name>" with the Historical target note. Until live /version.json reports the merge SHA: NOT_MEASURED.
+active_writer: Claude session_017UoYKyX1Beo5tnXmkJp17C
+decisions: read archived rows (RLS SELECT stays auth.uid() = user_id; no schema/RLS change); sole-tent fallback still counts non-archived tents only; "missing" is inferred only from a complete read (select with count "exact" and rows >= count), never while loading, after an error, or from a capped response; callers/mocks without the new maps keep the old "Name unavailable" copy; the default list hides alerts on archived/removed targets behind a count toggle (VER-300 acceptance; presentation only, nothing resolved), and the One-Tent Loop next-step card counts only open alerts not known to be on archived/removed targets and is not shown until target reads settle; after a failed name read the card still navigates but never auto-queues (Matthew, 2026-10-28); a capped read keeps base behaviour (gating it needs realistic tent fixtures in two locked scorers, action-queue-add-and-create-2175 and alerts-action-queue-handoff-p1-fixes); target inputs are not built while the scope is invalid (no card renders, old behavior kept); copy uses the VER-300 spec strings; stored alerts are never modified.
+tried_and_rejected: unbounded read without a count (fresh-context review P2: PostgREST max-rows can cap it and falsely mark a live plant removed); .in("id", alertIds) lookups (would need a hook signature change in two pages and a second sole-tent read; larger than the fix needs).
+commands: bunx vitest run src/test/alert-target-archived-removed.test.tsx src/test/alert-target-context.test.tsx src/test/alert-target-io-hooks.test.tsx src/test/alert-why-context.test.tsx src/test/alert-why-context-legacy-vpd.test.tsx --reporter=dot ; NODE_OPTIONS=--max-old-space-size=12288 bunx tsc -p tsconfig.json --noEmit
+files_touched: src/test/alerts-historical-targets-toggle.test.tsx; src/hooks/useAlertTargetNames.ts; src/lib/alertTargetContextRules.ts; src/lib/alertWhyContext.ts; src/components/AlertTargetContext.tsx; src/pages/Alerts.tsx; src/pages/AlertDetail.tsx; src/test/alert-target-archived-removed.test.tsx; src/test/alert-target-context.test.tsx; src/test/alert-why-context.test.tsx; src/test/alert-why-context-legacy-vpd.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: independent exact-head acceptance needs a non-contributing session; merge needs Matthew's per-item yes
+open_questions: none in scope; server-side auto-resolve of alerts on archived tents stays Matthew's call (would be a migration/trigger, out of scope)
+gotchas: alerts.tent_id/plant_id are ON DELETE SET NULL, so a hard-deleted tent shows the "unavailable" copy (or the sole active tent fallback), not "Removed"; the client cannot tell deleted from not-accessible; src/lib/stabilityWhyContext.ts still says "Target context unavailable." (stability card, out of scope)
+links: https://linear.app/verdantgrowdiary/issue/VER-300/alerts-tent-name-unavailable-for-alerts-on-archived-tents-misleading
+artifacts: PR checks
+reviewer_seat: Jack Herer PASS 5678566277 at ca2a72886fdf87c2aa8d0ad97fa7b263529e05be (stale); re-review requested at ceb66fba8 (comment 6463032437), superseded by this merge; Sour Diesel peer observation at ceb66fba8: no blocking findings
+reviewer_sha: none valid at the current head
+session_state: Claude cloud session session_017UoYKyX1Beo5tnXmkJp17C watching the PR; no routines; no paused workflows
+claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
+owner: Claude
+last_updated: 2026-10-29 01:05 UTC, by Claude
+````
 
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 

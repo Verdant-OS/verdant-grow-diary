@@ -960,10 +960,10 @@ why: Matthew's decisions 2026-10-27 (existing holders keep access forever; a lat
 branch: claude/retire-founder-cap-migration
 base: verdant-grow-diary
 checkout: git fetch origin claude/retire-founder-cap-migration verdant-grow-diary && git switch claude/retire-founder-cap-migration && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: to be opened as a draft by Claude once the branch is pushed
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2609 (draft)
 head_sha: read the PR head; this commit cannot name itself
 state: draft; migration, concurrency DB test, harness and money-migration allowlist edited; local validation in this block's commands
-current_step: open the draft PR; request independent review (billing + migration scope)
+current_step: draft PR open; request independent review (billing + migration scope)
 next_action: Matthew undeploys founder-slots-remaining (still live 2026-10-29 00:xx UTC, answering remaining 99/100), reviews the migration, applies it himself and gives the receipt; then bun run sb:types regenerates src/integrations/supabase/types.ts from the applied schema (not done here: no Supabase CLI or Docker in this session, and gen types reads the live schema, so it is a post-apply step)
 post_merge_check: after Matthew applies: SELECT public.founder_lifetime_slots_remaining() fails with "does not exist"; a live allocate_lovable_founder_lifetime call with 100 seats consumed returns ok true, founder_number null
 active_writer: Claude (session_01U9xQZcQhgrfTPEcjzgvjkb)

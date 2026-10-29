@@ -418,7 +418,7 @@ That choice covers the client change; it does not make any single
 token or settings flip sufficient. The release sequence above is the order.
 
 Standing checks. Each one is a pre-merge gate for the live release, alongside
-steps 1–5 of the release sequence; none is optional, because the merge lets
+steps 1–6 of the release sequence; none is optional, because the merge lets
 the publisher expose live checkout:
 
 - [ ] Complete Paddle live verification (merchant of record onboarding).

@@ -13,8 +13,8 @@
  *  - `paddlePriceId` is a HUMAN-READABLE plan id (e.g. "pro_monthly"), not
  *    a raw `pri_...`; get-paddle-price resolves it server-side. This
  *    mirrors what /pricing already does via usePaddleCheckout.
- *  - `cap.claimed` here is a legacy display default; the live counter now
- *    comes from `useFounderSlotsRemaining()`.
+ *  - `cap.claimed` here is a legacy display default; Founder Lifetime is no
+ *    longer sold, so there is no live counter.
  */
 
 import {

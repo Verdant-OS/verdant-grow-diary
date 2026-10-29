@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { exportGrowDiaryReportAsPdf } from "@/lib/growDiaryPdfExport";
+import { getGrowDiaryPdfReadiness } from "@/lib/growDiaryPdfReadinessRules";
 
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import { type CountValue, type GrowStatus, type StatusLevel, formatCount } from "@/lib/growStatus";
@@ -130,6 +131,7 @@ export default function GrowDetail() {
 
   const showPostGrowReport =
     grow.is_archived || grow.stage === "harvest" || grow.stage === "drying";
+  const exportReadiness = getGrowDiaryPdfReadiness(counts.diary, recent);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -186,7 +188,13 @@ export default function GrowDetail() {
             variant="outline"
             size="sm"
             data-testid="grow-detail-export-pdf"
+            disabled={exportReadiness === "loading"}
+            aria-busy={exportReadiness === "loading"}
             onClick={() => {
+              if (exportReadiness !== "ready" || recent.status !== "ok") {
+                toast.error("Couldn't load the diary data for export. Refresh this grow and try again.");
+                return;
+              }
               const result = exportGrowDiaryReportAsPdf({
                 grow: {
                   name: grow.name,
@@ -197,7 +205,7 @@ export default function GrowDetail() {
                   diary: counts.diary,
                   alerts: counts.alertsOpen,
                 },
-                recent: recent.status === "ok" ? recent.items : [],
+                recent: recent.items,
               });
               if (result === "unavailable") {
                 toast.error("Couldn't open the export window. Check popup blockers and try again.");
@@ -207,7 +215,7 @@ export default function GrowDetail() {
             }}
           >
             <FileDown className="h-4 w-4" aria-hidden="true" />
-            Export PDF
+            {exportReadiness === "loading" ? "Loading export…" : "Export PDF"}
           </Button>
           <GrowArchiveControlButton
             growId={grow.id}

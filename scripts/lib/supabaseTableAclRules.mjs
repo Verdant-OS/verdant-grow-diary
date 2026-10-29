@@ -314,10 +314,11 @@ export function findTablesWithoutExplicitAcl(migrations) {
       } else if (event.kind === "drop") {
         tables.delete(event.table);
       } else if (event.kind === "rename") {
-        // The new name now holds the renamed table, tracked or not.
+        // A rename onto a still-tracked name does not run: PostgreSQL
+        // rejects it, or IF EXISTS with a missing source is a no-op.
+        if (tables.has(event.to)) continue;
         const state = tables.get(event.table);
         tables.delete(event.table);
-        tables.delete(event.to);
         if (state) tables.set(event.to, state);
       } else {
         const state = tables.get(event.table);

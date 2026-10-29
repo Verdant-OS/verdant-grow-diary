@@ -264,6 +264,19 @@ describe("supabase table explicit ACL rule", () => {
     ]);
   });
 
+  it("leaves a tracked table alone when a rename onto its name does not run", () => {
+    // IF EXISTS and a missing source is a no-op in PostgreSQL.
+    expect(tables(`${CREATE}\nALTER TABLE IF EXISTS public.missing RENAME TO leaky;`)).toEqual([
+      "leaky",
+    ]);
+    // Both names already hold tables: PostgreSQL rejects the rename.
+    expect(
+      tables(
+        `${CREATE}\nCREATE TABLE public.other (id int);\nALTER TABLE public.other RENAME TO leaky;`,
+      ),
+    ).toEqual(["leaky", "other"]);
+  });
+
   it("drops every table in a DROP TABLE list", () => {
     expect(
       tables(

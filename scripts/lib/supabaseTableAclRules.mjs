@@ -581,9 +581,7 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) 
         }
         if (j < end) {
           const prefix = code.slice(stmtStart, i).join("");
-          const executes =
-            EXECUTES_RE.test(prefix) &&
-            EXECUTE_ENDS_RE.test(sql.slice(j + 1, end));
+          const executes = EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(j + 1, end));
           // A single-quoted DO body runs now, matching dollar-quoted DO.
           const doBody = scanDoBodies && RUNS_NOW_RE.test(prefix);
           if (executableOnly && !executes && !doBody) blank(i, j + 1);
@@ -679,7 +677,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
       }
     }
     for (const match of ddl.matchAll(CREATE_TEMP_HEAD_RE)) {
-      if (quotedDdl[match.index]) continue;
+      if (quoted[match.index]) continue;
       const after = ddl.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));

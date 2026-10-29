@@ -11,6 +11,7 @@
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { discoverBundleRoots } from "./lib/checkoutDisabledBundleRoots.mjs";
 
 const PAUSED_COPY =
   "New checkout is paused. Existing plans, renewals and billing management are not affected.";
@@ -26,14 +27,10 @@ function walk(dir, out = []) {
   return out;
 }
 
-const roots = [resolve(".output/public"), resolve(".output/server")].filter((dir) => {
-  try {
-    return statSync(dir).isDirectory();
-  } catch {
-    return false;
-  }
-});
-const files = roots.flatMap((dir) => walk(dir));
+// The emitted layout is detected (nitro.json, then conventional trees) so a
+// layout move yields a real verdict instead of bundleFiles: 0.
+const roots = discoverBundleRoots(process.cwd());
+const files = roots.flatMap((root) => walk(root.path));
 let pausedHits = 0;
 const forbiddenHits = [];
 
@@ -47,6 +44,7 @@ for (const file of files) {
 
 const receipt = {
   checkedAt: new Date().toISOString(),
+  bundleRoots: roots,
   bundleFiles: files.length,
   pausedCopyHits: pausedHits,
   forbiddenHits,
@@ -58,7 +56,7 @@ writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
 
 if (!receipt.pass) {
   console.error(
-    `checkout-disabled bundle verification failed: pausedCopyHits=${pausedHits} forbidden=${forbiddenHits.length}`,
+    `checkout-disabled bundle verification failed: bundleRoots=${roots.length} bundleFiles=${files.length} pausedCopyHits=${pausedHits} forbidden=${forbiddenHits.length}`,
   );
   process.exit(1);
 }

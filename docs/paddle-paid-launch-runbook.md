@@ -188,6 +188,12 @@ Rollback order, before any production publish:
 9. [ ] **Rollback artifact verified** — the checkout-disabled build is built,
        verified under production-host conditions, and pinned
        (see "Live checkout rollback").
+10. [ ] **Founder price archived in live Paddle** — the retired
+        `founder_lifetime` price reads `archived` on a read-only price list
+        (owner-approved Paddle-side write; see step 4 below and
+        `docs/billing.md` step 4). The client and server refusals do not stop a
+        caller who passes the price id to Paddle.js directly, and the webhook
+        still allocates a seat; only archiving makes Paddle refuse it.
 
 ## Live checkout release
 
@@ -195,9 +201,9 @@ Merging #2539 into `verdant-grow-diary` makes it the build the configured
 publisher deploys to production. Customer exposure starts when the live
 `/version.json` reports the merge SHA; from then the live token opens checkout,
 and there is no operator-only gate. So backend readiness is verified first, in
-this order, and the merge waits for steps 1–5 and for every standing check in
+this order, and the merge waits for steps 1–6 and for every standing check in
 `docs/billing.md` ("What must be true before live payments open to
-customers"); step 6 is the merge followed by post-merge deployment
+customers"); step 7 is the merge followed by post-merge deployment
 verification:
 
 1. Merge #2229 (shared webhook-verifier packaging repair) through the queue.
@@ -222,12 +228,18 @@ verification:
    is Craft today, or `410 plan_retired` for `founder_lifetime`). Any
    `price_resolution_unavailable` blocks the release:
    one click on that SKU closes checkout for every plan on the page.
-4. Read-only webhook pass: Paddle notification logs for both live
+4. Founder price archived in live Paddle, owner-approved: the retired
+   `founder_lifetime` price (`import_meta.external_id = founder_lifetime`) is
+   set to `archived` by the Paddle operator, then verified by a read-only
+   price read that shows that status. Record the price id and the read-back
+   timestamp. Without this, a direct Paddle.js call with the price id still
+   buys a Founder seat that the webhook grants, whatever the app refuses.
+5. Read-only webhook pass: Paddle notification logs for both live
    destinations, live `lovable_paddle_events` rows, `payments-webhook` logs.
    Choose the canonical destination from evidence. A live test event is a
    production write and needs its own authorization.
-5. Build and verify the rollback artifact (below).
-6. Post-merge: merge #2539 through the queue. Measure the publisher deployment for the
+6. Build and verify the rollback artifact (below).
+7. Post-merge: merge #2539 through the queue. Measure the publisher deployment for the
    merge commit; exposure and live verification start only when the live
    `/version.json` names it. Then confirm `/pricing` shows "Secure checkout by
    Paddle". A

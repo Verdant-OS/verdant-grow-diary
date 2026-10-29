@@ -24,6 +24,7 @@ import {
 import {
   isDefinitiveQuickLogActivityRejection,
   planQuickLogPersistence,
+  withQuickLogNoteMarker,
 } from "@/lib/quickLogActivityRules";
 import {
   QUICK_LOG_V2_ENTRY_CREATED_EVENT,
@@ -137,9 +138,11 @@ export function useQuickLogActivitySave() {
             setError("missing_target");
             return { ok: false, reason: "missing_target" };
           }
-          const manualDetails: Record<string, unknown> = {
+          // The manual route is the Note tile: mark it so saved entries can
+          // tell a note from an issue.
+          const manualDetails: Record<string, unknown> = withQuickLogNoteMarker({
             ...(input.extraDetails ?? {}),
-          };
+          });
           const { data, error: rpcErr } = await supabase.rpc(
             "quicklog_save_manual" as any,
             {

@@ -1011,12 +1011,12 @@ open_questions: none
 gotchas: this block and AHREFS-WEB-ANALYTICS-KEY-SWAP both append before "## Closed"; whichever PR merges second needs a base merge keeping both blocks
 links: sibling key-swap PR from claude/admiring-dirac-3vaz57
 artifacts: PR body
-reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3; this Claude session excluded
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3; excluded contributors: this Claude session (session_017UoYKzCisV3nBJG6Dhco3K) and the Cursor Agent session that authored fe37c87c
 reviewer_sha: none yet
 session_state: none
 claimed_by: Claude, 2026-10-28 23:20 UTC
 owner: Claude
-last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
+last_updated: 2026-10-29 18:45 UTC, by Claude (Bloomer advisory P2s: reviewer exclusions and contract-test wording)
 ```
 
 ### HONO-NODE-SERVER-GHSA-RMXM

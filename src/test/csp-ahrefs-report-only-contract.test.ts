@@ -1,6 +1,9 @@
 /**
  * Companion to csp-ahrefs-analytics-origin.test.ts (scorer-locked): pins the
- * KNOWN_THIRD_PARTY_ORIGINS entry and forbids Ahrefs in unrelated CSP directives.
+ * KNOWN_THIRD_PARTY_ORIGINS entry and checks that the explicit Ahrefs source is added
+ * only to script-src and connect-src. Directives that already allow `https:`
+ * (img-src, media-src) still match the origin under CSP source matching; this
+ * test pins the explicit token, not that wider policy.
  */
 import { describe, expect, it } from "vitest";
 
@@ -28,7 +31,7 @@ describe("Ahrefs report-only CSP contract", () => {
     expect(KNOWN_THIRD_PARTY_ORIGINS.ahrefsAnalytics).toEqual([AHREFS_ORIGIN]);
   });
 
-  it("allows Ahrefs only on script-src and connect-src", () => {
+  it("adds the explicit Ahrefs source only to script-src and connect-src", () => {
     expect(directiveSources(csp, "script-src")).toContain(AHREFS_ORIGIN);
     expect(directiveSources(csp, "connect-src")).toContain(AHREFS_ORIGIN);
     for (const name of [

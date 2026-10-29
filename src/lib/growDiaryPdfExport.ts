@@ -59,8 +59,7 @@ export interface GrowDiaryPdfChartHint {
 export interface BuildGrowDiaryReportInput {
   grow: GrowDiaryPdfGrowContext;
   counts: GrowDiaryPdfCounts;
-  /** null/undefined means unavailable, whereas [] is a successful empty read. */
-  recent: readonly RecentItem[] | null | undefined;
+  recent: readonly RecentItem[];
   sensorSources?: readonly GrowDiaryPdfSourceRollup[];
   chartHints?: readonly GrowDiaryPdfChartHint[];
   chartsUnavailableReason?: string | null;
@@ -146,7 +145,12 @@ export function buildGrowDiaryReportFilename(growName: string, now: Date): strin
   return `verdant-grow-diary-${safeSlug(growName)}-${localDate(now)}.pdf`;
 }
 
-export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): GrowDiaryPdfModel {
+/** Only the model builder accepts missing activity; [] is a successful empty read. */
+type GrowDiaryReportModelInput = Omit<BuildGrowDiaryReportInput, "recent"> & {
+  recent: BuildGrowDiaryReportInput["recent"] | null | undefined;
+};
+
+export function buildGrowDiaryReportModel(input: GrowDiaryReportModelInput): GrowDiaryPdfModel {
   const now = input.now ?? new Date();
   const plantNames = (input.grow.plantNames ?? []).filter(Boolean);
   const scopeParts: string[] = [input.grow.name];
@@ -366,7 +370,7 @@ export interface ExportGrowDiaryReportOptions {
  * is blocked or the environment lacks a window.
  */
 export function exportGrowDiaryReportAsPdf(
-  input: BuildGrowDiaryReportInput & { recent: readonly RecentItem[] },
+  input: BuildGrowDiaryReportInput,
   opts: ExportGrowDiaryReportOptions = {},
 ): ExportGrowDiaryReportResult {
   const win = opts.win !== undefined ? opts.win : typeof window !== "undefined" ? window : null;

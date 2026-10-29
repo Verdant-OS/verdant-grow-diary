@@ -240,6 +240,52 @@ describe("invalid provenance is never fresh (Copilot on #2586 at 12f1e03fe)", ()
   });
 });
 
+describe("a persisted snapshot's live claim is never fresh (Codex P1 on #2586 at 60b20d9c8)", () => {
+  it("counts a five-minute-old persisted live snapshot as unknown, not fresh", () => {
+    expect(
+      classifySensorSourceSummaryFreshness(
+        { source: "live", captured_at: minutesAgo(5), context: "persisted_snapshot" },
+        NOW,
+      ),
+    ).toBe("unknown");
+    const r = summarizeSensorSources(
+      [{ source: "live", captured_at: minutesAgo(5), context: "persisted_snapshot" }],
+      { now: NOW, fallback: "invalid" },
+    );
+    expect(r.freshness).toEqual({ fresh: 0, stale: 0, unknown: 1 });
+    // Provenance still reports what the row claims; only freshness is fenced.
+    expect(r.counts.live).toBe(1);
+    expect(r.counts.stale).toBe(0);
+  });
+
+  it("keeps a direct five-minute-old live reading fresh (Sensors page rows pass no context)", () => {
+    expect(
+      classifySensorSourceSummaryFreshness({ source: "live", captured_at: minutesAgo(5) }, NOW),
+    ).toBe("fresh");
+    expect(
+      classifySensorSourceSummaryFreshness(
+        { source: "live", captured_at: minutesAgo(5), context: "direct" },
+        NOW,
+      ),
+    ).toBe("fresh");
+  });
+
+  it("leaves a persisted manual snapshot on the 24-hour manual clock", () => {
+    expect(
+      classifySensorSourceSummaryFreshness(
+        { source: "manual", captured_at: hoursAgo(1), context: "persisted_snapshot" },
+        NOW,
+      ),
+    ).toBe("fresh");
+    expect(
+      classifySensorSourceSummaryFreshness(
+        { source: "manual", captured_at: hoursAgo(30), context: "persisted_snapshot" },
+        NOW,
+      ),
+    ).toBe("stale");
+  });
+});
+
 describe("SensorSourceSummaryWidget freshness line (VER-299)", () => {
   it("shows Stale > 0 for a stale manual reading instead of Stale 0", () => {
     render(

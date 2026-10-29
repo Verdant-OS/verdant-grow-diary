@@ -36,6 +36,11 @@ export function buildPlantSensorSourceReadings(
       source: source ?? (canonical ? "invalid" : "manual"),
       captured_at: observedAt ?? row.entry_at ?? null,
       ts: row.entry_at,
+      // A diary row stores a copy of the reading. Its `live` claim is never
+      // corroborated here, so freshness applies the Timeline's persisted-
+      // snapshot fence; the provenance row still reports what the row claims
+      // (Codex P1 on #2586 at 60b20d9c8).
+      context: "persisted_snapshot",
     });
   }
   return out;

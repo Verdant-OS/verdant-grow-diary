@@ -97,6 +97,27 @@ describe("buildPlantSensorSourceReadings", () => {
   });
 });
 
+describe("buildPlantSensorSourceReadings marks every reading as a persisted snapshot", () => {
+  it("sets context so a stored live claim cannot read fresh (Codex P1 on #2586)", () => {
+    const out = buildPlantSensorSourceReadings([
+      {
+        entry_at: "2026-06-16T12:05:00Z",
+        details: { sensor_snapshot: { source: "live", ts: "2026-06-16T12:04:00Z" } },
+      },
+      {
+        entry_at: "2026-06-16T12:05:00Z",
+        details: { manual_sensor_snapshot: { source: "manual", ts: "2026-06-16T12:04:00Z" } },
+      },
+      {
+        entry_at: "2026-06-16T12:05:00Z",
+        details: { sensor_snapshot: { temp: 22 } },
+      },
+    ]);
+    expect(out).toHaveLength(3);
+    expect(out.every((r) => r.context === "persisted_snapshot")).toBe(true);
+  });
+});
+
 describe("PlantSensorSourceBreakdownCard freshness uses the snapshot capture time", () => {
   it("counts a manual snapshot captured 30 hours ago as stale even on a five-minute-old entry", () => {
     const now = Date.now();
@@ -120,6 +141,32 @@ describe("PlantSensorSourceBreakdownCard freshness uses the snapshot capture tim
       "0",
     );
     expect(screen.getByTestId("sensor-source-summary-freshness-count-stale")).toHaveTextContent(
+      "1",
+    );
+  });
+
+  it("never counts a five-minute-old persisted live claim as fresh (Codex P1 on #2586)", () => {
+    const now = Date.now();
+    const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
+    render(
+      withProviders(
+        <PlantSensorSourceBreakdownCard
+          plantId="p-persisted-live"
+          rows={[
+            {
+              entry_at: iso(5 * 60_000),
+              details: { sensor_snapshot: { source: "live", captured_at: iso(5 * 60_000) } },
+            },
+          ]}
+        />,
+      ),
+    );
+    // The row still claims live provenance; its freshness is unknown, not fresh.
+    expect(screen.getByTestId("sensor-source-summary-count-live")).toHaveTextContent("1");
+    expect(screen.getByTestId("sensor-source-summary-freshness-count-fresh")).toHaveTextContent(
+      "0",
+    );
+    expect(screen.getByTestId("sensor-source-summary-freshness-count-unknown")).toHaveTextContent(
       "1",
     );
   });

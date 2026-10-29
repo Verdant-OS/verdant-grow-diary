@@ -26,6 +26,12 @@
  *    canonical `status` of stale / invalid / needs_review / no_data, or a
  *    `quality` other than ok, keeps the reading out of `fresh` even when its
  *    source and timestamp alone would pass (Codex P2 on #2586 at b1cab8f9d).
+ *  - A persisted snapshot's own `live` claim is never fresh. Diary rows carry
+ *    a copy of a reading, not the reading, so the Timeline's persisted-snapshot
+ *    trust fence applies to their freshness: a reading with
+ *    `context: "persisted_snapshot"` and a live source is unknown even inside
+ *    the 15-minute window. Direct readings (Sensors page rows) pass no context
+ *    and keep the clock rule (Codex P1 on #2586 at 60b20d9c8).
  *  - `counts.stale` is a freshness count: readings persisted as `stale` plus live
  *    or manual readings older than their canon window or flagged stale. A stale
  *    manual reading therefore counts under both `manual` (provenance) and
@@ -62,6 +68,12 @@ export interface SensorSourceSummaryReading {
   status?: string | null;
   /** Persisted intake quality for raw rows (`ok` or empty means no downgrade). */
   quality?: string | null;
+  /**
+   * Where the reading came from. `persisted_snapshot` marks a copy stored on a
+   * diary row, whose `live` claim is not corroborated and is never fresh.
+   * Omitted or `direct` means a reading the caller read from its source table.
+   */
+  context?: "direct" | "persisted_snapshot";
 }
 
 export interface SensorSourceSummaryRange {
@@ -156,10 +168,13 @@ export function classifySensorSourceSummaryFreshness(
 ): SensorSourceSummaryFreshness {
   // Provenance first: a source string the canonical classifier rejects (vendor
   // or transport aliases, unknown labels) is Invalid and can never be current,
-  // even when the canon's freshness windows would accept the alias.
+  // even when the canon's freshness windows would accept the alias. The
+  // persisted-snapshot context applies the Timeline's trust fence: a stored
+  // copy's live claim is Invalid here, so it is never fresh.
   const provenance = classifyTimelineSensorSource({
     rawSource: reading.source ?? null,
     capturedAt: readingTimestamp(reading),
+    context: reading.context,
     fallback: "invalid",
   }).kind;
   if (provenance === "invalid") return "unknown";

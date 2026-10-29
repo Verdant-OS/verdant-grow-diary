@@ -16,6 +16,7 @@ import {
 } from "@/lib/harvestCheckHandoffStore";
 import { trackHarvestTrackerEvent } from "@/lib/harvestWindowAnalytics";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { plantsPath } from "@/lib/routes";
 
 /**
  * Offers to import the harvest checks a visitor logged on the public Harvest
@@ -140,7 +141,7 @@ function ImportPrompt({ handoff, onDone }: { handoff: HarvestCheckHandoff; onDon
       ) : list.length === 0 ? (
         <p className="mt-3">
           Add your first plant, then come back here to import.{" "}
-          <Link className="underline" to="/plants">
+          <Link className="underline" to={plantsPath()}>
             Go to Plants
           </Link>
         </p>

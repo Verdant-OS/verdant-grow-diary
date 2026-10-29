@@ -85,7 +85,7 @@ current_step: Rules rewritten (provenance never age-downgraded; counts.stale = f
 next_action: Full suite at the new head, reply on both Copilot threads naming the fix commit and resolve them, then independent exact-head review by an available non-contributing session under OWNERSHIP.md section 4.3. No merge from the authoring session.
 post_merge_check: On the live site after the publish that carries the fix, /sensors with a manual reading older than 24 hours shows the same Stale count in the summary as the badges beside it; NOT_MEASURED until then.
 active_writer: Claude session_017UoYKvojgRxESWUyQyGEmj on claude/ver-299-sensor-source-summary-freshness
-decisions: Reuse resolveDashboardSensorBadgeStatus for per-reading freshness so the summary agrees with the Dashboard by construction (usable→fresh, stale→stale, invalid/needs_review/no_data→unknown; csv/demo are unknown, never fresh). Keep provenance rows as provenance (an old live reading stays Live) and make the Stale row the freshness count, so "Stale 0" can no longer sit beside stale badges; a stale manual reading counts under both Manual and Stale, and the new freshness line makes that explicit. Remove the staleMs option (only tests used it) rather than carry two freshness paths. Legend windows derived from sensorTruthCanon constants, not hardcoded. Ported #2605's three-file @hono/node-server 2.0.10→2.1.3 bump (package.json override, bun.lock resolved entry, BUN_LOCK_SECURITY_FLOORS) as its own commit because check:deps is red on the deploy tip, not this PR's; the port no-ops once the base carries #2605, and #2605's own handoff block is not carried. Codex P2 round: honour the adapter's persisted-status floor inside the summary rather than re-deriving quality (the Sensors page already carries status on every grouped reading; PlantSensorSourceBreakdownCard's diary snapshots carry neither and are unchanged); make the Stale row non-clickable instead of adding a freshness filter to the Timeline (a new filter semantics is a separate slice; the row is an aggregate and says so). Copilot round: reject Invalid provenance inside the summary's own classifier rather than widening the Timeline classifier's alias table (provenance vocabulary is canonical; vendor/transport strings are metadata); keep the diary-entry fallback for snapshots with no timestamp (the canonical manual writer always carries ts, and the existing test pins the legacy fallback).
+decisions: Reuse resolveDashboardSensorBadgeStatus for per-reading freshness so the summary agrees with the Dashboard by construction (usable→fresh, stale→stale, invalid/needs_review/no_data→unknown; csv/demo are unknown, never fresh). Keep provenance rows as provenance (an old live reading stays Live) and make the Stale row the freshness count, so "Stale 0" can no longer sit beside stale badges; a stale manual reading counts under both Manual and Stale, and the new freshness line makes that explicit. Remove the staleMs option (only tests used it) rather than carry two freshness paths. Legend windows derived from sensorTruthCanon constants, not hardcoded. Ported #2605's three-file @hono/node-server 2.0.10→2.1.3 bump (package.json override, bun.lock resolved entry, BUN_LOCK_SECURITY_FLOORS) as its own commit because check:deps is red on the deploy tip, not this PR's; the port no-ops once the base carries #2605, and #2605's own handoff block is not carried. Codex P2 round: honour the adapter's persisted-status floor inside the summary rather than re-deriving quality (the Sensors page already carries status on every grouped reading; PlantSensorSourceBreakdownCard's diary snapshots carry neither and are unchanged); make the Stale row non-clickable instead of adding a freshness filter to the Timeline (a new filter semantics is a separate slice; the row is an aggregate and says so). Copilot round: reject Invalid provenance inside the summary's own classifier rather than widening the Timeline classifier's alias table (provenance vocabulary is canonical; vendor/transport strings are metadata); keep the diary-entry fallback for snapshots with no timestamp (the canonical manual writer always carries ts, and the existing test pins the legacy fallback). #2605 merged into the base as dcf39fdb6 on 2026-10-29, so the ported bump is now identical to the base (no-op as intended).
 tried_and_rejected: Keeping the Stale row as persisted-source-only provenance plus a separate freshness line (leaves "Stale 0" on screen next to "Stale 3"; the contradiction reborn). Re-deriving thresholds in the rules file (duplicates the canon; VER-299 asks for reuse). Running vitest locally (BLOCKED: 978 lockfile tarballs on *.pkg.dev/lovable-core-prod return 403; one attempt, partial node_modules left behind because the session's bash hook blocks rm -rf).
 commands: bun run <scratch>.ts importing the base and fixed rules (base: manual 30h → stale 0, RED; fixed: 1/1/fresh/unknown as expected, PASS); bunx -p typescript@5.9.3 tsc -p <scratch tsconfig with files: [src/lib/sensorSourceSummaryRules.ts]> → exit 0; bunx prettier@3 --check on the seven changed files → clean; git diff --check → clean; node scripts/check-contract-test-resolution.mjs → OK; CI: bunx vitest run src/test/sensor-source-summary-freshness-ver-299.test.tsx src/test/sensor-source-summary-rules.test.ts src/test/sensor-source-summary-widget.test.tsx src/test/sensor-source-summary-widget-clickable.test.tsx src/test/sensor-source-summary-period-copy.test.tsx src/test/plant-sensor-source-breakdown.test.tsx src/test/plant-sensor-source-read-truth.test.tsx src/test/sensor-source-ux-phase2-static-safety.test.ts src/test/sensor-source-ux-phase3-static-safety.test.ts; Codex round RED/GREEN via bun scratch: base rules give fresh for live+5min with status stale / quality stale / quality degraded / status needs_review (RED); fixed rules give stale / stale / unknown / unknown and leave status usable, no flags and the 30h-manual clock verdict unchanged (PASS); tsc on the rules module exit 0; Copilot round RED/GREEN via bun scratch: base gives mqtt → Invalid 1 + Fresh 1, quick_log → fresh, projected captured_at = entry time, card fresh 1 (RED); fixed gives unknown, unknown, the snapshot's captured_at, card stale 1 (PASS); tsc on both rules modules exit 0
 files_touched: src/lib/sensorSourceSummaryRules.ts; src/components/SensorSourceSummaryWidget.tsx; src/components/PlantSensorSourceBreakdownCard.tsx; src/pages/Sensors.tsx; src/test/sensor-source-summary-freshness-ver-299.test.tsx (new); src/test/sensor-source-summary-rules.test.ts; src/test/sensor-source-summary-widget.test.tsx; docs/agents/HANDOFF_LOG.md (this block); ported from #2605: package.json, bun.lock, scripts/check-bun-lockfile-policy.mjs; Codex round: src/lib/sensorSourceSummaryRules.ts, src/components/SensorSourceSummaryWidget.tsx, src/pages/Sensors.tsx, src/test/sensor-source-summary-freshness-ver-299.test.tsx; Copilot round: src/lib/sensorSourceSummaryRules.ts, src/lib/plantSensorSourceHistoryRules.ts, src/test/sensor-source-summary-freshness-ver-299.test.tsx, src/test/plant-sensor-source-breakdown.test.tsx
@@ -100,7 +100,41 @@ reviewer_sha: NOT_MEASURED
 session_state: Claude cloud session; PR subscription after creation; no cron, merge, publish, sensor write or production action
 claimed_by: Claude session_017UoYKvojgRxESWUyQyGEmj, 2026-10-28 (Matthew's assignment in session; no GitHub claim comment posted)
 owner: Claude (this session); default inheritor OG Kush
-last_updated: 2026-10-29 18:20 UTC, by Claude session_017UoYKvojgRxESWUyQyGEmj (Copilot round fixed)
+last_updated: 2026-10-29 18:30 UTC, by Claude session_017UoYKvojgRxESWUyQyGEmj (merged origin/verdant-grow-diary dcf39fdb6; HANDOFF_LOG conflict resolved by keeping both Open blocks)
+```
+
+### VER-300-ALERT-ARCHIVED-TARGETS
+
+```text
+TASK VER-300-ALERT-ARCHIVED-TARGETS  priority: P2  status: OPEN
+goal: per VER-300 acceptance, an alert on an archived tent/plant reads "Archived tent: <name>" / "Archived plant: <name>" instead of "Tent: Name unavailable"; an id the complete owner read did not return reads "Tent removed" / "Plant removed"; the default /alerts list hides those alerts behind a "Show archived targets (n)" toggle with a visible "N hidden for archived tents/plants" count; "Why this alert?" says "Target range not recorded for this alert." instead of "Target context unavailable".
+why: Linear VER-300 (Toad Venom QA sweep, 2026-10-27): 3 of 5 open alerts read "Tent: Name unavailable". Cause in source: src/hooks/useAlertTargetNames.ts filtered tents and plants on is_archived = false.
+branch: claude/alert-archived-tent-display-dg3dq4
+base: verdant-grow-diary
+checkout: git fetch origin claude/alert-archived-tent-display-dg3dq4 verdant-grow-diary && git switch claude/alert-archived-tent-display-dg3dq4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: read from the branch's draft PR (opened right after the first push)
+head_sha: read from the PR; the base merge follows c80a505ab52b6576f172e2bb94d702d81fd41b7d (round-7 test pin)
+state: pushed, ready; enqueued 2026-10-28 06:17 UTC, dequeued 06:45 UTC on MERGE_CONFLICT; base merged at ceb66fba8 (06:50), again for #2562/#2570, and again 2026-10-29 after runners recovered (this file only each time)
+current_step: round 7: Matthew approved (2026-10-28) the "N hidden for archived tents/plants" count and gating the loop card on a failed name read; both pushed. the 2026-10-28 repo-wide Actions outage (PR comment 6465270630) is fixed (Matthew, 2026-10-29); base merged again so CI runs on a fresh head
+next_action: confirm 35/35 required checks at the new head; the PASS at ca2a728 is invalidated by the new head, so get an exact-head re-review (Jack Herer or another eligible non-contributing seat), then re-queue only with Matthew's per-item yes. Open P3 (Jack Herer 5678566277): the "Show archived targets (n)" label also counts removed targets; folds into Matthew's pending copy decision ("N hidden for archived tents/plants").
+post_merge_check: after Publish, on verdantgrowdiary.com the fixture account's Alerts list hides alerts on archived tents by default; the "Show archived targets (n)" toggle reveals them as "Archived tent: <name>" with the Historical target note. Until live /version.json reports the merge SHA: NOT_MEASURED.
+active_writer: Claude session_017UoYKyX1Beo5tnXmkJp17C
+decisions: read archived rows (RLS SELECT stays auth.uid() = user_id; no schema/RLS change); sole-tent fallback still counts non-archived tents only; "missing" is inferred only from a complete read (select with count "exact" and rows >= count), never while loading, after an error, or from a capped response; callers/mocks without the new maps keep the old "Name unavailable" copy; the default list hides alerts on archived/removed targets behind a count toggle (VER-300 acceptance; presentation only, nothing resolved), and the One-Tent Loop next-step card counts only open alerts not known to be on archived/removed targets and is not shown until target reads settle; after a failed name read the card still navigates but never auto-queues (Matthew, 2026-10-28); a capped read keeps base behaviour (gating it needs realistic tent fixtures in two locked scorers, action-queue-add-and-create-2175 and alerts-action-queue-handoff-p1-fixes); target inputs are not built while the scope is invalid (no card renders, old behavior kept); copy uses the VER-300 spec strings; stored alerts are never modified.
+tried_and_rejected: unbounded read without a count (fresh-context review P2: PostgREST max-rows can cap it and falsely mark a live plant removed); .in("id", alertIds) lookups (would need a hook signature change in two pages and a second sole-tent read; larger than the fix needs).
+commands: bunx vitest run src/test/alert-target-archived-removed.test.tsx src/test/alert-target-context.test.tsx src/test/alert-target-io-hooks.test.tsx src/test/alert-why-context.test.tsx src/test/alert-why-context-legacy-vpd.test.tsx --reporter=dot ; NODE_OPTIONS=--max-old-space-size=12288 bunx tsc -p tsconfig.json --noEmit
+files_touched: src/test/alerts-historical-targets-toggle.test.tsx; src/hooks/useAlertTargetNames.ts; src/lib/alertTargetContextRules.ts; src/lib/alertWhyContext.ts; src/components/AlertTargetContext.tsx; src/pages/Alerts.tsx; src/pages/AlertDetail.tsx; src/test/alert-target-archived-removed.test.tsx; src/test/alert-target-context.test.tsx; src/test/alert-why-context.test.tsx; src/test/alert-why-context-legacy-vpd.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: independent exact-head acceptance needs a non-contributing session; merge needs Matthew's per-item yes
+open_questions: none in scope; server-side auto-resolve of alerts on archived tents stays Matthew's call (would be a migration/trigger, out of scope)
+gotchas: alerts.tent_id/plant_id are ON DELETE SET NULL, so a hard-deleted tent shows the "unavailable" copy (or the sole active tent fallback), not "Removed"; the client cannot tell deleted from not-accessible; src/lib/stabilityWhyContext.ts still says "Target context unavailable." (stability card, out of scope)
+links: https://linear.app/verdantgrowdiary/issue/VER-300/alerts-tent-name-unavailable-for-alerts-on-archived-tents-misleading
+artifacts: PR checks
+reviewer_seat: Jack Herer PASS 5678566277 at ca2a72886fdf87c2aa8d0ad97fa7b263529e05be (stale); re-review requested at ceb66fba8 (comment 6463032437), superseded by this merge; Sour Diesel peer observation at ceb66fba8: no blocking findings
+reviewer_sha: none valid at the current head
+session_state: Claude cloud session session_017UoYKyX1Beo5tnXmkJp17C watching the PR; no routines; no paused workflows
+claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
+owner: Claude
+last_updated: 2026-10-29 01:05 UTC, by Claude
 ```
 
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
@@ -983,6 +1017,40 @@ session_state: none
 claimed_by: Claude, 2026-10-28 00:00 UTC
 owner: Claude
 last_updated: 2026-10-28 01:30 UTC, by Claude
+```
+
+### HONO-NODE-SERVER-GHSA-RMXM
+
+```text
+TASK HONO-NODE-SERVER-GHSA-RMXM  priority: P2  status: OPEN
+goal: Clear GHSA-rmxm-3fg6-px4f (moderate, @hono/node-server >=1.19.10 <2.1.3), which blocks check:deps on every PR and on the deploy tip bbc77ae23. Raise the exact override and BUN_LOCK_SECURITY_FLOORS from 2.0.10 to 2.1.3 and regenerate bun.lock with CI's bun 1.3.14.
+why: a dependency audit red across PRs is top-priority work (CURRENT_STATE Start here). Matthew approved the scorer unlock, a separate PR and porting into #2602/#2603 (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-29).
+branch: claude/hono-node-server-2-1-3
+base: verdant-grow-diary
+checkout: git fetch origin claude/hono-node-server-2-1-3 verdant-grow-diary && git switch claude/hono-node-server-2-1-3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft PR from claude/hono-node-server-2-1-3 (link in the PR list)
+head_sha: read the PR head; this commit cannot name itself
+state: pushed; marked ready for review
+current_step: fresh exact-head review and 35/35 required CI at the head after this handoff fix
+next_action: independent exact-head review at the new head (session_017UoYKuwk7Z3wSC7syg3jnF offered); then 35/35 required CI, the founder's per-item yes and the merge queue. The same three-file dependency change is ported into #2602 and #2603
+post_merge_check: Dependency & Security CI check:deps passes on the deploy branch tip after merge
+active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
+decisions: 2.1.3 is the first fixed release in major 2 (advisory range <2.1.3); follow the ip-address 10.7.4 precedent (6f937d3): override + floor + bun.lock only
+tried_and_rejected: a dependency-security exception; the advisory has a fixed release, so a bump is the right fix
+commands: node scripts/check-dependency-security.mjs; node scripts/check-bun-lockfile-policy.mjs; bunx vitest run src/test/check-bun-lockfile-policy.test.ts src/test/check-dependency-security.test.ts src/test/dependency-security-phase-a-contract.test.ts src/test/modelcontextprotocol-sdk-advisory-security-floor.test.ts src/test/hono-node-server-advisory-security-floor.test.ts --reporter=dot
+files_touched: package.json, bun.lock, scripts/check-bun-lockfile-policy.mjs, src/test/hono-node-server-advisory-security-floor.test.ts (new, 87999663c), src/test/check-bun-lockfile-policy.test.ts and src/test/dependency-security-phase-a-contract.test.ts (02f83c7e1, Cursor Agent), docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: regenerate bun.lock with bun 1.3.14 (CI pin), not a newer local bun; package.json and check-bun-lockfile-policy.mjs are scorer-locked
+links: https://github.com/advisories/GHSA-rmxm-3fg6-px4f
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (dependency/lockfile scope); this Claude session excluded
+reviewer_sha: none valid. session_017UoYKuwk7Z3wSC7syg3jnF: PASS for code scope at 4d9defc1c, then FAIL at 02f83c7e1 on this block's files_touched and commands (comment 6500943336); this commit fixes that and needs a fresh review
+session_state: none
+claimed_by: Claude, 2026-10-29 00:24 UTC
+owner: Claude
+last_updated: 2026-10-29 16:08 UTC, by Claude
 ```
 
 ## Closed

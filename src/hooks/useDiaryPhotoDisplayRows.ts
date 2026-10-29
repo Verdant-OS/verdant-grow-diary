@@ -30,7 +30,7 @@ export interface UseDiaryPhotoDisplayRowsResult {
   isResolvingPrivatePhotos: boolean;
   /** The private-photo read is waiting for a connection. */
   isPrivatePhotoReadPaused: boolean;
-  /** A private-photo signing request failed; external photos may still render. */
+  /** At least one private photo is unavailable; successfully signed photos may still render. */
   hasPrivatePhotoError: boolean;
   /** At least one supported persisted photo reference exists, even if it is loading. */
   hasPhotoReference: boolean;
@@ -79,15 +79,13 @@ export function useDiaryPhotoDisplayRows(
       const signedByPath = new Map<string, string>();
       for (const signed of data ?? []) {
         if (
+          !signed.error &&
           typeof signed.path === "string" &&
           typeof signed.signedUrl === "string" &&
           signed.signedUrl.length > 0
         ) {
           signedByPath.set(signed.path, signed.signedUrl);
         }
-      }
-      if (storagePaths.some((path) => !signedByPath.has(path))) {
-        throw new Error("diary-photo-display-url-failed");
       }
       return signedByPath;
     },
@@ -115,7 +113,11 @@ export function useDiaryPhotoDisplayRows(
     isResolvingPrivatePhotos:
       storagePaths.length > 0 && (signedQuery.isPending || signedQuery.isFetching),
     isPrivatePhotoReadPaused: storagePaths.length > 0 && signedQuery.fetchStatus === "paused",
-    hasPrivatePhotoError: storagePaths.length > 0 && signedQuery.isError,
+    hasPrivatePhotoError:
+      storagePaths.length > 0 &&
+      (signedQuery.isError ||
+        (signedQuery.data !== undefined &&
+          storagePaths.some((path) => !signedQuery.data.has(path)))),
     hasPhotoReference: parsedRows.some(
       ({ reference }) => reference.kind === "external" || reference.kind === "storage",
     ),

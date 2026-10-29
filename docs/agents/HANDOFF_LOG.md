@@ -69,6 +69,42 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-295-PRIVATE-PHOTO-PARTIAL-SIGNING
+
+```text
+TASK VER-295-PRIVATE-PHOTO-PARTIAL-SIGNING  priority: P2  status: OPEN
+goal: keep successfully signed diary photos visible when another owned photo is unavailable, while retaining an explicit error state.
+why: VER-295 / GitHub #2566; one missing object currently blanks the shared hook's whole private-photo batch.
+branch: codex/ver-295-private-photo-partial-signing
+base: verdant-grow-diary at 9b60f907e8e13b7dc6501b2406b96ab922530241
+checkout: git fetch origin codex/ver-295-private-photo-partial-signing verdant-grow-diary && git switch codex/ver-295-private-photo-partial-signing
+pr: locate the draft by this branch; its body is the canonical published full-head receipt
+head_sha: NOT_MEASURED in this pre-push source entry; read the full remote head from the draft PR before resuming
+state: implemented and locally tested; publication, hosted CI and independent acceptance require separate receipts
+current_step: publish the narrow draft, verify its full head and check results, then obtain eligible independent acceptance
+next_action: inspect the branch's draft PR and complete its exact-head CI/review checklist; do not duplicate an existing review request
+post_merge_check: after separately approved deployment, verify the served SHA and confirm a fixture-owned valid photo remains visible alongside an unavailable photo in Plant Timeline and Recent photos; NOT_MEASURED until then
+active_writer: Codex VER-295 session fc8a3dc876de, directly assigned by Matthew; no claim on PR #2262
+owner: Codex VER-295 session fc8a3dc876de
+claimed_by: Codex, Matthew's explicit VER-295 draft-only assignment on 2026-10-29
+last_updated: 2026-10-29, by Codex
+scope: src/hooks/useDiaryPhotoDisplayRows.ts; new src/test/diary-photo-partial-signing.test.tsx; this handoff block only
+decisions: return each successful signature; ignore per-item errors; derive hasPrivatePhotoError from missing requested signatures independently of the query error. Keep whole-call failures fail-closed, including failed refreshes. Preserve the owner parser, viewer-scoped query key, 1800-second URL lifetime, five-minute stale margin, cache lifetime and external-photo behavior.
+tried_and_rejected: copying #2262's opt-in allowPartial is insufficient because current callers still fail the batch and partial errors are not reported. This draft changes the shared default as Matthew requested, without taking over that branch.
+overlap: #2262 is open/draft at a4717570dbf870b801b037cab797456013c27cac and changes this hook for plant-card fallback. Reported to Matthew before editing. No routing answer was returned; retained the original narrow-draft scope. Its holder must reconcile the overlapping opt-in hunk with this shared behavior before both changes can land. No duplicate card implementation, merge order approval or ownership transfer is claimed.
+commands: node node_modules/vitest/vitest.mjs run src/test/diary-photo-partial-signing.test.tsx src/test/use-diary-photo-display-rows.test.tsx src/test/diary-photo-display-rules.test.ts src/test/plant-relative-timeline-photo-thumbnail.test.tsx src/test/plant-detail-photo-strip.test.tsx src/test/plant-photo-strip-items-enabled-and-hero-fallback.test.tsx src/test/plant-profile-photo-regression.test.ts src/test/diary-storage-buckets-contract.test.ts src/test/verdant-bucket-owner-policies-migration.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot
+validation: RED on unchanged base hook: 6 failed / 5 passed. Corrected candidate: 10 files / 157 passed / 0 failed. Changed-file lint/format, static client secret-scan and its self-tests, strict scorer report against the named base, and whitespace checks pass. Full TypeScript result is recorded in the PR body after completion.
+files_touched: src/hooks/useDiaryPhotoDisplayRows.ts; src/test/diary-photo-partial-signing.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: no planned runtime edits; address real same-scope review findings if any
+blockers: eligible non-contributing Claude/Grok reviewer transport/availability not established; required CI and full-head acceptance must be observed. Bun is absent on PATH: installed Vitest/TypeScript/ESLint run directly under Node; bun-dependent dependency audit is BLOCKED locally, not passed.
+open_questions: no implementation preference required; #2262 overlap disposition remains for its holder before integration
+gotchas: existing locked tests are untouched. Missing/empty batches now return an empty result plus an error flag, without manufacturing successful photos. Partial refetch results replace the old map; whole-call errors still hide cached private previews. Local mocks do not verify hosted storage or production.
+links: https://linear.app/verdantgrowdiary/issue/VER-295/diary-photos-one-unsigned-private-path-hides-every-private-photo ; https://github.com/Verdant-OS/verdant-grow-diary/issues/2566 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2262
+reviewer_seat: BLOCKED pending verified eligible outside-session availability; all contributing Codex sessions excluded from acceptance
+reviewer_sha: none; obtain an exact full-head verdict after publication and required CI
+session_state: no deployments, production writes, queue actions or automations. Stay draft; no merge without Matthew's approval.
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

@@ -28,6 +28,12 @@
 // A CREATE TABLE target counts only as a complete name followed by (, AS, OF,
 // PARTITION, ; or the end. Any other CREATE TABLE keyword is reported as
 // (unreadable CREATE TABLE target at offset N) for that migration.
+// An EXECUTE whose argument is not a single string has its string pieces
+// joined. If they spell CREATE TABLE or SELECT INTO only after joining, the
+// migration is reported as (unreadable dynamic EXECUTE at offset N). A bare
+// variable (EXECUTE v) checks every single-quoted string in the migration
+// the same way. format('SELECT … FROM %I') INTO n, format('GRANT …'), and
+// trigger EXECUTE FUNCTION are not reported.
 // A top-level SELECT ... INTO [UNLOGGED] [TABLE] name is also a create. It is
 // read from a third masked view in which DO and function bodies stay blank, so
 // a PL/pgSQL SELECT ... INTO n is not a table. A whole-command EXECUTE string
@@ -123,6 +129,238 @@ const RUNS_NOW_RE = /^\s*DO\b/i;
 // command. Anything else (EXECUTE 'DROP ...' || suffix) builds the command at
 // run time, so the string is not read as the statement (fails closed).
 const EXECUTE_ENDS_RE = /^\s*(?:;|$|USING\b|INTO\b)/i;
+const EXECUTE_TRIGGER_TAIL_RE = /^(?:FUNCTION|PROCEDURE)\b/i;
+const ASSEMBLED_CREATE_RE = /\bCREATE\s+(?:UNLOGGED\s+)?TABLE\b/i;
+const ASSEMBLED_SELECT_INTO_RE = new RegExp(
+  String.raw`\bSELECT\b[^;]*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?`,
+  "i",
+);
+
+function spellsAssembledDdl(text) {
+  return ASSEMBLED_CREATE_RE.test(text) || ASSEMBLED_SELECT_INTO_RE.test(text);
+}
+
+// True when joining pieces is what forms CREATE TABLE / SELECT INTO. A piece
+// that already contains the keywords is left to CREATE_HEAD_RE / SELECT_INTO_RE.
+function spellsAssembledDdlOnlyAfterJoin(pieces) {
+  const rest = pieces.filter((piece) => !spellsAssembledDdl(piece));
+  return rest.length > 0 && spellsAssembledDdl(rest.join(""));
+}
+
+function skipWsAndComments(sql, i, end) {
+  while (i < end) {
+    if (/\s/.test(sql[i])) {
+      i++;
+      continue;
+    }
+    if (sql.startsWith("--", i)) {
+      const eol = sql.indexOf("\n", i);
+      i = eol === -1 || eol > end ? end : eol;
+      continue;
+    }
+    if (sql.startsWith("/*", i)) {
+      let depth = 1;
+      let j = i + 2;
+      while (j < end && depth > 0) {
+        if (sql.startsWith("/*", j)) (depth++, (j += 2));
+        else if (sql.startsWith("*/", j)) (depth--, (j += 2));
+        else j++;
+      }
+      i = Math.min(j, end);
+      continue;
+    }
+    break;
+  }
+  return i;
+}
+
+function skipQuotedIdentifier(sql, i, end) {
+  let j = i + 1;
+  while (j < end) {
+    if (sql[j] === '"' && sql[j + 1] === '"') j += 2;
+    else if (sql[j] === '"') return j + 1;
+    else j++;
+  }
+  return i + 1;
+}
+
+function readSingleQuoted(sql, i, end) {
+  const escapes = i > 0 && /[eE]/.test(sql[i - 1]) && !/[a-zA-Z0-9_]/.test(sql[i - 2] ?? "");
+  let j = i + 1;
+  let value = "";
+  while (j < end) {
+    if (escapes && sql[j] === "\\") {
+      value += sql[j + 1] ?? "";
+      j += 2;
+      continue;
+    }
+    if (sql[j] === "'" && sql[j + 1] === "'") {
+      value += "'";
+      j += 2;
+      continue;
+    }
+    if (sql[j] === "'") return { value, after: j + 1 };
+    value += sql[j];
+    j++;
+  }
+  return null;
+}
+
+function readDollarQuoted(sql, i, end) {
+  if (sql[i] !== "$" || /[A-Za-z0-9_$]/.test(sql[i - 1] ?? "")) return null;
+  DOLLAR_TAG_RE.lastIndex = i;
+  const tag = DOLLAR_TAG_RE.exec(sql)?.[0];
+  if (!tag) return null;
+  const close = sql.indexOf(tag, i + tag.length);
+  if (close === -1 || close >= end) return null;
+  return { value: sql.slice(i + tag.length, close), after: close + tag.length, tag };
+}
+
+function collectSingleQuotedValues(sql) {
+  const pieces = [];
+  const end = sql.length;
+  let i = 0;
+  while (i < end) {
+    i = skipWsAndComments(sql, i, end);
+    if (i >= end) break;
+    if (sql[i] === '"') {
+      i = skipQuotedIdentifier(sql, i, end);
+      continue;
+    }
+    if (sql[i] === "'") {
+      const lit = readSingleQuoted(sql, i, end);
+      if (lit) {
+        pieces.push(lit.value);
+        i = lit.after;
+      } else i++;
+      continue;
+    }
+    const dol = readDollarQuoted(sql, i, end);
+    if (dol) {
+      // Walk into the body so strings inside DO blocks are collected.
+      i += dol.tag.length;
+      continue;
+    }
+    i++;
+  }
+  return pieces;
+}
+
+function readExecuteArgument(sql, start, end) {
+  let i = start;
+  let depth = 0;
+  const pieces = [];
+  let sawString = false;
+  let sawCallOrConcat = false;
+  while (i < end) {
+    i = skipWsAndComments(sql, i, end);
+    if (i >= end) break;
+    if (depth === 0 && EXECUTE_ENDS_RE.test(sql.slice(i))) break;
+    if (sql[i] === "(") {
+      depth++;
+      sawCallOrConcat = true;
+      i++;
+      continue;
+    }
+    if (sql[i] === ")") {
+      depth = Math.max(0, depth - 1);
+      i++;
+      continue;
+    }
+    if (sql[i] === "'") {
+      const lit = readSingleQuoted(sql, i, end);
+      if (!lit) {
+        i++;
+        continue;
+      }
+      pieces.push(lit.value);
+      sawString = true;
+      i = lit.after;
+      continue;
+    }
+    const dol = readDollarQuoted(sql, i, end);
+    if (dol) {
+      pieces.push(dol.value);
+      sawString = true;
+      i = dol.after;
+      continue;
+    }
+    if (sql.startsWith("||", i)) {
+      sawCallOrConcat = true;
+      i += 2;
+      continue;
+    }
+    if (sql[i] === '"') {
+      i = skipQuotedIdentifier(sql, i, end);
+      continue;
+    }
+    i++;
+  }
+  return {
+    pieces,
+    kind: !sawString && !sawCallOrConcat ? "variable" : "expression",
+    after: i,
+  };
+}
+
+function collectDynamicExecuteEvents(sql) {
+  const events = [];
+  const end = sql.length;
+  let i = 0;
+  while (i < end) {
+    i = skipWsAndComments(sql, i, end);
+    if (i >= end) break;
+    if (sql[i] === '"') {
+      i = skipQuotedIdentifier(sql, i, end);
+      continue;
+    }
+    if (sql[i] === "'") {
+      const lit = readSingleQuoted(sql, i, end);
+      i = lit ? lit.after : i + 1;
+      continue;
+    }
+    const dol = readDollarQuoted(sql, i, end);
+    if (dol) {
+      i += dol.tag.length;
+      continue;
+    }
+    const isWordBefore = i > 0 && /[A-Za-z0-9_\u0080-\uFFFF]/.test(sql[i - 1]);
+    if (isWordBefore || !/^EXECUTE\b/i.test(sql.slice(i))) {
+      i++;
+      continue;
+    }
+    const executeAt = i;
+    i += 7;
+    const afterKw = skipWsAndComments(sql, i, end);
+    if (EXECUTE_TRIGGER_TAIL_RE.test(sql.slice(afterKw))) {
+      i = afterKw;
+      continue;
+    }
+    if (sql[afterKw] === "'" || sql[afterKw] === "$") {
+      const lit =
+        sql[afterKw] === "'"
+          ? readSingleQuoted(sql, afterKw, end)
+          : readDollarQuoted(sql, afterKw, end);
+      const afterLit = lit ? skipWsAndComments(sql, lit.after, end) : afterKw;
+      if (lit && EXECUTE_ENDS_RE.test(sql.slice(afterLit))) {
+        i = lit.after;
+        continue;
+      }
+    }
+    const arg = readExecuteArgument(sql, afterKw, end);
+    const pieces = arg.kind === "variable" ? collectSingleQuotedValues(sql) : arg.pieces;
+    if (spellsAssembledDdlOnlyAfterJoin(pieces)) {
+      events.push({
+        kind: "create",
+        conditional: false,
+        table: `(unreadable dynamic EXECUTE at offset ${executeAt})`,
+        index: executeAt,
+      });
+    }
+    i = arg.after;
+  }
+  return events;
+}
 
 // Split a target list on the commas outside quoted identifiers, so
 // public."a,b" stays one name.
@@ -405,6 +643,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
       const table = publicTable(match[1], match[2]);
       if (table) events.push({ kind: "create", conditional: false, table, index: match.index });
     }
+    for (const event of collectDynamicExecuteEvents(ddl)) events.push(event);
     for (const match of executed.matchAll(RENAME_RE)) {
       if (quoted[match.index]) continue;
       const table = publicTable(match[1], match[2]);

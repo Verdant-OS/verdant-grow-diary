@@ -369,6 +369,46 @@ describe("supabase table explicit ACL rule", () => {
     ]);
   });
 
+  it("fails closed when EXECUTE concatenates CREATE and TABLE", () => {
+    const sql = "DO $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky (id int)'; END $$;";
+    expect(tables(sql)).toEqual([
+      `(unreadable dynamic EXECUTE at offset ${sql.indexOf("EXECUTE")})`,
+    ]);
+  });
+
+  it("fails closed when EXECUTE concatenates SELECT and INTO", () => {
+    const sql = "DO $$ BEGIN EXECUTE 'SELECT 1 ' || 'INTO TABLE public.leaky'; END $$;";
+    expect(tables(sql)).toEqual([
+      `(unreadable dynamic EXECUTE at offset ${sql.indexOf("EXECUTE")})`,
+    ]);
+  });
+
+  it("fails closed when a variable EXECUTE is assembled from split literals", () => {
+    const sql =
+      "DO $$ DECLARE v text; BEGIN v := 'CREATE ' || 'TABLE public.leaky (id int)'; EXECUTE v; END $$;";
+    expect(tables(sql)).toEqual([
+      `(unreadable dynamic EXECUTE at offset ${sql.indexOf("EXECUTE")})`,
+    ]);
+  });
+
+  it("does not report format SELECT FROM, format GRANT, or trigger EXECUTE FUNCTION", () => {
+    expect(
+      tables(
+        "DO $$ DECLARE n int; BEGIN EXECUTE format('SELECT id FROM %I', 'leaky') INTO n; END $$;",
+      ),
+    ).toEqual([]);
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN EXECUTE format('GRANT SELECT ON public.leaky TO authenticated'); END $$;`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(
+        `${CREATE}\nCREATE FUNCTION public.tg() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN RETURN NEW; END $fn$;\nCREATE TRIGGER t BEFORE INSERT ON public.leaky FOR EACH ROW EXECUTE FUNCTION public.tg();`,
+      ),
+    ).toEqual(["leaky"]);
+  });
+
   it("counts an unqualified table under SET search_path as public", () => {
     expect(tables("SET search_path = public;\nCREATE TABLE leaky (id int);")).toEqual(["leaky"]);
   });

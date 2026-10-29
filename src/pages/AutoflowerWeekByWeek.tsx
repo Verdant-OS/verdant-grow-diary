@@ -159,9 +159,30 @@ export default function AutoflowerWeekByWeek() {
     : null;
   const plantTitle = plan.plantName.trim();
 
+  // The status timer is cleared on unmount, so it never fires after the page is gone.
+  const pendingTimers = useRef(new Set<number>());
+  // A copy started before the plan changed (or the page closed) must not report or restore an outdated plan.
+  const copyGeneration = useRef(0);
+  useEffect(() => {
+    copyGeneration.current += 1;
+  }, [plan]);
+  useEffect(() => {
+    const timers = pendingTimers.current;
+    const generation = copyGeneration;
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      timers.clear();
+      generation.current += 1;
+    };
+  }, []);
+
   function announce(message: string) {
     setStatus("");
-    window.setTimeout(() => setStatus(message), 20);
+    const id = window.setTimeout(() => {
+      pendingTimers.current.delete(id);
+      setStatus(message);
+    }, 20);
+    pendingTimers.current.add(id);
   }
 
   function trackGenerated(next: AutoflowerPlanState) {
@@ -256,11 +277,14 @@ export default function AutoflowerWeekByWeek() {
   async function copyPlan() {
     const tsv = buildAutoflowerPlanTsv(plan);
     trackAutoflowerPlannerEvent("autoflower_planner_copy", { week_count: plan.estimateWeeks });
+    const generation = copyGeneration.current;
     try {
       await navigator.clipboard.writeText(tsv);
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(null);
       announce(`Copied ${plan.estimateWeeks}-week autoflower plan and milestones to clipboard.`);
     } catch {
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(tsv);
       announce("Clipboard unavailable. Select and copy the tab-separated plan shown below.");
     }

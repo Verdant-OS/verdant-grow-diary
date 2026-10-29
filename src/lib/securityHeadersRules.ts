@@ -32,6 +32,8 @@ export const KNOWN_THIRD_PARTY_ORIGINS = {
    * script-src miss as the console error on /pricing.
    */
   cloudflareInsights: ["https://static.cloudflareinsights.com"],
+  /** Consent-gated Ahrefs Web Analytics: the tag and its collect requests share one origin. */
+  ahrefsAnalytics: ["https://analytics.ahrefs.com"],
   lovableAuth: ["https://api.lovable.dev"],
   /** Error-report ingest (PR #1938 reporter). Report-only CSP; nothing is blocked either way. */
   sentryIngest: [
@@ -64,6 +66,7 @@ export function buildContentSecurityPolicyReportOnly(): string {
     lovableAuth,
     sentryIngest,
     cloudflareInsights,
+    ahrefsAnalytics,
   } = KNOWN_THIRD_PARTY_ORIGINS;
   const directives: ReadonlyArray<[string, string]> = [
     ["default-src", "'self'"],
@@ -73,7 +76,13 @@ export function buildContentSecurityPolicyReportOnly(): string {
     ["object-src", "'none'"],
     [
       "script-src",
-      joinSources(["'self'", "'unsafe-inline'"], paddle, googleAnalytics, cloudflareInsights),
+      joinSources(
+        ["'self'", "'unsafe-inline'"],
+        paddle,
+        googleAnalytics,
+        cloudflareInsights,
+        ahrefsAnalytics,
+      ),
     ],
     ["style-src", joinSources(["'self'", "'unsafe-inline'"], [googleFonts[0]])],
     ["font-src", joinSources(["'self'", "data:"], [googleFonts[1]])],
@@ -81,7 +90,15 @@ export function buildContentSecurityPolicyReportOnly(): string {
     ["media-src", "'self' blob: https:"],
     [
       "connect-src",
-      joinSources(["'self'"], supabase, paddle, googleAnalytics, lovableAuth, sentryIngest),
+      joinSources(
+        ["'self'"],
+        supabase,
+        paddle,
+        googleAnalytics,
+        ahrefsAnalytics,
+        lovableAuth,
+        sentryIngest,
+      ),
     ],
     ["frame-src", joinSources(["'self'"], paddle)],
     ["worker-src", "'self' blob:"],

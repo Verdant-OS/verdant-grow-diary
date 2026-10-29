@@ -31,8 +31,9 @@ Open PRs #2565 (`mergeable_state: dirty` against the deploy tip) and #2582 (stac
 - **Checklist** Grow · Tent · Plant with done markers and the record's name (or what the step creates). Screen readers hear "done" / "not yet".
 - **One primary action.**
   - No grow → **Start setup** → `/start-room`.
-  - One grow, no tent → **Continue setup** → `/start-room`, which resumes at the tent step.
-  - One grow, one tent, no plant → **Continue setup** → `/start-room`, which resumes at the plant step.
+  - One grow, no tent, on a verified one-grow plan → **Continue setup** → `/start-room`, which resumes at the tent step.
+  - One grow, one tent, no plant, on a verified one-grow plan → **Continue setup** → `/start-room`, which resumes at the plant step.
+  - A plan that can still add a grow (paid, or plan not yet verified) → **Add a tent** / **Add a plant** on the scoped page, because `/start-room` deliberately opens at "create a grow" for those accounts.
   - Several grows, or several tents with no plant → **Add a tent** / **Add a plant** on the existing list page scoped to the grow, because the wizard's resume reader refuses an ambiguous room and would otherwise open at "create a grow".
 - **Secondary route** to the plain Tents / Plants page whenever the primary resumes the wizard, so the wizard is never the only way (no wizard trap).
 - **Allowance line**, from capabilities, never from a plan name (`maxActiveGrows`):
@@ -50,7 +51,7 @@ Loading stays loading; a failed grows/tents/plants read is still an error with T
 ## 4. Decisions
 
 - **Reuse, do not rewrite, the setup flow.** The brief says "reuse/extend approved phase-one foundations, do not rewrite the logging flow" and AGENTS.md §9 says one implementation per feature. #2565/#2582 already carry pause/recovery for `/start-room`; duplicating them on this branch would be a competing implementation.
-- **Resume preconditions are mirrored, not imported.** `canResumeSetupWizard` restates the one-grow / matching-active-grow / tent-count rule the wizard's own reader applies, so this card does not import from a file two open PRs are rewriting. If #2582 changes the rule, this file is the one place to follow it.
+- **Resume preconditions are mirrored, not imported.** `canResumeSetupWizard` restates the one-grow / matching-active-grow / tent-count rule the wizard's own reader applies, plus its rule that a partial resume applies only when a verified plan limit blocks another grow (Codex P2 on 43b7fd1b), so this card does not import from a file two open PRs are rewriting. If #2582 changes the rule, this file is the one place to follow it.
 - **Allowance from capabilities only.** No plan name appears in JSX; copy is pinned in the rules file.
 - **Rename lives on the home card, not a new grow-settings surface.** It is the smallest answer to "offer rename where applicable"; GrowDetail has no rename today and gaining one is a later, separate change.
 - **`/onboarding` and `Auth.tsx` are unchanged.** The post-sign-in choice already exists and already lands returning growers on `/`.

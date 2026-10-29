@@ -73,7 +73,7 @@ describe("buildSimpleHomeSetupProgress", () => {
       grows: [{ id: GROW, name: "" }],
       activeGrowId: GROW,
       tentCount: 1,
-      capabilities: PRO,
+      capabilities: FREE,
     });
     expect(p.nextStep).toBe("plant");
     expect(p.steps.map((s) => s.done)).toEqual([true, true, false]);
@@ -81,7 +81,28 @@ describe("buildSimpleHomeSetupProgress", () => {
     expect(p.primary).toEqual({ label: "Continue setup", href: "/start-room" });
     expect(p.secondary?.href).toBe(`/plants?growId=${GROW}`);
     expect(p.growName).toBe("Untitled grow");
-    expect(p.allowance).toBeNull();
+  });
+
+  it("a plan that can still add a grow (or is unverified) gets the plain page, because the wizard would open at create-a-grow", () => {
+    for (const capabilities of [PRO, { maxActiveGrows: 3 }, null]) {
+      const tent = buildSimpleHomeSetupProgress({
+        state: { kind: "no-tent", growId: GROW, href: `/tents?growId=${GROW}` },
+        grows: [{ id: GROW, name: "A" }],
+        activeGrowId: null,
+        tentCount: 0,
+        capabilities,
+      });
+      expect(tent.primary).toEqual({ label: "Add a tent", href: `/tents?growId=${GROW}` });
+      expect(tent.secondary).toBeNull();
+      const plant = buildSimpleHomeSetupProgress({
+        state: { kind: "no-plant", growId: GROW, href: `/plants?growId=${GROW}` },
+        grows: [{ id: GROW, name: "A" }],
+        activeGrowId: null,
+        tentCount: 1,
+        capabilities,
+      });
+      expect(plant.primary).toEqual({ label: "Add a plant", href: `/plants?growId=${GROW}` });
+    }
   });
 
   it("several grows: the wizard cannot resume, so the plain page is the primary and no rename is offered", () => {
@@ -129,22 +150,65 @@ describe("buildSimpleHomeSetupProgress", () => {
 describe("canResumeSetupWizard", () => {
   it("grow step always resumes (the wizard starts there)", () => {
     expect(
-      canResumeSetupWizard({ grows: [], activeGrowId: null, tentCount: 0, nextStep: "grow" }),
+      canResumeSetupWizard({
+        grows: [],
+        activeGrowId: null,
+        tentCount: 0,
+        nextStep: "grow",
+        capabilities: FREE,
+      }),
     ).toBe(true);
+  });
+  it("partial steps resume only when a verified plan limit blocks another grow", () => {
+    const base = {
+      grows: [{ id: GROW }],
+      activeGrowId: null,
+      tentCount: 0,
+      nextStep: "tent" as const,
+    };
+    expect(canResumeSetupWizard({ ...base, capabilities: FREE })).toBe(true);
+    expect(canResumeSetupWizard({ ...base, capabilities: PRO })).toBe(false);
+    expect(canResumeSetupWizard({ ...base, capabilities: { maxActiveGrows: 2 } })).toBe(false);
+    expect(canResumeSetupWizard({ ...base, capabilities: null })).toBe(false);
+    expect(canResumeSetupWizard({ ...base, nextStep: "grow", capabilities: null })).toBe(true);
   });
   it("tent step needs exactly one grow, an unset or matching active grow, and zero tents", () => {
     const one = [{ id: GROW }];
     expect(
-      canResumeSetupWizard({ grows: one, activeGrowId: null, tentCount: 0, nextStep: "tent" }),
+      canResumeSetupWizard({
+        grows: one,
+        activeGrowId: null,
+        tentCount: 0,
+        nextStep: "tent",
+        capabilities: FREE,
+      }),
     ).toBe(true);
     expect(
-      canResumeSetupWizard({ grows: one, activeGrowId: GROW, tentCount: 0, nextStep: "tent" }),
+      canResumeSetupWizard({
+        grows: one,
+        activeGrowId: GROW,
+        tentCount: 0,
+        nextStep: "tent",
+        capabilities: FREE,
+      }),
     ).toBe(true);
     expect(
-      canResumeSetupWizard({ grows: one, activeGrowId: GROW_2, tentCount: 0, nextStep: "tent" }),
+      canResumeSetupWizard({
+        grows: one,
+        activeGrowId: GROW_2,
+        tentCount: 0,
+        nextStep: "tent",
+        capabilities: FREE,
+      }),
     ).toBe(false);
     expect(
-      canResumeSetupWizard({ grows: one, activeGrowId: null, tentCount: 1, nextStep: "tent" }),
+      canResumeSetupWizard({
+        grows: one,
+        activeGrowId: null,
+        tentCount: 1,
+        nextStep: "tent",
+        capabilities: FREE,
+      }),
     ).toBe(false);
     expect(
       canResumeSetupWizard({
@@ -152,19 +216,38 @@ describe("canResumeSetupWizard", () => {
         activeGrowId: null,
         tentCount: 0,
         nextStep: "tent",
+        capabilities: { maxActiveGrows: 2 },
       }),
     ).toBe(false);
   });
   it("plant step needs exactly one tent", () => {
     const one = [{ id: GROW }];
     expect(
-      canResumeSetupWizard({ grows: one, activeGrowId: null, tentCount: 1, nextStep: "plant" }),
+      canResumeSetupWizard({
+        grows: one,
+        activeGrowId: null,
+        tentCount: 1,
+        nextStep: "plant",
+        capabilities: FREE,
+      }),
     ).toBe(true);
     expect(
-      canResumeSetupWizard({ grows: one, activeGrowId: null, tentCount: 0, nextStep: "plant" }),
+      canResumeSetupWizard({
+        grows: one,
+        activeGrowId: null,
+        tentCount: 0,
+        nextStep: "plant",
+        capabilities: FREE,
+      }),
     ).toBe(false);
     expect(
-      canResumeSetupWizard({ grows: one, activeGrowId: null, tentCount: 2, nextStep: "plant" }),
+      canResumeSetupWizard({
+        grows: one,
+        activeGrowId: null,
+        tentCount: 2,
+        nextStep: "plant",
+        capabilities: FREE,
+      }),
     ).toBe(false);
   });
 });

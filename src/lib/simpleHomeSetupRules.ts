@@ -9,9 +9,9 @@
  * every action is a link to a surface where creating is an explicit submit.
  *
  * Resume rule: `/start-room` resumes a partial room only for the single grow
- * the account holds (its own resume reader refuses an ambiguous room and would
- * open at "create a grow"). With several grows, or several tents, the card
- * sends the grower to the existing list page scoped to the grow instead.
+ * the account holds, and only when a verified plan limit blocks another grow
+ * (otherwise it opens at "create a grow"). In every other case the card sends
+ * the grower to the existing list page scoped to the grow instead.
  *
  * Pure: no React, no Supabase, no clock.
  */
@@ -108,19 +108,27 @@ export function isValidGrowName(value: unknown): boolean {
 }
 
 /**
- * Whether `/start-room` resumes this exact room. Mirrors the preconditions of
- * the setup flow's own resume reader (one grow, matching or unset active grow,
- * and for the plant step exactly one tent) without importing it.
+ * Whether `/start-room` resumes this exact room. Mirrors the setup flow's own
+ * resume preconditions without importing it:
+ *  - its reader needs one grow, a matching or unset active grow, and (for the
+ *    plant step) exactly one tent;
+ *  - it applies a partial resume only when creating another grow is blocked
+ *    by a verified plan limit. A plan that can still add a grow (paid, or
+ *    not yet verified) opens at "create a grow" so that choice is not hidden.
  */
 export function canResumeSetupWizard(input: {
   grows: ReadonlyArray<{ id: string }>;
   activeGrowId: string | null;
   tentCount: number;
   nextStep: SetupStepKey;
+  capabilities: Pick<Capabilities, "maxActiveGrows"> | null | undefined;
 }): boolean {
   if (input.nextStep === "grow") return true;
   if (input.grows.length !== 1) return false;
   if (input.activeGrowId && input.activeGrowId !== input.grows[0].id) return false;
+  const limit = input.capabilities?.maxActiveGrows;
+  if (typeof limit !== "number" || !Number.isFinite(limit)) return false;
+  if (input.grows.length < limit) return false;
   if (input.nextStep === "tent") return input.tentCount === 0;
   return input.tentCount === 1;
 }
@@ -193,6 +201,7 @@ export function buildSimpleHomeSetupProgress(input: {
     activeGrowId: input.activeGrowId,
     tentCount,
     nextStep,
+    capabilities: input.capabilities,
   });
 
   let primary: SetupAction;

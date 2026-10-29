@@ -26,7 +26,7 @@ vi.mock("@/components/AppShell", () => ({
     <div data-testid="app-shell">{children}</div>
   ),
 }));
-vi.mock("@/pages/Dashboard", () => ({
+vi.mock("@/pages/Home", () => ({
   default: () => <div data-testid="dashboard">Private dashboard</div>,
 }));
 

@@ -141,7 +141,9 @@ async function openDashboard(page: Page, viewport: { width: number; height: numb
   await seedFakeSession(page);
   await mockSignedInSupabase(page);
 
-  await page.goto("/");
+  // `/dashboard` is the direct Dashboard link (always the Advanced view);
+  // `/` renders the grower's chosen view, Simple by default.
+  await page.goto("/dashboard");
   await acceptReconsentGateIfShown(page);
 
   const dashboard = page.getByTestId("dashboard-root");

@@ -88,7 +88,7 @@ vi.mock("@/components/LegalFooterLinks", () => ({ default: () => null }));
 vi.mock("@/components/BrandLogo", () => ({ default: () => null }));
 vi.mock("@/components/QuickLog", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
-vi.mock("@/pages/Dashboard", () => ({
+vi.mock("@/pages/Home", () => ({
   default: () => <div data-testid="private-page">Private grow history</div>,
 }));
 vi.mock("@/pages/Landing", () => ({ default: SignInLanding }));

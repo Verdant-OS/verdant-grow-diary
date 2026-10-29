@@ -63,6 +63,66 @@ describe("buildPlantSensorSourceReadings", () => {
     ]);
     expect(out[0].captured_at).toBe("2026-06-15T12:00:00Z");
   });
+
+  it("prefers the snapshot's captured_at over ts and over entry_at (Copilot on #2586)", () => {
+    const out = buildPlantSensorSourceReadings([
+      {
+        entry_at: "2026-06-16T12:05:00Z",
+        details: {
+          sensor_snapshot: { source: "manual", captured_at: "2026-06-15T06:00:00Z" },
+        },
+      },
+      {
+        entry_at: "2026-06-16T12:05:00Z",
+        details: {
+          sensor_snapshot: {
+            source: "csv",
+            captured_at: "2026-06-01T06:00:00Z",
+            ts: "2026-06-16T12:00:00Z",
+          },
+        },
+      },
+      {
+        entry_at: "2026-06-16T12:05:00Z",
+        details: { manual_sensor_snapshot: { source: "manual", ts: "2026-06-16T11:00:00Z" } },
+      },
+    ]);
+    expect(out.map((r) => r.captured_at)).toEqual([
+      "2026-06-15T06:00:00Z",
+      "2026-06-01T06:00:00Z",
+      "2026-06-16T11:00:00Z",
+    ]);
+    // The diary entry time stays the range key.
+    expect(out.every((r) => r.ts === "2026-06-16T12:05:00Z")).toBe(true);
+  });
+});
+
+describe("PlantSensorSourceBreakdownCard freshness uses the snapshot capture time", () => {
+  it("counts a manual snapshot captured 30 hours ago as stale even on a five-minute-old entry", () => {
+    const now = Date.now();
+    const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
+    render(
+      withProviders(
+        <PlantSensorSourceBreakdownCard
+          plantId="p-fresh"
+          rows={[
+            {
+              entry_at: iso(5 * 60_000),
+              details: { sensor_snapshot: { source: "manual", captured_at: iso(30 * 3_600_000) } },
+            },
+          ]}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("sensor-source-summary-count-manual")).toHaveTextContent("1");
+    expect(screen.getByTestId("sensor-source-summary-count-stale")).toHaveTextContent("1");
+    expect(screen.getByTestId("sensor-source-summary-freshness-count-fresh")).toHaveTextContent(
+      "0",
+    );
+    expect(screen.getByTestId("sensor-source-summary-freshness-count-stale")).toHaveTextContent(
+      "1",
+    );
+  });
 });
 
 describe("PlantSensorSourceBreakdownCard", () => {

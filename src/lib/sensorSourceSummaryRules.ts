@@ -17,6 +17,11 @@
  *    never lets a missing, unparseable, or future timestamp read as current.
  *    This keeps the summary in agreement with the individual badges and the
  *    Dashboard (VER-299).
+ *  - Invalid provenance is never fresh. The Sensor Truth canon accepts vendor
+ *    and Quick Log source aliases for its freshness windows that the canonical
+ *    provenance classifier does not, so a raw snapshot source such as "mqtt"
+ *    or "quick_log" counts as Invalid provenance; its freshness is unknown,
+ *    never fresh (Copilot on #2586 at 12f1e03fe).
  *  - A reading's persisted downgrade is a floor the clock cannot lift: a
  *    canonical `status` of stale / invalid / needs_review / no_data, or a
  *    `quality` other than ok, keeps the reading out of `fresh` even when its
@@ -140,14 +145,24 @@ function persistedFreshnessFloor(
 }
 
 /**
- * Freshness of one reading, by the same rule the Dashboard badge uses, then
- * lowered (never raised) by the reading's persisted status or quality.
- * Exported so presenters and tests can pin a single reading's bucket.
+ * Freshness of one reading: invalid provenance is unknown; otherwise the same
+ * rule the Dashboard badge uses, then lowered (never raised) by the reading's
+ * persisted status or quality. Exported so presenters and tests can pin a
+ * single reading's bucket.
  */
 export function classifySensorSourceSummaryFreshness(
   reading: SensorSourceSummaryReading,
   now: number,
 ): SensorSourceSummaryFreshness {
+  // Provenance first: a source string the canonical classifier rejects (vendor
+  // or transport aliases, unknown labels) is Invalid and can never be current,
+  // even when the canon's freshness windows would accept the alias.
+  const provenance = classifyTimelineSensorSource({
+    rawSource: reading.source ?? null,
+    capturedAt: readingTimestamp(reading),
+    fallback: "invalid",
+  }).kind;
+  if (provenance === "invalid") return "unknown";
   const status = resolveDashboardSensorBadgeStatus(
     { source: reading.source ?? null, captured_at: reading.captured_at, ts: reading.ts },
     now,
@@ -233,7 +248,7 @@ export const SENSOR_SOURCE_SUMMARY_FRESHNESS_LEGEND: Record<SensorSourceSummaryF
     stale:
       "Older than its freshness window, or persisted or flagged as stale; not current telemetry.",
     unknown:
-      "Invalid, missing or future timestamp, rejected quality, or non-current provenance (CSV/demo); never healthy.",
+      "Invalid provenance, invalid, missing or future timestamp, rejected quality, or non-current provenance (CSV/demo); never healthy.",
   };
 
 /** The Stale row counts freshness, so it cannot link to the Timeline's persisted-source filter. */

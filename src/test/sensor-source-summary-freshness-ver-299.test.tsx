@@ -215,6 +215,31 @@ describe("persisted status and quality floors (Codex P2 on #2586 at b1cab8f9d)",
   });
 });
 
+describe("invalid provenance is never fresh (Copilot on #2586 at 12f1e03fe)", () => {
+  it.each(["mqtt", "home_assistant", "ecowitt", "quick_log", "manual_snapshot", "totally-unknown"])(
+    "counts a recent snapshot with raw source %s as Invalid provenance and unknown freshness",
+    (rawSource) => {
+      const r = summarizeSensorSources([{ source: rawSource, captured_at: minutesAgo(1) }], {
+        now: NOW,
+        fallback: "invalid",
+      });
+      expect(r.counts.invalid).toBe(1);
+      expect(r.counts.live).toBe(0);
+      expect(r.counts.manual).toBe(0);
+      expect(r.freshness).toEqual({ fresh: 0, stale: 0, unknown: 1 });
+    },
+  );
+
+  it("still lets canonical live and manual sources through the clock rule", () => {
+    expect(
+      classifySensorSourceSummaryFreshness({ source: "live", captured_at: minutesAgo(1) }, NOW),
+    ).toBe("fresh");
+    expect(
+      classifySensorSourceSummaryFreshness({ source: "manual", captured_at: hoursAgo(1) }, NOW),
+    ).toBe("fresh");
+  });
+});
+
 describe("SensorSourceSummaryWidget freshness line (VER-299)", () => {
   it("shows Stale > 0 for a stale manual reading instead of Stale 0", () => {
     render(

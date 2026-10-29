@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### TENT-CARD-SUBTITLE-SEPARATOR
+
+```text
+TASK TENT-CARD-SUBTITLE-SEPARATOR  priority: P3  status: OPEN
+goal: a /tents card with a blank brand or size shows only what was saved, never a dangling " · " or an empty subtitle line.
+why: tent-card unavailable-readings note 2026-10-28 (D2); Matthew 2026-10-29 "execute all" with defaults, since no audit answers were given.
+branch: claude/tent-card-subtitle-separator
+base: verdant-grow-diary
+checkout: git fetch origin claude/tent-card-subtitle-separator verdant-grow-diary && git switch claude/tent-card-subtitle-separator && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: read the head from the PR
+state: draft; awaiting CI and an independent exact-head review
+current_step: D2 fixed in src/pages/Tents.tsx by reusing formatTentHeaderDescription (the Tent Detail header helper); new render test src/test/tents-list-card-subtitle.test.tsx
+next_action: confirm 35/35 required checks, then route to an eligible reviewer who did not author this PR
+post_merge_check: after Publish, on the disposable fixture account, a tent with a blank size shows only its brand on /tents. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+decisions: D1 (unavailable readings) and D3 (stale threshold) left as they are, with no new data query and the existing stale threshold kept; only D2 changes. Reused the existing helper instead of adding a second one.
+tried_and_rejected: editing tents-list-sensor-truth.test.tsx (locked; a new test file needs no unlock)
+commands: bunx vitest run src/test/tents-list-card-subtitle.test.tsx src/test/tents-list-sensor-truth.test.tsx src/test/tent-detail-blank-header-fields.test.ts
+files_touched: src/pages/Tents.tsx; src/test/tents-list-card-subtitle.test.tsx (new); docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work; Publish and the live check are Matthew's
+open_questions: whether D1 or D3 should change (needs Matthew)
+gotchas: RED without the fix is 3 failed / 1 passed; the plain brand+size case passes either way
+links: none
+artifacts: PR checks
+reviewer_seat: not assigned (excluded: session_017UoYKuwk7Z3wSC7syg3jnF as author)
+reviewer_sha: none
+session_state: check-ins armed by this session via send_later; no paused workflows
+claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-29
+owner: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+last_updated: 2026-10-29 05:20 UTC, by Claude session_017UoYKuwk7Z3wSC7syg3jnF
+```
+
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
 
 ```text

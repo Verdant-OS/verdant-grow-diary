@@ -178,7 +178,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
   ];
 
   const activityAvailable = Array.isArray(input.recent);
-  const events = (activityAvailable ? input.recent : []).slice(0, 50).map((r) => ({
+  const events = (Array.isArray(input.recent) ? input.recent : []).slice(0, 50).map((r) => ({
     when: tryDateLabel(r.ts),
     kind:
       r.kind === "diary"
@@ -366,7 +366,7 @@ export interface ExportGrowDiaryReportOptions {
  * is blocked or the environment lacks a window.
  */
 export function exportGrowDiaryReportAsPdf(
-  input: BuildGrowDiaryReportInput,
+  input: BuildGrowDiaryReportInput & { recent: readonly RecentItem[] },
   opts: ExportGrowDiaryReportOptions = {},
 ): ExportGrowDiaryReportResult {
   const win = opts.win !== undefined ? opts.win : typeof window !== "undefined" ? window : null;

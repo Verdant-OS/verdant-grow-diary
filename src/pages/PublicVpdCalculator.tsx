@@ -23,6 +23,7 @@ import {
   evaluatePublicVpdCalculator,
   parsePublicVpdTemperatureField,
   PUBLIC_VPD_CALCULATOR_FAQ,
+  PUBLIC_VPD_CALCULATOR_PAGE_DESCRIPTION,
   PUBLIC_VPD_CALCULATOR_PATH,
   PUBLIC_VPD_CALCULATOR_URL,
   PUBLIC_VPD_GUIDE_PATH,
@@ -120,8 +121,7 @@ export default function PublicVpdCalculator() {
 
   usePageSeo({
     title: "Accurate Cannabis Leaf VPD Calculator | Verdant",
-    description:
-      "Calculate air VPD, add measured leaf temperature and calibration evidence, then unlock an honest stage-aware leaf VPD comparison. No upload, diagnosis, or device control.",
+    description: PUBLIC_VPD_CALCULATOR_PAGE_DESCRIPTION,
     path: PUBLIC_VPD_CALCULATOR_PATH,
   });
 

@@ -20,7 +20,7 @@ export default function PhenoExpressionShowcase() {
   usePageSeo({
     title: "Pheno Expression Showcase — Verdant Grow Diary",
     description:
-      "Ten example phenotypes — loud gas, dessert, fruit, yield-monster, frost bomb, and more — laid side by side. Demo data only; Verdant never picks a keeper for you.",
+      "Ten example phenotypes laid side by side. Demo data only. Verdant never picks a keeper for you.",
     path: "/pheno-expression-showcase",
   });
   const [selected, setSelected] = useState<ReadonlySet<string>>(

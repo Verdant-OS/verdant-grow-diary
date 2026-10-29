@@ -69,6 +69,74 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEO-BETA-NOINDEX-SUPERSEDES-2543
+
+```text
+TASK SEO-BETA-NOINDEX-SUPERSEDES-2543  priority: P1  status: OPEN
+goal: supersede draft #2543 (public SEO audit fixes, head c82d243630e0e3b5c4ffcb42c83090097676a419) with its P1 fixed: /creator-beta and /breeder-beta noindex in page hooks and static SEO docs, /creator-beta out of public/sitemap.xml, SEO tests and indexation matrix updated.
+why: Jack Herer review 5674385352 FAIL, 1 P1. Matthew (2026-10-27, Cursor outage) asked for separate PRs instead of pushing the Cursor branches.
+branch: claude/seo-beta-noindex (created at c82d243630e0e3b5c4ffcb42c83090097676a419)
+base: verdant-grow-diary
+checkout: git fetch origin claude/seo-beta-noindex verdant-grow-diary && git switch claude/seo-beta-noindex && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: ef3a49939a30252e3103daa86b062e95237cbb82 before the self-canonical commit; read the current head from the PR
+state: pushed draft
+current_step: awaiting CI and independent exact-head review
+next_action: route to an eligible non-author reviewer; when this or #2549 merges, close the other as superseded on the overlapping files
+post_merge_check: after Publish, curl -s https://verdantgrowdiary.com/creator-beta and /breeder-beta show robots noindex, follow; /sitemap.xml has no creator-beta loc. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+decisions: ported #2549's existing noindex implementation (no second implementation) minus its HANDOFF_LOG block and its src/routeTree.gen.ts header edit; kept #2543's shortened beta descriptions on the moved noindex documents; fixed two failures #2543 itself introduced (duplicate /guides -> /glossary link; no-account claim without "your browser"). CodeQL alert 287 (js/file-access-to-http, scripts/indexnow-submit.mjs): suppressed inline with a codeql[js/file-access-to-http] comment and reason (Matthew 2026-10-27: suppress); the flow is the public sitemap to IndexNow. Scorer-locked edits (Matthew 2026-10-27: "Keep the scorer-locked edits"), each following a specified behaviour change: scripts/public-route-parity.config.mjs (/creator-beta noindex, out of sitemap; STATIC_ONLY_ROUTES emptied), scripts/validate-jsonld-rich-results.mjs (#2543 Article JSON-LD), src/test/breeder-beta-cross-canonical.test.ts, src/test/static-public-seo-documents.test.ts, src/test/grow-stage-care-schema-ssr.test.tsx, src/test/verdant-guides-glossary-head-invariants.test.ts, src/test/verdant-seo-guides-render.test.tsx. Canonical: Matthew (2026-10-28) chose self-canonical /breeder-beta (optional P3 from Sour Diesel review 5677749338); crossCanonicalDocument removed as unused; breeder-beta-cross-canonical, static-public-seo-documents and creator-beta-noindex tests now assert the self-canonical (RED 6 failed / 16 passed with the source change set aside, GREEN 22/22).
+tried_and_rejected: writing an independent noindex change (would duplicate #2549).
+commands: bunx vitest run src/test/creator-beta-noindex.test.tsx src/test/breeder-beta-cross-canonical.test.ts src/test/static-public-seo-documents.test.ts src/test/seo-contextual-internal-links.test.tsx src/test/search-to-first-value-guides.test.tsx
+files_touched: docs/seo/route-indexation-matrix.md; public/sitemap.xml; scripts/public-route-parity.config.mjs; src/lib/build/staticPublicSeoDocuments.ts; src/pages/CreatorBeta.tsx; src/pages/BreederBeta.tsx; src/pages/GuidesIndex.tsx; src/constants/verdantSeoContent.ts; src/test/breeder-beta-cross-canonical.test.ts; src/test/creator-beta-noindex.test.tsx; src/test/static-public-seo-documents.test.ts
+files_remaining: none
+blockers: none for repository work
+open_questions: whether to close #2543 and #2549 once this lands (Matthew / OG Kush)
+gotchas: #2549 (cursor/creator-beta-noindex-2708) overlaps the same files; not edited
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2543 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2549
+artifacts: PR checks
+reviewer_seat: not assigned (OG Kush routes; this session excluded as author)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:45 CT (Matthew: separate PRs)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-28 03:03 CT, by Claude
+```
+
+### PUBLIC-SEO-AUDIT-20261026
+
+```text
+TASK PUBLIC-SEO-AUDIT-20261026  priority: other  status: OPEN
+goal: Draft-only technical SEO fixes from the 2026-10-21 Ahrefs crawl: Article JSON-LD on every guide, homepage Organization logo, shorter indexable meta descriptions, param-stripped canonicals, IndexNow key plus a manual submit script, and internal links to /glossary and /docs/mcp-api.
+why: The crawl (health 97, 94 URLs) flagged missing Article schema, an incomplete Organization node, long meta descriptions, parameter URLs, and three likely orphan sitemap URLs. No 4xx/5xx was reported.
+branch: cursor/public-seo-audit-fixes-0b51
+base: verdant-grow-diary
+checkout: git fetch origin cursor/public-seo-audit-fixes-0b51 verdant-grow-diary && git switch cursor/public-seo-audit-fixes-0b51 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2543 (draft)
+head_sha: 240aabf773e1d5c468de72adaa42c075058c109b
+state: draft; Jack Herer review 5669930375 is 0/0/3 on that SHA; this P3 repair commit supersedes it
+current_step: Article JSON-LD is emitted for every VERDANT_SEO_GUIDES page and the grow-stage care guide. datePublished is included only when publishedOn exists. Organization logo on the root graph is an ImageObject. IndexNow is a public key file plus scripts/indexnow-submit.mjs, which does not call the network unless INDEXNOW_SUBMIT=1. Cheeko decided on 2026-10-26 to noindex /creator-beta and /breeder-beta. That change is carried by PR #2549, not this PR. This PR does not change their robots or sitemap.
+next_action: Keep the PR draft. Do not merge, enqueue, or deploy. Enable IndexNow only after this commit is live by running INDEXNOW_SUBMIT=1 node scripts/indexnow-submit.mjs. Hide-from-search for the beta routes stays on PR #2549.
+post_merge_check: After merge and publish, confirm a guide URL without publishedOn contains an Article script and that https://verdantgrowdiary.com/a7c3e91b4d8f2e6c0b5a19d47e83f012.txt returns the key. NOT_MEASURED until then.
+active_writer: Cursor Grok cloud agent
+decisions: Do not invent publication dates. Do not add sameAs; the repo has no public social profile URLs. Do not remove any noindex. Do not change /creator-beta or /breeder-beta robots or sitemap here; Cheeko's 2026-10-26 hide-from-search decision is PR #2549. Renegotiated pins: scripts/validate-jsonld-rich-results.mjs (missing datePublished is a warning), src/test/verdant-guides-glossary-head-invariants.test.ts, src/test/static-public-seo-documents.test.ts, src/test/verdant-seo-guides-render.test.tsx (undated guides emit Article and omit dates), src/test/grow-stage-care-schema-ssr.test.tsx (one Article, still no dates). P3 repair restores the public VPD page description and adds IndexNow gate and sitemap-parse tests with no network call.
+tried_and_rejected: Emitting Article only when publishedOn exists leaves the ~21 undated guides flagged. Inventing dates was rejected.
+commands: bunx vitest run src/test/public-seo-article-and-meta.test.tsx src/test/verdant-guides-glossary-head-invariants.test.ts src/test/static-public-seo-documents.test.ts src/test/lighting-seo-cluster.test.ts src/test/use-page-seo-canonical-path.test.tsx src/test/static-guide-body-fallback.test.ts src/test/validate-jsonld-rich-results.test.ts --reporter=dot
+files_touched: src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/routes/__root.tsx; src/hooks/usePageSeo.ts; src/constants/verdantSeoContent.ts; src/constants/publicQuickLogStarterCopy.ts; src/pages/GuidePage.tsx; src/pages/GuidesIndex.tsx; src/pages/PublicVpdCalculator.tsx; src/pages/HardwareIntegrations.tsx; src/pages/CreatorBeta.tsx; src/pages/BreederBeta.tsx; src/pages/PhenoExpressionShowcase.tsx; src/lib/publicVpdCalculatorRules.ts; scripts/validate-jsonld-rich-results.mjs; scripts/indexnow-submit.mjs; public/a7c3e91b4d8f2e6c0b5a19d47e83f012.txt; src/test/public-seo-article-and-meta.test.tsx; src/test/public-vpd-calculator-description.test.tsx; src/test/indexnow-submit.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; src/test/static-public-seo-documents.test.ts; src/test/verdant-seo-guides-render.test.tsx; src/test/grow-stage-care-schema-ssr.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none in this slice
+blockers: independent exact-head review not requested; PR stays draft
+open_questions: whether a 1200px Article image should replace the 512 logo later
+gotchas: A new head invalidates review 5669930375. Do not run the IndexNow script with INDEXNOW_SUBMIT=1 from an agent session. Legal descriptions were already under 160 characters and were not edited. The static /tools/vpd-calculator document and the page hook share one description that names leaf temperature and calibration and stays within 160 characters.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2543 https://github.com/Verdant-OS/verdant-grow-diary/pull/2543#pullrequestreview-5669780629 https://github.com/Verdant-OS/verdant-grow-diary/pull/2549
+artifacts: src/test/public-seo-article-and-meta.test.tsx
+reviewer_seat: an eligible independent session that did not author this PR
+reviewer_sha: a2d2eac18df147923324ec4dafc352f504ed0668 (PASS-pending-CI; does not cover the repair commit)
+session_state: Cursor cloud agent; draft only; no production ping
+claimed_by: Cursor Grok cloud agent, 2026-10-26 16:55 UTC
+owner: Cursor Grok cloud agent
+last_updated: 2026-10-27 10:45 CT, by Cursor Grok cloud agent
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

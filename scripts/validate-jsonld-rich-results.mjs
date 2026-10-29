@@ -143,14 +143,19 @@ const validators = {
   Article(obj, ctx, issues, warnings) {
     requireField(obj, "headline", ctx, issues);
     requireAbsoluteUrl(obj, "url", ctx, issues);
-    if (requireField(obj, "datePublished", ctx, issues)) {
-      if (!ISO_DATE.test(String(obj.datePublished))) {
-        pushIssue(
-          issues,
-          { ...ctx, path: `${ctx.path}.datePublished` },
-          `datePublished must be ISO-8601 (got ${JSON.stringify(obj.datePublished)})`,
-        );
-      }
+    if (obj.datePublished === undefined) {
+      warnings.push({
+        ...ctx,
+        path: `${ctx.path}.datePublished`,
+        message:
+          "Article.datePublished is recommended. Omitted when the page has no repository publication date.",
+      });
+    } else if (!ISO_DATE.test(String(obj.datePublished))) {
+      pushIssue(
+        issues,
+        { ...ctx, path: `${ctx.path}.datePublished` },
+        `datePublished must be ISO-8601 (got ${JSON.stringify(obj.datePublished)})`,
+      );
     }
     if (obj.dateModified !== undefined && !ISO_DATE.test(String(obj.dateModified))) {
       pushIssue(

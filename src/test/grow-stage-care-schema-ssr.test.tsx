@@ -78,9 +78,10 @@ describe("grow-stage care guide schema in the SSR route head", () => {
     expect(canonicals).toEqual([{ rel: "canonical", href: URL }]);
   });
 
-  it("emits no Article, NewsArticle, BlogPosting, datePublished or dateModified", () => {
+  it("emits one Article and no invented datePublished or dateModified", () => {
     const nodes = headNodes();
-    for (const type of ["Article", "NewsArticle", "BlogPosting"]) {
+    expect(ofType(nodes, "Article")).toHaveLength(1);
+    for (const type of ["NewsArticle", "BlogPosting"]) {
       expect(ofType(nodes, type)).toHaveLength(0);
     }
     const serialized = JSON.stringify(nodes);

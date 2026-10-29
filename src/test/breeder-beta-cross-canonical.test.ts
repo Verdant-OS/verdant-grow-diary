@@ -1,44 +1,40 @@
 /**
- * /breeder-beta cross-canonical contract (owner adjudication 2026-08-20).
+ * /breeder-beta canonical contract.
  *
  * /breeder-beta and /creator-beta render the same <BetaLanding> component and
- * differ only in kicker, support copy, and meta description. Two self-canonical
- * near-duplicates would compete on the same queries, so /breeder-beta concedes
- * its ranking URL to /creator-beta while STAYING INDEXABLE for direct and paid
- * traffic.
+ * differ only in kicker, support copy, and meta description. The 2026-08-20
+ * adjudication pointed /breeder-beta's canonical at /creator-beta so the two
+ * would not compete on the same queries.
  *
- * That contract has three independently breakable halves, and a regression in
- * any one of them is silent — the page keeps rendering, and only the index
- * notices weeks later:
+ * 2026-10-26, owner: hide from search. Both URLs are `noindex, follow` and
+ * neither loc is in the sitemap. The pages stay public.
  *
- *   1. the build-time pre-rendered <head>   (staticPublicSeoDocuments.ts)
- *   2. the hydrated runtime <head>          (BreederBeta.tsx via usePageSeo)
- *   3. sitemap exclusion                    (public-route-parity.config.mjs)
+ * 2026-10-28, owner: /breeder-beta is self-canonical. With both pages noindex
+ * there is no ranking to concede, and noindex plus a cross-canonical sends two
+ * different signals. If /creator-beta is ever re-indexed, revisit this.
  *
- * If (2) drifts back to a self-canonical it silently overwrites (1) for every
- * JS-rendering crawler, which is the whole failure mode this file exists to
- * catch. If (3) drifts, we advertise a URL that disclaims itself.
- *
- * Resolved-value assertions throughout — these import the modules and read the
- * real values rather than pattern-matching source text.
+ * Resolved-value assertions: these import the modules and read the real
+ * documents, route head, hydrated head, and sitemap locs.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  STATIC_PUBLIC_NOINDEX_DOCUMENTS,
+  STATIC_PUBLIC_OUTPUT_DOCUMENTS,
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
 import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import { STATIC_ONLY_ROUTES } from "../../scripts/public-route-parity.config.mjs";
 
 const REPO = resolve(__dirname, "../..");
 const VARIANT = "/breeder-beta";
+const VARIANT_URL = `${VERDANT_SITE_ORIGIN}${VARIANT}`;
 const CANONICAL = "/creator-beta";
 const CANONICAL_URL = `${VERDANT_SITE_ORIGIN}${CANONICAL}`;
-
-const BLOCKING_DIRECTIVES = ["noindex", "nofollow", "none"] as const;
 
 /**
  * Minimal shell mirroring the tags staticSocialRouteHtml.ts rewrites, matching
@@ -63,37 +59,40 @@ const INDEX_HTML_FIXTURE = `<!doctype html><html><head>
 </head><body></body></html>`;
 
 function documentFor(path: string) {
-  const doc = STATIC_PUBLIC_SEO_DOCUMENTS.find((candidate) => candidate.path === path);
-  if (!doc) throw new Error(`No STATIC_PUBLIC_SEO_DOCUMENTS entry for ${path}`);
+  const doc = STATIC_PUBLIC_OUTPUT_DOCUMENTS.find((candidate) => candidate.path === path);
+  if (!doc) throw new Error(`No STATIC_PUBLIC_OUTPUT_DOCUMENTS entry for ${path}`);
   return doc;
 }
 
-describe("/breeder-beta → /creator-beta cross-canonical", () => {
+function robotsContent(html: string): string {
+  const robots = [...html.matchAll(/<meta\s+name=["']robots["']\s+content=["']([^"']+)["']/gi)].map(
+    (match) => match[1],
+  );
+  expect(robots, "expected exactly one robots meta").toHaveLength(1);
+  return robots[0];
+}
+
+describe("/breeder-beta self-canonical", () => {
   it("both routes still have a pre-rendered document", () => {
     expect(documentFor(VARIANT)).toBeTruthy();
     expect(documentFor(CANONICAL)).toBeTruthy();
   });
 
-  it("the variant's canonical identity points at /creator-beta, not itself", () => {
+  it("the variant's canonical identity is itself, not /creator-beta", () => {
     const doc = documentFor(VARIANT);
-    expect(doc.metadata.url).toBe(CANONICAL_URL);
-    expect(doc.metadata.url).not.toBe(`${VERDANT_SITE_ORIGIN}${VARIANT}`);
+    expect(doc.metadata.url).toBe(VARIANT_URL);
+    expect(doc.metadata.url).not.toBe(CANONICAL_URL);
   });
 
-  it("records the canonical target explicitly, not just by URL coincidence", () => {
-    // Without this the relationship is only inferable by comparing two URLs;
-    // the manifest's alias reporting reads canonicalPath directly.
-    expect((documentFor(VARIANT) as { canonicalPath?: string }).canonicalPath).toBe(CANONICAL);
+  it("declares no cross-canonical target", () => {
+    expect((documentFor(VARIANT) as { canonicalPath?: string }).canonicalPath).toBeUndefined();
   });
 
-  it("/creator-beta remains self-canonical — the pair must not point at each other", () => {
+  it("/creator-beta remains self-canonical", () => {
     expect(documentFor(CANONICAL).metadata.url).toBe(CANONICAL_URL);
   });
 
   it("keeps its own breeder-oriented title and description", () => {
-    // The failure this guards: collapsing the variant into the generic
-    // aliasDocument() helper, which inherits the target's copy wholesale and
-    // would erase the reason the route exists.
     const variant = documentFor(VARIANT);
     const canonical = documentFor(CANONICAL);
     expect(variant.metadata.title).toContain("Breeder Beta");
@@ -102,58 +101,43 @@ describe("/breeder-beta → /creator-beta cross-canonical", () => {
     expect(variant.metadata.description.toLowerCase()).toContain("breeder");
   });
 
-  it("stays affirmatively indexable — a cross-canonical must not also be noindex", () => {
-    // noindex + cross-canonical are contradictory instructions about one URL.
+  it("emits noindex, follow on the pre-rendered variant head", () => {
     const html = buildStaticSocialRouteHtml(INDEX_HTML_FIXTURE, documentFor(VARIANT).metadata);
-    const robots = [
-      ...html.matchAll(/<meta\s+name=["']robots["']\s+content=["']([^"']+)["']/gi),
-    ].map((m) => m[1]);
-    expect(robots, "expected exactly one robots meta").toHaveLength(1);
-    const tokens = robots[0].split(",").map((t) => t.trim().toLowerCase());
-    for (const blocking of BLOCKING_DIRECTIVES) {
-      expect(tokens, `robots="${robots[0]}" must not contain "${blocking}"`).not.toContain(
-        blocking,
-      );
-    }
-    expect(tokens).toContain("index");
+    expect(robotsContent(html)).toBe("noindex, follow");
+    expect(documentFor(VARIANT).metadata.robots).toBe("noindex, follow");
   });
 
-  it("emits canonical and og:url in agreement, both on the canonical target", () => {
+  it("emits canonical and og:url in agreement, both on /breeder-beta", () => {
     const html = buildStaticSocialRouteHtml(INDEX_HTML_FIXTURE, documentFor(VARIANT).metadata);
     const canonicals = [
       ...html.matchAll(/<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']*)["'][^>]*>/gi),
-    ].map((m) => m[1]);
+    ].map((match) => match[1]);
     expect(canonicals, "expected exactly one canonical link").toHaveLength(1);
-    expect(canonicals[0]).toBe(CANONICAL_URL);
+    expect(canonicals[0]).toBe(VARIANT_URL);
 
     const ogUrls = [
       ...html.matchAll(/<meta\s+property=["']og:url["']\s+content=["']([^"']+)["']/gi),
-    ].map((m) => m[1]);
+    ].map((match) => match[1]);
     expect(ogUrls).toHaveLength(1);
     expect(ogUrls[0], "og:url disagreeing with canonical sends two answers").toBe(canonicals[0]);
   });
 
-  it("the runtime page names the same canonical target as the build-time document", () => {
-    // The silent killer: usePageSeo runs after hydration and rewrites the head,
-    // so a self-canonical here defeats the pre-rendered one for Googlebot.
-    const source = readFileSync(resolve(REPO, "src/pages/BreederBeta.tsx"), "utf8");
-    const match = source.match(/canonicalPath:\s*"([^"]+)"/);
-    expect(match, "BreederBeta.tsx must pass canonicalPath to usePageSeo").toBeTruthy();
-    expect(match?.[1]).toBe(CANONICAL);
-    expect(match?.[1], "runtime and build-time canonical targets must agree").toBe(
-      (documentFor(VARIANT) as { canonicalPath?: string }).canonicalPath,
+  it("the route head agrees with the pre-rendered canonical and robots", () => {
+    const head = staticRouteHead(VARIANT);
+    expect(head.links).toEqual([{ rel: "canonical", href: VARIANT_URL }]);
+    expect(head.meta).toContainEqual({ name: "robots", content: "noindex, follow" });
+  });
+
+  it("neither URL is advertised, and neither stays in the indexable document set", () => {
+    const sitemap = readFileSync(resolve(REPO, "public/sitemap.xml"), "utf8");
+    const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1].trim());
+    expect(locs).not.toContain(VARIANT_URL);
+    expect(locs).not.toContain(CANONICAL_URL);
+    expect(STATIC_ONLY_ROUTES as readonly string[]).toEqual([]);
+    expect(STATIC_PUBLIC_SEO_DOCUMENTS.some((document) => document.path === VARIANT)).toBe(false);
+    expect(STATIC_PUBLIC_SEO_DOCUMENTS.some((document) => document.path === CANONICAL)).toBe(false);
+    expect(STATIC_PUBLIC_NOINDEX_DOCUMENTS.map((document) => document.path)).toEqual(
+      expect.arrayContaining([VARIANT, CANONICAL]),
     );
-  });
-
-  it("is excluded from the sitemap — never advertise a URL that disclaims itself", () => {
-    const sitemap = readFileSync(resolve(REPO, "public/sitemap.xml"), "utf8");
-    expect(sitemap).not.toContain(`<loc>${VERDANT_SITE_ORIGIN}${VARIANT}</loc>`);
-    expect(STATIC_ONLY_ROUTES as readonly string[]).toContain(VARIANT);
-  });
-
-  it("the canonical target IS advertised — conceding only makes sense if one ranks", () => {
-    const sitemap = readFileSync(resolve(REPO, "public/sitemap.xml"), "utf8");
-    expect(sitemap).toContain(`<loc>${CANONICAL_URL}</loc>`);
-    expect(STATIC_ONLY_ROUTES as readonly string[]).not.toContain(CANONICAL);
   });
 });

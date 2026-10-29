@@ -103,6 +103,20 @@ describe("static public SEO documents", () => {
           robots: "noindex, follow",
         }),
       }),
+      expect.objectContaining({
+        path: "/creator-beta",
+        metadata: expect.objectContaining({
+          url: `${VERDANT_SITE_ORIGIN}/creator-beta`,
+          robots: "noindex, follow",
+        }),
+      }),
+      expect.objectContaining({
+        path: "/breeder-beta",
+        metadata: expect.objectContaining({
+          url: `${VERDANT_SITE_ORIGIN}/breeder-beta`,
+          robots: "noindex, follow",
+        }),
+      }),
     ]);
     expect(
       STATIC_PUBLIC_SEO_DOCUMENTS.some(
@@ -136,8 +150,8 @@ describe("static public SEO documents", () => {
       expect(document.fileName).toBe(expectedFileName(document.path));
       // Self-canonical is the rule. The single sanctioned exception is a
       // document that DECLARES a `canonicalPath` — an indexable audience
-      // variant conceding its ranking URL to another route (see
-      // crossCanonicalDocument and src/test/breeder-beta-cross-canonical.test.ts).
+      // variant conceding its ranking URL to another route. None is in the
+      // indexable set today (/breeder-beta became self-canonical on 2026-10-28).
       // The fence is not loosened, only redirected: such a document must match
       // its declared target exactly, so a wrong URL still fails here and can
       // only be introduced deliberately.
@@ -205,7 +219,7 @@ describe("static public SEO documents", () => {
     expect(typesAt("/guides/what-to-log-in-a-grow-journal")).toEqual(
       expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList"]),
     );
-    expect(typesAt("/guides/what-to-log-in-a-grow-journal")).not.toContain("Article");
+    expect(typesAt("/guides/what-to-log-in-a-grow-journal")).toContain("Article");
     expect(typesAt("/guides/cannabis-grow-light-distance-and-schedule")).toEqual(
       expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList", "Article"]),
     );

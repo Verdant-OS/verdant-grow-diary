@@ -59,7 +59,12 @@ const SITE_JSON_LD = {
       "@id": `${SITE_URL}/#organization`,
       name: SITE_NAME,
       url: SITE_URL,
-      logo: SITE_IMAGE,
+      logo: {
+        "@type": "ImageObject",
+        url: SITE_IMAGE,
+        width: 512,
+        height: 512,
+      },
     },
     {
       "@type": "WebSite",

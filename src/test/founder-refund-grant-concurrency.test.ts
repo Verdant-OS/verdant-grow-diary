@@ -33,6 +33,8 @@ const childEnv = {
     : {}),
 };
 const migration = "20260915193000_founder_refund_grant_serialization.sql";
+// PR B: retires the 100-seat cap and drops founder_lifetime_slots_remaining().
+const capRetiredMigration = "20261029030000_founder_cap_retired.sql";
 let host = "";
 let port = "55432";
 const tool = (name: string) => join(binDir, name + (process.platform === "win32" ? ".exe" : ""));
@@ -177,6 +179,7 @@ beforeAll(async () => {
   `);
   for (const file of migrations) sql(readFileSync(resolve("supabase/migrations", file), "utf8"));
   sql(readFileSync(resolve("supabase/migrations", migration), "utf8"));
+  sql(readFileSync(resolve("supabase/migrations", capRetiredMigration), "utf8"));
   console.info("Disposable concurrency database:", sql("SELECT version();"));
 }, 60_000);
 
@@ -548,9 +551,7 @@ describe("Founder Lifetime grant/refund concurrency — native PostgreSQL", () =
           "SELECT status, founder_number, display_name, show_on_wall, optional_link FROM public.founders;",
         ),
       ).toBe("refunded|1|Fixture grower|t|https://example.test/founder");
-      expect(
-        sql("SELECT public.founders_seats_consumed(), public.founder_lifetime_slots_remaining();"),
-      ).toBe("1|99");
+      expect(sql("SELECT public.founders_seats_consumed();")).toBe("1");
     } finally {
       await grant.close();
       await refundDone?.catch(() => undefined);
@@ -691,25 +692,54 @@ describe("Founder Lifetime grant/refund concurrency — native PostgreSQL", () =
     expect(sql("SELECT count(*) FROM public.founders;")).toBe("0");
   });
 
-  it("preserves the 100 consumed-seat cap, including refunded seats", () => {
+  it("grants the entitlement past 100 consumed seats; the Wall seat and the counter RPC stop at the cap", () => {
+    // Pre-PR B the 100th consumed seat (refunded seats included) refused a live
+    // grant with cap_reached, so a late or replayed purchase event could leave a
+    // paying buyer with nothing. Matthew retired that refusal on 2026-10-27: the
+    // lifetime subscription is always written. The Founders Wall seat is still
+    // minted only while numbers 1..100 remain (founders_number_range), so
+    // refunded seats are never reopened and no seat beyond 100 is invented.
     sql(`
       INSERT INTO auth.users SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(1,100) n;
       INSERT INTO public.founders(user_id, founder_number, paddle_subscription_ref, status)
         SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid, n, 'lifetime_retired_' || n, 'refunded' FROM generate_series(1,100) n;
     `);
     expect(JSON.parse(serviceSql(allocationSql()))).toEqual({
-      ok: false,
-      reason: "cap_reached",
-      seats_consumed: 100,
+      ok: true,
+      reason: "allocated",
+      paddle_subscription_id: "lifetime_" + TX,
+      founder_number: null,
     });
-    expect(activeCount()).toBe(0);
+    expect(activeCount()).toBe(1);
     expect(
-      sql("SELECT public.founders_seats_consumed(), public.founder_lifetime_slots_remaining();"),
-    ).toBe("100|0");
-    expect(JSON.parse(serviceSql(allocationSql("sandbox"))).reason).toBe("allocated");
+      sql(
+        `SELECT status, price_id, environment FROM public.subscriptions WHERE paddle_subscription_id = ${literal("lifetime_" + TX)};`,
+      ),
+    ).toBe("active|founder_lifetime|live");
+    expect(sql("SELECT public.founders_seats_consumed();")).toBe("100");
     expect(
       sql("SELECT min(founder_number), max(founder_number), count(*) FROM public.founders;"),
     ).toBe("1|100|100");
+    // Idempotent replay of the same transaction still grants nothing new.
+    expect(JSON.parse(serviceSql(allocationSql()))).toEqual({
+      ok: true,
+      reason: "idempotent",
+      paddle_subscription_id: "lifetime_" + TX,
+      founder_number: null,
+    });
+    expect(activeCount()).toBe(1);
+    expect(sql("SELECT count(*) FROM public.founders;")).toBe("100");
+    // A refund of that late grant still revokes the entitlement.
+    expect(JSON.parse(serviceSql(revocationSql()))).toEqual({
+      ok: true,
+      subscriptions_updated: 1,
+      founders_updated: 0,
+    });
+    expectRetired();
+    // The public seats-remaining counter behind the deleted edge function is dropped.
+    expect(() => sql("SELECT public.founder_lifetime_slots_remaining();")).toThrow(
+      /founder_lifetime_slots_remaining\(\) does not exist/,
+    );
   });
 
   it("rolls back a failed protected reconciliation and retries without acknowledging a purchase", async () => {

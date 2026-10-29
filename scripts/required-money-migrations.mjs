@@ -106,6 +106,11 @@ export const KNOWN_MONEY_MIGRATIONS = new Set([
   // Client UPDATE hardening merged in #1373; preferences remain edge-only.
   "20260914190600_founders_client_updates_fail_closed.sql",
   // everything in REQUIRED is by definition known
+  // Retires the Founder seat-cap refusal in allocate_lovable_founder_lifetime
+  // and drops founder_lifetime_slots_remaining() (PR B after #2570). Known,
+  // not deploy-required: the operator applies it after undeploying the
+  // founder-slots-remaining edge function.
+  "20261029030000_founder_cap_retired.sql",
   ...REQUIRED_MONEY_MIGRATIONS,
 ]);
 

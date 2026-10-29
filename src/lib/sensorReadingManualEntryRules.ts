@@ -32,6 +32,10 @@ import {
   type TemperatureInputUnit,
 } from "@/lib/sensorInputUnitConversion";
 import { classifyPpfd, PPFD_MAX } from "@/lib/ppfdRules";
+import {
+  isManualAirTemperatureValid,
+  manualAirTemperatureRangeMessage,
+} from "@/lib/manualAirTemperatureRules";
 
 export type ManualMetric =
   "temperature_c" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "soil_moisture_pct" | "ppfd";
@@ -156,6 +160,14 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   if (airTemp.kind === "invalid") {
     errors.push("Air temperature must be a finite number.");
   }
+  // Same -10..50 °C band the insert validator enforces; refusing here keeps
+  // the card from reaching Confirm and reporting a deterministic refusal as
+  // an unconfirmed save. Copy is in the unit the grower typed.
+  const airTempOutOfBand =
+    airTemp.celsius !== null && !isManualAirTemperatureValid(airTemp.celsius);
+  if (airTempOutOfBand) {
+    errors.push(manualAirTemperatureRangeMessage(airTemp.unit === "C" ? "celsius" : "fahrenheit"));
+  }
   if (ppfdClass.kind === "invalid") {
     if (ppfdClass.reason === "negative") {
       errors.push("PPFD cannot be negative.");
@@ -194,7 +206,7 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   }
 
   // Build metric rows for accepted fields (only schema-supported metrics).
-  if (airTemp.celsius !== null) {
+  if (airTemp.celsius !== null && !airTempOutOfBand) {
     metrics.push({
       metric: "temperature_c",
       value: Math.round(airTemp.celsius * 100) / 100,

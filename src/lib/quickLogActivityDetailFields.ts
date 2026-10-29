@@ -35,6 +35,7 @@
  */
 
 import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
+import { MANUAL_AIR_TEMP_MAX_C, MANUAL_AIR_TEMP_MIN_C } from "@/lib/manualAirTemperatureRules";
 import {
   celsiusToFahrenheit,
   fahrenheitToCelsius,
@@ -98,6 +99,12 @@ export interface QuickLogDetailFieldSpec {
    * temperature field. Never set on non-temperature fields.
    */
   readonly temperatureCelsius?: boolean;
+  /**
+   * Upper bound for DISPLAYING an already-stored value, when it is wider than
+   * the entry bound `max`. Keeps rows saved under an older, wider entry band
+   * visible in history (preserve old rows). Never used to validate new input.
+   */
+  readonly storedMax?: number;
   /** Placeholder shown when the display unit is Fahrenheit (see above). */
   readonly placeholderF?: string;
 }
@@ -269,8 +276,10 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       key: "temp_c",
       label: "Temperature (manual)",
       kind: "number",
-      min: -10,
-      max: 60,
+      min: MANUAL_AIR_TEMP_MIN_C,
+      max: MANUAL_AIR_TEMP_MAX_C,
+      // Entries before 2026-10-28 were accepted up to 60 °C; keep showing them.
+      storedMax: 60,
       unit: "°C",
       placeholder: "e.g. 24",
       placeholderF: "e.g. 75",
@@ -292,7 +301,7 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
 
 /**
  * Round-trip a Celsius plausibility bound to a whole-number Fahrenheit
- * bound for display/validation. -10°C/60°C are exact (14°F/140°F); the
+ * bound for display/validation. -10°C/50°C are exact (14°F/122°F); the
  * rounding guards any future non-exact bound.
  */
 function toFahrenheitBound(celsius: number): number {
@@ -512,7 +521,8 @@ function formatDetailLine(
     }
     if (!Number.isFinite(n)) return null;
     if (typeof spec.min === "number" && n < spec.min) return null;
-    if (typeof spec.max === "number" && n > spec.max) return null;
+    const readMax = spec.storedMax ?? spec.max;
+    if (typeof readMax === "number" && n > readMax) return null;
     const displayValue =
       spec.temperatureCelsius && tempUnit === "fahrenheit" ? celsiusToFahrenheit(n) : n;
     const displayUnit = spec.temperatureCelsius ? getTemperatureUnitSymbol(tempUnit) : spec.unit;

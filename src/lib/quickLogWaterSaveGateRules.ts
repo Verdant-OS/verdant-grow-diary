@@ -4,7 +4,7 @@
  * Temperatures passed in are already canonical °C.
  */
 import type { TemperatureUnitPreference } from "./temperatureUnitPreference";
-import { celsiusToFahrenheit } from "./temperatureUnitPreference";
+import { manualAirTemperatureRangeMessage } from "./manualAirTemperatureRules";
 import {
   buildWateringFormPayload,
   EMPTY_QUICKLOG_WATERING_FORM,
@@ -25,16 +25,7 @@ export interface QuickLogWaterSaveGate {
 }
 
 export function wateringTemperatureRangeMessage(unit: TemperatureUnitPreference): string {
-  if (unit === "fahrenheit") {
-    const low = formatBound(celsiusToFahrenheit(-10));
-    const high = formatBound(celsiusToFahrenheit(60));
-    return `Temperature must be between ${low} and ${high} °F.`;
-  }
-  return "Temperature must be between -10 and 60 °C.";
-}
-
-function formatBound(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
+  return manualAirTemperatureRangeMessage(unit);
 }
 
 function probeReason(

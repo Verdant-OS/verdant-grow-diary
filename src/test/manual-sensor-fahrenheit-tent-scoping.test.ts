@@ -81,9 +81,15 @@ describe("Manual sensor temperature is collected and labeled in Fahrenheit", () 
     expect(cold.ok).toBe(true);
     expect(cold.warnings.some((w) => w.includes("50–100°F"))).toBe(true);
 
+    const warm = validateManualEntry({ airTempF: 110 });
+    expect(warm.ok).toBe(true);
+    expect(warm.warnings.some((w) => w.includes("50–100°F"))).toBe(true);
+
+    // Past the manual 122°F (50°C) ceiling is a refusal, not a warning.
     const hot = validateManualEntry({ airTempF: 130 });
-    expect(hot.ok).toBe(true);
-    expect(hot.warnings.some((w) => w.includes("50–100°F"))).toBe(true);
+    expect(hot.ok).toBe(false);
+    expect(hot.errors).toContain("Temperature must be between 14 and 122 °F.");
+    expect(hot.metrics.some((m) => m.metric === "temperature_c")).toBe(false);
   });
 
   it("converts °F → °C exactly once before storage (schema requires Celsius)", () => {

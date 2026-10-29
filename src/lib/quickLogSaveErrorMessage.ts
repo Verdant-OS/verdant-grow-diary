@@ -12,6 +12,7 @@
  */
 
 import { QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE } from "./quickLogWateringFormViewModel";
+import { MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_BOTH_UNITS } from "./manualAirTemperatureRules";
 export type QuickLogSaveReason =
   | "no_selection"
   | "target_unresolved"
@@ -126,7 +127,7 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
     case "volume_too_large":
       return QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE;
     case "temperature_out_of_range":
-      return "Temperature must be between -10 and 60°C.";
+      return MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_BOTH_UNITS;
     case "humidity_out_of_range":
       return "Humidity must be between 0 and 100.";
     case "vpd_out_of_range":

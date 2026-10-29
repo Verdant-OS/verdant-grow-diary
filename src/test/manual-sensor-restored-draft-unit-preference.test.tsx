@@ -17,6 +17,8 @@ import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules"
 // restored after a reload showed "Entered in °C" with 93.33, so typing 77
 // meaning °F would have saved 77 °C. The restored draft must show the
 // grower's unit, with the number expressed in that unit.
+// Since #2599 the card refuses 200 °F before Confirm (manual band -10..50 °C),
+// so the pending snapshot here comes from an in-band reading saved offline.
 
 type Row = Record<string, unknown>;
 const backend = vi.hoisted(() => ({
@@ -87,20 +89,22 @@ const airTemp = () => screen.getByLabelText(/Air temp/i) as HTMLInputElement;
 const temperatureRow = (rows: Row[] | undefined) =>
   rows?.find((row) => row.metric === "temperature_c");
 
-async function refuseHotReadingThenReload() {
+async function leaveUnconfirmedReadingThenReload() {
   const first = mountPage();
   expect(screen.getByTestId("manual-reading-temp-unit-F")).toHaveAttribute("aria-pressed", "true");
-  fireEvent.change(airTemp(), { target: { value: "200" } });
+  backend.offline = true;
+  fireEvent.change(airTemp(), { target: { value: "86" } });
   fireEvent.change(screen.getByLabelText(/Humidity/i), { target: { value: "50" } });
   fireEvent.click(screen.getByTestId("manual-reading-save"));
   fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
-  // The app refuses the out-of-range reading before any insert, leaving the
-  // claimed snapshot (canonical °C) pending in this tab's sessionStorage.
+  // The insert fails, leaving the claimed snapshot (canonical °C) pending in
+  // this tab's sessionStorage.
   await screen.findByTestId("manual-reading-save-unconfirmed");
   expect(backend.posts).toHaveLength(0);
   const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) ?? "null");
-  expect(temperatureRow(pending?.payloads)?.value).toBe(93.33);
+  expect(temperatureRow(pending?.payloads)?.value).toBe(30);
   first.unmount();
+  backend.offline = false;
   mountPage();
 }
 
@@ -119,8 +123,8 @@ afterEach(() => {
 });
 
 describe("manual reading form keeps the °F preference after a restored draft", () => {
-  it("shows the restored reading in °F (200, not 93.33 °C) after a reload", async () => {
-    await refuseHotReadingThenReload();
+  it("shows the restored reading in °F (86, not 30 °C) after a reload", async () => {
+    await leaveUnconfirmedReadingThenReload();
 
     expect(screen.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();
     expect(screen.getByTestId("manual-reading-temp-unit-F")).toHaveAttribute(
@@ -131,12 +135,12 @@ describe("manual reading form keeps the °F preference after a restored draft", 
       "aria-pressed",
       "false",
     );
-    expect(airTemp().value).toBe("200");
+    expect(airTemp().value).toBe("86");
     expect(screen.getByLabelText(/Humidity/i)).toHaveValue(50);
   });
 
   it("treats 77 typed into the restored form as °F and sends 25 °C", async () => {
-    await refuseHotReadingThenReload();
+    await leaveUnconfirmedReadingThenReload();
 
     fireEvent.change(airTemp(), { target: { value: "77" } });
     fireEvent.click(screen.getByTestId("manual-reading-save"));

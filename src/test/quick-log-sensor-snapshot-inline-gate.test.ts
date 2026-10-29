@@ -16,12 +16,12 @@ describe("assessQuickLogSensorSnapshotGate", () => {
       temperatureUnit: "fahrenheit",
     });
     expect(gate.blocksSave).toBe(true);
-    expect(gate.fields.temperature).toBe("Temperature must be between 14 and 140 °F.");
+    expect(gate.fields.temperature).toBe("Temperature must be between 14 and 122 °F.");
     expect(gate.fields.temperature).not.toMatch(/°C/);
   });
 
-  it("accepts the °F boundaries 14 and 140 and rejects just past them", () => {
-    for (const t of ["14", "140", "77"]) {
+  it("accepts the °F boundaries 14 and 122 and rejects just past them", () => {
+    for (const t of ["14", "122", "77"]) {
       const gate = assessQuickLogSensorSnapshotGate({
         ...base,
         temperatureInput: t,
@@ -29,7 +29,7 @@ describe("assessQuickLogSensorSnapshotGate", () => {
       });
       expect(gate.blocksSave).toBe(false);
     }
-    for (const t of ["140.5", "13.5", "abc"]) {
+    for (const t of ["122.5", "13.5", "abc"]) {
       const gate = assessQuickLogSensorSnapshotGate({
         ...base,
         temperatureInput: t,
@@ -42,10 +42,10 @@ describe("assessQuickLogSensorSnapshotGate", () => {
   it("uses the °C message for a Celsius grower", () => {
     const gate = assessQuickLogSensorSnapshotGate({
       ...base,
-      temperatureInput: "61",
+      temperatureInput: "51",
       temperatureUnit: "celsius",
     });
-    expect(gate.fields.temperature).toBe("Temperature must be between -10 and 60 °C.");
+    expect(gate.fields.temperature).toBe("Temperature must be between -10 and 50 °C.");
   });
 
   it("blocks RH 150 and VPD 11", () => {
@@ -70,7 +70,7 @@ describe("assessQuickLogSensorSnapshotGate", () => {
         temperatureUnit: "fahrenheit",
       });
       expect(gate.blocksSave, t).toBe(true);
-      expect(gate.fields.temperature, t).toBe("Temperature must be between 14 and 140 °F.");
+      expect(gate.fields.temperature, t).toBe("Temperature must be between 14 and 122 °F.");
     }
     for (const t of ["+77", "50", "32.5", "77.", " 68.5 "]) {
       const gate = assessQuickLogSensorSnapshotGate({
@@ -83,17 +83,17 @@ describe("assessQuickLogSensorSnapshotGate", () => {
   });
 
   it("applies the save seam's 2 dp °C rounding before the canonical band", () => {
-    // 140.004 °F -> 60.0022 °C, which the seam rounds to 60 and the payload accepts.
+    // 122.004 °F -> 50.0022 °C, which the seam rounds to 50 and the payload accepts.
     const accepted = assessQuickLogSensorSnapshotGate({
       ...base,
-      temperatureInput: "140.004",
+      temperatureInput: "122.004",
       temperatureUnit: "fahrenheit",
     });
     expect(accepted.blocksSave).toBe(false);
-    // 140.01 °F -> 60.0056 °C, rounds to 60.01 and is rejected by the payload.
+    // 122.01 °F -> 50.0056 °C, rounds to 50.01 and is rejected by the payload.
     const rejected = assessQuickLogSensorSnapshotGate({
       ...base,
-      temperatureInput: "140.01",
+      temperatureInput: "122.01",
       temperatureUnit: "fahrenheit",
     });
     expect(rejected.blocksSave).toBe(true);
@@ -162,10 +162,10 @@ describe("assessQuickLogSensorSnapshotGate", () => {
 describe("snapshot gate copy and footer", () => {
   it("owns its temperature copy, matching the canonical band in each unit", () => {
     expect(quickLogSnapshotTemperatureRangeMessage("fahrenheit")).toBe(
-      "Temperature must be between 14 and 140 °F.",
+      "Temperature must be between 14 and 122 °F.",
     );
     expect(quickLogSnapshotTemperatureRangeMessage("celsius")).toBe(
-      "Temperature must be between -10 and 60 °C.",
+      "Temperature must be between -10 and 50 °C.",
     );
   });
 
@@ -176,7 +176,7 @@ describe("snapshot gate copy and footer", () => {
       vpdInput: "11",
       temperatureUnit: "fahrenheit",
     });
-    expect(all.footerMessage).toBe("Temperature must be between 14 and 140 °F.");
+    expect(all.footerMessage).toBe("Temperature must be between 14 and 122 °F.");
     const rhOnly = assessQuickLogSensorSnapshotGate({
       temperatureInput: "",
       humidityInput: "150",

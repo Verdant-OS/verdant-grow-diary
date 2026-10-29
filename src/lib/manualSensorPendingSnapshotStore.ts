@@ -121,11 +121,19 @@ function valid(value: unknown, ownerId: string): value is PendingManualSnapshot 
     return false;
   if (new Set(rows.map((row) => row.metric)).size !== rows.length) return false;
   const payloads = rows as ManualSnapshotPayloads;
-  const validation = validateManualEntry(formFor(payloads));
+  // Older entry rules could retain any finite air temperature before the
+  // insert validator refused it. Recovery must still expose that original
+  // value for a deliberate correction, without treating it as a new entry.
+  // Preserve the old canonical two-decimal constraint and every other metric,
+  // owner, identity and provenance check; never clamp or silently discard it.
+  const temperature = payloads.find((row) => row.metric === "temperature_c");
+  if (temperature && Math.round(temperature.value * 100) / 100 !== temperature.value) return false;
+  const otherMetrics = payloads.filter((row) => row.metric !== "temperature_c");
+  const validation = validateManualEntry(formFor(otherMetrics));
   if (
-    !validation.ok ||
-    validation.metrics.length !== rows.length ||
-    !payloads.every((row) =>
+    (otherMetrics.length > 0 && !validation.ok) ||
+    validation.metrics.length !== otherMetrics.length ||
+    !otherMetrics.every((row) =>
       validation.metrics.some(
         (metric) => metric.metric === row.metric && metric.value === row.value,
       ),
@@ -198,7 +206,8 @@ export function claimPendingManualSnapshot(
   record: PendingManualSnapshot,
 ): { status: "claimed"; record: PendingManualSnapshot } | Exclude<ReadResult, { status: "empty" }> {
   try {
-    if (!valid(record, record.ownerId)) return { status: "blocked" };
+    if (!valid(record, record.ownerId) || !validateManualEntry(formFor(record.payloads)).ok)
+      return { status: "blocked" };
     const current = readPendingManualSnapshot(record.ownerId);
     if (current.status === "blocked") return current;
     if (current.status === "pending")

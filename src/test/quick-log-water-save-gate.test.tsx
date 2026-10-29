@@ -98,7 +98,7 @@ describe("Quick Log Water save gate", () => {
     fireEvent.change(screen.getByLabelText("RH (%)"), { target: { value: "150" } });
     fireEvent.change(screen.getByLabelText("VPD (kPa)"), { target: { value: "-3" } });
     expect(screen.getByTestId("qlv2-temp-error")).toHaveTextContent(
-      "Temperature must be between 14 and 140 °F.",
+      "Temperature must be between 14 and 122 °F.",
     );
     expect(screen.getByTestId("qlv2-rh-error")).toHaveTextContent(
       "Humidity must be between 0 and 100%.",

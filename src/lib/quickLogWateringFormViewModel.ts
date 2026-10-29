@@ -18,7 +18,11 @@ import {
   type RootZoneMediumSurface,
   type RootZonePotWeightFeel,
 } from "./rootZoneManualObservationRules";
-import { isHumidityValid, isTemperatureValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import {
+  isManualAirTemperatureValid,
+  MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_CELSIUS,
+} from "./manualAirTemperatureRules";
 import {
   assessWaterVolumeText,
   LARGE_WATER_AMOUNT_HARD_MAX_ML,
@@ -246,7 +250,7 @@ export function buildWateringFormPayload(
   if (!temperature.ok || !humidity.ok || !vpd.ok) {
     return { ok: false, reason: "numeric:invalid" };
   }
-  if (!isTemperatureValid(temperature.value)) {
+  if (!isManualAirTemperatureValid(temperature.value)) {
     return { ok: false, reason: "temperature_out_of_range" };
   }
   if (!isHumidityValid(humidity.value)) {
@@ -326,7 +330,7 @@ export function wateringFormReasonToHelper(reason: WateringFormFailureReason | s
     case "manual_observation:invalid":
       return "Choose one of the available manual observation labels.";
     case "temperature_out_of_range":
-      return "Temperature must be between -10 and 60 °C.";
+      return MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_CELSIUS;
     case "humidity_out_of_range":
       return "Humidity must be between 0 and 100%.";
     case "vpd_out_of_range":

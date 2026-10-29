@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   LoaderCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
@@ -33,6 +33,14 @@ import { useAuth } from "@/store/auth";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import {
+  useDiaryPhotoDisplayRows,
+  type DiaryPhotoDisplayRow,
+} from "@/hooks/useDiaryPhotoDisplayRows";
+import {
+  plantListPhotoFallbackUrls,
+  selectPlantListPhotoFallbackRows,
+} from "@/lib/plantListPhotoFallbackRules";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { dashboardPath, plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -288,6 +296,52 @@ export default function Plants() {
   const visibleAfterArchive = filterVisiblePlants(growScopedPlants, { showArchived });
   const visibleAfterTent = filterPlantsByTentChip(visibleAfterArchive, effectiveTentFilter);
   const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
+
+  const [unavailableProfilePhotoKeys, setUnavailableProfilePhotoKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const noteUnavailableProfilePhoto = useCallback(
+    (source: string) => {
+      const key = JSON.stringify([user?.id ?? null, source]);
+      setUnavailableProfilePhotoKeys((previous) =>
+        previous.has(key) ? previous : new Set([...previous, key]),
+      );
+    },
+    [user?.id],
+  );
+  const unavailableProfilePhotoPlantIds = useMemo(
+    () =>
+      new Set(
+        filtered
+          .filter((plant) =>
+            unavailableProfilePhotoKeys.has(JSON.stringify([user?.id ?? null, plant.photo])),
+          )
+          .map((plant) => plant.id),
+      ),
+    [filtered, unavailableProfilePhotoKeys, user?.id],
+  );
+
+  // Cards without a profile photo, or whose profile failed, show their newest diary photo, like
+  // the Plant Detail hero (#2257). The diary is already loaded for this page;
+  // the visible cards' photos are signed in one capped batch.
+  const photoFallbackRows = useMemo(
+    () =>
+      selectPlantListPhotoFallbackRows({
+        plants: filtered,
+        diaryRows: diaryQuery.data,
+        viewerUserId: user?.id,
+        unavailableProfilePhotoPlantIds,
+      }),
+    [filtered, diaryQuery.data, user?.id, unavailableProfilePhotoPlantIds],
+  );
+  const photoFallbackDisplay = useDiaryPhotoDisplayRows(
+    photoFallbackRows as ReadonlyArray<DiaryPhotoDisplayRow>,
+    { allowPartial: true },
+  );
+  const photoFallbackByPlant = useMemo(
+    () => plantListPhotoFallbackUrls(photoFallbackDisplay.rows),
+    [photoFallbackDisplay.rows],
+  );
 
   // Filter summary — counts only active plants under the current grow scope.
   const summary = summarizePlantsPageFilters(growScopedPlants, {
@@ -804,6 +858,8 @@ export default function Plants() {
                 >
                   <PlantPhoto
                     src={p.photo}
+                    fallbackSrc={photoFallbackByPlant.get(p.id) ?? null}
+                    onProfileUnavailable={noteUnavailableProfilePhoto}
                     alt={p.name}
                     className="aspect-[4/3]"
                     caption="No plant photo yet"

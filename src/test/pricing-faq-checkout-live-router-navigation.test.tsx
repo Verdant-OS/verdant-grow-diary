@@ -25,16 +25,6 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useFounderSlotsRemaining", () => ({
-  useFounderSlotsRemaining: () => ({
-    status: "ready" as const,
-    remaining: 42,
-    total: 100,
-    claimed: 58,
-    soldOut: false,
-  }),
-}));
-
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 vi.mock("@/lib/pricingAnalytics", () => ({ trackPricingEvent: vi.fn() }));
 vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent: vi.fn() }));

@@ -427,9 +427,10 @@ still met by C once the client change is live).
 
 - [ ] P1–P11 pass in the disposable-PG harness; P7 shown RED first, with its count in the PR body.
       P9 tests the new mirror UPDATE's `SET` expression in isolation with a null `vpd_kpa`,
-      leaving `details` non-null. P11 calls `quicklog_correct_entry` as an `authenticated` owner
-      with `sensor_values: {"vpd_kpa": null}` and asserts `invalid_changes` with mirror `details`
-      unchanged. P10 runs the step-5 postflight slice against the new body.
+      leaving `details` non-null. P10 runs the step-5 postflight slice against the new body.
+      P11 calls `quicklog_correct_entry` as an `authenticated` owner with
+      `sensor_values: {"vpd_kpa": null}` and asserts `invalid_changes` with mirror `details`
+      unchanged.
 - [ ] T1–T9 pass; all three negative gates shown failing, then restored.
 - [ ] Two fresh disposable harness runs produce byte-identical fixtures with the fixed
       captured timestamps required by §6.2; `--check` passes against the committed fixture.

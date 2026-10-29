@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ISSUE-2235-GROW-PDF-READINESS
+
+```text
+TASK ISSUE-2235-GROW-PDF-READINESS  priority: P2  status: OPEN
+goal: prevent Grow PDF export from claiming no entries while required counts or activity are loading or unavailable.
+why: issue #2235 reports two premature empty exports from a disposable QA grow with 66 entries.
+branch: codex/2235-grow-pdf-readiness
+base: verdant-grow-diary at 9b60f907e8e13b7dc6501b2406b96ab922530241
+checkout: git fetch origin codex/2235-grow-pdf-readiness verdant-grow-diary && git switch codex/2235-grow-pdf-readiness
+pr: NOT_MEASURED; preparation draft follows this checkpoint
+head_sha: read the draft PR's full current head; preparation parent is 9b60f907e8e13b7dc6501b2406b96ab922530241
+state: preparation; implementation not started
+current_step: scope and collision preflight completed for observed records; draft claim before implementation
+next_action: implement required-data readiness and honest builder fallback; add new regression files, run targeted checks, request independent review at final head
+post_merge_check: after a separately authorized deployment, disposable QA account hard-reloads the 66-entry grow twice; export waits for usable data and never claims it is empty. Production NOT_MEASURED here.
+active_writer: Codex /root, delegated ChatGPT session, 2026-10-29 05:50 UTC
+decisions: smallest client-only change; new tests rather than modifying locked scorers
+tried_and_rejected: gh GraphQL open-PR file audit is Forbidden; connected GitHub issue/PR search and git remote reads work
+commands: git status --short --branch; git ls-remote --heads origin verdant-grow-diary; node scripts/scorer-lock.mjs --report --strict
+files_touched: docs/agents/HANDOFF_LOG.md
+files_remaining: src/pages/GrowDetail.tsx; src/lib/growDiaryPdfExport.ts; a pure readiness helper if needed; new src/test/issue-2235-*.test.*
+blockers: no bun or node_modules provisioned; independent eligible non-contributing Claude/Grok session availability unverified
+open_questions: no required-data representation change in useGrowDetailData is planned
+gotchas: unavailable counts and unresolved recent must never be replaced by zero/empty; all tracked tests are scorer-locked; no specific unlock granted
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2235
+artifacts: PR and local scratch receipts to follow
+reviewer_seat: BLOCKED pending an actually available eligible non-contributing outside session; this Codex author is excluded
+reviewer_sha: none
+session_state: no subagents, routines or paused workflows; no merge, deploy, production, SQL, settings or secret work authorized
+claimed_by: Codex /root, 2026-10-29 05:50 UTC; explicit delegated assignment
+owner: Codex /root
+last_updated: 2026-10-29 05:50 UTC, by Codex
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

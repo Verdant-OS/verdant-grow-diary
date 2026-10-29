@@ -28,10 +28,12 @@ code, no SEO markup, no GA4/GSC setting and no Ahrefs project setting.
 
 ## What this changes in the review's priorities
 
-1. **Fix the sync before reading any trend.** Every October conclusion drawn from Ahrefs'
-   GSC view is about September data. The owner reconnects or re-syncs Search Console in
-   Ahrefs project `10225273` and names the linked property. Until then, GSC impressions
-   and clicks in any weekly scorecard are `NOT_MEASURED` for October, not zero.
+1. **Find out why October is missing before reading any trend.** Every October conclusion
+   drawn from Ahrefs' GSC view is about September data. Why the rows stop at 2026-10-01 is
+   `NOT_MEASURED`; a stalled sync is the likely cause (`inference`), not a confirmed one. The
+   owner checks the Search Console connection in Ahrefs project `10225273`, re-syncs it if it
+   has stalled, and names the linked property. Until then, GSC impressions and clicks in any
+   weekly scorecard are `NOT_MEASURED` for October, not zero.
 2. **Use `10225273` as the Ahrefs project of record** for this connector, unless the owner
    says `10204962` should be. Record the choice once; never mix their audits.
 3. **The comparison page carries most of the attributable impressions** (25 of 36; the home
@@ -58,5 +60,5 @@ Ahrefs MCP, read-only:
 - `gsc-performance-history` `{project_id: 10225273, date_from: "2026-07-29", date_to: "2026-10-28", history_grouping: "daily", search_type: "web"}`
 - `gsc-pages` and `gsc-keywords` `{project_id: 10225273, date_from: "2026-07-29", date_to: "2026-10-27", search_type: "web", limit: 100}`
 
-Re-run `gsc-performance-history` after the owner re-syncs. The receipt is superseded
+Re-run `gsc-performance-history` after the owner checks the connection. The receipt is superseded
 when a row dated on or after 2026-10-02 appears.

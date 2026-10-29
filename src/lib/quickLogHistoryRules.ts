@@ -36,6 +36,8 @@ export const QUICK_LOG_EVENT_LANES: Record<string, HistoryLane> = {
   environment: "measurement",
   photo: "photo",
   observation: "observation",
+  // An issue is an observation with subtype "issue"; it keeps the lane.
+  issue: "observation",
   // Falls back to the "All recent activity" lane so nothing is hidden.
   transplant: "activity",
   harvest: "activity",

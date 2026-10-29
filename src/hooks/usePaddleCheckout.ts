@@ -9,6 +9,11 @@ import {
   type PaddleCheckoutCatalogReason,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
+import {
+  checkoutBlockedScopeForReason,
+  type CheckoutBlockedScope,
+} from "@/lib/checkoutBlockedScopeRules";
+import { useRenderedPaddleCheckoutEnvironment } from "@/hooks/useRenderedPaddleCheckoutEnvironment";
 import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { toast } from "@/hooks/use-toast";
 import { buildCreditPackSuccessUrl, sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
@@ -21,7 +26,7 @@ import {
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
-import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
+import { CHECKOUT_PAUSED_MESSAGE, type PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
@@ -45,7 +50,7 @@ export interface UsePaddleCheckoutResult {
   environment: PaddleCheckoutEnvironment;
   /**
    * True when the client-side environment gate has blocked checkout
-   * (anything other than an exact sandbox environment). Derived
+   * (environment `"unavailable"`; sandbox and live may open). Derived
    * from the same helper the banner uses, so UI stays consistent.
    */
   unavailable: boolean;
@@ -63,6 +68,13 @@ export interface UsePaddleCheckoutResult {
   blockedReason: string | null;
   /** Sanitized catalog reason for cause-aware recovery UI. Never render it. */
   blockedReasonCode: PaddleCheckoutCatalogReason | null;
+  /**
+   * Scope of the current block (see checkoutBlockedScopeRules): "plan" for the
+   * attempted plan only, "pack" for every credit pack, "checkout" when no plan
+   * can check out (environment, Paddle.js load/init, overlay open, or a shared
+   * or unknown resolver reason). Null when nothing is blocked.
+   */
+  blockedScope: CheckoutBlockedScope | null;
   dismissBlocked: () => void;
 }
 
@@ -89,7 +101,8 @@ function defaultSuccessUrl(): string {
  *
  * SAFETY:
  *  - Fails closed via `resolvePaddleCheckout()` before any Paddle call
- *    unless the environment is exactly `"sandbox"`. The caller sees a
+ *    when the environment is `"unavailable"` (sandbox and live may open).
+ *    The caller sees a
  *    calm `blockedReason` string; no navigation, no toast, no crash.
  *  - If the user is not signed in, redirects to /auth with a return-to
  *    parameter so we never open a checkout that cannot be attributed
@@ -108,6 +121,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const [blockedReasonCode, setBlockedReasonCode] = useState<PaddleCheckoutCatalogReason | null>(
     null,
   );
+  const [blockedScope, setBlockedScope] = useState<CheckoutBlockedScope | null>(null);
 
   // Track mount state so the Paddle `checkout.closed` cancel handler (which
   // fires asynchronously from Paddle.js after the modal actually closes)
@@ -120,18 +134,12 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     };
   }, []);
 
-  // Derived at every render so a hot-reload / rerender after the token
-  // becomes available flips `unavailable` back to false without needing
-  // to remount. Cheap — pure string/hostname checks.
-  const environment = useMemo(
-    () => resolvePaddleCheckout(),
-    // resolvePaddleCheckout reads module-scope + window.location.hostname;
-    // both are stable across renders in production. This memo is a
-    // per-render read, not a subscription — that is intentional.
-
-    [],
-  );
-  const unavailable = environment !== "sandbox";
+  // Rendered environment: the server render reads the request host and the
+  // browser reads window.location.hostname (renderHostname), so both apply the
+  // production-host rule and the markup matches on hydration. Opening checkout
+  // below re-checks with resolvePaddleCheckout() at action time.
+  const environment = useRenderedPaddleCheckoutEnvironment();
+  const unavailable = environment === "unavailable";
   const unavailableMessage = useMemo(
     () => (unavailable ? getCheckoutUnavailableMessage() : null),
     [unavailable],
@@ -140,20 +148,33 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const dismissBlocked = useCallback(() => {
     setBlockedReason(null);
     setBlockedReasonCode(null);
+    setBlockedScope(null);
   }, []);
 
   const openCheckout = useCallback(
     async (options: OpenCheckoutOptions) => {
       if (isFounderLifetimeCheckoutSku(options.priceId)) {
         setBlockedReasonCode(null);
+        setBlockedScope("plan");
         setBlockedReason(FOUNDER_LIFETIME_CHECKOUT_REFUSAL);
         return;
       }
+
+      // Constant kill switch so a checkout-disabled production build drops
+      // Paddle.Checkout.open below. Exact "true" only.
+      if (import.meta.env.VITE_CHECKOUT_DISABLED === "true") {
+        setBlockedReasonCode(null);
+        setBlockedScope("checkout");
+        setBlockedReason(CHECKOUT_PAUSED_MESSAGE);
+        return;
+      }
+
       // Fail-closed gate BEFORE any auth redirect: if checkout cannot run
       // here, we must not detour the user to /auth and then dead-end.
       const env = resolvePaddleCheckout();
-      if (env !== "sandbox") {
+      if (env === "unavailable") {
         setBlockedReasonCode(null);
+        setBlockedScope("checkout");
         setBlockedReason(getCheckoutUnavailableMessage());
         return;
       }
@@ -181,6 +202,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
       setLoading(true);
       setBlockedReason(null);
       setBlockedReasonCode(null);
+      setBlockedScope(null);
       // Funnel ping: an authenticated grower initiated checkout. Fires
       // before price resolution on purpose — a blocked or sold-out
       // resolution is exactly the drop-off the funnel needs to see.
@@ -271,9 +293,17 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           setBlockedReasonCode(
             err instanceof PaddleCheckoutCatalogUnavailableError ? err.reason : null,
           );
+          // Map the resolver's reason to its real scope; shared or unknown
+          // reasons fail closed to checkout-wide.
+          setBlockedScope(
+            err instanceof PaddleCheckoutCatalogUnavailableError
+              ? checkoutBlockedScopeForReason(err.reason)
+              : "checkout",
+          );
           setBlockedReason(err.message);
         } else {
           setBlockedReasonCode(null);
+          setBlockedScope("checkout");
           setBlockedReason(CHECKOUT_RECOVERY_MESSAGE);
           toast({
             title: "Checkout unavailable",
@@ -312,6 +342,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     unavailableMessage,
     blockedReason,
     blockedReasonCode,
+    blockedScope,
     dismissBlocked,
   };
 }

@@ -86,7 +86,7 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
       p_humidity_pct: null,
       p_vpd_kpa: null,
       p_occurred_at: null,
-      p_details: { subtype: "morning" },
+      p_details: { subtype: "morning", quick_log_activity: "note" },
       p_idempotency_key: "idem-key-12345678",
     });
     expect(payload).not.toHaveProperty("p_grow_id");
@@ -113,7 +113,7 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
     expect(payload.p_idempotency_key).toBe("idem-key-12345678");
   });
 
-  it("omits p_details without extra details and forwards a valid 8..200 key", async () => {
+  it("sends only the note marker as p_details without extra details and forwards a valid 8..200 key", async () => {
     rpcMock.mockResolvedValueOnce(OK_RESPONSE);
     await save({
       activityId: "note",
@@ -122,7 +122,8 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
       idempotencyKey: "idem-key-12345678",
     });
     const [, payload] = rpcMock.mock.calls[0];
-    expect(payload).not.toHaveProperty("p_details");
+    // VER-298: every new note carries the marker, so p_details is never empty.
+    expect(payload.p_details).toEqual({ quick_log_activity: "note" });
     expect(payload.p_idempotency_key).toBe("idem-key-12345678");
   });
 

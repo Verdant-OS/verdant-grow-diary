@@ -118,6 +118,18 @@ vi.mock("@/hooks/useDashboardScopedData", () => ({
     reload: scoped.reload,
   }),
 }));
+const guidance = vi.hoisted(() => ({
+  state: { tips: "on", notices: {} as Record<string, unknown> },
+  status: "ready",
+  save: { kind: "idle" },
+  act: vi.fn(async () => true),
+  setTips: vi.fn(async () => true),
+  restoreAll: vi.fn(async () => true),
+  retryRead: vi.fn(async () => {}),
+}));
+vi.mock("@/hooks/useGuidance", () => ({
+  useGuidance: () => guidance,
+}));
 vi.mock("@/hooks/useUiViewPreference", () => ({
   useUiViewPreference: () => viewPreference,
 }));
@@ -191,6 +203,9 @@ beforeEach(() => {
   entitlements.lookupFailed = false;
   entitlements.maxActiveGrows = 1;
   rename.renameGrow.mockReset();
+  guidance.state = { tips: "on", notices: {} };
+  guidance.status = "ready";
+  guidance.act.mockClear();
 });
 
 afterEach(() => cleanup());
@@ -308,6 +323,38 @@ describe("SimpleHome — ready", () => {
       "href",
       `/timeline?growId=${GROW}`,
     );
+  });
+
+  it("with no observations yet, one tip offers the first observation and acts through the hook", async () => {
+    renderHome();
+    const tip = screen.getByTestId("simple-home-tip");
+    expect(tip).toHaveAttribute("data-step-id", "first-observation");
+    fireEvent.click(within(tip).getByRole("button", { name: "Add an observation" }));
+    expect(screen.getByTestId("qlv2-stub")).toHaveAttribute("data-target", "null");
+    fireEvent.click(screen.getByTestId("simple-home-tip-dismiss"));
+    await waitFor(() => expect(guidance.act).toHaveBeenCalledWith("first-observation", "dismiss"));
+  });
+
+  it("no tip while the tips read is pending or failed, or with tips off; What next? stays", () => {
+    for (const setup of [
+      () => (guidance.status = "loading"),
+      () => (guidance.status = "unavailable"),
+      () => (guidance.state = { tips: "off", notices: {} }),
+    ]) {
+      setup();
+      renderHome();
+      expect(screen.queryByTestId("simple-home-tip")).toBeNull();
+      expect(screen.getByTestId("simple-home-what-next")).toBeInTheDocument();
+      cleanup();
+      guidance.status = "ready";
+      guidance.state = { tips: "on", notices: {} };
+    }
+  });
+
+  it("an unavailable recent read adds no observation tip", () => {
+    scoped.recent = { status: "unavailable" };
+    renderHome();
+    expect(screen.queryByTestId("simple-home-tip")).toBeNull();
   });
 
   it("an empty recent read says so; an unavailable one offers a retry", () => {

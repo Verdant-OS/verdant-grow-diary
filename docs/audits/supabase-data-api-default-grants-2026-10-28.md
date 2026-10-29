@@ -45,13 +45,22 @@ its latest `CREATE`, a table-level `GRANT` or a full `REVOKE ALL`. A partial or 
 a GRANT whose every privilege has a column list, a statement inside a comment (nested block
 comments included), a string literal, a function body or other dollar-quoted text, a schema-wide or
 default-privilege statement, or a function/sequence grant does not count. A top-level statement, a
-`DO` block and a string handed straight to `EXECUTE` do count, and the same rule decides whether a
+`DO` block (dollar-quoted or a single-quoted body, including `DO LANGUAGE ... '...'`) and a string
+handed straight to `EXECUTE` do count, and the same rule decides whether a
 removal or `ALTER TABLE ... RENAME TO` clears a table: one written in a comment, a literal or an
 uncalled function body does not. A string handed to `EXECUTE` is decoded and read the same way, so
 a literal or comment nested inside it does not count either. A keyword inside a quoted identifier
-(a policy named `"Admins grant access"`) is not a statement. A string handed to `EXECUTE` counts only when it is
-the whole command; one joined to more text at run time (`EXECUTE '...' || x`) does not. A list of
-targets splits only on commas outside quoted names, and each removal target must be a complete name.
+(a policy named `"Admins grant access"`) is not a statement. A string handed to `EXECUTE` counts as
+a GRANT or DROP only when it is the whole command; one joined to more text at run time
+(`EXECUTE '...' || x`) does not. If those joined pieces, or the strings behind a bare `EXECUTE v`,
+spell `CREATE TABLE` or `SELECT ... INTO`, the migration is reported as
+`(unreadable dynamic EXECUTE at offset N)`. `EXECUTE format('GRANT ...')`,
+`EXECUTE format('SELECT ... FROM %I') INTO n`, and trigger `EXECUTE FUNCTION` are not that finding.
+A list of targets splits only on commas outside quoted names, and each removal target must be a complete name.
+A `GRANT`/`REVOKE` target whose name is an object-type keyword (`functions`, `sequence`, `schema`)
+counts when `TO`/`FROM` follows the name; `FUNCTION name`, `SEQUENCE name`, and `ALL ... IN SCHEMA`
+still do not. Temporary tables (`CREATE TEMP TABLE`, `SELECT ... INTO TEMP`) shadow an unqualified
+`DROP`/`RENAME`/`GRANT` of the same name until `pg_temp.name` or that unqualified name is dropped.
 Unquoted names may use non-ASCII letters, as in PostgreSQL. Quoted names (`"public"."x"`),
 unqualified names (read as `public`), `CREATE UNLOGGED TABLE` and `ALTER TABLE ... RENAME TO` are
 recognised. `ALTER TABLE ... SET SCHEMA public` brings a table into scope and it then needs its own
@@ -82,10 +91,13 @@ own two files were made under unlocks Matthew approved on 2026-10-28 and 2026-10
   `uncertainty`. All called RPCs grant explicitly, so the answer changes nothing today.
 - Function, sequence, view and materialized-view grants for future migrations are not enforced by
   a check yet. Persistent table-producing forms are tracked: `CREATE [UNLOGGED] TABLE`,
-  `CREATE TABLE ... AS`, and `SELECT ... INTO` at the top level or as a whole top-level `EXECUTE`
-  string. The rule reports unreadable `CREATE TABLE` targets and unreadable `EXECUTE`s of
-  `CREATE TABLE`. A new `CREATE VIEW public.v ...` with no GRANT still passes the rule. The same
-  pattern applies when a new client-called RPC, client-inserted serial column or client-read view
-  appears.
+  `CREATE TABLE ... AS`, and `SELECT ... INTO` at the top level or as a whole `EXECUTE` string
+  (including inside a `DO` block). The rule reports unreadable `CREATE TABLE` targets and
+  unreadable dynamic `EXECUTE`s that assemble `CREATE TABLE` or `SELECT ... INTO` (including
+  `EXECUTE v` built from concatenated strings). Single-quoted `DO` bodies count as executable SQL.
+  Temporary tables shadow unqualified `DROP`/`RENAME`/`GRANT` of the same name. Bare keyword-named
+  tables (`GRANT ... ON functions`) count. A new `CREATE VIEW public.v ...` with no GRANT still
+  passes the rule. The same pattern applies when a new client-called RPC, client-inserted serial
+  column or client-read view appears.
 - The 22 legacy tables still depend on default privileges in any fresh schema without `seed.sql`.
   Giving them explicit grants is a separate, additive migration and needs Matthew's decision.

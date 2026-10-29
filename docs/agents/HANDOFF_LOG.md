@@ -69,6 +69,39 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PADDLE-LIVE-WEBHOOK-READINESS-20261028
+
+```text
+TASK PADDLE-LIVE-WEBHOOK-READINESS-20261028  priority: P2  status: OPEN
+goal: Repo-side readiness audit so the founder's Paddle-side writes (A: register live destination, C: checkout recovery off, D: simulation) land on code that is ready. Docs only.
+why: The live destination does not exist yet; the founder asked for the destination spec and the defects that make D unsafe.
+branch: claude/charming-curie-w7yg2s
+base: verdant-grow-diary
+checkout: git fetch origin claude/charming-curie-w7yg2s verdant-grow-diary && git switch claude/charming-curie-w7yg2s && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2589 (draft); read the PR for the exact head
+head_sha: bff4e7e5975086f64be40f2c67fc34d5348a1bed plus merges of verdant-grow-diary (latest 479cadb) to clear HANDOFF_LOG conflicts; read the exact head from the PR
+state: pushed draft (docs only)
+current_step: Audit written to docs/release/paddle-live-webhook-readiness-2026-10-28.md
+next_action: Eligible independent reviewer (OWNERSHIP.md §4.3, billing scope; Claude excluded as author) reviews the doc at the exact head. Separately, the founder decides whether to assign the §3 edge PR (simulation guard in payments-webhook). #2570 is merged (bbc77ae2), so nothing blocks its sequencing.
+post_merge_check: NOT_APPLICABLE (docs only; nothing ships)
+active_writer: Claude
+decisions: Docs-only. The simulation predicate is not added as an unwired src/lib module: the edge mirror only copies modules an edge function imports, so it lands with its caller in the edge PR. No supabase/ edits (CURRENT_STATE gate).
+tried_and_rejected: Firecrawl search for Paddle simulation docs (account out of credits); used WebFetch/WebSearch on developer.paddle.com instead.
+commands: bunx vitest run src/test/lovable-paddle-webhook-event-processor.test.ts src/test/lovable-paddle-webhook-orchestrator.test.ts src/test/paddle-webhook-adjustment-refund-routing.test.ts src/test/founders-webhook-refund-decision.test.ts src/test/payments-webhook-raw-wire.test.ts src/test/payments-webhook-raw-wire-transport.test.ts src/test/ai-credit-grants-sql.test.ts src/test/get-paddle-price-hardening.test.ts --reporter=dot ; node scripts/assert-docs-safety.mjs
+files_touched: docs/release/paddle-live-webhook-readiness-2026-10-28.md; docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: none in this slice
+blockers: none for the doc. D against the production destination is blocked on the §3 edge PR (owner-named action required for supabase/).
+open_questions: Hide Craft CTAs before any live client ships? Archive the live Founder price before a live client token ships? Paddle event_id prefix ntfsimevt_ for simulations is a Paddle-docs source claim, to be measured on the first guarded simulation.
+gotchas: PADDLE-WIRE-001 block below still says #2221 is open; #2221 merged 2026-10-16. The closed STOP-SELLING-FOUNDER-LIFETIME block says the Paddle Founder price is archived; the founder's live read on 2026-10-28 shows it active (5 active, 0 archived).
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2539
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3; Claude (author) excluded
+reviewer_sha: none yet
+session_state: Claude Code cloud session; no routines; no paused workflows
+claimed_by: Claude, 2026-10-28 08:05 UTC
+owner: Claude
+last_updated: 2026-10-29 16:20 UTC, by Claude (merged verdant-grow-diary 479cadb for a HANDOFF_LOG conflict)
+```
+
 ### VER-300-ALERT-ARCHIVED-TARGETS
 
 ```text

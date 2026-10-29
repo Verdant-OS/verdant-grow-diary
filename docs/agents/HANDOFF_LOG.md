@@ -94,6 +94,40 @@ local_validation: Current integrated tree: existing spec 1 file / 19 PASS / 0 FA
 production_boundary: Disposable loopback lane only. No migration, RLS/ACL, backend, workflow, environment/secret, live Paddle, production DB, device or app behavior change. Release/live NOT_MEASURED.
 ```
 
+### VER-298-QUICKLOG-NOTE-VS-ISSUE
+
+```text
+TASK VER-298-QUICKLOG-NOTE-VS-ISSUE  priority: P2  status: OPEN
+goal: a saved Quick Log note reads "Note" and an issue reads "Issue" on every saved-entry surface, and the two tiles stop sounding the same.
+why: Toad Venom onboarding fix (Cheeko yes, 2026-10-27 3:56 PM CT); VER-298 SENTINEL prompt; Matthew 2026-10-28: option (b) + join, renegotiate tests; widen to the Quick Log history panel; issue heading "Issue"; "Push both".
+branch: claude/quicklog-note-vs-issue-tiles
+base: verdant-grow-diary
+checkout: git fetch origin claude/quicklog-note-vs-issue-tiles verdant-grow-diary && git switch claude/quicklog-note-vs-issue-tiles && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: feature commit a051df41b5fe72f3035b92344692d42058ab8f65; read the head from the PR
+state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
+current_step: review 5677116739 addressed: P1 by 9f39bddf (prior holder, dependency-free quickLogNoteMarkerRules, one new mirror file), P3 copy in, both P2s answered with Matthew's kept decision; awaiting CI and an independent exact-head review
+next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR
+post_merge_check: after Publish, on the disposable fixture account, save a Note and an Issue on the fixture plant (tag [smoke <timestamp>]): Timeline card, Quick Log history badge and Dashboard recent row read "Note" and "Issue". NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+decisions: review 5677116739 (Matthew 2026-10-28): keep (b)+join, so old unmarked notes stay "Observation" and the marker stays; tile copy is Note / "Anything you want to remember." and Problem spotted / "Something looks off: leaves, pests, smell."; marker predicates live in dependency-free quickLogNoteMarkerRules so the edge mirror stays small. new note saves add p_details.quick_log_activity = "note" (V2 payload, useQuickLogActivitySave manual route, legacy unified save for eventType "note"; never water, environment checks or legacy "observation"); one rule: marked row = Note, observation + subtype "issue" = Issue, any other observation (old unmarked notes) = Observation; display-only NOTE/ISSUE kinds in getEventType, kept out of EVENT_TYPES; issues keep the observation history lane; Dashboard/grow-detail read the linked diary mirror already fetched (5-row window; outside it the row stays "Observation"); AI Doctor, ecowitt and diagnostics note builders stay unmarked.
+tried_and_rejected: delegate:builder stopped at the 200k context mark before writing code; implemented in-session. Editing QuickLogHistoryPanels.tsx was not needed (badge flows through resolveEffectiveQuickLogCareType).
+commands: bunx vitest run src/test/quick-log-note-vs-issue-labels.test.ts src/test/quick-log-v2-save-payload.test.ts src/test/quick-log-activity-save-manual-rpc-contract.test.ts src/test/diary-timeline-event-wiring.test.ts src/test/quick-log-activity-types-saved-items.test.ts
+files_touched: src/constants/quickLogActivityTypes.ts; src/lib/quickLogNoteMarkerRules.ts (new) and its edge mirror; src/lib/{quickLogActivityRules,diary,environmentCheckTimelineViewModel,quickLogEventIdentityRules,quickLogHistoryRules,growDiaryTimelineRules,dailyCheckPostSubmitRules,quickLogV2SavePayload,legacyQuickLogUnifiedSave}.ts; src/hooks/{useQuickLogActivitySave,useDashboardScopedData,useGrowDetailData}.ts; src/test/quick-log-note-vs-issue-labels.test.ts (new); renegotiated (approved): quick-log-v2-save-payload, quick-log-activity-save-manual-rpc-contract, quick-log-activity-types-saved-items, diary-timeline-event-wiring
+files_remaining: none
+blockers: none for repository work; Publish and the live check are Matthew's
+open_questions: none
+gotchas: the idempotency request hash covers p_details; pending-note recovery replays stored payloads unchanged, so never rebuild a stored payload; getEventType unknown/null fallback to observation and EVENT_TYPE_MAP size are pinned by locked tests
+links: VER-298
+artifacts: PR checks
+reviewer_seat: not assigned (excluded: session_017UoYKzLzTv1RAhx1Cc7Pme as author, session_017UoYKxgRTFgtyQW6ka38Ec as repairer)
+reviewer_sha: none
+session_state: the prior holder's check-in trig_01Hi7LCPDNjfdvVBvGoWUhCv belongs to that session; no paused workflows
+claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677116739; prior holder told to stop pushing)
+owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 06:22 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (merged verdant-grow-diary a5ac6a9 after the merge queue removed this PR for a HANDOFF_LOG conflict)
+```
+
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
 
 ```text
@@ -194,40 +228,6 @@ session_state: Claude cloud session; self check-in trig_01Qi9RH9aH5Dg64ZSU1XiQUL
 claimed_by: Claude, 2026-10-27 12:13 CT (first commit of this block, e99de0741; session_017UoYKyHCyHbSMw6VpDj2mb)
 owner: Claude (default inheritor OG Kush)
 last_updated: 2026-10-27 21:05 CT, by Claude
-```
-
-### PLANT-TIMELINE-PHOTO-THUMBNAIL
-
-```text
-TASK PLANT-TIMELINE-PHOTO-THUMBNAIL  priority: P2  status: OPEN
-goal: show the photo on a Plant Detail Relative Timeline row; prod showed only the note for a Photo-only log (Hashato #1, 2026-10-27 ~3:55 PM CT) while the header and Recent photos showed it.
-why: the row's "Photo" badge came from the raw row, but PlantRelativeTimelineSection never signed or rendered photo_url. Blocks Lemon G's Photo Quick Log episode.
-branch: claude/new-session-6xw9g6
-base: verdant-grow-diary
-checkout: git fetch origin claude/new-session-6xw9g6 verdant-grow-diary && git switch claude/new-session-6xw9g6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2559
-head_sha: eb075f7f942ce5f8653a1092b4fa146644017996 observed 2026-10-27 21:28 UTC (first push); the review-fix commit that adds this line follows it, so read the current head from the PR
-state: pushed; marked ready by Matthew 2026-10-27 21:48 UTC
-current_step: ready for review (Matthew, 21:48 UTC), auto-merge on; review fixes pushed; awaiting required CI and an independent exact-head PASS at the current head
-next_action: confirm 35/35 required checks at the PR head; route to an eligible reviewer who did not author it
-post_merge_check: after Publish, on verdantgrowdiary.com open the fixture plant's timeline with a Photo-only log; the row shows a thumbnail that opens full size. Until live /version.json reports the SHA: NOT_MEASURED.
-active_writer: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-decisions: sign through the existing owner-guarded useDiaryPhotoDisplayRows; keep projection on raw rows so a pending/failed signature never flips the Photo badge; reuse TimelinePhotoLightbox for tap-to-open; order lightbox by visible timeline items via new pure buildOrderedTimelinePhotoLightboxList.
-tried_and_rejected: signing rows before projection (would relabel photo rows as Note while signing is pending or failed).
-commands: bunx vitest run src/test/plant-relative-timeline-photo-thumbnail.test.tsx; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
-files_touched: src/components/PlantRelativeTimelineSection.tsx; src/lib/timelinePhotoLightboxRules.ts; src/test/plant-relative-timeline-photo-thumbnail.test.tsx; src/test/relative-timeline-projection.test.tsx, src/test/plant-last-updated-local-date-2206.test.tsx, src/test/plant-last-updated-utc-midnight-2206.test.tsx (stub the signing hook: they render without a QueryClient)
-files_remaining: none
-blockers: none for repository work; Publish and the live check are Matthew's
-open_questions: none
-gotchas: relative-timeline-projection.test.tsx was already prettier-unclean on base (line 704); left as is
-links: handoff 2026-10-27 4:20 PM CT (OG Kush)
-artifacts: PR checks
-reviewer_seat: not yet assigned (OG Kush routes; Claude session_017UoYKzLzTv1RAhx1Cc7Pme is excluded as author)
-reviewer_sha: none
-session_state: no routines; no paused workflows
-claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:25 CT (Matthew's handoff prompt, item 1)
-owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
-last_updated: 2026-10-27 16:25 CT, by Claude
 ```
 
 ### PR-2283-REMOVAL-PAGINATION-REPAIR
@@ -997,6 +997,41 @@ reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (bill
 claimed_by: Claude, 2026-10-27 18:17 UTC (renewal, PR comment 6450051931)
 last_updated: 2026-10-27 23:00 UTC, by Claude
 closure: #2028 merged as 0200d2551b86d3df63e709651874ee85d9863fdc at 2026-10-27 22:54:01 UTC from final head f4754d21d48fdec73d4fec25d46da7132601d903 via the merge queue (GitHub API: merged true, merge_commit_sha 0200d255)
+```
+
+### PLANT-TIMELINE-PHOTO-THUMBNAIL
+
+```text
+TASK PLANT-TIMELINE-PHOTO-THUMBNAIL  priority: P2  status: CLOSED
+goal: show the photo on a Plant Detail Relative Timeline row; prod showed only the note for a Photo-only log (Hashato #1, 2026-10-27 ~3:55 PM CT) while the header and Recent photos showed it.
+why: the row's "Photo" badge came from the raw row, but PlantRelativeTimelineSection never signed or rendered photo_url. Blocks Lemon G's Photo Quick Log episode.
+branch: claude/new-session-6xw9g6
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin claude/new-session-6xw9g6 verdant-grow-diary && git switch claude/new-session-6xw9g6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2559 (merged)
+head_sha: 422df91667a13204988093fa0029b76dcb5d19d5 (final PR head; base merge of 27991451 over a0381f65 resolving the HANDOFF_LOG conflict); merge commit b99d7cb80d95b525c62863d4390f41295e68d51d on the deploy branch
+state: CLOSED (merged). Last recorded open state: pushed; marked ready by Matthew 2026-10-27 21:48 UTC
+current_step: Closed. Last open step: ready for review (Matthew, 21:48 UTC), auto-merge on; review fixes pushed; awaiting required CI and an independent exact-head PASS at the current head
+next_action: None; closed. The post_merge_check below stays owned by this block: if the live photo-row check fails after Publish, this work reopens with the same owner.
+post_merge_check: after Publish, on verdantgrowdiary.com open the fixture plant's timeline with a Photo-only log; the row shows a thumbnail that opens full size. Until live /version.json reports the SHA: NOT_MEASURED.
+active_writer: none; branch claude/new-session-6xw9g6 retired after merge
+decisions: sign through the existing owner-guarded useDiaryPhotoDisplayRows; keep projection on raw rows so a pending/failed signature never flips the Photo badge; reuse TimelinePhotoLightbox for tap-to-open; order lightbox by visible timeline items via new pure buildOrderedTimelinePhotoLightboxList.
+tried_and_rejected: signing rows before projection (would relabel photo rows as Note while signing is pending or failed).
+commands: bunx vitest run src/test/plant-relative-timeline-photo-thumbnail.test.tsx; node --max-old-space-size=6144 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+files_touched: src/components/PlantRelativeTimelineSection.tsx; src/lib/timelinePhotoLightboxRules.ts; src/test/plant-relative-timeline-photo-thumbnail.test.tsx; src/test/relative-timeline-projection.test.tsx, src/test/plant-last-updated-local-date-2206.test.tsx, src/test/plant-last-updated-utc-midnight-2206.test.tsx (stub the signing hook: they render without a QueryClient)
+files_remaining: none
+blockers: none for repository work; Publish and the live check are Matthew's
+open_questions: none
+gotchas: relative-timeline-projection.test.tsx was already prettier-unclean on base (line 704); left as is
+links: handoff 2026-10-27 4:20 PM CT (OG Kush)
+artifacts: PR checks
+reviewer_seat: Sour Diesel review session (login cheekhimself), review-only, neither authored nor repaired; recorded as the OWNERSHIP.md section 4.3 independent acceptance. Excluded: Claude session_017UoYKzLzTv1RAhx1Cc7Pme (author), connector bots.
+reviewer_sha: 422df91667a13204988093fa0029b76dcb5d19d5, review 5675123292 at 2026-10-27 22:11 UTC: "no blocking findings" (merge-only head; none of the 7 PR code/test files changed vs a0381f65, where review 5675069721 was 0 blocking / 1 should-fix / 1 nit, both fixed in 422df916 per comment 6454987310)
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKzLzTv1RAhx1Cc7Pme, 2026-10-27 16:25 CT (Matthew's handoff prompt, item 1)
+owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
+last_updated: 2026-10-28 04:45 UTC, by Claude (handoff-close session, branch claude/handoff-close-2559-2028) (closure)
+closure: #2559 merged as b99d7cb80d95b525c62863d4390f41295e68d51d at 2026-10-27 22:22:53 UTC by cheekhimself from final head 422df91667a13204988093fa0029b76dcb5d19d5. Required checks at that head: 35/35 SUCCESS (all 32 Full test suite shards, "Lint, typecheck, test, build", "Preflight — edge shared-lib mirror in sync", test:legal-seo), read from the PR status rollup at closure time; no non-green supplemental check. Independent acceptance: Sour Diesel 5675123292 at the exact head. Post-merge live check (photo-row thumbnail on verdantgrowdiary.com) NOT_MEASURED at closure; it reopens this block with the same owner if it fails. Closed by this follow-up PR.
 ```
 
 ### ARCH-CONTRACT-POST-MERGE-20261028

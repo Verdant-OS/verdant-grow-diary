@@ -606,8 +606,8 @@ export default function GrowTentTemperatureHumidityChart() {
                   ) : (
                     <>
                       no RH from 0 to 100% reaches the {live.nudge.midpoint.toFixed(2)} kPa midpoint
-                      at {inputs.airF}°F air and {inputs.offsetF}°F leaf offset; the temperature
-                      would have to change.
+                      at {inputs.airF}°F air and {inputs.offsetF}°F leaf offset, so RH alone cannot
+                      center the band here. Temperature also affects the result.
                     </>
                   )}
                 </p>

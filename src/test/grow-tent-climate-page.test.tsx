@@ -197,6 +197,9 @@ describe("public grow tent temperature and humidity page", () => {
     const result = screen.getByTestId("climate-live-result");
     expect(result).toHaveTextContent("no RH from 0 to 100% reaches the 1.40 kPa midpoint");
     expect(result).not.toHaveTextContent("0% RH (centers at");
+    // The band itself may still be reachable by RH; only the midpoint is not.
+    expect(result).toHaveTextContent("RH alone cannot center the band here");
+    expect(result).not.toHaveTextContent("would have to change");
   });
 
   it("discloses that the VPD calculator's late-flower band differs", () => {

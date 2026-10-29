@@ -103,6 +103,39 @@ owner: Claude session_017UoYKwd1Xq18V6DhSBjxFc (default inheritor OG Kush)
 last_updated: 2026-10-29 16:40 UTC, by Claude
 ```
 
+### SIMPLE-VIEW-PHASE-3
+
+```text
+TASK SIMPLE-VIEW-PHASE-3  priority: P2  status: OPEN
+goal: Phase 3 of Matthew's four-phase simplification: one tip card on the Simple home (Not now / Remind me in 3 days; the third Not now retires a tip), a What next? list on demand, account-persisted tip state separate from the Simple/Advanced view, and a shared notice state model reusable by later in-app notifications.
+why: Matthew approved Phase 2 on 2026-10-29, which opens Phase 3; on 2026-10-29 ~19:10 UTC he said "push" for this work while #2615 waits on review and merge.
+branch: claude/verdant-simplification-phase-3 (stacked on claude/verdant-simplification-ki5ccn at 8eae24f4a38ffbe77a86512b8159b95d51880b5e so #2615's approved head is not moved)
+base: claude/verdant-simplification-ki5ccn until #2615 merges; then retarget the PR to verdant-grow-diary and merge the base in (no rebase)
+checkout: git fetch origin claude/verdant-simplification-phase-3 && git switch claude/verdant-simplification-phase-3
+pr: read from the branch's draft PR (opened right after the first push)
+head_sha: read from the PR; Phase 3 commit d024dcf4ba6c8cc9de31889e80c7493a914cf8a2
+state: BUILT and pushed as a draft, awaiting Matthew's Phase 3 review. Not mergeable before #2615.
+current_step: docs/specs/simple-view-phase-3.md (decisions in section 4, acceptance checklist in section 6)
+next_action: Matthew reviews Phase 3. After #2615 merges: retarget to verdant-grow-diary, merge base, re-run checks, get an independent exact-head review, then Matthew's per-item yes. Phase 4 waits for Phase 3 approval.
+post_merge_check: after Publish, on the disposable fixture account with a grow, tent and plant but no observations, Simple home shows one tip "Add your first observation"; Not now hides it across reload and a second device; Preferences > Tips off hides the card while What next? still lists steps. NOT_MEASURED until live /version.json reports the merged SHA.
+active_writer: Claude session_017UoYKwd1Xq18V6DhSBjxFc
+decisions: tip state lives in the user's own auth metadata key verdant_guidance (no table, RLS, migration or auth-config change), written whole and confirmed by read-back, known notice ids only; no device cache, so the card stays hidden until the account answers; only actionable steps (plant without a grow, first observation, 3+ day observation gap) reach the card, Timeline and Advanced view are What next? only; steps come only from reads that succeeded and never give cultivation advice; one tip per visit; a late older save never overwrites a newer one.
+tried_and_rejected: showing discovery tips on the card (would need three dismissals each from an up-to-date grower); a localStorage tip store (fails the cross-device requirement).
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/notice-state-rules.test.ts src/test/simple-home-guidance-rules.test.ts src/test/guidance-preference-service.test.ts src/test/simple-home-guidance.test.tsx src/test/tips-preference-card.test.tsx src/test/simple-home-render.test.tsx --reporter=dot
+files_touched: src/lib/noticeStateRules.ts, src/lib/simpleHomeGuidanceRules.ts, src/lib/guidancePreferenceService.ts, src/hooks/useGuidance.ts, src/components/SimpleHomeGuidance.tsx (new); src/pages/SimpleHome.tsx, src/pages/AccountPreferences.tsx; tests notice-state-rules, simple-home-guidance-rules, guidance-preference-service, simple-home-guidance, tips-preference-card (new), simple-home-render (extended); docs/specs/simple-view-phase-3.md; docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: none for Phase 3
+blockers: #2615 must merge first; Matthew's Phase 3 review
+open_questions: reading of the 3-dismiss rule and the 24 h Not now window (spec section 4)
+gotchas: the PR diff is against the #2615 branch; do not rebase after #2615 squash-merges, merge the base instead.
+links: docs/specs/simple-view-phase-3.md; https://github.com/Verdant-OS/verdant-grow-diary/pull/2615
+reviewer_seat: not assigned (this session excluded as author; Codex excluded by Matthew's brief for this work)
+reviewer_sha: none
+session_state: Claude cloud session session_017UoYKwd1Xq18V6DhSBjxFc; #2615 check-in trig_012iRwM39zjHzZ425if6Zm16; pending human decision: Phase 3 approval, #2615 reviewer and merge actor
+claimed_by: Claude session_017UoYKwd1Xq18V6DhSBjxFc, 2026-10-29 (Matthew's direct assignment)
+owner: Claude session_017UoYKwd1Xq18V6DhSBjxFc (default inheritor OG Kush)
+last_updated: 2026-10-29 19:15 UTC, by Claude
+```
+
 ### VER-300-ALERT-ARCHIVED-TARGETS
 
 ```text

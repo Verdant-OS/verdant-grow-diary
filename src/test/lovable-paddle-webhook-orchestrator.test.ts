@@ -487,6 +487,23 @@ describe("handleVerifiedEvent — Pro→Founder provider cancellation (double-bi
     expect(cancel).not.toHaveBeenCalled();
   });
 
+  it("entitlement-only grant (no Wall seat) still processes and cancels other subscriptions", async () => {
+    const f = makeFixture();
+    (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
+      ok: true as const,
+      reason: "allocated" as const,
+    }));
+    const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 1 }));
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_entitlement_only"), "live", NOW, {});
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe("processed:record_lifetime");
+    expect(cancel).toHaveBeenCalledTimes(1);
+    const mark = f.markCalls.at(-1)?.patch;
+    expect(mark?.processing_status).toBe("processed");
+    expect(mark?.processed_ok).toBe(true);
+  });
+
   it("allocator hard failure (500 path) never triggers a cancel", async () => {
     const f = makeFixture();
     (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({

@@ -78,8 +78,8 @@ why: Matthew's 2026-10-29 brief: make the shallow end ankle-deep; a tired grower
 branch: claude/verdant-simplification-ki5ccn
 base: verdant-grow-diary
 checkout: git fetch origin claude/verdant-simplification-ki5ccn verdant-grow-diary && git switch claude/verdant-simplification-ki5ccn && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft PR from this branch; read URL and head from GitHub
-head_sha: read origin/claude/verdant-simplification-ki5ccn
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2615 (draft; do not mark ready without Matthew)
+head_sha: 85a6d118247a3892803822414010bc1dd31fc0ab (feature commit, 2026-10-29 ~15:00 UTC); this log commit moves the head, read the PR
 state: pushed draft; awaiting Matthew's Phase 1 review, CI and an independent exact-head review
 current_step: Phase 1 implemented with tests; Phases 2-4 not started by design (each needs Matthew's explicit approval of the prior phase).
 next_action: Matthew reviews docs/specs/simple-view-phase-1.md section 7 and the PR; on approval, start Phase 2 (easy setup, pause and recovery) on the same branch or a stacked branch as Matthew prefers. Until then: keep CI green and answer review threads only.

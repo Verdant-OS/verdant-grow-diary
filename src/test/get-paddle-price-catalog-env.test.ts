@@ -59,6 +59,14 @@ describe("get-paddle-price catalog env names", () => {
     expect(Object.values(catalog).every((value) => value === "")).toBe(true);
   });
 
+  it("trims whitespace from configured price ids", () => {
+    const catalog = readGetPaddlePriceCatalog((name) => {
+      if (name === "PADDLE_PRICE_PRO_MONTHLY") return "  pri_live_trimmed  ";
+      return undefined;
+    });
+    expect(catalog.pro_monthly).toBe("pri_live_trimmed");
+  });
+
   it("names the seven sandbox copies that must exist before the live flip", () => {
     expect(Object.values(PADDLE_SANDBOX_PRICE_COPIES_BEFORE_LIVE)).toEqual([...SANDBOX_COPIES]);
     expect(PAYMENTS_ENVIRONMENT_ENV_NAME).toBe("PAYMENTS_ENVIRONMENT");

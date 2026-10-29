@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyPaddleToken,
+  isCheckoutDisabledFlag,
   isLoopbackHostname,
   resolvePaddleCheckoutEnvironment,
   CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
@@ -193,11 +194,47 @@ describe("resolvePaddleCheckoutEnvironment", () => {
   });
 
   it("requires sandbox even when hostname is missing", () => {
-    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc000000000000000000000000", hostname: null })).toBe(
-      "unavailable",
-    );
-    expect(resolvePaddleCheckoutEnvironment({ token: "test_abc000000000000000000000000", hostname: null })).toBe("sandbox");
+    expect(
+      resolvePaddleCheckoutEnvironment({
+        token: "live_abc000000000000000000000000",
+        hostname: null,
+      }),
+    ).toBe("unavailable");
+    expect(
+      resolvePaddleCheckoutEnvironment({
+        token: "test_abc000000000000000000000000",
+        hostname: null,
+      }),
+    ).toBe("sandbox");
   });
+
+  it("returns unavailable for every host when the build-time kill switch is on", () => {
+    const liveOnProd = {
+      token: "live_abc000000000000000000000000",
+      hostname: "verdantgrowdiary.com",
+      checkoutDisabled: true,
+    };
+    const sandboxOnLocal = {
+      token: "test_abc000000000000000000000000",
+      hostname: "localhost",
+      checkoutDisabled: true,
+    };
+    expect(resolvePaddleCheckoutEnvironment(liveOnProd)).toBe("unavailable");
+    expect(resolvePaddleCheckoutEnvironment(sandboxOnLocal)).toBe("unavailable");
+  });
+});
+
+describe("isCheckoutDisabledFlag", () => {
+  it("disables checkout only for the exact string true", () => {
+    expect(isCheckoutDisabledFlag("true")).toBe(true);
+  });
+
+  it.each(["TRUE", "True", " true", "true ", "1", "", undefined, null, true, false])(
+    "does not disable checkout for %j",
+    (value) => {
+      expect(isCheckoutDisabledFlag(value)).toBe(false);
+    },
+  );
 });
 
 describe("blocking copy constants", () => {

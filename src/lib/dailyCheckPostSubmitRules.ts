@@ -12,6 +12,7 @@
  * enforced by tests — see
  * src/test/daily-check-post-submit.test.tsx.
  */
+import { QUICK_LOG_ISSUE_TILE_COPY } from "@/constants/quickLogActivityTypes";
 import { formatHarvestSavedBreakdownDetail } from "@/lib/harvestDetailsRules";
 import { withGrowId } from "@/lib/routes";
 import {
@@ -396,7 +397,7 @@ const SAVED_LABELS: Record<DailyCheckSavedSource, { key: DailyCheckSavedItemKey;
     defoliation: { key: "defoliation", label: "Defoliation" },
     issue_observation: {
       key: "issue_observation",
-      label: "Issue / observation",
+      label: QUICK_LOG_ISSUE_TILE_COPY.label,
     },
     harvest: { key: "harvest", label: "Harvest" },
   };

@@ -14,7 +14,12 @@
 // see the gap; this static rule is the only check that does.
 //
 // Schema-wide statements (GRANT ... ON ALL TABLES IN SCHEMA, ALTER DEFAULT
-// PRIVILEGES ... ON TABLES) are not a decision about one table and do not count.
+// PRIVILEGES ... ON TABLES) and grants on other object types (FUNCTION,
+// SEQUENCE, SCHEMA, TYPE, ...) are not a decision about one table and do
+// not count. A non-table ON clause is recognised only as ALL TABLES|
+// SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or an object keyword
+// followed by that object's name. A keyword followed by TO, FROM or a
+// comma is a table name, so GRANT SELECT ON functions TO … counts.
 //
 // The scan fails closed. CREATE is read from the SQL with only comments
 // removed, so a table created anywhere, even in a function body, is tracked.
@@ -93,8 +98,19 @@ const SET_SCHEMA_RE = new RegExp(
   "gi",
 );
 const DROP_RE = /\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
-const ACL_RE =
-  /\b(GRANT|REVOKE)\b([^;]*?)\bON\s+(?!(?:ALL\s+)?(?:TABLES|FUNCTIONS?|ROUTINES?|PROCEDURES?|SEQUENCES?|SCHEMAS?|TYPES?|DOMAINS?|LANGUAGE|FOREIGN|LARGE|DATABASE|TABLESPACE)\b)(?:TABLE\s+)?([^;]*?)\s+(?:TO|FROM)\b/gi;
+// Table GRANT/REVOKE. Skip only a complete non-table clause: ALL TABLES|
+// SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or FUNCTION|SEQUENCE|SCHEMA|
+// TYPE|… followed by that object's name. A keyword followed by TO, FROM or
+// a comma is a table name.
+const ACL_RE = new RegExp(
+  String.raw`\b(GRANT|REVOKE)\b([^;]*?)\bON\s+` +
+    String.raw`(?!ALL\s+(?:TABLES|SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES)\s+IN\b)` +
+    String.raw`(?!(?:FUNCTION|PROCEDURE|ROUTINE|SEQUENCE|SCHEMA|TYPE|DOMAIN|LANGUAGE|DATABASE|TABLESPACE)\b(?!\s*(?:TO|FROM|,)))` +
+    String.raw`(?!FOREIGN\s+(?:DATA\s+WRAPPER|SERVER)\b)` +
+    String.raw`(?!LARGE\s+OBJECT\b)` +
+    String.raw`(?:TABLE\s+)?([^;]*?)\s+(?:TO|FROM)\b`,
+  "gi",
+);
 const TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*$`);
 const DROP_TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*(?:CASCADE|RESTRICT)?\s*$`, "i");
 const REVOKE_ALL_RE = /^\s*ALL(?:\s+PRIVILEGES)?\s*$/i;

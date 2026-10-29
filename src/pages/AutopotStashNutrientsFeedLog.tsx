@@ -169,9 +169,34 @@ export default function AutopotStashNutrientsFeedLog() {
     [entries],
   );
 
+  // Timers that update state or call window are cleared on unmount, so none fires after the page is gone.
+  const pendingTimers = useRef(new Set<number>());
+  // A copy started before the log changed (or the page closed) must not report or restore an outdated log.
+  const copyGeneration = useRef(0);
+  useEffect(() => {
+    copyGeneration.current += 1;
+  }, [entries]);
+  useEffect(() => {
+    const timers = pendingTimers.current;
+    const generation = copyGeneration;
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      timers.clear();
+      generation.current += 1;
+    };
+  }, []);
+
+  function later(callback: () => void, delayMs: number) {
+    const id = window.setTimeout(() => {
+      pendingTimers.current.delete(id);
+      callback();
+    }, delayMs);
+    pendingTimers.current.add(id);
+  }
+
   function announce(message: string) {
     setStatus("");
-    window.setTimeout(() => setStatus(message), 20);
+    later(() => setStatus(message), 20);
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -259,11 +284,14 @@ export default function AutopotStashNutrientsFeedLog() {
   async function copyLog() {
     const tsv = buildAutopotTsv(entries);
     trackAutopotLogEvent("autopot_log_copy", { refill_count: entries.length });
+    const generation = copyGeneration.current;
     try {
       await navigator.clipboard.writeText(tsv);
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(null);
       announce(`Copied ${entries.length} AutoPot log entry(s) to clipboard.`);
     } catch {
+      if (generation !== copyGeneration.current) return;
       setCopyFallback(tsv);
       announce("Clipboard unavailable. Select and copy the tab-separated AutoPot log shown below.");
     }
@@ -272,7 +300,7 @@ export default function AutopotStashNutrientsFeedLog() {
   function printLog() {
     announce("Opening print dialog for your AutoPot reservoir & feed log.");
     trackAutopotLogEvent("autopot_log_print", {});
-    window.setTimeout(() => window.print(), 30);
+    later(() => window.print(), 30);
   }
 
   function clearLog() {

@@ -139,6 +139,82 @@ describe("summarizeSensorSources freshness (VER-299)", () => {
   });
 });
 
+describe("persisted status and quality floors (Codex P2 on #2586 at b1cab8f9d)", () => {
+  const recentLive = { source: "live", captured_at: minutesAgo(5) };
+
+  it("keeps a recent live reading out of fresh when its canonical status is stale", () => {
+    const r = summarizeSensorSources([{ ...recentLive, status: "stale" }], { now: NOW });
+    expect(r.counts.live).toBe(1);
+    expect(r.counts.stale).toBe(1);
+    expect(r.freshness).toEqual({ fresh: 0, stale: 1, unknown: 0 });
+  });
+
+  it("treats a persisted quality of stale the same way", () => {
+    expect(classifySensorSourceSummaryFreshness({ ...recentLive, quality: "stale" }, NOW)).toBe(
+      "stale",
+    );
+  });
+
+  it.each([
+    ["status invalid", { status: "invalid" }],
+    ["status needs_review", { status: "needs_review" }],
+    ["status no_data", { status: "no_data" }],
+    ["an unrecognised status", { status: "weird" }],
+    ["quality invalid", { quality: "invalid" }],
+    ["quality degraded", { quality: "degraded" }],
+    ["an unrecognised non-ok quality", { quality: "suspect" }],
+  ])("never counts a recent live reading as fresh with %s", (_label, downgrade) => {
+    const r = summarizeSensorSources([{ ...recentLive, ...downgrade }], { now: NOW });
+    expect(r.freshness).toEqual({ fresh: 0, stale: 0, unknown: 1 });
+    expect(r.counts.stale).toBe(0);
+  });
+
+  it("leaves a usable status, an ok quality, or no flags to the clock", () => {
+    for (const extra of [{ status: "usable" }, { quality: "ok" }, { quality: "" }, {}]) {
+      expect(classifySensorSourceSummaryFreshness({ ...recentLive, ...extra }, NOW)).toBe("fresh");
+    }
+  });
+
+  it("cannot promote a reading the clock already calls stale or unknown", () => {
+    expect(
+      classifySensorSourceSummaryFreshness(
+        { source: "manual", captured_at: hoursAgo(30), status: "usable", quality: "ok" },
+        NOW,
+      ),
+    ).toBe("stale");
+    expect(
+      classifySensorSourceSummaryFreshness(
+        { source: "live", captured_at: null, ts: null, status: "usable" },
+        NOW,
+      ),
+    ).toBe("unknown");
+  });
+
+  it("renders the Stale row as a non-linking aggregate even when its count is positive", () => {
+    render(
+      <SensorSourceSummaryWidget
+        options={{ now: NOW }}
+        readings={[
+          { source: "manual", captured_at: hoursAgo(30) },
+          { source: "live", captured_at: minutesAgo(5) },
+        ]}
+      />,
+    );
+    const staleRow = screen.getByTestId("sensor-source-summary-row-stale");
+    expect(screen.getByTestId("sensor-source-summary-count-stale")).toHaveTextContent("1");
+    expect(staleRow).toHaveAttribute("data-clickable", "false");
+    expect(staleRow).toHaveAttribute("data-aggregate", "true");
+    expect(staleRow).not.toHaveAttribute("aria-disabled");
+    expect(staleRow.getAttribute("title")).toMatch(/not a Timeline source filter/i);
+    expect(screen.queryByTestId("sensor-source-summary-link-stale")).toBeNull();
+    // Provenance rows keep their Timeline links.
+    expect(screen.getByTestId("sensor-source-summary-link-live")).toHaveAttribute(
+      "href",
+      expect.stringContaining("sensorSources=live"),
+    );
+  });
+});
+
 describe("SensorSourceSummaryWidget freshness line (VER-299)", () => {
   it("shows Stale > 0 for a stale manual reading instead of Stale 0", () => {
     render(

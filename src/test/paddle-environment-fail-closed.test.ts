@@ -15,11 +15,11 @@ import {
 
 describe("classifyPaddleToken", () => {
   it("classifies well-formed sandbox tokens", () => {
-    expect(classifyPaddleToken("test_abc123xyz")).toBe("sandbox");
+    expect(classifyPaddleToken("test_abc123xyz000000000000000000")).toBe("sandbox");
   });
 
   it("classifies well-formed live tokens", () => {
-    expect(classifyPaddleToken("live_abc123xyz")).toBe("live");
+    expect(classifyPaddleToken("live_abc123xyz000000000000000000")).toBe("live");
   });
 
   it("fails closed on null / undefined / empty / whitespace", () => {
@@ -43,14 +43,14 @@ describe("classifyPaddleToken", () => {
   });
 
   it("trims surrounding whitespace before classifying", () => {
-    expect(classifyPaddleToken("  test_abc  ")).toBe("sandbox");
-    expect(classifyPaddleToken("\tlive_abc\n")).toBe("live");
+    expect(classifyPaddleToken("  test_abc000000000000000000000000  ")).toBe("sandbox");
+    expect(classifyPaddleToken("\tlive_abc000000000000000000000000\n")).toBe("live");
   });
 
   it("never returns the token value in the classification", () => {
     // Sanity: the return type is a fixed union, but assert the actual
     // returned string is only one of the three known labels.
-    const out = classifyPaddleToken("test_super_secret_token_value");
+    const out = classifyPaddleToken("test_supersecrettokenvalue000000");
     expect(["sandbox", "live", "unavailable"]).toContain(out);
     expect(out).not.toContain("super_secret_token_value");
   });
@@ -111,64 +111,64 @@ describe("resolvePaddleCheckoutEnvironment", () => {
   it("returns sandbox for a sandbox token on any host, including loopback", () => {
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "test_abc",
+        token: "test_abc000000000000000000000000",
         hostname: "localhost",
       }),
     ).toBe("sandbox");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "test_abc",
+        token: "test_abc000000000000000000000000",
         hostname: "127.0.0.1",
       }),
     ).toBe("sandbox");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "test_abc",
+        token: "test_abc000000000000000000000000",
         hostname: "id-preview--x.lovable.app",
       }),
     ).toBe("sandbox");
   });
 
-  it("fails closed for a live token on every host", () => {
+  it("opens a live token only on the production hosts and fails closed on every other host", () => {
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "verdantgrowdiary.com",
       }),
-    ).toBe("unavailable");
+    ).toBe("live");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "www.verdantgrowdiary.com",
       }),
-    ).toBe("unavailable");
+    ).toBe("live");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "localhost",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "127.0.0.1",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "::1",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "app.localhost",
       }),
     ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
-        token: "live_abc",
+        token: "live_abc000000000000000000000000",
         hostname: "id-preview--x.lovable.app",
       }),
     ).toBe("unavailable");
@@ -193,17 +193,17 @@ describe("resolvePaddleCheckoutEnvironment", () => {
   });
 
   it("requires sandbox even when hostname is missing", () => {
-    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc", hostname: null })).toBe(
+    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc000000000000000000000000", hostname: null })).toBe(
       "unavailable",
     );
-    expect(resolvePaddleCheckoutEnvironment({ token: "test_abc", hostname: null })).toBe("sandbox");
+    expect(resolvePaddleCheckoutEnvironment({ token: "test_abc000000000000000000000000", hostname: null })).toBe("sandbox");
   });
 });
 
 describe("blocking copy constants", () => {
-  it("live-token blocking copy states the sandbox-only policy", () => {
+  it("off-host live-token blocking copy names the only live checkout host", () => {
     expect(CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE).toBe(
-      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.",
+      "Live checkout is only available on verdantgrowdiary.com.",
     );
   });
 

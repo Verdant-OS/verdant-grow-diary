@@ -68,6 +68,8 @@ export default function GuidePage() {
       "Verdant grower guides on grow diary logging, sensor truth, VPD, and AI Doctor.",
     path: guide ? `/guides/${guide.slug}` : "/guides",
     ogType: guide ? "article" : "website",
+    // Unknown slug: keep the SSR "noindex, follow" until the redirect lands.
+    noindex: !guide,
   });
 
   if (!guide) {

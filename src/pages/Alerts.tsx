@@ -51,8 +51,11 @@ import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
 import { useAlertLinkedTargetEvidence } from "@/hooks/useAlertLinkedTargetEvidence";
 import {
+  alertTargetHiddenCountLabel,
+  alertTargetHistoricalToggleLabel,
   buildAlertTargetPresenterInput,
   deriveAlertTargetContext,
+  partitionAlertsByTargetHistory,
   type AlertTargetContextInput,
 } from "@/lib/alertTargetContextRules";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
@@ -180,14 +183,68 @@ export default function Alerts() {
     [scopedGrowId, activeGrowId, grows, growIdsWithOpenAlerts],
   );
 
+  // Not built while the scope is invalid: no card renders, so every alert
+  // stays "current" exactly as before.
+  const targetInputByAlertId = useMemo(() => {
+    const map = new Map<string, AlertTargetContextInput>();
+    if (hasInvalidScope) return map;
+    for (const a of alerts) {
+      map.set(
+        a.id,
+        buildAlertTargetPresenterInput({
+          tentId: a.tent_id,
+          plantId: a.plant_id,
+          growId: a.grow_id,
+          tentNameById: targetNames.tentNameById,
+          plantNameById: targetNames.plantNameById,
+          linkedEvidence: linkedTargets.evidenceByAlertId.get(a.id) ?? [],
+          singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+          tentStateById: targetNames.tentStateById,
+          plantStateById: targetNames.plantStateById,
+          namesReady: targetNames.status === "ok" && targetNames.readComplete === true,
+          namesLoading: targetNames.status === "loading",
+          idsLoading: linkedTargets.idsLoading,
+        }),
+      );
+    }
+    return map;
+  }, [alerts, hasInvalidScope, targetNames, linkedTargets]);
+
+  // VER-300: alerts on archived/removed tents or plants are history, not
+  // live problems. Hidden from the default list behind a count toggle;
+  // never resolved or changed.
+  const [showHistoricalTargets, setShowHistoricalTargets] = useState(false);
+  const targetHistory = useMemo(
+    () =>
+      partitionAlertsByTargetHistory(alerts, (a) => {
+        const input = targetInputByAlertId.get(a.id);
+        return input ? deriveAlertTargetContext(input).historical : false;
+      }),
+    [alerts, targetInputByAlertId],
+  );
+  const listedAlerts = showHistoricalTargets ? alerts : targetHistory.current;
+
   const grouped = useMemo(() => {
     return {
-      open: alerts.filter((a) => a.status === "open"),
-      acknowledged: alerts.filter((a) => a.status === "acknowledged"),
-      resolved: alerts.filter((a) => a.status === "resolved"),
-      dismissed: alerts.filter((a) => a.status === "dismissed"),
+      open: listedAlerts.filter((a) => a.status === "open"),
+      acknowledged: listedAlerts.filter((a) => a.status === "acknowledged"),
+      resolved: listedAlerts.filter((a) => a.status === "resolved"),
+      dismissed: listedAlerts.filter((a) => a.status === "dismissed"),
     };
-  }, [alerts]);
+  }, [listedAlerts]);
+  // VER-300: while target names or linked ids are still loading, an alert
+  // may yet prove to be on an archived/removed tent. The loop card waits,
+  // so it neither flashes nor auto-queues on an unverified target.
+  const targetsSettled =
+    targetNames.status !== "loading" && targetNames.status !== "idle" && !linkedTargets.idsLoading;
+  // A failed name read can't prove a target is current, so the loop card
+  // still navigates but never auto-queues on it.
+  const targetNamesRead = targetNames.status === "ok";
+  // Loop next-step card only ever counts alerts on current targets.
+  const currentOpenAlerts = useMemo(
+    () => targetHistory.current.filter((a) => a.status === "open"),
+    [targetHistory],
+  );
 
   // Read-only per-alert summary of open linked Action Queue items.
   const visibleAlertIds = useMemo(() => alerts.map((a) => a.id), [alerts]);
@@ -206,12 +263,12 @@ export default function Alerts() {
 
   const unlinkedOpenAlerts = useMemo(
     () =>
-      grouped.open.filter((a) => {
+      currentOpenAlerts.filter((a) => {
         const summary = effectiveLinkedSummaryForAlert(a.id);
         return !summary || summary.count === 0;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [grouped.open, linkedActionCounts, locallyQueuedByAlertId],
+    [currentOpenAlerts, linkedActionCounts, locallyQueuedByAlertId],
   );
   const singleUnlinkedOpenAlert = unlinkedOpenAlerts.length === 1 ? unlinkedOpenAlerts[0] : null;
   const loopCardGrowId = singleUnlinkedOpenAlert?.grow_id ?? scopedGrowId ?? null;
@@ -222,6 +279,8 @@ export default function Alerts() {
     // alerts exist, navigate to /actions without guessing so the grower
     // chooses via the per-row "Add to Action Queue" buttons.
     if (!singleUnlinkedOpenAlert) return;
+    // Defense in depth: the card is not rendered until targets settle.
+    if (!targetsSettled || !targetNamesRead) return;
     const res = await queueOpenAlertToActionQueue(singleUnlinkedOpenAlert);
     if (!res.ok) return false;
     if (res.actionQueueId) {
@@ -301,7 +360,7 @@ export default function Alerts() {
         description="Persistent environment alerts. Read-only insights — no automation."
         icon={<Bell className="h-5 w-5" />}
       />
-      {showAlertsOneTentLoopNextStep(grouped.open.length) ? (
+      {targetsSettled && showAlertsOneTentLoopNextStep(currentOpenAlerts.length) ? (
         <OneTentLoopNextStepCard
           current="alert"
           ids={{ growId: loopCardGrowId }}
@@ -375,6 +434,31 @@ export default function Alerts() {
         </Select>
       </div>
 
+      {!hasInvalidScope && status === "ok" && targetHistory.historical.length > 0 ? (
+        <div className="mb-3 flex items-center justify-end gap-3">
+          {showHistoricalTargets ? null : (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="alerts-historical-targets-hidden-count"
+            >
+              {alertTargetHiddenCountLabel(targetHistory.historical.length)}
+            </p>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            aria-pressed={showHistoricalTargets}
+            onClick={() => setShowHistoricalTargets((shown) => !shown)}
+            data-testid="alerts-historical-targets-toggle"
+          >
+            {alertTargetHistoricalToggleLabel(
+              showHistoricalTargets,
+              targetHistory.historical.length,
+            )}
+          </Button>
+        </div>
+      ) : null}
+
       {hasInvalidScope ? (
         <div
           role="status"
@@ -437,7 +521,7 @@ export default function Alerts() {
             </Button>
           </div>
         </div>
-      ) : alerts.length === 0 ? (
+      ) : listedAlerts.length === 0 ? (
         <div data-testid="alerts-empty-state">
           <EmptyState
             icon={<Bell className="h-6 w-6" />}
@@ -514,17 +598,7 @@ export default function Alerts() {
                     <AlertCard
                       key={a.id}
                       alert={a}
-                      targetInput={buildAlertTargetPresenterInput({
-                        tentId: a.tent_id,
-                        plantId: a.plant_id,
-                        growId: a.grow_id,
-                        tentNameById: targetNames.tentNameById,
-                        plantNameById: targetNames.plantNameById,
-                        linkedEvidence: linkedTargets.evidenceByAlertId.get(a.id) ?? [],
-                        singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
-                        namesLoading: targetNames.status === "loading",
-                        idsLoading: linkedTargets.idsLoading,
-                      })}
+                      targetInput={targetInputByAlertId.get(a.id) ?? {}}
                       linkedSummary={effectiveLinkedSummaryForAlert(a.id)}
                       onQueued={(alertId, actionId) =>
                         setLocallyQueuedByAlertId((prev) => ({ ...prev, [alertId]: actionId }))
@@ -677,6 +751,8 @@ function AlertCard({
           idsLoading={targetInput.idsLoading}
           linkedEvidence={targetInput.linkedEvidence}
           singleTentId={targetInput.singleTentId}
+          tentState={targetInput.tentState}
+          plantState={targetInput.plantState}
           variant="compact"
         />
         <AlertWhyContext alert={a} variant="compact" />

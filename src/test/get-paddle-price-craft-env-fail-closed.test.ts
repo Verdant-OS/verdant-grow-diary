@@ -38,11 +38,6 @@ describe("get-paddle-price — Craft env-var wiring", () => {
     const catalog = readGetPaddlePriceCatalog(() => undefined);
     expect(catalog.craft_monthly).toBe("");
     expect(catalog.craft_annual).toBe("");
-    const helper = readFileSync(
-      resolve(process.cwd(), "supabase/functions/_shared/getPaddlePriceCatalogEnv.ts"),
-      "utf8",
-    );
-    expect(helper).toMatch(/getEnv\(name\) \?\? ""/);
   });
 });
 

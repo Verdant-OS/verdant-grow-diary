@@ -6,6 +6,11 @@
  * never `PADDLE_ENVIRONMENT` (that name stays `sandbox` for the legacy
  * `paddle-webhook` audit sink).
  *
+ * `founder_lifetime` stays in the list only so the cold-start drift guard in
+ * `get-paddle-price` finds a name for every `PAID_PLAN_IDS` entry; the function
+ * answers `410 plan_retired` before any lookup, so that name needs no value.
+ * The Craft names stay empty while Craft has no live Paddle product.
+ *
  * The seven `PADDLE_SANDBOX_PRICE_*` copies are the operator prerequisite
  * that must exist before those live names are flipped. The legacy classifier
  * currently maps only pro monthly, pro annual, and founder lifetime; the

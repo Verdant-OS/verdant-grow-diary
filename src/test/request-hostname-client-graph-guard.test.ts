@@ -1,4 +1,8 @@
 /**
+ * @source-scan-justified: the invariant is the static import graph of
+ * client-reachable files; a resolved-value assertion cannot detect a server
+ * import without running the bundler, so this test scans import statements.
+ *
  * #2230 public census: `/auth` failed with net::ERR_ABORTED on a cold dev
  * server. requestHostname.ts is in the client graph (paddle.ts → the root
  * payment banner); while it imported `@tanstack/react-start/server` (directly,

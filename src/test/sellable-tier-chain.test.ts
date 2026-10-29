@@ -1,4 +1,9 @@
 /**
+ * @source-scan-justified: the get-paddle-price and payments-webhook edge
+ * entrypoints use `npm:` specifiers and cannot be imported under Vitest, so the
+ * wiring lines that assign SERVER_PRICE_CONFIG and KNOWN_PRICE_IDS are scanned
+ * as text; every other assertion uses imported values.
+ *
  * sellable-tier chain — every purchasable id must be handled, exactly once,
  * at every layer between "we take the money" and "we grant the thing".
  *

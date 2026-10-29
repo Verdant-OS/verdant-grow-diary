@@ -119,7 +119,12 @@ sandbox event classified as `null` with no error raised.
 
 `get-paddle-price` reads only these seven names, and only an explicit
 `PAYMENTS_ENVIRONMENT` of `live` or `sandbox` selects the gateway. It does not
-read `PADDLE_ENVIRONMENT`. At switch time the seven names hold **live** price ids:
+read `PADDLE_ENVIRONMENT`. At switch time the four sellable names (1, 2, 6, 7)
+hold **live** price ids. Name 5 needs no value: Founder Lifetime is no longer
+sold (#2028, #2570) and the function answers `410 plan_retired` before any
+lookup; the name stays wired only for the cold-start drift guard. Names 3 and 4
+stay empty while Craft has no live Paddle product (`price_not_configured`;
+the live catalog read on 2026-10-29 had no Craft product):
 
 1. `PADDLE_PRICE_PRO_MONTHLY`
 2. `PADDLE_PRICE_PRO_ANNUAL`
@@ -129,7 +134,8 @@ read `PADDLE_ENVIRONMENT`. At switch time the seven names hold **live** price id
 6. `PADDLE_PRICE_CREDIT_PACK_50`
 7. `PADDLE_PRICE_CREDIT_PACK_150`
 
-Before flipping them, set these seven sandbox copies. The legacy classifier
+Before flipping them, set these seven sandbox copies (a copy for a plan with
+no sandbox price may be empty, but the name must exist). The legacy classifier
 maps pro monthly, pro annual, and founder lifetime today; the craft and
 credit-pack copies are still required so those ids are stored off the shared
 live names before the flip:
@@ -210,10 +216,11 @@ verification:
 3. From a signed-in production session, call `get-paddle-price` once for each
    SKU the pricing page sells (`pro_monthly`, `pro_annual`, `craft_monthly`,
    `craft_annual`, `founder_lifetime`, `credit_pack_50`, `credit_pack_150`;
-   packs need a paid plan with a monthly AI allowance, e.g. Pro or Founder) and record status and log line. Each
-   must return a live price ID or a deliberate calm block
-   (`price_not_configured` for a product absent from live Paddle, or
-   `plan_sold_out`). Any `price_resolution_unavailable` blocks the release:
+   packs need a paid plan with a monthly AI allowance, e.g. Pro) and record
+   status and log line. Each must return a live price ID or a deliberate calm
+   block (`price_not_configured` for a product absent from live Paddle, which
+   is Craft today, or `410 plan_retired` for `founder_lifetime`). Any
+   `price_resolution_unavailable` blocks the release:
    one click on that SKU closes checkout for every plan on the page.
 4. Read-only webhook pass: Paddle notification logs for both live
    destinations, live `lovable_paddle_events` rows, `payments-webhook` logs.

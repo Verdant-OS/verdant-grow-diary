@@ -138,9 +138,12 @@ Server-only secrets (configured via Lovable Cloud → Secrets, never in
   the legacy names, which `get-paddle-price` also reads and which hold LIVE ids
   once `PAYMENTS_ENVIRONMENT=live`
 
-At the live switch, these seven names must hold live price ids. `get-paddle-price`
-reads only this set, and `PAYMENTS_ENVIRONMENT` (not `PADDLE_ENVIRONMENT`) selects
-the gateway:
+At the live switch, the four sellable names (Pro monthly, Pro annual, both
+credit packs) must hold live price ids. `get-paddle-price` reads only this set
+of seven names, and `PAYMENTS_ENVIRONMENT` (not `PADDLE_ENVIRONMENT`) selects
+the gateway. `PADDLE_PRICE_FOUNDER_LIFETIME` needs no value: the function
+answers `410 plan_retired` before any lookup. The two Craft names stay empty
+while Craft has no live product (`price_not_configured`):
 
 - `PADDLE_PRICE_PRO_MONTHLY`
 - `PADDLE_PRICE_PRO_ANNUAL`
@@ -282,10 +285,10 @@ is done; step 6 is the merge followed by post-merge deployment verification.
    HTTP status and log line (`reason`, `stage`, `env_var_configured`):
    `pro_monthly`, `pro_annual`, `craft_monthly`, `craft_annual`,
    `founder_lifetime`, `credit_pack_50`, `credit_pack_150` (packs need a
-   session whose paid plan includes a monthly AI allowance, such as Pro or
-   Founder). Each must return a live price ID, or
-   a deliberate calm block: `price_not_configured` for a product that does not
-   exist in live Paddle (Craft today) or `plan_sold_out`. Any SKU returning
+   session whose paid plan includes a monthly AI allowance, such as Pro).
+   Each must return a live price ID, or a deliberate calm block:
+   `price_not_configured` for a product that does not exist in live Paddle
+   (Craft today) or `410 plan_retired` for `founder_lifetime`. Any SKU returning
    `price_resolution_unavailable` (for example a live product whose
    `PADDLE_PRICE_*` secret is empty or holds a sandbox ID) blocks: the client
    cannot tell that from a shared failure, so one click on it closes checkout
@@ -320,8 +323,9 @@ prebuild step (`restore-env-production-from-head.mjs`) resets
 `.env.production` to `HEAD` before every build, so an uncommitted switch is
 silently discarded. Build it like this:
 
-1. Before the merge, start from the exact reviewed #2230 head (the merge commit
-   does not exist yet).
+1. Before the merge, start from the exact reviewed head of this release's PR
+   (#2539, the full 40-character SHA that the independent exact-head review
+   passed; the merge commit does not exist yet).
 2. Add one commit, on a branch that is never merged, that only appends
    `VITE_CHECKOUT_DISABLED="true"` to `.env.production`, next to the unchanged
    live token.

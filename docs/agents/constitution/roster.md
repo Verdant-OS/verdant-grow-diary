@@ -83,15 +83,33 @@ historical record does not revoke separately recorded founder grants.
 
 Current task assignments and session claims stay in operating state and the handoff
 log; a role profile does not replace the current engineering lead or default inheritor.
+AGENTS.md §13 sends every seat here: before work beyond the startup read, the seat reads
+its role file from this list. Each profile is a governed file in the `CANONICAL` and
+`MIRRORS` lists of `scripts/check-sentinel-version-parity.mjs`; a retired profile stays
+listed, and governed, as history. Seat names live here, never in AGENTS.md.
 
-- [canopy](../roles/canopy.md)
-- [graft](../roles/graft.md)
-- [root-cause](../roles/root-cause.md)
-- [trellis](../roles/trellis.md)
-- [verdante](../roles/verdante.md)
-- [chemdawg — historical profile; retired from current routing](../roles/chemdawg.md)
-- [golden-toad](../roles/golden-toad.md)
-- [harvest](../roles/harvest.md)
+Peer seats (the constitution's "Peers" row):
+
+- [codex](../roles/codex.md) — Implementation and Integration Lead
+- [claude](../roles/claude.md) — Knowledge Library and Product Specification Architect
+- [grok](../roles/grok.md) — Product Intelligence, Adversarial Audit, and Implementation Lead
+- [gemini](../roles/gemini.md) — QA, Search Integrity, Risk Auditor, and Sentinel; `GEMINI.md`
+  is its platform mirror and embeds the constitution
+
+Assigned seats:
+
+- [canopy](../roles/canopy.md) — Engineering Lead profile; the current engineering lead
+  and default inheritor are named in the table above
+- [graft](../roles/graft.md) — Exact-Head Reviewer and Open-PR Backlog Owner
+- [root-cause](../roles/root-cause.md) — Bug Triage
+- [trellis](../roles/trellis.md) — Project Manager, Linear Team VER
+- [verdante](../roles/verdante.md) — Chief of Staff
+- [golden-toad](../roles/golden-toad.md) — Fixture Sweeps
+
+Historical profiles, retired from current routing (receipts preserved):
+
+- [chemdawg](../roles/chemdawg.md) — Historical Merge Actor
+- [harvest](../roles/harvest.md) — Historical Backup Merge Profile
 
 ## Per-item approval
 

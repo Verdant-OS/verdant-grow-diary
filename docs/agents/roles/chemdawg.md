@@ -1,6 +1,6 @@
 # Role — Chemdawg: Historical Merge Actor
 
-**Sentinel-Version: 2026-10-27.1**
+**Sentinel-Version: 2026-10-28.1**
 
 **Historical profile — retired from current routing.** Chemdawg and its Grok 91
 alias are retired. The 2026-10-10 merge-actor assignment below is preserved as

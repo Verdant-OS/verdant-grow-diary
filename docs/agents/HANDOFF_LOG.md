@@ -985,6 +985,40 @@ owner: Claude
 last_updated: 2026-10-28 01:30 UTC, by Claude
 ```
 
+### RETIRE-FOUNDER-CAP-MIGRATION
+
+```text
+TASK RETIRE-FOUNDER-CAP-MIGRATION  priority: P2  status: OPEN
+goal: PR B of two (after #2570). One additive migration: allocate_lovable_founder_lifetime no longer refuses a verified purchase with cap_reached (the lifetime entitlement is always written; a Founders Wall seat is still minted only while numbers 1..100 remain, so founders_number_range holds and refunded seats never reopen), and founder_lifetime_slots_remaining() is dropped. Held for Matthew's migration receipt; never auto-applied.
+why: Matthew's decisions 2026-10-27 (existing holders keep access forever; a late or replayed pre-cutoff purchase event still grants; the Wall stays) and 2026-10-29 ("Go" on PR B; option A for seats past 100: grant access, no Wall seat).
+branch: claude/retire-founder-cap-migration
+base: verdant-grow-diary
+checkout: git fetch origin claude/retire-founder-cap-migration verdant-grow-diary && git switch claude/retire-founder-cap-migration && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2609 (ready for review)
+head_sha: read the PR head; this commit cannot name itself
+state: ready for review; migration (allocator, cap-skipped event reopen, counter drop), concurrency DB test, manifest contract test, orchestrator test, harness and money-migration manifest edited; Codex review at 1185a815 (1 P1, 3 P2) addressed in the next push
+current_step: draft PR open; request independent review (billing + migration scope)
+next_action: Matthew undeploys founder-slots-remaining (still live 2026-10-29 00:xx UTC, answering remaining 99/100), reviews the migration, applies it himself and gives the receipt; then bun run sb:types regenerates src/integrations/supabase/types.ts from the applied schema (not done here: no Supabase CLI or Docker in this session, and gen types reads the live schema, so it is a post-apply step)
+post_merge_check: after Matthew applies: SELECT public.founder_lifetime_slots_remaining() fails with "does not exist"; a live allocate_lovable_founder_lifetime call with 100 seats consumed returns ok true, founder_number null
+active_writer: Claude (session_01U9xQZcQhgrfTPEcjzgvjkb)
+decisions: only the cap_reached refusal is removed; the two founders_seats_consumed() < 100 seat guards stay (Matthew chose A over lifting founders_number_range). founders_seats_consumed(), founders_wall_count(), revoke_lovable_founder_lifetime_by_transaction and the legacy sandbox-only allocate_founder_lifetime family are untouched. Listed in REQUIRED_MONEY_MIGRATIONS (Codex P2 at 1185a815): the manual live applied check reports it missing until Matthew applies it, which is the intended signal; deployed code does not depend on it. Historical cap-skipped lovable_paddle_events rows are reopened as failed so a redelivery reaches the allocator (Codex P1 at 1185a815); zero such rows exist on Paddle live (0 transactions, 2026-10-29). The Paddle catalog preflight relaxation is NOT in this PR: its pins (paddle-preflight-guards-credit-packs, the report test) and the keep/retire decision are separate.
+tried_and_rejected: removing the seat guards too (seat 101 violates founders_number_range and the allocator has no exception handler, so the webhook would 500 and Paddle would retry forever; proven on the local Postgres run)
+commands: as a non-root user with PostgreSQL 16 server tools: node node_modules/vitest/vitest.mjs run src/test/founder-refund-grant-concurrency.test.ts (RED 1/20 without the migration replay, GREEN 20/20 with it; the cap-skipped replay case RED without the UPDATE, GREEN with it); bunx vitest run src/test/founder-cap-retired-migration-static.test.ts src/test/lovable-paddle-webhook-orchestrator.test.ts src/test/required-money-migrations-version.test.ts src/test/paddle-paid-launch-gate-static.test.ts src/test/test-execution-manifest.test.ts; node scripts/assert-no-unreviewed-money-migrations.mjs; node scripts/assert-required-money-migrations.mjs; bun run typecheck:tsgo
+files_touched: supabase/migrations/20261029030000_founder_cap_retired.sql (new); src/test/founder-refund-grant-concurrency.test.ts; src/test/founder-cap-retired-migration-static.test.ts (new, manifest contract only); src/test/lovable-paddle-webhook-orchestrator.test.ts (entitlement-only grant case); scripts/run-paid-launch-proof-harness.ts; scripts/required-money-migrations.mjs; this log
+files_remaining: none for PR B; post-apply: src/integrations/supabase/types.ts regeneration (operator), docs/founder-slots-remaining-response.md and its schema (docs follow-up)
+blockers: Matthew's migration receipt (production database change); the undeploy of founder-slots-remaining precedes the apply
+open_questions: none
+gotchas: founders.founder_number CHECK 1..100 (20260719044601); the concurrency test refuses to run as root and needs initdb/pg_ctl on pg_config --bindir; scorer unlocks for the test and harness were approved by Matthew 2026-10-29
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2588
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (billing and migration scope); all contributors excluded
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-10-29 05:15 UTC
+owner: Claude
+last_updated: 2026-10-29 05:15 UTC, by Claude
+```
+
 ## Closed
 
 ### STOP-SELLING-FOUNDER-LIFETIME

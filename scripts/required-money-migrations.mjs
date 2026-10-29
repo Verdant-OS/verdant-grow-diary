@@ -69,6 +69,15 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // environment (grant-path audit 2026-10-03). Absence silently restores
   // unbounded referral credit farming.
   "20261003020000_referral_referrer_monthly_cap.sql",
+  // Founder seat-cap retirement (PR B after #2570): allocate_lovable_founder_lifetime
+  // no longer refuses a verified purchase with cap_reached, historical cap-skipped
+  // webhook events are reopened for replay, and founder_lifetime_slots_remaining()
+  // is dropped. REQUIRED, not merely KNOWN: without it a paid Founder purchase at
+  // 100 consumed seats is still refused while the repository says it grants, and
+  // the live verifier would stay green. The operator undeploys the
+  // founder-slots-remaining edge function, then applies this file; the live
+  // applied check reports it missing until then, which is the intended signal.
+  "20261029030000_founder_cap_retired.sql",
 ];
 
 /**

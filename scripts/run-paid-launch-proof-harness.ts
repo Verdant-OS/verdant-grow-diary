@@ -440,12 +440,6 @@ async function main() {
     p_processing_id: ev1.processingId,
   });
   check("authenticated user cannot execute the founder RPC", !!authedRpc);
-  const { data: slots, error: slotsError } = await authed.rpc("founder_lifetime_slots_remaining");
-  check(
-    "authenticated user CAN read only the aggregate founder availability (0..75)",
-    !slotsError && typeof slots === "number" && slots >= 0 && slots <= 75,
-    slots,
-  );
   await authed.auth.signOut();
 
   // 9. audit rows exist and are sanitized

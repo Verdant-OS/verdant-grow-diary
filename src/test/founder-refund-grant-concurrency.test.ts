@@ -33,6 +33,8 @@ const childEnv = {
     : {}),
 };
 const migration = "20260915193000_founder_refund_grant_serialization.sql";
+// PR B: retires the 100-seat cap and drops founder_lifetime_slots_remaining().
+const capRetiredMigration = "20261029030000_founder_cap_retired.sql";
 let host = "";
 let port = "55432";
 const tool = (name: string) => join(binDir, name + (process.platform === "win32" ? ".exe" : ""));
@@ -177,6 +179,7 @@ beforeAll(async () => {
   `);
   for (const file of migrations) sql(readFileSync(resolve("supabase/migrations", file), "utf8"));
   sql(readFileSync(resolve("supabase/migrations", migration), "utf8"));
+  sql(readFileSync(resolve("supabase/migrations", capRetiredMigration), "utf8"));
   console.info("Disposable concurrency database:", sql("SELECT version();"));
 }, 60_000);
 
@@ -548,9 +551,7 @@ describe("Founder Lifetime grant/refund concurrency — native PostgreSQL", () =
           "SELECT status, founder_number, display_name, show_on_wall, optional_link FROM public.founders;",
         ),
       ).toBe("refunded|1|Fixture grower|t|https://example.test/founder");
-      expect(
-        sql("SELECT public.founders_seats_consumed(), public.founder_lifetime_slots_remaining();"),
-      ).toBe("1|99");
+      expect(sql("SELECT public.founders_seats_consumed();")).toBe("1");
     } finally {
       await grant.close();
       await refundDone?.catch(() => undefined);
@@ -691,25 +692,97 @@ describe("Founder Lifetime grant/refund concurrency — native PostgreSQL", () =
     expect(sql("SELECT count(*) FROM public.founders;")).toBe("0");
   });
 
-  it("preserves the 100 consumed-seat cap, including refunded seats", () => {
+  it("grants the entitlement past 100 consumed seats; the Wall seat and the counter RPC stop at the cap", () => {
+    // Pre-PR B the 100th consumed seat (refunded seats included) refused a live
+    // grant with cap_reached, so a late or replayed purchase event could leave a
+    // paying buyer with nothing. Matthew retired that refusal on 2026-10-27: the
+    // lifetime subscription is always written. The Founders Wall seat is still
+    // minted only while numbers 1..100 remain (founders_number_range), so
+    // refunded seats are never reopened and no seat beyond 100 is invented.
     sql(`
       INSERT INTO auth.users SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(1,100) n;
       INSERT INTO public.founders(user_id, founder_number, paddle_subscription_ref, status)
         SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid, n, 'lifetime_retired_' || n, 'refunded' FROM generate_series(1,100) n;
     `);
     expect(JSON.parse(serviceSql(allocationSql()))).toEqual({
-      ok: false,
-      reason: "cap_reached",
-      seats_consumed: 100,
+      ok: true,
+      reason: "allocated",
+      paddle_subscription_id: "lifetime_" + TX,
+      founder_number: null,
     });
-    expect(activeCount()).toBe(0);
+    expect(activeCount()).toBe(1);
     expect(
-      sql("SELECT public.founders_seats_consumed(), public.founder_lifetime_slots_remaining();"),
-    ).toBe("100|0");
-    expect(JSON.parse(serviceSql(allocationSql("sandbox"))).reason).toBe("allocated");
+      sql(
+        `SELECT status, price_id, environment FROM public.subscriptions WHERE paddle_subscription_id = ${literal("lifetime_" + TX)};`,
+      ),
+    ).toBe("active|founder_lifetime|live");
+    expect(sql("SELECT public.founders_seats_consumed();")).toBe("100");
     expect(
       sql("SELECT min(founder_number), max(founder_number), count(*) FROM public.founders;"),
     ).toBe("1|100|100");
+    // Idempotent replay of the same transaction still grants nothing new.
+    expect(JSON.parse(serviceSql(allocationSql()))).toEqual({
+      ok: true,
+      reason: "idempotent",
+      paddle_subscription_id: "lifetime_" + TX,
+      founder_number: null,
+    });
+    expect(activeCount()).toBe(1);
+    expect(sql("SELECT count(*) FROM public.founders;")).toBe("100");
+    // A refund of that late grant still revokes the entitlement.
+    expect(JSON.parse(serviceSql(revocationSql()))).toEqual({
+      ok: true,
+      subscriptions_updated: 1,
+      founders_updated: 0,
+    });
+    expectRetired();
+    // The public seats-remaining counter behind the deleted edge function is dropped.
+    expect(() => sql("SELECT public.founder_lifetime_slots_remaining();")).toThrow(
+      /founder_lifetime_slots_remaining\(\) does not exist/,
+    );
+  });
+
+  it("reopens a cap-skipped delivery so its redelivery reaches the allocator and grants", async () => {
+    // Before PR B the orchestrator stored a cap refusal as terminal
+    // (skipped / founder_cap_reached) and a Paddle redelivery short-circuits to
+    // duplicate_skipped before the allocator runs. The migration reopens exactly
+    // those rows; nothing is granted until the webhook re-runs the event.
+    const capSkipped = "evt_cap_skipped_before_pr_b";
+    const seed = (id: string, status: string, skip: string | null, tx = TX) =>
+      `INSERT INTO public.lovable_paddle_events (paddle_event_id, event_type, environment, user_id, paddle_transaction_id, price_external_id, processing_status, processed_ok, skip_reason, payload)
+       VALUES (${[id, "transaction.completed", "live", OWNER, tx, "founder_lifetime", status, status === "processed", skip].map(literal).join(",")}, '{}'::jsonb);`;
+    serviceSql(seed(capSkipped, "skipped", "founder_cap_reached"));
+    serviceSql(
+      seed("evt_barrier_skip", "skipped", "founder_refund_precedes_purchase", "txn_other"),
+    );
+    serviceSql(seed("evt_already_granted", "processed", null, "txn_granted"));
+    expect(eventState(capSkipped)).toBe("skipped|f|founder_cap_reached");
+
+    // Replaying the migration is idempotent and reopens only the cap refusal.
+    sql(readFileSync(resolve("supabase/migrations", capRetiredMigration), "utf8"));
+    expect(eventState(capSkipped)).toBe("failed|f|");
+    expect(
+      sql(
+        `SELECT last_error FROM public.lovable_paddle_events WHERE paddle_event_id = ${literal(capSkipped)};`,
+      ),
+    ).toBe("founder_cap_retired_20261029: cap refusal reopened for replay");
+    expect(eventState("evt_barrier_skip")).toBe("skipped|f|founder_refund_precedes_purchase");
+    expect(eventState("evt_already_granted")).toBe("processed|t|");
+    expect(activeCount()).toBe(0);
+
+    // The same Paddle event delivered again now passes the duplicate check,
+    // reaches the allocator and grants the lifetime entitlement.
+    const replay = await deliver(purchase(capSkipped));
+    expect(replay).toEqual({ httpStatus: 200, reason: "processed:record_lifetime" });
+    expect(eventState(capSkipped)).toBe("processed|t|");
+    expect(activeCount()).toBe(1);
+    expect(sql("SELECT founder_number, status FROM public.founders;")).toBe("1|confirmed");
+    // A second redelivery is the ordinary processed duplicate.
+    expect(await deliver(purchase(capSkipped))).toEqual({
+      httpStatus: 200,
+      reason: "duplicate_processed",
+    });
+    expect(activeCount()).toBe(1);
   });
 
   it("rolls back a failed protected reconciliation and retries without acknowledging a purchase", async () => {

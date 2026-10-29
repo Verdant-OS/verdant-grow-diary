@@ -69,6 +69,35 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### QUICKLOG-HISTORY-FENCE-RELOAD
+
+```text
+TASK QUICKLOG-HISTORY-FENCE-RELOAD  priority: P1  status: OPEN
+goal: Fix two Codex P1 findings raised on merged #1831. (1) V2 sheet: a receipt_target_moved
+  Note refusal must keep its verified review scope across reload. (2) Legacy QuickLog: a
+  history-review refusal must survive reload so the same log cannot be saved again as a new
+  record before the grower checks Timeline.
+branch: claude/awesome-darwin-3wp5bi
+base: verdant-grow-diary at 640d6f5
+checkout: git fetch origin claude/awesome-darwin-3wp5bi verdant-grow-diary && git switch claude/awesome-darwin-3wp5bi && git merge origin/verdant-grow-diary
+pr: pending first push
+state: (1) Already fixed on the deploy branch: markPendingQuickLogNoteHistoryCheck journals
+  historyReviewTarget and the sheet restores it; this slice adds a sheet-level Note reload test.
+  (2) New tab-scoped sessionStorage fence (src/lib/quickLogLegacyHistoryFenceStore.ts) written on
+  non-Water legacy history refusals, restored on open, cleared only by the explicit discard.
+  Water keeps its existing durable claim and gets no fence. Local install BLOCKED: bun.lock
+  pins the Lovable registry (403 here) and there is no package-lock.json; tests and typecheck
+  were not run locally, so hosted CI is the first execution. Prettier 3.8.1 PASS on touched files.
+next_action: Read CI at the pushed head; fix any red; independent exact-head review.
+files: src/components/QuickLog.tsx; src/lib/quickLogLegacyHistoryFenceStore.ts;
+  src/test/quick-log-legacy-history-fence-reload.test.tsx;
+  src/test/quick-log-note-moved-target-reload.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: Local dependency install (registry 403). RED-before-fix proof NOT_MEASURED locally.
+reviewer_seat: Blue Dream or Codex (Codex raised the findings but did not author or repair this change)
+claimed_by: Claude, 2026-10-28 (task assignment: Codex review fixes for #1831)
+last_updated: 2026-10-28, by Claude
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

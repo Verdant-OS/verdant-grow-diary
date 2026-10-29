@@ -2603,7 +2603,9 @@ function QuickLogV2SheetForOwner({
     // best-effort attachment work, so a rejected media promise can never
     // leave the committed server key attached to a new editable draft.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
-    observationDraftSuppressedRef.current = true;
+    // A Watering keeps its measurements in wateringForm, so the stored draft
+    // may still be another plant's unsaved note; only retire one this sheet owns.
+    if (observationDraftOwnedRef.current) observationDraftSuppressedRef.current = true;
     observationUnconfirmedRef.current = false;
     setObservationDraftRestored(null);
 
@@ -2740,7 +2742,7 @@ function QuickLogV2SheetForOwner({
       if (recoveryClearFailed) setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
       manualRetrySubmissionRef.current = null;
     }
-    if (user?.id) {
+    if (user?.id && observationDraftOwnedRef.current) {
       clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
     }
     const successMessage =
@@ -3035,10 +3037,12 @@ function QuickLogV2SheetForOwner({
     // This is a resolution action, never a successful receipt for this draft.
     manualRetrySubmissionRef.current = null;
     // The words are already saved; a restored draft would save them again
-    // under a new key.
-    observationDraftSuppressedRef.current = true;
-    if (user?.id) {
-      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+    // under a new key. Another plant's unsaved draft is not this record's.
+    if (observationDraftOwnedRef.current) {
+      observationDraftSuppressedRef.current = true;
+      if (user?.id) {
+        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+      }
     }
     keepSubmissionLockedRef.current = false;
     submissionLockedRef.current = false;

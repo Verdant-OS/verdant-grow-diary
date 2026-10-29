@@ -3465,6 +3465,12 @@ function QuickLogV2SheetForOwner({
             </div>
           </div>
 
+          {observationDraftRestored ? (
+            <p className="text-xs text-muted-foreground" data-testid="qlv2-draft-restored">
+              {observationDraftRestored}
+            </p>
+          ) : null}
+
           {form.action === "feed" && (
             <div className="space-y-2">
               {feedingDefaultsApplied && feedingDefaults.label && (
@@ -3727,11 +3733,6 @@ function QuickLogV2SheetForOwner({
 
           {form.action !== "feed" && (
             <div>
-              {observationDraftRestored ? (
-                <p className="text-xs text-muted-foreground" data-testid="qlv2-draft-restored">
-                  {observationDraftRestored}
-                </p>
-              ) : null}
               <Label htmlFor="qlv2-note">Note (optional)</Label>
               <Textarea
                 id="qlv2-note"

@@ -17,6 +17,14 @@
  *    presenter must only render "Defoliation" when that fence is
  *    present — generic training stays labeled Training.
  */
+// Note marker and Issue heading live in a dependency-free module so the
+// identity rules mirrored into supabase/functions/_shared stay small.
+import { QUICK_LOG_ISSUE_TIMELINE_LABEL } from "@/lib/quickLogNoteMarkerRules";
+export {
+  QUICK_LOG_ISSUE_TIMELINE_LABEL,
+  QUICK_LOG_NOTE_MARKER_KEY,
+  QUICK_LOG_NOTE_MARKER_VALUE,
+} from "@/lib/quickLogNoteMarkerRules";
 
 export const QUICK_LOG_ACTIVITY_IDS = [
   "note",
@@ -110,13 +118,27 @@ export interface QuickLogActivityDefinition {
 export const QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON =
   "Harvest logging is not enabled on this backend yet.";
 
+/** Tile copy chosen by Matthew on 2026-10-28 (review 5677116739, P3). */
+export const QUICK_LOG_NOTE_TILE_COPY = {
+  label: "Note",
+  description: "Anything you want to remember.",
+} as const;
+
+export const QUICK_LOG_ISSUE_TILE_COPY = {
+  label: "Problem spotted",
+  description: "Something looks off: leaves, pests, smell.",
+} as const;
+
+/** Heading for any other observation, including old unmarked notes. */
+export const QUICK_LOG_OBSERVATION_TIMELINE_LABEL = "Observation";
+
 export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
   Record<QuickLogActivityId, QuickLogActivityDefinition>
 > = Object.freeze({
   note: {
     id: "note",
-    label: "Note",
-    description: "Record a short plant note.",
+    label: QUICK_LOG_NOTE_TILE_COPY.label,
+    description: QUICK_LOG_NOTE_TILE_COPY.description,
     safetyNote: "A note is grower memory, not a diagnosis.",
     saveRoute: "manual_note",
     timelineLabel: "Note",
@@ -191,13 +213,13 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
   },
   issue_observation: {
     id: "issue_observation",
-    label: "Issue / observation",
-    description: "Record something you observed on the plant.",
+    label: QUICK_LOG_ISSUE_TILE_COPY.label,
+    description: QUICK_LOG_ISSUE_TILE_COPY.description,
     safetyNote: "Record what you observed. This is not a diagnosis by itself.",
     saveRoute: "event",
     eventType: "observation",
     detailsSubtype: "issue",
-    timelineLabel: "Observation",
+    timelineLabel: QUICK_LOG_ISSUE_TIMELINE_LABEL,
     savedBreakdownLabel: "Issue / observation",
     enabled: true,
   },

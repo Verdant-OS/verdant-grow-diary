@@ -15,8 +15,14 @@ import {
   ClipboardCheck,
   CircleCheckBig,
   Sparkles,
+  StickyNote,
+  CircleAlert,
   type LucideIcon,
 } from "lucide-react";
+import {
+  QUICK_LOG_ACTIVITY_DEFINITIONS,
+  QUICK_LOG_ISSUE_TIMELINE_LABEL,
+} from "@/constants/quickLogActivityTypes";
 
 export interface EventTypeDef {
   value: string;
@@ -173,7 +179,27 @@ export const EVENT_TYPE_MAP: Record<string, EventTypeDef> = Object.fromEntries(
   EVENT_TYPES.map((e) => [e.value, e]),
 );
 
+/**
+ * Display-only kinds for Quick Log rows that persist as `observation`. They
+ * stay out of EVENT_TYPES so legacy type pickers never offer them.
+ */
+export const NOTE_EVENT_TYPE: EventTypeDef = {
+  value: "note",
+  label: QUICK_LOG_ACTIVITY_DEFINITIONS.note.timelineLabel,
+  icon: StickyNote,
+  tone: "bg-secondary/60 text-foreground border-border/50",
+};
+
+export const ISSUE_EVENT_TYPE: EventTypeDef = {
+  value: "issue",
+  label: QUICK_LOG_ISSUE_TIMELINE_LABEL,
+  icon: CircleAlert,
+  tone: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+};
+
 export function getEventType(value?: string | null): EventTypeDef {
+  if (value === NOTE_EVENT_TYPE.value) return NOTE_EVENT_TYPE;
+  if (value === ISSUE_EVENT_TYPE.value) return ISSUE_EVENT_TYPE;
   if (value && EVENT_TYPE_MAP[value]) return EVENT_TYPE_MAP[value];
   return EVENT_TYPE_MAP.observation;
 }

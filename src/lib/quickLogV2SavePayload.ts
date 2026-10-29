@@ -12,6 +12,7 @@ import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import { hasQuickLogMaturityEvidence } from "./quickLogMaturityEvidenceRules";
 import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEvidenceRules";
 import { buildManualSensorProvenance } from "./manualSensorProvenanceRules";
+import { withQuickLogNoteMarker } from "./quickLogActivityRules";
 import { assessWaterVolumeText } from "./quickLogWaterVolumeWarningRules";
 
 export interface QuickLogV2SavePayload {
@@ -147,10 +148,16 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
 
   // Metadata belongs to the existing diary companion. Do not duplicate the
   // measurements: the RPC already creates their environment event sibling.
-  const details =
+  const measuredDetails =
     t !== null || h !== null || v !== null
       ? { ...input.details, manual_provenance: buildManualSensorProvenance() }
       : input.details;
+  // A new note carries the note marker so saved entries can tell it from an
+  // issue. Legacy environment-check envelopes keep their own identity.
+  const details =
+    action === "note" && !measuredDetails?.environment_check
+      ? withQuickLogNoteMarker(measuredDetails)
+      : measuredDetails;
 
   return {
     ok: true,

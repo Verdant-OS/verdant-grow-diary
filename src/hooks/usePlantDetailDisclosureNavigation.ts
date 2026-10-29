@@ -15,7 +15,7 @@ export interface PlantDetailDisclosureOpenState {
 export type PlantDetailRevealAndNavigate = (
   anchorId: string,
   preferredTarget?: HTMLElement | null,
-  options?: { updateHash?: boolean; replace?: boolean },
+  options?: { updateHash?: boolean; replace?: boolean; block?: ScrollLogicalPosition },
 ) => void;
 
 interface UsePlantDetailDisclosureNavigationInput {
@@ -161,9 +161,9 @@ function openStateFor(group: PlantDetailDisclosureGroup | null): PlantDetailDisc
   return group ? { ...ALL_CLOSED, [group]: true } : { ...ALL_CLOSED };
 }
 
-function safelyFocusAndScroll(target: HTMLElement) {
+function safelyFocusAndScroll(target: HTMLElement, block: ScrollLogicalPosition = "center") {
   try {
-    target.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    target.scrollIntoView?.({ behavior: "smooth", block });
   } catch {
     try {
       target.scrollIntoView?.();
@@ -225,7 +225,7 @@ export function usePlantDetailDisclosureNavigation({
   );
 
   const scheduleNavigation = useCallback(
-    (anchorId: string, preferredTarget?: HTMLElement | null) => {
+    (anchorId: string, preferredTarget?: HTMLElement | null, block?: ScrollLogicalPosition) => {
       cancelPendingFrame();
       if (
         typeof document === "undefined" ||
@@ -240,7 +240,7 @@ export function usePlantDetailDisclosureNavigation({
           (typeof preferredTarget.isConnected !== "boolean" || preferredTarget.isConnected);
         const target =
           (preferredIsMounted ? preferredTarget : null) ?? document.getElementById(anchorId);
-        if (target) safelyFocusAndScroll(target);
+        if (target) safelyFocusAndScroll(target, block);
       });
     },
     [cancelPendingFrame],
@@ -286,7 +286,7 @@ export function usePlantDetailDisclosureNavigation({
           };
         });
       }
-      scheduleNavigation(target.anchorId, preferredTarget);
+      scheduleNavigation(target.anchorId, preferredTarget, options?.block);
 
       const nextHash = `#${target.anchorId}`;
       if (options?.updateHash && location.hash !== nextHash) {

@@ -167,6 +167,17 @@ export default function GuidesIndex() {
             </li>
           ))}
           <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/grow-tent-temperature-humidity-chart" className="block">
+              <h3 className="font-semibold text-lg">
+                Grow Tent Temperature &amp; Humidity Chart + Humidity Fixer
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Check your tent's °F and RH against the VPD band for your stage, get fixes for high
+                or low humidity, and log readings. Nothing is saved in your browser.
+              </p>
+            </Link>
+          </li>
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
             <Link to="/guides/athena-feed-chart-log" className="block">
               <h3 className="font-semibold text-lg">Athena Feed Chart Log (Planned vs Actual)</h3>
               <p className="mt-2 text-sm text-muted-foreground">

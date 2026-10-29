@@ -1,4 +1,4 @@
- 
+/* eslint-disable */
 
 // @ts-nocheck
 
@@ -79,6 +79,7 @@ import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesAthenaFeedChartLogRouteImport } from './routes/guides.athena-feed-chart-log'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
+import { Route as GuidesGrowTentTemperatureHumidityChartRouteImport } from './routes/guides.grow-tent-temperature-humidity-chart'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
 import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
@@ -507,6 +508,12 @@ const GuidesGrowStageCareGuideRoute =
   GuidesGrowStageCareGuideRouteImport.update({
     id: '/guides/grow-stage-care-guide',
     path: '/guides/grow-stage-care-guide',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const GuidesGrowTentTemperatureHumidityChartRoute =
+  GuidesGrowTentTemperatureHumidityChartRouteImport.update({
+    id: '/guides/grow-tent-temperature-humidity-chart',
+    path: '/guides/grow-tent-temperature-humidity-chart',
     getParentRoute: () => rootRouteImport,
   } as any)
 const InternalContextualPhenoComparisonDemoRoute =
@@ -1015,6 +1022,7 @@ export interface FileRoutesByFullPath {
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/grow-tent-temperature-humidity-chart': typeof GuidesGrowTentTemperatureHumidityChartRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1163,6 +1171,7 @@ export interface FileRoutesByTo {
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/grow-tent-temperature-humidity-chart': typeof GuidesGrowTentTemperatureHumidityChartRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1315,6 +1324,7 @@ export interface FileRoutesById {
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/grow-tent-temperature-humidity-chart': typeof GuidesGrowTentTemperatureHumidityChartRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1466,6 +1476,7 @@ export interface FileRouteTypes {
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
+    | '/guides/grow-tent-temperature-humidity-chart'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1614,6 +1625,7 @@ export interface FileRouteTypes {
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
+    | '/guides/grow-tent-temperature-humidity-chart'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1765,6 +1777,7 @@ export interface FileRouteTypes {
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
+    | '/guides/grow-tent-temperature-humidity-chart'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1891,6 +1904,7 @@ export interface RootRouteChildren {
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesAthenaFeedChartLogRoute: typeof GuidesAthenaFeedChartLogRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
+  GuidesGrowTentTemperatureHumidityChartRoute: typeof GuidesGrowTentTemperatureHumidityChartRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
   InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute
@@ -2399,6 +2413,13 @@ declare module '@tanstack/react-router' {
       path: '/guides/grow-stage-care-guide'
       fullPath: '/guides/grow-stage-care-guide'
       preLoaderRoute: typeof GuidesGrowStageCareGuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/grow-tent-temperature-humidity-chart': {
+      id: '/guides/grow-tent-temperature-humidity-chart'
+      path: '/guides/grow-tent-temperature-humidity-chart'
+      fullPath: '/guides/grow-tent-temperature-humidity-chart'
+      preLoaderRoute: typeof GuidesGrowTentTemperatureHumidityChartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/internal/contextual-pheno-comparison-demo': {
@@ -3232,6 +3253,8 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesAthenaFeedChartLogRoute: GuidesAthenaFeedChartLogRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
+  GuidesGrowTentTemperatureHumidityChartRoute:
+    GuidesGrowTentTemperatureHumidityChartRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,
   InternalDemoProofWalkthroughRoute: InternalDemoProofWalkthroughRoute,

@@ -236,6 +236,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",
   },
+  {
+    path: "/guides/grow-tent-temperature-humidity-chart",
+    access: "public",
+    description: "Public grow tent temperature and humidity check, fixer and reading log. In-memory only.",
+  },
   { path: "/hardware-integrations", access: "public" },
   { path: "/health", access: "auth", description: "Authenticated app health page." },
   {

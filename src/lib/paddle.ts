@@ -89,7 +89,7 @@ export class PaddleCheckoutUnavailableError extends Error {
  *
  *  1. SERVER-DECLARED — the sanitized code get-paddle-price put in its own
  *     response body (`unknown_plan` | `price_not_configured` |
- *     `price_resolution_unavailable` | `plan_sold_out` |
+ *     `price_resolution_unavailable` | `plan_sold_out` | `plan_retired` |
  *     `pack_requires_monthly_plan` | `auth_required`). Trusted as-is.
  *  2. CLIENT-CLASSIFIED — assigned here when no server code is readable,
  *     from the HTTP status alone (`price_gateway_unavailable` |
@@ -110,6 +110,7 @@ export type PaddleCheckoutCatalogReason =
   | "price_not_configured"
   | "price_resolution_unavailable"
   | "plan_sold_out"
+  | "plan_retired"
   | "pack_requires_monthly_plan"
   | "auth_required"
   | "price_gateway_unavailable"
@@ -140,6 +141,7 @@ const CATALOG_REASONS: ReadonlySet<PaddleCheckoutCatalogReason> = new Set([
   "price_not_configured",
   "price_resolution_unavailable",
   "plan_sold_out",
+  "plan_retired",
   "pack_requires_monthly_plan",
   "auth_required",
 ]);
@@ -152,6 +154,8 @@ export function getPaddleCheckoutCatalogMessage(reason: PaddleCheckoutCatalogRea
       return "This plan isn't set up for checkout yet. Please pick another plan or check back soon.";
     case "plan_sold_out":
       return "This plan is sold out.";
+    case "plan_retired":
+      return "Founder Lifetime is no longer available for new purchases.";
     case "pack_requires_monthly_plan":
       return "Credit packs top up the monthly AI allowance that comes with a paid plan. Your current plan includes AI Doctor checks per grow instead, so a pack would have nothing to add to yet.";
     case "auth_required":

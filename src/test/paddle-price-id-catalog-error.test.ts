@@ -85,9 +85,29 @@ describe("getPaddlePriceId — catalog-unavailable mapping", () => {
       },
     });
 
-    await expect(getPaddlePriceId("founder_lifetime")).rejects.toMatchObject({
+    await expect(getPaddlePriceId("legacy_sold_out_plan")).rejects.toMatchObject({
       reason: "plan_sold_out",
     });
+  });
+
+  it("maps `plan_retired` from get-paddle-price to a typed catalog error for founder_lifetime", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: "plan_retired" }), {
+          status: 410,
+          headers: { "Content-Type": "application/json" },
+        }),
+      },
+    });
+
+    const err = await getPaddlePriceId("founder_lifetime").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect(err).toMatchObject({
+      reason: "plan_retired",
+      planId: "founder_lifetime",
+    });
+    expect((err as Error).message).toMatch(/no longer available/i);
   });
 
   it("maps an unspendable pack refusal to calm paid-plan guidance", async () => {
@@ -149,6 +169,7 @@ describe("getPaddlePriceId — catalog-unavailable mapping", () => {
       "price_not_configured",
       "price_resolution_unavailable",
       "plan_sold_out",
+      "plan_retired",
       "pack_requires_monthly_plan",
     ] as const) {
       const msg = getPaddleCheckoutCatalogMessage(reason);
@@ -425,6 +446,7 @@ describe("catalog copy — auth, gateway and config tell the grower different th
       "price_not_configured",
       "price_resolution_unavailable",
       "plan_sold_out",
+      "plan_retired",
       "pack_requires_monthly_plan",
       "auth_required",
       "price_gateway_unavailable",
@@ -457,6 +479,7 @@ describe("catalog copy — auth, gateway and config tell the grower different th
       "price_not_configured",
       "price_resolution_unavailable",
       "plan_sold_out",
+      "plan_retired",
       "pack_requires_monthly_plan",
       "auth_required",
       "price_gateway_unavailable",

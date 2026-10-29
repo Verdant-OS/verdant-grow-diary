@@ -96,6 +96,42 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky"]);
   });
 
+  it("masks literals nested inside an EXECUTE string", () => {
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN EXECUTE 'COMMENT ON TABLE public.leaky IS ''GRANT SELECT ON public.leaky TO authenticated;'''; END $$;`,
+      ),
+    ).toEqual(["leaky"]);
+    // The payload itself still runs.
+    expect(
+      tables(
+        `${CREATE}\nDO $$ BEGIN EXECUTE 'GRANT SELECT ON public.leaky TO authenticated'; END $$;`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not read a keyword inside a quoted identifier as a grant", () => {
+    expect(
+      tables(
+        `${CREATE}\nCREATE POLICY "Admins grant access" ON public.leaky TO authenticated USING (true);`,
+      ),
+    ).toEqual(["leaky"]);
+    expect(
+      tables(
+        'CREATE TABLE public."table with spaces" (id int);\nGRANT SELECT ON public."table with spaces" TO authenticated;',
+      ),
+    ).toEqual([]);
+  });
+
+  it("tracks a table moved into public with ALTER TABLE ... SET SCHEMA", () => {
+    const moveIn =
+      "CREATE TABLE private.leaky (id int);\nALTER TABLE private.leaky SET SCHEMA public;";
+    expect(tables(moveIn)).toEqual(["leaky"]);
+    expect(tables(`${moveIn}\nGRANT SELECT ON public.leaky TO authenticated;`)).toEqual([]);
+    // Moving out of public takes the table out of scope.
+    expect(tables(`${CREATE}\nALTER TABLE IF EXISTS public.leaky SET SCHEMA private;`)).toEqual([]);
+  });
+
   it("keeps tracking a table whose removal or rename never runs", () => {
     // An uncalled function body.
     expect(

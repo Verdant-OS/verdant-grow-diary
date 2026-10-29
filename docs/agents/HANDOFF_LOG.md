@@ -81,8 +81,8 @@ checkout: git fetch origin ccr-01625fd2-17flsm verdant-grow-diary && git switch 
 pr: NOT_MEASURED at block creation; read it from the branch's open draft PR
 head_sha: read from the PR (this block lands in the first push)
 state: pushed, ready for review (PR #2584); merged base bbc77ae23 to clear a HANDOFF_LOG queue conflict
-current_step: round-3 fix applied under Matthew's 2026-10-29 unlocks: removal and rename events are read only from executed SQL (top level, DO bodies, literal EXECUTE strings), so a removal in a comment, literal or uncalled function body no longer clears tracking; 55/55 in the ACL test file, the new test red with the fix set aside
-next_action: confirm 35/35 required at the PR head (Actions billing restored 2026-10-29); then route an eligible independent exact-head reviewer
+current_step: round-4 fix applied under Matthew's 2026-10-29 unlocks: literals nested in an EXECUTE string are decoded and masked, keywords inside quoted identifiers are skipped, ALTER TABLE ... SET SCHEMA into public is tracked; 58/58 in the ACL test file, the 3 new tests red with the fix set aside. Conditional DO control flow is a documented known limit (Matthew accepted 2026-10-29); the @hono/node-server advisory is left to #2605
+next_action: confirm 35/35 required at the new PR head; then route an eligible independent exact-head reviewer
 post_merge_check: NOT_APPLICABLE for production (test-only change); after merge, the required Vitest suite on verdant-grow-diary runs src/test/supabase-table-explicit-acl.test.ts green
 active_writer: Claude session_017UoYKwf4ZrLARR3NCo2iwM
 decisions: no migration needed a correction (pending badge/referral/plants migrations all explicit or no new object); added a NEW check instead of editing scripts/check-supabase-migration-safety.mjs because the scorer lock refuses that edit and the unlock was denied in-session; a partial REVOKE does not count as an ACL decision because reads stay on the inherited default; the 22 legacy tables are frozen in LEGACY_DEFAULT_PRIVILEGE_TABLES and may only shrink
@@ -91,7 +91,7 @@ commands: bunx vitest run src/test/supabase-table-explicit-acl.test.ts; NODE_OPT
 files_touched: scripts/lib/supabaseTableAclRules.mjs, src/test/supabase-table-explicit-acl.test.ts, docs/audits/supabase-data-api-default-grants-2026-10-28.md, docs/agents/HANDOFF_LOG.md
 files_remaining: none in scope
 blockers: none for the PR; production applied-migration state is NOT_MEASURED (Matthew's surface)
-open_questions: explicit grants for the 22 legacy tables (new additive migration) need Matthew's decision; function/sequence grant check is deferred
+open_questions: explicit grants for the 22 legacy tables (new additive migration) need Matthew's decision; function/sequence grant check is deferred; the stricter conditional-DO rule would flag two existing tables and need its own migration
 gotchas: node_modules was absent; bun install --frozen-lockfile worked and left bun.lock unchanged; full tsc needs a larger heap in this container
 links: docs/audits/supabase-data-api-default-grants-2026-10-28.md; https://supabase.com/docs/guides/api/securing-your-api
 artifacts: the draft PR's checks
@@ -100,7 +100,7 @@ reviewer_sha: none yet
 session_state: no routines; no paused workflows; migration-touching follow-ups held for Matthew
 claimed_by: Claude session_017UoYKwf4ZrLARR3NCo2iwM, 2026-10-28 02:45 UTC (Matthew's direct assignment in chat; no GitHub claim comment posted)
 owner: Claude
-last_updated: 2026-10-29, by Claude
+last_updated: 2026-10-29 (round 4), by Claude
 ```
 
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE

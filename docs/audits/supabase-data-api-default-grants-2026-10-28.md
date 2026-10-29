@@ -47,20 +47,28 @@ comments included), a string literal, a function body or other dollar-quoted tex
 default-privilege statement, or a function/sequence grant does not count. A top-level statement, a
 `DO` block and a string handed straight to `EXECUTE` do count, and the same rule decides whether a
 removal or `ALTER TABLE ... RENAME TO` clears a table: one written in a comment, a literal or an
-uncalled function body does not. Quoted names (`"public"."x"`),
+uncalled function body does not. A string handed to `EXECUTE` is decoded and read the same way, so
+a literal or comment nested inside it does not count either. A keyword inside a quoted identifier
+(a policy named `"Admins grant access"`) is not a statement. Quoted names (`"public"."x"`),
 unqualified names (read as `public`), `CREATE UNLOGGED TABLE` and `ALTER TABLE ... RENAME TO` are
-recognised; a `CREATE TABLE IF NOT EXISTS` of a table that already exists keeps its ACL. The test
+recognised. `ALTER TABLE ... SET SCHEMA public` brings a table into scope and it then needs its own
+ACL; a move out of `public` takes it out of scope. A `CREATE TABLE IF NOT EXISTS` of a table that
+already exists keeps its ACL. The test
 runs against the real migration tree in the required Vitest suite. The result must equal the frozen
 legacy list exactly, with each legacy table bound to the migration that created it, so a new table
 without an ACL fails CI, a legacy table that is dropped and recreated needs its own ACL, and the
 list can only shrink. Known limits: a grant assembled at run time (`EXECUTE format(...)`) cannot be
 read statically and is not counted, so the table is reported (fails closed); `SET search_path` is
 not modelled, so a migration that changes it must schema-qualify its names. No migration in the
-tree today changes `search_path` at the top level.
+tree today changes `search_path` at the top level. Control flow inside a `DO` block is not
+evaluated: a statement in an `IF` branch counts as if it ran, so keep a table's `GRANT`
+unconditional. Treating everything inside `DO` as not run would flag
+`__default_privilege_selftest_tbl` (`20260805090000`) and `soil_moisture_calibrations`
+(`20260728090000`), so that stricter path would need its own migration and Matthew's decision.
 
 It is a new check, not an edit to `scripts/check-supabase-migration-safety.mjs`. The scorer lock
 refuses edits to that existing gate, and that unlock was not taken. The review fixes to this PR's
-own two files were made under unlocks Matthew approved on 2026-10-28.
+own two files were made under unlocks Matthew approved on 2026-10-28 and 2026-10-29.
 
 ## Not verified
 

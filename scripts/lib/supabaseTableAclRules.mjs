@@ -24,7 +24,12 @@
 // Text in comments, string literals, function or procedure bodies, and other
 // dollar-quoted strings (COMMENT ... IS $c$...$c$) never clears it. A statement
 // assembled at run time (EXECUTE format(...)) cannot be read, so the table is
-// reported; give it a plain GRANT statement.
+// reported; give it a plain GRANT statement. A literal handed to EXECUTE is
+// decoded and masked the same way, so prose nested inside it never counts.
+// ALTER TABLE ... SET SCHEMA public brings a table into scope that needs an ACL.
+// Known limit: control flow inside a DO block is not evaluated. A statement
+// in an IF branch counts as if it ran, so a guarded GRANT or removal that is
+// never reached is still counted. Keep a table's GRANT unconditional.
 //
 // Precondition: migrations run with public first on search_path, so an
 // unqualified name is read as public. SET search_path is not modelled. Under
@@ -45,6 +50,13 @@ const RENAME_RE = new RegExp(
   String.raw`\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+RENAME\s+TO\s+(${IDENT})`,
   "gi",
 );
+// ALTER TABLE ... SET SCHEMA moves a table, with its grants, between schemas.
+// A table moved into public from elsewhere did not get public's default
+// grants, so it needs its own ACL there; one moved out of public leaves scope.
+const SET_SCHEMA_RE = new RegExp(
+  String.raw`\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+SET\s+SCHEMA\s+(${IDENT})`,
+  "gi",
+);
 const DROP_RE = /\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
 const ACL_RE =
   /\b(GRANT|REVOKE)\b([^;]*?)\bON\s+(?!(?:ALL\s+)?(?:TABLES|FUNCTIONS?|ROUTINES?|PROCEDURES?|SEQUENCES?|SCHEMAS?|TYPES?|DOMAINS?|LANGUAGE|FOREIGN|LARGE|DATABASE|TABLESPACE)\b)(?:TABLE\s+)?([^;]*?)\s+(?:TO|FROM)\b/gi;
@@ -61,6 +73,21 @@ const RUNS_NOW_RE = /^\s*DO\b/i;
 // A mixed list ("INSERT, SELECT (id)") still grants a table-level privilege.
 function columnLevelOnly(privileges) {
   return privileges.split(/,(?![^(]*\))/).every((item) => item.includes("("));
+}
+
+// Positions of sql that sit inside a double-quoted identifier, so a keyword
+// in a name (CREATE POLICY "Admins grant access" ...) never starts a match.
+// Run on masked SQL, where comments and literals are already blank.
+function quotedIdentifierPositions(sql) {
+  const inside = new Uint8Array(sql.length);
+  for (let i = 0; i < sql.length; i++) {
+    if (sql[i] !== '"') continue;
+    let j = i + 1;
+    while (j < sql.length && !(sql[j] === '"' && sql[j + 1] !== '"')) j += sql[j] === '"' ? 2 : 1;
+    inside.fill(1, i + 1, j);
+    i = j;
+  }
+  return inside;
 }
 
 // The public table a (schema, name) match refers to, or null for another schema.
@@ -126,6 +153,29 @@ function maskSql(sql, executableOnly) {
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (code[k] !== "\n") code[k] = " ";
   };
+  // A literal handed straight to EXECUTE runs as SQL. Decode it ('' -> '),
+  // mask that SQL the same way, and blank the raw characters behind every
+  // masked one, so a literal or comment nested in the payload never counts.
+  // An E'' payload is blanked whole: its escapes are not decoded (fails closed).
+  const maskExecutedLiteral = (open, close, escapes) => {
+    if (escapes) {
+      blank(open, close + 1);
+      return;
+    }
+    let decoded = "";
+    const origin = []; // decoded index -> raw indices
+    for (let k = open + 1; k < close; k++) {
+      if (sql[k] === "'" && sql[k + 1] === "'") {
+        origin.push([k, k + 1]);
+        k++;
+      } else origin.push([k]);
+      decoded += sql[k];
+    }
+    const masked = maskSql(decoded, true);
+    for (let d = 0; d < decoded.length; d++) {
+      if (masked[d] !== decoded[d]) for (const k of origin[d]) blank(k, k + 1);
+    }
+  };
   const mask = (start, end) => {
     let i = start;
     let stmtStart = start;
@@ -170,6 +220,7 @@ function maskSql(sql, executableOnly) {
         if (j < end) {
           const executes = EXECUTES_RE.test(code.slice(stmtStart, i).join(""));
           if (executableOnly && !executes) blank(i, j + 1);
+          else if (executableOnly) maskExecutedLiteral(i, j, escapes);
           i = j + 1;
         } else {
           i++; // unterminated within these bounds: prose, not a literal
@@ -208,6 +259,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
   for (const m of migrations) {
     const ddl = maskSql(m.sql, false);
     const executed = maskSql(m.sql, true);
+    const quoted = quotedIdentifierPositions(executed);
     const events = [];
     for (const match of ddl.matchAll(CREATE_RE)) {
       const table = publicTable(match[2], match[3]);
@@ -216,11 +268,22 @@ export function findTablesWithoutExplicitAcl(migrations) {
       }
     }
     for (const match of executed.matchAll(RENAME_RE)) {
+      if (quoted[match.index]) continue;
       const table = publicTable(match[1], match[2]);
       if (table)
         events.push({ kind: "rename", table, to: identName(match[3]), index: match.index });
     }
+    for (const match of executed.matchAll(SET_SCHEMA_RE)) {
+      if (quoted[match.index]) continue;
+      const name = identName(match[2]);
+      const fromPublic = publicTable(match[1], match[2]) !== null;
+      const toPublic = identName(match[3]) === "public";
+      if (fromPublic !== toPublic) {
+        events.push({ kind: toPublic ? "move-in" : "drop", table: name, index: match.index });
+      }
+    }
     for (const match of executed.matchAll(DROP_RE)) {
+      if (quoted[match.index]) continue;
       for (const target of match[1].split(",")) {
         const name = DROP_TARGET_RE.exec(target);
         const table = name && publicTable(name[1], name[2]);
@@ -228,6 +291,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
       }
     }
     for (const match of executed.matchAll(ACL_RE)) {
+      if (quoted[match.index]) continue;
       const isRevoke = match[1].toUpperCase() === "REVOKE";
       // Column-level ACLs (a privilege list with a column list) leave the rest
       // of the table on the default, so they are not a table-level decision.
@@ -244,6 +308,8 @@ export function findTablesWithoutExplicitAcl(migrations) {
         // CREATE TABLE IF NOT EXISTS on a table that already exists is a no-op
         // and keeps that table's grants.
         if (event.conditional && tables.has(event.table)) continue;
+        tables.set(event.table, { migration: m.name, acl: false });
+      } else if (event.kind === "move-in") {
         tables.set(event.table, { migration: m.name, acl: false });
       } else if (event.kind === "drop") {
         tables.delete(event.table);

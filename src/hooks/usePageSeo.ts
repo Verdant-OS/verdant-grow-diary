@@ -45,6 +45,12 @@ export interface PageSeo {
   ogType?: "website" | "article";
   /** When true, emit <meta name="robots" content="noindex, follow">. */
   noindex?: boolean;
+  /**
+   * When true, write no `<link rel="canonical">`. For a page that is about to
+   * redirect away (e.g. an unknown guide slug) and must not pair noindex with
+   * a canonical to some other URL. Opt-in, so other noindex callers keep theirs.
+   */
+  omitCanonical?: boolean;
 }
 
 function upsertMeta(selector: string, attr: "name" | "property", key: string, content: string) {
@@ -86,6 +92,7 @@ export function usePageSeo(seo: PageSeo): void {
     ogImage,
     ogType = "website",
     noindex = false,
+    omitCanonical = false,
   } = seo;
   const routeImageRef = useRef<{ path: string; image: string | null } | null>(null);
 
@@ -114,7 +121,7 @@ export function usePageSeo(seo: PageSeo): void {
 
     document.title = title;
     upsertMeta('meta[name="description"]', "name", "description", description);
-    upsertLink("canonical", url);
+    if (!omitCanonical) upsertLink("canonical", url);
     upsertMeta(
       'meta[name="robots"]',
       "name",
@@ -169,5 +176,5 @@ export function usePageSeo(seo: PageSeo): void {
       upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", DEFAULT_OG_IMAGE);
       void prevTitle;
     };
-  }, [title, description, path, canonicalPath, ogImage, ogType, noindex]);
+  }, [title, description, path, canonicalPath, ogImage, ogType, noindex, omitCanonical]);
 }

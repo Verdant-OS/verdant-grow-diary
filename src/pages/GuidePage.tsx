@@ -70,6 +70,8 @@ export default function GuidePage() {
     ogType: guide ? "article" : "website",
     // Unknown slug: keep the SSR "noindex, follow" until the redirect lands.
     noindex: !guide,
+    // ...and write no canonical, so noindex never pairs with a /guides canonical.
+    omitCanonical: !guide,
   });
 
   if (!guide) {

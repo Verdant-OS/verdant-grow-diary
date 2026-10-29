@@ -69,37 +69,37 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
+### GUIDE-UNKNOWN-SLUG-NO-CLIENT-CANONICAL-20261029
 
 ```text
-TASK SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028  priority: P2  status: OPEN
-goal: Unknown /guides/<slug> never serves "index, follow" (or a canonical to /guides), and the Athena feed log stops linking the unpublished /guides/advanced-nutrients-feeding-chart-log.
-why: Ahrefs indexability audit (2026-10-28, Grok Bot's /workspace/seo/audits/2026-10-28-ahrefs-indexability.md; not readable from this session). On base the dead link rendered a 200 "index, follow" page with no canonical that then redirected to /guides on the client.
-branch: claude/seo-noindex-unknown-guide-slugs
+TASK GUIDE-UNKNOWN-SLUG-NO-CLIENT-CANONICAL-20261029  priority: other  status: OPEN
+goal: while an unknown /guides/<slug> redirects to /guides, the client head writes no <link rel="canonical"> (it used to write one to /guides next to "noindex, follow"); published guides keep their self-canonical.
+why: optional P3-1 from the independent review of #2597 (comments 6503462362 and 6506806545); the founder said yes to doing it as a separate PR after #2597 merged.
+branch: claude/guide-unknown-slug-no-client-canonical
 base: verdant-grow-diary
-checkout: git fetch origin claude/seo-noindex-unknown-guide-slugs verdant-grow-diary && git switch claude/seo-noindex-unknown-guide-slugs && git merge origin/verdant-grow-diary
+checkout: git fetch origin claude/guide-unknown-slug-no-client-canonical verdant-grow-diary && git switch claude/guide-unknown-slug-no-client-canonical && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here; only the writer then runs git merge origin/verdant-grow-diary, which pushes a new head)
 pr: draft; read the PR for the exact head
-head_sha: parent of this commit is 8101fa97bc5c87356bb679c0dd886543d85a079c (Cursor Agent test commit on 2b80c76918af614da5cc298494fbad5e3718aa66, the 479cadb base merge); feature commit 80ec001f2e4abc5676b53a662524969ee62553f6. A commit cannot record its own SHA: the reviewed head is this commit, and review must name its full SHA from the PR
-state: ready for review. PASS (session_017UoYKwL7nbjQYSesoeniiR) and founder yes were both at 96901cea4e0e92fe3644a33a151a60e30e995939; the merge queue dequeued it on a HANDOFF_LOG.md conflict after #2539 (d55c557) merged, so this block's commit is a base merge that keeps both blocks. Both the PASS and the founder yes are stale at the new head and must be renewed there
-current_step: Codex review at 8101fa9 addressed: P1 (GuidePage hydration flipped unknown slugs to index, follow) fixed with noindex: !guide; P2 source-scan route test replaced with a resolved Route.options.head assertion (founder-approved scorer unlock); P2 head_sha precision answered here
-next_action: Eligible independent reviewer (OWNERSHIP.md §4.3; Claude excluded as author) reviews at the exact head. #2542 re-adds the Athena related link when it ships.
-post_merge_check: Once live /version.json reports the merge SHA, GET https://verdantgrowdiary.com/guides/does-not-exist and confirm one <meta name="robots" content="noindex, follow"> and no rel=canonical; NOT_MEASURED until then.
+head_sha: a commit cannot record its own SHA; read the full head from the PR
+state: pushed draft
+current_step: opt-in omitCanonical on usePageSeo; GuidePage passes omitCanonical: !guide. New test src/test/guide-page-unknown-slug-no-client-canonical.test.tsx: 2 failed / 1 passed before the fix, 3/3 after.
+next_action: an eligible independent reviewer (not session 017UoYKxQUVr5LNsENPKJ59K) reviews the exact head; then 35/35 required checks and the founder's per-item yes at that head.
+post_merge_check: once live /version.json reports the merge SHA, load https://verdantgrowdiary.com/guides/does-not-exist in a JS browser and confirm no rel=canonical is written before the redirect to /guides; NOT_MEASURED until then.
 active_writer: Claude
-decisions: noindex, follow instead of a real 404 (keeps the existing client redirect to /guides and its tests); head logic in pure src/lib/guideRouteHeadRules.ts; published guides keep their exact staticRouteHead. Optional csv-preview PR skipped (not trivial on top of the scorer-lock decision).
-tried_and_rejected: curl of the built page (blocked by a plugin safety hook) and vite preview (cloudflare-module output cannot run under Node). Verified instead by importing .output/server/index.mjs and calling its fetch handler, as scripts/capture-ssr-head-snapshots-with-server.mjs does.
-commands: bunx vitest run src/test/seo-guide-slug-indexability.test.tsx src/test/athena-feed-log-page.test.tsx ; bun run typecheck ; node scripts/scorer-lock.mjs --report --strict
-files_touched: src/lib/athenaFeedLogRules.ts; src/pages/AthenaFeedLog.tsx; src/routes/guides.$slug.tsx; src/lib/guideRouteHeadRules.ts (new); src/test/seo-guide-slug-indexability.test.tsx (new); src/test/athena-feed-log-page.test.tsx (renegotiated pin, founder-approved); docs/agents/HANDOFF_LOG.md; src/pages/GuidePage.tsx (noindex while redirecting); src/test/guide-page-unknown-slug-client-head.test.tsx (new); src/test/guideRouteHeadRules.test.ts (added by Cursor Agent in 8101fa9; source scan replaced by Claude, founder-approved unlock)
+decisions: opt-in flag instead of making noindex drop the canonical (other noindex callers keep theirs); og:url is unchanged; the new assertions live in a new test file because src/test/guide-page-unknown-slug-client-head.test.tsx is scorer-locked.
+tried_and_rejected: editing the locked guide-page-unknown-slug-client-head.test.tsx (scorer-lock refused; no unlock requested).
+commands: bunx vitest run src/test/guide-page-unknown-slug-no-client-canonical.test.tsx ; bunx vitest run $(grep -rlE 'usePageSeo|pages/GuidePage|GuidePage\.tsx' src/test) ; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck ; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/hooks/usePageSeo.ts; src/pages/GuidePage.tsx; src/test/guide-page-unknown-slug-no-client-canonical.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block and the SEO-NOINDEX closure)
 files_remaining: none
-blockers: none for repository work. The 2026-10-28 Actions outage cleared; non-required Dependency & Security CI is red on the base's @hono/node-server advisory until #2605 lands; required ci.yml checks skip while draft.
+blockers: none for repository work
 open_questions: none
-gotchas: bun run build refuses a dirty tree (stamp_dirty); a local build rewrites src/routeTree.gen.ts, public/version.json and src/generated/buildInfo.ts, which must be reverted.
-links: #2542 (re-adds the link); not folded into #2561 or #2549
-reviewer_seat: eligible independent session under OWNERSHIP.md §4.3; excluded: Claude (author) and the Cursor Agent session that pushed 8101fa9
+gotchas: every PR that adds a block at the top of ## Open conflicts with the others in HANDOFF_LOG.md; resolve by keeping both blocks.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2597
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3; excluded: author/holder session 017UoYKxQUVr5LNsENPKJ59K
 reviewer_sha: none yet
-session_state: Claude Code cloud session; no routines
-claimed_by: Claude, 2026-10-28 12:05 UTC
+session_state: Claude Code cloud session 017UoYKxQUVr5LNsENPKJ59K; no routines
+claimed_by: Claude session 017UoYKxQUVr5LNsENPKJ59K, 2026-10-29 21:25 UTC
 owner: Claude
-last_updated: 2026-10-29 16:40 UTC, by Claude (Codex P1/P2 fixes on top of 8101fa9)
+last_updated: 2026-10-29 21:25 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K
 ```
 
 ### SEO-GSC-AHREFS-RECONCILIATION-20261028
@@ -1019,6 +1019,40 @@ last_updated: 2026-10-29 16:08 UTC, by Claude
 ```
 
 ## Closed
+
+### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
+
+```text
+TASK SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028  priority: P2  status: CLOSED
+goal: Unknown /guides/<slug> never serves "index, follow" (or a canonical to /guides), and the Athena feed log stops linking the unpublished /guides/advanced-nutrients-feeding-chart-log.
+why: Ahrefs indexability audit (2026-10-28, Grok Bot's /workspace/seo/audits/2026-10-28-ahrefs-indexability.md; not readable from this session). On base the dead link rendered a 200 "index, follow" page with no canonical that then redirected to /guides on the client.
+branch: claude/seo-noindex-unknown-guide-slugs
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin verdant-grow-diary && git show a6254b56d52a9ebb2a78dc9192d2c259c4174baf
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2597 (merged)
+head_sha: da4bfd4666fe0584b646379bc12fcf1e30a47277 (final PR head; second base merge after #2600/#2606); merge commit a6254b56d52a9ebb2a78dc9192d2c259c4174baf on the deploy branch
+state: CLOSED (merged). Dequeued once at 18:54 UTC on a HANDOFF_LOG MERGE_CONFLICT after #2539; base merged twice (16ebdcc, da4bfd4); re-enqueued 19:53 UTC and merged by the merge queue
+current_step: Closed.
+next_action: None; closed. The post_merge_check below stays owned by this block. P3-1 (client canonical to /guides while redirecting) is the follow-up block GUIDE-UNKNOWN-SLUG-NO-CLIENT-CANONICAL-20261029.
+post_merge_check: Once live /version.json reports the merge SHA, GET https://verdantgrowdiary.com/guides/does-not-exist and confirm one <meta name="robots" content="noindex, follow"> and no rel=canonical; NOT_MEASURED until then.
+active_writer: none; closed
+decisions: noindex, follow instead of a real 404 (keeps the existing client redirect to /guides and its tests); head logic in pure src/lib/guideRouteHeadRules.ts; published guides keep their exact staticRouteHead. Optional csv-preview PR skipped (not trivial on top of the scorer-lock decision).
+tried_and_rejected: curl of the built page (blocked by a plugin safety hook) and vite preview (cloudflare-module output cannot run under Node). Verified instead by importing .output/server/index.mjs and calling its fetch handler, as scripts/capture-ssr-head-snapshots-with-server.mjs does.
+commands: bunx vitest run src/test/seo-guide-slug-indexability.test.tsx src/test/athena-feed-log-page.test.tsx ; bun run typecheck ; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/lib/athenaFeedLogRules.ts; src/pages/AthenaFeedLog.tsx; src/routes/guides.$slug.tsx; src/lib/guideRouteHeadRules.ts (new); src/test/seo-guide-slug-indexability.test.tsx (new); src/test/athena-feed-log-page.test.tsx (renegotiated pin, founder-approved); docs/agents/HANDOFF_LOG.md; src/pages/GuidePage.tsx (noindex while redirecting); src/test/guide-page-unknown-slug-client-head.test.tsx (new); src/test/guideRouteHeadRules.test.ts (added by Cursor Agent in 8101fa9; source scan replaced by Claude, founder-approved unlock)
+files_remaining: none
+blockers: none for repository work. The 2026-10-28 Actions outage cleared; non-required Dependency & Security CI is red on the base's @hono/node-server advisory until #2605 lands; required ci.yml checks skip while draft.
+open_questions: none
+gotchas: bun run build refuses a dirty tree (stamp_dirty); a local build rewrites src/routeTree.gen.ts, public/version.json and src/generated/buildInfo.ts, which must be reverted.
+links: #2542 (re-adds the link); not folded into #2561 or #2549
+reviewer_seat: Claude session_017UoYKwL7nbjQYSesoeniiR, a non-contributing Claude review session (OWNERSHIP.md section 4.3); excluded: author/holder sessions 017UoYKx8T6Y6eyPhvDvxPjS and 017UoYKxQUVr5LNsENPKJ59K, and the Cursor Agent that pushed 8101fa9
+reviewer_sha: da4bfd4666fe0584b646379bc12fcf1e30a47277, comment 6506806545: PASS (P1x0, P2x0, P3x2); 35/35 required checks. Earlier PASS at 96901cea4e0e92fe3644a33a151a60e30e995939 (6503462362) superseded by the base merges
+session_state: no routines; no paused workflows; PR subscription ended at merge
+claimed_by: Claude, 2026-10-28 12:05 UTC
+owner: Claude
+last_updated: 2026-10-29 21:25 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K (closure)
+closure: #2597 merged as a6254b56d52a9ebb2a78dc9192d2c259c4174baf on 2026-10-29 (19:53 UTC commit) via the merge queue, parents b0fa0aaf20a185dc0a2953dbf4af906e66ef3ca9 and da4bfd4666fe0584b646379bc12fcf1e30a47277. Production NOT_MEASURED until live /version.json reports it.
+```
 
 ### VER-300-ALERT-ARCHIVED-TARGETS
 

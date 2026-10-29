@@ -192,6 +192,20 @@ describe("supabase table explicit ACL rule", () => {
     expect(tables(`${CREATE}\nALTER TABLE IF EXISTS public.leaky SET SCHEMA private;`)).toEqual([]);
   });
 
+  it("leaves a tracked table alone when a move into public onto its name does not run", () => {
+    const granted = `${CREATE}\nGRANT SELECT ON public.leaky TO authenticated;`;
+    // IF EXISTS and a missing source is a no-op in PostgreSQL.
+    expect(tables(`${granted}\nALTER TABLE IF EXISTS private.leaky SET SCHEMA public;`)).toEqual(
+      [],
+    );
+    // The destination already holds a table: PostgreSQL rejects the move.
+    expect(
+      tables(
+        `${granted}\nCREATE TABLE private.leaky (id int);\nALTER TABLE private.leaky SET SCHEMA public;`,
+      ),
+    ).toEqual([]);
+  });
+
   it("keeps tracking a table whose removal or rename never runs", () => {
     // An uncalled function body.
     expect(

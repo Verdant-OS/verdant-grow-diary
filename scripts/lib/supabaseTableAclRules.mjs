@@ -348,6 +348,9 @@ export function findTablesWithoutExplicitAcl(migrations) {
         if (event.conditional && tables.has(event.table)) continue;
         tables.set(event.table, { migration: m.name, acl: false });
       } else if (event.kind === "move-in") {
+        // A move into public onto a still-tracked name does not run:
+        // PostgreSQL rejects it, or IF EXISTS with a missing source is a no-op.
+        if (tables.has(event.table)) continue;
         tables.set(event.table, { migration: m.name, acl: false });
       } else if (event.kind === "drop") {
         tables.delete(event.table);

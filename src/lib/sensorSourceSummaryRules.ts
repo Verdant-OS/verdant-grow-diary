@@ -17,9 +17,16 @@
  *    never lets a missing, unparseable, or future timestamp read as current.
  *    This keeps the summary in agreement with the individual badges and the
  *    Dashboard (VER-299).
+ *  - A reading's persisted downgrade is a floor the clock cannot lift: a
+ *    canonical `status` of stale / invalid / needs_review / no_data, or a
+ *    `quality` other than ok, keeps the reading out of `fresh` even when its
+ *    source and timestamp alone would pass (Codex P2 on #2586 at b1cab8f9d).
  *  - `counts.stale` is a freshness count: readings persisted as `stale` plus live
- *    or manual readings older than their canon window. A stale manual reading
- *    therefore counts under both `manual` (provenance) and `stale` (freshness).
+ *    or manual readings older than their canon window or flagged stale. A stale
+ *    manual reading therefore counts under both `manual` (provenance) and
+ *    `stale` (freshness). The Stale row is an aggregate, not a Timeline source
+ *    filter: the Timeline's `sensorSources=stale` filter matches persisted
+ *    provenance only, so the row must not link there.
  *  - Missing/unknown source counts as `invalid` (unless caller supplies a
  *    `fallback`, used e.g. for demo-mode datasets).
  *  - Date range is half-open: [from, to). Either bound may be null.
@@ -42,6 +49,14 @@ export interface SensorSourceSummaryReading {
   /** Either of these timestamps will be used (captured_at preferred). */
   captured_at?: string | null;
   ts?: string | null;
+  /**
+   * Canonical Sensor Snapshot Status for the reading when the caller already
+   * derived one (`usable` | `stale` | `invalid` | `needs_review` | `no_data`).
+   * Anything other than `usable` is a floor: it can only lower freshness.
+   */
+  status?: string | null;
+  /** Persisted intake quality for raw rows (`ok` or empty means no downgrade). */
+  quality?: string | null;
 }
 
 export interface SensorSourceSummaryRange {
@@ -95,8 +110,38 @@ function emptyFreshness(): SensorSourceSummaryFreshnessCounts {
   return { fresh: 0, stale: 0, unknown: 0 };
 }
 
+const FRESHNESS_TRUST_RANK: Record<SensorSourceSummaryFreshness, number> = {
+  fresh: 0,
+  stale: 1,
+  unknown: 2,
+};
+
+function normalizeFlag(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
 /**
- * Freshness of one reading, by the same rule the Dashboard badge uses.
+ * The part of a reading's freshness fixed by its persisted status and quality,
+ * mirroring the adapter's persisted-status floor: stale stays stale; invalid,
+ * degraded, needs_review, no_data and any other non-ok flag are never current.
+ * Null when only source and capture time decide.
+ */
+function persistedFreshnessFloor(
+  status: unknown,
+  quality: unknown,
+): SensorSourceSummaryFreshness | null {
+  const s = normalizeFlag(status);
+  const q = normalizeFlag(quality);
+  if (s && s !== "usable" && s !== "stale") return "unknown";
+  if (q === "invalid" || q === "degraded") return "unknown";
+  if (s === "stale" || q === "stale") return "stale";
+  if (q && q !== "ok") return "unknown";
+  return null;
+}
+
+/**
+ * Freshness of one reading, by the same rule the Dashboard badge uses, then
+ * lowered (never raised) by the reading's persisted status or quality.
  * Exported so presenters and tests can pin a single reading's bucket.
  */
 export function classifySensorSourceSummaryFreshness(
@@ -107,9 +152,11 @@ export function classifySensorSourceSummaryFreshness(
     { source: reading.source ?? null, captured_at: reading.captured_at, ts: reading.ts },
     now,
   );
-  if (status === "usable") return "fresh";
-  if (status === "stale") return "stale";
-  return "unknown";
+  const byClock: SensorSourceSummaryFreshness =
+    status === "usable" ? "fresh" : status === "stale" ? "stale" : "unknown";
+  const floor = persistedFreshnessFloor(reading.status, reading.quality);
+  if (floor === null) return byClock;
+  return FRESHNESS_TRUST_RANK[floor] > FRESHNESS_TRUST_RANK[byClock] ? floor : byClock;
 }
 
 function readingTimestamp(r: SensorSourceSummaryReading): string | null {
@@ -182,11 +229,16 @@ export const SENSOR_SOURCE_SUMMARY_FRESHNESS_LABEL: Record<SensorSourceSummaryFr
 
 export const SENSOR_SOURCE_SUMMARY_FRESHNESS_LEGEND: Record<SensorSourceSummaryFreshness, string> =
   {
-    fresh: `Live within ${LIVE_CURRENT_STATE_STALE_MINUTES} minutes or manual within ${MANUAL_CURRENT_STATE_STALE_HOURS} hours; may be treated as current.`,
-    stale: "Older than its freshness window, or persisted as stale; not current telemetry.",
+    fresh: `Live within ${LIVE_CURRENT_STATE_STALE_MINUTES} minutes or manual within ${MANUAL_CURRENT_STATE_STALE_HOURS} hours, with no persisted status or quality downgrade; may be treated as current.`,
+    stale:
+      "Older than its freshness window, or persisted or flagged as stale; not current telemetry.",
     unknown:
-      "Invalid, missing or future timestamp, or non-current provenance (CSV/demo); never healthy.",
+      "Invalid, missing or future timestamp, rejected quality, or non-current provenance (CSV/demo); never healthy.",
   };
+
+/** The Stale row counts freshness, so it cannot link to the Timeline's persisted-source filter. */
+export const SENSOR_SOURCE_SUMMARY_STALE_ROW_NOTE =
+  "Freshness count (past its window or flagged stale); not a Timeline source filter.";
 
 export const SENSOR_SOURCE_SUMMARY_FRESHNESS_ORDER: readonly SensorSourceSummaryFreshness[] = [
   "fresh",

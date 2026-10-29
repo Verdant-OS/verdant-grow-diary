@@ -1,11 +1,19 @@
 # Paddle Sandbox Smoke Checklist
 
-Rerun this whenever the billing surface changes — checkout, webhook, entitlement
-gates, price IDs, env config. Mirrors the release-gate items in
-`docs/paddle-paid-launch-runbook.md` §Release gate. Everything below is
-**provider-sandbox-only** at https://verdantgrowdiary.com; no real charges, no live
-secrets required. This verifies the current product policy, not a rehearsal
-that silently authorizes live checkout.
+> **Status: pre-transition evidence only (since #2230).** Production now ships
+> live checkout: the committed production token is `live_`, the production
+> prebuild gate and the production smoke refuse a `test_` token, and a live
+> token opens checkout only on the production hostnames. Do **not** reconfigure
+> production (`.env.production`, `PAYMENTS_ENVIRONMENT`, Paddle settings) back to
+> sandbox to run this checklist. It records how the sandbox lane was verified
+> before the transition. Live release validation lives in `docs/billing.md`
+> ("Live checkout release sequence") and the runbook's "Live checkout release".
+
+The checklist below is the dated record of how the sandbox lane was verified
+before the live transition. It is not a release gate and is not rerun against
+production. When it was used, everything was **provider-sandbox-only** at
+https://verdantgrowdiary.com, with no real charges and no live secrets; it
+verified the sandbox policy of that time, never live checkout.
 
 Use the designated test-fixture account and its own grow only; never the KEEP
 account or customer data. Tag grow records `[smoke <timestamp>]`. Provider sandbox

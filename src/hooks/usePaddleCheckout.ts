@@ -32,6 +32,10 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
 import { clearCheckoutStarted, markCheckoutStarted } from "@/lib/checkoutContextRules";
 import { CREDIT_PACKS } from "@/constants/pricing";
+import {
+  FOUNDER_LIFETIME_CHECKOUT_REFUSAL,
+  isFounderLifetimeCheckoutSku,
+} from "@/lib/founderLifetimeCheckoutGuard";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -149,6 +153,13 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
 
   const openCheckout = useCallback(
     async (options: OpenCheckoutOptions) => {
+      if (isFounderLifetimeCheckoutSku(options.priceId)) {
+        setBlockedReasonCode(null);
+        setBlockedScope("plan");
+        setBlockedReason(FOUNDER_LIFETIME_CHECKOUT_REFUSAL);
+        return;
+      }
+
       // Constant kill switch so a checkout-disabled production build drops
       // Paddle.Checkout.open below. Exact "true" only.
       if (import.meta.env.VITE_CHECKOUT_DISABLED === "true") {

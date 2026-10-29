@@ -37,35 +37,45 @@ all laws applicable to cultivation in their own jurisdiction.
 
 ## Plans
 
-What the pricing page sells, from `src/constants/pricing.ts` (amounts) and
-`get-paddle-price` (the seven SKUs it resolves):
+What the pricing page offers, from `src/config/pricing.ts` (amounts) and
+`get-paddle-price` (the plan ids it resolves). The live Paddle catalog was read
+on 2026-10-29 (read-only): it holds Pro monthly, Pro annual, both credit packs
+and the retired Founder price, and no Craft product.
 
-| Plan / pack        | Price           | Cadence  | Checkout SKU       |
-| ------------------ | --------------- | -------- | ------------------ |
-| Pro Monthly        | $12             | / month  | `pro_monthly`      |
-| Pro Annual         | $99             | / year   | `pro_annual`       |
-| Craft Monthly      | $29             | / month  | `craft_monthly`    |
-| Craft Annual       | $249            | / year   | `craft_annual`     |
-| Founder Lifetime   | $129 (one-time) | one-time | `founder_lifetime` |
-| AI credit pack 50  | $9 (one-time)   | one-time | `credit_pack_50`   |
-| AI credit pack 150 | $19 (one-time)  | one-time | `credit_pack_150`  |
+| Plan / pack        | Price          | Cadence  | Checkout SKU      | Live Paddle price         |
+| ------------------ | -------------- | -------- | ----------------- | ------------------------- |
+| Pro Monthly        | $12            | / month  | `pro_monthly`     | yes                       |
+| Pro Annual         | $99            | / year   | `pro_annual`      | yes                       |
+| Craft Monthly      | $29            | / month  | `craft_monthly`   | none (scoped unavailable) |
+| Craft Annual       | $249           | / year   | `craft_annual`    | none (scoped unavailable) |
+| AI credit pack 50  | $9 (one-time)  | one-time | `credit_pack_50`  | yes                       |
+| AI credit pack 150 | $19 (one-time) | one-time | `credit_pack_150` | yes                       |
+
+Founder Lifetime is no longer sold (#2028, #2570). Existing Founder
+entitlements stay in place until a separate PR and migration remove them.
+Holders keep Pro-like access with AI credits capped at 100 per UTC month. New
+checkout for `founder_lifetime` is refused on the client
+(`founderLifetimeCheckoutGuard`) and by `get-paddle-price`, which answers
+`410 plan_retired` before any price lookup. The `PADDLE_PRICE_FOUNDER_LIFETIME`
+name stays wired only because the cold-start drift guard requires a name for
+every `PAID_PLAN_IDS` entry; it needs no live value.
 
 Included AI Doctor credits: Free 3 per grow; Pro and Founder 100 per month;
-Craft 300 per month. Founder Lifetime is a limited early-supporter offer.
-Credit packs are one-time top-ups for any active paid entitlement that
-includes a monthly AI allowance: Pro and Craft subscriptions, and Founder
-Lifetime (one-time, but it carries the monthly bucket). They never expire and
-are spent only after the monthly allowance.
+Craft 300 per month. Credit packs are one-time top-ups for any active paid
+entitlement that includes a monthly AI allowance: Pro and Craft subscriptions,
+and existing Founder Lifetime rows (one-time, but they carry the monthly
+bucket). They never expire and are spent only after the monthly allowance.
 
 Deliberate unavailable cases at launch. Each must show a calm, scoped block,
 never a page-wide one (see [Live checkout release sequence](#live-checkout-release-sequence)):
 
-- **Craft** has no live Paddle product today, so `get-paddle-price` returns
+- **Craft** has no live Paddle product, so `get-paddle-price` returns
   `price_not_configured`. That block is per SKU: only the Craft button that was
   tried (monthly or annual) changes to "Join the Craft launch list"; the other
   Craft button stays available until it is tried, and other plans are
-  unaffected.
-- **Founder Lifetime** returns `plan_sold_out` once the cap is reached.
+  unaffected. Do not create Craft products or prices to make it sell.
+- **Founder Lifetime** is refused before any network call; a stale or direct
+  request reaches `410 plan_retired`.
 - **Credit packs** return `pack_requires_monthly_plan` for a grower without an
   active paid entitlement that includes a monthly AI allowance, which blocks
   both packs and leaves subscriptions open.
@@ -227,7 +237,7 @@ the other Paddle gates:
   also revokes authenticated access to the legacy refund function.
 
 The ledger remains append-only. Refunds continue through `ai_credit_refund`,
-and Founder Lifetime remains capped at 100 AI credits per UTC month.
+and an existing Founder Lifetime entitlement remains capped at 100 AI credits per UTC month. Founder Lifetime is no longer sold; removing the entitlement is a separate PR plus migration.
 
 Deployment is an expand/verify/contract sequence across two database releases.
 The expand migration adds service-only overloads but deliberately leaves legacy

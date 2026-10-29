@@ -191,6 +191,9 @@ export default function AlertDetail() {
     plantNameById: targetNames.plantNameById,
     linkedEvidence: alert ? (linkedTargets.evidenceByAlertId.get(alert.id) ?? []) : [],
     singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+    tentStateById: targetNames.tentStateById,
+    plantStateById: targetNames.plantStateById,
+    namesReady: targetNames.status === "ok" && targetNames.readComplete === true,
     namesLoading: targetNames.status === "loading",
     idsLoading: linkedTargets.idsLoading,
   });
@@ -594,6 +597,8 @@ export default function AlertDetail() {
                 idsLoading={targetInput.idsLoading}
                 linkedEvidence={targetInput.linkedEvidence}
                 singleTentId={targetInput.singleTentId}
+                tentState={targetInput.tentState}
+                plantState={targetInput.plantState}
                 variant="detailed"
                 tentHref={targetInput.tentId ? tentDetailPath(targetInput.tentId) : null}
                 plantHref={targetInput.plantId ? plantDetailPath(targetInput.plantId) : null}

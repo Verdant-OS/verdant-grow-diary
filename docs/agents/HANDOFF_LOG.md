@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-2291-EVIDENCE-READINESS
+
+```text
+TASK CODEX-2291-EVIDENCE-READINESS  priority: P2  status: OPEN
+goal: Hold the welcome onboarding count until its connected sensor and activation-evidence reads settle, preserving the original grow/tent/plant gate.
+why: Pending evidence reads produced a premature step count even after the three graph reads had completed.
+branch: claude/onboarding-count-consistency
+base: verdant-grow-diary at cbdd6acb0e22cfaef381f3704a0c33394f54cd26
+checkout: Fetch this existing branch and base; verify the live PR full head and writer claim before adopting it in an isolated cloud worktree. Preserve child #2384 and use normal merges and pushes.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2291
+head_sha: 3cac4d2fafeb79900099edc2be20a252b167e5c9 (published source checkpoint before required base integration; resulting full head is recorded in the current PR description after normal publication)
+state: Locally validated required base-integration checkpoint. The resulting published full head and current GitHub/CI/review state are recorded in the current PR description; this log snapshot is not acceptance.
+current_step: At 2026-10-27T02:50:09.920498+00:00 the cbdd6acb normal integration passed the same28 focused files /274 tests, complete TypeScript and scoped ESLint. Only this own HANDOFF block needed manual conflict resolution; all three bridge-test files are byte-identical to3cac4d2f. Earlier real-hook RED/GREEN evidence remains historical. Documentation/normal-hook checks and fresh resulting-head CI/review remain separate gates.
+next_action: After normal validation/publication, verify the exact resulting remote head, fresh required/supplemental checks and the existing non-contributing Sour full-scope review. Preserve draft, child2384 parent-first ordering and the two unchanged locked-test P3s; no new scorer edit or deferral is authorized.
+post_merge_check: Verify the served version includes the merge and confirm the loading-to-exact-count transition using authorized QA; live authenticated behavior remains NOT_MEASURED until separately measured.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, only the bridge, readiness helper, new rendered regression, this block and matching PR metadata. No child #2384, ManualSensorReadingCard, Timeline, or unrelated writer scope.
+decisions: Always-enabled tent/plant reads wait for isPending or isLoading, including an offline first read. Sensor pending/loading matters only for a queryable connected tent; disabled queries must not hang a no-tent graph. Activation evidence loading is unresolved. Preserve loading-flag fallback for mocks. Keep one persistent role=status, polite atomic region for loading and settled count.
+tried_and_rejected: Displaying a numeric count while an evidence source is unresolved; weakening existing assertions; treating disabled-query pending as an active read; claiming a queued workflow or writer test as independent acceptance.
+commands: node node_modules/vitest/vitest.mjs run src/test/landing-authed-onboarding-bridge-evidence-readiness.test.tsx --pool=forks --maxWorkers=1; node node_modules/typescript/bin/tsc --noEmit; node scripts/scorer-lock.mjs --report --base e18e067af80fcb3eb32b37f1e046fa725bba8a9d --strict; node scripts/assert-docs-safety.mjs; git diff --check.
+files_touched: src/components/LandingAuthedOnboardingBridge.tsx; src/lib/onboardingBridgeReadinessRules.ts; src/test/landing-authed-onboarding-bridge-evidence-readiness.test.tsx (initial repair, untouched in follow-up); src/test/landing-authed-onboarding-bridge-paused-core-reads.test.tsx (NEW follow-up); docs/agents/HANDOFF_LOG.md (this block only). Normal base integration inherits existing approved base files unchanged.
+files_remaining: None planned for this repair; respond to fresh findings within current approval fences.
+blockers: Fresh exact-head hosted checks and outside acceptance are pending. Codex repaired this PR and cannot independently accept it. No production action is authorized.
+open_questions: Actual available outside reviewer pickup after the current-head CI precheck.
+gotchas: #2384 is a separate stacked test PR; do not retarget, absorb or close it from this repair. Existing tracked scorers stay locked.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2291; https://github.com/Verdant-OS/verdant-grow-diary/pull/2384
+artifacts: New rendered regression and current PR description/check receipts; cloud-only diagnostic receipts supplement the repository evidence.
+reviewer_seat: An actually available eligible non-contributing outside session under current OWNERSHIP, excluding every Claude/Cursor/Codex implementation contributor. A posted request is not pickup or acceptance.
+reviewer_sha: NOT_MEASURED for the repaired head; old-head receipts remain historical.
+session_state: Codex writer in isolated authorized cloud worktree; release and live behavior NOT_MEASURED.
+claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 18:32:05 UTC (matching PR claim).
+owner: Codex closeout coordinator for this bounded repair; outside reviewer and normal merge gates remain separate.
+last_updated: 2026-10-27T02:50:09.920498+00:00 by existing Codex closeout session01a16de3-1885-74b8-8142-25b4c333d0cd; normal base-conflict integration checkpoint.
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

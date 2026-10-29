@@ -3,12 +3,17 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
+import {
+  LANDING_ONBOARDING_BRIDGE_LOADING_LABEL,
+  isOnboardingBridgeCountReady,
+} from "@/lib/onboardingBridgeReadinessRules";
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRules";
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useGrows } from "@/store/grows";
 import { useGrowTents, useGrowPlants } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { isUuid } from "@/lib/isUuid";
 
 /**
  * Compact onboarding bridge shown on `/welcome` for authenticated users
@@ -24,17 +29,30 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
  *  - No writes, no automation, no device control, no fake-live data.
  */
 export default function LandingAuthedOnboardingBridge() {
-  const { grows, activeGrowId } = useGrows();
-  const { data: tents = [] } = useGrowTents();
-  const { data: plants = [] } = useGrowPlants();
+  const { grows, activeGrowId, loading: growsLoading } = useGrows();
+  const { data: tents = [], isLoading: tentsLoading, isPending: tentsPending } = useGrowTents();
+  const { data: plants = [], isLoading: plantsLoading, isPending: plantsPending } = useGrowPlants();
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
     plants,
     preferredGrowId: activeGrowId,
   });
-  const { data: readings = [] } = useSensorReadings(activationGraph.tentId);
+  const {
+    data: readings = [],
+    isPending: sensorPending,
+    isLoading: sensorLoading,
+  } = useSensorReadings(activationGraph.tentId);
   const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  const countReady = isOnboardingBridgeCountReady({
+    growsLoading,
+    tentsLoading: tentsPending || tentsLoading,
+    plantsLoading: plantsPending || plantsLoading,
+    // Disabled queries remain pending. Only a queryable connected tent
+    // contributes sensor evidence to this count.
+    sensorReadPending: isUuid(activationGraph.tentId) && (sensorPending || sensorLoading),
+    activationEvidencePending: activationEvidence.status === "loading",
+  });
   const connectedSensorRows = activationGraph.tentId
     ? readings.filter((row) => row.tent_id === activationGraph.tentId)
     : [];
@@ -58,8 +76,22 @@ export default function LandingAuthedOnboardingBridge() {
       data-testid="landing-authed-onboarding-bridge"
       className="mt-8 mx-auto max-w-xl rounded-2xl border border-primary/30 bg-primary/5 p-4 md:p-5"
     >
-      <div className="flex items-center justify-center mb-2">
-        <OnboardingProgressPill vm={vm} />
+      <div
+        className="flex items-center justify-center mb-2"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {countReady ? (
+          <OnboardingProgressPill vm={vm} />
+        ) : (
+          <p
+            data-testid="landing-authed-onboarding-bridge-loading"
+            className="text-[11px] text-muted-foreground"
+          >
+            {LANDING_ONBOARDING_BRIDGE_LOADING_LABEL}
+          </p>
+        )}
       </div>
       <p className="text-center text-sm md:text-base font-medium">
         {vm.isFullyActivated

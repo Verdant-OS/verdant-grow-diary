@@ -78,11 +78,11 @@ why: the founder chose option A (docs-only refresh) on 2026-10-29, after a colli
 branch: claude/new-session-kulf08
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head; only the writer then runs git merge origin/verdant-grow-diary and pushes a new head)
-pr: NOT_MEASURED (opened after the first push)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622 (draft)
 head_sha: a commit cannot record its own SHA; read the full head from the PR
-state: pushed draft
+state: pushed draft. Independent review at 4c718a4ea502fd2544611570889cffa990e15434 was PASS-with-findings, 3 P3, by session_017UoYKvqHhSHehpNuWHT7qV (comment 6505081663). This commit merges base d55c557 (#2539) to clear a HANDOFF_LOG.md conflict and fixes F1 and F2, so that verdict is stale at the new head.
 current_step: restamp written. 419 path:line cites re-read by text (9 moved, 3 live in AC-8.1, all in scripts/check-bun-lockfile-policy.mjs after #2569); AC-3.2, AC-4.3 and AC-10.2 counts unchanged; AC-3.4 940 in 939 -> 945 in 944.
-next_action: an eligible independent reviewer (not Claude) re-runs the cite and count checks at the PR head and gives a verdict at that exact SHA.
+next_action: an eligible independent reviewer (not session 017UoYKx8T6Y6eyPhvDvxPjS or 017UoYKxQUVr5LNsENPKJ59K) re-reviews at the new PR head: the base-merge delta plus F1 and F2. Then the founder gives a per-item yes at that SHA, and the PR is marked ready so the 35 required checks run.
 post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
 active_writer: Claude
 decisions: (1) no new contract and no topology edit; slice C (topology) waits for #2539, #2609 and #2589. (2) the six moved cites inside the 27991451 header record stay as that tree's lines, because a stamp record describes its own tree. (3) the counts were reproduced at 27991451 before measuring 479cadb, so the same method gives both. (4) the stale CLAUDE.md lockfile wording (option B) is out of scope; it would need the 18-file Sentinel bump.
@@ -95,13 +95,46 @@ open_questions: whether to run option B (fix CLAUDE.md:117 and :297, which still
 gotchas: docs/specs/release-topology-specification.md:1012 records `PASS` for "AI Doctor inference through the Lovable AI gateway", citing GATEWAY_URL and LOVABLE_API_KEY, but AI Doctor is Gemini-direct since #1982 (contract AC-5.1). In slice C, confirm whether that §6.1 row is a dated measurement that a later section supersedes; if not, correct it.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564
 artifacts: the PR's check runs
-reviewer_seat: eligible independent session under OWNERSHIP.md §4.3; Claude excluded as author
-reviewer_sha: none yet
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3. A non-contributing Claude session qualifies. Excluded: author session 017UoYKx8T6Y6eyPhvDvxPjS and holder session 017UoYKxQUVr5LNsENPKJ59K
+reviewer_sha: 4c718a4ea502fd2544611570889cffa990e15434, PASS-with-findings (P3 only), now stale; none yet at the new head
 session_state: Claude cloud session 017UoYKx8T6Y6eyPhvDvxPjS; separate one-shot check-in trig_01F8BsQcKVPKV5VDk4EPy3X1 is for #2597 CI
 claimed_by: Claude, 2026-10-29 12:20 CT
 owner: Claude
-last_updated: 2026-10-29 12:20 CT, by Claude
+last_updated: 2026-10-29 19:00 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K (base merge; F1 and F2)
 ```
+
+### LIVE-CHECKOUT-2497-REBASE
+
+````text
+TASK LIVE-CHECKOUT-2497-REBASE  priority: P1  status: OPEN
+goal: Finish Paddle live billing on PR #2539 through a verified live purchase: live checkout opens only with a well-formed live_ client token on verdantgrowdiary.com / www.verdantgrowdiary.com, every other host and token fails closed, a build-time kill switch (VITE_CHECKOUT_DISABLED="true") is the deployable rollback, and get-paddle-price reads its catalog through the pure helper.
+why: Live checkout code existed only on closed #2497; this draft replays it. Matthew (2026-10-29, direct instruction to this Claude session) owns the release decisions and asked Claude to own investigation, repair, validation, coordination and the release packet, with every production, payment and refund action approved by him per item at the verified head.
+branch: cursor/live-checkout-2497-rebase-c00d
+base: verdant-grow-diary
+checkout: git fetch origin cursor/live-checkout-2497-rebase-c00d verdant-grow-diary && git switch cursor/live-checkout-2497-rebase-c00d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2539 (draft)
+head_sha: 01c26b0 (2026-10-29 ~15:42 UTC) fixes the two Codex P2 findings posted at 3b80e7c28c1e5942bdae97a3e70ecb7b96a384ce; the commit that records this line follows it. Read origin/cursor/live-checkout-2497-rebase-c00d for the exact head.
+state: base verdant-grow-diary 9b60f907 merged at 84fe871; Founder retirement reconciled at f4936dd; all seven review threads answered and resolved; marked ready for review on Matthew's instruction (2026-10-29, this session) so the 35 required contexts run. Local at 91a91f7: full vitest 3749 files passed / 6 BLOCKED (PostgreSQL proofs refuse root) / 49575 tests passed; tsc strict PASS; bun run build PASS with postbuild SEO validators OK.
+current_step: ready for review. Codex code review at 3b80e7c: two P2 (the rollback verifier assumed the .output layout; the runbook gates lacked the Founder archive), fixed in 01c26b0 (layout discovery from nitro.json with .output, dist and .vercel/output fallbacks, plus src/test/checkout-disabled-bundle-roots.test.ts; runbook prerequisite 10 and release step 4). Codex security review at 3b80e7c completed with no finding posted. Re-review requested at the new head; required CI re-running there.
+next_action: Codex reviews the exact pushed head (full 40-character SHA from the PR) under OWNERSHIP.md section 4.3; this session fixes findings and re-requests at the new head. After a clean PASS at the head with 35/35 green: Matthew's per-item yes, then the merge queue (squash) at that exact SHA. No deploy, secret, webhook, charge or refund without Matthew's per-item yes.
+post_merge_check: live /version.json reports the merge commit; /pricing on verdantgrowdiary.com shows "Secure checkout by Paddle" and opens live checkout for pro_monthly; Craft shows the scoped "Join the Craft launch list" block; founder_lifetime is refused. NOT_MEASURED until that deploy.
+active_writer: Claude session_017UoYKz9AZWshNbyKnd1ck6 (took over from the Cursor Grok cloud agent, idle since 2026-10-27 21:04 UTC, on Matthew's 2026-10-29 instruction)
+decisions: Reuse this PR, not a new one (Matthew). Sellable catalog is pro_monthly, pro_annual, credit_pack_50, credit_pack_150 (live Paddle read 2026-10-29: five active prices, no Craft product; the Founder price is still active in Paddle and must be archived by Matthew before any live client ships). Craft stays offered with a scoped unavailable block; do not create Craft products. founder_lifetime keeps its env name only for the cold-start drift guard; the function answers 410 plan_retired first. Founder refusal in usePaddleCheckout runs before the kill switch and is scoped to the plan. Rollback workflow: permissions contents: read, persist-credentials false, receipt upload also on verify failure.
+tried_and_rejected: a rebase or force-push (forbidden; the base was merged with one merge commit). Resolving the 32 conflicts file by file against the virtual merge base (criss-cross bases 7f2f974a, 65d9964e, bfd2a85c inflated the list); instead files unchanged since 7f2f974a take the tip and only the four changed files were merged three-way.
+commands: bunx vitest run src/test/*paddle*.test.ts* src/test/*checkout*.test.ts* src/test/sellable-tier-chain.test.ts src/test/get-paddle-price*.test.ts src/test/request-hostname*.test.ts src/test/pricing*.test.ts* src/test/ci-pr-concurrency.test.ts --reporter=dot ; NODE_OPTIONS=--max-old-space-size=8192 bunx tsc -p tsconfig.json --noEmit ; node scripts/check-contract-test-resolution.mjs ; node scripts/verify-edge-shared-in-sync.mjs ; node scripts/assert-paddle-production-sandbox.mjs
+files_touched: .env.example; .env.production; .github/workflows/checkout-disabled-rollback-artifact.yml; docs/billing.md; docs/paddle-paid-launch-runbook.md; docs/codebase-map.md; src/lib/paddle.ts; src/lib/paddleEnvironment.ts; src/lib/requestHostname.ts; src/lib/requestHostname.server.ts; src/lib/checkoutBlockedScopeRules.ts; src/lib/checkoutTrustCopyRules.ts; src/hooks/usePaddleCheckout.ts; src/hooks/useRenderedPaddleCheckoutEnvironment.ts; src/pages/Pricing.tsx; src/server.ts; supabase/functions/_shared/getPaddlePriceCatalogEnv.ts; supabase/functions/get-paddle-price/index.ts; scripts/verify-checkout-disabled-bundle.mjs; the paddle/checkout/pricing tests; docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: none in the code slice. Outside the repo, Matthew: production secrets (PAYMENTS_ENVIRONMENT=live, PADDLE_LIVE_API_KEY, PAYMENTS_LIVE_WEBHOOK_SECRET, the four live PADDLE_PRICE_* values), deploy of get-paddle-price and payments-webhook, the live webhook destination (traffic_source platform, per #2589), archiving the live Founder price, Publish, the approved purchase and any refund.
+blockers: Paddle-side: archiving the live Founder price pri_01kx3dsezn1d73dghffdxnr2za was ordered by Matthew (2026-10-29) but this session's Paddle MCP connection lacks price.write (request 2ea301d4-42f5-49a7-bcde-5527f1e29163); Matthew archives it in the Paddle dashboard or grants price.write at vendors.paddle.com/mcps. Webhook destinations (read-only inventory 2026-10-29 ~15:36 UTC; all three show zero notifications in 30 days): "Test" (simulation traffic to the website root, all 57 events, sensitive fields on); the Lovable relay (platform traffic, 20 events); the direct payments-webhook?env=live destination (platform traffic, 5 events: transaction.completed, transaction.payment_failed, subscription.created/updated/canceled; it misses adjustment.created, the refund event the function handles). Recommendation, each its own approval: widen the direct destination to the 13 handled types; deactivate "Test" after the purchase; keep the relay until the first purchase proves the direct path. Matthew (2026-10-29): review exact events and destinations before approving; nothing applied. Production deployed-function receipts for get-paddle-price and payments-webhook: BLOCKED from this session (Supabase MCP sees only bzatgtgjvuojpoxcknaa). Dependency-audit lane red repo-wide on @hono/node-server (fix PR #2605), UNSTABLE not blocking.
+open_questions: Matthew: apply the webhook recommendation (one word); archive the Founder price or grant price.write; production secrets and the two Edge deploys with receipts; the exact purchase (plan, tax-inclusive total, method, refund plan) before any charge.
+gotchas: Drafts skip the 32 shard contexts (#2555), so a draft's green header is not required CI. assert-paddle-production-sandbox and restore-env-production-from-head run in prebuild; the committed .env.production holds the live client token, which is public by design. Local DB proofs (founder-*-db, founder-refund-grant-concurrency) are BLOCKED as root or without PostgreSQL tools; that is environment, not a code result. Three merge bases exist with the tip; a plain merge-tree overstates conflicts. The husky pre-commit tsc needs NODE_OPTIONS=--max-old-space-size=8192 on this box.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2497 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2589 (webhook readiness audit) ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 ; docs/specs/paddle-live-checkout-runtime-slice.md
+artifacts: PR body and checks; checkout-disabled-rollback-receipt artifact from the rollback workflow at the pushed head
+reviewer_seat: Codex (named by Matthew 2026-10-29) as independent exact-head reviewer under OWNERSHIP.md section 4.3; excluded: the Cursor Grok cloud agent (author), Claude session_017UoYKz9AZWshNbyKnd1ck6 (repairer)
+reviewer_sha: none at the current head (Codex code review at 3b80e7c found two P2, both fixed in 01c26b0; CodeRabbit comments are not acceptance)
+session_state: Claude Code cloud session session_017UoYKz9AZWshNbyKnd1ck6; no routines; no paused workflows; pending Matthew decisions listed under open_questions
+claimed_by: Claude session_017UoYKz9AZWshNbyKnd1ck6, 2026-10-29 (Matthew's direct assignment)
+owner: Claude session_017UoYKz9AZWshNbyKnd1ck6
+last_updated: 2026-10-29 ~15:45 UTC by Claude session_017UoYKz9AZWshNbyKnd1ck6 (Codex P2s fixed in 01c26b0; Founder archive still BLOCKED on price.write at 15:34 UTC, Matthew routes it to the Paddle operator; Pro Monthly read-only tax preview for US 64154: $12.00 subtotal, $0.00 tax, $12.00 USD total; no charge made)
 
 ### VER-300-ALERT-ARCHIVED-TARGETS
 
@@ -135,7 +168,7 @@ session_state: Claude cloud session session_017UoYKyX1Beo5tnXmkJp17C watching th
 claimed_by: Claude session_017UoYKyX1Beo5tnXmkJp17C, 2026-10-28 02:20 UTC (Matthew's VER-300 task prompt)
 owner: Claude
 last_updated: 2026-10-29 01:05 UTC, by Claude
-```
+````
 
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 

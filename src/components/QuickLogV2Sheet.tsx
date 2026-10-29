@@ -1184,7 +1184,13 @@ function QuickLogV2SheetForOwner({
         manualTempEntryUnitRef.current = restorable.tempEntryUnit;
         chipAuthoredStatusRef.current = restorable.chipStatus;
       }
-      setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      // A draft saved while Feed was active carries its words in form.note, but
+      // Feed shows and submits feedingForm.note; hand them over as switching does.
+      setFeedingForm(
+        restoredDraft?.action === "feed"
+          ? { ...EMPTY_QUICKLOG_FEEDING_FORM, note: restoredDraft.note }
+          : EMPTY_QUICKLOG_FEEDING_FORM,
+      );
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;

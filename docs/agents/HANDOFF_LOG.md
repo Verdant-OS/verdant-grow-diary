@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-2286-FOOTER-DISPLAY-PREFERENCE
+
+```text
+TASK CODEX-2286-FOOTER-DISPLAY-PREFERENCE  priority: P2  status: OPEN
+goal: Make the Daily Check footer explicitly describe the saved display preference while the form may temporarily use another entry unit.
+why: The real manual-reading card can toggle Celsius/Fahrenheit locally without changing the preference hook used by the footer, so an unlabeled unit sentence contradicts the form.
+branch: claude/daily-check-footer-temperature-unit
+base: verdant-grow-diary at 59fd56421f57b23366258d1a9ed907699054103b
+checkout: Fetch the existing branch and base; verify the live full head and writer before adopting it in an isolated authorized cloud worktree. Use normal base merges and pushes only.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2286
+head_sha: d3ce46f7125e37b64a711789b8f0269e649d6c7e (published source checkpoint verified before this normal conflict-only base integration; the resulting full head belongs in the coordinator PR packet).
+state: Footer repair was published at the source checkpoint. Sour Diesel review 5661894683 reports only a merge-conflict P1, zero P2 and two nonblocking P3s. Normal base integration resolves only this own handoff conflict; runtime and test blobs are preserved.
+current_step: Current-base integration validation passed 82 existing Daily Check/manual-sensor/unit-preference files, 929 tests, zero failures/skips; full TypeScript passed. Docs safety (three categories), nine-file release docs, phenotyping docs, own-block formatting and whitespace pass. Historical rendered RED/GREEN remains dated evidence; no new behavior/assertion change.
+next_action: Existing coordinator verifies the published resulting full head in the PR packet, obtains fresh required/supplemental CI and a fresh complete-scope verdict through the existing eligible Sour Diesel route. Keep draft; no readiness, queue or merge action in this source slice.
+post_merge_check: Existing Codex closeout coordinator verifies served version includes the merge; authenticated footer/input-toggle behavior is NOT_MEASURED until authorized QA records it.
+active_writer: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd delegates only this normal conflict-only integration to /root/reconcile_counts within the same task. Only this block is edited manually; no runtime/test edit, protected unlock, ManualSensorReadingCard or #2251 guard change.
+decisions: Prefix the original helper output with Saved display preference; preserve its existing pure tests, the manual/not-live label, input conversion, persistence and source truth.
+tried_and_rejected: Treating a saved display preference as the local entry-unit override; modifying the shared form or locked scorers for a copy-only repair; assuming writer tests are outside acceptance.
+commands: Canonical Bun 1.3.14 install --frozen-lockfile (manifest/lock unchanged); node node_modules/vitest/vitest.mjs run [79 existing Daily Check/manual-sensor paths plus temperature-unit-preference, manual-sensor-save-toast-temperature-unit and manual-sensor-card-toast-celsius tests] --pool=forks --maxWorkers=1 --reporter=json (exact 82-path command in focused-receipt.json); node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit --pretty false; node scripts/assert-docs-safety.mjs; node scripts/assert-release-docs-safety.mjs; node scripts/assert-automated-phenotyping-docs-safety.mjs; node scripts/scorer-lock.mjs --report --base 59fd56421f57b23366258d1a9ed907699054103b --strict (expected historical exit 2); git diff --check; normal commit hooks and guarded non-force push.
+files_touched: This integration manually changes only docs/agents/HANDOFF_LOG.md (this block). Five authored nonlog source/test blobs remain exact d3ce46f7125e37b64a711789b8f0269e649d6c7e. Every unrelated base byte/block is adopted intact; no dependency authoring.
+files_remaining: None planned for this bounded repair; respond to fresh findings within current permission fences.
+blockers: The new integration head needs fresh hosted required/supplemental CI and eligible complete-scope outside acceptance. All Codex authors/repairers are excluded. Sour's stale helper-docstring and whitespace-regex P3s remain unchanged, open and unwaived; no accepted deferral is claimed. No deployment or production operation authorized.
+open_questions: Actual available eligible outside reviewer pickup after current-head precheck.
+gotchas: Strict vs current base exits 2 for the historical daily-grow-check.test.ts pin, exact original 7da357e1 and d3ce bytes. Strict vs d3ce exits 2 for 26 protected changes, each exact incoming-base bytes. Neither report is green; this integration edits/unlocks no scorer. #2266 card and #2251 guards remain separate. Full local suite/build and production behavior NOT_MEASURED in this slice; old CI/reviews do not accept a new head.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2286
+artifacts: Coordinator PR packet and hosted checks; cloud 2286-required-base-integration compact receipts bind exact source/base/tree, preservation, tests, normal hooks and push readback. Historical RED/GREEN receipts remain dated history.
+reviewer_seat: Existing non-contributing Sour Diesel Grok route, actual session 48794c65; coordinator verifies current availability before one fresh full-scope request. Exclude original Claude session 016Ym79BwSvGTrmSyMeN9zsA, every actual shared-account contributor and all Codex authors/repairers including /root/reconcile_counts.
+reviewer_sha: 5661894683 is FAIL at d3ce46f7125e37b64a711789b8f0269e649d6c7e (conflict P1 only); fresh acceptance at the resulting head is NOT_MEASURED.
+session_state: Sole delegated isolated cloud integrator; no other source lane or review request started. Source writes stop after handoff. Release/live behavior NOT_MEASURED.
+claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 19:06 UTC (matching PR claim).
+owner: Codex closeout coordinator for this bounded repair; outside acceptance and merge authority remain separate.
+last_updated: 2026-10-27 03:54 UTC, by delegated Codex closeout integrator /root/reconcile_counts
+```
+
 ### VER-298-QUICKLOG-NOTE-VS-ISSUE
 
 ```text

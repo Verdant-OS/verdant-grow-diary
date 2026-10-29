@@ -11,13 +11,10 @@ import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage"
 const GENERIC = quickLogReasonToOperatorMessage("some_unknown_reason_code");
 
 describe("quickLogReasonToOperatorMessage — canonical sensor bands", () => {
-  it("temperature_out_of_range states the -10..60 °C band", () => {
+  it("temperature_out_of_range states the manual air band in both units", () => {
     const msg = quickLogReasonToOperatorMessage("temperature_out_of_range");
     expect(msg).not.toBe(GENERIC);
-    expect(msg).toMatch(/temperature/i);
-    expect(msg).toMatch(/-10/);
-    expect(msg).toMatch(/60/);
-    expect(msg).toMatch(/°?C/);
+    expect(msg).toBe("Temperature must be between -10 and 50 °C (14–122 °F).");
   });
 
   it("humidity_out_of_range states the 0..100 band", () => {

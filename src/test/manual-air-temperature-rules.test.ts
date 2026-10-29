@@ -4,6 +4,7 @@ import {
   MANUAL_AIR_TEMP_MAX_C,
   MANUAL_AIR_TEMP_MIN_C,
   MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_BOTH_UNITS,
+  MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_CELSIUS,
   manualAirTemperatureRangeMessage,
 } from "@/lib/manualAirTemperatureRules";
 import { AIR_TEMP_C_RANGE } from "@/constants/csvValidationRanges";
@@ -11,6 +12,12 @@ import { validateManualEntry } from "@/lib/sensorReadingManualEntryRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { assessQuickLogSensorSnapshotGate } from "@/lib/quickLogSensorSnapshotGateRules";
+import { validateEnvironmentCheckSensorBand } from "@/lib/environmentCheckQuickLogRules";
+import {
+  buildWateringFormPayload,
+  EMPTY_QUICKLOG_WATERING_FORM,
+  wateringFormReasonToHelper,
+} from "@/lib/quickLogWateringFormViewModel";
 import {
   describeQuickLogActivityDetails,
   getQuickLogActivityDetailFields,
@@ -66,6 +73,25 @@ describe("2,462 °F typed at the tent door (Case Files Ep07)", () => {
     expect(gate.fields.temperature).toBe("Temperature must be between 14 and 122 °F.");
   });
 
+  it("closes the old 50–60 °C gap on the Water form snapshot", () => {
+    const base = {
+      growId: "grow-1",
+      idempotencyKey: "manual-air-water-gap-0001",
+      occurredAt: "2026-07-20T10:30:00.000Z",
+      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "500" },
+      humidityPct: "",
+      vpdKpa: "",
+    };
+    expect(buildWateringFormPayload({ ...base, temperatureC: "55" })).toEqual({
+      ok: false,
+      reason: "temperature_out_of_range",
+    });
+    expect(buildWateringFormPayload({ ...base, temperatureC: "50" }).ok).toBe(true);
+    expect(wateringFormReasonToHelper("temperature_out_of_range")).toBe(
+      MANUAL_AIR_TEMPERATURE_RANGE_MESSAGE_CELSIUS,
+    );
+  });
+
   it("closes the old 50–60 °C gap: 55 °C no longer builds a Quick Log payload", () => {
     const input = {
       resolved: {
@@ -97,6 +123,15 @@ describe("2,462 °F typed at the tent door (Case Files Ep07)", () => {
 });
 
 describe("Environment-check history keeps rows saved under the old 60 °C band", () => {
+  it("refuses 55 °C typed as Celsius on a new environment check", () => {
+    expect(validateEnvironmentCheckSensorBand({ roomTempF: "55", roomTempUnit: "C" }).ok).toBe(
+      false,
+    );
+    expect(validateEnvironmentCheckSensorBand({ roomTempF: "50", roomTempUnit: "C" }).ok).toBe(
+      true,
+    );
+  });
+
   it("still displays a stored 55 °C reading while refusing 55 as new input", () => {
     const lines = describeQuickLogActivityDetails("environment_check", {
       environment_check: { temp_c: 55 },

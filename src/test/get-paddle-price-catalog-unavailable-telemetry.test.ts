@@ -100,7 +100,6 @@ describe("get-paddle-price — telemetry fires on every fail-closed branch", () 
       "auth",
       "allowlist",
       "entitlement",
-      "founder_cap",
       "gateway",
       "gateway_body",
       "config_drift",
@@ -176,7 +175,6 @@ describe("get-paddle-price — reason codes never leak into HTTP responses", () 
     const diagnosticTokens = [
       "gateway_body",
       "config_drift",
-      "founder_cap",
       "env_var_configured",
       "get_paddle_price_catalog_unavailable",
     ];

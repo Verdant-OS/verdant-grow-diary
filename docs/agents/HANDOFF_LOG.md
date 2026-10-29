@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GUIDE-AUTOPOT-STASH-NUTRIENTS-FEED-LOG
+
+```text
+TASK GUIDE-AUTOPOT-STASH-NUTRIENTS-FEED-LOG  priority: other  status: OPEN
+goal: port the founder-supplied autopot-feed-log HTML to the public route /guides/autopot-stash-nutrients-feed-log, same pattern as /guides/when-to-harvest-cannabis.
+why: Matthew (2026-10-28) asked for one small draft PR against verdant-grow-diary, without touching scorer-locked files.
+branch: claude/guide-autopot-stash-nutrients-feed-log
+base: verdant-grow-diary
+checkout: git fetch origin claude/guide-autopot-stash-nutrients-feed-log verdant-grow-diary && git switch claude/guide-autopot-stash-nutrients-feed-log && git merge origin/verdant-grow-diary
+pr: read from the PR list for branch claude/guide-autopot-stash-nutrients-feed-log
+head_sha: 4761357646d972af19324f7b2dd55be7240a39b5 before the unmount-timer and stale-copy fix; read the current head from the PR
+state: pushed, draft PR
+current_step: the same status-timer defect failed shard 18 on the sibling harvest page (#2592), and the #2594 review found a stale clipboard race; both were present here. The status and print timers are now cleared on unmount, and a clipboard result that arrives after the log changed is ignored. Pinned by src/test/autopot-feed-log-page-async.test.tsx (RED 4 failed / 1 passed). Earlier: draft; awaiting founder decision on the /guides index card, then CI and an independent exact-head review
+next_action: founder decides whether to unlock src/test/verdant-seo-guides-public-links.test.tsx for the GuidesIndex card; then independent exact-head review (author: this Claude session; exclude it)
+post_merge_check: after Publish, https://verdantgrowdiary.com/guides/autopot-stash-nutrients-feed-log returns the H1 "AutoPot + Stash Nutrients Feed Log: Track Every Reservoir Refill" and /version.json reports the merge SHA; else NOT_MEASURED
+active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
+decisions: copy, FAQ and the four JSON-LD blocks are verbatim; GROW_EXAMPLE stays null, its section renders empty with the hidden attribute, and it never reaches JSON-LD or CSV; readings stay as typed and EC/PPM is never converted (different units show "Different units — no comparison"); autopot_log_* params are integers and enums only; plan_compared keeps the source's 2 s trailing debounce; the breadcrumb links /guides. No existing test, e2e spec or gate script is edited; the GuidesIndex card is left out because it fails the locked verdant-seo-guides-public-links test.
+tried_and_rejected: adding the GuidesIndex card; it needs an edit to a locked scorer.
+commands: bun run typecheck (NODE_OPTIONS=--max-old-space-size=8192 here); bunx vitest run src/test/autopot-feed-log-*.ts* src/test/route-indexation-matrix.test.ts src/test/*seo*.test.ts* src/test/*guides*.test.ts* --reporter=dot; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/lib/autopotFeedLogRules.ts src/lib/autopotFeedLogAnalytics.ts src/pages/AutopotStashNutrientsFeedLog.tsx src/test/autopot-feed-log-page-async.test.tsx src/routes/guides.autopot-stash-nutrients-feed-log.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts src/styles.css public/sitemap.xml docs/seo/route-indexation-matrix.md scripts/seo-runtime-smoke.mjs and four new autopot tests
+files_remaining: src/pages/GuidesIndex.tsx card (blocked on the locked-test decision); the grow example stays null until the grower confirms the EC unit (brief slot D)
+blockers: GuidesIndex card needs a scorer unlock the founder has not given
+open_questions: unlock verdant-seo-guides-public-links.test.tsx for the index card, or ship the cards in a separate reviewed PR
+gotchas: all guide PRs (#2592-#2595 and this one) edit the same registration lines, styles.css hunk and matrix counts.
+links: NOT_MEASURED
+artifacts: PR checks
+reviewer_seat: unassigned (eligible independent reviewer per OWNERSHIP.md 4.3)
+reviewer_sha: none
+session_state: no routines, no paused workflows
+claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-28 11:30 UTC
+owner: Claude
+last_updated: 2026-10-29 18:20 UTC, by Claude
+```
+
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
 
 ```text

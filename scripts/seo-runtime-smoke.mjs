@@ -33,6 +33,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/grow-help-toolkit`,
   },
   {
+    path: "/guides/autopot-stash-nutrients-feed-log",
+    expectTitle: /AutoPot Feed Log/,
+    canonical: `${ORIGIN}/guides/autopot-stash-nutrients-feed-log`,
+  },
+  {
     path: "/guides/athena-feed-chart-log",
     expectTitle: /Athena Feed Chart Log/,
     canonical: `${ORIGIN}/guides/athena-feed-chart-log`,

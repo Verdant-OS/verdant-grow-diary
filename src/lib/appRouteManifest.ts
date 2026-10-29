@@ -232,6 +232,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public planned-vs-actual Athena feed log. In-memory only.",
   },
   {
+    path: "/guides/autopot-stash-nutrients-feed-log",
+    access: "public",
+    description: "Public AutoPot reservoir and feed log with explicit EC/PPM units. In-memory only.",
+  },
+  {
     path: "/guides/grow-stage-care-guide",
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",

@@ -71,6 +71,9 @@ import {
 } from "@/lib/startYourRoomDraftRules";
 
 const ROOM_LIMITS_LOADING_COPY = "Checking your plan and active room limits…";
+// A reopened page takes ownership even when its stored values are unchanged.
+// Symbols stay within this browser lifetime and do not consume row UUIDs.
+const startRoomDraftWriters = new Map<string, symbol>();
 
 function plantsSelectAvailable(): boolean {
   try {
@@ -148,6 +151,15 @@ export default function StartYourRoom() {
 
   const ownerId = user?.id ?? null;
   const mountedRef = useRef(true);
+  const draftWriterRef = useRef(Symbol("start-room-draft"));
+  const ownerIdRef = useRef<string | null>(ownerId);
+  // Written at commit, not during render: a discarded render must not leave an
+  // owner the committed page is not showing.
+  useLayoutEffect(() => {
+    if (ownerIdRef.current !== ownerId) draftWriterRef.current = Symbol("start-room-draft");
+    ownerIdRef.current = ownerId;
+    if (ownerId) startRoomDraftWriters.set(ownerId, draftWriterRef.current);
+  }, [ownerId]);
   useEffect(() => {
     // Set on every mount: StrictMode runs this cleanup once before remounting.
     mountedRef.current = true;
@@ -155,12 +167,6 @@ export default function StartYourRoom() {
       mountedRef.current = false;
     };
   }, []);
-  const ownerIdRef = useRef<string | null>(ownerId);
-  // Written at commit, not during render: a discarded render must not leave an
-  // owner the committed page is not showing.
-  useLayoutEffect(() => {
-    ownerIdRef.current = ownerId;
-  }, [ownerId]);
 
   useEffect(() => {
     // A failed roster read looks like an empty roster; hydrating then would
@@ -247,6 +253,7 @@ export default function StartYourRoom() {
 
   useEffect(() => {
     if (!ownerId || draftHydratedFor.current !== ownerId || draftOwnerReady !== ownerId) return;
+    if (startRoomDraftWriters.get(ownerId) !== draftWriterRef.current) return;
     if (step === "done") {
       clearBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID);
       return;
@@ -472,18 +479,25 @@ export default function StartYourRoom() {
   async function persistStartRoomAttempt(
     attempt: HierarchyCreateAttempt,
     payload: Record<string, unknown>,
+    submissionIsCurrent: () => boolean,
   ) {
-    const saveOwnerId = ownerIdRef.current;
+    const saveOwnerId = attempt.ownerId;
+    if (ownerIdRef.current !== saveOwnerId || !submissionIsCurrent()) return null;
     const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
     if (ownerIdRef.current !== saveOwnerId) return null;
-    if (result.status === "confirmed") return result.confirmed;
     if (result.status === "unknown") {
+      // Recovery belongs to the owner even after another instance takes over;
+      // only the current writer may change this page's error state.
       recordUnknownCreateOutcome(attempt);
-      setError(
-        `Verdant could not confirm whether this ${attempt.entity} was saved. Refresh before adding another.`,
-      );
+      if (submissionIsCurrent()) {
+        setError(
+          `Verdant could not confirm whether this ${attempt.entity} was saved. Refresh before adding another.`,
+        );
+      }
       return null;
     }
+    if (!submissionIsCurrent()) return null;
+    if (result.status === "confirmed") return result.confirmed;
     setError(startRoomSaveErrorWithReason(attempt.entity, result.message));
     return null;
   }
@@ -529,6 +543,12 @@ export default function StartYourRoom() {
     }
     const roomForm = startRoomFormWithDefaults(shownForm);
     const saveOwnerId = user.id;
+    const saveDraftWriter = draftWriterRef.current;
+    const submissionIsCurrent = () =>
+      ownerIdRef.current === saveOwnerId &&
+      draftWriterRef.current === saveDraftWriter &&
+      startRoomDraftWriters.get(saveOwnerId) === saveDraftWriter;
+    if (!submissionIsCurrent()) return;
     let growId = shownIds.growId;
     let tentId = shownIds.tentId;
     createInFlightRef.current = true;
@@ -548,8 +568,9 @@ export default function StartYourRoom() {
         const confirmed = await persistStartRoomAttempt(
           { entity: "grow", rowId, ownerId: user.id },
           { id: rowId, user_id: user.id, ...payload },
+          submissionIsCurrent,
         );
-        if (ownerIdRef.current !== saveOwnerId || !confirmed) return;
+        if (!submissionIsCurrent() || !confirmed) return;
         releaseRowId("grow");
         const confirmedGrowId = confirmed.row.id;
         rememberConfirmedName("grow", confirmed.row, saveOwnerId);
@@ -558,8 +579,9 @@ export default function StartYourRoom() {
         setIds((prev) => ({ ...prev, growId: confirmedGrowId }));
         try {
           await refresh();
-          if (ownerIdRef.current !== saveOwnerId) return;
+          if (!submissionIsCurrent()) return;
         } catch {
+          if (!submissionIsCurrent()) return;
           // The grow is confirmed; continue rather than leave the form ready to
           // duplicate it.
           toast.error(
@@ -569,7 +591,7 @@ export default function StartYourRoom() {
       }
       // A grower who left mid-save may reopen setup and submit again; this
       // instance must not start another row the reopened page cannot see.
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !submissionIsCurrent()) return;
       if (!tentId) {
         const payload = buildStartRoomTentPayload(roomForm, {
           growId,
@@ -587,8 +609,9 @@ export default function StartYourRoom() {
         const confirmed = await persistStartRoomAttempt(
           { entity: "tent", rowId, ownerId: user.id, growId: payload.grow_id },
           { id: rowId, user_id: user.id, ...payload },
+          submissionIsCurrent,
         );
-        if (ownerIdRef.current !== saveOwnerId || !confirmed) return;
+        if (!submissionIsCurrent() || !confirmed) return;
         releaseRowId("tent");
         const confirmedTentId = confirmed.row.id;
         rememberConfirmedName("tent", confirmed.row, saveOwnerId);
@@ -600,7 +623,7 @@ export default function StartYourRoom() {
           tentId: confirmedTentId,
         }));
       }
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !submissionIsCurrent()) return;
       const plantPayload = buildStartRoomPlantPayload(roomForm, { growId, tentId, plantId: null });
       if (!plantPayload) return;
       let plantRowId: string;
@@ -619,8 +642,9 @@ export default function StartYourRoom() {
           tentId: plantPayload.tent_id,
         },
         { id: plantRowId, user_id: user.id, ...plantPayload },
+        submissionIsCurrent,
       );
-      if (ownerIdRef.current !== saveOwnerId || !confirmedPlant) return;
+      if (!submissionIsCurrent() || !confirmedPlant) return;
       // Fail closed if binding somehow dropped (should never happen with payload).
       if (!confirmedPlant.row.grow_id) {
         setError(
@@ -637,7 +661,7 @@ export default function StartYourRoom() {
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);
-      if (ownerIdRef.current !== saveOwnerId) return;
+      if (!submissionIsCurrent()) return;
       const plantId = confirmedPlant.row.id;
       setIds({ growId, tentId, plantId });
       // Hold the retry id until the plant id is recorded: a reload during the
@@ -646,10 +670,13 @@ export default function StartYourRoom() {
       toast.success("Plant created and linked");
       // The page unmounts with this navigation, before the "done" effect that
       // clears the draft can run, so clear it here.
-      clearBrowserSessionFormDraft(saveOwnerId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      // A reopened page owns its pending retry even when its text is identical.
+      if (startRoomDraftWriters.get(saveOwnerId) === saveDraftWriter) {
+        clearBrowserSessionFormDraft(saveOwnerId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      }
       // A grower who left while this save finished chose where to go; do not
       // override their start screen or pull them back to the plant.
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !submissionIsCurrent()) return;
       // Persist diary-first start screen so next login skips empty onboarding.
       setStartScreenChoice(user.id, "quickLog");
       nav(plantDetailQuickLogHref(plantId), { replace: true });

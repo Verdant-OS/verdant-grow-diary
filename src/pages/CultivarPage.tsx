@@ -39,8 +39,9 @@ function sectionId(key: CultivarGuideSectionKey): string {
 
 function formatDate(value: string): string {
   const date = new Date(value);
+  // Reference dates use UTC; preserve their calendar day during browser hydration.
   return Number.isFinite(date.getTime())
-    ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date)
+    ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(date)
     : "Not recorded";
 }
 

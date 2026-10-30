@@ -80,27 +80,27 @@ base: verdant-grow-diary at ab4aaa2f3a648c28860c682ddec3ec0103347246
 checkout: git fetch origin codex/ver-306-cultivar-utc-dates verdant-grow-diary && git switch codex/ver-306-cultivar-utc-dates && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 pr: Read the draft PR for this branch.
 head_sha: A commit cannot record itself; read the full current head from the PR.
-state: Initial scoped handoff; implementation and verification pending.
-current_step: Add explicit UTC to CultivarPage's formatter and new regression tests; inspect the separate catalog hypothesis.
-next_action: Codex completes implementation and records verification at the resulting exact head.
+state: Implemented; Node formatter matrix PASS (36/36); rendered regression suites and hosted checks pending.
+current_step: Explicit UTC added to the existing formatter; 14 date-render/hydration cases and 3 real-hook catalog hydration cases added.
+next_action: Codex inspects hosted checks at the PR's full head; then an eligible non-contributing outside session reviews the complete four-file scope. Stay draft.
 post_merge_check: After an owner-authorized release, verify /cultivars/sour-diesel in UTC and America/Chicago shows Jul 22, 2026 for Last verified and source retrieval; confirm no recoverable hydration errors and unchanged Article dates.
 active_writer: Codex in this task session; no other branch writer.
 decisions: Explicit UTC preserves the stored editorial date; no data, schema, SEO builder or catalog behavior change.
 tried_and_rejected: Do not suppress hydration errors or shift stored timestamps. Git mirror paths were unavailable; ordinary public GitHub clone worked.
 commands: bunx vitest run src/test/cultivar-page-date-timezone.test.tsx src/test/cultivar-catalog-hydration.test.tsx src/test/cultivar-page-seo.test.tsx src/test/cultivar-page-v1.test.tsx src/test/cultivar-pages-database-source.test.tsx; bun run typecheck; bun run build; node scripts/scorer-lock.mjs --report --base origin/verdant-grow-diary --strict
-files_touched: docs/agents/HANDOFF_LOG.md (this block)
-files_remaining: src/pages/CultivarPage.tsx; new src/test/cultivar-page-date-timezone.test.tsx; new src/test/cultivar-catalog-hydration.test.tsx
+files_touched: src/pages/CultivarPage.tsx; new src/test/cultivar-page-date-timezone.test.tsx; new src/test/cultivar-catalog-hydration.test.tsx; docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: None planned; repair only defects in this slice.
 blockers: Local Bun and node_modules are absent; local Vitest/typecheck/build cannot yet run. Hosted checks and independent exact-head review remain required.
 open_questions: The unmapped GB Sentry event is not independently explained by the confirmed west-of-UTC date defect.
-gotchas: usePublishedCultivars initializes pending/bundled and switches only in useEffect; production feature flag is false. Cached catalog behavior needs regression coverage, not a speculative implementation change.
+gotchas: Current and recorded-event release 0200d2551b86 use the same pending/bundled hook, switching only in useEffect. Current production flag is false. New tests cover enabled reads with cold and warm cache, but the original GB event remains unverified without mapped frames/browser TZ/server-client payload evidence. No catalog behavior change.
 links: https://linear.app/verdantgrowdiary/issue/VER-306
 artifacts: Draft PR and its hosted checks.
 reviewer_seat: BLOCKED until an actually available eligible non-contributing Claude/Grok or other eligible outside session is established under OWNERSHIP.md section 4.3.
 reviewer_sha: None; contributing Codex session excluded from independent acceptance.
 session_state: No subagents, routines, production operations, merge or deployment authorized. GitHub comments require separate approval, so claim and resume evidence live in the draft PR body.
-claimed_by: Codex, 2026-10-30 23:44 UTC
+claimed_by: Codex, 2026-10-30 15:38 UTC (PR creation receipt)
 owner: Codex
-last_updated: 2026-10-30 18:44 CT, by Codex
+last_updated: 2026-10-30, by Codex (implementation checkpoint; inspect PR for exact head and CI)
 ```
 
 ### ARCH-CONTRACT-RESTAMP-20261029

@@ -30,6 +30,7 @@ const HISTORICAL_DYNAMIC_EXECUTE = Object.freeze({
 
 // Unquoted identifiers: PostgreSQL reads every non-ASCII character as a letter.
 const IDENT = String.raw`(?:"(?:[^"]|"")+"|[a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_$\u0080-\uFFFF]*)`;
+const SQL_IDENT_CHAR = String.raw`[a-zA-Z0-9_$\u0080-\uFFFF]`;
 // Optional schema, then the name: group 1 is the schema, group 2 the table.
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`;
 const CREATE_HEAD_RE = new RegExp(
@@ -59,6 +60,24 @@ const SELECT_INTO_TEMP_RE = new RegExp(
   "gi",
 );
 const SELECT_INTO_CTE_DML_RE = /\)\s+(?:INSERT|MERGE)\s+INTO\b/i;
+// The matched SELECT starts inside a CTE only if its closing parenthesis
+// leaves that SELECT's nesting level. `(1) insert INTO` can instead be a
+// parenthesized expression with a valid bare alias and creates a table.
+function endsCteBeforeDml(tokens) {
+  const dml = SELECT_INTO_CTE_DML_RE.exec(tokens);
+  if (!dml) return false;
+  let depth = 0;
+  const selects = [];
+  const prefix = tokens.slice(0, dml.index + 1);
+  for (const token of prefix.match(/[a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_$\u0080-\uFFFF]*|[()]/g) ?? []) {
+    if (token === "(") depth++;
+    else if (token === ")") {
+      depth--;
+      while (selects.length && selects[selects.length - 1] > depth) selects.pop();
+    } else if (identName(token) === "select") selects.push(depth);
+  }
+  return selects.length === 0;
+}
 // Semicolons inside quoted identifiers would terminate [^;]* statement
 // patterns. Carry them as this placeholder through every masked view;
 // identName turns it back into a semicolon when a name is read.
@@ -82,7 +101,7 @@ const DROP_RE = /\bDROP\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
 // TYPE|… followed by that object's name. A keyword followed by TO, FROM or
 // a comma is a table name.
 const ACL_RE = new RegExp(
-  String.raw`\b(GRANT|REVOKE)\b([^;]*?)\bON\s+` +
+  String.raw`(?<!${SQL_IDENT_CHAR})(GRANT|REVOKE)(?!${SQL_IDENT_CHAR})([^;]*?)\bON\s+` +
     String.raw`(?!ALL\s+(?:TABLES|SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES)\s+IN\b)` +
     String.raw`(?!(?:FUNCTION|PROCEDURE|ROUTINE|SEQUENCE|SCHEMA|TYPE|DOMAIN|LANGUAGE|DATABASE|TABLESPACE)\b(?!\s*(?:TO|FROM|,)))` +
     String.raw`(?!FOREIGN\s+(?:DATA\s+WRAPPER|SERVER)\b)` +
@@ -603,6 +622,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const quotedCreation = quotedIdentifierPositions(creation);
     const keywordSql = executed.split("").map((ch, index) => quoted[index] ? " " : ch).join("");
     const quotedSelectInto = quotedIdentifierPositions(selectIntoSql);
+    const selectIntoTokens = selectIntoSql.split("").map((ch, index) => quotedSelectInto[index] ? " " : ch).join("");
     const events = [];
     // Schema deletion/renaming can invalidate many tracked names at once.
     // Until modeled, reject these commands rather than reusing stale ACLs.
@@ -662,13 +682,13 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     for (const match of selectIntoSql.matchAll(SELECT_INTO_RE)) {
       if (quotedSelectInto[match.index]) continue;
-      if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
+      if (endsCteBeforeDml(selectIntoTokens.slice(match.index, match.index + match[0].length))) continue;
       if (schemaName(match[1]) === "pg_temp") events.push({kind:"temp-create", conditional:false, table:identName(match[2]), index:match.index});
       else events.push({ kind: "create", conditional: false, table:identName(match[2]), schema:schemaName(match[1]), index: match.index });
     }
     for (const match of selectIntoSql.matchAll(SELECT_INTO_TEMP_RE)) {
       if (quotedSelectInto[match.index]) continue;
-      if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
+      if (endsCteBeforeDml(selectIntoTokens.slice(match.index, match.index + match[0].length))) continue;
       events.push({
         kind: "temp-create",
         conditional: false,
@@ -734,7 +754,11 @@ export function findTablesWithoutExplicitAcl(migrations) {
     for (const event of events) {
       if (event.kind === "diagnostic") { diagnostics.push({table:event.table,migration:m.name}); continue; }
       if (event.kind === "transaction") {
-        if (event.action === "BEGIN") { transactionStart=snapshot(); savepoints=[]; }
+        if (event.action === "BEGIN") {
+          // PostgreSQL warns on a repeated BEGIN; it does not start a nested
+          // transaction or replace the original rollback/savepoint state.
+          if (transactionStart === null) { transactionStart=snapshot(); savepoints=[]; }
+        }
         else if (event.action === "SAVEPOINT" && event.name) savepoints.push({name:event.name,state:snapshot()});
         else if (event.action.startsWith("ROLLBACK TO")) {
           const at=savepoints.findLastIndex((point)=>point.name===event.name);

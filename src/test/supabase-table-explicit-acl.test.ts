@@ -1018,3 +1018,37 @@ describe("schema-qualified object lifecycle", () => {
     expect(tables("CREATE TABLE private.leaky(id int); ALTER SCHEMA private RENAME TO other; ALTER TABLE other.leaky SET SCHEMA public;").some((table) => table.startsWith("(unsupported schema lifecycle"))).toBe(true);
   });
 });
+
+describe("SQL token boundaries and repeated transaction starts", () => {
+  it.each(["insert", "merge"])("retains a bare %s alias after a parenthesized expression", (alias) => {
+    expect(tables("SELECT (1) " + alias + " INTO TABLE public.leaky;")).toEqual(["leaky"]);
+    expect(tables("WITH x AS (SELECT 1) SELECT (1) " + alias + " INTO TABLE public.leaky;")).toEqual(["leaky"]);
+    expect(tables("SELECT (SELECT 1) " + alias + " INTO TABLE public.leaky;")).toEqual(["leaky"]);
+    expect(tables("WITH x AS (SELECT 1) SELECT (SELECT 1) " + alias + " INTO TABLE public.leaky;")).toEqual(["leaky"]);
+  });
+  it.each(["insert", "merge"])("retains a temporary shadow after parenthesized %s alias", (alias) => {
+    expect(tables(CREATE + "SELECT (1) " + alias + " INTO TEMP leaky; GRANT SELECT ON leaky TO authenticated;")).toEqual(["leaky"]);
+    expect(tables(CREATE + "WITH x AS (SELECT 1) SELECT (1) " + alias + " INTO TEMP leaky; GRANT SELECT ON leaky TO authenticated;")).toEqual(["leaky"]);
+  });
+  it.each(["INSERT", "MERGE"])("does not suppress SELECT INTO for a quoted %s alias", (verb) => {
+    expect(tables('SELECT 1 AS ") ' + verb + ' INTO" INTO TABLE public.leaky;')).toEqual(["leaky"]);
+  });
+  it.each(["INSERT", "MERGE"])("retains a temporary shadow with a quoted %s alias", (verb) => {
+    expect(tables(CREATE + 'SELECT 1 AS ") ' + verb + ' INTO" INTO TEMP leaky; GRANT SELECT ON leaky TO authenticated;')).toEqual(["leaky"]);
+  });
+  it.each(["BEGIN", "BEGIN WORK", "START TRANSACTION"])("preserves the initial rollback state on repeated %s", (begin) => {
+    expect(tables(CREATE + "BEGIN; GRANT SELECT ON public.leaky TO authenticated; " + begin + "; ROLLBACK;")).toEqual(["leaky"]);
+  });
+  it("preserves savepoints across a repeated BEGIN", () => {
+    expect(tables(CREATE + "BEGIN; SAVEPOINT s; GRANT SELECT ON public.leaky TO authenticated; BEGIN; ROLLBACK TO s; COMMIT;")).toEqual(["leaky"]);
+  });
+  it("keeps a real grant when repeated BEGIN is committed", () => {
+    expect(tables(CREATE + "BEGIN; GRANT SELECT ON public.leaky TO authenticated; BEGIN; COMMIT;")).toEqual([]);
+  });
+  it.each(["p$grant", "égrant", "grant$foo", "granté", "p$revoke", "érevoke"])("does not read an ACL keyword inside policy identifier %s", (name) => {
+    expect(tables(CREATE + "CREATE POLICY " + name + " ON public.leaky TO authenticated USING (true);")).toEqual(["leaky"]);
+  });
+  it("accepts a real ACL after a similarly named policy", () => {
+    expect(tables(CREATE + "CREATE POLICY p$grant ON public.leaky TO authenticated USING (true); GRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
+  });
+});

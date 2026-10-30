@@ -63,6 +63,9 @@ renaming fail closed as unsupported lifecycle operations, so retained state cann
 revive grants from a deleted object. Column privilege lists are split outside
 quoted identifiers and balanced parentheses; even column-only ALL PRIVILEGES does
 not qualify. Nested literal EXECUTE spans are propagated through decoded DO bodies.
+Quoted aliases cannot trigger CTE/DML suppression. Repeated transaction starts
+preserve the original rollback snapshot and savepoints. ACL keywords must have
+SQL identifier boundaries, including dollar signs and non-ASCII characters.
 
 Twenty-five historical dynamic statements were inspected in six immutable migration
 files. They handle policies or existing object ACLs rather than creating tables.

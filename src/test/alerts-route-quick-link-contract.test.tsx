@@ -80,7 +80,7 @@ describe("Alerts route — quick link contract", () => {
     expect(ALERTS).toMatch(/status === "loading"/);
     expect(ALERTS).toMatch(/status === "unavailable"/);
     expect(ALERTS).toMatch(/Alerts unavailable/);
-    expect(ALERTS).toMatch(/alerts\.length === 0/);
+    expect(ALERTS).toMatch(/listedAlerts\.length === 0/);
     expect(ALERTS).toMatch(/<EmptyState/);
   });
 

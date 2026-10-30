@@ -19,7 +19,7 @@ describe("Ahrefs Web Analytics consent loader", () => {
   });
 
   it("resolves the owner-supplied public data key and official script URL", () => {
-    expect(AHREFS_WEB_ANALYTICS_KEY).toBe("GRdwmweqUZoPO7SfmEsPZg");
+    expect(AHREFS_WEB_ANALYTICS_KEY).toBe("KZfnjSoVSRYkyDJq+SUsow");
     expect(AHREFS_WEB_ANALYTICS_SCRIPT_SRC).toBe("https://analytics.ahrefs.com/analytics.js");
   });
 

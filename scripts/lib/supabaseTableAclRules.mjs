@@ -51,7 +51,7 @@ const IDENT_AT_RE = new RegExp(String.raw`^${IDENT}`);
 const CATALOG_LIFECYCLE_RE = new RegExp(
   String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?(?:ONLY(?=\s|\(|")\s*(?:\(\s*)?)?${IDENT}\s*\.\s*${IDENT}\s*\.\s*${IDENT}(?:\s*\))?(?:\s*\*)?${RELATION_SEPARATOR}(?:RENAME\s+TO|SET\s+SCHEMA)\b`, "gi",
 );
-const OTHER_RELATION_HEAD_RE = new RegExp(String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(TEMP(?:ORARY)?\s+)?(?:RECURSIVE\s+)?(VIEW|SEQUENCE)${NAME_SEPARATOR}(?:IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?`, "gi");
+const OTHER_RELATION_HEAD_RE = new RegExp(String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(TEMP(?:ORARY)?\s+)?(?:RECURSIVE\s+)?(MATERIALIZED\s+VIEW|VIEW|SEQUENCE)${NAME_SEPARATOR}(?:IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?`, "gi");
 const RELATION_TARGET_END_RE = /^(?:\s|\(|;|$)/;
 const SELECT_TARGET_END_RE = /^(?:\s|;|$)/;
 // For a rejection-only header match, Unicode identifiers need not be decoded.
@@ -601,16 +601,88 @@ function identName(raw) {
   // Supabase uses PostgreSQL's default NAMEDATALEN: identifiers retain at
   // most 63 UTF-8 bytes, never a partial character. Apply the same identity
   // to tables, schemas, roles and savepoints before comparing their names.
-  if (Buffer.byteLength(name, "utf8") <= 63) return name;
+  return clipUtf8(name, 63);
+}
+
+function clipUtf8(name, limit) {
+  if (Buffer.byteLength(name, "utf8") <= limit) return name;
   let bytes = 0;
   let clipped = "";
   for (const character of name) {
     const size = Buffer.byteLength(character, "utf8");
-    if (bytes + size > 63) break;
+    if (bytes + size > limit) break;
     bytes += size;
     clipped += character;
   }
   return clipped;
+}
+
+// Inspect the top-level column definitions only. Defaults/type arguments can
+// contain commas, parentheses and quoted words without becoming new columns.
+function sequenceColumns(tail) {
+  const text = tail.trimStart();
+  if (!text.startsWith("(")) return [];
+  const definitions = [];
+  let depth=1, quoted=false, start=1;
+  for (let i=1;i<text.length;i++) {
+    const ch=text[i];
+    if (ch==='"') {
+      if (quoted && text[i+1]==='"') i++;
+      else quoted=!quoted;
+    } else if (!quoted) {
+      if (ch==='(') depth++;
+      else if (ch===')') { if (--depth===0) { definitions.push(text.slice(start,i)); break; } }
+      else if (ch===',' && depth===1) { definitions.push(text.slice(start,i)); start=i+1; }
+    }
+  }
+  const columns=[];
+  for (const definition of definitions) {
+    if(new RegExp(String.raw`^\s*(?:U&"|${IDENT}(?:${NAME_SEPARATOR}|(?<="))U&")`,"i").test(definition)) {
+      columns.push({unsupported:true});
+      continue;
+    }
+    const quotedDefinition=quotedIdentifierPositions(definition);
+    const definitionKeywords=definition.split("").map((ch,i)=>quotedDefinition[i]?" ":ch).join("");
+    if (new RegExp(String.raw`^\s*LIKE${NAME_SEPARATOR}`,"i").test(definition) && /\bINCLUDING\s+(?:IDENTITY|ALL)\b/i.test(definitionKeywords)) {
+      columns.push({unsupported:true});
+      continue;
+    }
+    const head=new RegExp(String.raw`^\s*(${IDENT})(?:${NAME_SEPARATOR}|(?<="))(${IDENT})(?!${SQL_IDENT_CHAR})`).exec(definition);
+    if (!head) continue;
+    const type=identName(head[2]);
+    const rest=definition.slice(head[0].length);
+    const quotedRest=quotedIdentifierPositions(rest);
+    const keywords=rest.split("").map((ch,i)=>quotedRest[i]?" ":ch).join("");
+    const serial=["serial","smallserial","bigserial","serial2","serial4","serial8"].includes(type) && !/^\s*\./.test(rest);
+    const identity=/\bGENERATED\s+(?:ALWAYS|BY\s+DEFAULT)\s+AS\s+IDENTITY\b/i.test(keywords);
+    if (!serial && !identity) continue;
+    const sequenceHead=/\bSEQUENCE\s+NAME(?:\s+|(?="))/gi;
+    let explicit=null, unreadable=false;
+    for(const match of rest.matchAll(sequenceHead)) {
+      if(quotedRest[match.index]) continue;
+      const after=rest.slice(match.index+match[0].length);
+      const name=QUALIFIED_AT_RE.exec(after);
+      if(!name || !/^(?:\s|\)|$)/.test(after.slice(name[0].length))) unreadable=true;
+      else explicit={schema:schemaName(name[1]),table:identName(name[2])};
+      break;
+    }
+    columns.push({column:identName(head[1]),explicit,unsupported:unreadable});
+  }
+  return columns;
+}
+
+// PostgreSQL makeObjectName balances the two name components by byte length,
+// then clips at UTF-8 boundaries; the seq[digits] label is never truncated.
+// Consider every collision suffix, rather than assuming a free initial name.
+function couldBeOwnedSequence(candidate, sequence) {
+  if(sequence.removed?.has(candidate)) return false;
+  if (sequence.explicit) return candidate===sequence.explicit;
+  const label=/(?:^|_)(seq\d*)$/.exec(candidate)?.[1];
+  if (!label) return false;
+  let a=Buffer.byteLength(sequence.table,"utf8"), b=Buffer.byteLength(sequence.column,"utf8");
+  const available=63-Buffer.byteLength(label,"utf8")-2;
+  while(a+b>available && a+b>0) { if(a>b) a--; else b--; }
+  return clipUtf8(sequence.table,a)+"_"+clipUtf8(sequence.column,b)+"_"+label===candidate;
 }
 
 // Blank SQL to spaces of the same length, so match indices line up with the
@@ -789,6 +861,8 @@ export function findTablesWithoutExplicitAcl(migrations) {
   // A schema move preserves the object and its ACL. Keep other schemas keyed
   // independently, including their drops/recreates, so stale grants cannot return.
   const outsideTables = new Map();
+  const nonTables = new Set();
+  let ownedSequences = [];
   const stateKey = (schema, table) => JSON.stringify([schema, table]);
   const stateLocation = (schema, table) => schema === null || schema === "public"
     ? [tables, table] : [outsideTables, stateKey(schema, table)];
@@ -856,6 +930,9 @@ export function findTablesWithoutExplicitAcl(migrations) {
         // on a temp relation. Its persistence cannot be proven here.
         events.push({kind:"ambiguous-view", index:match.index});
       }
+      if (name && RELATION_TARGET_END_RE.test(after.slice(name[0].length)) && !match[1] && !isTempSchema(schemaName(name[1]))) {
+        events.push({kind:"non-table-create",table:identName(name[2]),schema:schemaName(name[1]),index:match.index});
+      }
     }
     // Schema deletion/renaming can invalidate many tracked names at once.
     // Until modeled, reject these commands rather than reusing stale ACLs.
@@ -879,8 +956,8 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     let transactionStart = null;
     let savepoints = [];
-    const snapshot = () => ({tables: new Map([...tables].map(([k,v])=>[k,{...v}])), outsideTables: new Map([...outsideTables].map(([k,v])=>[k,{...v}])), temps:new Map(temps)});
-    const restore = (snap) => { tables.clear(); for (const [k,v] of snap.tables) tables.set(k,{...v}); outsideTables.clear(); for (const [k,v] of snap.outsideTables) outsideTables.set(k,{...v}); temps.clear(); for (const [k,v] of snap.temps) temps.set(k,v); };
+    const snapshot = () => ({tables: new Map([...tables].map(([k,v])=>[k,{...v}])), outsideTables: new Map([...outsideTables].map(([k,v])=>[k,{...v}])), temps:new Map(temps),nonTables:new Set(nonTables),ownedSequences:ownedSequences.map(s=>({...s,removed:new Set(s.removed)}))});
+    const restore = (snap) => { tables.clear(); for (const [k,v] of snap.tables) tables.set(k,{...v}); outsideTables.clear(); for (const [k,v] of snap.outsideTables) outsideTables.set(k,{...v}); temps.clear(); for (const [k,v] of snap.temps) temps.set(k,v); nonTables.clear(); for(const key of snap.nonTables) nonTables.add(key); ownedSequences=snap.ownedSequences.map(s=>({...s,removed:new Set(s.removed)})); };
     for (const match of creation.matchAll(CREATE_HEAD_RE)) {
       if (quotedCreation[match.index]) continue;
       if (executed[match.index] !== creation[match.index]) {
@@ -904,10 +981,11 @@ export function findTablesWithoutExplicitAcl(migrations) {
       }
       if (isTempSchema(schemaName(name[1]))) {
         events.push({kind:"temp-create", conditional:Boolean(match[1]), table:identName(name[2]),
+          sequences:sequenceColumns(after.slice(name[0].length)),
           onCommitDrop:/\bON\s+COMMIT\s+DROP\b/i.test(keywordSql.slice(match.index, keywordSql.indexOf(";",match.index)<0?keywordSql.length:keywordSql.indexOf(";",match.index))),
           index:match.index});
       } else {
-        events.push({ kind: "create", conditional: Boolean(match[1]), table:identName(name[2]), schema:schemaName(name[1]), index: match.index });
+        events.push({ kind: "create", conditional: Boolean(match[1]), table:identName(name[2]), schema:schemaName(name[1]), sequences:sequenceColumns(after.slice(name[0].length)), index: match.index });
       }
     }
     for (const match of creation.matchAll(CREATE_TEMP_HEAD_RE)) {
@@ -930,6 +1008,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
         kind: "temp-create",
         conditional: Boolean(match[1]),
         table: identName(name[2]),
+        sequences:sequenceColumns(after.slice(name[0].length)),
         onCommitDrop: /\bON\s+COMMIT\s+DROP\b/i.test(keywordSql.slice(match.index, keywordSql.indexOf(";",match.index)<0?keywordSql.length:keywordSql.indexOf(";",match.index))),
         index: match.index,
       });
@@ -961,6 +1040,15 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const commandEvents = collectDynamicExecuteEvents(sql);
     const relationCommands = new Set(commandEvents.filter((event) => event.kind === "relation-command").map((event) => event.index));
     for (const event of commandEvents.filter((event) => event.kind !== "relation-command" && !(legacyValid && legacyDynamic.offsets.includes(event.index)))) events.push(event);
+    const alterColumns=new RegExp(String.raw`\bALTER\s+TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?${TABLE_RELATION}${RELATION_SEPARATOR}([^;]*)`,"gi");
+    for (const match of creation.matchAll(alterColumns)) {
+      if (quotedCreation[match.index] || !relationCommands.has(match.index)) continue;
+      const addsSequence=splitTargets(match[3]).some((clause)=>{
+        const add=new RegExp(String.raw`^\s*ADD${NAME_SEPARATOR}(?:COLUMN${NAME_SEPARATOR})?(?:IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?([\s\S]*)$`,"i").exec(clause);
+        return (add && sequenceColumns("("+add[1]+")").length>0) || new RegExp(String.raw`^\s*ALTER${NAME_SEPARATOR}(?:COLUMN${NAME_SEPARATOR})?${PARTITION_IDENT}${AFTER_NAME_SEPARATOR}ADD\s+GENERATED\s+(?:ALWAYS|BY\s+DEFAULT)\s+AS\s+IDENTITY\b`,"i").test(clause);
+      });
+      if(addsSequence) events.push({kind:"diagnostic",table:"(unsupported sequence dependency creation at offset "+match.index+")",index:match.index});
+    }
     for (const matcher of [DROP_RE, RENAME_RE, SET_SCHEMA_RE]) {
       for (const match of creation.matchAll(matcher)) {
         if (!quotedCreation[match.index] && executed[match.index] !== creation[match.index]) {
@@ -999,14 +1087,19 @@ export function findTablesWithoutExplicitAcl(migrations) {
       for (const target of splitTargets(match[1])) {
         const name = DROP_TARGET_RE.exec(target);
         if (!name) events.push({kind:"diagnostic",table:"(unreadable relation lifecycle at offset "+match.index+")",index:match.index});
-        else events.push({kind:"other-lifecycle",table:identName(name[2]),schema:schemaName(name[1]),index:match.index});
+        else events.push({kind:"other-lifecycle",action:"drop",sequence:/^DROP\s+SEQUENCE/i.test(match[0]),deferred:executed[match.index]!==creation[match.index],table:identName(name[2]),schema:schemaName(name[1]),index:match.index});
       }
     }
     for (const match of creation.matchAll(OTHER_ALTER_RE)) {
       if (quotedCreation[match.index] || !relationCommands.has(match.index)) continue;
       if (!RELATION_TARGET_END_RE.test(creation.slice(match.index + match[0].length))) {
         events.push({kind:"diagnostic",table:"(unreadable relation lifecycle at offset "+match.index+")",index:match.index});
-      } else events.push({kind:"other-lifecycle",table:identName(match[2]),schema:schemaName(match[1]),index:match.index});
+      } else {
+        const tail=creation.slice(match.index+match[0].length);
+        const rename=new RegExp(String.raw`^\s*RENAME\s+TO${NAME_SEPARATOR}(${IDENT})`,"i").exec(tail);
+        const move=new RegExp(String.raw`^\s*SET\s+SCHEMA${NAME_SEPARATOR}(${IDENT})`,"i").exec(tail);
+        events.push({kind:"other-lifecycle",sequence:/^ALTER\s+SEQUENCE/i.test(match[0]),deferred:executed[match.index]!==creation[match.index],action:rename?"rename":move?"move":"alter",to:rename?identName(rename[1]):move?identName(move[1]):null,table:identName(match[2]),schema:schemaName(match[1]),index:match.index});
+      }
     }
     for (const match of executed.matchAll(DROP_RE)) {
       if (quoted[match.index]) continue;
@@ -1041,11 +1134,27 @@ export function findTablesWithoutExplicitAcl(migrations) {
     events.sort((a, b) => a.index - b.index);
     for (const event of events) {
       if (event.kind === "diagnostic") { diagnostics.push({table:event.table,migration:m.name}); continue; }
+      if (event.kind === "non-table-create") {
+        const [states,key]=stateLocation(event.schema,event.table);
+        if(!states.has(key)) nonTables.add(stateKey(event.schema??"public",event.table));
+        continue;
+      }
       if (event.kind === "other-lifecycle") {
+        if (event.deferred) {
+          diagnostics.push({table:"(unmodeled deferred relation lifecycle at offset "+event.index+")",migration:m.name});
+          continue;
+        }
         const [states, key] = stateLocation(event.schema, event.table);
         if (states.has(key) || actsOnTemp(temps, event.schema, event.table)) {
           diagnostics.push({table:"(unmodeled relation-kind lifecycle at offset "+event.index+")",migration:m.name});
         }
+        const relationKey=stateKey(event.schema??"public",event.table);
+        if (["drop","rename","move"].includes(event.action)) nonTables.delete(relationKey);
+        if (event.sequence && ["drop","rename","move"].includes(event.action)) {
+          for(const sequence of ownedSequences) if(sequence.schema===(event.schema??"public")) sequence.removed.add(event.table);
+        }
+        if (event.action==="rename") nonTables.add(stateKey(event.schema??"public",event.to));
+        if (event.action==="move") nonTables.add(stateKey(event.to,event.table));
         continue;
       }
       if (event.kind === "ambiguous-view") {
@@ -1078,6 +1187,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
       }
       if (event.kind === "temp-create") {
         if (event.conditional && temps.has(event.table)) continue;
+        if(event.sequences?.length) diagnostics.push({table:"(unsupported temporary sequence dependency at offset "+event.index+")",migration:m.name});
         temps.set(event.table,Boolean(event.onCommitDrop));
         continue;
       }
@@ -1096,15 +1206,28 @@ export function findTablesWithoutExplicitAcl(migrations) {
         // CREATE TABLE IF NOT EXISTS on a table that already exists is a no-op
         // and keeps that table's grants.
         if (event.conditional && states.has(key)) continue;
+        const schema=event.schema??"public";
+        if (event.conditional && (nonTables.has(stateKey(schema,event.table)) || ownedSequences.some(s=>s.schema===schema&&couldBeOwnedSequence(event.table,s)))) {
+          diagnostics.push({table:"(ambiguous conditional table identity at offset "+event.index+")",migration:m.name});
+          continue;
+        }
+        nonTables.delete(stateKey(schema,event.table));
         states.set(key, { migration: m.name, acl: false });
+        for (const sequence of event.sequences??[]) {
+          if(sequence.unsupported) diagnostics.push({table:"(unsupported sequence dependency creation at offset "+event.index+")",migration:m.name});
+          else if(sequence.explicit) ownedSequences.push({schema:sequence.explicit.schema??schema,owner:event.table,table:event.table,column:sequence.column,explicit:sequence.explicit.table,removed:new Set()});
+          else ownedSequences.push({schema,owner:event.table,table:event.table,column:sequence.column,removed:new Set()});
+        }
       } else if (event.kind === "move") {
         const [destination, toKey] = stateLocation(event.toSchema, event.table);
         if (destination.has(toKey)) continue;
         const state = states.get(key) ?? { migration: m.name, acl: false };
         states.delete(key);
         destination.set(toKey, state);
+        ownedSequences=ownedSequences.map(s=>s.schema===(event.schema??"public")&&s.owner===event.table?{...s,schema:event.toSchema}:s);
       } else if (event.kind === "drop") {
         states.delete(key);
+        ownedSequences=ownedSequences.filter(s=>s.schema!==(event.schema??"public")||s.owner!==event.table);
       } else if (event.kind === "rename") {
         // A rename onto a still-tracked name does not run: PostgreSQL
         // rejects it, or IF EXISTS with a missing source is a no-op.
@@ -1113,6 +1236,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
         const state = states.get(key);
         states.delete(key);
         if (state) states.set(toKey, state);
+        ownedSequences=ownedSequences.map(s=>s.schema===(event.schema??"public")&&s.owner===event.table?{...s,owner:event.to}:s);
       } else {
         const state = states.get(key);
         if (state) state.acl = true;

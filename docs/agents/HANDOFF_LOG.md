@@ -77,28 +77,28 @@ goal: repair confirmed fail-open and false-positive defects in PR #2584's explic
 branch: ccr-01625fd2-17flsm
 base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2584
-head_sha: 04d80dd373c2b325742e5e41337a75a18de0e54d (verified predecessor; late4P1s reproduced despite green CI. This commit repairs deferred relation state, temporary resets, complete savepoint names and CR comments plus confirmed relation-kind/dependency stale grants. Resolve current exact PR head before accepting evidence.)
+head_sha: 017d81df643ed3e748230657ac13b309701a1b84 (verified predecessor; a late owned-sequence P1 reproduced despite green CI. This commit rejects conditional tables over non-table/owned-sequence identities, including quoted and temporary sequence cases. Resolve current exact PR head before accepting evidence.)
 state: repair prepared for native CI; no merge or deployment authorized
 active_writer: Codex /root, reassigned by Matthew Cheek; claim https://github.com/Verdant-OS/verdant-grow-diary/pull/2584#issuecomment-6511257557
 claimed_by: Codex /root, 2026-10-29 UTC; founder explicitly authorized proceeding without unavailable Claude's release. No Claude release is fabricated.
 owner: Codex
-current_step: candidate442 tests enforce explicit table ACL decisions through quoted/Unicode identifiers, complete SQL tokens, dynamic/nested literal SQL, relation expressions, schema/rename/drop/recreate state, EXPLAIN execution, transactions/savepoints and temporary shadows. Deferred relation effects, temporary resets, destructive dependency drops and overlapping non-table lifecycle fail closed. Opaque diagnostics cannot be granted away. No new historical exception or database correction.
+current_step: candidate501 tests enforce explicit table ACL decisions. A conditional table cannot borrow a known non-table or owned serial/identity sequence identity. Generated sequence names respect PostgreSQL byte balancing, UTF-8 clipping and collision labels; namespace snapshots follow owner rename/schema/drop/rollback. Temp/ALTER/LIKE sequence dependencies fail closed. All earlier dynamic/foreign/dollar/quoted/savepoint/deferred/reset/lifecycle fixes retained. No new historical exception or database correction.
 history: Claude session_017UoYKwf4ZrLARR3NCo2iwM authored the slice; Cursor Agent automation and Codex review/repair sessions contributed. Historical review/test receipts retain their original heads and do not transfer. Conditional DO control flow remains a previously accepted, documented limitation; changing search_path still requires qualified names.
 files_touched: scripts/lib/supabaseTableAclRules.mjs, src/test/supabase-table-explicit-acl.test.ts, docs/audits/supabase-data-api-default-grants-2026-10-28.md, docs/agents/HANDOFF_LOG.md
 scorer_change_reason: Matthew explicitly assigned repairs to this existing rule and its tests, then instructed "make ready to ship". Existing check-supabase-migration-safety.mjs, baselines, lockfiles, migrations, grants and policies remain untouched. Local scorer-lock invocation is NOT_MEASURED in the managed checkout; no local unlock or strict-report PASS is claimed.
-validation_local: 442 PASS/0 FAIL in a lightweight Node compatibility runner, NOT Vitest. Latest4P1 classes and relation-kind/dependency stale grants reproduced at exact04d80dd373c2b325742e5e41337a75a18de0e54d. Exact301 migration blobs and unchanged22 legacy tuples verified. Existing scanner8 findings all baselined (7 accepted), baseline unchanged.
-validation_native: predecessor04d80dd373c2b325742e5e41337a75a18de0e54d had native ACL373/373, full suite50163 PASS/0 FAIL/223 SKIP and35/35 required SUCCESS; late4P1s were found afterward. None transfers to this head; fresh CI required.
+validation_local: 501 PASS/0 FAIL in a lightweight Node compatibility runner, NOT Vitest. Owned serial sequence, quoted type, temp sequence GRANT-shadow and implicit view-dependency probes reproduced at exact017d81df643ed3e748230657ac13b309701a1b84. Exact301 migration blobs and unchanged22 legacy tuples verified. Existing scanner8 findings all baselined (7 accepted), baseline unchanged.
+validation_native: predecessor017d81df643ed3e748230657ac13b309701a1b84 had native ACL442/442, full suite50232 PASS/0 FAIL/223 SKIP and35/35 required SUCCESS; a lateP1 was found afterward. None transfers to this head; fresh CI required.
 reviewer_seat: BLOCKED until an actually available eligible non-contributing Claude/Grok or Durban Poison session is verified. Jack Herer's aed89d80aa predecessor review is preserved, but current-head acknowledgment/verdict has not arrived through the OG Kush / PR relay; direct Grok transport unavailable. No eligible fallback verified.
 contributor_exclusions: author Claude session_017UoYKwf4ZrLARR3NCo2iwM; Cursor Agent automation; all contributing Codex review/repair sessions including current /root and supplemental /root/acl_security_review.
 reviewer_sha: none; no independent acceptance PASS obtained
-review_request: Codex owns one canonical per-head ledger; predecessor https://github.com/Verdant-OS/verdant-grow-diary/pull/2584#issuecomment-6514290969 held/superseded after fresh findings; new blocked intake follows push. Fallback0; no current eligible outside reviewer verified. Prior Jack receipt and all contributor exclusions preserved.
+review_request: Codex owns one canonical per-head ledger; predecessor https://github.com/Verdant-OS/verdant-grow-diary/pull/2584#issuecomment-6515131736 held/superseded after fresh findings; new blocked intake follows push. Fallback0; no current eligible outside reviewer verified. Prior Jack receipt and all contributor exclusions preserved.
 supplemental_review: separate Codex read-only technical probes cover the scoped fixes; exact current hashes/count recorded in the per-head PR evidence packet. This review cannot occupy independent acceptance.
 blockers: exact-head native CI and eligible independent complete-scope PASS; no P1/P2 may be waived
 next_action: verify native CI at the full repair head, fix any failures, then obtain eligible independent exact-head acceptance. Do not merge, enqueue, enable auto-merge, deploy or execute SQL.
 commands: bunx vitest run src/test/supabase-table-explicit-acl.test.ts; bun run typecheck; bun run lint; bun run check:supabase-security; node scripts/check-contract-test-resolution.mjs
 post_merge_check: after separate founder authorization and merge, verify required deploy-branch suite; merge is not deployment or proof of hosted grants
 out_of_scope: hosted grants, migration execution, RLS/auth/Edge changes, device control, Action Queue changes, and new function/sequence/view ACL enforcement
-last_updated: 2026-10-30T04:36:15.172Z, Codex /root
+last_updated: 2026-10-30T04:57:51.704Z, Codex /root
 ```
 
 

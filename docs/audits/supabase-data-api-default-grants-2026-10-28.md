@@ -95,7 +95,15 @@ DROP EXTENSION and cascading type/domain/server/foreign-data-wrapper cleanup
 are rejected because their dependent table removals are not modeled. Ordinary
 unrelated view/sequence lifecycle and non-cascading dependency drops remain valid.
 Unresolved rollback diagnostics are opaque and cannot be satisfied by a table
-with a matching quoted name. The focused suite now contains 442 cases; local
+with a matching quoted name. Conditional table declarations that overlap known
+views/materialized views/sequences or possible owned serial/identity sequence
+names fail closed before recording table state. Generated sequence names use
+PostgreSQL's component-balancing and UTF-8 clipping, including numbered collision
+suffixes; owner rename, schema move, drop and rollback preserve that namespace.
+Temporary serial/identity dependencies, ALTER-created sequence dependencies and
+LIKE INCLUDING IDENTITY/ALL remain unsupported and are rejected conservatively. Unicode-escaped column/type heads fail closed rather than hiding sequence creation. Explicit sequence removals and their rollback are tracked without assuming a numbered collision name was also removed.
+These checks protect table ACL identity; they add no sequence/view grant policy.
+The focused suite now contains 501 cases; local
 compatibility-runner evidence is preliminary until exact-head native CI runs.
 
 Live CI inspection found active ruleset 24445196 with the same 35 required check

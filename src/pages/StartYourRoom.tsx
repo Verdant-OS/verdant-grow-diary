@@ -153,8 +153,14 @@ export default function StartYourRoom() {
       parseStartYourRoomDraft,
     );
     // A saved tent must be checked against a successful roster read before
-    // restoring its plant step. An unavailable read is not a deleted tent.
-    if (draft?.ids.tentId && (tentsQuery.isLoading || tentsQuery.isError)) return;
+    // restoring its plant step. A cached roster still being refreshed is not
+    // current, and an unavailable read is not a deleted tent.
+    if (
+      draft?.ids.tentId &&
+      (tentsQuery.isLoading || tentsQuery.isFetching || tentsQuery.isError)
+    ) {
+      return;
+    }
     draftHydratedFor.current = ownerId;
     if (!draft) {
       setStep("grow");
@@ -201,6 +207,7 @@ export default function StartYourRoom() {
     growsError,
     tentsQuery.data,
     tentsQuery.isLoading,
+    tentsQuery.isFetching,
     tentsQuery.isError,
   ]);
 
@@ -372,7 +379,10 @@ export default function StartYourRoom() {
     shownStep === "grow" ? roomPreflightGate : shownStep === "tent" ? tentGate : null;
   const currentCreationGate = !growGate.allowed ? growGate : stepCreationGate;
   const progress = useMemo(() => progressLabel(shownStep), [shownStep]);
-  const showRoomLoading = roomSourcesLoading || creationVerificationLoading;
+  const showRoomLoading =
+    roomSourcesLoading ||
+    creationVerificationLoading ||
+    (draftOwnerReady !== ownerId && tentsQuery.isFetching);
   // Until the stored draft is restored (it waits for a good roster read), the
   // step forms stay hidden: anything typed now would be reset by hydration.
   const stepFormsReady = !showRoomLoading && draftOwnerReady === ownerId;

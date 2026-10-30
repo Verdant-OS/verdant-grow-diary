@@ -524,6 +524,8 @@ describe("Issue #2160 — °C/°F setting applied across Dashboard strip, Timeli
         user_id: "u1",
         device_id: null,
         raw_payload: null,
+        notes: null,
+        unit_unconfirmed: false,
       },
       {
         id: "r2",
@@ -538,6 +540,8 @@ describe("Issue #2160 — °C/°F setting applied across Dashboard strip, Timeli
         user_id: "u1",
         device_id: null,
         raw_payload: null,
+        notes: null,
+        unit_unconfirmed: false,
       },
     ];
 

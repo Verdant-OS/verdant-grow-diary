@@ -108,3 +108,15 @@ export function classifyLiveMembershipRoles(
   if (TRUST_LIVE_ALIASES.has(raw)) roles.push("trust_live_alias");
   return roles;
 }
+
+/**
+ * True when the raw label names a known hardware/bridge transport
+ * (EcoWitt, MQTT, Home Assistant, webhook, …). These are real device
+ * readings, not invalid data — callers that otherwise fail unrecognized
+ * labels closed to "invalid" must consult this first.
+ */
+export function isKnownHardwareTransportSource(source: string | null | undefined): boolean {
+  if (source == null) return false;
+  const v = String(source).trim().toLowerCase();
+  return RECEIVING_TRANSPORT_SOURCES.has(v) || LIVE_WINDOW_ALIASES.has(v);
+}

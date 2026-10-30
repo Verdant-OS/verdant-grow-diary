@@ -23,6 +23,7 @@ import {
   type SoilMoistureCalibrationContext,
 } from "@/lib/soilMoistureCalibrationSelectionRules";
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isKnownHardwareTransportSource } from "@/lib/sensorLiveMembership";
 
 export const DRYBACK_MONITORING_TITLE = "Dryback monitoring";
 export const DRYBACK_MONITORING_CAVEAT =
@@ -191,7 +192,14 @@ export function classifyDrybackSource(source: string | null | undefined): Drybac
   // private branches promoted "bridge" and any "live*" prefix to live;
   // the canon keeps pi_bridge live and fails everything unrecognized
   // closed to invalid. "unknown" remains only for a missing label.
-  return normalizeSensorSource(s);
+  const canon = normalizeSensorSource(s);
+  if (canon !== "invalid") return canon;
+  // Known hardware transports (EcoWitt, MQTT, Home Assistant, webhook…)
+  // are real probe readings, not invalid data.
+  if (isKnownHardwareTransportSource(s)) return "live";
+  if (s === "invalid") return "invalid";
+  // Unrecognized label: unverified, never live, but not discarded as invalid.
+  return "unknown";
 }
 
 export function drybackSourceLabel(sourceClass: DrybackSourceClass): string {
@@ -443,12 +451,13 @@ function buildWindow(args: {
 
   // Invalid-source samples remain counted evidence and still block a Live /
   // usable label, but they do not participate in peak/trough math.
-  const sourceClass = inWindow.some((s) => s.sourceClass === "invalid")
-    ? "invalid"
-    : majoritySource(inWindow);
+  // Source is the majority of the samples that drive the math; a single
+  // invalid-labeled row must not downgrade an otherwise clean window.
+  const sourceClass: DrybackSourceClass =
+    mathSamples.length > 0 ? majoritySource(mathSamples) : inWindow.length > 0 ? "invalid" : majoritySource(inWindow);
   const scored = scoreWindow({
     kind,
-    sampleCount: inWindow.length,
+    sampleCount: mathSamples.length,
     delta,
     durationMs,
     sourceClass,
@@ -481,7 +490,7 @@ function buildWindow(args: {
     wateringAt: args.start.occurredAt,
     nextWateringId: args.end?.id ?? null,
     nextWateringAt: args.end?.occurredAt ?? null,
-    sampleCount: inWindow.length,
+    sampleCount: mathSamples.length,
     peakVwcPct: peakVwc !== null ? round1(peakVwc) : null,
     troughVwcPct: troughVwc !== null ? round1(troughVwc) : null,
     peakAt: peak?.capturedAt ?? null,

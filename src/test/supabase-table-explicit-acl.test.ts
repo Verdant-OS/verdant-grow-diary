@@ -934,3 +934,87 @@ describe("literal terminators, deferred routine bodies and opaque diagnostics", 
     expect(tables("CREATE FUNCTION public.later() RETURNS int LANGUAGE SQL BEGIN ATOMIC SELECT 1; END;").length > 0).toBe(true);
   });
 });
+
+describe("creation and nested literal views", () => {
+  it("uses the creation view for quoted identifiers in routine bodies", () => {
+    expect(tables('CREATE FUNCTION public.f() RETURNS int LANGUAGE SQL AS $$ SELECT 1 AS "CREATE TABLE public.ghost ("; $$;')).toEqual([]);
+  });
+  it("tracks SELECT INTO from EXECUTE in a single-quoted DO body", () => {
+    expect(tables("DO 'BEGIN EXECUTE ''SELECT 1 INTO TABLE public.leaky''; END';")).toEqual(["leaky"]);
+  });
+  it("does not treat nested procedural SELECT INTO as table creation", () => {
+    expect(tables("DO $o$ BEGIN EXECUTE 'DO $i$ DECLARE n int; BEGIN SELECT 1 INTO n; END $i$'; END $o$;")).toEqual([]);
+  });
+  it.each([
+    "DO $o$ BEGIN EXECUTE 'DO $i$ BEGIN NULL; END $i$; SELECT 1 INTO TABLE public.leaky'; END $o$;",
+    "DO $o$ BEGIN EXECUTE $cmd$DO $i$ BEGIN NULL; END $i$; SELECT 1 INTO TABLE public.leaky$cmd$; END $o$;",
+  ])("tracks SQL after a DO statement in an EXECUTE payload: %s", (sql) => {
+    expect(tables(sql)).toEqual(["leaky"]);
+  });
+});
+
+describe("column lists with quoted punctuation", () => {
+  it.each(["GRANT SELECT ON public.leaky TO GROUP authenticated;", "REVOKE ALL ON public.leaky FROM GROUP authenticated;"])("recognizes an API role with optional GROUP noise: %s", (acl) => {
+    expect(tables(CREATE + acl)).toEqual([]);
+  });
+  it.each(['GRANT SELECT ON public.leaky TO "GROUP";', 'GRANT SELECT ON public.leaky TO GROUP unrelated;'])("still requires a Data API role: %s", (acl) => {
+    expect(tables(CREATE + acl)).toEqual(["leaky"]);
+  });
+  it.each([
+    ['"a, b, c(d" int', 'SELECT ("a, b, c(d")'],
+    ['"a,b" int, "c(d" int', 'SELECT ("a,b"), UPDATE ("c(d")'],
+    ['"a""b,c(d" int', 'SELECT ("a""b,c(d")'],
+    ['"a)b,c" int, "d(e" int', 'REFERENCES ("a)b,c"), INSERT ("d(e")'],
+    ['id int, private_note text', 'ALL (id)'],
+    ['id int, private_note text', 'ALL PRIVILEGES (id)'],
+    ['id int, private_note text', 'SELECT (id), ALL PRIVILEGES (id)'],
+  ])("keeps column-only ACLs distinct: %s", (columns, privileges) => {
+    expect(tables('CREATE TABLE public.leaky (' + columns + '); GRANT ' + privileges + ' ON public.leaky TO authenticated;')).toEqual(["leaky"]);
+  });
+  it("accepts a mixed table/column ACL despite quoted punctuation", () => {
+    expect(tables('CREATE TABLE public.leaky ("a, b, c(d" int); GRANT SELECT ("a, b, c(d"), UPDATE ON public.leaky TO authenticated;')).toEqual([]);
+  });
+});
+
+describe("schema-qualified object lifecycle", () => {
+  const out = "ALTER TABLE public.leaky SET SCHEMA private;";
+  const back = "ALTER TABLE private.leaky SET SCHEMA public;";
+  const grant = "GRANT SELECT ON public.leaky TO authenticated;";
+  it("preserves ACLs across a schema round trip", () => {
+    expect(tables(CREATE + grant + out + back)).toEqual([]);
+  });
+  it("still requires an ACL after an ungranted round trip", () => {
+    expect(tables(CREATE + out + back)).toEqual(["leaky"]);
+  });
+  it("clears an old ACL after an external drop and recreate", () => {
+    expect(tables(CREATE + grant + out + "DROP TABLE private.leaky; CREATE TABLE private.leaky(id int);" + back)).toEqual(["leaky"]);
+  });
+  it("preserves the ACL through an external rename", () => {
+    expect(tables(CREATE + grant + out + "ALTER TABLE private.leaky RENAME TO renamed; ALTER TABLE private.renamed SET SCHEMA public;")).toEqual([]);
+  });
+  it("recognizes an explicit ACL before moving into public", () => {
+    expect(tables("CREATE TABLE private.leaky(id int); GRANT SELECT ON private.leaky TO authenticated;" + back)).toEqual([]);
+  });
+  it("restores external object state on rollback to a savepoint", () => {
+    expect(tables("BEGIN;" + CREATE + grant + out + "SAVEPOINT s; DROP TABLE private.leaky; CREATE TABLE private.leaky(id int); ROLLBACK TO s;" + back + "COMMIT;")).toEqual([]);
+  });
+  it("does not retain an external grant rolled back to a savepoint", () => {
+    expect(tables("BEGIN;" + CREATE + out + "SAVEPOINT s; GRANT SELECT ON private.leaky TO authenticated; ROLLBACK TO s;" + back + "COMMIT;")).toEqual(["leaky"]);
+  });
+  it("keeps identical names in different schemas separate", () => {
+    expect(tables("CREATE TABLE one.leaky(id int); GRANT SELECT ON one.leaky TO authenticated; CREATE TABLE two.leaky(id int); ALTER TABLE two.leaky SET SCHEMA public;")).toEqual(["leaky"]);
+  });
+  it("resets state for SELECT INTO outside public", () => {
+    expect(tables(CREATE + grant + out + "DROP TABLE private.leaky; SELECT 1 INTO TABLE private.leaky;" + back)).toEqual(["leaky"]);
+  });
+  it("preserves state across migration files", () => {
+    expect(findTablesWithoutExplicitAcl([{name:"one.sql",sql:CREATE + grant + out},{name:"two.sql",sql:back}])).toEqual([]);
+  });
+  it("rejects schema drops instead of reviving a stale ACL", () => {
+    const sql = "CREATE SCHEMA private; CREATE TABLE private.leaky(id int); GRANT SELECT ON private.leaky TO authenticated; DROP SCHEMA private CASCADE; CREATE SCHEMA private; CREATE TABLE public.leaky(id int); ALTER TABLE public.leaky SET SCHEMA private; DROP TABLE IF EXISTS public.leaky; ALTER TABLE private.leaky SET SCHEMA public;";
+    expect(tables(sql).some((table) => table.startsWith("(unsupported schema lifecycle"))).toBe(true);
+  });
+  it("rejects schema renames instead of crediting the wrong object", () => {
+    expect(tables("CREATE TABLE private.leaky(id int); ALTER SCHEMA private RENAME TO other; ALTER TABLE other.leaky SET SCHEMA public;").some((table) => table.startsWith("(unsupported schema lifecycle"))).toBe(true);
+  });
+});

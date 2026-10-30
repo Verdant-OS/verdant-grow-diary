@@ -57,6 +57,13 @@ statements as executed ACLs. Opaque unreadable-SQL diagnostics are separate
 from table state and cannot be satisfied by a table whose name matches a
 diagnostic. Comments after executable literals are treated as whitespace.
 
+Schema-qualified object state survives moves out of public and back, including
+ACLs, renames, drops/recreates and savepoint rollback. Schema deletion and schema
+renaming fail closed as unsupported lifecycle operations, so retained state cannot
+revive grants from a deleted object. Column privilege lists are split outside
+quoted identifiers and balanced parentheses; even column-only ALL PRIVILEGES does
+not qualify. Nested literal EXECUTE spans are propagated through decoded DO bodies.
+
 Twenty-five historical dynamic statements were inspected in six immutable migration
 files. They handle policies or existing object ACLs rather than creating tables.
 Those exact occurrences are pinned by filename, normalized SHA-256 and statement

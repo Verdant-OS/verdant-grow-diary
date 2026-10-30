@@ -322,7 +322,28 @@ function splitTargets(list) {
 // True when every privilege in a GRANT list has a column list ("INSERT (id)").
 // A mixed list ("INSERT, SELECT (id)") still grants a table-level privilege.
 function columnLevelOnly(privileges) {
-  return privileges.split(/,(?![^(]*\))/).every((item) => item.includes("("));
+  const items = [];
+  let start = 0;
+  let depth = 0;
+  let quoted = false;
+  for (let i = 0; i < privileges.length; i++) {
+    const ch = privileges[i];
+    if (ch === '"') {
+      if (quoted && privileges[i + 1] === '"') i++;
+      else quoted = !quoted;
+    } else if (!quoted) {
+      if (ch === "(") depth++;
+      else if (ch === ")") depth--;
+      else if (ch === "," && depth === 0) {
+        items.push(privileges.slice(start, i));
+        start = i + 1;
+      }
+      if (depth < 0) return true; // unreadable ACL never satisfies the rule
+    }
+  }
+  if (quoted || depth !== 0) return true;
+  items.push(privileges.slice(start));
+  return items.every((item) => /^\s*(?:SELECT|INSERT|UPDATE|REFERENCES|ALL(?:\s+PRIVILEGES)?)\s*\(/i.test(item));
 }
 
 // Positions of sql that sit inside a double-quoted identifier, so a keyword
@@ -341,19 +362,9 @@ function quotedIdentifierPositions(sql) {
   return inside;
 }
 
-// The public table a (schema, name) match refers to, or null for another schema.
-function publicTable(schema, name) {
-  if (schema !== undefined && identName(schema) !== "public") return null;
-  return identName(name);
-}
-
 // Folded schema, or null when the name is unqualified.
 function schemaName(schema) {
   return schema === undefined ? null : identName(schema);
-}
-
-function inTrackedSchema(schema) {
-  return schema === null || schema === "public" || schema === "pg_temp";
 }
 
 // Unqualified names search pg_temp first. A pg_temp-qualified name always
@@ -443,12 +454,17 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
       blank(open, close + 1);
       return;
     }
-    const masked = maskSql(literal.value, true, scanDoBodies);
+    const nestedSpans = [];
+    const masked = maskSql(literal.value, true, scanDoBodies, nestedSpans);
+    if (executeSpans) for (const span of nestedSpans) executeSpans.push({...span,start:open+1+span.start,end:open+1+span.end});
     // Normalize tokens before scanning: retaining raw doubled apostrophes
     // would identify a different quoted table. Compact within the original
     // span and pad its tail so outer statement ordering remains stable.
     blank(open, close + 1);
     for (let k = 0; k < masked.length; k++) code[open + 1 + k] = masked[k];
+    // SQL SELECT INTO creates tables; procedural SELECT INTO assigns variables.
+    // Blank DO bodies in this payload's SQL view, retaining trailing statements.
+    return executeSpans ? maskSql(literal.value, true, false) : undefined;
   };
   const mask = (start, end) => {
     let i = start;
@@ -503,8 +519,8 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
           const doBody = scanDoBodies && RUNS_NOW_RE.test(prefix);
           if ((executableOnly || creationOnly) && !executes && !doBody) blank(i, j + 1);
           else if (executableOnly || creationOnly) {
-            maskExecutedLiteral(i, j, escapes);
-            if (executeSpans && executes && !escapes) executeSpans.push({ start: i + 1, end: j });
+            const sqlView = maskExecutedLiteral(i, j, escapes);
+            if (executeSpans && executes && !escapes) executeSpans.push({ start: i + 1, end: j, sqlView });
           }
           i = j + 1;
         } else {
@@ -531,7 +547,7 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
             blank(i, i + tag.length);
             blank(close, close + tag.length);
             if (executeSpans && executableOnly && isExecute) {
-              executeSpans.push({ start: i + tag.length, end: close });
+              executeSpans.push({ start: i + tag.length, end: close, sqlView:maskSql(sql.slice(i + tag.length, close), true, false) });
             }
           } else blank(i, close + tag.length);
           i = close + tag.length;
@@ -550,8 +566,9 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
 function overlayExecutePayloads(topLevel, executed, spans) {
   if (spans.length === 0) return topLevel;
   const out = topLevel.split("");
-  for (const { start, end } of spans) {
-    for (let k = start; k < end && k < executed.length; k++) out[k] = executed[k];
+  // Overlay containing commands first, then their nested EXECUTE commands.
+  for (const { start, end, sqlView } of spans.sort((a,b)=>a.start-b.start || b.end-a.end)) {
+    for (let k = start; k < end && k < executed.length; k++) out[k] = sqlView === undefined ? executed[k] : (sqlView[k-start] ?? " ");
   }
   return out.join("");
 }
@@ -563,6 +580,12 @@ function overlayExecutePayloads(topLevel, executed, spans) {
  */
 export function findTablesWithoutExplicitAcl(migrations) {
   const tables = new Map(); // table -> { migration, acl }
+  // A schema move preserves the object and its ACL. Keep other schemas keyed
+  // independently, including their drops/recreates, so stale grants cannot return.
+  const outsideTables = new Map();
+  const stateKey = (schema, table) => JSON.stringify([schema, table]);
+  const stateLocation = (schema, table) => schema === null || schema === "public"
+    ? [tables, table] : [outsideTables, stateKey(schema, table)];
   const diagnostics = []; // opaque failures: SQL identifiers/ACLs cannot clear them
   // Session temp names outlive a single migration file: if two migrations share
   // a session, the shadow still holds (fails closed).
@@ -577,9 +600,15 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const topLevel = maskSql(sql, true, false);
     const selectIntoSql = overlayExecutePayloads(topLevel, executed, executeSpans);
     const quoted = quotedIdentifierPositions(executed);
+    const quotedCreation = quotedIdentifierPositions(creation);
     const keywordSql = executed.split("").map((ch, index) => quoted[index] ? " " : ch).join("");
     const quotedSelectInto = quotedIdentifierPositions(selectIntoSql);
     const events = [];
+    // Schema deletion/renaming can invalidate many tracked names at once.
+    // Until modeled, reject these commands rather than reusing stale ACLs.
+    for (const match of keywordSql.matchAll(/\b(?:DROP\s+SCHEMA\b|ALTER\s+SCHEMA\b[^;]*?\bRENAME\s+TO\b)/gi)) {
+      events.push({kind:"diagnostic", table:"(unsupported schema lifecycle at offset "+match.index+")", index:match.index});
+    }
     // SQL-standard routine bodies are deferred. Reject the unsupported body
     // form rather than crediting its unexecuted ACL/removal statements.
     const atomicRoutineRe = /\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[^;]*?\bBEGIN\s+ATOMIC\b/gi;
@@ -593,10 +622,10 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     let transactionStart = null;
     let savepoints = [];
-    const snapshot = () => ({tables: new Map([...tables].map(([k,v])=>[k,{...v}])), temps:new Map(temps)});
-    const restore = (snap) => { tables.clear(); for (const [k,v] of snap.tables) tables.set(k,{...v}); temps.clear(); for (const [k,v] of snap.temps) temps.set(k,v); };
+    const snapshot = () => ({tables: new Map([...tables].map(([k,v])=>[k,{...v}])), outsideTables: new Map([...outsideTables].map(([k,v])=>[k,{...v}])), temps:new Map(temps)});
+    const restore = (snap) => { tables.clear(); for (const [k,v] of snap.tables) tables.set(k,{...v}); outsideTables.clear(); for (const [k,v] of snap.outsideTables) outsideTables.set(k,{...v}); temps.clear(); for (const [k,v] of snap.temps) temps.set(k,v); };
     for (const match of creation.matchAll(CREATE_HEAD_RE)) {
-      if (quoted[match.index]) continue;
+      if (quotedCreation[match.index]) continue;
       const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
@@ -609,18 +638,16 @@ export function findTablesWithoutExplicitAcl(migrations) {
         });
         continue;
       }
-      const table = publicTable(name[1], name[2]);
       if (schemaName(name[1]) === "pg_temp") {
         events.push({kind:"temp-create", conditional:Boolean(match[1]), table:identName(name[2]),
           onCommitDrop:/\bON\s+COMMIT\s+DROP\b/i.test(keywordSql.slice(match.index, keywordSql.indexOf(";",match.index)<0?keywordSql.length:keywordSql.indexOf(";",match.index))),
           index:match.index});
-      }
-      if (table) {
-        events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
+      } else {
+        events.push({ kind: "create", conditional: Boolean(match[1]), table:identName(name[2]), schema:schemaName(name[1]), index: match.index });
       }
     }
     for (const match of creation.matchAll(CREATE_TEMP_HEAD_RE)) {
-      if (quoted[match.index]) continue;
+      if (quotedCreation[match.index]) continue;
       const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
@@ -636,9 +663,8 @@ export function findTablesWithoutExplicitAcl(migrations) {
     for (const match of selectIntoSql.matchAll(SELECT_INTO_RE)) {
       if (quotedSelectInto[match.index]) continue;
       if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
-      const table = publicTable(match[1], match[2]);
       if (schemaName(match[1]) === "pg_temp") events.push({kind:"temp-create", conditional:false, table:identName(match[2]), index:match.index});
-      if (table) events.push({ kind: "create", conditional: false, table, index: match.index });
+      else events.push({ kind: "create", conditional: false, table:identName(match[2]), schema:schemaName(match[1]), index: match.index });
     }
     for (const match of selectIntoSql.matchAll(SELECT_INTO_TEMP_RE)) {
       if (quotedSelectInto[match.index]) continue;
@@ -654,7 +680,6 @@ export function findTablesWithoutExplicitAcl(migrations) {
     for (const match of executed.matchAll(RENAME_RE)) {
       if (quoted[match.index]) continue;
       const schema = schemaName(match[1]);
-      if (!inTrackedSchema(schema)) continue;
       events.push({
         kind: "rename",
         table: identName(match[2]),
@@ -667,13 +692,13 @@ export function findTablesWithoutExplicitAcl(migrations) {
       if (quoted[match.index]) continue;
       const schema = schemaName(match[1]);
       const name = identName(match[2]);
-      const fromPublic = schema === null || schema === "public";
-      const toPublic = identName(match[3]) === "public";
-      if (fromPublic !== toPublic) {
+      const toSchema = identName(match[3]);
+      if ((schema ?? "public") !== toSchema) {
         events.push({
-          kind: toPublic ? "move-in" : "move-out",
+          kind: "move",
           table: name,
           schema,
+          toSchema,
           index: match.index,
         });
       }
@@ -684,7 +709,6 @@ export function findTablesWithoutExplicitAcl(migrations) {
         const name = DROP_TARGET_RE.exec(target);
         if (!name) continue;
         const schema = schemaName(name[1]);
-        if (!inTrackedSchema(schema)) continue;
         events.push({ kind: "drop", table: identName(name[2]), schema, index: match.index });
       }
     }
@@ -696,14 +720,13 @@ export function findTablesWithoutExplicitAcl(migrations) {
       if (isRevoke ? !REVOKE_ALL_RE.test(match[2]) : columnLevelOnly(match[2])) continue;
       // An unrelated role is not a decision about Data API access.
       if (!splitTargets(match[4]).some((role) => {
-        const name=/^\s*("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)(?:\s|$)/.exec(role)?.[1];
+        const name=/^\s*(?:GROUP\s+)?("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)(?:\s|$)/i.exec(role)?.[1];
         return name && ["public","anon","authenticated","service_role"].includes(identName(name));
       })) continue;
       for (const target of splitTargets(match[3])) {
         const name = TARGET_RE.exec(target);
         if (!name) continue;
         const schema = schemaName(name[1]);
-        if (!inTrackedSchema(schema)) continue;
         events.push({ kind: "acl", table: identName(name[2]), schema, index: match.index });
       }
     }
@@ -745,27 +768,30 @@ export function findTablesWithoutExplicitAcl(migrations) {
         }
         continue;
       }
+      const [states, key] = stateLocation(event.schema, event.table);
       if (event.kind === "create") {
         // CREATE TABLE IF NOT EXISTS on a table that already exists is a no-op
         // and keeps that table's grants.
-        if (event.conditional && tables.has(event.table)) continue;
-        tables.set(event.table, { migration: m.name, acl: false });
-      } else if (event.kind === "move-in") {
-        // A move into public onto a still-tracked name does not run:
-        // PostgreSQL rejects it, or IF EXISTS with a missing source is a no-op.
-        if (tables.has(event.table)) continue;
-        tables.set(event.table, { migration: m.name, acl: false });
-      } else if (event.kind === "drop" || event.kind === "move-out") {
-        tables.delete(event.table);
+        if (event.conditional && states.has(key)) continue;
+        states.set(key, { migration: m.name, acl: false });
+      } else if (event.kind === "move") {
+        const [destination, toKey] = stateLocation(event.toSchema, event.table);
+        if (destination.has(toKey)) continue;
+        const state = states.get(key) ?? { migration: m.name, acl: false };
+        states.delete(key);
+        destination.set(toKey, state);
+      } else if (event.kind === "drop") {
+        states.delete(key);
       } else if (event.kind === "rename") {
         // A rename onto a still-tracked name does not run: PostgreSQL
         // rejects it, or IF EXISTS with a missing source is a no-op.
-        if (tables.has(event.to)) continue;
-        const state = tables.get(event.table);
-        tables.delete(event.table);
-        if (state) tables.set(event.to, state);
+        const [, toKey] = stateLocation(event.schema, event.to);
+        if (states.has(toKey)) continue;
+        const state = states.get(key);
+        states.delete(key);
+        if (state) states.set(toKey, state);
       } else {
-        const state = tables.get(event.table);
+        const state = states.get(key);
         if (state) state.acl = true;
       }
     }

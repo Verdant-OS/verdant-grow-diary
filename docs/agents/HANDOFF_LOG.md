@@ -69,6 +69,43 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-2526-MCP-BUNDLE-PARITY
+
+```text
+TASK PR-2526-MCP-BUNDLE-PARITY  priority: P2  status: OPEN
+goal: Integrate pinned deploy target ab4aaa2f3a648c28860c682ddec3ec0103347246 normally into source 38e4d947791322c064c8ff9cdacf6e124b2e7e4f only through the actual shared-handoff conflict; preserve all six feature bytes and every incoming line.
+why: Required CI shard 7/32 failed mcp-effective-bundle-parity because five generated imports still named npm:zod@^4.6.6.
+branch: cursor/zod-override-npm-ref-4a60
+base: verdant-grow-diary at ab4aaa2f3a648c28860c682ddec3ec0103347246
+checkout: Verified exact source 38e4d947791322c064c8ff9cdacf6e124b2e7e4f and target ab4aaa2f3a648c28860c682ddec3ec0103347246; clean retained checkout, OPEN/DRAFT/CONFLICTING-DIRTY, no PR queue/auto-merge and complete global queueZERO. Stop on pin movement, another writer/queue or non-HANDOFF conflict.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2526
+head_sha: 38e4d947791322c064c8ff9cdacf6e124b2e7e4f is the pre-integration source; read the PR for the resulting full head, which this commit cannot contain.
+state: HANDOFF-only resolution and full preservation PASS; targeted analytics/consent/docs3files/78passed/0failed/0skipped. Normal hooks/ordinary push pending. Fresh resulting-head CI and outside acceptance NOT_MEASURED.
+current_step: Preserve complete incoming architecture/analytics/owner handoff blocks and every target log byte/order; insert this complete refreshed PR2526 block. All incoming non-resolution blobs and six source feature blobs must match exactly.
+next_action: Validate preservation and targeted analytics/docs behavior, commit with normal hooks, guard pins/queue and push normally; measure only fresh resulting-head CI and prepare one private UNSENT review packet/ledger.
+post_merge_check: node scripts/sync-mcp-edge-bundle.mjs --check on the landed SHA; live deployment and runtime behavior remain NOT_MEASURED.
+active_writer: Existing Codex PR2526 sole writer under Matthew approved owner handoff and bounded future-conflict grant, renewed by the 2026-10-30UTC coordinator dispatch. Claim retained without transfer/retirement/release.
+decisions: Manual resolution confined to HANDOFF. Preserve all six source feature bytes, original three locked scorers, incoming architecture/analytics/test blobs, complete owner blocks, grants and named holds. No dependency/product/assertion/timeout/workflow repair, new unlock, force-push/rebase, manual CI rerun/cancel, body/comment/review edit, reviewer contact, ready/enqueue/PR merge/deploy/SQL/APPLY/provider/auth/settings/spend.
+tried_and_rejected: No choosing one handoff side wholesale, competing implementation, generated/dependency/scorer edit, old failure rerun, hook bypass or reviewer substitution. Prior38 environment repair remains history; no new install or junction change.
+commands: bun x vitest run src/test/ahrefs-analytics-loader.test.ts src/test/analytics-consent-runtime.test.ts src/test/assert-automated-phenotyping-docs-safety.test.ts --reporter=dot --maxWorkers=1; node scripts/check-bun-lockfile-policy.mjs; node scripts/sync-mcp-edge-bundle.mjs --check; node scripts/check-sentinel-version-parity.mjs ab4aaa2f3a648c28860c682ddec3ec0103347246; node scripts/sync-sentinel-mirror.mjs --check; node scripts/verify-edge-shared-in-sync.mjs --check-only; node scripts/assert-docs-safety.mjs; git diff --check ab4aaa2f3a648c28860c682ddec3ec0103347246
+files_touched: Only HANDOFF manually resolved/refreshed. Three incoming non-resolution files imported unchanged: docs/architecture-contract.md, src/constants/analytics.ts, src/test/ahrefs-analytics-loader.test.ts. Original seven-file PR delta and locked scorers retained.
+files_remaining: None within this bounded integration if checks pass. Any non-HANDOFF/protected repair requires stopping before scope expansion.
+evidence: Actual merge conflicted only HANDOFF, at competing Open-block insertion. Source six-file blob and full target non-resolution preservation are checked independently, not inferred from path overlap or prior API metadata.
+integration_evidence: All8091tree paths checked: six features equal source38, three incoming non-resolution blobs and every non-feature path equal targetab4. Complete incoming log bytes/order reproduced after removing this block. MCP SHA256e2af9003a87613191e4a325b800f5c66c8bcd4a72c1d8856e2b246ca5358047d. Policy/MCP/Sentinel18/mirror107/docs/whitespace PASS. Targeted3files/78passed/0failed/0skipped, no tests added or edited. Normal-hook/push evidence belongs to private resulting-head receipt.
+validation_limits: Existing prepared dependency tree reused without install or junction changes. Full new-head local suite/typecheck/build/browser/runtime/DB/production NOT_MEASURED. Historical38 results are not new-head execution; original three ancillary timeouts retain FAIL and are not rerun.
+blockers: Fresh complete required/supplemental CI, eligible independent full-scope clean PASS, original protected/scorer gates and named holds remain. Main/Auth SKIPPED are not execution success. Body still contains historical head/base claims under no-edit scope. New source invalidates prior CI/review; no merge/deploy authorized.
+open_questions: Reviewer transport remains UNANSWERED; packet UNSENT, no route choice/probe/send/relay. Old914/7fe audit failures superseded/DONE; no repair or rerun authorized here.
+gotchas: All six feature files must be source38 byte-identical for this integration. Incoming public analytics constant/test and architecture contract are imported unchanged; no current live analytics/consent/architecture runtime claim. Complete incoming log must reproduce after removing this block.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2526 ; https://github.com/Verdant-OS/verdant-grow-diary/commit/ab4aaa2f3a648c28860c682ddec3ec0103347246
+artifacts: Private incoming inventory/preservation/validation/hook/push/resulting-head packet and ledger under C:/Users/G8/verdant-work/execute-pr-plan-20261026; prior38 repair receipt remains dated history.
+reviewer_seat: NOT_ASSIGNED; private packet UNSENT and delivery BLOCKED. Existing team request is not a verified independent session. All contributing Codex sessions excluded.
+reviewer_sha: No resulting-head independent acceptance. Supersede old38 routing record only after successful normal push; retain historical receipts and implementation claim.
+session_state: One retained writer and one read-only scope-advice helper, all contributing Codex excluded from acceptance. No outside review contact, manual CI action, new routine, ownership transfer/release or production operation.
+claimed_by: Codex, 2026-10-26 17:45 UTC; original owner retained and bounded integration authority verified from the later human plan. No public claim/resume comment under the chat-only reporting restriction.
+owner: Existing Codex PR #2526 writer; merge/review-routing seats and named holds unchanged.
+last_updated: 2026-10-29 20:54 CT, by Codex PR2526 owner
+```
+
 ### ARCH-CONTRACT-RESTAMP-20261029
 
 ```text

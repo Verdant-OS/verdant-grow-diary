@@ -7,7 +7,7 @@ import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.24.0";
 
 // src/lib/mcp/tools/list-grows.ts
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z } from "npm:zod@^4.6.6";
+import { z } from "npm:zod@^4.6.7";
 
 // src/lib/mcp/tools/_supabase.ts
 import { createClient } from "npm:@supabase/supabase-js@^2.105.4";
@@ -67,7 +67,7 @@ ${JSON.stringify(rows, null, 2)}`
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z as z2 } from "npm:zod@^4.6.6";
+import { z as z2 } from "npm:zod@^4.6.7";
 
 // src/lib/liveSourceTruthGateRules.ts
 var LIVE_SOURCE_TRUTH_STALE_AFTER_MS = 15 * 60 * 1e3;
@@ -830,7 +830,7 @@ ${JSON.stringify(rows, null, 2)}`
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z as z3 } from "npm:zod@^4.6.6";
+import { z as z3 } from "npm:zod@^4.6.7";
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
@@ -879,7 +879,7 @@ ${summary}`
 
 // src/lib/mcp/tools/list-grow-walk-targets.ts
 import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z as z4 } from "npm:zod@^4.6.6";
+import { z as z4 } from "npm:zod@^4.6.7";
 
 // src/lib/growAttributionRules.ts
 function buildGrowScopedPlantsOrFilter(growId, tentIds) {
@@ -1653,7 +1653,7 @@ var list_grow_walk_targets_default = defineTool4({
 
 // src/lib/mcp/tools/get-grow-walk-context.ts
 import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z as z5 } from "npm:zod@^4.6.6";
+import { z as z5 } from "npm:zod@^4.6.7";
 
 // src/lib/actionQueueProvenanceRules.ts
 var ALERT_TOKEN_RE = /\[alert:([A-Za-z0-9_-]{1,64})\]/;

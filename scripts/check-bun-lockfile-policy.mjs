@@ -330,6 +330,65 @@ export function isExactSemver(spec) {
   return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(value);
 }
 
+const DIRECT_DEPENDENCY_GROUPS = Object.freeze([
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+  "peerDependencies",
+]);
+
+/** First string spec for each direct dependency, dependencies winning over later groups. */
+function directDependencySpecs(packageJson) {
+  const specs = new Map();
+  if (!isObject(packageJson)) return specs;
+  for (const group of DIRECT_DEPENDENCY_GROUPS) {
+    const section = packageJson[group];
+    if (!isObject(section)) continue;
+    for (const [name, spec] of Object.entries(section)) {
+      if (typeof spec === "string" && !specs.has(name)) specs.set(name, spec);
+    }
+  }
+  return specs;
+}
+
+/**
+ * npm rejects an override of a direct dependency unless it is `$name` or exactly
+ * the declared spec (`EOVERRIDE`). Nested override objects are not that form.
+ */
+export function directDependencyOverrideConflicts(
+  packageJson,
+  specs = directDependencySpecs(packageJson),
+) {
+  if (!isObject(packageJson) || !isObject(packageJson.overrides)) return [];
+  const errors = [];
+  for (const [name, value] of Object.entries(packageJson.overrides)) {
+    if (!specs.has(name)) continue;
+    const spec = specs.get(name);
+    if (value === `$${name}` || value === spec) continue;
+    const shown = typeof value === "string" ? value : JSON.stringify(value);
+    errors.push(
+      `Override for ${name}@${spec} conflicts with its direct dependency ` +
+        `(npm EOVERRIDE). Use "$${name}" or set the override exactly to "${spec}" ` +
+        `(got ${shown}).`,
+    );
+  }
+  return errors;
+}
+
+/**
+ * Bun rewrites a `$name` override to the direct dependency spec in bun.lock.
+ * Treat that expansion as synchronized with package.json.
+ */
+function overrideRecordForLockSync(overrides, specs) {
+  const stable = stableObject(overrides);
+  if (!isObject(stable)) return stable;
+  const expanded = {};
+  for (const [name, value] of Object.entries(stable)) {
+    expanded[name] = value === `$${name}` && specs.has(name) ? specs.get(name) : value;
+  }
+  return expanded;
+}
+
 /** Extract all resolved versions of a package from a bun.lock text body. */
 export function resolvedVersionInBunLock(lockText, packageName) {
   if (typeof lockText !== "string") return null;
@@ -468,6 +527,14 @@ export function evaluatePolicy({
     errors.push(`${CRITICAL_PACKAGE} must be pinned to an exact semver (got "${declared}").`);
   }
 
+  // npm aborts with EOVERRIDE when an override for a direct dependency is neither
+  // a `$name` reference nor exactly the declared spec. Bun accepts the conflict,
+  // so this check is what keeps `npx wrangler deploy` installable.
+  const dependencySpecs = directDependencySpecs(packageJson);
+  for (const error of directDependencyOverrideConflicts(packageJson, dependencySpecs)) {
+    errors.push(error);
+  }
+
   const bunLockPath = resolve(root, "bun.lock");
   if (exists(bunLockPath)) {
     try {
@@ -491,8 +558,8 @@ export function evaluatePolicy({
         }
       }
       if (
-        JSON.stringify(stableObject(packageJson.overrides)) !==
-        JSON.stringify(stableObject(bunDocument.overrides))
+        JSON.stringify(overrideRecordForLockSync(packageJson.overrides, dependencySpecs)) !==
+        JSON.stringify(overrideRecordForLockSync(bunDocument.overrides, dependencySpecs))
       ) {
         errors.push("bun.lock overrides are not synchronized with package.json.");
       }

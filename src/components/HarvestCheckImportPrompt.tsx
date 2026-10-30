@@ -27,6 +27,14 @@ import { plantsPath } from "@/lib/routes";
  * here. With no plant yet, the handoff stays until one exists.
  */
 export default function HarvestCheckImportPrompt() {
+  const { user } = useAuth();
+  // Reset the complete prompt lifetime on account changes, including the handoff
+  // read. An old import's stale return must not leave the new account busy or
+  // let its completion change a newer import's state.
+  return <AccountImportPrompt key={user?.id ?? "signed-out"} />;
+}
+
+function AccountImportPrompt() {
   const [handoff, setHandoff] = useState<HarvestCheckHandoff | null>(null);
   // Read after mount so the server and first client render stay identical.
   useEffect(() => {

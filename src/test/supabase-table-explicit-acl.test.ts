@@ -869,3 +869,20 @@ describe("executed literals normalize quoted identifier tokens", () => {
     expect(tables(`CREATE TABLE public."grower's"(id int); DO $$ BEGIN EXECUTE 'GRANT SELECT ON public."grower''s" TO authenticated'; END $$;`)).toEqual([]);
   });
 });
+
+describe("EXECUTE statement contexts and control headers", () => {
+  it.each([
+    "CREATE TABLE public.operations (execute text); GRANT SELECT ON public.operations TO authenticated;",
+    "CREATE TABLE public.execute (id int); GRANT SELECT ON public.execute TO authenticated;",
+    "DO $$ DECLARE n int; execute text; BEGIN n := 1; END $$;",
+    "DO $$ BEGIN CREATE TABLE public.operations (execute text); GRANT SELECT ON public.operations TO authenticated; END $$;",
+  ])("does not invent dynamic SQL from an identifier: %s", (sql) => { expect(tables(sql)).toEqual([]); });
+  it.each([
+    "DO $$ BEGIN IF true THEN EXECUTE 'CREATE TABLE public.leaky(id int)'; END IF; END $$;",
+    "DO $$ BEGIN FOR n IN 1..1 LOOP EXECUTE 'CREATE TABLE public.leaky(id int)'; END LOOP; END $$;",
+    "DO $$ BEGIN IF false THEN NULL; ELSE EXECUTE 'CREATE TABLE public.leaky(id int)'; END IF; END $$;",
+  ])("exposes literal creation after a control header: %s", (sql) => { expect(tables(sql)).toEqual(["leaky"]); });
+  it("credits a literal grant after a true control header", () => {
+    expect(tables(CREATE + "DO $$ BEGIN IF true THEN EXECUTE 'GRANT SELECT ON public.leaky TO authenticated'; END IF; END $$;")).toEqual([]);
+  });
+});

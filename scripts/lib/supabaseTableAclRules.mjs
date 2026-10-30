@@ -94,7 +94,7 @@ const REVOKE_ALL_RE = /^\s*ALL(?:\s+PRIVILEGES)?\s*$/i;
 const DOLLAR_TAG_RE = /\$(?:[A-Za-z_\u0080-\uFFFF][A-Za-z0-9_\u0080-\uFFFF]*)?\$/y;
 // A statement prefix that ends by handing the next string to EXECUTE, after
 // any block keywords (BEGIN, THEN, ELSE, LOOP) that open the statement.
-const EXECUTES_RE = /^\s*(?:(?:BEGIN|THEN|ELSE|LOOP)\s+)*EXECUTE\s*$/i;
+const EXECUTES_RE = /(?:^|\b(?:BEGIN|THEN|ELSE|LOOP)\b)\s*EXECUTE\s*$/i;
 const RUNS_NOW_RE = /^\s*DO\b/i;
 const DO_LANGUAGE = "(?:" + IDENT + "|'(?:[^']|'')*')";
 const DO_BODY_PREFIX_RE = new RegExp("^\\s*DO(?:\\s+LANGUAGE\\s+" + DO_LANGUAGE + ")?\\s*$", "i");
@@ -230,11 +230,12 @@ function readExecuteArgument(sql, start, end) {
   };
 }
 
-function collectDynamicExecuteEvents(sql) {
+function collectDynamicExecuteEvents(sql, procedural = false) {
   const events = [];
   const noComments = maskSql(sql, false);
-  function walk(start, end) {
+  function walk(start, end, isProcedural = procedural) {
     let i=start, statementStart=start;
+    let inStatements = !isProcedural;
     while (i<end) {
       i=skipWsAndComments(sql,i,end);
       if(i>=end) break;
@@ -254,7 +255,7 @@ function collectDynamicExecuteEvents(sql) {
           events.push({kind:"create",conditional:false,table:"(unreadable escaped DO body at offset "+i+")",index:i});
         }
         if(lit && DO_BODY_PREFIX_RE.test(noComments.slice(statementStart,i))){
-          for(const nested of collectDynamicExecuteEvents(lit.value)){
+          for(const nested of collectDynamicExecuteEvents(lit.value, true)){
             const at=i+1+nested.index;
             events.push({...nested,index:at,table:"(unreadable dynamic EXECUTE at offset "+at+")"});
           }
@@ -268,12 +269,13 @@ function collectDynamicExecuteEvents(sql) {
           events.push({kind:"create",conditional:false,table:"(unreadable DO body prefix at offset "+i+")",index:i});
         }
         if (DO_BODY_PREFIX_RE.test(prefix) || /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[\s\S]*\bAS\s*$/i.test(prefix)) {
-          walk(i+dol.tag.length,dol.after-dol.tag.length);
+          walk(i+dol.tag.length,dol.after-dol.tag.length,true);
         }
         i=dol.after; continue;
       }
+      if (isProcedural && /^BEGIN\b/i.test(sql.slice(i)) && !(i > start && /[A-Za-z0-9_\u0080-\uFFFF]/.test(sql[i - 1]))) inStatements = true;
       if((i>start && /[A-Za-z0-9_\u0080-\uFFFF]/.test(sql[i-1])) || !/^EXECUTE\b/i.test(sql.slice(i))){i++;continue;}
-      if (/\b(?:GRANT|REVOKE)\s*$/i.test(noComments.slice(statementStart,i))) { i+=7; continue; }
+      if (!inStatements || !EXECUTES_RE.test(noComments.slice(statementStart,i) + "EXECUTE")) { i+=7; continue; }
       const executeAt=i;
       const afterKw=skipWsAndComments(sql,i+7,end);
       if(EXECUTE_TRIGGER_TAIL_RE.test(sql.slice(afterKw))){i=afterKw;continue;}

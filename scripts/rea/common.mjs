@@ -38,7 +38,7 @@ export function redact(value, key = '') {
   }
   if (typeof value !== 'string') return value;
   const urls = value.replace(/(?:https?|wss?):\/\/[^\s"'<>]+/g, scrubUrl);
-  return (/^[/?#]/.test(urls) ? scrubUrl(urls) : urls).replace(jwt, REDACTED).replace(keyLike, REDACTED)
+  return (/^[/?#]/.test(urls) || /^[^\s?#]+[?#]/.test(urls) ? scrubUrl(urls) : urls).replace(jwt, REDACTED).replace(keyLike, REDACTED)
     .replace(/\bBearer\s+[^\s"',;}]+/gi, `Bearer ${REDACTED}`)
     .replace(/((?:password|api[_-]?key|secret|access[_-]?token)\s*[=:]\s*)[^\s"',;}]+/gi, `$1${REDACTED}`);
 }

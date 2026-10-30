@@ -45,7 +45,8 @@ test('canonical safety accepts benign campaign queries and rejects relative/WebS
   assert.doesNotThrow(() => assertSafeEvidence(evidence({ url: 'https://example.com/?utm_source=public#features' })));
   for (const endpoint of ['/callback?token=synthetic', '//example.com/?api_key=synthetic',
     'wss://example.com/ws?access_token=synthetic', '?password=synthetic', '#token=synthetic',
-    '/callback?redirect=%2Fnext%3Ftoken%3Dsynthetic']) {
+    '/callback?redirect=%2Fnext%3Ftoken%3Dsynthetic', 'api/callback?token=synthetic',
+    './api?token=synthetic', '../api?token=synthetic', 'api#token=synthetic']) {
     assert.throws(() => assertSafeEvidence(evidence({ endpoint })), /unsafe/i);
   }
   assert.throws(() => assertSafeEvidence(evidence({ headers: [{ name: 'Authorization', value: 'Basic synthetic' }] })), /unsafe/i);

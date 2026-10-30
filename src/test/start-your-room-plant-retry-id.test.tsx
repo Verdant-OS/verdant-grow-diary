@@ -160,12 +160,16 @@ describe("Start Your Room plant retry id (Codex review)", () => {
 
     await waitFor(() => expect(refreshHanging).toBe(true));
     await act(async () => undefined);
-    expect(window.sessionStorage.getItem(draftKey) ?? "").toContain(
-      `"plant":"${ATTEMPT_IDS.plant}"`,
-    );
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toMatchObject({
+      step: "plant",
+      pendingRowIds: { plant: ATTEMPT_IDS.plant },
+    });
 
     releaseRefresh();
     await waitFor(() => expect(navMock).toHaveBeenCalledTimes(1));
+    expect(navMock).toHaveBeenCalledWith(`/plants/${ATTEMPT_IDS.plant}?open=quick-log`, {
+      replace: true,
+    });
   });
 
   it("clears the setup draft before leaving for the new plant (Copilot review)", async () => {

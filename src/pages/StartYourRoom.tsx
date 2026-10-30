@@ -50,6 +50,7 @@ import {
   newHierarchyCreateAttemptId,
   persistHierarchyCreateAttempt,
   type HierarchyCreateAttempt,
+  type ConfirmedHierarchyCreateRow,
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 import {
@@ -129,6 +130,11 @@ export default function StartYourRoom() {
   const [draftOwnerReady, setDraftOwnerReady] = useState<string | null>(null);
   const [verificationRetrying, setVerificationRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmedNames, setConfirmedNames] = useState<{
+    ownerId: string;
+    grow?: { id: string; name: string };
+    tent?: { id: string; name: string };
+  } | null>(null);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
   });
@@ -347,6 +353,19 @@ export default function StartYourRoom() {
       }
     : form;
   const shownStep: StartYourRoomStep = firstMissingStep(shownIds);
+  // Drafts retain unsent typing. Saved names come from the matching owner-scoped
+  // records, or the confirmed response while those lists are still refreshing.
+  const savedNames = confirmedNames?.ownerId === ownerId ? confirmedNames : null;
+  const boundGrowName =
+    grows.find((grow) => grow.id === shownIds.growId)?.name?.trim() ||
+    (savedNames?.grow?.id === shownIds.growId ? savedNames.grow.name : "") ||
+    "your grow";
+  const boundTentName =
+    tentsQuery.data
+      ?.find((tent) => tent.id === shownIds.tentId && tent.grow_id === shownIds.growId)
+      ?.name?.trim() ||
+    (savedNames?.tent?.id === shownIds.tentId ? savedNames.tent.name : "") ||
+    "your tent";
   const stepCreationGate =
     shownStep === "grow" ? roomPreflightGate : shownStep === "tent" ? tentGate : null;
   const currentCreationGate = !growGate.allowed ? growGate : stepCreationGate;
@@ -492,6 +511,7 @@ export default function StartYourRoom() {
         if (ownerIdRef.current !== saveOwnerId || !confirmed) return;
         releaseRowId("grow");
         const confirmedGrowId = confirmed.row.id;
+        rememberConfirmedName("grow", confirmed.row, saveOwnerId);
         growId = confirmedGrowId;
         setActiveGrowId(confirmedGrowId);
         setIds((prev) => ({ ...prev, growId: confirmedGrowId }));
@@ -530,6 +550,7 @@ export default function StartYourRoom() {
         if (ownerIdRef.current !== saveOwnerId || !confirmed) return;
         releaseRowId("tent");
         const confirmedTentId = confirmed.row.id;
+        rememberConfirmedName("tent", confirmed.row, saveOwnerId);
         const boundGrowId = growId;
         tentId = confirmedTentId;
         setIds((prev) => ({
@@ -595,6 +616,19 @@ export default function StartYourRoom() {
       createInFlightRef.current = false;
       setBusy(false);
     }
+  }
+
+  function rememberConfirmedName(
+    entity: "grow" | "tent",
+    row: ConfirmedHierarchyCreateRow,
+    saveOwnerId: string,
+  ) {
+    if (typeof row.name !== "string" || !row.name.trim()) return;
+    const name = row.name.trim();
+    setConfirmedNames((previous) => ({
+      ...(previous?.ownerId === saveOwnerId ? previous : { ownerId: saveOwnerId }),
+      [entity]: { id: row.id, name },
+    }));
   }
 
   function finish() {
@@ -694,15 +728,11 @@ export default function StartYourRoom() {
                   className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
                   data-testid="start-room-bound-grow"
                 >
-                  Bound to grow:{" "}
-                  <span className="font-medium">{shownForm.growName.trim() || "your grow"}</span>
+                  Bound to grow: <span className="font-medium">{boundGrowName}</span>
                   {shownIds.tentId ? (
                     <>
                       {" "}
-                      · tent{" "}
-                      <span className="font-medium">
-                        {shownForm.tentName.trim() || "your tent"}
-                      </span>
+                      · tent <span className="font-medium">{boundTentName}</span>
                     </>
                   ) : null}
                 </p>

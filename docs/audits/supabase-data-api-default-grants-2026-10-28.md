@@ -51,7 +51,11 @@ it preserves quoted identifiers, distinguishes ASCII case folding, and models
 transaction savepoints and temporary tables that expire at commit. Executable
 literal statements in `DO` blocks are scanned; descriptive strings do not count.
 Runtime-built `EXECUTE` statements and escaped `DO` bodies are conservatively
-reported as unreadable, even when they happen to be harmless.
+reported as unreadable, even when they happen to be harmless. SQL-standard
+BEGIN ATOMIC routine bodies are also rejected rather than treating deferred
+statements as executed ACLs. Opaque unreadable-SQL diagnostics are separate
+from table state and cannot be satisfied by a table whose name matches a
+diagnostic. Comments after executable literals are treated as whitespace.
 
 Twenty-five historical dynamic statements were inspected in six immutable migration
 files. They handle policies or existing object ACLs rather than creating tables.

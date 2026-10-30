@@ -5,6 +5,8 @@
 // Tracks ordinary, unlogged, foreign, CTAS and SELECT INTO table creation;
 // supports quoted identifiers and rollback to savepoints. Runtime-built SQL
 // and escaped DO bodies fail closed when they cannot be analyzed statically.
+// SQL-standard BEGIN ATOMIC routine bodies are rejected as unsupported.
+// Opaque diagnostics are never tracked as SQL table names and cannot be granted away.
 // Twenty-five reviewed historical occurrences are pinned by file name, content
 // hash and offset. Independent review of those pins is still required.
 // CREATE inside a function is scanned conservatively. No DB access is made.
@@ -246,13 +248,13 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
         const prefix = noComments.slice(statementStart,i);
         const languageLiteral = /^\s*DO\s+LANGUAGE\s*(?:E|U&|N)?$/i.test(prefix);
         if (lit && /^\s*DO\b/i.test(prefix) && !languageLiteral && !DO_BODY_PREFIX_RE.test(prefix) && !DO_ESCAPED_PREFIX_RE.test(prefix)) {
-          events.push({kind:"create",conditional:false,table:"(unreadable DO body prefix at offset "+i+")",index:i});
+          events.push({kind:"diagnostic",conditional:false,table:"(unreadable DO body prefix at offset "+i+")",index:i});
         }
         if (lit && /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[\s\S]*\bAS\s*(?:E|U&)?$/i.test(noComments.slice(statementStart,i))) {
-          events.push({kind:"create",conditional:false,table:"(unreadable quoted routine body at offset "+i+")",index:i});
+          events.push({kind:"diagnostic",conditional:false,table:"(unreadable quoted routine body at offset "+i+")",index:i});
         }
         if (lit && DO_ESCAPED_PREFIX_RE.test(noComments.slice(statementStart,i))) {
-          events.push({kind:"create",conditional:false,table:"(unreadable escaped DO body at offset "+i+")",index:i});
+          events.push({kind:"diagnostic",conditional:false,table:"(unreadable escaped DO body at offset "+i+")",index:i});
         }
         if(lit && DO_BODY_PREFIX_RE.test(noComments.slice(statementStart,i))){
           for(const nested of collectDynamicExecuteEvents(lit.value, true)){
@@ -266,7 +268,7 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
       if(dol){
         const prefix=noComments.slice(statementStart,i);
         if (/^\s*DO\b/i.test(prefix) && !DO_BODY_PREFIX_RE.test(prefix)) {
-          events.push({kind:"create",conditional:false,table:"(unreadable DO body prefix at offset "+i+")",index:i});
+          events.push({kind:"diagnostic",conditional:false,table:"(unreadable DO body prefix at offset "+i+")",index:i});
         }
         if (DO_BODY_PREFIX_RE.test(prefix) || /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[\s\S]*\bAS\s*$/i.test(prefix)) {
           walk(i+dol.tag.length,dol.after-dol.tag.length,true);
@@ -292,7 +294,7 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
       }
       const arg=readExecuteArgument(sql,afterKw,end);
       // Runtime SQL cannot be proven not to create a table; reject it.
-      events.push({kind:"create",conditional:false,table:"(unreadable dynamic EXECUTE at offset "+executeAt+")",index:executeAt});
+      events.push({kind:"diagnostic",conditional:false,table:"(unreadable dynamic EXECUTE at offset "+executeAt+")",index:executeAt});
       i=Math.max(arg.after,i+7);
     }
   }
@@ -496,7 +498,7 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
         }
         if (j < end) {
           const prefix = code.slice(stmtStart, i).join("");
-          const executes = EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(j + 1, end));
+          const executes = EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(skipWsAndComments(sql, j + 1, end), end));
           // A single-quoted DO body runs now, matching dollar-quoted DO.
           const doBody = scanDoBodies && RUNS_NOW_RE.test(prefix);
           if ((executableOnly || creationOnly) && !executes && !doBody) blank(i, j + 1);
@@ -517,7 +519,7 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
           // inside one (EXECUTE $ddl$ ... $ddl$).
           const prefix = code.slice(stmtStart, i).join("");
           const isExecute =
-            EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(close + tag.length, end));
+            EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(skipWsAndComments(sql, close + tag.length, end), end));
           const runsNow = (scanDoBodies && RUNS_NOW_RE.test(prefix)) || isExecute;
           const routineBody = /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[\s\S]*\bAS\s*$/i.test(prefix);
           if ((!executableOnly && (!creationOnly || runsNow || routineBody)) || runsNow) {
@@ -561,6 +563,7 @@ function overlayExecutePayloads(topLevel, executed, spans) {
  */
 export function findTablesWithoutExplicitAcl(migrations) {
   const tables = new Map(); // table -> { migration, acl }
+  const diagnostics = []; // opaque failures: SQL identifiers/ACLs cannot clear them
   // Session temp names outlive a single migration file: if two migrations share
   // a session, the shadow still holds (fails closed).
   const temps = new Map();
@@ -577,6 +580,12 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const keywordSql = executed.split("").map((ch, index) => quoted[index] ? " " : ch).join("");
     const quotedSelectInto = quotedIdentifierPositions(selectIntoSql);
     const events = [];
+    // SQL-standard routine bodies are deferred. Reject the unsupported body
+    // form rather than crediting its unexecuted ACL/removal statements.
+    const atomicRoutineRe = /\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[^;]*?\bBEGIN\s+ATOMIC\b/gi;
+    for (const match of keywordSql.matchAll(atomicRoutineRe)) {
+      events.push({kind:"diagnostic", table:"(unreadable SQL-standard routine body at offset "+match.index+")", index:match.index});
+    }
     const transactionRe = /(?:^|;)\s*(SAVEPOINT|RELEASE(?:\s+SAVEPOINT)?|ROLLBACK\s+(?:(?:WORK|TRANSACTION)\s+)?TO(?:\s+SAVEPOINT)?|START\s+TRANSACTION|BEGIN|COMMIT|END|ROLLBACK|ABORT)\b(?:\s+("(?:[^"]|"")*"|[a-zA-Z_][a-zA-Z0-9_$]*))?/gi;
     for (const match of topLevel.matchAll(transactionRe)) {
       if (quotedIdentifierPositions(topLevel)[match.index]) continue;
@@ -593,7 +602,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
       if (!complete) {
         events.push({
-          kind: "create",
+          kind: "diagnostic",
           conditional: false,
           table: `(unreadable CREATE TABLE target at offset ${match.index})`,
           index: match.index,
@@ -700,12 +709,13 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     events.sort((a, b) => a.index - b.index);
     for (const event of events) {
+      if (event.kind === "diagnostic") { diagnostics.push({table:event.table,migration:m.name}); continue; }
       if (event.kind === "transaction") {
         if (event.action === "BEGIN") { transactionStart=snapshot(); savepoints=[]; }
         else if (event.action === "SAVEPOINT" && event.name) savepoints.push({name:event.name,state:snapshot()});
         else if (event.action.startsWith("ROLLBACK TO")) {
           const at=savepoints.findLastIndex((point)=>point.name===event.name);
-          if (at<0) tables.set('(unresolved rollback at offset ' + event.index + ')',{migration:m.name,acl:false});
+          if (at<0) diagnostics.push({table:'(unresolved rollback at offset ' + event.index + ')',migration:m.name});
           else { restore(savepoints[at].state); savepoints=savepoints.slice(0,at+1); }
         } else if (event.action === "RELEASE SAVEPOINT") {
           const at=savepoints.findLastIndex((point)=>point.name===event.name);
@@ -760,8 +770,9 @@ export function findTablesWithoutExplicitAcl(migrations) {
       }
     }
   }
-  return [...tables]
+  const missing = [...tables]
     .filter(([, info]) => !info.acl)
-    .map(([table, info]) => ({ table, migration: info.migration }))
-    .sort((a, b) => (a.table < b.table ? -1 : a.table > b.table ? 1 : 0));
+    .map(([table, info]) => ({ table, migration: info.migration }));
+  return [...diagnostics, ...missing]
+    .sort((a, b) => a.table < b.table ? -1 : a.table > b.table ? 1 : a.migration < b.migration ? -1 : a.migration > b.migration ? 1 : 0);
 }

@@ -913,3 +913,24 @@ describe("nested literal SQL and relation lifecycle forms", () => {
     expect(tables("CREATE FOREIGN TABLE public.leaky(id int) SERVER remote; ALTER FOREIGN TABLE public.leaky RENAME TO renamed;")).toEqual(["renamed"]);
   });
 });
+
+describe("literal terminators, deferred routine bodies and opaque diagnostics", () => {
+  it.each([
+    "DO $$ BEGIN EXECUTE 'CREATE TABLE public.leaky(id int)' /* rationale */; END $$;",
+    "DO $$ BEGIN EXECUTE $cmd$CREATE TABLE public.leaky(id int)$cmd$ /* rationale */; END $$;",
+    "DO $$ BEGIN EXECUTE 'CREATE TABLE public.leaky(id int)' -- rationale\n; END $$;",
+  ])("treats trailing comments as whitespace: %s", (sql) => { expect(tables(sql)).toEqual(["leaky"]); });
+  it("accepts an executable literal grant with a trailing comment", () => {
+    expect(tables(CREATE + "DO $$ BEGIN EXECUTE 'GRANT SELECT ON public.leaky TO authenticated' /* rationale */; END $$;")).toEqual([]);
+  });
+  it.each(["GRANT SELECT ON public.leaky TO authenticated;", "DROP TABLE public.leaky;"])("rejects deferred SQL-standard ACL/removal: %s", (command) => {
+    expect(tables(CREATE + "CREATE FUNCTION public.later() RETURNS void LANGUAGE SQL BEGIN ATOMIC " + command + " END;").length > 0).toBe(true);
+  });
+  it("does not let a table identifier satisfy an opaque diagnostic", () => {
+    const sql = 'DO $$ BEGIN EXECUTE \'CREATE \' || \'TABLE public.leaky(id int)\'; END $$; CREATE TABLE public."(unreadable dynamic EXECUTE at offset 12)"(id int); GRANT SELECT ON public."(unreadable dynamic EXECUTE at offset 12)" TO authenticated;';
+    expect(tables(sql)).toEqual(["(unreadable dynamic EXECUTE at offset 12)"]);
+  });
+  it("fails closed for an unsupported SQL-standard routine even when innocuous", () => {
+    expect(tables("CREATE FUNCTION public.later() RETURNS int LANGUAGE SQL BEGIN ATOMIC SELECT 1; END;").length > 0).toBe(true);
+  });
+});

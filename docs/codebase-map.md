@@ -191,6 +191,13 @@ Safety invariant stated in `oneTentLoopProofRules.ts`: never classify missing, s
 invalid, unknown or demo telemetry as healthy; Action Queue rows stay approval-required, and
 any executable-device marker flips a row to `blocked`.
 
+**First-session entry, checked 2026-10-30 at `ffc6076ae` (#2582).** This is not an eleventh
+`LOOP_STEP_IDS` value, and the table counts above were not re-measured. `/start-room`
+(`src/routes/_app/start-room.tsx`) renders `StartYourRoom.tsx`. One submit creates whichever
+of grow, tent, and plant is still missing, then opens Plant Detail with Quick Log. Contract:
+[`docs/specs/start-your-room-one-submit.md`](specs/start-your-room-one-submit.md). Pure modules:
+`startYourRoomRules.ts`, `startYourRoomDraftRules.ts`, `sessionFormDraftRules.ts`.
+
 ---
 
 ## 3. Edge functions (`supabase/functions/`, 34 + `_shared`)

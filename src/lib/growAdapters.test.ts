@@ -207,6 +207,8 @@ describe("mapPlantRow", () => {
 
 describe("mapSensorReadingRow", () => {
   const base: Omit<SensorReadingRow, "metric" | "value"> = {
+    notes: null,
+    unit_unconfirmed: false,
     id: "r1",
     user_id: "u1",
     tent_id: "tent-1",
@@ -312,6 +314,8 @@ describe("mapSensorReadingRow", () => {
 
 describe("groupSensorReadingRows", () => {
   const base: Omit<SensorReadingRow, "tent_id" | "ts" | "metric" | "value"> = {
+    notes: null,
+    unit_unconfirmed: false,
     id: "r",
     user_id: "u",
     quality: "ok",
@@ -480,6 +484,8 @@ describe("mock data immutability", () => {
     mapTentRow(tentRow);
     mapPlantRow(plantRow);
     mapSensorReadingRow({
+    notes: null,
+    unit_unconfirmed: false,
       id: "x",
       user_id: "u",
       tent_id: "t",

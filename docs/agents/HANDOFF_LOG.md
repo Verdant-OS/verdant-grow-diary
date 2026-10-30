@@ -69,6 +69,46 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-295-PRIVATE-PHOTO-PARTIAL-SIGNING
+
+```text
+TASK VER-295-PRIVATE-PHOTO-PARTIAL-SIGNING  priority: P2  status: OPEN
+goal: keep successfully signed diary photos visible when another owned photo is unavailable, while retaining an explicit error state.
+why: VER-295 / GitHub #2566; one missing object previously blanked the shared hook's whole private-photo batch.
+branch: codex/ver-295-private-photo-partial-signing
+base: verdant-grow-diary at ffc6076aeb3723f17d85057154f8e9772ed9c222
+checkout: git fetch origin refs/heads/codex/ver-295-private-photo-partial-signing:refs/remotes/origin/codex/ver-295-private-photo-partial-signing refs/heads/verdant-grow-diary:refs/remotes/origin/verdant-grow-diary; verify PR head/claim before switching and normally merging the base
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2612
+head_sha: eea8831b4ab7accb51ace7ca28d58f43e0b4f447 was the verified starting remote head; the merge commit containing this block is the next candidate. Read the PR body/current remote head for the published full SHA and hosted receipts.
+state: base integration resolved and locally checked; normal commit/push and fresh hosted CI remain to be observed in the PR body
+current_step: one normal merge of ffc6076a; only HANDOFF_LOG conflicted. Resolution preserves the entire incoming base log byte-for-byte after removing this task block; hook/test retain exact eea8831 source bytes.
+next_action: verify the resulting full remote head, measure its required/supplemental CI, and route one eligible outside exact-head review after the CI precheck. Keep draft; no merge or deployment.
+post_merge_check: after separately approved deployment, verify the served SHA and confirm a fixture-owned valid photo remains visible alongside an unavailable photo in Plant Timeline and Recent photos; NOT_MEASURED until then
+active_writer: Codex VER-295 takeover session, 2026-10-30; sole writer by Matthew's explicit reassignment. No claim on #2262.
+owner: Codex VER-295 takeover session, 2026-10-30
+claimed_by: Codex VER-295 takeover session, 2026-10-30; owner-authorized transfer recorded in PR body before checkout and comments re-read without a competing claim
+transfer: Prior writer fc8a3dc876de's completed task could not be resumed. Matthew authorized a new task to take over this same branch. No released_by or voluntary release was observed; this record does not claim one. Other-chat/private-fleet writer coverage is unavailable.
+last_updated: 2026-10-30, by Codex VER-295 takeover session
+scope: existing hook change, its new regression file, normal merge from the current base, and this handoff block only. Protected/dependency/Supabase/workflow files inherited from base require no manual resolution and remain identical to that base.
+decisions: retain successful signatures, ignore per-item errors, derive hasPrivatePhotoError separately; preserve request-level fail-closed behavior, owner parser, viewer-scoped cache key, private bucket, URL TTL and external photos. #2605 merged as dcf39fdb605de7ea89884e5a884978857f99b18a and is an ancestor of the integrated base; its 2.1.3 dependency fix is inherited unchanged.
+tried_and_rejected: no force-push, rebase, dependency rewrite, existing scorer edit or CI/settings bypass. CLI GitHub API reads return Forbidden; connected GitHub tools supply remote metadata/check reads.
+overlap: #2262 remains open/draft, freshly observed at a76ddc0fa97238e55975f99732e50e5b14424b9e on 2026-10-30; separate holder/branch untouched. Its opt-in allowPartial hunk overlaps this shared default change. The prior proposal remains this narrow fix first, then #2262's holder reconciles; no integration order approval is claimed.
+commands: node node_modules/vitest/vitest.mjs run src/test/diary-photo-partial-signing.test.tsx src/test/use-diary-photo-display-rows.test.tsx src/test/diary-photo-display-rules.test.ts src/test/plant-relative-timeline-photo-thumbnail.test.tsx src/test/plant-detail-photo-strip.test.tsx src/test/plant-photo-strip-items-enabled-and-hero-fallback.test.tsx src/test/plant-profile-photo-regression.test.ts src/test/diary-storage-buckets-contract.test.ts src/test/verdant-bucket-owner-policies-migration.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot
+historical_validation: at eea8831, original writer reported RED 6 failed / 5 passed; GREEN 10 files / 157 passed / 0 failed, full TypeScript exit 0, lint/format and safety checks PASS. Original technical Codex review was explicitly not eligible independent acceptance and does not cover the new merge head.
+validation: new-head receipts belong in the PR body after execution. This environment has Node 24.19.0 but no Bun or node_modules; local Vitest/TypeScript/ESLint/build and Bun audit are BLOCKED. No install is authorized by this handoff. Hooks were unconfigured in the supplied checkout; no hook setting was disabled and no hook pass is claimed.
+fresh_validation: PASS: all unrelated incoming handoff bytes preserved; hook/test identical to eea8831; strict scorer-lock against ffc6076a (no existing scorer edited); Bun lockfile policy; all three docs-safety scanners; contract-test resolution; Sentinel parity; governance regression 31 passed / 0 failed / 0 skipped; 107 edge mirrors; no src/lib escapes; staged/working whitespace. BLOCKED: Vitest missing module, static secret scanner missing TypeScript, dependency audit missing Bun. Full application tests/build/typecheck NOT_MEASURED in this environment.
+files_touched: src/hooks/useDiaryPhotoDisplayRows.ts; src/test/diary-photo-partial-signing.test.tsx; docs/agents/HANDOFF_LOG.md (only own block manually resolved/refreshed)
+files_remaining: no planned runtime edits; real same-scope review findings only
+blockers: full local validation needs the canonical installed toolchain. Draft CI skips main heavy checks under existing policy; skipped/missing checks never establish 35/35. Eligible non-contributing Claude/Grok session and authorized usable transport remain unavailable; no independent PASS or sent review request is claimed.
+open_questions: #2262's holder must reconcile overlap before integration; no implementation preference required here
+gotchas: all unrelated incoming handoffs are preserved. Existing locked tests are untouched by this task. Local/static evidence is not hosted storage or production evidence. Every new head invalidates earlier reviews.
+links: https://linear.app/verdantgrowdiary/issue/VER-295/diary-photos-one-unsigned-private-path-hides-every-private-photo ; https://github.com/Verdant-OS/verdant-grow-diary/issues/2566 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2262 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2605
+reviewer_seat: BLOCKED; eligible independent non-contributing Claude/Grok session under OWNERSHIP 4.3 needed; all contributing Codex sessions and original writer excluded
+reviewer_sha: none; historical technical receipt at eea8831 is superseded by the merge head
+review_request: owner Codex VER-295 takeover session; state blocked; request/receipt permalink unavailable (not sent); fallback-transfer count 0; complete scope is the three-file base-relative PR diff plus required checks and protected-file evidence. PR body is canonical full-head ledger.
+session_state: no reviewer process, deployments, production writes, settings changes, queue actions or automations. Stay draft. No PR/issue/review comments posted; claim and resume evidence are in the owner-authorized PR body.
+```
+
 ### VER-296-START-ROOM-ONE-STEP
 
 ```text

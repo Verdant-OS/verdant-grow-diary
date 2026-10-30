@@ -31,7 +31,9 @@ Implementation plan and checkpoints:
 - [x] Implement source inventory, passive browser capture, reporting and cleanup.
 - [x] Run a production bundle map, inspect its evidence and record measured counts.
 - [x] Compare available before/after checks and complete a fresh peer code review.
-- [ ] Complete the app suite after the locked dependency installation succeeds.
+- [x] Restore the locked dependency tree and pass both type checkers and a production build.
+- [x] Complete full candidate verification through all 16 CI partitions.
+- [x] Finish the local baseline and triage all count differences against CI.
 
 Allowed files are `scripts/rea/`, this runbook and `.gitignore`. App source,
 Supabase, migrations, Workers settings, CI, billing and parked sensor work stay
@@ -65,6 +67,11 @@ Each successful run writes into `rea-out/bundle-map/<ISO-timestamp>/`:
 Directories are private and report files use owner-only permissions on POSIX.
 CT uses `America/Chicago`, including daylight saving time. The directory uses
 basic ISO 8601 UTC form, for example `20261030T010000.000Z`.
+
+Script counts distinguish `scripts_observed`, `scripts_submitted_for_analysis`,
+`scripts_parsed`, and `script_parse_failures`. REA's upstream
+`capture.scripts_analyzed` counts submitted scripts, including timed-out attempts;
+it must not be presented as a successful parse count.
 
 Privacy: inspection disables accessibility/console text, JSON/WebSocket shapes,
 storage keys/fingerprints and script-source output. Bundle analysis processes
@@ -152,16 +159,16 @@ Base: `0792349d57de2c1c0e2610f643920cf595486dfc` on `verdant-grow-diary`.
 Branch: `codex/rea-foundation-bundle-map-20261029`.
 Owner: this Codex implementation session. No merge or deployment is authorized.
 
-Measured in this cloud environment on October 29, 2026 (CT):
+Initial implementation measurements in this cloud environment on October 29, 2026 (CT):
 
-| Check | Before | After |
-| --- | --- | --- |
-| REA tooling tests | Not present | 21 passed, 0 failed |
-| Static client-secret scanner self-tests | 29 passed, 0 failed | 29 passed, 0 failed |
-| Static client-secret repository scan | PASS | PASS |
-| Docs safety | 3 scanners passed | 3 scanners passed |
-| App static-safety suite | BLOCKED: 8 suite-load errors, 0 tests executed | BLOCKED: same 8 suite-load errors, 0 tests executed |
-| Full app suite | BLOCKED; incomplete | BLOCKED; incomplete |
+| Check                                   | Before                                         | After                                               |
+| --------------------------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| REA tooling tests                       | Not present                                    | 21 passed, 0 failed                                 |
+| Static client-secret scanner self-tests | 29 passed, 0 failed                            | 29 passed, 0 failed                                 |
+| Static client-secret repository scan    | PASS                                           | PASS                                                |
+| Docs safety                             | 3 scanners passed                              | 3 scanners passed                                   |
+| App static-safety suite                 | BLOCKED: 8 suite-load errors, 0 tests executed | BLOCKED: same 8 suite-load errors, 0 tests executed |
+| Full app suite                          | BLOCKED; incomplete                            | BLOCKED; incomplete                                 |
 
 Exact commands (Bun 1.3.14 was provisioned outside the repository):
 
@@ -210,9 +217,85 @@ the credential and process cases, plus interruptions during startup, capture,
 export and shutdown. This peer review is not repository independent acceptance
 or merge approval. The PR stays draft pending those gates and the blocked app checks.
 
-Resume with a supported global REA runtime, then repeat the command in job 3.
-Further route extraction needs REA support for the timed-out/unsupported code;
-do not infer missing routes or change application bundling inside this scope.
-Restore the locked app dependency installation to complete the app-suite check.
-Rollback is removal of these scripts/runbook and the REA-specific ignore entries;
-the application has no runtime dependency on them.
+## Production-readiness follow-up
+
+The existing branch was updated by a normal merge of deploy base
+`ab4aaa2f3a648c28860c682ddec3ec0103347246`. The hardened implementation is
+`552cd2c51d184f3be1143ab7285136c47a5d6f07`.
+
+Dependency recovery succeeded with Bun 1.3.14 and
+`bun install --frozen-lockfile --network-concurrency=1`. The missing
+`ansi-regex@5.0.1` now loads; its retrieved tarball's SHA-512 matches the lock.
+No manifest, lockfile, registry or TLS-policy change was needed. The original
+HTTP failures above are historical, not a current dependency blocker.
+
+The readiness changes replace generated executable test programs with static
+fixtures and private JSON inputs, including paths with spaces and shell
+characters. Test commits use the current local Git HEAD rather than a historical
+SHA that could be missing from a shallow checkout. Repeated termination signals
+remain handled until child shutdown, profile removal and failed-output rollback
+have all finished. Credential checks include decoded API-key parameter names.
+
+| Check                                        | Readiness result                                                                       |
+| -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| REA tooling tests                            | 26 passed, 0 failed                                                                    |
+| Scoped ESLint                                | 0 errors, 0 warnings                                                                   |
+| `bun run typecheck`                          | PASS                                                                                   |
+| `bun run typecheck:tsgo`                     | PASS                                                                                   |
+| `bun run build`, isolated checkout           | PASS, including postbuild SEO validation                                               |
+| Precommit docs regression                    | 67 passed, 0 failed                                                                    |
+| Hosted CodeQL at the implementation SHA      | PASS: no new alerts in changed code                                                    |
+| Full candidate app suite, 16 CI partitions   | 49,801 passing test executions, 223 skipped, 0 failed; 3,769 scheduled files validated |
+| Local deploy-base full-suite comparison      | 49,626 passed, 10 failed, 377 skipped; six PostgreSQL harness blocks                   |
+| Isolated rerun of the nine baseline UI files | 57 passed, 0 failed                                                                    |
+
+The candidate full-suite run is
+[41005654425](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/41005654425)
+at the implementation SHA above. The repository's existing
+`vitest-batched-full-suite.yml` workflow used all 16 partitions and Bun 1.3.14.
+Its receipt parser returned GO, with no failed or unvalidated batches and no
+OOM. The full manifest independently contains 3,769 files. The parsed JSON and
+Markdown receipts are `candidate-full-receipt.json` and
+`candidate-full-receipt.md` under `/tmp/verdant-rea-validation/readiness/`.
+
+The local deploy-base run completed with 50,013 registered tests across 3,769
+files. Six PostgreSQL harnesses were blocked because this cloud environment has
+no PostgreSQL server tools; 150 tests in those files were unexecuted. Ten UI
+assertions failed across nine files, then all 57 tests in those files passed in
+a serial rerun. They also passed in the candidate CI run. These are recorded
+baseline failures, not silently discarded tests or a green local full-suite claim.
+
+All count differences were compared by file against terminal CI chunk summaries:
+
+- The six database files run all 150 tests successfully in CI.
+- CI has PowerShell and runs three invocation checks. The local environment
+  skips those three and instead registers one extra informational sentinel test.
+- The new runbook adds one case to the existing dynamic stale-document scan.
+- The existing batched runner passes `.test.ts` as a substring filter, which also
+  selects the same-named `.test.tsx` file for GGS freshness guidance. Its 11
+  passing tests execute twice. The raw CI receipt therefore contains 11 repeated
+  executions; it does not represent 11 new product tests. The file is also
+  scheduled normally, and no manifest file is missing.
+
+Deduplicating that observed overlap gives 49,790 passed and 223 skipped across
+50,013 candidate cases. The raw execution counts above are preserved exactly.
+No application source, test, dependency or CI file differs from the deploy base.
+The per-file comparison, without duplicate scheduled files, is saved as
+`full-count-triage.json`; local JSON/logs and hosted receipts are under
+`/tmp/verdant-rea-validation/readiness/`.
+
+The final saved production export was rechecked with the stronger credential
+policy: both records pass unchanged. A fresh production smoke of the hardened
+command also passed, writing `rea-out/bundle-map/20261030T050323.196Z/`.
+It captured 81 chunks against 147 source routes, submitted 81 scripts and parsed 80. Both exported records pass preflight; the new unmodified export SHA-256 is
+`38489a5a3b84dc3bead7fcb036845eee6856b25646636ac8b73e00bd3853a595`.
+The remaining script timeout and unknown route/module coverage stay explicit.
+Further route extraction needs REA support for the timed-out/unsupported code.
+Do not infer missing routes or change application bundling inside this scope.
+
+The PR remains draft. GitHub currently reports three required contexts: two
+passing, with `Lint, typecheck, test, build` skipped while the PR is draft.
+Skipped required checks and a Codex peer review do not provide the eligible
+independent acceptance or exact-head merge approval required by repository
+ownership rules. Rollback removes these scripts/runbook and the
+REA-specific ignore entries; the application has no runtime dependency on them.

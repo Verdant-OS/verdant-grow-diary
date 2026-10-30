@@ -40,43 +40,31 @@ migration that forgets its `GRANT` would pass every local and CI DB lane, then r
 app once it is applied to the hosted project after 2026-10-30. Before this change no check could see that.
 
 Correction (this PR): `scripts/lib/supabaseTableAclRules.mjs` and
-`src/test/supabase-table-explicit-acl.test.ts`. Every persistent `public` table must have, after
-its latest `CREATE`, a table-level `GRANT` or a full `REVOKE ALL`. A partial or column-level revoke,
-a GRANT whose every privilege has a column list, a statement inside a comment (nested block
-comments included), a string literal, a function body or other dollar-quoted text, a schema-wide or
-default-privilege statement, or a function/sequence grant does not count. A top-level statement, a
-`DO` block (dollar-quoted or a single-quoted body, including `DO LANGUAGE ... '...'`) and a string
-handed straight to `EXECUTE` do count, and the same rule decides whether a
-removal or `ALTER TABLE ... RENAME TO` clears a table: one written in a comment, a literal or an
-uncalled function body does not. A string handed to `EXECUTE` is decoded and read the same way, so
-a literal or comment nested inside it does not count either. A keyword inside a quoted identifier
-(a policy named `"Admins grant access"`) is not a statement. A string handed to `EXECUTE` counts as
-a GRANT or DROP only when it is the whole command; one joined to more text at run time
-(`EXECUTE '...' || x`) does not. If those joined pieces, or the strings behind a bare `EXECUTE v`,
-spell `CREATE TABLE` or `SELECT ... INTO`, the migration is reported as
-`(unreadable dynamic EXECUTE at offset N)`. `EXECUTE format('GRANT ...')`,
-`EXECUTE format('SELECT ... FROM %I') INTO n`, and trigger `EXECUTE FUNCTION` are not that finding.
-A list of targets splits only on commas outside quoted names, and each removal target must be a complete name.
-A `GRANT`/`REVOKE` target whose name is an object-type keyword (`functions`, `sequence`, `schema`)
-counts when `TO`/`FROM` follows the name; `FUNCTION name`, `SEQUENCE name`, and `ALL ... IN SCHEMA`
-still do not. Temporary tables (`CREATE TEMP TABLE`, `SELECT ... INTO TEMP`) shadow an unqualified
-`DROP`/`RENAME`/`GRANT` of the same name until `pg_temp.name` or that unqualified name is dropped.
-Unquoted names may use non-ASCII letters, as in PostgreSQL. Quoted names (`"public"."x"`),
-unqualified names (read as `public`), `CREATE UNLOGGED TABLE` and `ALTER TABLE ... RENAME TO` are
-recognised. `ALTER TABLE ... SET SCHEMA public` brings a table into scope and it then needs its own
-ACL; a move out of `public` takes it out of scope. A `CREATE TABLE IF NOT EXISTS` of a table that
-already exists keeps its ACL. The test
-runs against the real migration tree in the required Vitest suite. The result must equal the frozen
-legacy list exactly, with each legacy table bound to the migration that created it, so a new table
-without an ACL fails CI, a legacy table that is dropped and recreated needs its own ACL, and the
-list can only shrink. Known limits: a grant assembled at run time (`EXECUTE format(...)`) cannot be
-read statically and is not counted, so the table is reported (fails closed); `SET search_path` is
-not modelled, so a migration that changes it must schema-qualify its names. No migration in the
-tree today changes `search_path` at the top level. Control flow inside a `DO` block is not
-evaluated: a statement in an `IF` branch counts as if it ran, so keep a table's `GRANT`
-unconditional. Treating everything inside `DO` as not run would flag
-`__default_privilege_selftest_tbl` (`20260805090000`) and `soil_moisture_calibrations`
-(`20260728090000`), so that stricter path would need its own migration and Matthew's decision.
+`src/test/supabase-table-explicit-acl.test.ts` scan migration text for an explicit
+table-level ACL decision after each persistent public table's latest creation. A
+qualifying grant must name at least one Data API role; the check cannot prove which
+roles need which privileges, or that RLS is correct. A full table-level `REVOKE ALL`
+for an affected role remains an explicit denial. Column-only privileges do not count.
+
+The scanner recognizes ordinary, unlogged and foreign tables, CTAS, and `SELECT INTO`;
+it preserves quoted identifiers, distinguishes ASCII case folding, and models
+transaction savepoints and temporary tables that expire at commit. Executable
+literal statements in `DO` blocks are scanned; descriptive strings do not count.
+Runtime-built `EXECUTE` statements and escaped `DO` bodies are conservatively
+reported as unreadable, even when they happen to be harmless.
+
+Twenty-five historical dynamic statements were inspected in six immutable migration
+files. They handle policies or existing object ACLs rather than creating tables.
+Those exact occurrences are pinned by filename, normalized SHA-256 and statement
+offset; changing or renaming the file invalidates the pin. The independent 22-table
+legacy list is unchanged. No new migration inherits a historical pin.
+
+Static analysis has limits: an unqualified name is assumed to resolve in public,
+so names must be schema-qualified when search_path changes. Conditional control
+flow in a `DO` block is not evaluated; an unreachable GRANT may still count.
+A static ACL decision is not proof of production application, access, or RLS.
+The complete current migration tree must equal the unchanged 22-entry legacy
+list; existing migrations remain immutable.
 
 It is a new check, not an edit to `scripts/check-supabase-migration-safety.mjs`. The scorer lock
 refuses edits to that existing gate, and that unlock was not taken. The review fixes to this PR's
@@ -89,15 +77,13 @@ own two files were made under unlocks Matthew approved on 2026-10-28 and 2026-10
 - Whether the hosted project already runs the hardened defaults: NOT_MEASURED.
 - Whether the platform change also revokes the built-in `PUBLIC` `EXECUTE` on new functions:
   `uncertainty`. All called RPCs grant explicitly, so the answer changes nothing today.
-- Function, sequence, view and materialized-view grants for future migrations are not enforced by
-  a check yet. Persistent table-producing forms are tracked: `CREATE [UNLOGGED] TABLE`,
-  `CREATE TABLE ... AS`, and `SELECT ... INTO` at the top level or as a whole `EXECUTE` string
-  (including inside a `DO` block). The rule reports unreadable `CREATE TABLE` targets and
-  unreadable dynamic `EXECUTE`s that assemble `CREATE TABLE` or `SELECT ... INTO` (including
-  `EXECUTE v` built from concatenated strings). Single-quoted `DO` bodies count as executable SQL.
-  Temporary tables shadow unqualified `DROP`/`RENAME`/`GRANT` of the same name. Bare keyword-named
-  tables (`GRANT ... ON functions`) count. A new `CREATE VIEW public.v ...` with no GRANT still
-  passes the rule. The same pattern applies when a new client-called RPC, client-inserted serial
-  column or client-read view appears.
+- Function, sequence, view and materialized-view grants for future migrations are
+  not enforced by this table contract. A new client-called RPC, serial column or
+  client-read view may need its own explicit grant.
+- The six historical dynamic-SQL pins need independent security review. Their
+  exact source, role and offsets must be verified, including function-name quoting.
+- Native Vitest, runtime database evidence and final-head CI are NOT_MEASURED for
+  the candidate patch.
+
 - The 22 legacy tables still depend on default privileges in any fresh schema without `seed.sql`.
   Giving them explicit grants is a separate, additive migration and needs Matthew's decision.

@@ -349,36 +349,20 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual(["leaky"]);
   });
 
-  it("tracks a table created by dynamic SQL and accepts a dynamic grant that runs", () => {
-    expect(tables("DO $$ BEGIN EXECUTE 'CREATE TABLE public.leaky (id int)'; END $$;")).toEqual([
-      "leaky",
-    ]);
-    expect(
-      tables(
-        "DO $$ BEGIN EXECUTE $ddl$ CREATE TABLE public.leaky (id int) $ddl$; EXECUTE 'GRANT SELECT ON public.leaky TO authenticated'; END $$;",
-      ),
-    ).toEqual([]);
-    // A grant assembled at run time cannot be read statically: fail closed.
-    expect(
-      tables(
-        `${CREATE}\nDO $$ BEGIN EXECUTE format($f$GRANT SELECT ON %I TO authenticated$f$, $t$leaky$t$); END $$;`,
-      ),
-    ).toEqual(["leaky"]);
+  it("tracks literal execution and rejects unreadable dynamic commands", () => {
+    expect(tables("DO $$ BEGIN EXECUTE 'CREATE TABLE public.leaky (id int)'; END $$;")).toEqual(["leaky"]);
+    expect(tables("DO $$ BEGIN EXECUTE $ddl$ CREATE TABLE public.leaky (id int) $ddl$; EXECUTE 'GRANT SELECT ON public.leaky TO authenticated'; END $$;")).toEqual([]);
+    const sql = `${CREATE}\nDO $$ BEGIN EXECUTE format($f$GRANT SELECT ON %I TO authenticated$f$, $t$leaky$t$); END $$;`;
+    expect(tables(sql)).toEqual([`(unreadable dynamic EXECUTE at offset ${sql.indexOf("EXECUTE")})`, "leaky"]);
   });
 
   it("fails closed when a CREATE TABLE target cannot be read", () => {
     const formatSql = "DO $$ BEGIN EXECUTE format('CREATE TABLE %I (id int)', 'leaky'); END $$;";
     const concatSql = "DO $$ BEGIN EXECUTE 'CREATE TABLE ' || quote_ident('leaky'); END $$;";
     const phantomSql = "CREATE TABLE public.%I (id int);";
-    expect(tables(formatSql)).toEqual([
-      `(unreadable CREATE TABLE target at offset ${formatSql.indexOf("CREATE TABLE")})`,
-    ]);
-    expect(tables(concatSql)).toEqual([
-      `(unreadable CREATE TABLE target at offset ${concatSql.indexOf("CREATE TABLE")})`,
-    ]);
-    expect(tables(phantomSql)).toEqual([
-      `(unreadable CREATE TABLE target at offset ${phantomSql.indexOf("CREATE TABLE")})`,
-    ]);
+    expect(tables(formatSql)).toEqual([`(unreadable dynamic EXECUTE at offset ${formatSql.indexOf("EXECUTE")})`]);
+    expect(tables(concatSql)).toEqual([`(unreadable dynamic EXECUTE at offset ${concatSql.indexOf("EXECUTE")})`]);
+    expect(tables(phantomSql)).toEqual([`(unreadable CREATE TABLE target at offset ${phantomSql.indexOf("CREATE TABLE")})`]);
   });
 
   it("fails closed when EXECUTE concatenates CREATE and TABLE", () => {
@@ -403,22 +387,12 @@ describe("supabase table explicit ACL rule", () => {
     ]);
   });
 
-  it("does not report format SELECT FROM, format GRANT, or trigger EXECUTE FUNCTION", () => {
-    expect(
-      tables(
-        "DO $$ DECLARE n int; BEGIN EXECUTE format('SELECT id FROM %I', 'leaky') INTO n; END $$;",
-      ),
-    ).toEqual([]);
-    expect(
-      tables(
-        `${CREATE}\nDO $$ BEGIN EXECUTE format('GRANT SELECT ON public.leaky TO authenticated'); END $$;`,
-      ),
-    ).toEqual(["leaky"]);
-    expect(
-      tables(
-        `${CREATE}\nCREATE FUNCTION public.tg() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN RETURN NEW; END $fn$;\nCREATE TRIGGER t BEFORE INSERT ON public.leaky FOR EACH ROW EXECUTE FUNCTION public.tg();`,
-      ),
-    ).toEqual(["leaky"]);
+  it("rejects unreadable dynamic SQL while ignoring trigger EXECUTE FUNCTION", () => {
+    const selectSql = "DO $$ DECLARE n int; BEGIN EXECUTE format('SELECT id FROM %I', 'leaky') INTO n; END $$;";
+    const grantSql = `${CREATE}\nDO $$ BEGIN EXECUTE format('GRANT SELECT ON public.leaky TO authenticated'); END $$;`;
+    expect(tables(selectSql)).toEqual([`(unreadable dynamic EXECUTE at offset ${selectSql.indexOf("EXECUTE")})`]);
+    expect(tables(grantSql)).toEqual([`(unreadable dynamic EXECUTE at offset ${grantSql.indexOf("EXECUTE")})`, "leaky"]);
+    expect(tables(`${CREATE}\nCREATE FUNCTION public.tg() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN RETURN NEW; END $fn$;\nCREATE TRIGGER t BEFORE INSERT ON public.leaky FOR EACH ROW EXECUTE FUNCTION public.tg();`)).toEqual(["leaky"]);
   });
 
   it("counts an unqualified table under SET search_path as public", () => {
@@ -466,9 +440,8 @@ describe("supabase table explicit ACL rule", () => {
         `${CREATE}\nCOMMENT ON TABLE public.leaky IS 'GRANT SELECT ON public.leaky TO authenticated;';`,
       ),
     ).toEqual(["leaky"]);
-    expect(
-      tables(`${CREATE}\nDO E'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`),
-    ).toEqual(["leaky"]);
+    const escapedDo = `${CREATE}\nDO E'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';`;
+    expect(tables(escapedDo)).toEqual([`(unreadable escaped DO body at offset ${escapedDo.indexOf("'")})`, "leaky"]);
   });
 
   it("does not let an apostrophe in a quoted identifier open a string literal", () => {
@@ -553,20 +526,11 @@ describe("supabase table explicit ACL rule", () => {
   });
 
   it("counts an EXECUTE string only when it is the whole command", () => {
-    // The command is built at run time and names leaky_backup, not leaky.
-    expect(
-      tables(
-        `${CREATE}\nDO $$ BEGIN\n  EXECUTE 'DROP TABLE IF EXISTS public.leaky' || '_backup';\nEND $$;`,
-      ),
-    ).toEqual(["leaky"]);
-    expect(
-      tables(
-        `${CREATE}\nDO $$ BEGIN\n  EXECUTE 'GRANT SELECT ON public.leaky TO ' || quote_ident('authenticated');\nEND $$;`,
-      ),
-    ).toEqual(["leaky"]);
-    expect(
-      tables(`${CREATE}\nDO $$ BEGIN\n  EXECUTE 'DROP TABLE IF EXISTS public.leaky';\nEND $$;`),
-    ).toEqual([]);
+    const dropSql=`${CREATE}\nDO $$ BEGIN\n  EXECUTE 'DROP TABLE IF EXISTS public.leaky' || '_backup';\nEND $$;`;
+    const grantSql=`${CREATE}\nDO $$ BEGIN\n  EXECUTE 'GRANT SELECT ON public.leaky TO ' || quote_ident('authenticated');\nEND $$;`;
+    expect(tables(dropSql)).toEqual([`(unreadable dynamic EXECUTE at offset ${dropSql.indexOf("EXECUTE")})`, "leaky"]);
+    expect(tables(grantSql)).toEqual([`(unreadable dynamic EXECUTE at offset ${grantSql.indexOf("EXECUTE")})`, "leaky"]);
+    expect(tables(`${CREATE}\nDO $$ BEGIN\n  EXECUTE 'DROP TABLE IF EXISTS public.leaky';\nEND $$;`)).toEqual([]);
   });
 
   it("blanks dollar-quote tags around an exposed EXECUTE or DO body", () => {
@@ -586,9 +550,8 @@ describe("supabase table explicit ACL rule", () => {
       ),
     ).toEqual([]);
     // A payload joined to more text is not the whole command (fails closed).
-    expect(
-      tables(`${CREATE}\nDO $$ BEGIN EXECUTE $d$DROP TABLE public.leaky$d$ || '_x'; END $$;`),
-    ).toEqual(["leaky"]);
+    const joined = `${CREATE}\nDO $ BEGIN EXECUTE $d$DROP TABLE public.leaky$d$ || '_x'; END $;`;
+    expect(tables(joined)).toEqual([`(unreadable dynamic EXECUTE at offset ${joined.indexOf("EXECUTE")})`, "leaky"]);
   });
 
   it("reads non-ASCII unquoted identifiers", () => {
@@ -782,5 +745,127 @@ describe("supabase table explicit ACL rule", () => {
 
   it("returns nothing for no migrations", () => {
     expect(findTablesWithoutExplicitAcl([])).toEqual([]);
+  });
+});
+
+describe("ACL scanner safety regressions", () => {
+  const checks: [string, string, boolean][] = [
+    ["variable with unrelated literal", "DO $$ DECLARE v text; BEGIN RAISE NOTICE 'x'; v := 'CREATE ' || 'TABLE public.leaky (id int)'; EXECUTE v; END $$;", true],
+    ["format placeholder in CREATE", "DO $$ BEGIN EXECUTE format('CREATE %s public.leaky (id int)', 'TABLE'); END $$;", true],
+    ["dollar prose and dynamic SQL", "COMMENT ON SCHEMA public IS $c$grower's notes$c$; DO $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky (id int)'; END $$;", true],
+    ["foreign table without grant", "CREATE FOREIGN TABLE public.leaky (id int) SERVER remote;", true],
+    ["foreign table with grant", "CREATE FOREIGN TABLE public.leaky (id int) SERVER remote; GRANT SELECT ON public.leaky TO authenticated;", false],
+    ["savepoint rolls grant back", "BEGIN; CREATE TABLE public.leaky(id int); SAVEPOINT p; GRANT SELECT ON public.leaky TO authenticated; ROLLBACK TO SAVEPOINT p; COMMIT;", true],
+    ["savepoint rolls create back", "BEGIN; SAVEPOINT p; CREATE TABLE public.leaky(id int); ROLLBACK TO p; COMMIT;", false],
+    ["savepoint restores dropped table", "BEGIN; CREATE TABLE public.leaky(id int); SAVEPOINT p; DROP TABLE public.leaky; ROLLBACK TO p; COMMIT;", true],
+    ["quoted target delimiter", 'CREATE TABLE public."foo TO bar" (id int); GRANT SELECT ON public."foo TO bar" TO authenticated;', false],
+    ["ordinary prose", "COMMENT ON SCHEMA public IS 'CREATE TABLE public.leaky (id int)';", false],
+    ["dollar prose", "COMMENT ON SCHEMA public IS $c$CREATE TABLE public.leaky(id int)$c$;", false],
+    ["grant to unrelated role", "CREATE TABLE public.leaky(id int); GRANT SELECT ON public.leaky TO postgres;", true],
+    ["quoted api role", 'CREATE TABLE public.leaky(id int); GRANT SELECT ON public.leaky TO "authenticated";', false],
+    ["quoted SELECT alias", 'SELECT 1 AS "x INTO private.decoy" INTO TABLE public.leaky;', true],
+    ["non-ascii case", "CREATE TABLE public.Ä (id int); CREATE TABLE public.ä (id int); GRANT SELECT ON public.ä TO authenticated;", true],
+    ["temporary table expires at commit", "BEGIN; CREATE TABLE public.leaky(id int); CREATE TEMP TABLE leaky(id int) ON COMMIT DROP; COMMIT; GRANT SELECT ON leaky TO authenticated;", false],
+    ["temporary rename preserves expiration", "BEGIN; CREATE TABLE public.leaky(id int); CREATE TEMP TABLE leaky(id int) ON COMMIT DROP; ALTER TABLE leaky RENAME TO other; COMMIT; GRANT SELECT ON public.leaky TO authenticated;", false],
+    ["CTAS WITH", "CREATE TABLE public.leaky WITH (fillfactor=90) AS SELECT 1 AS id; GRANT SELECT ON public.leaky TO authenticated;", false],
+    ["CTAS USING", "CREATE TABLE public.leaky USING heap AS SELECT 1 AS id; GRANT SELECT ON public.leaky TO authenticated;", false],
+    ["CTAS TABLESPACE", "CREATE TABLE public.leaky TABLESPACE pg_default AS SELECT 1 AS id; GRANT SELECT ON public.leaky TO authenticated;", false],
+    ["single quoted DO dynamic", "DO 'BEGIN EXECUTE ''CREATE '' || ''TABLE public.leaky (id int)''; END';", true],
+    ["escaped DO body", "DO E'BEGIN CREATE TABLE public.leaky(id int); END';", true],
+    ["dynamic SQL in function", "CREATE FUNCTION public.make() RETURNS void LANGUAGE plpgsql AS $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky (id int)'; END $$; SELECT public.make();", true],
+    ["empty migrations", "", false],
+  ];
+  it.each(checks)("%s", (_name, sql, finding) => {
+    expect(tables(sql).length > 0).toBe(finding);
+    expect(tables(sql)).toEqual(tables(sql));
+  });
+});
+
+describe("historical dynamic SQL is pinned to immutable migration bytes", () => {
+  it.each([
+    "20260709192453_507784b6-6a68-4a62-a5a4-ab2dc94598ea.sql",
+    "20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql",
+    "20260728090000_production_schema_reconciliation.sql",
+    "20260807150000_quicklog_save_manual_all_overloads.sql",
+    "20260815054645_revoke_public_and_anon_execute_on_definer_functions.sql",
+    "20260825233000_pheno_hunts_ownership_check_restore.sql",
+  ])("fails closed when historical migration %s changes or is renamed", (name) => {
+    const sql = readFileSync(join(MIGRATIONS_DIR, name), "utf8").replace(/\r\n/g, "\n");
+    const dynamic = (file: string, text: string) => findTablesWithoutExplicitAcl([{name:file, sql:text}])
+      .filter((finding: {table:string}) => finding.table.startsWith("(unreadable dynamic EXECUTE"));
+    expect(dynamic(name, sql)).toEqual([]);
+    expect(dynamic(name, sql + "\n").length > 0).toBe(true);
+    expect(dynamic("20990101000000_new.sql", sql).length > 0).toBe(true);
+    expect(dynamic(name, sql + "\nDO $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky(id int)'; END $$;").length > 0).toBe(true);
+  });
+});
+
+describe("quoted routine body and comment boundaries", () => {
+  it.each([
+    "CREATE FUNCTION public.make() RETURNS void LANGUAGE plpgsql AS 'BEGIN CREATE TABLE public.leaky(id int); END'; SELECT public.make();",
+    "CREATE FUNCTION public.make() RETURNS void LANGUAGE plpgsql AS E'BEGIN CREATE TABLE public.leaky(id int); END'; SELECT public.make();",
+    "-- comment before DO\nDO $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky (id int)'; END $$;",
+  ])("fails closed: %s", (sql) => {
+    expect(tables(sql).length > 0).toBe(true);
+  });
+});
+
+describe("security review transaction and lexical regressions", () => {
+  it.each(["WORK", "TRANSACTION"])("honors ROLLBACK %s TO SAVEPOINT", (alias) => {
+    const sql = "BEGIN; CREATE TABLE public.leaky(id int); SAVEPOINT p; GRANT SELECT ON public.leaky TO authenticated; ROLLBACK " + alias + " TO SAVEPOINT p; COMMIT;";
+    expect(tables(sql)).toEqual(["leaky"]);
+  });
+  it("releases a repeated savepoint without the optional SAVEPOINT keyword", () => {
+    expect(tables("BEGIN; CREATE TABLE public.leaky(id int); SAVEPOINT p; GRANT SELECT ON public.leaky TO authenticated; SAVEPOINT p; RELEASE p; ROLLBACK TO p; COMMIT;")).toEqual(["leaky"]);
+  });
+  it.each(["GRANT SELECT ON public.leaky TO authenticated;", "DROP TABLE public.leaky;"])("does not execute non-ASCII dollar prose: %s", (prose) => {
+    expect(tables(CREATE + "\nCOMMENT ON SCHEMA public IS $é$" + prose + "$é$;")).toEqual(["leaky"]);
+  });
+  it.each(["note text DEFAULT 'ON COMMIT DROP'", '"ON COMMIT DROP" text'])("does not expire a temp shadow from descriptive text: %s", (column) => {
+    expect(tables("BEGIN; CREATE TABLE public.leaky(id int); CREATE TEMP TABLE leaky(id int, " + column + "); COMMIT; GRANT SELECT ON leaky TO authenticated;")).toEqual(["leaky"]);
+  });
+});
+
+describe("Unicode escape executable bodies", () => {
+  it.each([
+    "DO U&'BEGIN EXECUTE ''CREATE '' || ''TABLE public.leaky(id int)''; END';",
+    "DO U&'BEGIN GRANT SELECT ON public.leaky TO authenticated; END';",
+    "CREATE FUNCTION public.make() RETURNS void LANGUAGE plpgsql AS U&'BEGIN CREATE TABLE public.leaky(id int); END'; SELECT public.make();",
+  ])("fails closed for unreadable Unicode escape SQL: %s", (sql) => {
+    expect(tables(sql).length > 0).toBe(true);
+  });
+});
+
+describe("DO language names use SQL identifier and string rules", () => {
+  it.each([
+    `DO LANGUAGE "plpgsql" $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky(id int)'; END $$;`,
+    `DO LANGUAGE 'plpgsql' $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky(id int)'; END $$;`,
+    `DO LANGUAGE "plpgsql" 'BEGIN EXECUTE ''CREATE '' || ''TABLE public.leaky(id int)''; END';`,
+    `DO LANGUAGE 'plpgsql' 'BEGIN EXECUTE ''CREATE '' || ''TABLE public.leaky(id int)''; END';`,
+  ])("reports dynamic DDL in %s", (sql) => { expect(tables(sql).length > 0).toBe(true); });
+});
+
+describe("transaction completion aliases and unknown DO prefixes", () => {
+  it("uses END as a COMMIT for temporary tables", () => {
+    expect(tables("BEGIN; CREATE TABLE public.leaky(id int); CREATE TEMP TABLE leaky(id int) ON COMMIT DROP; END; GRANT SELECT ON leaky TO authenticated;")).toEqual([]);
+  });
+  it.each(["BEGIN", "START TRANSACTION"])("uses ABORT to roll back %s", (start) => {
+    expect(tables(start + "; CREATE TABLE public.leaky(id int); ABORT;")).toEqual([]);
+  });
+  it("rejects an executable DO body with an unparsed language prefix", () => {
+    expect(tables("DO LANGUAGE U&'plpgsql' $$ BEGIN EXECUTE 'CREATE ' || 'TABLE public.leaky(id int)'; END $$;").length > 0).toBe(true);
+  });
+});
+
+describe("executed literals normalize quoted identifier tokens", () => {
+  const both = `CREATE TABLE public."grower''s"(id int); CREATE TABLE public."grower's"(id int);`;
+  it("does not credit a raw doubled-apostrophe table from EXECUTE", () => {
+    expect(tables(both + `DO $$ BEGIN EXECUTE 'GRANT SELECT ON public."grower''s" TO authenticated'; END $$; GRANT SELECT ON public."grower's" TO authenticated;`)).toEqual(["grower''s"]);
+  });
+  it("does not credit the raw spelling in a single-quoted DO body", () => {
+    expect(tables(both + `DO 'BEGIN GRANT SELECT ON public."grower''s" TO authenticated; END'; GRANT SELECT ON public."grower's" TO authenticated;`)).toEqual(["grower''s"]);
+  });
+  it("accepts the correctly decoded identifier", () => {
+    expect(tables(`CREATE TABLE public."grower's"(id int); DO $$ BEGIN EXECUTE 'GRANT SELECT ON public."grower''s" TO authenticated'; END $$;`)).toEqual([]);
   });
 });

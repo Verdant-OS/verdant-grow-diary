@@ -1,84 +1,37 @@
-// Pure rule: every persistent public table must state its Data API access
-// in a migration, as a table-level GRANT (for the roles that read or write it)
-// or a full REVOKE ALL (when only SECURITY DEFINER code touches it). A partial
-// REVOKE (say INSERT, UPDATE, DELETE) or a column-level GRANT/REVOKE does not
-// count: it leaves the rest of the table on the inherited default, which a new
-// hosted table no longer has. An unqualified table name counts as public (the
-// default search_path); a name in any other schema is out of scope.
-//
-// Why: from 2026-10-30 Supabase stops granting new public tables, functions
-// and sequences to anon/authenticated/service_role by default
-// (https://supabase.com/docs/guides/api/securing-your-api). A hosted table
-// created after that date with no GRANT returns 42501 to the app. Locally,
-// supabase/seed.sql grants every table after replay, so no local DB lane can
-// see the gap; this static rule is the only check that does.
-//
-// Schema-wide statements (GRANT ... ON ALL TABLES IN SCHEMA, ALTER DEFAULT
-// PRIVILEGES ... ON TABLES) and grants on other object types (FUNCTION,
-// SEQUENCE, SCHEMA, TYPE, ...) are not a decision about one table and do
-// not count. A non-table ON clause is recognised only as ALL TABLES|
-// SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or an object keyword
-// followed by that object's name. A keyword followed by TO, FROM or a
-// comma is a table name, so GRANT SELECT ON functions TO … counts.
-//
-// The scan fails closed. CREATE is read from the SQL with only comments
-// removed, so a table created anywhere, even in a function body, is tracked.
-// A CREATE TABLE that starts inside a quoted identifier (CREATE POLICY
-// "CREATE TABLE public.leaky (" ...) is skipped, like GRANT/DROP/RENAME.
-// The skip uses quoted-identifier positions from the executed view, so a
-// quote inside a string literal or dollar-quoted body does not hide a later
-// CREATE TABLE.
-// A CREATE TABLE target counts only as a complete name followed by (, AS, OF,
-// PARTITION, ; or the end. Any other CREATE TABLE keyword is reported as
-// (unreadable CREATE TABLE target at offset N) for that migration.
-// An EXECUTE whose argument is not a single string has its string pieces
-// joined. If they spell CREATE TABLE or SELECT INTO only after joining, the
-// migration is reported as (unreadable dynamic EXECUTE at offset N). A bare
-// variable (EXECUTE v) checks every single-quoted string in the migration
-// the same way. format('SELECT … FROM %I') INTO n, format('GRANT …'), and
-// trigger EXECUTE FUNCTION are not reported.
-// A top-level SELECT ... INTO [UNLOGGED] [TABLE] name is also a create. It is
-// read from a third masked view in which DO and function bodies stay blank, so
-// a PL/pgSQL SELECT ... INTO n is not a table. A whole-command EXECUTE string
-// is recorded while masking and scanned as plain SQL, so EXECUTE 'SELECT ...
-// INTO TABLE name' (or the $q$ form) inside a DO block is a create. CREATE
-// [GLOBAL|LOCAL] TEMP|TEMPORARY TABLE and SELECT ... INTO TEMP|TEMPORARY are
-// session tables: they are tracked by name across migrations. While a temp of
-// that name exists, an unqualified removal, rename or GRANT/REVOKE acts on the
-// temp table and leaves the public table's state alone. DROP of pg_temp.name,
-// or the first unqualified DROP of that name, ends the shadow. A schema-
-// qualified public name is unaffected. INSERT INTO / MERGE INTO after a WITH
-// ... SELECT is skipped only when INTO comes directly after ) INSERT or )
-// MERGE. An alias named insert or merge, quoted or unquoted, is not a skip.
-// A semicolon inside a quoted identifier is carried as a placeholder in every
-// masked view so [^;]* statement patterns run past it; identName turns the
-// placeholder back into a semicolon.
-// Everything that can clear a table's requirement (a removal, a rename, a
-// GRANT or REVOKE) counts only where it runs at migration time: top-level
-// statements, DO blocks (dollar-quoted or a single-quoted body, including
-// DO LANGUAGE ... '...'), and a literal string handed straight to EXECUTE.
-// Text in comments, string literals, function or procedure bodies, and other
-// dollar-quoted strings (COMMENT ... IS $c$...$c$) never clears it. A statement
-// assembled at run time (EXECUTE format(...)) cannot be read, so the table is
-// reported; give it a plain GRANT statement. A literal handed to EXECUTE is
-// decoded and masked the same way, so prose nested inside it never counts.
-// ALTER TABLE ... SET SCHEMA public brings a table into scope that needs an ACL.
-// Known limit: control flow inside a DO block is not evaluated. A statement
-// in an IF branch counts as if it ran, so a guarded GRANT or removal that is
-// never reached is still counted. Keep a table's GRANT unconditional.
-//
-// Precondition: migrations run with public first on search_path, so an
-// unqualified name is read as public. SET search_path is not modelled. Under
-// SET search_path = other, an unqualified GRANT on a name that also exists in
-// public would be credited to the public table. Schema-qualify names in any
-// migration that changes search_path.
+// Scans migration SQL for persistent public tables without an explicit table
+// ACL. A qualifying GRANT must name a Data API role; this does not prove that
+// every intended role or privilege is granted, or that RLS is correct.
+// REVOKE ALL remains a separate explicit-denial path.
+// Tracks ordinary, unlogged, foreign, CTAS and SELECT INTO table creation;
+// supports quoted identifiers and rollback to savepoints. Runtime-built SQL
+// and escaped DO bodies fail closed when they cannot be analyzed statically.
+// Twenty-five reviewed historical occurrences are pinned by file name, content
+// hash and offset. Independent review of those pins is still required.
+// CREATE inside a function is scanned conservatively. No DB access is made.
+// Known limitation: DO control flow is not evaluated. Unqualified names are
+// assumed public; a migration that changes search_path must qualify names.
+import { createHash } from "node:crypto";
+
+// Immutable migration SQL reviewed for dynamic commands that do not create
+// tables: policy creation/removal, fixed literal ACLs, and function ACLs
+// using pg_proc regprocedure identifiers. A matching filename, normalized
+// content hash AND exact event offset are all required. New or edited SQL
+// never inherits these exceptions.
+const HISTORICAL_DYNAMIC_EXECUTE = Object.freeze({
+  "20260709192453_507784b6-6a68-4a62-a5a4-ab2dc94598ea.sql": { sha256: "1630d6746fb66bed51dd03cb36e23b6cc8f5dd0f768dfd39ec941b1865582df8", offsets: [2412, 2518, 2624, 2731, 2944, 3223] },
+  "20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql": { sha256: "95e829d6a8a2efca6bf6323a1052c8eef24298a5f23dde5e1fb36077e3f2fb30", offsets: [1141] },
+  "20260728090000_production_schema_reconciliation.sql": { sha256: "7e4912b4c58efcfe6bce208f94704b28c99a5a064fd93763ded905e232bf17ed", offsets: [51831, 51977, 52088, 52185, 61415, 61543] },
+  "20260807150000_quicklog_save_manual_all_overloads.sql": { sha256: "fcb48a161ed4c232f30e284e5fa1dbb6b80fa5ba9475b9b2dd19a658b8387cff", offsets: [2033, 2112, 2189] },
+  "20260815054645_revoke_public_and_anon_execute_on_definer_functions.sql": { sha256: "1048bfefe36c263c0522deb37ce767f8d6015eed9487818f7127ffa396ddb13b", offsets: [1895, 1974, 2051] },
+  "20260825233000_pheno_hunts_ownership_check_restore.sql": { sha256: "01d1b9a041bccc29e13b6415887cb614aa12a671364c15edf48304a72d094199", offsets: [3391, 3497, 3603, 3710, 3923, 4202] },
+});
 
 // Unquoted identifiers: PostgreSQL reads every non-ASCII character as a letter.
 const IDENT = String.raw`(?:"(?:[^"]|"")+"|[a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_$\u0080-\uFFFF]*)`;
 // Optional schema, then the name: group 1 is the schema, group 2 the table.
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`;
 const CREATE_HEAD_RE = new RegExp(
-  String.raw`\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`,
+  String.raw`\bCREATE\s+(?:(?:UNLOGGED|FOREIGN)\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`,
   "gi",
 );
 const CREATE_TEMP_HEAD_RE = new RegExp(
@@ -89,18 +42,18 @@ const QUALIFIED_AT_RE = new RegExp(String.raw`^${QUALIFIED}`);
 // Complete CREATE TABLE names end at the column list, a typed/partitioned
 // table, a CTAS, a statement end, or EOF. Anything else (%I, concatenation)
 // cannot be named statically.
-const CREATE_TARGET_END_RE = /^\s*(?:\(|AS\b|OF\b|PARTITION\b|;|$)/i;
+const CREATE_TARGET_END_RE = /^\s*(?:\(|AS\b|OF\b|PARTITION\b|USING\b|WITH\b|TABLESPACE\b|;|$)/i;
 // SQL SELECT ... INTO [UNLOGGED] [TABLE] name creates a table. INTO TEMP /
 // TEMPORARY is a session table and is tracked separately. INSERT/MERGE INTO
 // after a WITH ... SELECT is skipped only when INTO comes directly after )
 // INSERT or ) MERGE, so an alias named insert or merge does not suppress
 // detection.
 const SELECT_INTO_RE = new RegExp(
-  String.raw`\bSELECT\b[^;]*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?${QUALIFIED}`,
+  String.raw`\bSELECT\b(?:"(?:[^"]|"")*"|[^;"])*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?${QUALIFIED}`,
   "gi",
 );
 const SELECT_INTO_TEMP_RE = new RegExp(
-  String.raw`\bSELECT\b[^;]*?\bINTO\s+TEMP(?:ORARY)?\s+(?:TABLE\s+)?${QUALIFIED}`,
+  String.raw`\bSELECT\b(?:"(?:[^"]|"")*"|[^;"])*?\bINTO\s+TEMP(?:ORARY)?\s+(?:TABLE\s+)?${QUALIFIED}`,
   "gi",
 );
 const SELECT_INTO_CTE_DML_RE = /\)\s+(?:INSERT|MERGE)\s+INTO\b/i;
@@ -121,7 +74,7 @@ const SET_SCHEMA_RE = new RegExp(
   String.raw`\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+SET\s+SCHEMA\s+(${IDENT})`,
   "gi",
 );
-const DROP_RE = /\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
+const DROP_RE = /\bDROP\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
 // Table GRANT/REVOKE. Skip only a complete non-table clause: ALL TABLES|
 // SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or FUNCTION|SEQUENCE|SCHEMA|
 // TYPE|… followed by that object's name. A keyword followed by TO, FROM or
@@ -132,39 +85,25 @@ const ACL_RE = new RegExp(
     String.raw`(?!(?:FUNCTION|PROCEDURE|ROUTINE|SEQUENCE|SCHEMA|TYPE|DOMAIN|LANGUAGE|DATABASE|TABLESPACE)\b(?!\s*(?:TO|FROM|,)))` +
     String.raw`(?!FOREIGN\s+(?:DATA\s+WRAPPER|SERVER)\b)` +
     String.raw`(?!LARGE\s+OBJECT\b)` +
-    String.raw`(?:TABLE\s+)?([^;]*?)\s+(?:TO|FROM)\b`,
+    String.raw`(?:TABLE\s+)?((?:"(?:[^"]|"")*"|[^;"])*?)\s+(?:TO|FROM)\b([^;]*)`,
   "gi",
 );
 const TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*$`);
 const DROP_TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*(?:CASCADE|RESTRICT)?\s*$`, "i");
 const REVOKE_ALL_RE = /^\s*ALL(?:\s+PRIVILEGES)?\s*$/i;
-const DOLLAR_TAG_RE = /\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/y;
+const DOLLAR_TAG_RE = /\$(?:[A-Za-z_\u0080-\uFFFF][A-Za-z0-9_\u0080-\uFFFF]*)?\$/y;
 // A statement prefix that ends by handing the next string to EXECUTE, after
 // any block keywords (BEGIN, THEN, ELSE, LOOP) that open the statement.
 const EXECUTES_RE = /^\s*(?:(?:BEGIN|THEN|ELSE|LOOP)\s+)*EXECUTE\s*$/i;
 const RUNS_NOW_RE = /^\s*DO\b/i;
+const DO_LANGUAGE = "(?:" + IDENT + "|'(?:[^']|'')*')";
+const DO_BODY_PREFIX_RE = new RegExp("^\\s*DO(?:\\s+LANGUAGE\\s+" + DO_LANGUAGE + ")?\\s*$", "i");
+const DO_ESCAPED_PREFIX_RE = new RegExp("^\\s*DO(?:\\s+LANGUAGE\\s+" + DO_LANGUAGE + ")?\\s+(?:E|U&)$", "i");
 // What may follow a string handed to EXECUTE for that string to be the whole
 // command. Anything else (EXECUTE 'DROP ...' || suffix) builds the command at
 // run time, so the string is not read as the statement (fails closed).
 const EXECUTE_ENDS_RE = /^\s*(?:;|$|USING\b|INTO\b)/i;
 const EXECUTE_TRIGGER_TAIL_RE = /^(?:FUNCTION|PROCEDURE)\b/i;
-const ASSEMBLED_CREATE_RE = /\bCREATE\s+(?:UNLOGGED\s+)?TABLE\b/i;
-const ASSEMBLED_SELECT_INTO_RE = new RegExp(
-  String.raw`\bSELECT\b[^;]*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?`,
-  "i",
-);
-
-function spellsAssembledDdl(text) {
-  return ASSEMBLED_CREATE_RE.test(text) || ASSEMBLED_SELECT_INTO_RE.test(text);
-}
-
-// True when joining pieces is what forms CREATE TABLE / SELECT INTO. A piece
-// that already contains the keywords is left to CREATE_HEAD_RE / SELECT_INTO_RE.
-function spellsAssembledDdlOnlyAfterJoin(pieces) {
-  const rest = pieces.filter((piece) => !spellsAssembledDdl(piece));
-  return rest.length > 0 && spellsAssembledDdl(rest.join(""));
-}
-
 function skipWsAndComments(sql, i, end) {
   while (i < end) {
     if (/\s/.test(sql[i])) {
@@ -225,43 +164,13 @@ function readSingleQuoted(sql, i, end) {
 }
 
 function readDollarQuoted(sql, i, end) {
-  if (sql[i] !== "$" || /[A-Za-z0-9_$]/.test(sql[i - 1] ?? "")) return null;
+  if (sql[i] !== "$" || /[A-Za-z0-9_$\u0080-\uFFFF]/.test(sql[i - 1] ?? "")) return null;
   DOLLAR_TAG_RE.lastIndex = i;
   const tag = DOLLAR_TAG_RE.exec(sql)?.[0];
   if (!tag) return null;
   const close = sql.indexOf(tag, i + tag.length);
   if (close === -1 || close >= end) return null;
   return { value: sql.slice(i + tag.length, close), after: close + tag.length, tag };
-}
-
-function collectSingleQuotedValues(sql) {
-  const pieces = [];
-  const end = sql.length;
-  let i = 0;
-  while (i < end) {
-    i = skipWsAndComments(sql, i, end);
-    if (i >= end) break;
-    if (sql[i] === '"') {
-      i = skipQuotedIdentifier(sql, i, end);
-      continue;
-    }
-    if (sql[i] === "'") {
-      const lit = readSingleQuoted(sql, i, end);
-      if (lit) {
-        pieces.push(lit.value);
-        i = lit.after;
-      } else i++;
-      continue;
-    }
-    const dol = readDollarQuoted(sql, i, end);
-    if (dol) {
-      // Walk into the body so strings inside DO blocks are collected.
-      i += dol.tag.length;
-      continue;
-    }
-    i++;
-  }
-  return pieces;
 }
 
 function readExecuteArgument(sql, start, end) {
@@ -323,60 +232,63 @@ function readExecuteArgument(sql, start, end) {
 
 function collectDynamicExecuteEvents(sql) {
   const events = [];
-  const end = sql.length;
-  let i = 0;
-  while (i < end) {
-    i = skipWsAndComments(sql, i, end);
-    if (i >= end) break;
-    if (sql[i] === '"') {
-      i = skipQuotedIdentifier(sql, i, end);
-      continue;
-    }
-    if (sql[i] === "'") {
-      const lit = readSingleQuoted(sql, i, end);
-      i = lit ? lit.after : i + 1;
-      continue;
-    }
-    const dol = readDollarQuoted(sql, i, end);
-    if (dol) {
-      i += dol.tag.length;
-      continue;
-    }
-    const isWordBefore = i > 0 && /[A-Za-z0-9_\u0080-\uFFFF]/.test(sql[i - 1]);
-    if (isWordBefore || !/^EXECUTE\b/i.test(sql.slice(i))) {
-      i++;
-      continue;
-    }
-    const executeAt = i;
-    i += 7;
-    const afterKw = skipWsAndComments(sql, i, end);
-    if (EXECUTE_TRIGGER_TAIL_RE.test(sql.slice(afterKw))) {
-      i = afterKw;
-      continue;
-    }
-    if (sql[afterKw] === "'" || sql[afterKw] === "$") {
-      const lit =
-        sql[afterKw] === "'"
-          ? readSingleQuoted(sql, afterKw, end)
-          : readDollarQuoted(sql, afterKw, end);
-      const afterLit = lit ? skipWsAndComments(sql, lit.after, end) : afterKw;
-      if (lit && EXECUTE_ENDS_RE.test(sql.slice(afterLit))) {
-        i = lit.after;
-        continue;
+  const noComments = maskSql(sql, false);
+  function walk(start, end) {
+    let i=start, statementStart=start;
+    while (i<end) {
+      i=skipWsAndComments(sql,i,end);
+      if(i>=end) break;
+      if(sql[i]===";"){statementStart=++i;continue;}
+      if(sql[i]==='"'){i=skipQuotedIdentifier(sql,i,end);continue;}
+      if(sql[i]==="'"){
+        const lit=readSingleQuoted(sql,i,end);
+        const prefix = noComments.slice(statementStart,i);
+        const languageLiteral = /^\s*DO\s+LANGUAGE\s*(?:E|U&|N)?$/i.test(prefix);
+        if (lit && /^\s*DO\b/i.test(prefix) && !languageLiteral && !DO_BODY_PREFIX_RE.test(prefix) && !DO_ESCAPED_PREFIX_RE.test(prefix)) {
+          events.push({kind:"create",conditional:false,table:"(unreadable DO body prefix at offset "+i+")",index:i});
+        }
+        if (lit && /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[\s\S]*\bAS\s*(?:E|U&)?$/i.test(noComments.slice(statementStart,i))) {
+          events.push({kind:"create",conditional:false,table:"(unreadable quoted routine body at offset "+i+")",index:i});
+        }
+        if (lit && DO_ESCAPED_PREFIX_RE.test(noComments.slice(statementStart,i))) {
+          events.push({kind:"create",conditional:false,table:"(unreadable escaped DO body at offset "+i+")",index:i});
+        }
+        if(lit && DO_BODY_PREFIX_RE.test(noComments.slice(statementStart,i))){
+          for(const nested of collectDynamicExecuteEvents(lit.value)){
+            const at=i+1+nested.index;
+            events.push({...nested,index:at,table:"(unreadable dynamic EXECUTE at offset "+at+")"});
+          }
+        }
+        i=lit?lit.after:i+1;continue;
       }
+      const dol=readDollarQuoted(sql,i,end);
+      if(dol){
+        const prefix=noComments.slice(statementStart,i);
+        if (/^\s*DO\b/i.test(prefix) && !DO_BODY_PREFIX_RE.test(prefix)) {
+          events.push({kind:"create",conditional:false,table:"(unreadable DO body prefix at offset "+i+")",index:i});
+        }
+        if (DO_BODY_PREFIX_RE.test(prefix) || /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[\s\S]*\bAS\s*$/i.test(prefix)) {
+          walk(i+dol.tag.length,dol.after-dol.tag.length);
+        }
+        i=dol.after; continue;
+      }
+      if((i>start && /[A-Za-z0-9_\u0080-\uFFFF]/.test(sql[i-1])) || !/^EXECUTE\b/i.test(sql.slice(i))){i++;continue;}
+      if (/\b(?:GRANT|REVOKE)\s*$/i.test(noComments.slice(statementStart,i))) { i+=7; continue; }
+      const executeAt=i;
+      const afterKw=skipWsAndComments(sql,i+7,end);
+      if(EXECUTE_TRIGGER_TAIL_RE.test(sql.slice(afterKw))){i=afterKw;continue;}
+      if(sql[afterKw]==="'" || sql[afterKw]==="$"){
+        const lit=sql[afterKw]==="'"?readSingleQuoted(sql,afterKw,end):readDollarQuoted(sql,afterKw,end);
+        const afterLit=lit?skipWsAndComments(sql,lit.after,end):afterKw;
+        if(lit && EXECUTE_ENDS_RE.test(sql.slice(afterLit))){i=lit.after;continue;}
+      }
+      const arg=readExecuteArgument(sql,afterKw,end);
+      // Runtime SQL cannot be proven not to create a table; reject it.
+      events.push({kind:"create",conditional:false,table:"(unreadable dynamic EXECUTE at offset "+executeAt+")",index:executeAt});
+      i=Math.max(arg.after,i+7);
     }
-    const arg = readExecuteArgument(sql, afterKw, end);
-    const pieces = arg.kind === "variable" ? collectSingleQuotedValues(sql) : arg.pieces;
-    if (spellsAssembledDdlOnlyAfterJoin(pieces)) {
-      events.push({
-        kind: "create",
-        conditional: false,
-        table: `(unreadable dynamic EXECUTE at offset ${executeAt})`,
-        index: executeAt,
-      });
-    }
-    i = arg.after;
   }
+  walk(0,sql.length);
   return events;
 }
 
@@ -478,7 +390,7 @@ export const LEGACY_DEFAULT_PRIVILEGE_TABLES = Object.freeze(
 
 // Unquoted identifiers fold to lower case; quoted ones keep their case.
 function identName(raw) {
-  const name = raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.toLowerCase();
+  const name = raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.replace(/[A-Z]/g, (c) => c.toLowerCase());
   return name.replaceAll(QUOTED_SEMICOLON, ";");
 }
 
@@ -501,7 +413,7 @@ function identName(raw) {
 // blank so a PL/pgSQL SELECT ... INTO n is not read as a table create.
 // Whole-command EXECUTE payloads recorded during the executable pass are
 // copied back onto that view so they are scanned as SQL.
-function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) {
+function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, creationOnly = false) {
   const code = sql.split("");
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (code[k] !== "\n") code[k] = " ";
@@ -516,22 +428,17 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) 
       blank(open, close + 1);
       return;
     }
-    let decoded = "";
-    const origin = []; // decoded index -> raw indices
-    for (let k = open + 1; k < close; k++) {
-      if (sql[k] === "'" && sql[k + 1] === "'") {
-        origin.push([k, k + 1]);
-        k++;
-      } else origin.push([k]);
-      decoded += sql[k];
+    const literal = readSingleQuoted(sql, open, close + 1);
+    if (!literal) {
+      blank(open, close + 1);
+      return;
     }
-    const masked = maskSql(decoded, true, scanDoBodies);
-    for (let d = 0; d < decoded.length; d++) {
-      if (masked[d] !== decoded[d]) for (const k of origin[d]) blank(k, k + 1);
-    }
-    // The quotes delimit the command; they are not part of it.
-    blank(open, open + 1);
-    blank(close, close + 1);
+    const masked = maskSql(literal.value, true, scanDoBodies);
+    // Normalize tokens before scanning: retaining raw doubled apostrophes
+    // would identify a different quoted table. Compact within the original
+    // span and pad its tail so outer statement ordering remains stable.
+    blank(open, close + 1);
+    for (let k = 0; k < masked.length; k++) code[open + 1 + k] = masked[k];
   };
   const mask = (start, end) => {
     let i = start;
@@ -584,8 +491,8 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) 
           const executes = EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(j + 1, end));
           // A single-quoted DO body runs now, matching dollar-quoted DO.
           const doBody = scanDoBodies && RUNS_NOW_RE.test(prefix);
-          if (executableOnly && !executes && !doBody) blank(i, j + 1);
-          else if (executableOnly) {
+          if ((executableOnly || creationOnly) && !executes && !doBody) blank(i, j + 1);
+          else if (executableOnly || creationOnly) {
             maskExecutedLiteral(i, j, escapes);
             if (executeSpans && executes && !escapes) executeSpans.push({ start: i + 1, end: j });
           }
@@ -593,7 +500,7 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) 
         } else {
           i++; // unterminated within these bounds: prose, not a literal
         }
-      } else if (sql[i] === "$" && !/[A-Za-z0-9_$]/.test(sql[i - 1] ?? "")) {
+      } else if (sql[i] === "$" && !/[A-Za-z0-9_$\u0080-\uFFFF]/.test(sql[i - 1] ?? "")) {
         DOLLAR_TAG_RE.lastIndex = i;
         const tag = DOLLAR_TAG_RE.exec(sql)?.[0];
         const close = tag ? sql.indexOf(tag, i + tag.length) : -1;
@@ -604,7 +511,8 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null) 
           const isExecute =
             EXECUTES_RE.test(prefix) && EXECUTE_ENDS_RE.test(sql.slice(close + tag.length, end));
           const runsNow = (scanDoBodies && RUNS_NOW_RE.test(prefix)) || isExecute;
-          if (!executableOnly || runsNow) {
+          const routineBody = /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\b[\s\S]*\bAS\s*$/i.test(prefix);
+          if ((!executableOnly && (!creationOnly || runsNow || routineBody)) || runsNow) {
             mask(i + tag.length, close);
             // Tags delimit the body; they are not part of it. Blank them so an
             // identifier sitting against the closing tag (leaky$ddl$) does not
@@ -647,19 +555,32 @@ export function findTablesWithoutExplicitAcl(migrations) {
   const tables = new Map(); // table -> { migration, acl }
   // Session temp names outlive a single migration file: if two migrations share
   // a session, the shadow still holds (fails closed).
-  const temps = new Set();
+  const temps = new Map();
   for (const m of migrations) {
-    const ddl = maskSql(m.sql, false);
+    const sql = m.sql.replace(/\r\n/g, "\n");
+    const legacyDynamic = HISTORICAL_DYNAMIC_EXECUTE[m.name];
+    const legacyValid = legacyDynamic && createHash("sha256").update(sql).digest("hex") === legacyDynamic.sha256;
+    const creation = maskSql(sql, false, true, null, true);
     const executeSpans = [];
-    const executed = maskSql(m.sql, true, true, executeSpans);
-    const topLevel = maskSql(m.sql, true, false);
+    const executed = maskSql(sql, true, true, executeSpans);
+    const topLevel = maskSql(sql, true, false);
     const selectIntoSql = overlayExecutePayloads(topLevel, executed, executeSpans);
     const quoted = quotedIdentifierPositions(executed);
+    const keywordSql = executed.split("").map((ch, index) => quoted[index] ? " " : ch).join("");
     const quotedSelectInto = quotedIdentifierPositions(selectIntoSql);
     const events = [];
-    for (const match of ddl.matchAll(CREATE_HEAD_RE)) {
+    const transactionRe = /(?:^|;)\s*(SAVEPOINT|RELEASE(?:\s+SAVEPOINT)?|ROLLBACK\s+(?:(?:WORK|TRANSACTION)\s+)?TO(?:\s+SAVEPOINT)?|START\s+TRANSACTION|BEGIN|COMMIT|END|ROLLBACK|ABORT)\b(?:\s+("(?:[^"]|"")*"|[a-zA-Z_][a-zA-Z0-9_$]*))?/gi;
+    for (const match of topLevel.matchAll(transactionRe)) {
+      if (quotedIdentifierPositions(topLevel)[match.index]) continue;
+      events.push({kind:"transaction", action:match[1].toUpperCase().replace(/\s+/g," ").replace(/^ROLLBACK (?:WORK|TRANSACTION) TO/, "ROLLBACK TO").replace(/^RELEASE$/, "RELEASE SAVEPOINT").replace(/^END$/, "COMMIT").replace(/^ABORT$/, "ROLLBACK").replace(/^START TRANSACTION$/, "BEGIN"), name:match[2] ? identName(match[2]) : null, index:match.index});
+    }
+    let transactionStart = null;
+    let savepoints = [];
+    const snapshot = () => ({tables: new Map([...tables].map(([k,v])=>[k,{...v}])), temps:new Map(temps)});
+    const restore = (snap) => { tables.clear(); for (const [k,v] of snap.tables) tables.set(k,{...v}); temps.clear(); for (const [k,v] of snap.temps) temps.set(k,v); };
+    for (const match of creation.matchAll(CREATE_HEAD_RE)) {
       if (quoted[match.index]) continue;
-      const after = ddl.slice(match.index + match[0].length);
+      const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
       if (!complete) {
@@ -676,9 +597,9 @@ export function findTablesWithoutExplicitAcl(migrations) {
         events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
       }
     }
-    for (const match of ddl.matchAll(CREATE_TEMP_HEAD_RE)) {
+    for (const match of creation.matchAll(CREATE_TEMP_HEAD_RE)) {
       if (quoted[match.index]) continue;
-      const after = ddl.slice(match.index + match[0].length);
+      const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
       if (!complete) continue;
@@ -686,6 +607,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
         kind: "temp-create",
         conditional: Boolean(match[1]),
         table: identName(name[2]),
+        onCommitDrop: /\bON\s+COMMIT\s+DROP\b/i.test(keywordSql.slice(match.index, keywordSql.indexOf(";",match.index)<0?keywordSql.length:keywordSql.indexOf(";",match.index))),
         index: match.index,
       });
     }
@@ -705,7 +627,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
         index: match.index,
       });
     }
-    for (const event of collectDynamicExecuteEvents(ddl)) events.push(event);
+    for (const event of collectDynamicExecuteEvents(sql).filter((event) => !(legacyValid && legacyDynamic.offsets.includes(event.index)))) events.push(event);
     for (const match of executed.matchAll(RENAME_RE)) {
       if (quoted[match.index]) continue;
       const schema = schemaName(match[1]);
@@ -749,6 +671,11 @@ export function findTablesWithoutExplicitAcl(migrations) {
       // Column-level ACLs (a privilege list with a column list) leave the rest
       // of the table on the default, so they are not a table-level decision.
       if (isRevoke ? !REVOKE_ALL_RE.test(match[2]) : columnLevelOnly(match[2])) continue;
+      // An unrelated role is not a decision about Data API access.
+      if (!splitTargets(match[4]).some((role) => {
+        const name=/^\s*("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)(?:\s|$)/.exec(role)?.[1];
+        return name && ["public","anon","authenticated","service_role"].includes(identName(name));
+      })) continue;
       for (const target of splitTargets(match[3])) {
         const name = TARGET_RE.exec(target);
         if (!name) continue;
@@ -759,17 +686,38 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     events.sort((a, b) => a.index - b.index);
     for (const event of events) {
+      if (event.kind === "transaction") {
+        if (event.action === "BEGIN") { transactionStart=snapshot(); savepoints=[]; }
+        else if (event.action === "SAVEPOINT" && event.name) savepoints.push({name:event.name,state:snapshot()});
+        else if (event.action.startsWith("ROLLBACK TO")) {
+          const at=savepoints.findLastIndex((point)=>point.name===event.name);
+          if (at<0) tables.set('(unresolved rollback at offset ' + event.index + ')',{migration:m.name,acl:false});
+          else { restore(savepoints[at].state); savepoints=savepoints.slice(0,at+1); }
+        } else if (event.action === "RELEASE SAVEPOINT") {
+          const at=savepoints.findLastIndex((point)=>point.name===event.name);
+          if (at>=0) savepoints=savepoints.slice(0,at);
+        } else if (event.action === "ROLLBACK") {
+          if (transactionStart) restore(transactionStart);
+          else tables.set('(unresolved rollback at offset ' + event.index + ')',{migration:m.name,acl:false});
+          transactionStart=null; savepoints=[];
+        } else if (event.action === "COMMIT") {
+          for (const [name,onCommitDrop] of temps) if (onCommitDrop) temps.delete(name);
+          transactionStart=null; savepoints=[];
+        }
+        continue;
+      }
       if (event.kind === "temp-create") {
         if (event.conditional && temps.has(event.table)) continue;
-        temps.add(event.table);
+        temps.set(event.table,Boolean(event.onCommitDrop));
         continue;
       }
       if (event.kind !== "create" && actsOnTemp(temps, event.schema, event.table)) {
         if (event.kind === "drop") temps.delete(event.table);
         else if (event.kind === "rename") {
           if (temps.has(event.to) && event.to !== event.table) continue;
+          const onCommitDrop = temps.get(event.table);
           temps.delete(event.table);
-          temps.add(event.to);
+          temps.set(event.to, onCommitDrop);
         }
         continue;
       }

@@ -72,35 +72,33 @@ active checkout has the branch open; inspect worktree ownership before selecting
 ### SUPABASE-DATA-API-DEFAULT-GRANTS-20261030
 
 ```text
-TASK SUPABASE-DATA-API-DEFAULT-GRANTS-20261030  priority: P2  status: OPEN
-goal: audit migrations for Supabase's 2026-10-30 Data API default-grant change; fix only verified gaps.
-why: after 2026-10-30 a new hosted public table, function or sequence with no GRANT returns 42501 to the app; supabase/seed.sql grants every table locally, so no local DB lane sees a missing GRANT.
+TASK SUPABASE-DATA-API-DEFAULT-GRANTS-20261030  priority: P1  status: OPEN
+goal: repair confirmed fail-open and false-positive defects in PR #2584's explicit-table-ACL rule without database changes.
 branch: ccr-01625fd2-17flsm
 base: verdant-grow-diary
-checkout: git fetch origin ccr-01625fd2-17flsm verdant-grow-diary && git switch ccr-01625fd2-17flsm && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2584
-head_sha: 18cabf7f3beed26de58472069ab5cd8e4d160c02 (last code-change head, rounds 10-11, pushed by the Cursor Agent automation and verified by this session on 2026-10-29: ACL test file 103/103, real tree equals the 22-entry legacy list, all round 3-14 repro probes pass). This block cannot name the commit that contains it; verify that origin/ccr-01625fd2-17flsm equals the PR head before resuming.
-state: pushed, ready for review (PR #2584); merged base bbc77ae23 to clear a HANDOFF_LOG queue conflict
-current_step: round-4 fix applied under Matthew's 2026-10-29 unlocks: literals nested in an EXECUTE string are decoded and masked, keywords inside quoted identifiers are skipped, ALTER TABLE ... SET SCHEMA into public is tracked; 58/58 in the ACL test file, the 3 new tests red with the fix set aside. Conditional DO control flow is a documented known limit (Matthew accepted 2026-10-29); the @hono/node-server advisory is left to #2605. Round 5 (17d174352, pushed by a Cursor Agent automation co-authored by Matthew's account, matching the fix this session prepared): a rename onto a still-tracked name is skipped; 59/59, the new test red with the fix set aside, verified by this session. Cursor Agent is now a contributor and is excluded from independent acceptance. Round 6 (Codex adverse evidence at ecec6e5f6): target lists split only outside quoted names with complete removal targets, an EXECUTE string counts only as the whole command, non-ASCII identifiers read; 62/62, the 3 new tests red with the fix set aside. The founder yes and the Claude PASS at ecec6e5f6 are void at the new head. Rounds 7-8 (pushed by the Cursor Agent automation, each verified by this session against its repro scripts with red/green): dollar-quote tags blanked on exposed bodies (e1addc615); audit RPC count corrected to 44 (78888e453); legacy allowlist pinned to its 22 tuples (1a25653f7); no-op SET SCHEMA keeps a tracked destination (0c512e21d); top-level SELECT ... INTO tracked as a create (8955bdfce); unreadable CREATE TABLE targets reported (a16202539). ACL test file 73/73; real tree equals the legacy list; 0 open review threads at a16202539. Round 9 (0ec03750c, Cursor Agent automation, verified here 74/74 with the new test red when set aside): SELECT INTO is detected past a column alias named insert or merge; only a CTE ') INSERT/MERGE INTO' is skipped Rounds 10-11 (Codex at 0ec03750c and beb2d3c4, CodeRabbit at 0375f51ac; pushed by the Cursor Agent automation 278d85b92..18cabf7f3, each verified here): quoted semicolons carried as a placeholder; CREATE inside a quoted identifier skipped using the executed view (an interim quotedDdl version at 585143b00 failed open on a quote inside a literal and was replaced); SELECT ... INTO inside a whole EXECUTE string tracked; run-time-assembled EXECUTE of CREATE TABLE / SELECT INTO reported as unreadable; temp-table shadows absorb unqualified removal/rename/grant; single-quoted DO bodies scanned; bare keyword-named tables (functions, sequence, schema) read as tables. Open at 18cabf7f3: Codex/CodeRabbit findings on bare-variable EXECUTE ordering, format() placeholders, TO/FROM inside quoted names, ROLLBACK TO SAVEPOINT, CREATE FOREIGN TABLE, descriptive CREATE text in literals, ON COMMIT DROP shadows, grantee role coverage, and bounded dollar-quote walks in the dynamic-EXECUTE helpers.
-next_action: confirm 35/35 required at the new PR head; then a fresh founder yes and a fresh independent exact-head review (excluded: this session, the Cursor Agent automation)
-post_merge_check: NOT_APPLICABLE for production (test-only change); after merge, the required Vitest suite on verdant-grow-diary runs src/test/supabase-table-explicit-acl.test.ts green
-active_writer: Claude session_017UoYKwf4ZrLARR3NCo2iwM
-decisions: no migration needed a correction (pending badge/referral/plants migrations all explicit or no new object); added a NEW check instead of editing scripts/check-supabase-migration-safety.mjs because the scorer lock refuses that edit and the unlock was denied in-session; a partial REVOKE does not count as an ACL decision because reads stay on the inherited default; the 22 legacy tables are frozen in LEGACY_DEFAULT_PRIVILEGE_TABLES and may only shrink
-tried_and_rejected: adding a TABLE_WITHOUT_EXPLICIT_ACL scanner to check-supabase-migration-safety.mjs (scorer-locked; unlock denied by the session permission classifier)
-commands: bunx vitest run src/test/supabase-table-explicit-acl.test.ts; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; node scripts/scorer-lock.mjs --report
+head_sha: 848d77254c02f81251058ab8b2e375efeebca679 (verified predecessor; this commit adds the Codex repair. Resolve the current full PR head before accepting any evidence.)
+state: repair prepared for native CI; no merge or deployment authorized
+active_writer: Codex /root, reassigned by Matthew Cheek; claim https://github.com/Verdant-OS/verdant-grow-diary/pull/2584#issuecomment-6511257557
+claimed_by: Codex /root, 2026-10-29 UTC; founder explicitly authorized proceeding without unavailable Claude's release. No Claude release is fabricated.
+owner: Codex
+current_step: repair foreign-table creation, runtime-assembled EXECUTE, bounded dollar strings including non-ASCII tags, quoted ACL delimiters, Data API role coverage, SELECT INTO aliases, UTF-8 identifier case, CTAS options, decoded literal identifiers, savepoint rollback aliases and temporary-table commit state. Unknown executable DO/routine string forms fail closed. Historical non-table dynamic commands are pinned by six immutable file hashes and 25 exact offsets; new or modified SQL cannot inherit those pins. The 22 table legacy exceptions are unchanged.
+history: Claude session_017UoYKwf4ZrLARR3NCo2iwM authored the slice; Cursor Agent automation and Codex review/repair sessions contributed. Historical review/test receipts retain their original heads and do not transfer. Conditional DO control flow remains a previously accepted, documented limitation; changing search_path still requires qualified names.
 files_touched: scripts/lib/supabaseTableAclRules.mjs, src/test/supabase-table-explicit-acl.test.ts, docs/audits/supabase-data-api-default-grants-2026-10-28.md, docs/agents/HANDOFF_LOG.md
-files_remaining: none in scope
-blockers: none for the PR; production applied-migration state is NOT_MEASURED (Matthew's surface)
-open_questions: explicit grants for the 22 legacy tables (new additive migration) need Matthew's decision; function/sequence grant check is deferred; the stricter conditional-DO rule would flag two existing tables and need its own migration
-gotchas: node_modules was absent; bun install --frozen-lockfile worked and left bun.lock unchanged; full tsc needs a larger heap in this container
-links: docs/audits/supabase-data-api-default-grants-2026-10-28.md; https://supabase.com/docs/guides/api/securing-your-api
-artifacts: the draft PR's checks
-reviewer_seat: eligible independent reviewer under OWNERSHIP.md §4.3 (excluded: this Claude session as author, the Cursor Agent automation as repairer, Codex session /root/review_pr_2584 whose findings drove round 6)
-reviewer_sha: none yet
-session_state: no routines; no paused workflows; migration-touching follow-ups held for Matthew
-claimed_by: Claude session_017UoYKwf4ZrLARR3NCo2iwM, 2026-10-28 02:45 UTC (Matthew's direct assignment in chat; no GitHub claim comment posted)
-owner: Claude
-last_updated: 2026-10-29 21:20 UTC (rounds 10-11 verified, base merge), by Claude
+scorer_change_reason: Matthew explicitly assigned repairs to this existing rule and its tests, then instructed "make ready to ship". Existing check-supabase-migration-safety.mjs, baselines, lockfiles, migrations, grants and policies remain untouched. Local scorer-lock invocation is NOT_MEASURED in the managed checkout; no local unlock or strict-report PASS is claimed.
+validation_local: 157 PASS / 0 FAIL in a lightweight Node compatibility runner, NOT Vitest. Exact 301 migration blobs verified by Git object hash; scanner result equals the unchanged 22-entry legacy list. Baseline focused reproduction 2 PASS / 12 FAIL, candidate 14 PASS / 0 FAIL. Additional probes are overlapping evidence, not extra unique aggregate tests.
+validation_native: NOT_MEASURED at the repair head; required CI must provide native Vitest, lint, typecheck, build and supplemental security results.
+reviewer_seat: BLOCKED pending an actually available non-contributing Claude/Grok or eligible Durban Poison session under OWNERSHIP.md §4.3.
+contributor_exclusions: author Claude session_017UoYKwf4ZrLARR3NCo2iwM; Cursor Agent automation; all contributing Codex review/repair sessions including current /root and supplemental /root/acl_security_review.
+reviewer_sha: none; no independent acceptance PASS obtained
+review_request: owner Codex; not yet sent for this new head; no invented permalink; fallback count 0
+supplemental_review: /root/acl_security_review found further concrete rollback, dollar-quote, temp-shadow and DO-prefix issues; regression fixes were added. This Codex review is technical evidence only and cannot occupy independent acceptance.
+blockers: exact-head native CI and eligible independent complete-scope PASS; no P1/P2 may be waived
+next_action: verify native CI at the full repair head, fix any failures, then obtain eligible independent exact-head acceptance. Do not merge, enqueue, enable auto-merge, deploy or execute SQL.
+commands: bunx vitest run src/test/supabase-table-explicit-acl.test.ts; bun run typecheck; bun run lint; bun run check:supabase-security; node scripts/check-contract-test-resolution.mjs
+post_merge_check: after separate founder authorization and merge, verify required deploy-branch suite; merge is not deployment or proof of hosted grants
+out_of_scope: hosted grants, migration execution, RLS/auth/Edge changes, device control, Action Queue changes, and new function/sequence/view ACL enforcement
+last_updated: 2026-10-30T00:36:20.639Z, Codex /root
 ```
 
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028

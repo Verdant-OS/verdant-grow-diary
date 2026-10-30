@@ -33,5 +33,5 @@ export const GOOGLE_ANALYTICS_MEASUREMENT_ID = resolveGoogleAnalyticsMeasurement
  * This identifies the property; it is intentionally shipped to browsers and
  * is not a credential or authorization secret.
  */
-export const AHREFS_WEB_ANALYTICS_KEY = "GRdwmweqUZoPO7SfmEsPZg";
+export const AHREFS_WEB_ANALYTICS_KEY = "KZfnjSoVSRYkyDJq+SUsow";
 export const AHREFS_WEB_ANALYTICS_SCRIPT_SRC = "https://analytics.ahrefs.com/analytics.js";

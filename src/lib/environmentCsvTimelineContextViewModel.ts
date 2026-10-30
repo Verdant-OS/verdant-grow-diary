@@ -18,7 +18,7 @@ export const CSV_UNKNOWN_VPD_LABEL = "VPD" as const;
 export const CSV_SNAPSHOT_TITLE = "CSV environment snapshot" as const;
 export const CSV_SOURCE_LABEL = "CSV" as const;
 
-const DEFAULT_WINDOW_MIN = 45;
+export const CSV_TIMELINE_WINDOW_MINUTES = 45;
 
 export interface CsvSensorReadingRow {
   id?: string | null;
@@ -47,9 +47,7 @@ export interface CsvTimelineSnapshot {
   sourceLabel: typeof CSV_SOURCE_LABEL;
   title: typeof CSV_SNAPSHOT_TITLE;
   derivedVpdLabel:
-    | typeof CSV_DERIVED_VPD_LABEL
-    | typeof CSV_SUPPLIED_VPD_LABEL
-    | typeof CSV_UNKNOWN_VPD_LABEL;
+    typeof CSV_DERIVED_VPD_LABEL | typeof CSV_SUPPLIED_VPD_LABEL | typeof CSV_UNKNOWN_VPD_LABEL;
 }
 
 export interface CsvTimelineContextEntry {
@@ -104,7 +102,7 @@ export function buildCsvTimelineContext(input: CsvTimelineContextInput): CsvTime
   const entries = Array.isArray(input.diaryEntries) ? input.diaryEntries : [];
   const rowsAll = Array.isArray(input.sensorReadings) ? input.sensorReadings : [];
   const { growId, tentId } = input;
-  const windowMs = Math.max(1, input.windowMinutes ?? DEFAULT_WINDOW_MIN) * 60_000;
+  const windowMs = Math.max(1, input.windowMinutes ?? CSV_TIMELINE_WINDOW_MINUTES) * 60_000;
   if (!tentId || entries.length === 0) return [];
 
   // Scope to CSV rows of this tent (and grow when known on the row).
@@ -179,4 +177,42 @@ export function buildCsvTimelineContext(input: CsvTimelineContextInput): CsvTime
     });
   }
   return out;
+}
+
+export interface CsvTimelineObservationContext {
+  tentId: string;
+  snapshot: CsvTimelineSnapshot;
+  diaryEntries: {
+    diaryEntryId: string;
+    occurredAt: string;
+    matchAgeMinutes: number;
+  }[];
+}
+
+/** Consolidate shared observations without losing their diary associations.
+ * Call per tent, just like buildCsvTimelineContext. Capture time identifies an
+ * observation within that tent; equal measurements at other times stay distinct.
+ */
+export function buildCsvTimelineObservationContext(
+  input: CsvTimelineContextInput,
+): CsvTimelineObservationContext[] {
+  if (!input.tentId) return [];
+  const diaryById = new Map((input.diaryEntries ?? []).map((entry) => [entry.id, entry]));
+  const byCapture = new Map<string, CsvTimelineObservationContext>();
+  for (const match of buildCsvTimelineContext(input)) {
+    const entry = diaryById.get(match.diaryEntryId);
+    const occurredMs = entry ? entryMs(entry) : null;
+    if (!match.snapshot || match.matchAgeMinutes == null || occurredMs == null) continue;
+    let context = byCapture.get(match.snapshot.capturedAt);
+    if (!context) {
+      context = { tentId: input.tentId, snapshot: match.snapshot, diaryEntries: [] };
+      byCapture.set(match.snapshot.capturedAt, context);
+    }
+    context.diaryEntries.push({
+      diaryEntryId: match.diaryEntryId,
+      occurredAt: new Date(occurredMs).toISOString(),
+      matchAgeMinutes: match.matchAgeMinutes,
+    });
+  }
+  return [...byCapture.values()];
 }

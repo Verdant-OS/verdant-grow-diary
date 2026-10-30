@@ -78,26 +78,26 @@ why: QA imported four observations; four diary entries can all select the latest
 branch: codex/ver-305-csv-timeline-shared-context
 base: verdant-grow-diary at ab4aaa2f3a648c28860c682ddec3ec0103347246
 checkout: git fetch origin codex/ver-305-csv-timeline-shared-context verdant-grow-diary && git switch codex/ver-305-csv-timeline-shared-context && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
-pr: To be opened as draft immediately after this planning push.
-head_sha: Read the current full SHA from the PR; this planning commit cannot contain its own SHA.
-state: Investigation complete; implementation pending.
-current_step: Open draft, reproduce four observations and repeated nearest matches in additive tests.
-next_action: Add grouping of matched observations per tent/capture time and explicit diary entry links.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2636 (draft)
+head_sha: b14cd34c6ef0a658c531c924718af65580418e3b is the planning parent. Read the final full SHA from PR #2636; this implementation commit cannot contain its own SHA.
+state: Implemented; local validation complete; draft implementation push pending.
+current_step: Publish the tested tree, then inspect exact-head hosted CI.
+next_action: Inspect required checks at the full current PR head, then obtain an eligible independent complete-scope review; keep draft and owner merge/deployment holds.
 post_merge_check: After separately authorized release, verify four exact-time matches stay distinct and four repeated nearest matches show one shared observation with four diary links on production.
 active_writer: Codex VER-305 session /workspace/scratch/094eb9844d09; only this session pushes.
-decisions: Preserve diary-context design and 45-minute nearest matching. Consolidate shared observation cards and explain associations; full imported history remains on Tent Detail. Keep existing CSV/derived/unknown VPD provenance and all read-state protections.
+decisions: Link only original diary rows with currently rendered canonical anchors, excluding hidden rows and synthetic manual receipts; display tent names to distinguish simultaneous observations across tents. Preserve diary-context design and 45-minute nearest matching. Consolidate shared observation cards and explain associations; full imported history remains on Tent Detail. Keep existing CSV/derived/unknown VPD provenance and all read-state protections.
 tried_and_rejected: One-card-per-import redesign would change this panel's diary context contract and broaden the query/window scope. Arbitrarily dropping diary associations would hide useful context. Neither is justified.
-commands: Run focused CSV Timeline Vitest suites, changed-file ESLint/Prettier, typecheck, scorer-lock strict and diff check when dependencies are available.
-files_touched: docs/agents/HANDOFF_LOG.md (this block only)
-files_remaining: src/components/TimelineCsvContextPanel.tsx; src/lib/environmentCsvTimelineContextViewModel.ts; new src/test/environment-csv-timeline-shared-context.test.tsx
+commands: node_modules/.bin/vitest run src/test/environment-csv-timeline-shared-context.test.tsx src/test/environment-csv-timeline-mounted-context.test.tsx src/test/environment-csv-timeline-context.test.tsx src/test/environment-csv-timeline-unknown-vpd.test.tsx src/test/csv-timeline-preview-ui.test.tsx src/test/csv-timeline-preview.test.ts src/test/v0-operating-loop-contract.test.ts src/test/timeline-entry-anchor-rules.test.ts --reporter=dot; node scripts/scorer-lock.mjs --report --strict --base ab4aaa2f3a648c28860c682ddec3ec0103347246; node scripts/assert-docs-safety.mjs; git diff --check. Results: 123 passed / 0 failed / 0 skipped; scoped strict TypeScript PASS; all four changed source/test files ESLint 0 errors, 1 pre-existing rows-hook warning; Prettier PASS. Additional unchanged timeline-hash-anchor-handoff suite: 3 passed / 2 failed here AND on base (setTimeout spy sees jsdom timer). Final 13-case regression on base: 10 failed / 3 passed, versus 13 passed with fix. Full typecheck/build/suite await hosted CI.
+files_touched: src/components/TimelineCsvContextPanel.tsx; src/lib/environmentCsvTimelineContextViewModel.ts; src/pages/Timeline.tsx (CSV panel call site only); src/test/environment-csv-timeline-shared-context.test.tsx (new); docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: None for implementation. Fix any attributable hosted-CI finding in the same scope.
 blockers: Independent acceptance needs an actually available eligible non-contributing outside session; none verified. Production verification awaits separate release authorization.
 open_questions: None blocking implementation.
 gotchas: Sensor rows are metric rows; group observations by tent and captured time, never by displayed value or capture time alone. Matching remains diary-driven, not full imported history. Local tests do not establish production acceptance.
 links: https://linear.app/verdantgrowdiary/issue/VER-305
-artifacts: Draft PR to follow.
+artifacts: PR #2636; 13 additive regressions exercise real parser -> insert mapper -> nearest matching -> mounted panel. Test measurements are synthetic, not production telemetry.
 reviewer_seat: BLOCKED / unavailable eligible outside session; Codex author is excluded.
 reviewer_sha: NOT_MEASURED
-session_state: No subagents, routines, workflow changes, merge or deployment authority.
+session_state: No subagents, routines, workflow changes, merge or deployment authority. Git HTTPS push lacks credentials; connector Git Data API uses normal fast-forward commits, verified against local tree hashes. Test tools installed under /tmp only; package manifests/lockfiles unchanged.
 claimed_by: Codex VER-305 session, 2026-10-30 UTC (Matthew's explicit assignment)
 owner: Codex VER-305 session
 last_updated: 2026-10-29 CT, by Codex

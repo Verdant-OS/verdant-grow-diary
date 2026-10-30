@@ -115,6 +115,10 @@ const SET_SCHEMA_RE = new RegExp(
   "gi",
 );
 const DROP_RE = new RegExp(String.raw`\bDROP\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?([^;]*)`, "gi");
+// TABLE IF NOT EXISTS can skip any existing relation kind. Do not let a
+// view/sequence lifecycle operation retain that object's ACL as a new table's.
+const OTHER_DROP_RE = new RegExp(String.raw`\bDROP\s+(?:MATERIALIZED\s+VIEW|VIEW|SEQUENCE)${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?([^;]*)`, "gi");
+const OTHER_ALTER_RE = new RegExp(String.raw`\bALTER\s+(?:MATERIALIZED\s+VIEW|VIEW|SEQUENCE)${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?${QUALIFIED}`, "gi");
 // Table GRANT/REVOKE. Skip only a complete non-table clause: ALL TABLES|
 // SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or FUNCTION|SEQUENCE|SCHEMA|
 // TYPE|… followed by that object's name. A keyword followed by TO, FROM or
@@ -143,6 +147,11 @@ const DO_ESCAPED_PREFIX_RE = new RegExp("^\\s*DO(?:\\s+LANGUAGE\\s+" + DO_LANGUA
 // command. Anything else (EXECUTE 'DROP ...' || suffix) builds the command at
 // run time, so the string is not read as the statement (fails closed).
 const EXECUTE_ENDS_RE = /^\s*(?:;|$|USING\b|INTO\b)/i;
+function lineCommentEnd(sql, start, end) {
+  const cr = sql.indexOf("\r", start);
+  const lf = sql.indexOf("\n", start);
+  return Math.min(cr < 0 ? end : cr, lf < 0 ? end : lf, end);
+}
 function skipWsAndComments(sql, i, end) {
   while (i < end) {
     if (/\s/.test(sql[i])) {
@@ -150,8 +159,7 @@ function skipWsAndComments(sql, i, end) {
       continue;
     }
     if (sql.startsWith("--", i)) {
-      const eol = sql.indexOf("\n", i);
-      i = eol === -1 || eol > end ? end : eol;
+      i = lineCommentEnd(sql, i, end);
       continue;
     }
     if (sql.startsWith("/*", i)) {
@@ -373,6 +381,10 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
   function walk(start, end, isProcedural = procedural) {
     let i=start, statementStart=start;
     let inStatements = !isProcedural;
+    // SQL-language routine bodies have statement lists rather than a
+    // PL/pgSQL DECLARE/BEGIN block. Declarations remain non-executing.
+    const first = IDENT_AT_RE.exec(sql.slice(skipWsAndComments(sql, start, end), end))?.[0];
+    if (isProcedural && first && !["declare", "begin"].includes(identName(first))) inStatements = true;
     while (i<end) {
       i=skipWsAndComments(sql,i,end);
       if(i>=end) break;
@@ -412,9 +424,32 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
       }
       if (isProcedural && wordAt(sql, i, start, "BEGIN")) inStatements = true;
       if (inStatements && statementPrefix(noComments.slice(statementStart, i))) {
+        if (["DROP", "ALTER"].some((word) => wordAt(sql, i, start, word))) {
+          events.push({kind:"relation-command",index:i});
+        }
+        if (wordAt(sql, i, start, "DISCARD")) {
+          const option = skipWsAndComments(sql, i + 7, end);
+          if (["TEMP", "TEMPORARY", "ALL"].some((name) => wordAt(sql, option, option, name))) {
+            events.push({kind:"diagnostic",table:"(unsupported temporary-state DISCARD at offset "+i+")",index:i});
+          }
+        }
         if (wordAt(sql, i, start, "DROP")) {
           const owned = skipWsAndComments(sql, i + 4, end);
           if (wordAt(sql, owned, owned, "OWNED")) events.push({kind:"diagnostic",table:"(unsupported DROP OWNED at offset "+i+")",index:i});
+          // Extensions may own tables directly; cascading type/server/wrapper
+          // drops can remove dependent typed or foreign tables. Dependencies
+          // are not modeled, so later conditional creates cannot reuse ACLs.
+          const clause = maskSql(sql.slice(owned, sqlStatementEnd(sql, owned, end)), false);
+          const quotedClause = quotedIdentifierPositions(clause);
+          const keywords = clause.split("").map((ch, at) => quotedClause[at] ? " " : ch).join("");
+          const dependencyHead = new RegExp(String.raw`^(?:TYPE|DOMAIN|SERVER|FOREIGN\s+DATA\s+WRAPPER)${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?`, "i").exec(clause);
+          const targets = dependencyHead ? splitTargets(clause.slice(dependencyHead[0].length).replace(/;\s*$/, "")) : [];
+          const lastTarget = targets.at(-1) ?? "";
+          const cascading = new RegExp(String.raw`^\s*${QUALIFIED}${AFTER_NAME_SEPARATOR}CASCADE\s*$`, "i").test(lastTarget);
+          const unreadable = targets.some((target) => !DROP_TARGET_RE.test(target));
+          if (new RegExp(String.raw`^EXTENSION(?!${SQL_IDENT_CHAR})`, "i").test(keywords) || cascading || unreadable) {
+            events.push({kind:"diagnostic",table:"(unsupported dependency DROP at offset "+i+")",index:i});
+          }
         }
         if (wordAt(sql, i, start, "EXPLAIN")) {
           const header = explainHeader(sql, i + 7, end);
@@ -432,7 +467,8 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
         if(lit && EXECUTE_ENDS_RE.test(sql.slice(afterLit))){
           for (const nested of collectDynamicExecuteEvents(lit.value)) {
             const at = afterKw + 1 + nested.index;
-            events.push({...nested, index: at, table: "(unreadable nested EXECUTE at offset " + at + ")"});
+            if (nested.kind === "relation-command") events.push({...nested,index:afterKw+(lit.tag?.length ?? 1)+nested.index});
+            else events.push({...nested, index: at, table: "(unreadable nested EXECUTE at offset " + at + ")"});
           }
           i=lit.after;continue;
         }
@@ -617,7 +653,7 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
       return;
     }
     const nestedSpans = [];
-    const masked = maskSql(literal.value, true, scanDoBodies, nestedSpans);
+    const masked = maskSql(literal.value, !creationOnly, scanDoBodies, nestedSpans, creationOnly);
     if (executeSpans) for (const span of nestedSpans) executeSpans.push({...span,start:open+1+span.start,end:open+1+span.end});
     // Normalize tokens before scanning: retaining raw doubled apostrophes
     // would identify a different quoted table. Compact within the original
@@ -645,8 +681,7 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
         stmtStart = i + 1;
         i++;
       } else if (sql.startsWith("--", i)) {
-        const eol = sql.indexOf("\n", i);
-        const stop = eol === -1 || eol > end ? end : eol;
+        const stop = lineCommentEnd(sql, i, end);
         blank(i, stop);
         i = stop;
       } else if (sql.startsWith("/*", i)) {
@@ -762,6 +797,16 @@ export function findTablesWithoutExplicitAcl(migrations) {
   // a session, the shadow still holds (fails closed).
   const temps = new Map();
   for (const m of migrations) {
+    // CRLF normalization is only a transport convention. Inside a quoted
+    // identifier those bytes change object identity; reject that unmodeled
+    // form before normalizing, rather than coalescing it with an LF name.
+    if (m.sql.includes("\r\n")) {
+      const rawCreation = maskSql(m.sql, false, true, null, true);
+      const rawQuoted = quotedIdentifierPositions(rawCreation);
+      for (const match of rawCreation.matchAll(/\r\n/g)) {
+        if (rawQuoted[match.index]) diagnostics.push({table:"(unreadable CRLF identifier at view offset "+match.index+")",migration:m.name});
+      }
+    }
     const sql = m.sql.replace(/\r\n/g, "\n");
     const legacyDynamic = HISTORICAL_DYNAMIC_EXECUTE[m.name];
     const legacyValid = legacyDynamic && createHash("sha256").update(sql).digest("hex") === legacyDynamic.sha256;
@@ -796,6 +841,10 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     for (const match of creation.matchAll(OTHER_RELATION_HEAD_RE)) {
       if (quotedCreation[match.index]) continue;
+      if (executed[match.index] !== creation[match.index]) {
+        events.push({kind:"diagnostic", table:"(unmodeled deferred relation creation at offset "+match.index+")", index:match.index});
+        continue;
+      }
       const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       if (!name || !RELATION_TARGET_END_RE.test(after.slice(name[0].length))) {
@@ -810,7 +859,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     // Schema deletion/renaming can invalidate many tracked names at once.
     // Until modeled, reject these commands rather than reusing stale ACLs.
-    for (const match of keywordSql.matchAll(/\b(?:DROP\s+SCHEMA\b|ALTER\s+SCHEMA\b[^;]*?\bRENAME\s+TO\b)/gi)) {
+    for (const match of creationKeywords.matchAll(/\b(?:DROP\s+SCHEMA\b|ALTER\s+SCHEMA\b[^;]*?\bRENAME\s+TO\b)/gi)) {
       events.push({kind:"diagnostic", table:"(unsupported schema lifecycle at offset "+match.index+")", index:match.index});
     }
     // SQL-standard routine bodies are deferred. Reject the unsupported body
@@ -819,9 +868,13 @@ export function findTablesWithoutExplicitAcl(migrations) {
     for (const match of keywordSql.matchAll(atomicRoutineRe)) {
       events.push({kind:"diagnostic", table:"(unreadable SQL-standard routine body at offset "+match.index+")", index:match.index});
     }
-    const transactionRe = /(?:^|;)\s*(SAVEPOINT|RELEASE(?:\s+SAVEPOINT)?|ROLLBACK\s+(?:(?:WORK|TRANSACTION)\s+)?TO(?:\s+SAVEPOINT)?|START\s+TRANSACTION|BEGIN|COMMIT|END|ROLLBACK|ABORT)\b(?:\s+("(?:[^"]|"")*"|[a-zA-Z_][a-zA-Z0-9_$]*))?/gi;
+    const transactionRe = new RegExp(String.raw`(?:^|;)\s*(SAVEPOINT|RELEASE(?:\s+SAVEPOINT)?|ROLLBACK\s+(?:(?:WORK|TRANSACTION)\s+)?TO(?:\s+SAVEPOINT)?|START\s+TRANSACTION|BEGIN|COMMIT|END|ROLLBACK|ABORT)(?!${SQL_IDENT_CHAR})(?:${NAME_SEPARATOR}(${IDENT}))?`, "gi");
     for (const match of topLevel.matchAll(transactionRe)) {
       if (quotedIdentifierPositions(topLevel)[match.index]) continue;
+      if (match[2] && !SELECT_TARGET_END_RE.test(topLevel.slice(match.index + match[0].length))) {
+        events.push({kind:"diagnostic",table:"(unreadable transaction identifier at offset "+match.index+")",index:match.index});
+        continue;
+      }
       events.push({kind:"transaction", action:match[1].toUpperCase().replace(/\s+/g," ").replace(/^ROLLBACK (?:WORK|TRANSACTION) TO/, "ROLLBACK TO").replace(/^RELEASE$/, "RELEASE SAVEPOINT").replace(/^END$/, "COMMIT").replace(/^ABORT$/, "ROLLBACK").replace(/^START TRANSACTION$/, "BEGIN"), name:match[2] ? identName(match[2]) : null, index:match.index});
     }
     let transactionStart = null;
@@ -830,6 +883,10 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const restore = (snap) => { tables.clear(); for (const [k,v] of snap.tables) tables.set(k,{...v}); outsideTables.clear(); for (const [k,v] of snap.outsideTables) outsideTables.set(k,{...v}); temps.clear(); for (const [k,v] of snap.temps) temps.set(k,v); };
     for (const match of creation.matchAll(CREATE_HEAD_RE)) {
       if (quotedCreation[match.index]) continue;
+      if (executed[match.index] !== creation[match.index]) {
+        events.push({kind:"diagnostic",table:"(unmodeled deferred relation creation at offset "+match.index+")",index:match.index});
+        continue;
+      }
       const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
@@ -855,6 +912,10 @@ export function findTablesWithoutExplicitAcl(migrations) {
     }
     for (const match of creation.matchAll(CREATE_TEMP_HEAD_RE)) {
       if (quotedCreation[match.index]) continue;
+      if (executed[match.index] !== creation[match.index]) {
+        events.push({kind:"diagnostic",table:"(unmodeled deferred relation creation at offset "+match.index+")",index:match.index});
+        continue;
+      }
       const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
@@ -897,7 +958,16 @@ export function findTablesWithoutExplicitAcl(migrations) {
         index: match.index,
       });
     }
-    for (const event of collectDynamicExecuteEvents(sql).filter((event) => !(legacyValid && legacyDynamic.offsets.includes(event.index)))) events.push(event);
+    const commandEvents = collectDynamicExecuteEvents(sql);
+    const relationCommands = new Set(commandEvents.filter((event) => event.kind === "relation-command").map((event) => event.index));
+    for (const event of commandEvents.filter((event) => event.kind !== "relation-command" && !(legacyValid && legacyDynamic.offsets.includes(event.index)))) events.push(event);
+    for (const matcher of [DROP_RE, RENAME_RE, SET_SCHEMA_RE]) {
+      for (const match of creation.matchAll(matcher)) {
+        if (!quotedCreation[match.index] && executed[match.index] !== creation[match.index]) {
+          events.push({kind:"diagnostic",table:"(unmodeled deferred table lifecycle at offset "+match.index+")",index:match.index});
+        }
+      }
+    }
     for (const match of executed.matchAll(RENAME_RE)) {
       if (quoted[match.index]) continue;
       const schema = schemaName(match[1]);
@@ -923,6 +993,20 @@ export function findTablesWithoutExplicitAcl(migrations) {
           index: match.index,
         });
       }
+    }
+    for (const match of creation.matchAll(OTHER_DROP_RE)) {
+      if (quotedCreation[match.index] || !relationCommands.has(match.index)) continue;
+      for (const target of splitTargets(match[1])) {
+        const name = DROP_TARGET_RE.exec(target);
+        if (!name) events.push({kind:"diagnostic",table:"(unreadable relation lifecycle at offset "+match.index+")",index:match.index});
+        else events.push({kind:"other-lifecycle",table:identName(name[2]),schema:schemaName(name[1]),index:match.index});
+      }
+    }
+    for (const match of creation.matchAll(OTHER_ALTER_RE)) {
+      if (quotedCreation[match.index] || !relationCommands.has(match.index)) continue;
+      if (!RELATION_TARGET_END_RE.test(creation.slice(match.index + match[0].length))) {
+        events.push({kind:"diagnostic",table:"(unreadable relation lifecycle at offset "+match.index+")",index:match.index});
+      } else events.push({kind:"other-lifecycle",table:identName(match[2]),schema:schemaName(match[1]),index:match.index});
     }
     for (const match of executed.matchAll(DROP_RE)) {
       if (quoted[match.index]) continue;
@@ -957,6 +1041,13 @@ export function findTablesWithoutExplicitAcl(migrations) {
     events.sort((a, b) => a.index - b.index);
     for (const event of events) {
       if (event.kind === "diagnostic") { diagnostics.push({table:event.table,migration:m.name}); continue; }
+      if (event.kind === "other-lifecycle") {
+        const [states, key] = stateLocation(event.schema, event.table);
+        if (states.has(key) || actsOnTemp(temps, event.schema, event.table)) {
+          diagnostics.push({table:"(unmodeled relation-kind lifecycle at offset "+event.index+")",migration:m.name});
+        }
+        continue;
+      }
       if (event.kind === "ambiguous-view") {
         if (temps.size > 0) diagnostics.push({table:"(unreadable view persistence at offset "+event.index+")",migration:m.name});
         continue;
@@ -977,7 +1068,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
           if (at>=0) savepoints=savepoints.slice(0,at);
         } else if (event.action === "ROLLBACK") {
           if (transactionStart) restore(transactionStart);
-          else tables.set('(unresolved rollback at offset ' + event.index + ')',{migration:m.name,acl:false});
+          else diagnostics.push({table:'(unresolved rollback at offset ' + event.index + ')',migration:m.name});
           transactionStart=null; savepoints=[];
         } else if (event.action === "COMMIT") {
           for (const [name,onCommitDrop] of temps) if (onCommitDrop) temps.delete(name);

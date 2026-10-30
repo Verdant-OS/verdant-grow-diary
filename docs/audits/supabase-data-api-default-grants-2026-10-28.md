@@ -81,6 +81,22 @@ Unsupported Unicode-escaped ALTER/DROP identifiers fail closed to prevent stale 
 Lifecycle relation expressions include ONLY(table) and table *. Unmodeled catalog
 qualifiers and DROP targets fail closed. EXPLAIN bodies are ignored unless ANALYZE
 is enabled; unreadable execution options and DROP OWNED are opaque diagnostics.
+Detected deferred relation creations/lifecycle changes are rejected rather than
+altering live state; routine calls are not evaluated. DISCARD TEMP/TEMPORARY/ALL
+is rejected as an unmodeled session reset. Savepoint names use the complete SQL
+identifier grammar and line comments end at either CR or LF without rewriting
+carriage returns inside identifiers.
+CRLF inside a quoted identifier is rejected before transport line-ending
+normalization; ordinary CRLF file endings and quoted prose remain supported.
+View, materialized-view and sequence lifecycle operations that overlap tracked
+table identities fail closed: CREATE TABLE IF NOT EXISTS may have skipped a
+different relation kind, whose old grant cannot cover a replacement table.
+DROP EXTENSION and cascading type/domain/server/foreign-data-wrapper cleanup
+are rejected because their dependent table removals are not modeled. Ordinary
+unrelated view/sequence lifecycle and non-cascading dependency drops remain valid.
+Unresolved rollback diagnostics are opaque and cannot be satisfied by a table
+with a matching quoted name. The focused suite now contains 442 cases; local
+compatibility-runner evidence is preliminary until exact-head native CI runs.
 
 Live CI inspection found active ruleset 24445196 with the same 35 required check
 names as the repository mirror. The mirror still names retired ruleset 20421416

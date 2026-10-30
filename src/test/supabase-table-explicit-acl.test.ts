@@ -320,22 +320,19 @@ describe("supabase table explicit ACL rule", () => {
 
   it("keeps tracking a table whose removal or rename never runs", () => {
     // An uncalled function body.
+    const removal = "CREATE FUNCTION public.reset() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN DROP TABLE IF EXISTS public.leaky; END $fn$;";
     expect(
-      tables(
-        CREATE,
-        "CREATE FUNCTION public.reset() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN DROP TABLE IF EXISTS public.leaky; END $fn$;",
-      ),
-    ).toEqual(["leaky"]);
+      tables(CREATE, removal),
+    ).toEqual([`(unmodeled deferred table lifecycle at offset ${removal.indexOf("DROP")})`, "leaky"]);
     // Prose inside a string literal.
     expect(
       tables(`${CREATE}\nCOMMENT ON TABLE public.leaky IS 'never drop table leaky by hand';`),
     ).toEqual(["leaky"]);
     // A rename onto the tracked name inside an uncalled function body.
+    const rename = `${CREATE}\nCREATE FUNCTION public.r() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN ALTER TABLE public.other RENAME TO leaky; END $fn$;`;
     expect(
-      tables(
-        `${CREATE}\nCREATE FUNCTION public.r() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN ALTER TABLE public.other RENAME TO leaky; END $fn$;`,
-      ),
-    ).toEqual(["leaky"]);
+      tables(rename),
+    ).toEqual([`(unmodeled deferred table lifecycle at offset ${rename.indexOf("ALTER")})`, "leaky"]);
     // Removals that do run still clear tracking.
     expect(tables(CREATE, "DO $$ BEGIN DROP TABLE public.leaky; END $$;")).toEqual([]);
     expect(tables(CREATE, "DO $$ BEGIN EXECUTE 'DROP TABLE public.leaky'; END $$;")).toEqual([]);
@@ -1288,7 +1285,8 @@ describe("complete lifecycle expressions and EXPLAIN execution", () => {
     expect(tables(sql)).toEqual(["leaky"]);
   });
   it("does not mask a routine named explain", () => {
-    expect(tables("CREATE FUNCTION public.explain() RETURNS void LANGUAGE plpgsql AS $$ BEGIN CREATE TABLE public.leaky(id int); END $$;")).toEqual(["leaky"]);
+    const sql = "CREATE FUNCTION public.explain() RETURNS void LANGUAGE plpgsql AS $$ BEGIN CREATE TABLE public.leaky(id int); END $$;";
+    expect(tables(sql)).toEqual([`(unmodeled deferred relation creation at offset ${sql.indexOf("CREATE TABLE")})`]);
   });
   it.each(["DROP OWNED BY acl_cleanup;", "DROP/* reason */OWNED BY acl_cleanup CASCADE;", "DO $$ BEGIN DROP OWNED BY acl_cleanup; END $$;"])("rejects unsupported ownership cleanup: %s", (drop) => {
     expect(tables(granted + "ALTER TABLE public.leaky OWNER TO acl_cleanup;" + drop + recreate).some((table) => table.includes("unsupported DROP OWNED"))).toBe(true);
@@ -1301,5 +1299,142 @@ describe("complete lifecycle expressions and EXPLAIN execution", () => {
   });
   it("keeps keyword-prefixed variable assignments out of command handling", () => {
     expect(tables("DO $$ DECLARE execute$var int; BEGIN execute$var := 1; END $$;")).toEqual([]);
+  });
+});
+
+describe("deferred effects, temporary resets and full lexical identifiers", () => {
+  const granted = CREATE + "GRANT SELECT ON public.leaky TO authenticated;";
+  const recreate = "CREATE TABLE IF NOT EXISTS public.leaky(id int);";
+  it.each([
+    "CREATE FUNCTION public.f() RETURNS void LANGUAGE plpgsql AS $$ BEGIN CREATE TEMP TABLE leaky(id int); END $$;",
+    "CREATE FUNCTION public.f() RETURNS void LANGUAGE sql AS $$ CREATE TEMP TABLE leaky(id int); $$;",
+    "CREATE PROCEDURE public.p() LANGUAGE plpgsql AS $$ BEGIN CREATE TEMP TABLE leaky(id int); END $$;",
+    "DO $o$ BEGIN EXECUTE 'CREATE FUNCTION public.f() RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN CREATE TEMP TABLE leaky(id int); END $fn$'; END $o$;",
+  ])("does not invent a live temporary relation from a declaration: %s", (routine) => {
+    const result = tables(granted + routine + "DROP TABLE leaky;" + recreate);
+    expect(result).toEqual(expect.arrayContaining(["leaky"]));
+    expect(result.some((table) => table.startsWith("(unmodeled deferred relation creation"))).toBe(true);
+  });
+  it("does not invent a schema-move destination from a deferred creation", () => {
+    const result = tables(granted + "CREATE FUNCTION public.f() RETURNS void LANGUAGE plpgsql AS $$ BEGIN CREATE TABLE private.leaky(id int); END $$; ALTER TABLE public.leaky SET SCHEMA private;" + recreate);
+    expect(result).toEqual(expect.arrayContaining(["leaky"]));
+    expect(result.some((table) => table.startsWith("(unmodeled deferred relation creation"))).toBe(true);
+  });
+  it("does not let an outside grant clear an unmodeled deferred creation", () => {
+    expect(tables("CREATE FUNCTION public.f() RETURNS void LANGUAGE plpgsql AS $$ BEGIN CREATE TABLE public.leaky(id int); END $$; SELECT public.f(); GRANT SELECT ON public.leaky TO authenticated;").some((table) => table.startsWith("(unmodeled deferred relation creation"))).toBe(true);
+  });
+  it("rejects a deferred SQL-language cleanup effect", () => {
+    expect(tables(granted + "CREATE FUNCTION public.f() RETURNS void LANGUAGE sql AS $$ DROP TABLE public.leaky; $$; SELECT public.f();" + recreate).some((table) => table.startsWith("(unmodeled deferred table lifecycle"))).toBe(true);
+  });
+  it("keeps non-creating routine declarations valid", () => {
+    expect(tables("CREATE FUNCTION public.f() RETURNS text LANGUAGE sql AS $$ SELECT 'CREATE TEMP TABLE leaky(id int)'::text; $$;")).toEqual([]);
+  });
+  it.each(["TEMP", "TEMPORARY", "ALL"])("rejects unmodeled temporary-state DISCARD %s", (option) => {
+    expect(tables(granted + "CREATE TEMP TABLE leaky(id int); DISCARD " + option + "; DROP TABLE leaky;" + recreate).some((table) => table.startsWith("(unsupported temporary-state DISCARD"))).toBe(true);
+  });
+  it("rejects a nested literal temporary-state reset", () => {
+    expect(tables(granted + "CREATE TEMP TABLE leaky(id int); DO $$ BEGIN EXECUTE 'DISCARD TEMP'; END $$; DROP TABLE leaky;" + recreate).some((table) => table.startsWith("(unreadable nested EXECUTE"))).toBe(true);
+  });
+  it.each(["PLANS", "SEQUENCES"])("does not confuse DISCARD %s with dropping temp relations", (option) => {
+    expect(tables(granted + "CREATE TEMP TABLE leaky(id int); DISCARD " + option + "; DROP TABLE leaky;" + recreate)).toEqual([]);
+  });
+  it("does not read DISCARD from SELECT identifiers", () => {
+    expect(tables(granted + "SELECT s.discard temp FROM public.s s;")).toEqual([]);
+  });
+  it.each([["sα", "sβ"], ["α", "β"], ['"sα"', '"sβ"']])("keeps distinct complete savepoint identifiers: %s/%s", (first, second) => {
+    expect(tables(CREATE + "BEGIN; SAVEPOINT " + first + "; GRANT SELECT ON public.leaky TO authenticated; SAVEPOINT " + second + "; ROLLBACK TO SAVEPOINT " + first + "; COMMIT;")).toEqual(["leaky"]);
+  });
+  it("preserves Unicode savepoints through RELEASE", () => {
+    expect(tables(CREATE + "BEGIN; SAVEPOINT α; GRANT SELECT ON public.leaky TO authenticated; SAVEPOINT β; RELEASE SAVEPOINT β; ROLLBACK TO α; COMMIT;")).toEqual(["leaky"]);
+  });
+  it("recognizes adjacent quoted transaction identifiers", () => {
+    expect(tables(CREATE + 'BEGIN; SAVEPOINT"α"; GRANT SELECT ON public.leaky TO authenticated; SAVEPOINT"β"; ROLLBACK TO SAVEPOINT"α"; COMMIT;')).toEqual(["leaky"]);
+  });
+  it("fails closed for incomplete Unicode-escaped savepoint identifiers", () => {
+    expect(tables(CREATE + 'BEGIN; SAVEPOINT U&"α"; GRANT SELECT ON public.leaky TO authenticated; ROLLBACK TO U&"α"; COMMIT;').some((table) => table.startsWith("(unreadable transaction identifier"))).toBe(true);
+  });
+  it("retains PostgreSQL's byte-truncated savepoint identity", () => {
+    const prefix = "s".repeat(63);
+    expect(tables(CREATE + "BEGIN; SAVEPOINT " + prefix + "α; GRANT SELECT ON public.leaky TO authenticated; SAVEPOINT " + prefix + "β; ROLLBACK TO " + prefix + "α; COMMIT;")).toEqual([]);
+  });
+  it("ends a line comment at a lone carriage return", () => {
+    expect(tables("-- rationale\r" + CREATE)).toEqual(["leaky"]);
+  });
+  it("keeps an executed grant visible after a CR comment", () => {
+    expect(tables(CREATE + "-- rationale\rGRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
+  });
+  it("keeps dynamic command validation visible after a CR comment", () => {
+    expect(tables("DO $$ BEGIN -- rationale\rEXECUTE format('CREATE TABLE public.%I(id int)', 'leaky'); END $$;").some((table) => table.startsWith("(unreadable dynamic EXECUTE"))).toBe(true);
+  });
+  it("preserves carriage returns that are part of quoted identifiers", () => {
+    expect(tables('CREATE TABLE public."leaky\rtail"(id int); GRANT SELECT ON public."leaky\ntail" TO authenticated;')).toEqual(["leaky\rtail"]);
+  });
+  it("rejects CRLF identifier identity before line-ending normalization", () => {
+    expect(tables('CREATE TABLE public."leaky\r\ntail"(id int); CREATE TABLE public."leaky\ntail"(id int); GRANT SELECT ON public."leaky\ntail" TO authenticated;').some((table) => table.startsWith("(unreadable CRLF identifier"))).toBe(true);
+  });
+  it("rejects CRLF quoted identifiers inside executed literals", () => {
+    expect(tables('DO $o$ BEGIN EXECUTE \'CREATE TABLE public."leaky\r\ntail"(id int)\'; END $o$; CREATE TABLE public."leaky\ntail"(id int); GRANT SELECT ON public."leaky\ntail" TO authenticated;').some((table) => table.startsWith("(unreadable CRLF identifier"))).toBe(true);
+  });
+  it("keeps ordinary CRLF file endings supported", () => {
+    expect(tables("CREATE TABLE public.leaky(\r\nid int\r\n);\r\nGRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
+  });
+  it("does not confuse CRLF prose with identifier bytes", () => {
+    expect(tables(granted + 'COMMENT ON TABLE public.leaky IS \'"quoted\r\nprose"\';')).toEqual([]);
+  });
+});
+
+describe("relation-kind and dependency lifecycle fences", () => {
+  const recreate = "CREATE TABLE IF NOT EXISTS public.leaky(id int);";
+  it.each([
+    ["CREATE VIEW public.leaky AS SELECT 1 AS id;", "DROP VIEW public.leaky;"],
+    ["CREATE MATERIALIZED VIEW public.leaky AS SELECT 1 AS id;", "DROP MATERIALIZED VIEW public.leaky;"],
+    ["CREATE SEQUENCE public.leaky;", "DROP SEQUENCE public.leaky;"],
+    ["CREATE VIEW public.leaky AS SELECT 1 AS id;", "ALTER VIEW public.leaky RENAME TO archived;"],
+    ["CREATE VIEW public.leaky AS SELECT 1 AS id;", "ALTER VIEW public.leaky SET SCHEMA private;"],
+    ["CREATE SEQUENCE public.leaky;", "ALTER SEQUENCE public.leaky RENAME TO archived;"],
+  ])("rejects stale ACLs after another relation kind is removed: %s / %s", (create, lifecycle) => {
+    const result = tables(create + recreate + "GRANT SELECT ON public.leaky TO authenticated;" + lifecycle + recreate);
+    expect(result.some((table) => table.startsWith("(unmodeled relation-kind lifecycle"))).toBe(true);
+  });
+  it("rejects a quoted multi-target view removal collision", () => {
+    expect(tables('CREATE VIEW public."leaky" AS SELECT 1; ' + recreate + 'GRANT SELECT ON public.leaky TO authenticated; DROP VIEW IF EXISTS public.other, public."leaky" CASCADE;' + recreate).some((table) => table.startsWith("(unmodeled relation-kind lifecycle"))).toBe(true);
+  });
+  it("retains the fence for literal-executed lifecycle operations", () => {
+    expect(tables("CREATE VIEW public.leaky AS SELECT 1;" + recreate + "GRANT SELECT ON public.leaky TO authenticated; DO $$ BEGIN EXECUTE 'DROP VIEW public.leaky'; END $$;" + recreate).some((table) => table.startsWith("(unmodeled relation-kind lifecycle"))).toBe(true);
+  });
+  it.each([
+    "DO $$ BEGIN EXECUTE $cmd$DROP VIEW public.leaky$cmd$; END $$;",
+    "DO $$ BEGIN IF true THEN DROP VIEW public.leaky; END IF; END $$;",
+    "CREATE FUNCTION public.f() RETURNS void LANGUAGE sql AS $$ DROP VIEW public.leaky; $$; SELECT public.f();",
+    "DO 'BEGIN DROP VIEW public.leaky; END';",
+  ])("retains lifecycle fences through statement contexts: %s", (drop) => {
+    expect(tables("CREATE VIEW public.leaky AS SELECT 1;" + recreate + "GRANT SELECT ON public.leaky TO authenticated;" + drop + recreate).some((table) => table.startsWith("(unmodeled relation-kind lifecycle"))).toBe(true);
+  });
+  it("allows an explicitly granted table after an unrelated view is removed", () => {
+    expect(tables("CREATE VIEW public.leaky AS SELECT 1; DROP VIEW public.leaky;" + CREATE + "GRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
+  });
+  it("allows ordinary view and sequence lifecycle outside tracked table identities", () => {
+    expect(tables("CREATE VIEW public.v AS SELECT 1; ALTER VIEW public.v RENAME TO v2; DROP VIEW public.v2; CREATE SEQUENCE public.s; ALTER SEQUENCE public.s RENAME TO s2; DROP SEQUENCE public.s2;")).toEqual([]);
+  });
+  it("keeps schema-qualified relation identities separate", () => {
+    expect(tables(CREATE + "GRANT SELECT ON public.leaky TO authenticated; CREATE VIEW private.leaky AS SELECT 1; DROP VIEW private.leaky;")).toEqual([]);
+  });
+  it.each(["SELECT s.drop view FROM public.s s;", "SELECT s.drop sequence FROM public.s s;", "SELECT s.alter view FROM public.s s;", 'SELECT s.drop "view" FROM public.s s;'])("does not read lifecycle commands from aliases: %s", (sql) => {
+    expect(tables(CREATE + "GRANT SELECT ON public.leaky TO authenticated;" + sql)).toEqual([]);
+  });
+  it("rejects unparsed encoded lifecycle targets", () => {
+    expect(tables(CREATE + 'GRANT SELECT ON public.leaky TO authenticated; DROP VIEW U&"leaky";').some((table) => table.startsWith("(unreadable relation lifecycle"))).toBe(true);
+  });
+  it.each(["DROP TYPE public.rowtype CASCADE;", "DROP/* reason */TYPE public.rowtype CASCADE;", "DROP DOMAIN public.rowtype CASCADE;", "DROP SERVER remote CASCADE;", "DROP FOREIGN DATA WRAPPER remote CASCADE;", "DROP EXTENSION addon;", "DROP EXTENSION IF EXISTS addon RESTRICT;"])("rejects unmodeled destructive dependencies: %s", (drop) => {
+    expect(tables("CREATE TYPE public.rowtype AS (id int); CREATE TABLE public.leaky OF public.rowtype; GRANT SELECT ON public.leaky TO authenticated;" + drop + recreate).some((table) => table.startsWith("(unsupported dependency DROP"))).toBe(true);
+  });
+  it("rejects a nested literal dependency cleanup", () => {
+    expect(tables("DO $$ BEGIN EXECUTE 'DROP TYPE public.rowtype CASCADE'; END $$;").some((table) => table.startsWith("(unreadable nested EXECUTE"))).toBe(true);
+  });
+  it.each(["DROP TYPE public.unused RESTRICT;", 'DROP TYPE public."cascade";', "CREATE TYPE public.cascade AS ENUM('a'); DROP TYPE public.cascade;", "CREATE DOMAIN public.cascade AS int; DROP DOMAIN public.cascade;", "DROP TYPE public.one, public.cascade;", "DROP SERVER unused;", "DROP SERVER IF EXISTS cascade;", "DROP FOREIGN DATA WRAPPER IF EXISTS cascade;", "SELECT s.drop extension FROM public.s s;", "SELECT 'DROP EXTENSION addon';"])("does not reject non-cascading or non-executed text: %s", (sql) => {
+    expect(tables(CREATE + "GRANT SELECT ON public.leaky TO authenticated;" + sql)).toEqual([]);
+  });
+  it("does not let a matching identifier clear an unresolved rollback diagnostic", () => {
+    expect(tables('ROLLBACK; CREATE TABLE public."(unresolved rollback at offset 0)"(id int); GRANT SELECT ON public."(unresolved rollback at offset 0)" TO authenticated;').some((table) => table.startsWith("(unresolved rollback"))).toBe(true);
   });
 });

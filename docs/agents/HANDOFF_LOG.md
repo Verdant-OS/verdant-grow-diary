@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-306-CULTIVAR-UTC-DATES
+
+```text
+TASK VER-306-CULTIVAR-UTC-DATES  priority: P2  status: OPEN
+goal: Make cultivar last-verified and retrieved dates deterministic between SSR and browsers.
+why: Midnight-UTC reference dates currently display the previous day west of UTC, causing hydration differences.
+branch: codex/ver-306-cultivar-utc-dates
+base: verdant-grow-diary; synced with ffc6076aeb3723f17d85057154f8e9772ed9c222 (original implementation base ab4aaa2f3a648c28860c682ddec3ec0103347246)
+checkout: git fetch origin codex/ver-306-cultivar-utc-dates verdant-grow-diary && git switch codex/ver-306-cultivar-utc-dates && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2638
+head_sha: A commit cannot record itself; read the full current head from the PR.
+state: Implemented; handoff-only base-sync conflict repaired. Historical validation at 9f9e4d187f4843ba0dee15697a3c7edc6abaaa15: local 10 files / 82 tests PASS; full tsc PASS; Prettier PASS; scoped ESLint 0 errors / 1 existing faqItems warning; docs safety and strict scorer report PASS.
+current_step: Merged current deploy base into this task branch; preserved every upstream handoff byte and this task block. Cultivar formatter and both new test files remain byte-identical to 9f9e4d187f4843ba0dee15697a3c7edc6abaaa15. Earlier 17-case green result and 6-failure UTC mutation proof are historical; fresh hosted checks bind to the new merge head.
+next_action: Inspect fresh hosted checks at the full PR head and obtain an eligible non-contributing outside review of all four files. The main lint/build job and 32 full-suite shards skip drafts; do not count those skips as PASS. Stay draft; no merge or deploy.
+post_merge_check: After an owner-authorized release, verify /cultivars/sour-diesel in UTC and America/Chicago shows Jul 22, 2026 for Last verified and source retrieval; confirm no recoverable hydration errors and unchanged Article dates.
+active_writer: Codex in this task session; no other branch writer.
+decisions: Explicit UTC preserves the stored editorial date; no data, schema, SEO builder or catalog behavior change.
+tried_and_rejected: Do not suppress hydration errors or shift stored timestamps. Git mirror paths were unavailable; ordinary public GitHub clone worked.
+commands: bunx vitest run src/test/cultivar-page-date-timezone.test.tsx src/test/cultivar-catalog-hydration.test.tsx src/test/cultivar-page-seo.test.tsx src/test/cultivar-page-v1.test.tsx src/test/cultivar-reference-view-model.test.ts src/test/cultivar-sample-verification-noindex.test.tsx src/test/cultivar-pages-database-source.test.tsx src/test/cultivar-detail-seo.test.ts src/test/static-public-seo-documents.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot (82 PASS); NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck (exit 0); bunx eslint src/pages/CultivarPage.tsx src/test/cultivar-page-date-timezone.test.tsx src/test/cultivar-catalog-hydration.test.tsx; node scripts/scorer-lock.mjs --report --base origin/verdant-grow-diary --strict
+files_touched: src/pages/CultivarPage.tsx; new src/test/cultivar-page-date-timezone.test.tsx; new src/test/cultivar-catalog-hydration.test.tsx; docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: None planned; repair only defects in this slice.
+blockers: No eligible non-contributing outside reviewer session is established here. Required main CI/full-suite jobs skip drafts, so 35/35 is not established. The earlier Bun 1.3.14 frozen install and local checks are historical; workspace maintenance removed the checkout and dependencies. This handoff-only conflict repair uses fresh dependency-free checks and hosted validation; no installation or lockfile change.
+open_questions: The unmapped GB Sentry event is not independently explained by the confirmed west-of-UTC date defect.
+gotchas: Current and recorded-event release 0200d2551b86 have identical pending/bundled hook and false database-read flag. Cold and warm-cache enabled-read hydration both PASS; flag-disabled makes no request. The original GB event remains unverified without mapped frames, browser TZ and server/client mismatch evidence. Geolocation alone is not the browser timezone. No catalog behavior change.
+links: https://linear.app/verdantgrowdiary/issue/VER-306
+artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/2638. Historical implementation-head 049269c3072ff994d4971dccf7a32fb4736f8813 library gate run 41083111846 PASS: typecheck, 17 files / 186 tests, production build and 390 JSON-LD blocks / 77 HTML documents (2 existing Athena warnings). It checked synthetic merge 5256e72d31768e505ccda7281cbc98c327bb948a. Fresh final-head hosted results belong in the PR, never inherit the old run.
+reviewer_seat: BLOCKED until an actually available eligible non-contributing Claude/Grok or other eligible outside session is established under OWNERSHIP.md section 4.3.
+reviewer_sha: None; contributing Codex session excluded from independent acceptance.
+session_state: No subagents, routines, production operations, merge or deployment authorized. GitHub comments require separate approval, so claim and resume evidence live in the draft PR body.
+claimed_by: Codex, 2026-10-30 15:38 UTC (PR creation receipt)
+owner: Codex
+last_updated: 2026-10-30, by Codex (base-sync conflict repair; inspect PR for exact head and CI)
+```
+
 ### VER-296-START-ROOM-ONE-STEP
 
 ```text

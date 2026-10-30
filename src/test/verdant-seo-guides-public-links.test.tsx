@@ -211,11 +211,23 @@ describe("/guides internal links resolve to known routes with one scoped diary h
     });
   }
 
+  it("the harvest tracker card says the log is lost on reload unless it is kept", () => {
+    const { container } = renderGuides("/guides");
+    const card = container.querySelector('a[href="/guides/when-to-harvest-cannabis"]');
+    expect(card?.textContent).toContain(
+      "The log is lost on reload unless you download it or choose to carry it into Verdant.",
+    );
+  });
+
   it("guide-family slugs linked from /guides all exist in shared constants or known custom guide pages", () => {
     const { container } = renderGuides("/guides");
     const { internal } = collectLinks(container);
     const guideLinks = internal.filter((h) => /^\/guides\/[^/]+$/.test(h));
-    const CUSTOM_GUIDE_PATHS = ["/guides/grow-stage-care-guide", "/guides/athena-feed-chart-log"];
+    const CUSTOM_GUIDE_PATHS = [
+      "/guides/grow-stage-care-guide",
+      "/guides/athena-feed-chart-log",
+      "/guides/when-to-harvest-cannabis",
+    ];
     expect(guideLinks.length).toBe(VERDANT_GUIDE_SLUGS.length + CUSTOM_GUIDE_PATHS.length);
     for (const href of guideLinks) {
       if (CUSTOM_GUIDE_PATHS.includes(href)) continue;

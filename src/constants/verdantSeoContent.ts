@@ -790,6 +790,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Harvest timing needs trichome and pistil evidence",
         body: "Days on a seed pack are estimates. The most reliable harvest signals are trichome color — clear, then milky, then amber — and pistil maturity. A jeweler's loupe or handheld microscope is enough. Rushing by calendar alone is a common source of regret.",
+        links: [
+          {
+            label: "Track trichome checks in the harvest window tracker",
+            to: "/guides/when-to-harvest-cannabis",
+          },
+        ],
       },
     ],
     faq: CANNABIS_PLANT_CARE_FAQ,

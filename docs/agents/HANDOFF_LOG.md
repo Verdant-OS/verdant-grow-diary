@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GUIDE-WHEN-TO-HARVEST-CANNABIS
+
+```text
+TASK GUIDE-WHEN-TO-HARVEST-CANNABIS  priority: P1  status: OPEN
+goal: port the founder-supplied Harvest Window Tracker HTML to the public route /guides/when-to-harvest-cannabis, same pattern as /guides/athena-feed-chart-log.
+why: Matthew (2026-10-28) asked for the guide as one ready-for-review PR against verdant-grow-diary.
+branch: claude/youthful-franklin-n0mg0f
+base: verdant-grow-diary
+checkout: git fetch origin claude/youthful-franklin-n0mg0f verdant-grow-diary && git switch claude/youthful-franklin-n0mg0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2592
+head_sha: a9527793d81230dd58cde82f6b9e6656a4ef00c4, pre-repair remote verified 2026-10-30 01:16 UTC. This entry accompanies the repair commit; read the PR body/current remote for its resulting full SHA and CI, rather than treating this parent as the repaired head
+state: Account-lifetime repair implemented in this commit; publication, exact full head, focused validation and CI are recorded in the PR body. No independent acceptance or merge is claimed
+current_step: Matthew explicitly requested the account-change-mid-import busy-state repair and PR evidence refresh at 2026-10-30 01:14 UTC. HarvestCheckImportPrompt now keys an AccountImportPrompt lifetime by user.id; identity changes remount busy/error/selection/binding state and reread the handoff after mount. The existing inner ImportPrompt implementation, including operation-token cancellation and storage-ownership fences, is unchanged. New harvest-check-import-account-recovery.test.tsx adds four runtime cases covering current-account controls/dismissal, replacement handoffs and stale completion during a newer import, missing handoffs, and stable same-account rerenders. Validation status is recorded on the PR, without carrying forward old-head passes
+next_action: Complete focused regression validation and normal publication, then obtain a complete eligible independent exact-head review. The separate Copy TSV quoting report (comment 6508685092) remains outside this bounded account-change request and must return to its assigned writer. Do not merge, enqueue or deploy from this repair
+post_merge_check: after Publish, https://verdantgrowdiary.com/guides/when-to-harvest-cannabis returns the page with the H1 "When to Harvest Cannabis: Track Your Trichomes and Harvest Window" and /version.json reports the merge SHA; else NOT_MEASURED
+active_writer: Codex, bounded account-change repair under Matthew's explicit 2026-10-30 request; existing claim comment 6507722155 and remote were rechecked with no newer competing writer
+decisions: Key the handoff loader and inner prompt together by user.id to reset the complete UI lifetime and reread current storage. Preserve the inner import loop byte-for-byte; do not add an unconditional finally that could reset a newer import. Add a new test file rather than editing locked tests. Preserve all unrelated task entries and existing base-merge history
+tried_and_rejected: An unconditional busy reset in the old async completion could affect a newer import. The earlier frozen install failed on a restricted dependency source; no registry bypass, unpinned replacement tree, lockfile rewrite or hook bypass is authorized. A supported matching frozen tree may be used only after provenance/lockfile verification
+commands: bunx vitest run src/test/harvest-check-import-account-recovery.test.tsx --reporter=dot (RED with only wrapper repair temporarily set aside; restore before GREEN/commit); bunx vitest run src/test/harvest-check-*.test.ts* src/test/harvest-window-*.test.ts* src/test/funnel-events-wiring.test.ts --reporter=dot; bun run typecheck; bunx eslint src/components/HarvestCheckImportPrompt.tsx src/test/harvest-check-import-account-recovery.test.tsx; node scripts/assert-docs-safety.mjs; node scripts/scorer-lock.mjs --report --strict --base a9527793d81230dd58cde82f6b9e6656a4ef00c4; git diff --check
+files_touched: docs/agents/HANDOFF_LOG.md; docs/seo/route-indexation-matrix.md; e2e/auth-route-protection-mobile.spec.ts; public/sitemap.xml; scripts/seo-runtime-smoke.mjs; src/components/AppShell.tsx; src/components/HarvestCheckImportPrompt.tsx; src/constants/verdantSeoContent.ts; src/lib/appRouteManifest.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/harvestCheckHandoffStore.ts; src/lib/harvestWindowAnalytics.ts; src/lib/harvestWindowRules.ts; src/pages/GuidesIndex.tsx; src/pages/HarvestWindowTracker.tsx; src/routeTree.gen.ts; src/routes/guides.when-to-harvest-cannabis.tsx; src/styles.css; src/test/funnel-events-wiring.test.ts; src/test/harvest-check-handoff-bytes.test.ts; src/test/harvest-check-handoff-store.test.ts; src/test/harvest-check-import-lifetime.test.tsx; src/test/harvest-check-import-prompt.test.tsx; src/test/harvest-window-analytics.test.ts; src/test/harvest-window-page-async.test.tsx; src/test/harvest-window-page.test.tsx; src/test/harvest-window-rules.test.ts; src/test/static-public-seo-documents.test.ts; src/test/verdant-seo-guides-public-links.test.tsx; src/test/verdant-seo-sitemap-robots.test.ts; src/test/harvest-check-import-account-recovery.test.tsx. This bounded repair touches only the import component, new account-recovery test, and this task block; it does not restore the stopped CURRENT_STATE edits
+files_remaining: No other implementation files planned; validate and refresh exact-head PR evidence after normal publication
+blockers: Local dependency availability and exact-head independent review are tracked on the PR. Five inherited base-relative scorer edits remain protected; this repair edits none and declares no unlock. Matthew's 2026-10-29 22:13 UTC instruction explicitly confirms the existing funnel-events-wiring.test.ts unlock and says to leave it in
+open_questions: Eligible outside reviewer needed for the full replacement head; separate TSV quoting finding is not resolved by this bounded fix
+gotchas: Previous base merge a9527793d81230dd58cde82f6b9e6656a4ef00c4 already preserved both task histories. Do not rebase, force-push, silently include other stopped local changes or mutate protected tests. Every new head invalidates old review/CI evidence. Storage remains per tab; mutation checks must restore the fixed source before staging/commit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2592; https://github.com/Verdant-OS/verdant-grow-diary/pull/2592#issuecomment-6507671234 (historical account-change FAIL); https://github.com/Verdant-OS/verdant-grow-diary/pull/2592#issuecomment-6508685092 (separate TSV finding); https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40964621010 (pre-repair base-merge CI)
+artifacts: src/test/harvest-check-import-account-recovery.test.tsx and the PR's exact-head validation/CI evidence; no local-only evidence is presented as a hosted test result
+reviewer_seat: Eligible independent non-contributing session under OWNERSHIP.md 4.3; exclude the original Claude author and all contributing Codex sessions, including this repair writer
+reviewer_sha: No independent PASS at the repair head. Historical review 6507671234 is FAIL at 0dda4e473735edef52e23922c3b3d44211b58b3d; it is preserved as evidence, not carried forward as acceptance
+session_state: Bounded repair only; no subagents, routines, workflow changes or PR #2622 work. No merge/enqueue/deployment authority. Validation and remaining blockers belong to the exact current PR head
+claimed_by: Codex, Matthew's explicit 2026-10-30 01:14 UTC assignment; remote claims checked before editing
+owner: Codex for this bounded repair; historical authors remain excluded from acceptance
+last_updated: 2026-10-29 20:14 CT, by Codex (2026-10-30 01:14 UTC assignment)
+```
+
 ### ARCH-CONTRACT-RESTAMP-20261029
 
 ```text

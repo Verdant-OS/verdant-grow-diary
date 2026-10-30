@@ -25,6 +25,15 @@ import {
   athenaFeedLogWebApplicationJsonLd,
 } from "../athenaFeedLogRules";
 import {
+  HARVEST_WINDOW_DATE_MODIFIED,
+  HARVEST_WINDOW_DESCRIPTION,
+  HARVEST_WINDOW_FAQ,
+  HARVEST_WINDOW_H1,
+  HARVEST_WINDOW_PATH,
+  HARVEST_WINDOW_TITLE,
+  harvestWindowWebApplicationJsonLd,
+} from "../harvestWindowRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -600,6 +609,42 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
         ],
       }),
       athenaFeedLogWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${ATHENA_FEED_LOG_PATH}`),
+    ],
+  }),
+  publicDocument(HARVEST_WINDOW_PATH, {
+    title: `${HARVEST_WINDOW_TITLE} | Verdant Grow Diary`,
+    description: HARVEST_WINDOW_DESCRIPTION,
+    imageAlt: "Trichome chart and harvest window tracker",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${HARVEST_WINDOW_TITLE} | Verdant Grow Diary`,
+        description: HARVEST_WINDOW_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${HARVEST_WINDOW_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: HARVEST_WINDOW_H1,
+        description: HARVEST_WINDOW_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${HARVEST_WINDOW_PATH}`,
+        datePublished: HARVEST_WINDOW_DATE_MODIFIED,
+        dateModified: HARVEST_WINDOW_DATE_MODIFIED,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${HARVEST_WINDOW_PATH}`,
+        questions: HARVEST_WINDOW_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "When to Harvest Cannabis",
+            url: `${VERDANT_SITE_ORIGIN}${HARVEST_WINDOW_PATH}`,
+          },
+        ],
+      }),
+      harvestWindowWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${HARVEST_WINDOW_PATH}`),
     ],
   }),
   publicDocument("/tools/blueprint-targets", {

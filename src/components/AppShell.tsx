@@ -25,6 +25,7 @@ import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
 import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
+import HarvestCheckImportPrompt from "./HarvestCheckImportPrompt";
 import SearchShortcutHint from "./SearchShortcutHint";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
@@ -446,6 +447,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                 data-testid="app-shell-page-content"
                 className={QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS}
               >
+                <HarvestCheckImportPrompt />
                 <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
                   {pageContent}
                 </TentQuickLogTargetScope>

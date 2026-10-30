@@ -67,6 +67,8 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
   },
   { file: "src/components/AiDoctorCheckInPreviewPanel.tsx", telemetryIntent: null },
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
+  // Harvest tracker handoff import: an adapter, not a grower Quick Log activation.
+  { file: "src/components/HarvestCheckImportPrompt.tsx", telemetryIntent: null },
   {
     file: "src/components/PlantQuickLog.tsx",
     telemetryIntent:

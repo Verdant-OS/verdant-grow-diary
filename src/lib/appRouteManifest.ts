@@ -236,6 +236,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",
   },
+  {
+    path: "/guides/when-to-harvest-cannabis",
+    access: "public",
+    description:
+      "Public trichome chart and harvest window tracker. In memory, except an opt-in sessionStorage signup handoff.",
+  },
   { path: "/hardware-integrations", access: "public" },
   { path: "/health", access: "auth", description: "Authenticated app health page." },
   {

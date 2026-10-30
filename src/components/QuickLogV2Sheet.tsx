@@ -5,7 +5,9 @@ import {
   isQuickLogObservationDraftEmpty,
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+  quickLogObservationDraftDetachedFromStoredTarget,
   quickLogObservationDraftRestoredCopy,
+  quickLogObservationFormMatches,
   QUICK_LOG_OBSERVATION_SAVE_ERROR,
   restorableQuickLogObservationDraft,
 } from "@/lib/quickLogObservationDraftRules";
@@ -638,6 +640,11 @@ function QuickLogV2SheetForOwner({
   // form; it must skip that one run or it rewrites (then clears) a draft that
   // belongs to another target.
   const observationDraftResetPendingRef = useRef(false);
+  // An untargeted open may display another plant's words without adopting
+  // that target. Until the grower edits that view, the stored draft stays
+  // bound to the plant it was typed for.
+  const observationDraftDetachedRef = useRef(false);
+  const observationDraftDetachedSnapshotRef = useRef<QuickLogV2FormState | null>(null);
   // An open re-baselines the response target. "armed" in the open's own commit
   // (the form is still the previous open's), "ready" in the next, which holds
   // the reset form; retarget checks wait until then.
@@ -1160,19 +1167,23 @@ function QuickLogV2SheetForOwner({
       // none; never into another plant's target.
       const restorable = restorableQuickLogObservationDraft(storedDraft, defaultTargetKey);
       const restoredDraft = restorable ? restorable.form : null;
+      const nextForm: QuickLogV2FormState = {
+        ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
+        selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
+        action: restoredDraft?.action ?? defaultAction,
+      };
+      const detached = quickLogObservationDraftDetachedFromStoredTarget(storedDraft, restorable);
       setObservationDraftRestored(
         restorable ? quickLogObservationDraftRestoredCopy(restorable) : null,
       );
-      observationDraftOwnedRef.current = Boolean(restorable);
+      observationDraftOwnedRef.current = Boolean(restorable) && !detached;
+      observationDraftDetachedRef.current = detached;
+      observationDraftDetachedSnapshotRef.current = detached ? nextForm : null;
       observationDraftResetPendingRef.current = true;
       // A new open starts the response-target baseline over, so restoring a
       // draft is never read as a retarget from whatever the sheet showed last.
       responseBaselineResetRef.current = "armed";
-      setForm({
-        ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
-        selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
-        action: restoredDraft?.action ?? defaultAction,
-      });
+      setForm(nextForm);
       manualTempEntryUnitRef.current = null;
       // A new draft has no chip-authored marker, so the provenance record must
       // not survive from the previous one. A stale status would let the
@@ -1226,6 +1237,8 @@ function QuickLogV2SheetForOwner({
       setTentPlantAutoApplied(false);
       resetPhotoSelection();
     } else {
+      observationDraftDetachedRef.current = false;
+      observationDraftDetachedSnapshotRef.current = null;
       setTargetFilterQuery("");
       setTentPlantAutoApplied(false);
     }
@@ -1247,6 +1260,13 @@ function QuickLogV2SheetForOwner({
       return;
     }
     if (!open || postSave) return;
+    if (observationDraftDetachedRef.current) {
+      const snapshot = observationDraftDetachedSnapshotRef.current;
+      if (snapshot && quickLogObservationFormMatches(draftForm, snapshot)) return;
+      observationDraftDetachedRef.current = false;
+      observationDraftDetachedSnapshotRef.current = null;
+      observationDraftOwnedRef.current = true;
+    }
     if (isQuickLogObservationDraftEmpty(draftForm)) {
       if (observationDraftOwnedRef.current) {
         clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);

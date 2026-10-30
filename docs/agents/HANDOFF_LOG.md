@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### QUICK-LOG-UNTARGETED-DRAFT-PRESERVE
+
+```text
+TASK QUICK-LOG-UNTARGETED-DRAFT-PRESERVE  priority: P2  status: OPEN
+goal: Opening Quick Log with no target must not replace a plant or tent observation draft.
+why: The header and mobile Quick Log on any page other than Tent or Plant Detail opens with a null target. That view restores the words, then the draft writer saved selectedKey null and saveFailed false, so the plant sheet no longer restored the note or the failed-save retry.
+branch: cursor/preserve-untargeted-quick-log-draft
+base: verdant-grow-diary
+checkout: git fetch origin cursor/preserve-untargeted-quick-log-draft verdant-grow-diary && git switch cursor/preserve-untargeted-quick-log-draft
+pr: opened from this branch; read the URL from GitHub
+head_sha: the commit that carries this block (git rev-parse HEAD)
+state: implemented locally; push and draft PR follow this commit
+current_step: untargeted open keeps the stored draft until the grower edits that view
+next_action: confirm the new regression is green in CI at the pushed head
+post_merge_check: on a signed-in fixture, type a note on a plant, close Quick Log, open Quick Log from the dashboard without typing, close it, reopen Quick Log on that plant: the note is still there. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Cursor automation Find critical bugs
+decisions: show the words on the untargeted sheet, and do not persist that stripped form until the text changes. An edit on that sheet still replaces the single observation draft.
+tried_and_rejected: none
+commands: bunx vitest run src/test/quick-log-untargeted-draft-preserve.test.tsx src/test/quick-log-observation-draft-scope.test.tsx src/test/quick-log-feed-draft-restored-notice.test.tsx src/test/start-room-quick-log-draft-p2-rules.test.ts --reporter=dot
+files_touched: src/components/QuickLogV2Sheet.tsx; src/lib/quickLogObservationDraftRules.ts; src/test/quick-log-untargeted-draft-preserve.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: the existing observation-draft scope test is scorer-locked; the regression is a new file. RED before the fix: stored draft became selectedKey null and saveFailed false. GREEN: 4 files / 31 tests passed.
+links: none yet
+artifacts: src/test/quick-log-untargeted-draft-preserve.test.tsx
+reviewer_seat: not assigned
+reviewer_sha: none
+session_state: Cursor automation 6552e001-d48e-11f1-89ee-7aa6f0729b11
+claimed_by: Cursor automation Find critical bugs, 2026-10-30
+owner: Cursor automation Find critical bugs
+last_updated: 2026-10-30 17:15 CT, by Cursor automation Find critical bugs
+```
+
 ### VER-296-START-ROOM-ONE-STEP
 
 ```text

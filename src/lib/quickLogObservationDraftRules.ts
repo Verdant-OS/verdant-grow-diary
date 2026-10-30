@@ -80,6 +80,35 @@ export function quickLogObservationDraftRestoredCopy(restored: QuickLogObservati
     : QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY;
 }
 
+/**
+ * The sheet is showing another target's words without adopting that target.
+ * The stored draft still belongs to the original plant or tent until the
+ * grower edits this view.
+ */
+export function quickLogObservationDraftDetachedFromStoredTarget(
+  stored: QuickLogObservationDraft | null,
+  restored: QuickLogObservationDraft | null,
+): boolean {
+  if (!stored || !restored) return false;
+  const storedKey = stored.form.selectedKey;
+  return typeof storedKey === "string" && storedKey.length > 0 && restored.form.selectedKey == null;
+}
+
+export function quickLogObservationFormMatches(
+  current: QuickLogV2FormState,
+  snapshot: QuickLogV2FormState,
+): boolean {
+  return (
+    current.selectedKey === snapshot.selectedKey &&
+    current.action === snapshot.action &&
+    current.note === snapshot.note &&
+    current.volumeMl === snapshot.volumeMl &&
+    current.temperatureC === snapshot.temperatureC &&
+    current.humidityPct === snapshot.humidityPct &&
+    current.vpdKpa === snapshot.vpdKpa
+  );
+}
+
 export function parseQuickLogObservationDraft(value: unknown): QuickLogObservationDraft | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const wrapper = value as Record<string, unknown>;

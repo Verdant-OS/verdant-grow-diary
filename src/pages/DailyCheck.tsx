@@ -171,6 +171,11 @@ export default function DailyCheck() {
   const [plantId, setPlantId] = useState<string>("");
   const [plantChoice, setPlantChoice] = useState<"route" | "explicit">("route");
   const [tentId, setTentId] = useState<string>("");
+  // Explicit grower pick, bound to the route it was made on so it never
+  // carries over to another plant link.
+  const [explicitTentPick, setExplicitTentPick] = useState<{ routeKey: string; tentId: string } | null>(
+    null,
+  );
   const [step, setStep] = useState<DailyGrowCheckStep>("select");
   const [state, setState] = useState<DailyGrowCheckState>(INITIAL_DAILY_GROW_CHECK_STATE);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
@@ -260,7 +265,15 @@ export default function DailyCheck() {
   );
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
+  const tentPickRouteKey = `${plantId ?? ""}|${plantResolution.status}`;
+  const pickedTentId =
+    explicitTentPick &&
+    explicitTentPick.routeKey === tentPickRouteKey &&
+    selectableTents.some((tent) => tent.id === explicitTentPick.tentId)
+      ? explicitTentPick.tentId
+      : null;
   const activityTarget = resolveDailyCheckActivityTarget({
+    pickedTentId,
     plantId: selectedPlant?.id ?? null,
     plantAssignedTentId: routeIdentityPending ? routeTentId : selectedPlantTentId,
     standaloneTentId: selectedStandaloneTentId,
@@ -626,7 +639,10 @@ export default function DailyCheck() {
                 <Label className="text-xs">Current Tent</Label>
                 <Select
                   value={effectiveTentId}
-                  onValueChange={setTentId}
+                  onValueChange={(next) => {
+                    setTentId(next);
+                    setExplicitTentPick({ routeKey: tentPickRouteKey, tentId: next });
+                  }}
                   disabled={!!selectedPlant}
                 >
                   <SelectTrigger

@@ -41,11 +41,22 @@ describe("plant grow-scope mismatch", () => {
 describe("daily check tent pick after broken plant link", () => {
   it.each(["unknown", "out-of-scope"] as const)("%s keeps picked tent", (status) => {
     const r = resolveDailyCheckActivityTarget({
-      standaloneTentId: "tent-9",
+      standaloneTentId: "tent-1",
+      firstSelectableTentId: "tent-1",
+      pickedTentId: "tent-9",
       routeTentId: null,
       plantResolutionStatus: status,
     } as never);
     expect(r.tentId).toBe("tent-9");
+  });
+  it("without an explicit pick, no tent is invented", () => {
+    const r = resolveDailyCheckActivityTarget({
+      standaloneTentId: "tent-1",
+      firstSelectableTentId: "tent-1",
+      routeTentId: null,
+      plantResolutionStatus: "unknown",
+    } as never);
+    expect(r.tentId).toBeNull();
   });
 });
 

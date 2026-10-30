@@ -26,6 +26,11 @@ export interface DailyCheckActivityTargetInput {
   firstSelectableTentId: string | null | undefined;
   routeTentId: string | null | undefined;
   plantResolutionStatus: DailyCheckPlantResolutionStatus;
+  /**
+   * Tent the grower explicitly picked on THIS route after a broken plant
+   * link (unknown / out-of-scope). Never a remembered or default tent.
+   */
+  pickedTentId?: string | null;
 }
 
 export interface DailyCheckActivityTarget {
@@ -47,7 +52,7 @@ export function resolveDailyCheckActivityTarget(
   if (input.plantResolutionStatus === "unknown" || input.plantResolutionStatus === "out-of-scope") {
     return {
       plantId: null,
-      tentId: nonemptyId(input.routeTentId) ?? nonemptyId(input.standaloneTentId),
+      tentId: nonemptyId(input.routeTentId) ?? nonemptyId(input.pickedTentId),
     };
   }
 

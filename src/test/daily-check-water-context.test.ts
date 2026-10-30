@@ -45,7 +45,7 @@ describe("resolveDailyCheckActivityTarget", () => {
         routeTentId: "",
         plantResolutionStatus: "missing",
       }),
-    ).toEqual({ plantId: null, tentId: "t2" });
+    ).toEqual({ plantId: null, tentId: null });
   });
 
   it("carries the first selectable tent when no plant was requested", () => {
@@ -61,7 +61,7 @@ describe("resolveDailyCheckActivityTarget", () => {
     ).toEqual({ plantId: null, tentId: "t1" });
   });
 
-  it("keeps the grower-picked tent (never the first tent) when a requested plant was not honored", () => {
+  it("does not invent a tent when a requested plant was not honored", () => {
     expect(
       resolveDailyCheckActivityTarget({
         plantId: null,

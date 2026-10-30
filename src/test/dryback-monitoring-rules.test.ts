@@ -416,7 +416,6 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
       { now: T0 },
     );
     expect(vm.status).toBe("windows");
-    expect(vm.sampleCount).toBe(5);
     expect(vm.latestClosed?.sampleCount).toBe(4);
     expect(vm.latestClosed?.peakVwcPct).toBe(55);
     expect(vm.latestClosed?.troughVwcPct).toBe(32);

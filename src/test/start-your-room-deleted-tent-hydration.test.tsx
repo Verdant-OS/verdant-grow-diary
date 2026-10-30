@@ -10,7 +10,6 @@ import {
 } from "@/lib/startYourRoomDraftRules";
 
 const STORED_ROW_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-const MINTED_ROW_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const STORED_GROW_NAME = "North tent run";
 const STORED_ERROR = plainStartRoomSaveError("plant");
 
@@ -19,8 +18,10 @@ const testState = vi.hoisted(() => ({
   failSaves: true,
   userId: "user-1",
   growsLoading: false,
+  grows: [] as Array<{ id: string; name: string }>,
   tents: [] as Array<{ id: string; grow_id: string; name: string }>,
   tentsLoading: false,
+  tentsFetching: false,
   tentsError: false,
   refetchTents: vi.fn(),
 }));
@@ -35,7 +36,7 @@ vi.mock("@/store/auth", () => ({
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", name: STORED_GROW_NAME }],
+    grows: testState.grows,
     loading: testState.growsLoading,
     error: null,
     activeGrowId: null,
@@ -49,6 +50,7 @@ vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
     data: testState.tents,
     isLoading: testState.tentsLoading,
+    isFetching: testState.tentsFetching,
     isError: testState.tentsError,
     refetch: testState.refetchTents,
   }),
@@ -130,7 +132,9 @@ describe("Start your room validates the restored tent", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
     testState.insert.mockReset();
+    testState.grows = [{ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", name: STORED_GROW_NAME }];
     testState.tents = [];
+    testState.tentsFetching = false;
     testState.tentsLoading = false;
     testState.tentsError = false;
     testState.refetchTents.mockReset();
@@ -190,17 +194,29 @@ describe("Start your room validates the restored tent", () => {
     });
   });
 
-  it.each(["loading", "failed"])(
+  it.each(["loading", "failed", "refreshing cached data"])(
     "preserves the stored draft while the tent read is %s",
     async (state) => {
       testState.tentsLoading = state === "loading";
       testState.tentsError = state === "failed";
+      testState.tentsFetching = state === "refreshing cached data";
+      if (testState.tentsFetching) {
+        // Paid account with multiple grows: the cached roster predates the
+        // saved tent, and the single-grow resume resolver cannot rescue it.
+        testState.grows.push({ id: "ffffffff-ffff-4fff-8fff-ffffffffffff", name: "Other grow" });
+      }
       const original = window.sessionStorage.getItem(draftKey("user-1"));
       const view = renderPage();
       expect(screen.queryByTestId("start-room-plant-name")).not.toBeInTheDocument();
       expect(window.sessionStorage.getItem(draftKey("user-1"))).toBe(original);
+      if (testState.tentsFetching) {
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "Checking your plan and active room limits",
+        );
+      }
       const completeRead = () => {
         testState.tentsLoading = false;
+        testState.tentsFetching = false;
         testState.tentsError = false;
         testState.tents = [
           {

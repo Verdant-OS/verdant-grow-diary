@@ -113,6 +113,8 @@ last_updated: 2026-10-28 06:19 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
 
 - Final parent merge: `ff67c3603f38c099ee726291039a1f9bd6765664`. The sole source conflict preserves the inherited tent validation while retaining this branch's derived one-form step. Every current parent handoff block and this branch's own block is retained; the older LIVE-CHECKOUT block adopts its already-recorded closure from the parent. Final combined selection: 97 files / 1002 tests passed. Full typecheck passed before the parent merge; the final normal merge hook checks the merged project again. A new worktree needed its generated Husky entrypoints; `bun run prepare` restored them before this final commit. The first local partial-save commit preceded that setup, so its checks are supplied by the explicit test/typecheck/lint runs and final hook, not claimed as an initial hook pass.
 
+- Cached-roster follow-up: merged parent `80a2aa6cec0cf3bf034997ac0cd777b6d3993667` normally. The loading/progress source conflict retains this branch's oneStepProgressLabel and inherits the parent's wait for isFetching, its effect dependency and visible loading status. The shared regression preserves a valid saved tent and pending plant retry ID while cached data refetches on a paid account with two grows. Current combined source selection passes 97 files / 1003 tests. The unused copied test constant is removed. Existing twelve-scorer declaration is public; their contents are unchanged by this parent merge. Fresh CI and eligible outside acceptance still bind to the resulting head, with no retarget or integration authority.
+
 ### SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541
 
 ```text
@@ -168,6 +170,13 @@ last_updated: 2026-10-28 06:26 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (
 - The deleted-tent decision is implemented under this new instruction; the separate account-switch busy decision remains open. Fresh CI and eligible outside complete-scope acceptance are still required at the resulting full head. This repair session cannot accept its own work. No merge or deployment is authorized.
 
 - Follow-up review found that a failed tent read hid the forms without a retry on multi-tent plans. The existing verification UI now includes tent failures that block hydration. RED: the visible retry was missing (1 failed / 4 passed); the regression now recovers through that button. New test selectors name the shared form fields so the same hydration safety checks apply to both stacked flows. Deploy base `e312c3fac` is merged normally; the sole handoff conflict retains every block from both parents verbatim.
+
+#### Codex cached-roster follow-up — 2026-10-30 UTC
+
+- Starting head: `ff67c3603f38c099ee726291039a1f9bd6765664`. Matthew directed Codex to fix the remaining work and directly approved publishing both exact prepared PR bodies; both were confirmed public. #2582 then pushed normally to `c5d275865dc1190dfbf8ebdcc9c2bf6f84f4903d`, preserving its stacked base and ready state.
+- Current-head review r4419637976 identified a real gap: cached tent data can still be refreshing while isLoading/isError are false. RED on the new cached-empty roster/two-grow case: the stored tent and pending plant ID were incorrectly cleared (1 failed / 5 passed). Hydration now also waits on isFetching, resumes when it settles, and shows the existing loading status during that wait. GREEN: all 6 hydration cases pass. The unused MINTED_ROW_ID copied into this new test file was removed for r4419647614.
+- The existing 11 unrelated #2582 scorers and the two pre-existing #2565 scorer additions remain unchanged. No auth/store/query-key policy change is made. Fresh required CI and complete eligible outside acceptance must cover the resulting heads; this contributing session and advisory agents are excluded from acceptance. Owner account-switch busy decision remains open.
+- Latest observed deploy `ab4aaa2f3a648c28860c682ddec3ec0103347246` advances analytics/handoff work. Read-only merge-tree against it is clean; no unrelated base churn is needed for this repair. Preserve all prior handoff entries. #2582 inherits this patch by normal parent merge, with no retarget, rebase, force-push, PR merge or deployment.
 
 ### SETUP-QUICKLOG-DRAFT-RETRY
 

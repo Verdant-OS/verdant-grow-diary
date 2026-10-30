@@ -78,6 +78,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  deriveQuickLogV2SaveState,
+  quickLogV2SaveStateLabel,
+  shouldFocusQuickLogV2NoteOnOpen,
+} from "@/lib/quickLogV2NoteFirstRules";
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -624,6 +629,30 @@ function QuickLogV2SheetForOwner({
     );
   const retryPending = wateringRetryPending || exactRetryPending;
   const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialSubmission));
+  // Note-first: a fresh Note sheet puts the cursor in the note box.
+  const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (
+      !shouldFocusQuickLogV2NoteOnOpen({
+        open,
+        action: form.action,
+        recoveryPending: retryPending,
+        submissionLocked,
+      })
+    ) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => noteInputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+    // Focus once per open/action change; typing must not re-trigger it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form.action]);
+  const noteFirstSaveState = deriveQuickLogV2SaveState({
+    saving: saving || feedingSaving || wateringSaving,
+    saved: postSave !== null,
+    error: localError,
+  });
+  const noteFirstSaveLabel = quickLogV2SaveStateLabel(noteFirstSaveState);
   // Synchronous in-flight guard. The save-state flags are React
   // state and don't flip until the next paint, so rapid double-clicks
   // can slip a second save through. This ref locks the entry point
@@ -3586,6 +3615,46 @@ function QuickLogV2SheetForOwner({
           )}
 
           {form.action !== "feed" && (
+            <div>
+              <Label htmlFor="qlv2-note">Note (optional)</Label>
+              <Textarea
+                ref={noteInputRef}
+                id="qlv2-note"
+                data-testid="qlv2-note"
+                value={form.note}
+                disabled={submissionLocked}
+                maxLength={NOTE_LIMIT}
+                aria-describedby="qlv2-note-helper qlv2-note-count"
+                onChange={(e) => setField("note", e.target.value)}
+                onInput={(e) => {
+                  // Native input events (paste, dictation, programmatic
+                  // dispatchEvent) can bypass React's synthetic onChange in
+                  // some environments. Mirror the DOM value into state so the
+                  // save payload always receives exactly what the grower
+                  // visibly typed. Same A1 sync pattern as the legacy QuickLog
+                  // note. Synchronization only — the note stays optional.
+                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
+                }}
+                onCompositionEnd={(e) => {
+                  // IME / dictation finalization: commit the composed value.
+                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
+                }}
+                onBlur={(e) => {
+                  // Last-chance sync before the grower taps Save.
+                  setField("note", e.currentTarget.value);
+                }}
+                placeholder="What did you observe?"
+              />
+              <div className="mt-1 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                <p id="qlv2-note-helper">Keep it short. Add more detail later from the timeline.</p>
+                <p id="qlv2-note-count" aria-live="polite">
+                  {noteLength}/{NOTE_LIMIT}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {form.action !== "feed" && (
             <div
               className="rounded-md border border-border p-3"
               data-testid="qlv2-photo-attachment"
@@ -3728,45 +3797,6 @@ function QuickLogV2SheetForOwner({
                   Checking video before save…
                 </p>
               )}
-            </div>
-          )}
-
-          {form.action !== "feed" && (
-            <div>
-              <Label htmlFor="qlv2-note">Note (optional)</Label>
-              <Textarea
-                id="qlv2-note"
-                data-testid="qlv2-note"
-                value={form.note}
-                disabled={submissionLocked}
-                maxLength={NOTE_LIMIT}
-                aria-describedby="qlv2-note-helper qlv2-note-count"
-                onChange={(e) => setField("note", e.target.value)}
-                onInput={(e) => {
-                  // Native input events (paste, dictation, programmatic
-                  // dispatchEvent) can bypass React's synthetic onChange in
-                  // some environments. Mirror the DOM value into state so the
-                  // save payload always receives exactly what the grower
-                  // visibly typed. Same A1 sync pattern as the legacy QuickLog
-                  // note. Synchronization only — the note stays optional.
-                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
-                }}
-                onCompositionEnd={(e) => {
-                  // IME / dictation finalization: commit the composed value.
-                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
-                }}
-                onBlur={(e) => {
-                  // Last-chance sync before the grower taps Save.
-                  setField("note", e.currentTarget.value);
-                }}
-                placeholder="What did you observe?"
-              />
-              <div className="mt-1 flex items-center justify-between gap-2 text-sm text-muted-foreground">
-                <p id="qlv2-note-helper">Keep it short. Add more detail later from the timeline.</p>
-                <p id="qlv2-note-count" aria-live="polite">
-                  {noteLength}/{NOTE_LIMIT}
-                </p>
-              </div>
             </div>
           )}
 
@@ -4026,6 +4056,17 @@ function QuickLogV2SheetForOwner({
               Original attachments are unavailable after reopening. Their status is unresolved;
               retry checks only the original {form.action === "water" ? "watering record" : "Note"}.
               Check its Timeline before adding the files separately.
+            </p>
+          )}
+
+          {noteFirstSaveLabel && (
+            <p
+              role="status"
+              className="text-sm text-muted-foreground"
+              data-testid="qlv2-note-first-save-state"
+              data-state={noteFirstSaveState}
+            >
+              {noteFirstSaveLabel}
             </p>
           )}
 

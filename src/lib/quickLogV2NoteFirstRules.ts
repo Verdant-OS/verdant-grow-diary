@@ -1,0 +1,48 @@
+// Pure rules for the note-first Quick Log V2 sheet (Verdant North Star:
+// capture the observation immediately, add structure only when useful,
+// make the save state obvious). No I/O, no clock, no React.
+
+export type QuickLogV2SaveState = "idle" | "saving" | "saved" | "failed";
+
+export interface QuickLogV2SaveStateInput {
+  saving: boolean;
+  saved: boolean;
+  error: string | null | undefined;
+}
+
+/** Saving wins over everything; a confirmed save wins over a stale error. */
+export function deriveQuickLogV2SaveState(input: QuickLogV2SaveStateInput): QuickLogV2SaveState {
+  if (input.saving) return "saving";
+  if (input.saved) return "saved";
+  if (input.error && input.error.trim().length > 0) return "failed";
+  return "idle";
+}
+
+/** Short, plain status line shown next to Save. Empty when there is nothing to say. */
+export function quickLogV2SaveStateLabel(state: QuickLogV2SaveState): string {
+  switch (state) {
+    case "saving":
+      return "Saving…";
+    case "saved":
+      return "Saved";
+    case "failed":
+      return "Not saved yet. Your note is kept — tap Save to try again.";
+    default:
+      return "";
+  }
+}
+
+export interface QuickLogV2NoteFocusInput {
+  open: boolean;
+  action: string;
+  recoveryPending: boolean;
+  submissionLocked: boolean;
+}
+
+/**
+ * Focus the note box when a fresh Note sheet opens. Never steal focus while a
+ * pending record is being recovered or a submission is locked.
+ */
+export function shouldFocusQuickLogV2NoteOnOpen(input: QuickLogV2NoteFocusInput): boolean {
+  return input.open && input.action === "note" && !input.recoveryPending && !input.submissionLocked;
+}

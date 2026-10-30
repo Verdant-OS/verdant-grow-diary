@@ -490,7 +490,7 @@ function buildWindow(args: {
     wateringAt: args.start.occurredAt,
     nextWateringId: args.end?.id ?? null,
     nextWateringAt: args.end?.occurredAt ?? null,
-    sampleCount: inWindow.length,
+    sampleCount: mathSamples.length,
     peakVwcPct: peakVwc !== null ? round1(peakVwc) : null,
     troughVwcPct: troughVwc !== null ? round1(troughVwc) : null,
     peakAt: peak?.capturedAt ?? null,

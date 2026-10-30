@@ -94,7 +94,8 @@ describe("isPlantDetailGrowScopeMismatch", () => {
 
   it("is true when query growId is present and does not match", () => {
     expect(isPlantDetailGrowScopeMismatch(goldenPlant as never, ORPHAN_GROW_ID)).toBe(true);
-    expect(isPlantDetailGrowScopeMismatch({ growId: null } as never, ORPHAN_GROW_ID)).toBe(true);
+    // plants.grow_id may be null (membership via tent) — not a proven mismatch.
+    expect(isPlantDetailGrowScopeMismatch({ growId: null } as never, ORPHAN_GROW_ID)).toBe(false);
     expect(isPlantDetailGrowScopeMismatch(null, ORPHAN_GROW_ID)).toBe(true);
   });
 

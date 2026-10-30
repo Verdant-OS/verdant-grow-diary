@@ -78,6 +78,14 @@ unsupported Unicode-escaped identifiers fail closed rather than crediting a pref
 Quoted names can directly follow SQL keywords, or precede later keywords, without
 whitespace. Keyword tests respect dollar signs and non-ASCII identifier characters.
 Unsupported Unicode-escaped ALTER/DROP identifiers fail closed to prevent stale ACLs.
+Lifecycle relation expressions include ONLY(table) and table *. Unmodeled catalog
+qualifiers and DROP targets fail closed. EXPLAIN bodies are ignored unless ANALYZE
+is enabled; unreadable execution options and DROP OWNED are opaque diagnostics.
+
+Live CI inspection found active ruleset 24445196 with the same 35 required check
+names as the repository mirror. The mirror still names retired ruleset 20421416
+and a stricter base-update policy; those metadata differences are deferred to a
+separate CI/governance repair. This PR changes no rule, workflow or gate setting.
 
 Twenty-five historical dynamic statements were inspected in six immutable migration
 files. They handle policies or existing object ACLs rather than creating tables.

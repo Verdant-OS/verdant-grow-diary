@@ -551,7 +551,7 @@ describe("supabase table explicit ACL rule", () => {
     ).toEqual([]);
     // A payload joined to more text is not the whole command (fails closed).
     const joined = `${CREATE}\nDO $ BEGIN EXECUTE $d$DROP TABLE public.leaky$d$ || '_x'; END $;`;
-    expect(tables(joined)).toEqual([`(unreadable dynamic EXECUTE at offset ${joined.indexOf("EXECUTE")})`, "leaky"]);
+    expect(tables(joined)).toEqual([`(unreadable DROP TABLE target at offset ${joined.indexOf("DROP")})`, `(unreadable dynamic EXECUTE at offset ${joined.indexOf("EXECUTE")})`, "leaky"]);
   });
 
   it("reads non-ASCII unquoted identifiers", () => {
@@ -1234,5 +1234,72 @@ describe("quoted-name adjacency and complete SQL keyword tokens", () => {
   });
   it("keeps existing ACLs on an adjacent quoted conditional CREATE", () => {
     expect(tables(CREATE + 'GRANT SELECT ON public.leaky TO authenticated; CREATE TABLE IF NOT EXISTS"public"."leaky"(id int);')).toEqual([]);
+  });
+});
+
+describe("complete lifecycle expressions and EXPLAIN execution", () => {
+  const granted = CREATE + "GRANT SELECT ON public.leaky TO authenticated;";
+  const recreate = "CREATE TABLE IF NOT EXISTS public.leaky(id int);";
+  it.each(["ONLY (public.leaky)", "ONLY(public.leaky)", 'ONLY"public"."leaky"', "public.leaky *", "public.leaky*", 'ONLY("public"."leaky")'])("tracks renamed relation expression %s", (relation) => {
+    expect(tables(granted + "ALTER TABLE " + relation + " RENAME TO archived;" + recreate)).toEqual(["leaky"]);
+  });
+  it.each(["ONLY (public.leaky)", "ONLY(public.leaky)", 'ONLY"public"."leaky"', "public.leaky *", "public.leaky*", 'ONLY("public"."leaky")'])("tracks schema-moved relation expression %s", (relation) => {
+    expect(tables(granted + "ALTER TABLE " + relation + " SET SCHEMA private;" + recreate)).toEqual(["leaky"]);
+  });
+  it.each(['ONLY(public.leaky)RENAME TO"archived";', 'public.leaky*RENAME TO"archived";'])("handles adjacent lifecycle tokens: %s", (action) => {
+    expect(tables(granted + "ALTER TABLE " + action + recreate)).toEqual(["leaky"]);
+  });
+  it.each(["ALTER TABLE ONLY(postgres.public.leaky) RENAME TO archived;", "ALTER TABLE postgres.public.leaky* SET SCHEMA private;"])("rejects unmodeled catalog-qualified lifecycle: %s", (action) => {
+    expect(tables(granted + action + recreate).some((table) => table.startsWith("(unreadable catalog-qualified lifecycle"))).toBe(true);
+  });
+  it("rejects an unparsed catalog-qualified DROP target", () => {
+    expect(tables(granted + "DROP TABLE postgres.public.leaky;" + recreate).some((table) => table.startsWith("(unreadable DROP TABLE target"))).toBe(true);
+  });
+  const planned = "CREATE TEMP TABLE leaky AS SELECT 1 AS id; DROP TABLE leaky;" + recreate;
+  it.each(["EXPLAIN ", "EXPLAIN VERBOSE ", "EXPLAIN (ANALYZE FALSE) ", "EXPLAIN(ANALYZE OFF) ", "EXPLAIN (ANALYZE 0, FORMAT JSON) ", "EXPLAIN (ANALYZE 'false') ", "EXPLAIN (COSTS OFF) ", "EXPLAIN /* reason */ (ANALYZE /* bool */ FALSE) "])("does not invent a planned temporary shadow: %s", (explain) => {
+    expect(tables(granted + explain + planned)).toEqual(["leaky"]);
+  });
+  it.each(["EXPLAIN ANALYZE ", "EXPLAIN ANALYSE ", "EXPLAIN (ANALYZE) ", "EXPLAIN (ANALYZE TRUE) ", "EXPLAIN (ANALYZE ON) ", "EXPLAIN (ANALYZE 1, FORMAT JSON) ", "EXPLAIN (ANALYZE 'true') "])("retains an executed temporary shadow: %s", (explain) => {
+    expect(tables(granted + explain + planned)).toEqual([]);
+  });
+  it("tracks a persistent CTAS under EXPLAIN ANALYZE", () => {
+    expect(tables("EXPLAIN ANALYZE CREATE TABLE public.leaky AS SELECT 1 AS id;")).toEqual(["leaky"]);
+  });
+  it("ignores a persistent CTAS under EXPLAIN without ANALYZE", () => {
+    expect(tables("EXPLAIN CREATE TABLE public.leaky AS SELECT 1 AS id;")).toEqual([]);
+  });
+  it.each([
+    "DO $$ BEGIN EXECUTE 'EXPLAIN CREATE TEMP TABLE leaky AS SELECT 1 AS id'; END $$;",
+    "DO $$ BEGIN EXECUTE $cmd$EXPLAIN CREATE TEMP TABLE leaky AS SELECT 1 AS id$cmd$; END $$;",
+  ])("honors a planned literal command: %s", (explain) => {
+    expect(tables(granted + explain + "DROP TABLE leaky;" + recreate)).toEqual(["leaky"]);
+  });
+  it("skips semicolons and fake DDL inside a planned dollar string", () => {
+    expect(tables(granted + "EXPLAIN CREATE TEMP TABLE leaky AS SELECT $$; CREATE TEMP TABLE leaky AS SELECT 1;$$ AS id; DROP TABLE leaky;" + recreate)).toEqual(["leaky"]);
+  });
+  it("skips escaped quotes and fake DDL inside a planned E string", () => {
+    const explain = String.raw`EXPLAIN CREATE TEMP TABLE leaky AS SELECT E'\'; CREATE TEMP TABLE leaky AS SELECT 1;' AS id;`;
+    expect(tables(granted + explain + "DROP TABLE leaky;" + recreate)).toEqual(["leaky"]);
+  });
+  it.each(["EXPLAIN (ANALYZE dynamic) ", "EXPLAIN (ANALYZE E'false') ", "EXPLAIN (ANALYZE TRUE, ANALYZE FALSE) "])("fails closed for unreadable execution options: %s", (explain) => {
+    expect(tables(granted + explain + planned).some((table) => table.startsWith("(unreadable EXPLAIN options"))).toBe(true);
+  });
+  it.each(["SELECT 1 AS explain INTO public.leaky;", "SELECT s.begin explain INTO public.leaky FROM public.s s;", "SELECT CASE WHEN true THEN explain ELSE 1 END INTO public.leaky FROM public.s;"])("does not confuse EXPLAIN identifiers with commands: %s", (sql) => {
+    expect(tables(sql)).toEqual(["leaky"]);
+  });
+  it("does not mask a routine named explain", () => {
+    expect(tables("CREATE FUNCTION public.explain() RETURNS void LANGUAGE plpgsql AS $$ BEGIN CREATE TABLE public.leaky(id int); END $$;")).toEqual(["leaky"]);
+  });
+  it.each(["DROP OWNED BY acl_cleanup;", "DROP/* reason */OWNED BY acl_cleanup CASCADE;", "DO $$ BEGIN DROP OWNED BY acl_cleanup; END $$;"])("rejects unsupported ownership cleanup: %s", (drop) => {
+    expect(tables(granted + "ALTER TABLE public.leaky OWNER TO acl_cleanup;" + drop + recreate).some((table) => table.includes("unsupported DROP OWNED"))).toBe(true);
+  });
+  it("rejects unsupported ownership cleanup in a literal EXECUTE", () => {
+    expect(tables(granted + "DO $$ BEGIN EXECUTE 'DROP OWNED BY acl_cleanup'; END $$;" + recreate).some((table) => table.startsWith("(unreadable nested EXECUTE"))).toBe(true);
+  });
+  it("does not read DROP OWNED from SELECT identifiers", () => {
+    expect(tables(granted + "SELECT s.drop owned FROM public.s s;")).toEqual([]);
+  });
+  it("keeps keyword-prefixed variable assignments out of command handling", () => {
+    expect(tables("DO $$ DECLARE execute$var int; BEGIN execute$var := 1; END $$;")).toEqual([]);
   });
 });

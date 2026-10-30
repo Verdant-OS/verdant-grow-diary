@@ -36,6 +36,8 @@ const NAME_SEPARATOR = String.raw`(?:\s+|(?="))`;
 const AFTER_NAME_SEPARATOR = String.raw`(?:\s+|(?<="))`;
 // Optional schema, then the name: group 1 is the schema, group 2 the table.
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`;
+const TABLE_RELATION = String.raw`(?:ONLY(?=\s|\(|")\s*(?:\(\s*)?)?${QUALIFIED}(?:\s*\))?(?:\s*\*)?`;
+const RELATION_SEPARATOR = String.raw`(?:\s+|(?<=[")*]))`;
 const CREATE_HEAD_RE = new RegExp(
   String.raw`\bCREATE\s+(?:(?:UNLOGGED|FOREIGN)\s+)?TABLE${NAME_SEPARATOR}(IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?`,
   "gi",
@@ -45,6 +47,10 @@ const CREATE_TEMP_HEAD_RE = new RegExp(
   "gi",
 );
 const QUALIFIED_AT_RE = new RegExp(String.raw`^${QUALIFIED}`);
+const IDENT_AT_RE = new RegExp(String.raw`^${IDENT}`);
+const CATALOG_LIFECYCLE_RE = new RegExp(
+  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?(?:ONLY(?=\s|\(|")\s*(?:\(\s*)?)?${IDENT}\s*\.\s*${IDENT}\s*\.\s*${IDENT}(?:\s*\))?(?:\s*\*)?${RELATION_SEPARATOR}(?:RENAME\s+TO|SET\s+SCHEMA)\b`, "gi",
+);
 const OTHER_RELATION_HEAD_RE = new RegExp(String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(TEMP(?:ORARY)?\s+)?(?:RECURSIVE\s+)?(VIEW|SEQUENCE)${NAME_SEPARATOR}(?:IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?`, "gi");
 const RELATION_TARGET_END_RE = /^(?:\s|\(|;|$)/;
 const SELECT_TARGET_END_RE = /^(?:\s|;|$)/;
@@ -98,14 +104,14 @@ const QUOTED_SEMICOLON = "\u0001";
 // ALTER TABLE ... RENAME TO keeps the table and its grants under the new name.
 // RENAME TO takes no schema; RENAME COLUMN and RENAME CONSTRAINT do not match.
 const RENAME_RE = new RegExp(
-  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?(?:ONLY${NAME_SEPARATOR})?${QUALIFIED}${AFTER_NAME_SEPARATOR}RENAME\s+TO${NAME_SEPARATOR}(${IDENT})`,
+  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?${TABLE_RELATION}${RELATION_SEPARATOR}RENAME\s+TO${NAME_SEPARATOR}(${IDENT})`,
   "gi",
 );
 // ALTER TABLE ... SET SCHEMA moves a table, with its grants, between schemas.
 // A table moved into public from elsewhere did not get public's default
 // grants, so it needs its own ACL there; one moved out of public leaves scope.
 const SET_SCHEMA_RE = new RegExp(
-  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?(?:ONLY${NAME_SEPARATOR})?${QUALIFIED}${AFTER_NAME_SEPARATOR}SET\s+SCHEMA${NAME_SEPARATOR}(${IDENT})`,
+  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?${TABLE_RELATION}${RELATION_SEPARATOR}SET\s+SCHEMA${NAME_SEPARATOR}(${IDENT})`,
   "gi",
 );
 const DROP_RE = new RegExp(String.raw`\bDROP\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?([^;]*)`, "gi");
@@ -263,6 +269,104 @@ function readExecuteArgument(sql, start, end) {
   };
 }
 
+function wordAt(sql, i, start, word) {
+  if (sql[i] !== word[0] && sql[i] !== word[0].toLowerCase()) return false;
+  if (i > start && /[A-Za-z0-9_$\u0080-\uFFFF.]/.test(sql[i - 1])) return false;
+  if (/[A-Za-z0-9_$\u0080-\uFFFF]/.test(sql[i + word.length] ?? "")) return false;
+  return sql.slice(i, i + word.length).replace(/[a-z]/g, (c) => c.toUpperCase()) === word;
+}
+
+function statementPrefix(prefix) {
+  const text = prefix.trim().replace(/^<<[\s\S]*?>>\s*/, "");
+  if (text === "") return true;
+  const first = IDENT_AT_RE.exec(text)?.[0];
+  if (!first || first.startsWith('"') || !["begin", "if", "elsif", "else", "for", "foreach", "while", "loop", "case", "when"].includes(identName(first))) return false;
+  return /(?:^|[^A-Za-z0-9_$\u0080-\uFFFF.])(?:BEGIN|THEN|ELSE|LOOP)\s*$/i.test(text);
+}
+
+function explainToken(sql, i, end) {
+  i = skipWsAndComments(sql, i, end);
+  if (i >= end) return {kind:"end", value:"", after:end};
+  if (sql[i] === "'") {
+    const lit = readSingleQuoted(sql, i, end);
+    return lit ? {kind:"value", value:lit.value, after:lit.after} : {kind:"unknown",value:"",after:end};
+  }
+  const name = IDENT_AT_RE.exec(sql.slice(i, end))?.[0];
+  if (name) return {kind:"word", value:identName(name), raw:name, after:i+name.length};
+  const number = /^\d+/.exec(sql.slice(i, end))?.[0];
+  if (number) return {kind:"value",value:number,after:i+number.length};
+  return {kind:sql[i],value:sql[i],after:i+1};
+}
+
+function explainBoolean(value) {
+  const text = value.trim();
+  if (/^(?:1|on|t(?:r(?:u(?:e)?)?)?|y(?:e(?:s)?)?)$/i.test(text)) return true;
+  if (/^(?:0|of(?:f)?|f(?:a(?:l(?:s(?:e)?)?)?)?|n(?:o)?)$/i.test(text)) return false;
+  return null;
+}
+
+function explainHeader(sql, start, end) {
+  let i = skipWsAndComments(sql, start, end);
+  let analyze = false;
+  if (sql[i] !== "(") {
+    for (;;) {
+      const token = explainToken(sql, i, end);
+      if (token.kind !== "word" || token.raw.startsWith('"')) break;
+      const name = token.value.toLowerCase();
+      if (name === "analyze" || name === "analyse") analyze = true;
+      else if (name !== "verbose") break;
+      i = token.after;
+    }
+    return {mode:analyze ? "execute" : "plan", after:i};
+  }
+  i++;
+  let sawAnalyze = false;
+  for (;;) {
+    const name = explainToken(sql, i, end);
+    if (name.kind !== "word") return {mode:"unknown",after:i};
+    let tail = explainToken(sql, name.after, end);
+    let value = "true";
+    if (tail.kind !== "," && tail.kind !== ")") {
+      if (tail.kind !== "word" && tail.kind !== "value") return {mode:"unknown",after:i};
+      value = tail.value;
+      tail = explainToken(sql, tail.after, end);
+    }
+    if (tail.kind !== "," && tail.kind !== ")") return {mode:"unknown",after:i};
+    if (["analyze", "analyse"].includes(name.value.toLowerCase())) {
+      const enabled = explainBoolean(value);
+      if (sawAnalyze || enabled === null) return {mode:"unknown",after:i};
+      analyze = enabled;
+      sawAnalyze = true;
+    }
+    if (tail.kind === ")") return {mode:analyze ? "execute" : "plan",after:tail.after};
+    i = tail.after;
+  }
+}
+
+function sqlStatementEnd(sql, start, end) {
+  let i = start;
+  while (i < end) {
+    i = skipWsAndComments(sql, i, end);
+    if (i >= end || sql[i] === ";") return i;
+    if (sql[i] === '"') { i = skipQuotedIdentifier(sql, i, end); continue; }
+    if (sql[i] === "'") {
+      const escaped = /[eE]/.test(sql[i - 1] ?? "") && !/[A-Za-z0-9_$\u0080-\uFFFF]/.test(sql[i - 2] ?? "");
+      i++;
+      while (i < end) {
+        if (escaped && sql[i] === "\\") i += 2;
+        else if (sql[i] === "'" && sql[i + 1] === "'") i += 2;
+        else if (sql[i] === "'") { i++; break; }
+        else i++;
+      }
+      continue;
+    }
+    const dollar = readDollarQuoted(sql, i, end);
+    if (dollar) { i = dollar.after; continue; }
+    i++;
+  }
+  return end;
+}
+
 function collectDynamicExecuteEvents(sql, procedural = false) {
   const events = [];
   const noComments = maskSql(sql, false);
@@ -306,8 +410,19 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
         }
         i=dol.after; continue;
       }
-      if (isProcedural && /^BEGIN\b/i.test(sql.slice(i)) && !(i > start && /[A-Za-z0-9_\u0080-\uFFFF]/.test(sql[i - 1]))) inStatements = true;
-      if((i>start && /[A-Za-z0-9_\u0080-\uFFFF]/.test(sql[i-1])) || !/^EXECUTE\b/i.test(sql.slice(i))){i++;continue;}
+      if (isProcedural && wordAt(sql, i, start, "BEGIN")) inStatements = true;
+      if (inStatements && statementPrefix(noComments.slice(statementStart, i))) {
+        if (wordAt(sql, i, start, "DROP")) {
+          const owned = skipWsAndComments(sql, i + 4, end);
+          if (wordAt(sql, owned, owned, "OWNED")) events.push({kind:"diagnostic",table:"(unsupported DROP OWNED at offset "+i+")",index:i});
+        }
+        if (wordAt(sql, i, start, "EXPLAIN")) {
+          const header = explainHeader(sql, i + 7, end);
+          if (header.mode === "unknown") events.push({kind:"diagnostic",table:"(unreadable EXPLAIN options at offset "+i+")",index:i});
+          if (header.mode === "plan") { i = sqlStatementEnd(sql, header.after, end); continue; }
+        }
+      }
+      if (!wordAt(sql, i, start, "EXECUTE")) { i++; continue; }
       if (!inStatements || !EXECUTES_RE.test(noComments.slice(statementStart,i) + "EXECUTE")) { i+=7; continue; }
       const executeAt=i;
       const afterKw=skipWsAndComments(sql,i+7,end);
@@ -517,6 +632,15 @@ function maskSql(sql, executableOnly, scanDoBodies = true, executeSpans = null, 
     let i = start;
     let stmtStart = start;
     while (i < end) {
+      if (wordAt(sql, i, start, "EXPLAIN") && statementPrefix(code.slice(stmtStart, i).join(""))) {
+        const header = explainHeader(sql, i + 7, end);
+        if (header.mode === "plan") {
+          const stop = sqlStatementEnd(sql, header.after, end);
+          blank(i, stop);
+          i = stop;
+          continue;
+        }
+      }
       if (sql[i] === ";") {
         stmtStart = i + 1;
         i++;
@@ -667,6 +791,9 @@ export function findTablesWithoutExplicitAcl(migrations) {
     for (const match of creation.matchAll(ALTER_PARTITION_RE)) {
       if (!quotedCreation[match.index]) events.push({kind:"diagnostic", table:"(unsupported relation lifecycle at offset "+match.index+")", index:match.index});
     }
+    for (const match of creation.matchAll(CATALOG_LIFECYCLE_RE)) {
+      if (!quotedCreation[match.index]) events.push({kind:"diagnostic", table:"(unreadable catalog-qualified lifecycle at offset "+match.index+")", index:match.index});
+    }
     for (const match of creation.matchAll(OTHER_RELATION_HEAD_RE)) {
       if (quotedCreation[match.index]) continue;
       const after = creation.slice(match.index + match[0].length);
@@ -801,7 +928,10 @@ export function findTablesWithoutExplicitAcl(migrations) {
       if (quoted[match.index]) continue;
       for (const target of splitTargets(match[1])) {
         const name = DROP_TARGET_RE.exec(target);
-        if (!name) continue;
+        if (!name) {
+          events.push({kind:"diagnostic",table:"(unreadable DROP TABLE target at offset "+match.index+")",index:match.index});
+          continue;
+        }
         const schema = schemaName(name[1]);
         events.push({ kind: "drop", table: identName(name[2]), schema, index: match.index });
       }

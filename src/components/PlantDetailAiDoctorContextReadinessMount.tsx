@@ -104,10 +104,16 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   const hasReadError = recentActivity.isError || manualLogs.isError || tentSensorFailed;
   const isLoading =
-    // Initial load only — background refetches keep the rendered panel.
-    recentActivity.isLoading ||
-    manualLogs.isLoading ||
-    Boolean(tentUuid && tentSensorStatus === "loading");
+    // Unresolved = not loaded yet, or refreshing an EMPTY result (never claim
+    // absence mid-refresh). A background refetch of rows already on screen keeps
+    // the rendered panel and its action buttons instead of flashing "Checking…".
+    isUnresolvedRead(recentActivity) ||
+    isUnresolvedRead(manualLogs) ||
+    Boolean(
+      tentUuid &&
+        (tentSensorStatus === "loading" ||
+          (tentReadings.refreshingByTent?.[tentUuid] && tentSensorRows.length === 0)),
+    );
 
   const retryContextReads = () => {
     void recentActivity.refetch();
@@ -310,4 +316,9 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       <AiDoctorCheckInPreviewPanel context={built.context} />
     </div>
   );
+}
+
+function isUnresolvedRead(q: { isLoading: boolean; isFetching: boolean; data: unknown }): boolean {
+  if (q.isLoading || q.data === undefined) return true;
+  return q.isFetching && Array.isArray(q.data) && q.data.length === 0;
 }

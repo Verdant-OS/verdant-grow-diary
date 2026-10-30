@@ -317,16 +317,20 @@ export default function StartYourRoom() {
   // the grower created; after hydration an unlimited plan is not held.
   const rosterReadBlocksCreation =
     Boolean(growsError) && (growCountRequired || draftOwnerReady !== ownerId);
+  const tentReadBlocksCreation =
+    tentsQuery.isError && (tentCountRequired || draftOwnerReady !== ownerId);
   const creationVerificationFailed =
     entitlementLookupFailed ||
     plantReadFailed ||
     rosterReadBlocksCreation ||
-    (tentCountRequired && tentsQuery.isError);
+    tentReadBlocksCreation;
   const planVerificationReady = !entitlementLoading && !entitlementLookupFailed;
   const growVerificationReady =
     planVerificationReady && !rosterReadBlocksCreation && (!growCountRequired || !growsLoading);
   const tentVerificationReady =
-    planVerificationReady && (!tentCountRequired || (!tentsQuery.isLoading && !tentsQuery.isError));
+    planVerificationReady &&
+    !tentReadBlocksCreation &&
+    (!tentCountRequired || !tentsQuery.isLoading);
   const growGate = evaluateVerifiedGrowCreationGate(
     entitlement.capabilities,
     grows.length,

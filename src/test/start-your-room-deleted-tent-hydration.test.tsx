@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
@@ -22,6 +22,7 @@ const testState = vi.hoisted(() => ({
   tents: [] as Array<{ id: string; grow_id: string; name: string }>,
   tentsLoading: false,
   tentsError: false,
+  refetchTents: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -49,7 +50,7 @@ vi.mock("@/hooks/use-tents", () => ({
     data: testState.tents,
     isLoading: testState.tentsLoading,
     isError: testState.tentsError,
-    refetch: vi.fn(),
+    refetch: testState.refetchTents,
   }),
 }));
 
@@ -132,6 +133,7 @@ describe("Start your room validates the restored tent", () => {
     testState.tents = [];
     testState.tentsLoading = false;
     testState.tentsError = false;
+    testState.refetchTents.mockReset();
     storePlantDraft();
   });
 
@@ -155,7 +157,7 @@ describe("Start your room validates the restored tent", () => {
   ])("returns to tent creation when the stored tent is %s", async (_, tents) => {
     testState.tents = tents;
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-tent-name")).toBeInTheDocument();
     expect(storedDraft()).toMatchObject({
       step: "tent",
       form: { plantName: "Kept plant", plantStage: "veg" },
@@ -175,7 +177,7 @@ describe("Start your room validates the restored tent", () => {
       },
     ];
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-plant-name")).toBeInTheDocument();
     expect(storedDraft()).toMatchObject({
       step: "plant",
       ids: {
@@ -195,23 +197,31 @@ describe("Start your room validates the restored tent", () => {
       testState.tentsError = state === "failed";
       const original = window.sessionStorage.getItem(draftKey("user-1"));
       const view = renderPage();
-      expect(screen.queryByTestId("start-your-room-step-plant")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("start-room-plant-name")).not.toBeInTheDocument();
       expect(window.sessionStorage.getItem(draftKey("user-1"))).toBe(original);
-      testState.tentsLoading = false;
-      testState.tentsError = false;
-      testState.tents = [
-        {
-          id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-          grow_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-          name: "Saved tent",
-        },
-      ];
-      view.rerender(
-        <MemoryRouter>
-          <StartYourRoom />
-        </MemoryRouter>,
-      );
-      expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
+      const completeRead = () => {
+        testState.tentsLoading = false;
+        testState.tentsError = false;
+        testState.tents = [
+          {
+            id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            grow_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            name: "Saved tent",
+          },
+        ];
+      };
+      if (state === "failed") {
+        testState.refetchTents.mockImplementation(async () => completeRead());
+        fireEvent.click(screen.getByTestId("start-room-creation-retry"));
+      } else {
+        completeRead();
+        view.rerender(
+          <MemoryRouter>
+            <StartYourRoom />
+          </MemoryRouter>,
+        );
+      }
+      expect(await screen.findByTestId("start-room-plant-name")).toBeInTheDocument();
       expect(storedDraft().pendingRowIds.plant).toBe(STORED_ROW_ID);
     },
   );

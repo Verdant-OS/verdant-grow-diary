@@ -123,6 +123,8 @@ last_updated: 2026-10-28 06:26 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (
 - Matthew also explicitly authorized refreshing the PR body. Its stale draft/file/count/validation statements will be replaced with final-head measured facts. The two pre-existing scorer additions remain separately declared; no new edits to them are authorized or made.
 - The deleted-tent decision is implemented under this new instruction; the separate account-switch busy decision remains open. Fresh CI and eligible outside complete-scope acceptance are still required at the resulting full head. This repair session cannot accept its own work. No merge or deployment is authorized.
 
+- Follow-up review found that a failed tent read hid the forms without a retry on multi-tent plans. The existing verification UI now includes tent failures that block hydration. RED: the visible retry was missing (1 failed / 4 passed); the regression now recovers through that button. New test selectors name the shared form fields so the same hydration safety checks apply to both stacked flows. Deploy base `e312c3fac` is merged normally; the sole handoff conflict retains every block from both parents verbatim.
+
 ### SETUP-QUICKLOG-DRAFT-RETRY
 
 ```text
@@ -155,6 +157,40 @@ session_state: Cursor cloud agent on cursor/setup-quicklog-draft-retry-8b19. No 
 claimed_by: Grok, 2026-10-26 11:15 CT
 owner: Grok
 last_updated: 2026-10-27 10:30 CT, by Grok
+```
+
+### ARCH-CONTRACT-RESTAMP-20261029
+
+```text
+TASK ARCH-CONTRACT-RESTAMP-20261029  priority: other  status: OPEN
+goal: re-verify docs/architecture-contract.md against deploy tip 479cadb3032ddc3ad80d93f105283609179d6c0a (#2581) and correct every clause that drifted since the 27991451 stamp and its 0200d255 post-stamp merge.
+why: the founder chose option A (docs-only refresh) on 2026-10-29, after a collision audit found that the contract (#2564) and docs/specs/release-topology-specification.md already exist, so a new contract would duplicate them.
+branch: claude/new-session-kulf08
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head; only the writer then runs git merge origin/verdant-grow-diary and pushes a new head)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622 (draft)
+head_sha: a commit cannot record its own SHA; read the full head from the PR
+state: pushed; ready for review. Independent verdicts by session_017UoYKvqHhSHehpNuWHT7qV, each stale once the head moved: 4c718a4 PASS-with-findings (6505081663), 37f2756 PASS-with-findings (6505693483), 8e06a5d PASS-with-findings (6506351031), d16efc2 PASS-with-findings (6508569894). Founder yes given at 37f2756 and 8e06a5d, both superseded by base merges. This commit fixes F6 and the Codex P2 on next_action, so the d16efc2 verdict is stale too.
+current_step: restamp written. 419 path:line cites re-read by text (9 moved, 3 live in AC-8.1, all in scripts/check-bun-lockfile-policy.mjs after #2569); AC-3.2, AC-4.3 and AC-10.2 counts unchanged; AC-3.4 940 in 939 -> 945 in 944.
+next_action: an eligible independent reviewer (not session 017UoYKx8T6Y6eyPhvDvxPjS or 017UoYKxQUVr5LNsENPKJ59K) does a complete re-review of the whole PR at the new full head SHA (OWNERSHIP.md section 4.3; a delta-only re-review is not acceptance). Then 35/35 required checks and the founder's per-item yes at that exact head.
+post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
+active_writer: Claude
+decisions: (1) no new contract and no topology edit; slice C (topology) waits for #2539, #2609 and #2589. (2) the six moved cites inside the 27991451 header record stay as that tree's lines, because a stamp record describes its own tree. (3) the counts were reproduced at 27991451 before measuring 479cadb, so the same method gives both. (4) the stale CLAUDE.md lockfile wording (option B) is out of scope; it would need the 18-file Sentinel bump.
+tried_and_rejected: a first cite pass that ignored bare `:NN` cites missed the AC-8.1 drift; the binder now ties each bare cite to the last full path in the same paragraph. Comparing topology-spec cites against 0200d255 gave false drift; 604274a7 is the right base because #2564 merged the spec and the contract together.
+commands: format and safety: bunx prettier --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs. Counts, run at both 27991451 and the head (replace REF): rules=$(git ls-tree --name-only REF src/lib/ | grep -E 'Rules\.ts$'); echo "$rules" | wc -l; git grep -l 'Date\.now()' REF -- $rules | wc -l; git grep -l 'Math\.random()' REF -- $rules | wc -l; git grep -h -o 'from "@/lib/react-router-compat"' REF -- src | wc -l; git grep -liE 'nelson|modified z|modifiedZ|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' REF -- src supabase scripts e2e tools plugins spikes | wc -l. The cite re-read and the AC-4.3 pair count used session-local scripts that are not committed; their method is in the contract header and the PR body. SKIPPED, not passed: Vitest, bun run typecheck and the pre-commit full tsc, because this session has no node_modules and no test reads either file.
+files_touched: docs/architecture-contract.md, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: whether to run option B (fix CLAUDE.md:117 and :297, which still call package-lock.json a compatibility lock) as a governance PR.
+gotchas: docs/specs/release-topology-specification.md:1012 records `PASS` for "AI Doctor inference through the Lovable AI gateway", citing GATEWAY_URL and LOVABLE_API_KEY, but AI Doctor is Gemini-direct since #1982 (contract AC-5.1). In slice C, confirm whether that §6.1 row is a dated measurement that a later section supersedes; if not, correct it.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564
+artifacts: the PR's check runs
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3. A non-contributing Claude session qualifies. Excluded: author session 017UoYKx8T6Y6eyPhvDvxPjS and holder session 017UoYKxQUVr5LNsENPKJ59K
+reviewer_sha: none at the current head. Latest stale verdict: d16efc2aad329264b8f1f3dd1c6ba808b56e50e5, PASS-with-findings (P3 only), comment 6508569894; earlier ones are listed under state. F3 and F4 go to the next restamp, per the founder.
+session_state: Claude cloud session 017UoYKx8T6Y6eyPhvDvxPjS; separate one-shot check-in trig_01F8BsQcKVPKV5VDk4EPy3X1 is for #2597 CI
+claimed_by: Claude, 2026-10-29 12:20 CT
+owner: Claude
+last_updated: 2026-10-29 21:35 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K (F6; full re-review scope per Codex P2)
 ```
 
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028

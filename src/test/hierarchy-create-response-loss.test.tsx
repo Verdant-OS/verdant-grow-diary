@@ -239,15 +239,9 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     );
 
     await user.type(screen.getByTestId("start-room-grow-name"), "Recovery Grow");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-
     await user.type(screen.getByTestId("start-room-tent-name"), "Recovery Tent");
-    await user.click(screen.getByTestId("start-room-tent-submit"));
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
-
     await user.type(screen.getByTestId("start-room-plant-name"), "Recovery Plant");
-    await user.click(screen.getByTestId("start-room-plant-submit"));
+    await user.click(screen.getByTestId("start-room-submit"));
     expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
 
     expect(state.inserted).toMatchObject([
@@ -446,11 +440,12 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     );
 
     await user.type(screen.getByTestId("start-room-grow-name"), "Unknown Grow");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
+    await user.type(screen.getByTestId("start-room-plant-name"), "Unknown Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
 
     expect(await screen.findByTestId("start-room-create-outcome-unknown")).toBeInTheDocument();
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
-    await user.click(screen.getByTestId("start-room-grow-submit"));
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
+    await user.click(screen.getByTestId("start-room-submit"));
     expect(state.inserted).toHaveLength(1);
   });
 
@@ -464,7 +459,8 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     );
 
     await user.type(screen.getByTestId("start-room-grow-name"), "Unknown Grow");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
+    await user.type(screen.getByTestId("start-room-plant-name"), "Unknown Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
     expect(await screen.findByTestId("start-room-create-outcome-unknown")).toBeInTheDocument();
     expect(state.inserted).toHaveLength(1);
 
@@ -475,7 +471,7 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
       </MemoryRouter>,
     );
     await user.type(screen.getByTestId("start-room-grow-name"), "Do not duplicate");
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
 
     unresolvedRemount.unmount();
     state.reconciliation = "confirmed";
@@ -484,8 +480,8 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
         <StartYourRoom />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("start-your-room-step-grow")).toBeInTheDocument();
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    expect(screen.getByTestId("start-room-grow-name")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
     expect(state.inserted).toHaveLength(1);
   });
 
@@ -679,7 +675,7 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     expect(state.inserted).toHaveLength(1);
   });
 
-  it("advances Start Your Room after a confirmed grow even when its list refresh rejects", async () => {
+  it("finishes Start Your Room after a confirmed grow even when its list refresh rejects", async () => {
     const user = userEvent.setup();
     state.refresh.mockRejectedValueOnce(new Error("refresh unavailable"));
     render(
@@ -689,11 +685,11 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     );
 
     await user.type(screen.getByTestId("start-room-grow-name"), "Confirmed Grow");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
+    await user.type(screen.getByTestId("start-room-plant-name"), "Confirmed Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
 
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
-    expect(state.inserted).toHaveLength(1);
+    expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    expect(state.inserted.map(({ table }) => table)).toEqual(["grows", "tents", "plants"]);
   });
 
   it("closes the standalone Tent dialog when its post-confirm callback throws", async () => {
@@ -780,11 +776,13 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     );
 
     await user.type(screen.getByTestId("start-room-grow-name"), "Delayed Grow");
-    fireEvent.click(screen.getByTestId("start-room-grow-submit"));
-    fireEvent.click(screen.getByTestId("start-room-grow-submit"));
+    await user.type(screen.getByTestId("start-room-plant-name"), "Delayed Plant");
+    fireEvent.click(screen.getByTestId("start-room-submit"));
+    fireEvent.click(screen.getByTestId("start-room-submit"));
 
     expect(state.inserted).toHaveLength(1);
     releaseInsert?.();
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    expect(state.inserted.map(({ table }) => table)).toEqual(["grows", "tents", "plants"]);
   });
 });

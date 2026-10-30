@@ -874,6 +874,22 @@ describe("ASTRA-001 exact Note recovery", () => {
     await expectRetry();
     expect(rpcMock.mock.calls[2][1].p_idempotency_key).not.toBe(firstKey);
   });
+  it("does not bring the reviewed note back as an unsaved draft (Codex review)", async () => {
+    modelLostNoteReply();
+    const view = renderSheet();
+    typeNote();
+    save();
+    await expectRetry();
+    const firstKey = rpcMock.mock.calls[0][1].p_idempotency_key;
+    committed.get(firstKey)!.note = "Updated from Timeline";
+    retry();
+    await waitFor(() => expect(screen.getByTestId("qlv2-review-saved-entry")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("qlv2-review-saved-entry"));
+    view.rerender(false);
+    view.rerender(true);
+    // The words are already saved; reopening must not offer them for a second save.
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("");
+  });
 });
 
 describe("ASTRA-001 related Feed recovery", () => {

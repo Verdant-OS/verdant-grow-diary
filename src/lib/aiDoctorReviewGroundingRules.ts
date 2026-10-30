@@ -34,8 +34,11 @@ const ABSOLUTE_CERTAINTY_UNNEGATABLE_RE =
 const CAUTIOUS_DIRECTIVE_PREFIX_RE =
   /^\s*(?:(?:caution|note)\s*:\s*)?(?:do\s+not|do\s*n['’]t|don['’]t|never|avoid|should\s*not|shouldn['’]t|must\s*not|mustn['’]t|refrain\s+from)\b/i;
 
+// `only` is already covered by [a-z]+ly. Keep the repeated alternatives
+// disjoint and whitespace-delimited so a failing suffix cannot branch
+// exponentially over repeated `only` tokens (VER-290).
 const DIRECT_NEGATIVE_CONTROL_SCOPE_PREFIX_RE =
-  /^\s*(?:(?:caution|note)\s*:\s*)?(?:do\s+not|do\s*n['’]t|don['’]t|never|avoid|should\s*not|shouldn['’]t|must\s*not|mustn['’]t|refrain\s+from)\s*(?:(?:[a-z]+ly|ever|again|just|only)\s+)*$/i;
+  /^\s*(?:(?:caution|note)\s*:\s*)?(?:do\s+not|do\s*n['’]t|don['’]t|never|avoid|should\s*not|shouldn['’]t|must\s*not|mustn['’]t|refrain\s+from)\s*(?:(?:[a-z]+ly|ever|again|just)\s+)*$/i;
 
 const AUTOMATION_RE =
   /\b(?:automatic(?:ally)?|autonomously|auto[-\s]?(?:pilot|adjust|control|operate|dose|water|irrigate|execute|approve|apply|run)|self[-\s]?(?:adjust|control|operate|dose|water|irrigate))\b/i;

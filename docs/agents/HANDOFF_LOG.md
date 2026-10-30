@@ -69,6 +69,45 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-290-GROUNDING-REGEX
+
+```text
+TASK VER-290-GROUNDING-REGEX  priority: P2  status: OPEN
+goal: Remove exponential backtracking from AI Doctor's direct-prohibition matcher without weakening grounding rules.
+why: Repeated only tokens followed by an invalid modifier made overlapping alternatives explore exponentially many paths on model output inside an Edge Function.
+branch: codex/ver-290-grounding-regex
+base: verdant-grow-diary at ab4aaa2f3a648c28860c682ddec3ec0103347246, fetched 2026-10-30 01:38 UTC. Normal base merge; both handoff additions preserved.
+checkout: git fetch origin codex/ver-290-grounding-regex verdant-grow-diary && git switch codex/ver-290-grounding-regex && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2551
+head_sha: Pre-integration head 67e5919d885a2ad7afe1b8b22228597f1c2d9c44, verified 2026-10-30 01:35 UTC. This base-merge commit advances that head; read the full current SHA and checkpoint from the PR before resuming. Earlier checks and verdicts do not carry forward.
+state: Fix implemented and missing handoff restored. While hosted CI ran, the base advanced and conflicted only on independent handoff additions. This merge preserves both blocks and does not change the grounding implementation or tests. Founder account cheekhimself marked the PR ready on 2026-10-29 23:53 UTC; it remains open and non-draft. This session did not make that transition. No queue, PR merge, deployment or production-data authorization is inferred.
+current_step: Resolve the additive handoff conflict, refresh the exact-head PR packet, and confirm hosted checks after publication.
+next_action: Confirm current-head CI, then obtain a complete re-review from eligible independent Jack Herer or another non-contributing Claude/Grok reviewer under OWNERSHIP.md section 4.3. The previous review explicitly requires re-review after a commit or body edit; no clean acceptance is carried forward.
+post_merge_check: After separately authorized deployment, confirm deployed source identity and exercise adversarial grounding cases in the Edge runtime. Production and Deno matcher performance remain NOT_MEASURED.
+active_writer: Codex Work session /root, Matthew's original VER-290 implementation assignment. No replacement writer claim or release was found in the current log, PR body or comments; base merges alone do not transfer ownership.
+decisions: Remove only the redundant only alternative, already accepted by [a-z]+ly. The remaining whitespace-delimited alternatives are disjoint, preserving the matched language with linear work. Regenerate the canonical Edge mirror and source hash. The second Edge path is a re-export shim and is verified by identity tests.
+tried_and_rejected: Do not cap or truncate validator input, loosen grounding, or rewrite the surrounding rejection logic. A child-process runner initially passed code through node -e; a supplemental review caught Windows command-line limits, so code and fixtures now travel on stdin.
+commands: node node_modules/vitest/vitest.mjs run src/test/ai-doctor-grounding-redos.test.ts src/test/ai-doctor-review-grounding-rules.test.ts src/test/ai-doctor-review-grounding-edge-static.test.ts src/test/ai-doctor-live-review-static-safety.test.ts src/test/ai-credit-replay-provider-boundary.test.ts src/test/v0-operating-loop-contract.test.ts --reporter=dot
+commands_mirror: node scripts/sync-edge-shared.mjs --check && node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs
+commands_docs: node scripts/assert-docs-safety.mjs && node scripts/assert-release-docs-safety.mjs && node scripts/assert-automated-phenotyping-docs-safety.mjs
+files_touched: src/lib/aiDoctorReviewGroundingRules.ts; src/test/ai-doctor-grounding-redos.test.ts; supabase/functions/_shared/lib/lib/aiDoctorReviewGroundingRules.ts; supabase/functions/_shared/lib/.sync-manifest.json; docs/agents/HANDOFF_LOG.md (this block only).
+files_remaining: None planned. Review findings require a new bounded repair and fresh exact-head evidence.
+local_evidence: At historical head 34a799ce96c6e5d3ac31036b8b9c214e685e8f8a: focused 6 files / 224 passed; new regression 102 cases; docs safety 67 passed; 106 mirrors in sync; scoped lint/format and tsgo passed. The same final regression file against unchanged original base be6d009dcf0110b92901b85bc8212b560e45cf62 produced 100 passed / 2 expected child-process timeouts. These are historical receipts, not validation of later base integration.
+hosted_evidence: At pre-integration 67e5919d885a2ad7afe1b8b22228597f1c2d9c44, verified 2026-10-30 01:35 UTC: 35/35 pinned required contexts SUCCESS; all applicable supplemental checks completed. Across 91 check runs, 86 current name/app contexts were 79 SUCCESS and 7 legitimate SKIPPED. Manual-correction local-backend startup failed before browser execution on attempt 1 and passed a single targeted retry on attempt 2. All other current contexts passed without a manual retry. These results are historical after this base merge.
+review_evidence: Jack Herer, independent outside Grok session 60b10d4e-a393-43f1-8037-95068424f98e, posted review 5707022186 at 67e5919d885a2ad7afe1b8b22228597f1c2d9c44: PASS-with-P2, 0 P1 / 1 P2, covering all five files and excluding contributors. P2 concerned old PR-body head, draft-state and CI claims; the body has been corrected. The review requires a full re-review after body edits or commits, so it is superseded and not clean acceptance. Its CI observation (1/35) was superseded by the later 35/35 receipt. The historical Codex supplemental review at 34a799ce96c6e5d3ac31036b8b9c214e685e8f8a remains ineligible for outside acceptance. No review applies to this new commit.
+blockers: Fresh hosted CI and eligible full-head re-review are required. Jack Herer's request came through an external OG Kush handoff, not this session; no authenticated reviewer-routing transport is exposed here. Codex security bot hit its account usage limit at 67e5919d885a2ad7afe1b8b22228597f1c2d9c44; that incomplete scan is not PASS. No spend or manual security-review retry is authorized. GitHub comments retain their owner-approval gate; the authorized PR body is the canonical checkpoint.
+open_questions: Outside reviewer must verify non-contribution across all authors and base-merge repair sessions. A historical CodeRabbit optional fixture-consistency nit remains recorded in review 5661384675; it is not a required thread or a waived acceptance finding.
+gotchas: The regex and regression blobs are unchanged between 34a799ce96c6e5d3ac31036b8b9c214e685e8f8a and 5fad937dfb8b43e793a274841aef156a528a5193, but unchanged blobs do not establish integration acceptance. Reconcile current dependencies and base. Every later push invalidates prior exact-head acceptance. The user's no-merge/no-deploy/no-production-data boundary remains.
+links: https://linear.app/verdantgrowdiary/issue/VER-290/security-exponential-time-regex-in-ai-doctor-grounding-rules-code ; https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40983793129 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2551#pullrequestreview-5707022186
+artifacts: PR body is the current exact-head checkpoint; workflow and review links above are historical receipts at their named SHA.
+reviewer_seat: Jack Herer (outside Grok reviewer), independently routed by OG Kush; previous verdict superseded by this merge. No replacement request delivered by this session. Exclude Codex /root and all implementation/base-merge contributors; shared GitHub account names alone do not establish independence.
+reviewer_sha: Historical 67e5919d885a2ad7afe1b8b22228597f1c2d9c44 only, PASS-with-P2. Fresh complete-head acceptance is missing.
+session_state: Codex Work /root; supplemental /root/ver290_exact_review finished and is ineligible for acceptance. No routines or paused workflows created. No external reviewer request, GitHub comment/review event, ready/queue/merge action, deployment or production write sent by this session.
+claimed_by: Codex Work /root, continuing Matthew's original explicit assignment; reconciled 2026-10-30 01:02 UTC. No takeover or release claimed.
+owner: Codex VER-290 implementation session; OG Kush routed Jack Herer's outside review, whose follow-up is still required.
+last_updated: 2026-10-29 20:39 CT, by Codex.
+```
+
 ### ARCH-CONTRACT-RESTAMP-20261029
 
 ```text

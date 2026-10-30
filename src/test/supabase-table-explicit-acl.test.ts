@@ -1088,3 +1088,151 @@ describe("identifier byte limits and executable command variables", () => {
     expect(tables("CREATE TRIGGER t BEFORE INSERT ON public.existing FOR EACH ROW EXECUTE " + keyword + " public.f();")).toEqual([]);
   });
 });
+
+describe("unsupported relation lifecycles and complete SELECT targets", () => {
+  it.each([
+    'CREATE TEMP TABLE U&"leaky"(id int);',
+    'CREATE TEMPORARY TABLE U&"leaky"(id int);',
+    'CREATE TEMP TABLE U&"pg_temp".leaky(id int);',
+    'CREATE GLOBAL TEMP TABLE U&"leaky"(id int);',
+  ])("rejects incomplete temporary-table targets: %s", (temporary) => {
+    expect(tables(CREATE + temporary + "GRANT SELECT ON leaky TO authenticated;").some((table) => table.startsWith("(unreadable CREATE TEMP TABLE target"))).toBe(true);
+  });
+  it.each([
+    "CREATE TEMP VIEW leaky AS SELECT 1 AS id;",
+    "CREATE OR REPLACE TEMPORARY VIEW leaky AS SELECT 1 AS id;",
+    "CREATE TEMP RECURSIVE VIEW leaky(id) AS SELECT 1;",
+    "CREATE TEMP SEQUENCE leaky;",
+    "CREATE TEMP SEQUENCE IF NOT EXISTS leaky;",
+    "CREATE VIEW pg_temp.leaky AS SELECT 1 AS id;",
+    "CREATE SEQUENCE pg_temp.leaky;",
+    "CREATE SEQUENCE IF NOT EXISTS pg_temp.leaky;",
+    "CREATE VIEW pg_temp_42.leaky AS SELECT 1 AS id;",
+    "CREATE SEQUENCE pg_temp_42.leaky;",
+  ])("rejects unsupported temporary relation shadows: %s", (relation) => {
+    expect(tables(CREATE + relation + "GRANT SELECT ON leaky TO authenticated;").some((table) => table.startsWith("(unsupported temporary relation"))).toBe(true);
+  });
+  it("retains numeric pg_temp table-schema shadows", () => {
+    expect(tables(CREATE + "CREATE TABLE pg_temp_42.leaky(id int); GRANT SELECT ON leaky TO authenticated;")).toEqual(["leaky"]);
+  });
+  it.each([true, false])("rejects potentially implicit temporary views (table first=%s)", (first) => {
+    const view = "CREATE TEMP TABLE source(id int); CREATE VIEW leaky AS SELECT id FROM source;";
+    const sql = (first ? CREATE + view : view + CREATE) + "GRANT SELECT ON leaky TO authenticated;";
+    expect(tables(sql).some((table) => table.startsWith("(unreadable view persistence"))).toBe(true);
+  });
+  it("keeps qualified persistent views outside the table ACL contract", () => {
+    expect(tables(CREATE + "GRANT SELECT ON public.leaky TO authenticated; CREATE TEMP TABLE source(id int); CREATE VIEW public.v AS SELECT id FROM public.leaky;")).toEqual([]);
+  });
+  it("keeps ordinary views without temp context outside this contract", () => {
+    expect(tables("CREATE VIEW v AS SELECT 1 AS id;")).toEqual([]);
+  });
+  it("does not add a persistent-sequence ACL requirement", () => {
+    expect(tables("CREATE SEQUENCE public.s START WITH 1 INCREMENT BY 1;")).toEqual([]);
+  });
+  it.each([
+    'SELECT 1 AS id INTO TABLE public.U&"leaky";',
+    'SELECT 1 AS id INTO TABLE U&"public".leaky;',
+    'SELECT 1 AS id INTO TEMP U&"leaky";',
+    'SELECT 1 AS id INTO TEMP U&"pg_temp".leaky;',
+  ])("rejects incomplete SELECT INTO identifiers: %s", (select) => {
+    expect(tables("CREATE TABLE public.u(id int);" + select + "GRANT SELECT ON public.u TO authenticated;").some((table) => table.startsWith("(unreadable SELECT INTO target"))).toBe(true);
+  });
+  it.each([
+    "IMPORT FOREIGN SCHEMA public LIMIT TO (leaky) FROM SERVER remote INTO public;",
+    'IMPORT FOREIGN SCHEMA "public" FROM SERVER remote INTO /* target */ "public";',
+    "IMPORT FOREIGN SCHEMA public FROM SERVER remote INTO private;",
+    "DO $$ BEGIN EXECUTE 'IMPORT FOREIGN SCHEMA public FROM SERVER remote INTO public'; END $$;",
+  ])("rejects remote-dependent imports: %s", (sql) => {
+    expect(tables(sql).some((table) => table.startsWith("(unsupported relation lifecycle"))).toBe(true);
+  });
+  it("rejects a partition-parent drop that could retain stale child ACLs", () => {
+    const sql = "CREATE TABLE public.p(id int) PARTITION BY RANGE(id); CREATE TABLE public.leaky PARTITION OF public.p FOR VALUES FROM (0) TO (10); GRANT SELECT ON public.leaky TO authenticated; DROP TABLE public.p; CREATE TABLE IF NOT EXISTS public.leaky(id int);";
+    expect(tables(sql).some((table) => table.startsWith("(unsupported relation lifecycle"))).toBe(true);
+  });
+  it.each([
+    "CREATE TABLE IF NOT EXISTS public.leaky PARTITION OF public.p FOR VALUES FROM (0) TO (10);",
+    "ALTER TABLE ONLY public.p ATTACH PARTITION public.leaky FOR VALUES FROM (0) TO (10);",
+    "ALTER TABLE public.p DETACH PARTITION public.leaky;",
+    "ALTER TABLE ONLY public.p DETACH PARTITION public.leaky CONCURRENTLY;",
+    "ALTER TABLE ONLY (public.p) ATTACH PARTITION public.leaky FOR VALUES FROM (0) TO (10);",
+    "ALTER TABLE current_db.public.p DETACH PARTITION public.leaky;",
+  ])("rejects unmodeled partition ancestry changes: %s", (sql) => {
+    expect(tables(sql).some((table) => table.startsWith("(unsupported relation lifecycle"))).toBe(true);
+  });
+  it("accepts a granted partitioned parent without child lifecycle changes", () => {
+    expect(tables("CREATE TABLE public.p(id int) PARTITION BY RANGE(id); GRANT SELECT ON public.p TO authenticated;")).toEqual([]);
+  });
+  it("does not read SELECT aliases as partition creation", () => {
+    expect(tables("CREATE TABLE public.leaky(partition int); GRANT SELECT ON public.leaky TO authenticated; SELECT partition of FROM public.leaky;")).toEqual([]);
+  });
+  it.each([
+    'public.U&"parent"',
+    'U&"public".parent',
+    'U&"parent"',
+    'public.U&"pare!006Et" UESCAPE \'!\'',
+    'public.U&"pare!006Et"UESCAPE\'!\'',
+    'public.U&"pare!006Et" UESCAPE E\'!\'',
+    'U&"public"UESCAPE\'!\'.parent',
+    'ONLY(public.parent)',
+  ])("rejects encoded or adjacent ONLY partition targets: %s", (target) => {
+    const sql = "CREATE TABLE public.parent(id int) PARTITION BY LIST(id); CREATE TABLE public.child(id int); GRANT SELECT ON public.child TO authenticated; ALTER TABLE " + target + " ATTACH PARTITION public.child FOR VALUES IN (1); DROP TABLE public.parent; CREATE TABLE IF NOT EXISTS public.child(id int);";
+    expect(tables(sql).some((table) => table.startsWith("(unsupported relation lifecycle"))).toBe(true);
+  });
+  it("does not read an ALTER column/type pair as partition attachment", () => {
+    expect(tables("CREATE DOMAIN partition AS integer;" + CREATE + "GRANT SELECT ON public.leaky TO authenticated; ALTER TABLE public.leaky ADD COLUMN detach partition;")).toEqual([]);
+  });
+  it("does not read unsupported syntax from quoted aliases or prose", () => {
+    expect(tables('SELECT 1 AS "IMPORT FOREIGN SCHEMA public"; SELECT \'PARTITION OF public.p\';')).toEqual([]);
+  });
+});
+
+describe("quoted-name adjacency and complete SQL keyword tokens", () => {
+  it.each([
+    'CREATE TABLE"leaky"(id int);',
+    'CREATE TABLE"public"."leaky"(id int);',
+    'CREATE TABLE IF NOT EXISTS"leaky"(id int);',
+    'CREATE FOREIGN TABLE"public"."leaky"(id int) SERVER remote;',
+  ])("tracks adjacent quoted CREATE targets: %s", (sql) => { expect(tables(sql)).toEqual(["leaky"]); });
+  it.each(['SELECT 1 INTO"leaky";', 'SELECT 1 INTO TABLE"leaky";', 'SELECT 1 INTO UNLOGGED"leaky";'])("tracks adjacent quoted SELECT targets: %s", (sql) => {
+    expect(tables(sql)).toEqual(["leaky"]);
+  });
+  it.each(['CREATE TEMP TABLE"leaky"(id int);', 'CREATE TEMP TABLE IF NOT EXISTS"leaky"(id int);', 'SELECT 1 INTO TEMP"leaky";'])("retains adjacent quoted temporary shadows: %s", (temporary) => {
+    expect(tables(CREATE + temporary + "GRANT SELECT ON leaky TO authenticated;")).toEqual(["leaky"]);
+  });
+  it.each(['CREATE TEMP VIEW"leaky" AS SELECT 1 AS id;', 'CREATE TEMP SEQUENCE"leaky";'])("rejects adjacent quoted unsupported shadows: %s", (temporary) => {
+    expect(tables(CREATE + temporary + "GRANT SELECT ON leaky TO authenticated;").some((table) => table.startsWith("(unsupported temporary relation"))).toBe(true);
+  });
+  it.each(['DROP TABLE"public"."leaky";', 'DROP TABLE IF EXISTS"public"."leaky";'])("clears ACLs after adjacent quoted DROP: %s", (drop) => {
+    expect(tables(CREATE + "GRANT SELECT ON public.leaky TO authenticated;" + drop + "CREATE TABLE IF NOT EXISTS public.leaky(id int);")).toEqual(["leaky"]);
+  });
+  it.each(['ALTER TABLE"public"."leaky"RENAME TO"renamed";', 'ALTER TABLE IF EXISTS"public"."leaky" RENAME TO"renamed";'])("tracks adjacent quoted rename lifecycle: %s", (rename) => {
+    expect(tables(CREATE + "GRANT SELECT ON public.leaky TO authenticated;" + rename + "CREATE TABLE IF NOT EXISTS public.leaky(id int);")).toEqual(["leaky"]);
+  });
+  it("tracks an adjacent quoted schema move before recreation", () => {
+    expect(tables(CREATE + 'GRANT SELECT ON public.leaky TO authenticated; ALTER TABLE public."leaky"SET SCHEMA"private"; CREATE TABLE IF NOT EXISTS public.leaky(id int);')).toEqual(["leaky"]);
+  });
+  it.each([
+    'GRANT SELECT ON"public"."leaky"TO"authenticated";',
+    'GRANT SELECT ON TABLE"public"."leaky"TO authenticated;',
+    'REVOKE ALL ON"public"."leaky"FROM"authenticated";',
+  ])("accepts adjacent quoted ACL names: %s", (acl) => { expect(tables(CREATE + acl)).toEqual([]); });
+  it.each(["p$into", "éinto"])("does not read an INTO suffix inside alias %s", (alias) => {
+    expect(tables('CREATE TABLE public."into"(id int); SELECT 1 AS ' + alias + ' INTO public.leaky; GRANT SELECT ON public."into" TO authenticated;')).toEqual(["leaky"]);
+  });
+  it.each(["temp$leaky", "temporaryé"])("does not read a TEMP prefix inside target %s", (name) => {
+    expect(tables("SELECT 1 INTO " + name + ";")).toEqual([name]);
+  });
+  it.each(['ALTER TABLE"public".parent', 'ALTER TABLE ONLY"public".parent'])("rejects unsupported partition targets with quoted adjacency: %s", (head) => {
+    expect(tables(head + " ATTACH PARTITION public.child FOR VALUES IN (1);").some((table) => table.startsWith("(unsupported relation lifecycle"))).toBe(true);
+  });
+  it.each([
+    'DROP TABLE public.U&"leaky";',
+    'ALTER TABLE public.U&"leaky" RENAME TO other;',
+    'ALTER TABLE public.leaky SET SCHEMA U&"private";',
+  ])("rejects Unicode-escaped table lifecycle identifiers: %s", (ddl) => {
+    expect(tables(CREATE + "GRANT SELECT ON public.leaky TO authenticated;" + ddl + "CREATE TABLE IF NOT EXISTS public.leaky(id int);").some((table) => table.startsWith("(unreadable table lifecycle identifier"))).toBe(true);
+  });
+  it("keeps existing ACLs on an adjacent quoted conditional CREATE", () => {
+    expect(tables(CREATE + 'GRANT SELECT ON public.leaky TO authenticated; CREATE TABLE IF NOT EXISTS"public"."leaky"(id int);')).toEqual([]);
+  });
+});

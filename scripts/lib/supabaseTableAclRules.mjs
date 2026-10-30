@@ -32,17 +32,29 @@ const HISTORICAL_DYNAMIC_EXECUTE = Object.freeze({
 // Unquoted identifiers: PostgreSQL reads every non-ASCII character as a letter.
 const IDENT = String.raw`(?:"(?:[^"]|"")+"|[a-zA-Z_\u0080-\uFFFF][a-zA-Z0-9_$\u0080-\uFFFF]*)`;
 const SQL_IDENT_CHAR = String.raw`[a-zA-Z0-9_$\u0080-\uFFFF]`;
+const NAME_SEPARATOR = String.raw`(?:\s+|(?="))`;
+const AFTER_NAME_SEPARATOR = String.raw`(?:\s+|(?<="))`;
 // Optional schema, then the name: group 1 is the schema, group 2 the table.
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`;
 const CREATE_HEAD_RE = new RegExp(
-  String.raw`\bCREATE\s+(?:(?:UNLOGGED|FOREIGN)\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`,
+  String.raw`\bCREATE\s+(?:(?:UNLOGGED|FOREIGN)\s+)?TABLE${NAME_SEPARATOR}(IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?`,
   "gi",
 );
 const CREATE_TEMP_HEAD_RE = new RegExp(
-  String.raw`\bCREATE\s+(?:(?:GLOBAL|LOCAL)\s+)?TEMP(?:ORARY)?\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`,
+  String.raw`\bCREATE\s+(?:(?:GLOBAL|LOCAL)\s+)?TEMP(?:ORARY)?\s+TABLE${NAME_SEPARATOR}(IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?`,
   "gi",
 );
 const QUALIFIED_AT_RE = new RegExp(String.raw`^${QUALIFIED}`);
+const OTHER_RELATION_HEAD_RE = new RegExp(String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(TEMP(?:ORARY)?\s+)?(?:RECURSIVE\s+)?(VIEW|SEQUENCE)${NAME_SEPARATOR}(?:IF\s+NOT\s+EXISTS${NAME_SEPARATOR})?`, "gi");
+const RELATION_TARGET_END_RE = /^(?:\s|\(|;|$)/;
+const SELECT_TARGET_END_RE = /^(?:\s|;|$)/;
+// For a rejection-only header match, Unicode identifiers need not be decoded.
+// Single-quoted UESCAPE constants are blank in the creation view; literal
+// prefixes can remain visible before that gap.
+const PARTITION_IDENT = String.raw`(?:U&"(?:[^"]|"")+"(?:\s*UESCAPE\b(?:\s+(?:E|N|U&))?\s*)?|${IDENT})`;
+const ALTER_PARTITION_RE = new RegExp(
+  String.raw`\bALTER\s+TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?(?:ONLY(?=\s|\(|")\s*(?:\(\s*)?)?(?:${PARTITION_IDENT}\s*\.\s*){0,2}${PARTITION_IDENT}(?:\s*\))?\s*(?:\*\s*)?(?:ATTACH|DETACH)\s+PARTITION\b`, "gi",
+);
 // Complete CREATE TABLE names end at the column list, a typed/partitioned
 // table, a CTAS, a statement end, or EOF. Anything else (%I, concatenation)
 // cannot be named statically.
@@ -53,11 +65,11 @@ const CREATE_TARGET_END_RE = /^\s*(?:\(|AS\b|OF\b|PARTITION\b|USING\b|WITH\b|TAB
 // INSERT or ) MERGE, so an alias named insert or merge does not suppress
 // detection.
 const SELECT_INTO_RE = new RegExp(
-  String.raw`\bSELECT\b(?:"(?:[^"]|"")*"|[^;"])*?\bINTO\s+(?!TEMP(?:ORARY)?\b)(?:UNLOGGED\s+)?(?:TABLE\s+)?${QUALIFIED}`,
+  String.raw`(?<!${SQL_IDENT_CHAR})SELECT(?!${SQL_IDENT_CHAR})(?:"(?:[^"]|"")*"|[^;"])*?(?<!${SQL_IDENT_CHAR})INTO${NAME_SEPARATOR}(?!TEMP(?:ORARY)?(?!${SQL_IDENT_CHAR}))(?:UNLOGGED${NAME_SEPARATOR})?(?:TABLE${NAME_SEPARATOR})?${QUALIFIED}`,
   "gi",
 );
 const SELECT_INTO_TEMP_RE = new RegExp(
-  String.raw`\bSELECT\b(?:"(?:[^"]|"")*"|[^;"])*?\bINTO\s+TEMP(?:ORARY)?\s+(?:TABLE\s+)?${QUALIFIED}`,
+  String.raw`(?<!${SQL_IDENT_CHAR})SELECT(?!${SQL_IDENT_CHAR})(?:"(?:[^"]|"")*"|[^;"])*?(?<!${SQL_IDENT_CHAR})INTO\s+TEMP(?:ORARY)?${NAME_SEPARATOR}(?:TABLE${NAME_SEPARATOR})?${QUALIFIED}`,
   "gi",
 );
 const SELECT_INTO_CTE_DML_RE = /\)\s+(?:INSERT|MERGE)\s+INTO\b/i;
@@ -86,28 +98,28 @@ const QUOTED_SEMICOLON = "\u0001";
 // ALTER TABLE ... RENAME TO keeps the table and its grants under the new name.
 // RENAME TO takes no schema; RENAME COLUMN and RENAME CONSTRAINT do not match.
 const RENAME_RE = new RegExp(
-  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+RENAME\s+TO\s+(${IDENT})`,
+  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?(?:ONLY${NAME_SEPARATOR})?${QUALIFIED}${AFTER_NAME_SEPARATOR}RENAME\s+TO${NAME_SEPARATOR}(${IDENT})`,
   "gi",
 );
 // ALTER TABLE ... SET SCHEMA moves a table, with its grants, between schemas.
 // A table moved into public from elsewhere did not get public's default
 // grants, so it needs its own ACL there; one moved out of public leaves scope.
 const SET_SCHEMA_RE = new RegExp(
-  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+SET\s+SCHEMA\s+(${IDENT})`,
+  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?(?:ONLY${NAME_SEPARATOR})?${QUALIFIED}${AFTER_NAME_SEPARATOR}SET\s+SCHEMA${NAME_SEPARATOR}(${IDENT})`,
   "gi",
 );
-const DROP_RE = /\bDROP\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
+const DROP_RE = new RegExp(String.raw`\bDROP\s+(?:FOREIGN\s+)?TABLE${NAME_SEPARATOR}(?:IF\s+EXISTS${NAME_SEPARATOR})?([^;]*)`, "gi");
 // Table GRANT/REVOKE. Skip only a complete non-table clause: ALL TABLES|
 // SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES IN …, or FUNCTION|SEQUENCE|SCHEMA|
 // TYPE|… followed by that object's name. A keyword followed by TO, FROM or
 // a comma is a table name.
 const ACL_RE = new RegExp(
-  String.raw`(?<!${SQL_IDENT_CHAR})(GRANT|REVOKE)(?!${SQL_IDENT_CHAR})([^;]*?)\bON\s+` +
+  String.raw`(?<!${SQL_IDENT_CHAR})(GRANT|REVOKE)(?!${SQL_IDENT_CHAR})([^;]*?)\bON${NAME_SEPARATOR}` +
     String.raw`(?!ALL\s+(?:TABLES|SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES)\s+IN\b)` +
     String.raw`(?!(?:FUNCTION|PROCEDURE|ROUTINE|SEQUENCE|SCHEMA|TYPE|DOMAIN|LANGUAGE|DATABASE|TABLESPACE)\b(?!\s*(?:TO|FROM|,)))` +
     String.raw`(?!FOREIGN\s+(?:DATA\s+WRAPPER|SERVER)\b)` +
     String.raw`(?!LARGE\s+OBJECT\b)` +
-    String.raw`(?:TABLE\s+)?((?:"(?:[^"]|"")*"|[^;"])*?)\s+(?:TO|FROM)\b([^;]*)`,
+    String.raw`(?:TABLE${NAME_SEPARATOR})?((?:"(?:[^"]|"")*"|[^;"])*?)${AFTER_NAME_SEPARATOR}(?:TO|FROM)(?!${SQL_IDENT_CHAR})([^;]*)`,
   "gi",
 );
 const TARGET_RE = new RegExp(String.raw`^\s*${QUALIFIED}\s*$`);
@@ -385,10 +397,14 @@ function schemaName(schema) {
   return schema === undefined ? null : identName(schema);
 }
 
+function isTempSchema(schema) {
+  return /^pg_temp(?:_\d+)?$/.test(schema ?? "");
+}
+
 // Unqualified names search pg_temp first. A pg_temp-qualified name always
 // names the session table, even after it has already been dropped.
 function actsOnTemp(temps, schema, table) {
-  return schema === "pg_temp" || (schema === null && temps.has(table));
+  return isTempSchema(schema) || (schema === null && temps.has(table));
 }
 
 /**
@@ -632,10 +648,39 @@ export function findTablesWithoutExplicitAcl(migrations) {
     const selectIntoSql = overlayExecutePayloads(topLevel, executed, executeSpans);
     const quoted = quotedIdentifierPositions(executed);
     const quotedCreation = quotedIdentifierPositions(creation);
+    const creationKeywords = creation.split("").map((ch, index) => quotedCreation[index] ? " " : ch).join("");
     const keywordSql = executed.split("").map((ch, index) => quoted[index] ? " " : ch).join("");
     const quotedSelectInto = quotedIdentifierPositions(selectIntoSql);
     const selectIntoTokens = selectIntoSql.split("").map((ch, index) => quotedSelectInto[index] ? " " : ch).join("");
     const events = [];
+    // Unmodeled Unicode identifier escapes in ALTER/DROP can hide object
+    // removals or moves. Reject them instead of retaining stale ACL state.
+    for (const match of creationKeywords.matchAll(/\b(?:ALTER|DROP)\s+(?:FOREIGN\s+)?TABLE(?:\s+|(?="))[^;]*?\bU&"/gi)) {
+      events.push({kind:"diagnostic", table:"(unreadable table lifecycle identifier at offset "+match.index+")", index:match.index});
+    }
+    // Imported tables depend on remote metadata. Partition ancestry and
+    // unsupported temporary relations can invalidate tracked ACL identity.
+    // Reject these forms until modeled; this does not enforce view ACLs.
+    for (const match of creationKeywords.matchAll(/\bIMPORT\s+FOREIGN\s+SCHEMA\b/gi)) {
+      events.push({kind:"diagnostic", table:"(unsupported relation lifecycle at offset "+match.index+")", index:match.index});
+    }
+    for (const match of creation.matchAll(ALTER_PARTITION_RE)) {
+      if (!quotedCreation[match.index]) events.push({kind:"diagnostic", table:"(unsupported relation lifecycle at offset "+match.index+")", index:match.index});
+    }
+    for (const match of creation.matchAll(OTHER_RELATION_HEAD_RE)) {
+      if (quotedCreation[match.index]) continue;
+      const after = creation.slice(match.index + match[0].length);
+      const name = QUALIFIED_AT_RE.exec(after);
+      if (!name || !RELATION_TARGET_END_RE.test(after.slice(name[0].length))) {
+        events.push({kind:"diagnostic", table:"(unreadable relation target at offset "+match.index+")", index:match.index});
+      } else if (match[1] || isTempSchema(schemaName(name[1]))) {
+        events.push({kind:"diagnostic", table:"(unsupported temporary relation at offset "+match.index+")", index:match.index});
+      } else if (match[2].toUpperCase() === "VIEW" && schemaName(name[1]) === null) {
+        // PostgreSQL can make an unqualified view temporary when it depends
+        // on a temp relation. Its persistence cannot be proven here.
+        events.push({kind:"ambiguous-view", index:match.index});
+      }
+    }
     // Schema deletion/renaming can invalidate many tracked names at once.
     // Until modeled, reject these commands rather than reusing stale ACLs.
     for (const match of keywordSql.matchAll(/\b(?:DROP\s+SCHEMA\b|ALTER\s+SCHEMA\b[^;]*?\bRENAME\s+TO\b)/gi)) {
@@ -670,7 +715,10 @@ export function findTablesWithoutExplicitAcl(migrations) {
         });
         continue;
       }
-      if (schemaName(name[1]) === "pg_temp") {
+      if (/^\s*PARTITION\s+OF\b/i.test(after.slice(name[0].length))) {
+        events.push({kind:"diagnostic", table:"(unsupported relation lifecycle at offset "+match.index+")", index:match.index});
+      }
+      if (isTempSchema(schemaName(name[1]))) {
         events.push({kind:"temp-create", conditional:Boolean(match[1]), table:identName(name[2]),
           onCommitDrop:/\bON\s+COMMIT\s+DROP\b/i.test(keywordSql.slice(match.index, keywordSql.indexOf(";",match.index)<0?keywordSql.length:keywordSql.indexOf(";",match.index))),
           index:match.index});
@@ -683,7 +731,13 @@ export function findTablesWithoutExplicitAcl(migrations) {
       const after = creation.slice(match.index + match[0].length);
       const name = QUALIFIED_AT_RE.exec(after);
       const complete = name !== null && CREATE_TARGET_END_RE.test(after.slice(name[0].length));
-      if (!complete) continue;
+      if (!complete) {
+        events.push({kind:"diagnostic", table:"(unreadable CREATE TEMP TABLE target at offset "+match.index+")", index:match.index});
+        continue;
+      }
+      if (/^\s*PARTITION\s+OF\b/i.test(after.slice(name[0].length))) {
+        events.push({kind:"diagnostic", table:"(unsupported relation lifecycle at offset "+match.index+")", index:match.index});
+      }
       events.push({
         kind: "temp-create",
         conditional: Boolean(match[1]),
@@ -695,12 +749,20 @@ export function findTablesWithoutExplicitAcl(migrations) {
     for (const match of selectIntoSql.matchAll(SELECT_INTO_RE)) {
       if (quotedSelectInto[match.index]) continue;
       if (endsCteBeforeDml(selectIntoTokens.slice(match.index, match.index + match[0].length))) continue;
-      if (schemaName(match[1]) === "pg_temp") events.push({kind:"temp-create", conditional:false, table:identName(match[2]), index:match.index});
+      if (!SELECT_TARGET_END_RE.test(selectIntoSql.slice(match.index + match[0].length))) {
+        events.push({kind:"diagnostic", table:"(unreadable SELECT INTO target at offset "+match.index+")", index:match.index});
+        continue;
+      }
+      if (isTempSchema(schemaName(match[1]))) events.push({kind:"temp-create", conditional:false, table:identName(match[2]), index:match.index});
       else events.push({ kind: "create", conditional: false, table:identName(match[2]), schema:schemaName(match[1]), index: match.index });
     }
     for (const match of selectIntoSql.matchAll(SELECT_INTO_TEMP_RE)) {
       if (quotedSelectInto[match.index]) continue;
       if (endsCteBeforeDml(selectIntoTokens.slice(match.index, match.index + match[0].length))) continue;
+      if (!SELECT_TARGET_END_RE.test(selectIntoSql.slice(match.index + match[0].length))) {
+        events.push({kind:"diagnostic", table:"(unreadable SELECT INTO target at offset "+match.index+")", index:match.index});
+        continue;
+      }
       events.push({
         kind: "temp-create",
         conditional: false,
@@ -765,6 +827,10 @@ export function findTablesWithoutExplicitAcl(migrations) {
     events.sort((a, b) => a.index - b.index);
     for (const event of events) {
       if (event.kind === "diagnostic") { diagnostics.push({table:event.table,migration:m.name}); continue; }
+      if (event.kind === "ambiguous-view") {
+        if (temps.size > 0) diagnostics.push({table:"(unreadable view persistence at offset "+event.index+")",migration:m.name});
+        continue;
+      }
       if (event.kind === "transaction") {
         if (event.action === "BEGIN") {
           // PostgreSQL warns on a repeated BEGIN; it does not start a nested

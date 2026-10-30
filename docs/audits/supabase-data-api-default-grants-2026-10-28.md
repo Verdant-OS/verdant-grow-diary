@@ -70,6 +70,14 @@ Identifier identity follows the target PostgreSQL default 63-byte limit, clippin
 whole UTF-8 characters after decoding and case folding. Runtime EXECUTE variables
 named function/procedure have no trigger-syntax exemption; actual trigger clauses
 remain outside executable-command statement contexts.
+Temporary views/sequences, ambiguous unqualified views created while temp tables
+are active, foreign-schema imports and partition ancestry changes are rejected as
+unsupported. These fences prevent shadows or stale ACL reuse without adding view
+or sequence ACL enforcement. SELECT INTO targets require a complete identifier;
+unsupported Unicode-escaped identifiers fail closed rather than crediting a prefix.
+Quoted names can directly follow SQL keywords, or precede later keywords, without
+whitespace. Keyword tests respect dollar signs and non-ASCII identifier characters.
+Unsupported Unicode-escaped ALTER/DROP identifiers fail closed to prevent stale ACLs.
 
 Twenty-five historical dynamic statements were inspected in six immutable migration
 files. They handle policies or existing object ACLs rather than creating tables.

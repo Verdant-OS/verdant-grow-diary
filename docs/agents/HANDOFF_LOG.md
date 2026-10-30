@@ -984,20 +984,56 @@ claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
 ```
 
+### AHREFS-WEB-ANALYTICS-KEY-SWAP
+
+```text
+TASK AHREFS-WEB-ANALYTICS-KEY-SWAP  priority: other  status: OPEN
+goal: Replace the Ahrefs Web Analytics public data-key GRdwmweqUZoPO7SfmEsPZg with KZfnjSoVSRYkyDJq+SUsow. Loading stays consent-gated (no static <head> tag).
+why: Matthew pasted Ahrefs' install snippet with the new key and chose "Replace the key" (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-28).
+branch: claude/admiring-dirac-3vaz57
+base: verdant-grow-diary
+checkout: git fetch origin claude/admiring-dirac-3vaz57 verdant-grow-diary && git switch claude/admiring-dirac-3vaz57 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2602 (from claude/admiring-dirac-3vaz57)
+head_sha: read the PR head; this commit cannot name itself
+state: pushed; marked ready for review 2026-10-29 18:06 UTC on Matthew's instruction
+current_step: 35/35 required CI and an independent exact-head review (request: see the PR conversation)
+next_action: independent exact-head review of the PR; after publish, check the live site per post_merge_check
+post_merge_check: on https://verdantgrowdiary.com accept analytics and confirm script[src="https://analytics.ahrefs.com/analytics.js"] carries data-key KZfnjSoVSRYkyDJq+SUsow; NOT_MEASURED until live /version.json reports the merge SHA
+active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
+decisions: keep the consent gate; a static tag would load before consent and contradict the privacy policy and consent settings page. CSP allowance for analytics.ahrefs.com goes in a separate PR (owner choice).
+tried_and_rejected: pasting the snippet into src/routes/__root.tsx <head>; rejected for the consent reason above
+commands: bunx vitest run src/test/ahrefs-analytics-loader.test.ts --reporter=dot; bun run typecheck; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/constants/analytics.ts, src/test/ahrefs-analytics-loader.test.ts, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: Ahrefs "Recheck installation" looks for the tag in static HTML, which this site does not serve before consent; whether Ahrefs accepts the consent-gated install is NOT_MEASURED
+gotchas: the key test is scorer-locked; unlock recorded with reason before commit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2600 (docs: Ahrefs project of record; no code overlap)
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3; this Claude session excluded
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-10-28 23:10 UTC
+owner: Claude
+last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
+```
+
+## Closed
+
 ### HONO-NODE-SERVER-GHSA-RMXM
 
 ```text
-TASK HONO-NODE-SERVER-GHSA-RMXM  priority: P2  status: OPEN
+TASK HONO-NODE-SERVER-GHSA-RMXM  priority: P2  status: CLOSED
 goal: Clear GHSA-rmxm-3fg6-px4f (moderate, @hono/node-server >=1.19.10 <2.1.3), which blocks check:deps on every PR and on the deploy tip bbc77ae23. Raise the exact override and BUN_LOCK_SECURITY_FLOORS from 2.0.10 to 2.1.3 and regenerate bun.lock with CI's bun 1.3.14.
 why: a dependency audit red across PRs is top-priority work (CURRENT_STATE Start here). Matthew approved the scorer unlock, a separate PR and porting into #2602/#2603 (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-29).
 branch: claude/hono-node-server-2-1-3
 base: verdant-grow-diary
-checkout: git fetch origin claude/hono-node-server-2-1-3 verdant-grow-diary && git switch claude/hono-node-server-2-1-3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+checkout: None; closed (merged). Historical branch: claude/hono-node-server-2-1-3
 pr: draft PR from claude/hono-node-server-2-1-3 (link in the PR list)
-head_sha: read the PR head; this commit cannot name itself
-state: pushed; marked ready for review
-current_step: fresh exact-head review and 35/35 required CI at the head after this handoff fix
-next_action: independent exact-head review at the new head (session_017UoYKuwk7Z3wSC7syg3jnF offered); then 35/35 required CI, the founder's per-item yes and the merge queue. The same three-file dependency change is ported into #2602 and #2603
+head_sha: 7c09de3413c556389da7677341d340da6c660b4a (final PR head)
+state: CLOSED (merged). #2605 merged by cheekhimself at 2026-10-29 17:24:03 UTC from final head 7c09de34 as dcf39fdb605de7ea89884e5a884978857f99b18a
+current_step: none; closed
+next_action: None; closed. post_merge_check PASS: Dependency & Security CI run 40920963434 succeeded on deploy tip dcf39fdb (the two prior tips 479cadb3 and 9b60f907 failed it on this advisory)
 post_merge_check: Dependency & Security CI check:deps passes on the deploy branch tip after merge
 active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
 decisions: 2.1.3 is the first fixed release in major 2 (advisory range <2.1.3); follow the ip-address 10.7.4 precedent (6f937d3): override + floor + bun.lock only
@@ -1011,11 +1047,12 @@ gotchas: regenerate bun.lock with bun 1.3.14 (CI pin), not a newer local bun; pa
 links: https://github.com/advisories/GHSA-rmxm-3fg6-px4f
 artifacts: PR body
 reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (dependency/lockfile scope); this Claude session excluded
-reviewer_sha: none valid. session_017UoYKuwk7Z3wSC7syg3jnF: PASS for code scope at 4d9defc1c, then FAIL at 02f83c7e1 on this block's files_touched and commands (comment 6500943336); this commit fixes that and needs a fresh review
+reviewer_sha: 7c09de3413c556389da7677341d340da6c660b4a, PASS by session_017UoYKuwk7Z3wSC7syg3jnF (earlier verdicts at 4d9defc1c and 02f83c7e1 superseded)
+closure: merged as dcf39fdb605de7ea89884e5a884978857f99b18a; ports in #2602 and #2603 are no-ops after their base merges
 session_state: none
 claimed_by: Claude, 2026-10-29 00:24 UTC
 owner: Claude
-last_updated: 2026-10-29 16:08 UTC, by Claude
+last_updated: 2026-10-29 17:50 UTC, by Claude (closed in the #2602 base merge)
 ```
 
 ## Closed

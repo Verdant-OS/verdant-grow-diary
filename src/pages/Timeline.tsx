@@ -2818,7 +2818,10 @@ export default function Timeline() {
 
       <TimelineCsvContextPanel
         growId={activeGrowId}
-        entries={entries.map((e) => ({ id: e.id, tent_id: e.tent_id, entry_at: e.entry_at }))}
+        tentNamesById={tentNamesById}
+        entries={entries
+          .filter((e) => renderedDiaryAnchorIds.has(buildTimelineEntryAnchorId(e.id) ?? ""))
+          .map((e) => ({ id: e.id, tent_id: e.tent_id, entry_at: e.entry_at }))}
       />
 
       {/* Quick Log history lanes (read-only). Order: recent activity first

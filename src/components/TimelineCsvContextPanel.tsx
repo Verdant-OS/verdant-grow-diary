@@ -1,6 +1,6 @@
 /**
  * TimelineCsvContextPanel — read-only presenter that renders CSV environment
- * snapshot chips for diary entries whose tent has matching CSV
+ * shared observation cards linked to visible diary entries whose tent has matching CSV
  * sensor_readings inside the time-window.
  *
  * Hard constraints:
@@ -13,11 +13,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
+import { buildTimelineEntryAnchorId } from "@/lib/timelineEntryAnchorRules";
 import { Button } from "@/components/ui/button";
 import {
-  buildCsvTimelineContext,
+  buildCsvTimelineObservationContext,
+  CSV_TIMELINE_WINDOW_MINUTES,
   type CsvSensorReadingRow,
-  type CsvTimelineContextEntry,
+  type CsvTimelineObservationContext,
 } from "@/lib/environmentCsvTimelineContextViewModel";
 
 export interface TimelineDiaryLike {
@@ -29,10 +31,11 @@ export interface TimelineDiaryLike {
 export interface TimelineCsvContextPanelProps {
   growId: string | null | undefined;
   entries: readonly TimelineDiaryLike[];
+  tentNamesById?: ReadonlyMap<string, string> | null;
 }
 
 export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
-  const { growId, entries } = props;
+  const { growId, entries, tentNamesById } = props;
   const [readState, setReadState] = useState<{
     scopeKey: string;
     rows: CsvSensorReadingRow[];
@@ -111,8 +114,8 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     };
   }, [growId, tentIdsKey, scopeKey, retryAttempt]);
 
-  const matchedByEntry = useMemo(() => {
-    const out = new Map<string, CsvTimelineContextEntry>();
+  const matchedObservations = useMemo(() => {
+    const out: CsvTimelineObservationContext[] = [];
     if (!growId || entries.length === 0) return out;
     // Run view-model per-tent (scope contract is per-tent).
     for (const tentId of tentIds) {
@@ -124,23 +127,21 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
           tent_id: e.tent_id,
           occurred_at: e.entry_at,
         }));
-      const ctx = buildCsvTimelineContext({
+      const ctx = buildCsvTimelineObservationContext({
         diaryEntries: tentEntries,
         sensorReadings: rows,
         growId,
         tentId,
       });
-      for (const c of ctx) {
-        if (c.snapshot) out.set(c.diaryEntryId, c);
-      }
+      out.push(...ctx);
     }
     return out;
   }, [rows, entries, growId, tentIds]);
 
   if (!growId || tentIds.length === 0) return null;
-  if (readStatus === "success" && matchedByEntry.size === 0) return null;
+  if (readStatus === "success" && matchedObservations.length === 0) return null;
 
-  const hasCachedMatches = matchedByEntry.size > 0;
+  const hasCachedMatches = matchedObservations.length > 0;
 
   return (
     <section data-testid="timeline-csv-context-panel" className="mt-4 space-y-2">
@@ -152,8 +153,10 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         data-testid="timeline-csv-context-readonly-banner"
         className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] text-amber-200"
       >
-        CSV context is read-only. Verdant shows this history only when the source is explicitly
-        labeled csv. Live and manual sensor readings remain separate.
+        Historical CSV context is read-only, never live telemetry. Each observation is shown once
+        per tent, linked to diary entries within {CSV_TIMELINE_WINDOW_MINUTES} minutes of capture.
+        This is matched diary context. Browse imported observations in a tent’s Imported sensor
+        history.
       </div>
       {readStatus === "loading" ? (
         <p role="status" className="text-xs text-muted-foreground">
@@ -179,12 +182,36 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
           </Button>
         </div>
       ) : null}
-      {[...matchedByEntry.values()].map((c) => (
-        <CsvTimelineEnvironmentChip
-          key={c.diaryEntryId}
-          diaryEntryId={c.diaryEntryId}
-          snapshot={c.snapshot}
-        />
+      {matchedObservations.map((context) => (
+        <div key={JSON.stringify([context.tentId, context.snapshot.capturedAt])}>
+          <p className="text-xs font-medium">
+            Tent: {tentNamesById?.get(context.tentId) ?? "Name unavailable"}
+          </p>
+          <CsvTimelineEnvironmentChip
+            diaryEntryId={context.diaryEntries[0].diaryEntryId}
+            snapshot={context.snapshot}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Context for {context.diaryEntries.length} diary{" "}
+            {context.diaryEntries.length === 1 ? "entry" : "entries"}
+          </p>
+          <ul className="space-y-1 text-xs">
+            {context.diaryEntries.map((entry, index) => {
+              const anchor = buildTimelineEntryAnchorId(entry.diaryEntryId);
+              return (
+                <li key={entry.diaryEntryId}>
+                  <a
+                    href={anchor ? `#${anchor}` : undefined}
+                    className="underline underline-offset-2"
+                    title={`${entry.matchAgeMinutes} min from CSV capture`}
+                  >
+                    Diary entry {index + 1} · {new Date(entry.occurredAt).toLocaleString()}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ))}
     </section>
   );

@@ -64,14 +64,14 @@ const QUOTED_SEMICOLON = "\u0001";
 // ALTER TABLE ... RENAME TO keeps the table and its grants under the new name.
 // RENAME TO takes no schema; RENAME COLUMN and RENAME CONSTRAINT do not match.
 const RENAME_RE = new RegExp(
-  String.raw`\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+RENAME\s+TO\s+(${IDENT})`,
+  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+RENAME\s+TO\s+(${IDENT})`,
   "gi",
 );
 // ALTER TABLE ... SET SCHEMA moves a table, with its grants, between schemas.
 // A table moved into public from elsewhere did not get public's default
 // grants, so it needs its own ACL there; one moved out of public leaves scope.
 const SET_SCHEMA_RE = new RegExp(
-  String.raw`\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+SET\s+SCHEMA\s+(${IDENT})`,
+  String.raw`\bALTER\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${QUALIFIED}\s+SET\s+SCHEMA\s+(${IDENT})`,
   "gi",
 );
 const DROP_RE = /\bDROP\s+(?:FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?([^;]*)/gi;
@@ -282,7 +282,13 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
       if(sql[afterKw]==="'" || sql[afterKw]==="$"){
         const lit=sql[afterKw]==="'"?readSingleQuoted(sql,afterKw,end):readDollarQuoted(sql,afterKw,end);
         const afterLit=lit?skipWsAndComments(sql,lit.after,end):afterKw;
-        if(lit && EXECUTE_ENDS_RE.test(sql.slice(afterLit))){i=lit.after;continue;}
+        if(lit && EXECUTE_ENDS_RE.test(sql.slice(afterLit))){
+          for (const nested of collectDynamicExecuteEvents(lit.value)) {
+            const at = afterKw + 1 + nested.index;
+            events.push({...nested, index: at, table: "(unreadable nested EXECUTE at offset " + at + ")"});
+          }
+          i=lit.after;continue;
+        }
       }
       const arg=readExecuteArgument(sql,afterKw,end);
       // Runtime SQL cannot be proven not to create a table; reject it.
@@ -595,6 +601,11 @@ export function findTablesWithoutExplicitAcl(migrations) {
         continue;
       }
       const table = publicTable(name[1], name[2]);
+      if (schemaName(name[1]) === "pg_temp") {
+        events.push({kind:"temp-create", conditional:Boolean(match[1]), table:identName(name[2]),
+          onCommitDrop:/\bON\s+COMMIT\s+DROP\b/i.test(keywordSql.slice(match.index, keywordSql.indexOf(";",match.index)<0?keywordSql.length:keywordSql.indexOf(";",match.index))),
+          index:match.index});
+      }
       if (table) {
         events.push({ kind: "create", conditional: Boolean(match[1]), table, index: match.index });
       }
@@ -617,6 +628,7 @@ export function findTablesWithoutExplicitAcl(migrations) {
       if (quotedSelectInto[match.index]) continue;
       if (SELECT_INTO_CTE_DML_RE.test(match[0])) continue;
       const table = publicTable(match[1], match[2]);
+      if (schemaName(match[1]) === "pg_temp") events.push({kind:"temp-create", conditional:false, table:identName(match[2]), index:match.index});
       if (table) events.push({ kind: "create", conditional: false, table, index: match.index });
     }
     for (const match of selectIntoSql.matchAll(SELECT_INTO_TEMP_RE)) {

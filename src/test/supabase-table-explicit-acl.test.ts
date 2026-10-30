@@ -886,3 +886,30 @@ describe("EXECUTE statement contexts and control headers", () => {
     expect(tables(CREATE + "DO $$ BEGIN IF true THEN EXECUTE 'GRANT SELECT ON public.leaky TO authenticated'; END IF; END $$;")).toEqual([]);
   });
 });
+
+describe("nested literal SQL and relation lifecycle forms", () => {
+  it("inspects nested DO commands inside literal EXECUTE", () => {
+    const sql = "DO $outer$ BEGIN EXECUTE 'DO $inner$ BEGIN EXECUTE format(''CREATE %s public.leaky(id int)'', ''TABLE''); END $inner$'; END $outer$;";
+    expect(tables(sql).length > 0).toBe(true);
+  });
+  it.each([
+    "CREATE TABLE pg_temp.leaky(id int); DROP TABLE leaky;",
+    "CREATE TABLE pg_temp.leaky(id int); GRANT SELECT ON leaky TO authenticated;",
+    "CREATE TABLE pg_temp.leaky(id int); ALTER TABLE leaky RENAME TO other;",
+    "SELECT 1 AS id INTO TABLE pg_temp.leaky; DROP TABLE leaky;",
+  ])("tracks schema-qualified temp shadows: %s", (tail) => {
+    expect(tables(CREATE + tail)).toEqual(["leaky"]);
+  });
+  it("ends a pg_temp shadow when it is dropped", () => {
+    expect(tables(CREATE + "CREATE TABLE pg_temp.leaky(id int); DROP TABLE pg_temp.leaky; GRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
+  });
+  it("tracks foreign tables moved into public", () => {
+    expect(tables("CREATE FOREIGN TABLE private.leaky(id int) SERVER remote; ALTER FOREIGN TABLE private.leaky SET SCHEMA public;")).toEqual(["leaky"]);
+  });
+  it("accepts a grant after a foreign-table move", () => {
+    expect(tables("CREATE FOREIGN TABLE private.leaky(id int) SERVER remote; ALTER FOREIGN TABLE private.leaky SET SCHEMA public; GRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
+  });
+  it("preserves foreign-table ACL state through rename", () => {
+    expect(tables("CREATE FOREIGN TABLE public.leaky(id int) SERVER remote; ALTER FOREIGN TABLE public.leaky RENAME TO renamed;")).toEqual(["renamed"]);
+  });
+});

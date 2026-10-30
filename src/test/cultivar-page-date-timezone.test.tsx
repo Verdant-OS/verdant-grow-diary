@@ -22,9 +22,7 @@ vi.mock("@/components/CultivarPhenoSampleModule", () => ({ default: () => null }
 vi.mock("@/components/CultivarQaPanel", () => ({ default: () => null }));
 vi.mock("@/components/CultivarBlueprintCrossSell", () => ({ default: () => null }));
 vi.mock("@/hooks/usePublishedCultivars", async () => {
-  const { BUNDLED_CULTIVAR_CATALOG: catalog } = await import(
-    "@/lib/cultivarReferenceSourceRules"
-  );
+  const { BUNDLED_CULTIVAR_CATALOG: catalog } = await import("@/lib/cultivarReferenceSourceRules");
   return {
     usePublishedCultivars: () => ({
       state: "bundled_fallback",
@@ -65,10 +63,9 @@ beforeEach(() => {
   fixture.date = null;
   // Model the host's default zone only. Explicit production timeZone options
   // take precedence. Changing process.env.TZ is unreliable in Vitest workers.
-  vi.spyOn(Intl, "DateTimeFormat").mockImplementation(
-    (locales, options) =>
-      new NativeDateTimeFormat(locales, { timeZone: hostTimezone, ...options }),
-  );
+  vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function (locales, options) {
+    return new NativeDateTimeFormat(locales, { timeZone: hostTimezone, ...options });
+  });
 });
 
 afterEach(async () => {

@@ -344,6 +344,8 @@ describe("manual duplicate receipt verification", () => {
     {
       ...submitted[0],
       id: "stored-row",
+      notes: null,
+      unit_unconfirmed: false,
       user_id: "owner-a",
       tent_id: TENT_A,
       source: "manual",

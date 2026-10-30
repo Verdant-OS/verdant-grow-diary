@@ -76,13 +76,13 @@ TASK VER-290-GROUNDING-REGEX  priority: P2  status: OPEN
 goal: Remove exponential backtracking from AI Doctor's direct-prohibition matcher without weakening grounding rules.
 why: Repeated only tokens followed by an invalid modifier made overlapping alternatives explore exponentially many paths on model output inside an Edge Function.
 branch: codex/ver-290-grounding-regex
-base: verdant-grow-diary at 0792349d57de2c1c0e2610f643920cf595486dfc, observed 2026-10-30 01:02 UTC.
+base: verdant-grow-diary at ab4aaa2f3a648c28860c682ddec3ec0103347246, fetched 2026-10-30 01:38 UTC. Normal base merge; both handoff additions preserved.
 checkout: git fetch origin codex/ver-290-grounding-regex verdant-grow-diary && git switch codex/ver-290-grounding-regex && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2551
-head_sha: Pre-restoration head 5fad937dfb8b43e793a274841aef156a528a5193, verified 2026-10-30 01:02 UTC. This documentation commit advances that head; read the full current SHA and checkpoint from the PR before resuming. Earlier checks and verdicts do not carry forward.
-state: Fix implemented. The later base merge removed this task's block; this commit restores it without changing code or tests. Founder account cheekhimself marked the PR ready on 2026-10-29 23:53 UTC; it is open and non-draft. This session did not make that transition. No merge, queue, deployment or production-data authorization is inferred.
-current_step: Restore the missing handoff and reconcile the PR description, then confirm hosted checks at the resulting exact head.
-next_action: Read the PR's current full head and CI, then obtain complete exact-head acceptance from an available non-contributing Claude/Grok reviewer under OWNERSHIP.md section 4.3. Delivery is BLOCKED until an eligible session and authorized transport are available.
+head_sha: Pre-integration head 67e5919d885a2ad7afe1b8b22228597f1c2d9c44, verified 2026-10-30 01:35 UTC. This base-merge commit advances that head; read the full current SHA and checkpoint from the PR before resuming. Earlier checks and verdicts do not carry forward.
+state: Fix implemented and missing handoff restored. While hosted CI ran, the base advanced and conflicted only on independent handoff additions. This merge preserves both blocks and does not change the grounding implementation or tests. Founder account cheekhimself marked the PR ready on 2026-10-29 23:53 UTC; it remains open and non-draft. This session did not make that transition. No queue, PR merge, deployment or production-data authorization is inferred.
+current_step: Resolve the additive handoff conflict, refresh the exact-head PR packet, and confirm hosted checks after publication.
+next_action: Confirm current-head CI, then obtain a complete re-review from eligible independent Jack Herer or another non-contributing Claude/Grok reviewer under OWNERSHIP.md section 4.3. The previous review explicitly requires re-review after a commit or body edit; no clean acceptance is carried forward.
 post_merge_check: After separately authorized deployment, confirm deployed source identity and exercise adversarial grounding cases in the Edge runtime. Production and Deno matcher performance remain NOT_MEASURED.
 active_writer: Codex Work session /root, Matthew's original VER-290 implementation assignment. No replacement writer claim or release was found in the current log, PR body or comments; base merges alone do not transfer ownership.
 decisions: Remove only the redundant only alternative, already accepted by [a-z]+ly. The remaining whitespace-delimited alternatives are disjoint, preserving the matched language with linear work. Regenerate the canonical Edge mirror and source hash. The second Edge path is a re-export shim and is verified by identity tests.
@@ -93,19 +93,53 @@ commands_docs: node scripts/assert-docs-safety.mjs && node scripts/assert-releas
 files_touched: src/lib/aiDoctorReviewGroundingRules.ts; src/test/ai-doctor-grounding-redos.test.ts; supabase/functions/_shared/lib/lib/aiDoctorReviewGroundingRules.ts; supabase/functions/_shared/lib/.sync-manifest.json; docs/agents/HANDOFF_LOG.md (this block only).
 files_remaining: None planned. Review findings require a new bounded repair and fresh exact-head evidence.
 local_evidence: At historical head 34a799ce96c6e5d3ac31036b8b9c214e685e8f8a: focused 6 files / 224 passed; new regression 102 cases; docs safety 67 passed; 106 mirrors in sync; scoped lint/format and tsgo passed. The same final regression file against unchanged original base be6d009dcf0110b92901b85bc8212b560e45cf62 produced 100 passed / 2 expected child-process timeouts. These are historical receipts, not validation of later base integration.
-hosted_evidence: At pre-restoration 5fad937dfb8b43e793a274841aef156a528a5193: 35/35 pinned required contexts SUCCESS; security-regression, security-db-local, CodeQL, dependency audit, docs safety, AI Doctor golden cases, Deno bridge and applicable mocked E2E checks SUCCESS. Two irrigation contexts legitimately skipped. All 140 check runs were paginated and current attempts selected. The new head needs fresh checks.
-review_evidence: Supplemental non-contributing Codex /root/ver290_exact_review reported 0 P1 / 0 P2 at historical 34a799ce96c6e5d3ac31036b8b9c214e685e8f8a. It cannot satisfy outside acceptance for Codex-authored work. At 5fad937dfb8b43e793a274841aef156a528a5193, Copilot identified this missing block and could not confirm complete scope; 0 review threads. Founder "goood" was a COMMENTED event, not an eligible independent verdict. No review applies to this new commit.
-blockers: Eligible outside complete-head acceptance is unavailable here. Current-head hosted CI must be confirmed after this documentation push. Codex security bot separately reported an account usage limit at 5fad937dfb8b43e793a274841aef156a528a5193; that failed scan is not a PASS. No spend or repeated blocked scan is authorized. GitHub comments retain their owner-approval gate; the authorized PR body is the canonical checkpoint, with no claim of an unsent review request.
+hosted_evidence: At pre-integration 67e5919d885a2ad7afe1b8b22228597f1c2d9c44, verified 2026-10-30 01:35 UTC: 35/35 pinned required contexts SUCCESS; all applicable supplemental checks completed. Across 91 check runs, 86 current name/app contexts were 79 SUCCESS and 7 legitimate SKIPPED. Manual-correction local-backend startup failed before browser execution on attempt 1 and passed a single targeted retry on attempt 2. All other current contexts passed without a manual retry. These results are historical after this base merge.
+review_evidence: Jack Herer, independent outside Grok session 60b10d4e-a393-43f1-8037-95068424f98e, posted review 5707022186 at 67e5919d885a2ad7afe1b8b22228597f1c2d9c44: PASS-with-P2, 0 P1 / 1 P2, covering all five files and excluding contributors. P2 concerned old PR-body head, draft-state and CI claims; the body has been corrected. The review requires a full re-review after body edits or commits, so it is superseded and not clean acceptance. Its CI observation (1/35) was superseded by the later 35/35 receipt. The historical Codex supplemental review at 34a799ce96c6e5d3ac31036b8b9c214e685e8f8a remains ineligible for outside acceptance. No review applies to this new commit.
+blockers: Fresh hosted CI and eligible full-head re-review are required. Jack Herer's request came through an external OG Kush handoff, not this session; no authenticated reviewer-routing transport is exposed here. Codex security bot hit its account usage limit at 67e5919d885a2ad7afe1b8b22228597f1c2d9c44; that incomplete scan is not PASS. No spend or manual security-review retry is authorized. GitHub comments retain their owner-approval gate; the authorized PR body is the canonical checkpoint.
 open_questions: Outside reviewer must verify non-contribution across all authors and base-merge repair sessions. A historical CodeRabbit optional fixture-consistency nit remains recorded in review 5661384675; it is not a required thread or a waived acceptance finding.
 gotchas: The regex and regression blobs are unchanged between 34a799ce96c6e5d3ac31036b8b9c214e685e8f8a and 5fad937dfb8b43e793a274841aef156a528a5193, but unchanged blobs do not establish integration acceptance. Reconcile current dependencies and base. Every later push invalidates prior exact-head acceptance. The user's no-merge/no-deploy/no-production-data boundary remains.
-links: https://linear.app/verdantgrowdiary/issue/VER-290/security-exponential-time-regex-in-ai-doctor-grounding-rules-code ; https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40976095312 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2551#pullrequestreview-5706814122
+links: https://linear.app/verdantgrowdiary/issue/VER-290/security-exponential-time-regex-in-ai-doctor-grounding-rules-code ; https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40983793129 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2551#pullrequestreview-5707022186
 artifacts: PR body is the current exact-head checkpoint; workflow and review links above are historical receipts at their named SHA.
-reviewer_seat: BLOCKED. Available non-contributing Claude/Grok session required. Exclude every author and repairer, including Codex /root and the contributing base-merge sessions; verify actual identities rather than assuming shared GitHub account names prove independence.
-reviewer_sha: NONE; eligible exact-head acceptance is missing.
+reviewer_seat: Jack Herer (outside Grok reviewer), independently routed by OG Kush; previous verdict superseded by this merge. No replacement request delivered by this session. Exclude Codex /root and all implementation/base-merge contributors; shared GitHub account names alone do not establish independence.
+reviewer_sha: Historical 67e5919d885a2ad7afe1b8b22228597f1c2d9c44 only, PASS-with-P2. Fresh complete-head acceptance is missing.
 session_state: Codex Work /root; supplemental /root/ver290_exact_review finished and is ineligible for acceptance. No routines or paused workflows created. No external reviewer request, GitHub comment/review event, ready/queue/merge action, deployment or production write sent by this session.
 claimed_by: Codex Work /root, continuing Matthew's original explicit assignment; reconciled 2026-10-30 01:02 UTC. No takeover or release claimed.
-owner: Codex VER-290 implementation session; outside reviewer availability and authorized routing remain unresolved.
-last_updated: 2026-10-29 20:05 CT, by Codex.
+owner: Codex VER-290 implementation session; OG Kush routed Jack Herer's outside review, whose follow-up is still required.
+last_updated: 2026-10-29 20:39 CT, by Codex.
+```
+
+### ARCH-CONTRACT-RESTAMP-20261029
+
+```text
+TASK ARCH-CONTRACT-RESTAMP-20261029  priority: other  status: OPEN
+goal: re-verify docs/architecture-contract.md against deploy tip 479cadb3032ddc3ad80d93f105283609179d6c0a (#2581) and correct every clause that drifted since the 27991451 stamp and its 0200d255 post-stamp merge.
+why: the founder chose option A (docs-only refresh) on 2026-10-29, after a collision audit found that the contract (#2564) and docs/specs/release-topology-specification.md already exist, so a new contract would duplicate them.
+branch: claude/new-session-kulf08
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head; only the writer then runs git merge origin/verdant-grow-diary and pushes a new head)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622 (draft)
+head_sha: a commit cannot record its own SHA; read the full head from the PR
+state: pushed; ready for review. Independent verdicts by session_017UoYKvqHhSHehpNuWHT7qV, each stale once the head moved: 4c718a4 PASS-with-findings (6505081663), 37f2756 PASS-with-findings (6505693483), 8e06a5d PASS-with-findings (6506351031), d16efc2 PASS-with-findings (6508569894). Founder yes given at 37f2756 and 8e06a5d, both superseded by base merges. This commit fixes F6 and the Codex P2 on next_action, so the d16efc2 verdict is stale too.
+current_step: restamp written. 419 path:line cites re-read by text (9 moved, 3 live in AC-8.1, all in scripts/check-bun-lockfile-policy.mjs after #2569); AC-3.2, AC-4.3 and AC-10.2 counts unchanged; AC-3.4 940 in 939 -> 945 in 944.
+next_action: an eligible independent reviewer (not session 017UoYKx8T6Y6eyPhvDvxPjS or 017UoYKxQUVr5LNsENPKJ59K) does a complete re-review of the whole PR at the new full head SHA (OWNERSHIP.md section 4.3; a delta-only re-review is not acceptance). Then 35/35 required checks and the founder's per-item yes at that exact head.
+post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
+active_writer: Claude
+decisions: (1) no new contract and no topology edit; slice C (topology) waits for #2539, #2609 and #2589. (2) the six moved cites inside the 27991451 header record stay as that tree's lines, because a stamp record describes its own tree. (3) the counts were reproduced at 27991451 before measuring 479cadb, so the same method gives both. (4) the stale CLAUDE.md lockfile wording (option B) is out of scope; it would need the 18-file Sentinel bump.
+tried_and_rejected: a first cite pass that ignored bare `:NN` cites missed the AC-8.1 drift; the binder now ties each bare cite to the last full path in the same paragraph. Comparing topology-spec cites against 0200d255 gave false drift; 604274a7 is the right base because #2564 merged the spec and the contract together.
+commands: format and safety: bunx prettier --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs. Counts, run at both 27991451 and the head (replace REF): rules=$(git ls-tree --name-only REF src/lib/ | grep -E 'Rules\.ts$'); echo "$rules" | wc -l; git grep -l 'Date\.now()' REF -- $rules | wc -l; git grep -l 'Math\.random()' REF -- $rules | wc -l; git grep -h -o 'from "@/lib/react-router-compat"' REF -- src | wc -l; git grep -liE 'nelson|modified z|modifiedZ|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' REF -- src supabase scripts e2e tools plugins spikes | wc -l. The cite re-read and the AC-4.3 pair count used session-local scripts that are not committed; their method is in the contract header and the PR body. SKIPPED, not passed: Vitest, bun run typecheck and the pre-commit full tsc, because this session has no node_modules and no test reads either file.
+files_touched: docs/architecture-contract.md, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: whether to run option B (fix CLAUDE.md:117 and :297, which still call package-lock.json a compatibility lock) as a governance PR.
+gotchas: docs/specs/release-topology-specification.md:1012 records `PASS` for "AI Doctor inference through the Lovable AI gateway", citing GATEWAY_URL and LOVABLE_API_KEY, but AI Doctor is Gemini-direct since #1982 (contract AC-5.1). In slice C, confirm whether that §6.1 row is a dated measurement that a later section supersedes; if not, correct it.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564
+artifacts: the PR's check runs
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3. A non-contributing Claude session qualifies. Excluded: author session 017UoYKx8T6Y6eyPhvDvxPjS and holder session 017UoYKxQUVr5LNsENPKJ59K
+reviewer_sha: none at the current head. Latest stale verdict: d16efc2aad329264b8f1f3dd1c6ba808b56e50e5, PASS-with-findings (P3 only), comment 6508569894; earlier ones are listed under state. F3 and F4 go to the next restamp, per the founder.
+session_state: Claude cloud session 017UoYKx8T6Y6eyPhvDvxPjS; separate one-shot check-in trig_01F8BsQcKVPKV5VDk4EPy3X1 is for #2597 CI
+claimed_by: Claude, 2026-10-29 12:20 CT
+owner: Claude
+last_updated: 2026-10-29 21:35 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K (F6; full re-review scope per Codex P2)
 ```
 
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
@@ -989,20 +1023,56 @@ claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
 ```
 
+### AHREFS-WEB-ANALYTICS-KEY-SWAP
+
+```text
+TASK AHREFS-WEB-ANALYTICS-KEY-SWAP  priority: other  status: OPEN
+goal: Replace the Ahrefs Web Analytics public data-key GRdwmweqUZoPO7SfmEsPZg with KZfnjSoVSRYkyDJq+SUsow. Loading stays consent-gated (no static <head> tag).
+why: Matthew pasted Ahrefs' install snippet with the new key and chose "Replace the key" (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-28).
+branch: claude/admiring-dirac-3vaz57
+base: verdant-grow-diary
+checkout: git fetch origin claude/admiring-dirac-3vaz57 verdant-grow-diary && git switch claude/admiring-dirac-3vaz57 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2602 (from claude/admiring-dirac-3vaz57)
+head_sha: read the PR head; this commit cannot name itself
+state: pushed; marked ready for review 2026-10-29 18:06 UTC on Matthew's instruction
+current_step: 35/35 required CI and an independent exact-head review (request: see the PR conversation)
+next_action: independent exact-head review of the PR; after publish, check the live site per post_merge_check
+post_merge_check: on https://verdantgrowdiary.com accept analytics and confirm script[src="https://analytics.ahrefs.com/analytics.js"] carries data-key KZfnjSoVSRYkyDJq+SUsow; NOT_MEASURED until live /version.json reports the merge SHA
+active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
+decisions: keep the consent gate; a static tag would load before consent and contradict the privacy policy and consent settings page. CSP allowance for analytics.ahrefs.com goes in a separate PR (owner choice).
+tried_and_rejected: pasting the snippet into src/routes/__root.tsx <head>; rejected for the consent reason above
+commands: bunx vitest run src/test/ahrefs-analytics-loader.test.ts --reporter=dot; bun run typecheck; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/constants/analytics.ts, src/test/ahrefs-analytics-loader.test.ts, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: Ahrefs "Recheck installation" looks for the tag in static HTML, which this site does not serve before consent; whether Ahrefs accepts the consent-gated install is NOT_MEASURED
+gotchas: the key test is scorer-locked; unlock recorded with reason before commit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2600 (docs: Ahrefs project of record; no code overlap)
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3; this Claude session excluded
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-10-28 23:10 UTC
+owner: Claude
+last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
+```
+
+## Closed
+
 ### HONO-NODE-SERVER-GHSA-RMXM
 
 ```text
-TASK HONO-NODE-SERVER-GHSA-RMXM  priority: P2  status: OPEN
+TASK HONO-NODE-SERVER-GHSA-RMXM  priority: P2  status: CLOSED
 goal: Clear GHSA-rmxm-3fg6-px4f (moderate, @hono/node-server >=1.19.10 <2.1.3), which blocks check:deps on every PR and on the deploy tip bbc77ae23. Raise the exact override and BUN_LOCK_SECURITY_FLOORS from 2.0.10 to 2.1.3 and regenerate bun.lock with CI's bun 1.3.14.
 why: a dependency audit red across PRs is top-priority work (CURRENT_STATE Start here). Matthew approved the scorer unlock, a separate PR and porting into #2602/#2603 (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-29).
 branch: claude/hono-node-server-2-1-3
 base: verdant-grow-diary
-checkout: git fetch origin claude/hono-node-server-2-1-3 verdant-grow-diary && git switch claude/hono-node-server-2-1-3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+checkout: None; closed (merged). Historical branch: claude/hono-node-server-2-1-3
 pr: draft PR from claude/hono-node-server-2-1-3 (link in the PR list)
-head_sha: read the PR head; this commit cannot name itself
-state: pushed; marked ready for review
-current_step: fresh exact-head review and 35/35 required CI at the head after this handoff fix
-next_action: independent exact-head review at the new head (session_017UoYKuwk7Z3wSC7syg3jnF offered); then 35/35 required CI, the founder's per-item yes and the merge queue. The same three-file dependency change is ported into #2602 and #2603
+head_sha: 7c09de3413c556389da7677341d340da6c660b4a (final PR head)
+state: CLOSED (merged). #2605 merged by cheekhimself at 2026-10-29 17:24:03 UTC from final head 7c09de34 as dcf39fdb605de7ea89884e5a884978857f99b18a
+current_step: none; closed
+next_action: None; closed. post_merge_check PASS: Dependency & Security CI run 40920963434 succeeded on deploy tip dcf39fdb (the two prior tips 479cadb3 and 9b60f907 failed it on this advisory)
 post_merge_check: Dependency & Security CI check:deps passes on the deploy branch tip after merge
 active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
 decisions: 2.1.3 is the first fixed release in major 2 (advisory range <2.1.3); follow the ip-address 10.7.4 precedent (6f937d3): override + floor + bun.lock only
@@ -1016,11 +1086,12 @@ gotchas: regenerate bun.lock with bun 1.3.14 (CI pin), not a newer local bun; pa
 links: https://github.com/advisories/GHSA-rmxm-3fg6-px4f
 artifacts: PR body
 reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (dependency/lockfile scope); this Claude session excluded
-reviewer_sha: none valid. session_017UoYKuwk7Z3wSC7syg3jnF: PASS for code scope at 4d9defc1c, then FAIL at 02f83c7e1 on this block's files_touched and commands (comment 6500943336); this commit fixes that and needs a fresh review
+reviewer_sha: 7c09de3413c556389da7677341d340da6c660b4a, PASS by session_017UoYKuwk7Z3wSC7syg3jnF (earlier verdicts at 4d9defc1c and 02f83c7e1 superseded)
+closure: merged as dcf39fdb605de7ea89884e5a884978857f99b18a; ports in #2602 and #2603 are no-ops after their base merges
 session_state: none
 claimed_by: Claude, 2026-10-29 00:24 UTC
 owner: Claude
-last_updated: 2026-10-29 16:08 UTC, by Claude
+last_updated: 2026-10-29 17:50 UTC, by Claude (closed in the #2602 base merge)
 ```
 
 ## Closed

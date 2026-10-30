@@ -156,7 +156,7 @@ Measured in this cloud environment on October 29, 2026 (CT):
 
 | Check | Before | After |
 | --- | --- | --- |
-| REA tooling tests | Not present | 20 passed, 0 failed |
+| REA tooling tests | Not present | 21 passed, 0 failed |
 | Static client-secret scanner self-tests | 29 passed, 0 failed | 29 passed, 0 failed |
 | Static client-secret repository scan | PASS | PASS |
 | Docs safety | 3 scanners passed | 3 scanners passed |
@@ -206,9 +206,9 @@ were introduced.
 
 Peer review found relative/WebSocket credential scanning, descendant-process
 cleanup and malformed-proxy cleanup issues. They were fixed; regressions cover
-the credential and process cases, plus interruptions during startup, capture
-and export. This peer review is not repository independent acceptance or merge
-approval. The PR stays draft pending those gates and the blocked app checks.
+the credential and process cases, plus interruptions during startup, capture,
+export and shutdown. This peer review is not repository independent acceptance
+or merge approval. The PR stays draft pending those gates and the blocked app checks.
 
 Resume with a supported global REA runtime, then repeat the command in job 3.
 Further route extraction needs REA support for the timed-out/unsupported code;

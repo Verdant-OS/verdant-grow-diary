@@ -32,7 +32,7 @@ export async function main(argv = process.argv.slice(2)) {
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const source = readSourceInventory(repo, values.commit);
   const reaVersion = checkRea(values.rea);
-  let browser, session, output, ownsOutput = false;
+  let browser, session, output, failure, summary, ownsOutput = false;
   const signals = ['SIGINT', 'SIGTERM'];
   const controller = new AbortController();
   const interrupted = () => { controller.abort(); void session?.close().catch(() => {}); };
@@ -71,15 +71,20 @@ export async function main(argv = process.argv.slice(2)) {
       await writeFile(join(output, 'inventory.json'), JSON.stringify({ metadata: meta, ...map }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
       await writeFile(join(output, 'report.md'), renderReport(meta, map), { flag: 'wx', mode: 0o600 });
       checkInterrupted();
-      process.stdout.write(`Report: ${join(output, 'report.md')}\nObserved route candidates: ${map.observed_route_candidate_count}\nApplication route coverage: NOT_MEASURED\n`);
+      summary = `Report: ${join(output, 'report.md')}\nObserved route candidates: ${map.observed_route_candidate_count}\nApplication route coverage: NOT_MEASURED\n`;
   } catch (error) {
-    await session?.close();
-    if (ownsOutput) await rm(output, { recursive: true, force: true });
-    throw error;
+    failure = error;
   } finally {
+    try { await session?.close(); } catch (error) { failure ??= error; }
+    try { await browser?.close(); } catch (error) { failure ??= error; }
     for (const signal of signals) process.removeListener(signal, interrupted);
-    await session?.close(); await browser?.close();
   }
+  if (controller.signal.aborted) failure = new Error('Interrupted; capture discarded.');
+  if (failure) {
+    if (ownsOutput) await rm(output, { recursive: true, force: true });
+    throw failure;
+  }
+  process.stdout.write(summary);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

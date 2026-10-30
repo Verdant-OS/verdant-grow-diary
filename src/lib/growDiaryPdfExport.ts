@@ -22,6 +22,7 @@
 import type { CountValue } from "@/lib/growStatus";
 import type { RecentItem } from "@/lib/growStatus";
 import { resolveSensorSourceDisplayCanon } from "@/lib/sensorSourceDisplayCanon";
+import { isUsableGrowDiaryPdfCount } from "@/lib/growDiaryPdfReadinessRules";
 
 /** Minimal grow context accepted by the PDF builder. */
 export interface GrowDiaryPdfGrowContext {
@@ -89,6 +90,7 @@ export interface GrowDiaryPdfModel {
   charts: Array<{ label: string; summary: string }>;
   chartsUnavailableNote: string | null;
   isEmpty: boolean;
+  dataUnavailableNote: string | null;
   safetyFooter: string;
 }
 
@@ -143,7 +145,12 @@ export function buildGrowDiaryReportFilename(growName: string, now: Date): strin
   return `verdant-grow-diary-${safeSlug(growName)}-${localDate(now)}.pdf`;
 }
 
-export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): GrowDiaryPdfModel {
+/** Only the model builder accepts missing activity; [] is a successful empty read. */
+type GrowDiaryReportModelInput = Omit<BuildGrowDiaryReportInput, "recent"> & {
+  recent: BuildGrowDiaryReportInput["recent"] | null | undefined;
+};
+
+export function buildGrowDiaryReportModel(input: GrowDiaryReportModelInput): GrowDiaryPdfModel {
   const now = input.now ?? new Date();
   const plantNames = (input.grow.plantNames ?? []).filter(Boolean);
   const scopeParts: string[] = [input.grow.name];
@@ -174,7 +181,8 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
     },
   ];
 
-  const events = (input.recent ?? []).slice(0, 50).map((r) => ({
+  const activityAvailable = Array.isArray(input.recent);
+  const events = (Array.isArray(input.recent) ? input.recent : []).slice(0, 50).map((r) => ({
     when: tryDateLabel(r.ts),
     kind:
       r.kind === "diary"
@@ -219,8 +227,11 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
         "No chart data was available to embed at export time. Use the summary totals and logged events below as the source data.")
       : null;
 
-  const diaryCount = typeof input.counts.diary === "number" ? input.counts.diary : 0;
-  const isEmpty = diaryCount === 0 && events.length === 0;
+  const dataUnavailableNote =
+    !isUsableGrowDiaryPdfCount(input.counts.diary) || !activityAvailable
+      ? "Some diary data couldn't be loaded. Refresh this grow and try exporting again."
+      : null;
+  const isEmpty = dataUnavailableNote === null && input.counts.diary === 0 && events.length === 0;
 
   return {
     title: `Grow Diary Summary — ${input.grow.name}`,
@@ -234,6 +245,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
     charts,
     chartsUnavailableNote,
     isEmpty,
+    dataUnavailableNote,
     safetyFooter:
       "Read-only report. Verdant does not control equipment or run your grow for you. Sensor sources are shown under their canonical labels, which may differ from the stored labels; stale/invalid/demo readings are not treated as healthy.",
   };
@@ -271,7 +283,9 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
 
   const eventsBlock = eventsRows
     ? `<table><thead><tr><th>When</th><th>Kind</th><th>Title</th><th>Detail</th></tr></thead><tbody>${eventsRows}</tbody></table>`
-    : `<p class="muted" data-testid="grow-diary-pdf-empty-events">No logged events yet. Start with a Quick Log to begin building your grow memory.</p>`;
+    : model.isEmpty
+      ? `<p class="muted" data-testid="grow-diary-pdf-empty-events">No logged events yet. Start with a Quick Log to begin building your grow memory.</p>`
+      : `<p class="muted">No recent events were included in this export.</p>`;
 
   const sourcesBlock = model.sensorSources.length
     ? `<ul class="sources">${model.sensorSources
@@ -290,7 +304,9 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
 
   const emptyBanner = model.isEmpty
     ? `<p class="muted" data-testid="grow-diary-pdf-empty-state">This grow has no logged diary entries yet. This report captures the current empty state so you have a baseline.</p>`
-    : "";
+    : model.dataUnavailableNote
+      ? `<p class="muted" data-testid="grow-diary-pdf-data-unavailable">${esc(model.dataUnavailableNote)}</p>`
+      : "";
 
   return `<!doctype html>
 <html lang="en">

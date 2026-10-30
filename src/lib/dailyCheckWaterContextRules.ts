@@ -47,7 +47,7 @@ export function resolveDailyCheckActivityTarget(
   if (input.plantResolutionStatus === "unknown" || input.plantResolutionStatus === "out-of-scope") {
     return {
       plantId: null,
-      tentId: nonemptyId(input.routeTentId),
+      tentId: nonemptyId(input.routeTentId) ?? nonemptyId(input.standaloneTentId),
     };
   }
 

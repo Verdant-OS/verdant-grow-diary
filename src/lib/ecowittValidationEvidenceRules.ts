@@ -131,12 +131,9 @@ function redactEvidenceNode(value: unknown): unknown {
 
 export function redactEvidenceValue(value: unknown): unknown {
   try {
-    if (isPlainRecord(value)) return redactEvidenceNode(value);
-    if (Array.isArray(value)) {
-      if (!value.every((reading) => isPlainRecord(reading))) return REDACTED;
-      return value.map((reading) => redactEvidenceNode(reading));
-    }
-    return REDACTED;
+    // Records, multi-reading batches (arrays, incl. empty) and raw string
+    // payloads keep their shape; secrets and internal ids are redacted per node.
+    return redactEvidenceNode(value);
   } catch {
     return REDACTED;
   }

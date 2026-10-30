@@ -101,15 +101,10 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
       : NO_TENT_MANUAL_ROWS;
   const hasReadError = recentActivity.isError || manualLogs.isError || tentSensorFailed;
   const isLoading =
+    // Initial load only — background refetches keep the rendered panel.
     recentActivity.isLoading ||
-    recentActivity.isFetching ||
-    recentActivity.data === undefined ||
     manualLogs.isLoading ||
-    manualLogs.isFetching ||
-    manualLogs.data === undefined ||
-    Boolean(
-      tentUuid && (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
-    );
+    Boolean(tentUuid && tentSensorStatus === "loading");
 
   const retryContextReads = () => {
     void recentActivity.refetch();

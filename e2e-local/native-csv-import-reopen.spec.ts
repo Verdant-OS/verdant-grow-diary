@@ -17,6 +17,14 @@ import {
   type CsvFixture as LocalFixture,
 } from "./lib/nativeCsvFixtures";
 
+test.beforeEach(async ({ context }) => {
+  // These import/readback scenarios assert canonical Celsius values. Set only
+  // the display preference before each document loads; auth remains real.
+  await context.addInitScript(() => {
+    window.localStorage.setItem("verdant:temperatureUnit", "celsius");
+  });
+});
+
 // Actual browser import + PostgREST + disposable PostgreSQL. No mocked save,
 // injected session, hosted backend, or published-site acceptance claim.
 function recentCsv(agesInMinutes: readonly [number, number] = [2, 1]) {

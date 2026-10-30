@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-305-CSV-TIMELINE-SHARED-CONTEXT
+
+```text
+TASK VER-305  priority: P2  status: OPEN
+goal: Prevent repeated nearest CSV observations from masquerading as distinct Timeline history.
+why: QA imported four observations; four diary entries can all select the latest observation within 45 minutes.
+branch: codex/ver-305-csv-timeline-shared-context
+base: verdant-grow-diary at ab4aaa2f3a648c28860c682ddec3ec0103347246
+checkout: git fetch origin codex/ver-305-csv-timeline-shared-context verdant-grow-diary && git switch codex/ver-305-csv-timeline-shared-context && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: To be opened as draft immediately after this planning push.
+head_sha: Read the current full SHA from the PR; this planning commit cannot contain its own SHA.
+state: Investigation complete; implementation pending.
+current_step: Open draft, reproduce four observations and repeated nearest matches in additive tests.
+next_action: Add grouping of matched observations per tent/capture time and explicit diary entry links.
+post_merge_check: After separately authorized release, verify four exact-time matches stay distinct and four repeated nearest matches show one shared observation with four diary links on production.
+active_writer: Codex VER-305 session /workspace/scratch/094eb9844d09; only this session pushes.
+decisions: Preserve diary-context design and 45-minute nearest matching. Consolidate shared observation cards and explain associations; full imported history remains on Tent Detail. Keep existing CSV/derived/unknown VPD provenance and all read-state protections.
+tried_and_rejected: One-card-per-import redesign would change this panel's diary context contract and broaden the query/window scope. Arbitrarily dropping diary associations would hide useful context. Neither is justified.
+commands: Run focused CSV Timeline Vitest suites, changed-file ESLint/Prettier, typecheck, scorer-lock strict and diff check when dependencies are available.
+files_touched: docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: src/components/TimelineCsvContextPanel.tsx; src/lib/environmentCsvTimelineContextViewModel.ts; new src/test/environment-csv-timeline-shared-context.test.tsx
+blockers: Independent acceptance needs an actually available eligible non-contributing outside session; none verified. Production verification awaits separate release authorization.
+open_questions: None blocking implementation.
+gotchas: Sensor rows are metric rows; group observations by tent and captured time, never by displayed value or capture time alone. Matching remains diary-driven, not full imported history. Local tests do not establish production acceptance.
+links: https://linear.app/verdantgrowdiary/issue/VER-305
+artifacts: Draft PR to follow.
+reviewer_seat: BLOCKED / unavailable eligible outside session; Codex author is excluded.
+reviewer_sha: NOT_MEASURED
+session_state: No subagents, routines, workflow changes, merge or deployment authority.
+claimed_by: Codex VER-305 session, 2026-10-30 UTC (Matthew's explicit assignment)
+owner: Codex VER-305 session
+last_updated: 2026-10-29 CT, by Codex
+```
+
 ### ARCH-CONTRACT-RESTAMP-20261029
 
 ```text

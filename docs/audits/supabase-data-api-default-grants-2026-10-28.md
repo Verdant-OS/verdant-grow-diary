@@ -66,6 +66,10 @@ not qualify. Nested literal EXECUTE spans are propagated through decoded DO bodi
 Quoted aliases cannot trigger CTE/DML suppression. Repeated transaction starts
 preserve the original rollback snapshot and savepoints. ACL keywords must have
 SQL identifier boundaries, including dollar signs and non-ASCII characters.
+Identifier identity follows the target PostgreSQL default 63-byte limit, clipping
+whole UTF-8 characters after decoding and case folding. Runtime EXECUTE variables
+named function/procedure have no trigger-syntax exemption; actual trigger clauses
+remain outside executable-command statement contexts.
 
 Twenty-five historical dynamic statements were inspected in six immutable migration
 files. They handle policies or existing object ACLs rather than creating tables.

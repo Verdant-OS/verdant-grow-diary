@@ -1052,3 +1052,39 @@ describe("SQL token boundaries and repeated transaction starts", () => {
     expect(tables(CREATE + "CREATE POLICY p$grant ON public.leaky TO authenticated USING (true); GRANT SELECT ON public.leaky TO authenticated;")).toEqual([]);
   });
 });
+
+describe("identifier byte limits and executable command variables", () => {
+  it.each([false, true])("retains a truncated ASCII temporary shadow (quoted=%s)", (quoted) => {
+    const n = "a".repeat(63);
+    const ident = (value: string) => quoted ? '"' + value + '"' : value;
+    expect(tables("CREATE TABLE public." + ident(n) + "(id int); CREATE TEMP TABLE " + ident(n + "x") + "(id int); DROP TABLE " + ident(n) + ";")).toEqual([n]);
+  });
+  it.each([false, true])("clips whole UTF-8 characters for temporary shadows (quoted=%s)", (quoted) => {
+    const n = "é".repeat(31);
+    const ident = (value: string) => quoted ? '"' + value + '"' : value;
+    expect(tables("CREATE TABLE public." + ident(n) + "(id int); CREATE TEMP TABLE " + ident(n + "éx") + "(id int); DROP TABLE " + ident(n) + ";")).toEqual([n]);
+  });
+  it("uses the same truncated identity for a real ACL", () => {
+    const n = "a".repeat(63);
+    expect(tables("CREATE TABLE public." + n + "suffix(id int); GRANT SELECT ON public." + n + "other TO authenticated;")).toEqual([]);
+  });
+  it("keeps names differing inside the byte boundary distinct", () => {
+    const prefix = "a".repeat(62);
+    expect(tables("CREATE TABLE public." + prefix + "x(id int); CREATE TEMP TABLE " + prefix + "ysuffix(id int); DROP TABLE " + prefix + "x;")).toEqual([]);
+  });
+  it("retains a full multibyte character ending at byte63", () => {
+    const n = "a".repeat(61) + "é";
+    expect(tables('CREATE TABLE public."' + n + '"(id int); CREATE TEMP TABLE "' + n + 'suffix"(id int); DROP TABLE "' + n + '";')).toEqual([n]);
+  });
+  it("normalizes savepoint names at the same byte limit", () => {
+    const n = "s".repeat(63);
+    expect(tables(CREATE + "BEGIN; SAVEPOINT " + n + "; GRANT SELECT ON public.leaky TO authenticated; ROLLBACK TO " + n + "suffix; COMMIT;")).toEqual(["leaky"]);
+  });
+  it.each(["procedure", "function", '"procedure"', '"function"'])("rejects a runtime command variable named %s", (name) => {
+    const findings = tables("DO $$ DECLARE " + name + " text := 'CREATE TABLE public.leaky(id int)'; BEGIN EXECUTE " + name + "; END $$;");
+    expect(findings.some((table) => table.startsWith("(unreadable dynamic EXECUTE"))).toBe(true);
+  });
+  it.each(["FUNCTION", "PROCEDURE"])("does not reject real trigger EXECUTE %s syntax", (keyword) => {
+    expect(tables("CREATE TRIGGER t BEFORE INSERT ON public.existing FOR EACH ROW EXECUTE " + keyword + " public.f();")).toEqual([]);
+  });
+});

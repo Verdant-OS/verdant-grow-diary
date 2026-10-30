@@ -13,6 +13,7 @@
 // Known limitation: DO control flow is not evaluated. Unqualified names are
 // assumed public; a migration that changes search_path must qualify names.
 import { createHash } from "node:crypto";
+import { Buffer } from "node:buffer";
 
 // Immutable migration SQL reviewed for dynamic commands that do not create
 // tables: policy creation/removal, fixed literal ACLs, and function ACLs
@@ -124,7 +125,6 @@ const DO_ESCAPED_PREFIX_RE = new RegExp("^\\s*DO(?:\\s+LANGUAGE\\s+" + DO_LANGUA
 // command. Anything else (EXECUTE 'DROP ...' || suffix) builds the command at
 // run time, so the string is not read as the statement (fails closed).
 const EXECUTE_ENDS_RE = /^\s*(?:;|$|USING\b|INTO\b)/i;
-const EXECUTE_TRIGGER_TAIL_RE = /^(?:FUNCTION|PROCEDURE)\b/i;
 function skipWsAndComments(sql, i, end) {
   while (i < end) {
     if (/\s/.test(sql[i])) {
@@ -299,7 +299,6 @@ function collectDynamicExecuteEvents(sql, procedural = false) {
       if (!inStatements || !EXECUTES_RE.test(noComments.slice(statementStart,i) + "EXECUTE")) { i+=7; continue; }
       const executeAt=i;
       const afterKw=skipWsAndComments(sql,i+7,end);
-      if(EXECUTE_TRIGGER_TAIL_RE.test(sql.slice(afterKw))){i=afterKw;continue;}
       if(sql[afterKw]==="'" || sql[afterKw]==="$"){
         const lit=sql[afterKw]==="'"?readSingleQuoted(sql,afterKw,end):readDollarQuoted(sql,afterKw,end);
         const afterLit=lit?skipWsAndComments(sql,lit.after,end):afterKw;
@@ -430,8 +429,21 @@ export const LEGACY_DEFAULT_PRIVILEGE_TABLES = Object.freeze(
 
 // Unquoted identifiers fold to lower case; quoted ones keep their case.
 function identName(raw) {
-  const name = raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.replace(/[A-Z]/g, (c) => c.toLowerCase());
-  return name.replaceAll(QUOTED_SEMICOLON, ";");
+  const decoded = raw.startsWith('"') ? raw.slice(1, -1).replace(/""/g, '"') : raw.replace(/[A-Z]/g, (c) => c.toLowerCase());
+  const name = decoded.replaceAll(QUOTED_SEMICOLON, ";");
+  // Supabase uses PostgreSQL's default NAMEDATALEN: identifiers retain at
+  // most 63 UTF-8 bytes, never a partial character. Apply the same identity
+  // to tables, schemas, roles and savepoints before comparing their names.
+  if (Buffer.byteLength(name, "utf8") <= 63) return name;
+  let bytes = 0;
+  let clipped = "";
+  for (const character of name) {
+    const size = Buffer.byteLength(character, "utf8");
+    if (bytes + size > 63) break;
+    bytes += size;
+    clipped += character;
+  }
+  return clipped;
 }
 
 // Blank SQL to spaces of the same length, so match indices line up with the

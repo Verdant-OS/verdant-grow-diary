@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ISSUE-2235-GROW-PDF-READINESS
+
+```text
+TASK ISSUE-2235-GROW-PDF-READINESS  priority: P2  status: OPEN
+goal: prevent Grow PDF export from presenting loading or unavailable diary data as an empty grow.
+why: issue #2235 reports two premature empty PDFs for a disposable QA grow with 66 entries; missing data must never be represented as confirmed zero.
+branch: codex/2235-grow-pdf-readiness
+base: verdant-grow-diary at 0792349d57de2c1c0e2610f643920cf595486dfc (verified starting base)
+checkout: git fetch origin codex/2235-grow-pdf-readiness verdant-grow-diary && git switch codex/2235-grow-pdf-readiness && git merge --ff-only origin/codex/2235-grow-pdf-readiness
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2611 (draft; keep draft)
+head_sha: d8e59ab8370bb147940d62419454b924eb876665 (full remote SHA observed 2026-10-30T00:33:23.245Z)
+state: client fix implemented; replacement writer restores the handoff lost in the base merge; required CI and independent acceptance incomplete
+current_step: documentation-only takeover/checkpoint after Matthew explicitly overrode the writer-continuity hold; no source or test change in this resumption
+next_action: confirm the current remote full head and its ancestry from head_sha, then run the nine-file Vitest command below in a canonical dependency environment; OG Kush routes complete-scope exact-head review to one actually available eligible non-contributing Claude/Grok session; keep draft and all release holds
+post_merge_check: separately authorized production verification only after the live SHA contains the fix: disposable fixture owner hard-reloads the 66-entry grow twice, verifies export waits and does not print an empty baseline, dismisses the print dialog and verifies the Grow status card resolves from its loading/unavailable state. Both repetitions and status-card behavior are NOT_MEASURED. A failure reopens this same task.
+active_writer: Codex ChatGPT #2611 resumption 2026-10-30T00:30:00.996Z
+decisions: Matthew's "I override these settings" followed the explicit explanation that this reassigns #2611 and authorizes recording the replacement claim and scoped continuation. This is an owner override, not an original-writer release or proof of session continuity. Claim https://github.com/Verdant-OS/verdant-grow-diary/pull/2611#issuecomment-6511864350 was posted, read back and checked with unchanged full remote head. Preserve the existing implementation: disable Export PDF and expose Loading export/aria-busy during activity loading; reject failed activity or unusable diary counts; preserve missing activity distinctly from successful []; an empty baseline requires a usable zero diary count plus successful empty activity. Optional unavailable alert totals remain exportable. Shared input/exporter types remain non-null; only the pure model accepts incomplete activity.
+tried_and_rejected: historical author checkpoints at d5d68df123ec154e7f3436e62f82ca75d3319006 and 366823e544b995a940679abe10005bcaf7663fd9 failed hosted typecheck; 0fb9e55fba443b4d57674dcf1fe87aafa39fd3e8 corrected the typing. Preserve those receipts, not their former acceptance status. Earlier frozen installation failed against the private Lovable mirror; no unpinned npm fallback or lockfile repair. This replacement session found neither Bun nor node_modules locally and did not install. Its prior write pause was deliberate collision compliance; no write operation was denied.
+commands: bunx vitest run src/test/issue-2235-grow-pdf-data-state.test.ts src/test/issue-2235-grow-pdf-button.test.tsx src/test/grow-detail-export-pdf-button.test.tsx src/test/grow-diary-pdf-export.test.ts src/test/grow-diary-pdf-export-local-print.test.ts src/test/grow-diary-pdf-export-source-and-escape.test.ts src/test/grow-diary-pdf-export-source-normalized-note.test.ts src/test/free-limited-export-contract.test.tsx src/test/quicklog-habit-polish.test.tsx --reporter=dot; bun run typecheck; bun run lint; bun run build; node scripts/scorer-lock.mjs --report --strict; git diff --check
+files_touched: original source scope is src/pages/GrowDetail.tsx; src/lib/growDiaryPdfExport.ts; src/lib/growDiaryPdfReadinessRules.ts (added); src/test/issue-2235-grow-pdf-data-state.test.ts (added, 19 cases); src/test/issue-2235-grow-pdf-button.test.tsx (added, 6 cases). This replacement changes only docs/agents/HANDOFF_LOG.md, docs/agents/CURRENT_STATE.md, the PR body and task comments.
+files_remaining: no planned application edits; finish canonical nine-file tests, full required CI and independent acceptance
+blockers: local Bun and node_modules absent, so canonical Vitest/DOM, lint, typecheck, build and strict scorer command cannot be executed locally on this current checkout. At d8e59ab8370bb147940d62419454b924eb876665 required contexts are 2 SUCCESS / 1 SKIPPED / 32 missing individual shard results (the matrix-template job was skipped on the draft). No eligible outside reviewer session is exposed; routing/acceptance BLOCKED. These are not owner-claim blockers.
+open_questions: production status-card recovery after print dismissal remains unverified; #2234 totals and print scheduling remain outside this task
+gotchas: head_sha is the last observed remote source checkpoint, not a self-referential hash of the commit containing this line. AGENTS takeover permits an ahead head only after verifying this SHA remains its ancestor. The final published checkpoint SHA is also recorded in the PR body/resume receipt after push. Preserve all unrelated handoff blocks. Do not edit existing tests, dependencies, lockfiles, schema, RLS, Edge, secrets or settings.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2235; https://github.com/Verdant-OS/verdant-grow-diary/pull/2611#issuecomment-6489399286 (superseded historical review ledger); https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40972670165; https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/40972670204
+artifacts: at d8e59ab8370bb147940d62419454b924eb876665, hosted Dependency & Security job 123792978119 PASS: dependency policy/scan, 230 contract tests across 5 files (0 failed), global typecheck, build and 36 Playwright smoke tests (0 failed). These are not the nine Grow PDF test files and not production proof. Main CI job 123792977787 has typecheck PASS and test:legal-seo SUCCESS; preflight job 123792977942 SUCCESS. Previous author's 19 new pure + 19 existing builder + 7 mocked-presenter supplemental checks and 7 mutations are historical at 0fb9e55, not fresh canonical Vitest/DOM results. Current source comparison to base: two test files added, zero existing tests modified. No strict scorer execution is claimed by this replacement.
+reviewer_seat: OG Kush routing owner; one actually available eligible non-contributing Claude/Grok session under OWNERSHIP.md section 4.3, not yet assigned. Exclude the original Codex author, this replacement and all other contributors. Shared GitHub identity is not independence evidence.
+reviewer_sha: none; old request superseded by the new head, no independent PASS obtained
+session_state: no subagents, routines or paused workflows; no ready/enqueue/auto-merge/merge/deploy/production work authorized; writer continuity hold overridden by Matthew, all release holds retained
+claimed_by: Codex ChatGPT #2611 resumption 2026-10-30T00:30:00.996Z; owner-authorized replacement, effective 2026-10-30T00:30:00.996Z
+owner: Codex ChatGPT #2611 resumption 2026-10-30T00:30:00.996Z
+last_updated: 2026-10-30T00:33:23.245Z, by replacement Codex
+```
+
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
 
 ```text

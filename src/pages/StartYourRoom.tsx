@@ -166,12 +166,15 @@ export default function StartYourRoom() {
     // A failed roster read looks like an empty roster; hydrating then would
     // reset a tent/plant-step draft and overwrite it. Wait for a good read.
     if (!ownerId || growsLoading || growsError || draftHydratedFor.current === ownerId) return;
-    draftHydratedFor.current = ownerId;
     const draft = readBrowserSessionFormDraft(
       ownerId,
       START_YOUR_ROOM_DRAFT_FORM_ID,
       parseStartYourRoomDraft,
     );
+    // A saved tent must be checked against a successful roster read before
+    // restoring its plant step. An unavailable read is not a deleted tent.
+    if (draft?.ids.tentId && (tentsQuery.isLoading || tentsQuery.isError)) return;
+    draftHydratedFor.current = ownerId;
     if (!draft) {
       setForm({ ...DEFAULT_START_YOUR_ROOM_FORM });
       setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
@@ -182,16 +185,40 @@ export default function StartYourRoom() {
     }
     const growStillHere =
       draft.ids.growId != null && grows.some((grow) => grow.id === draft.ids.growId);
+    const tentStillHere =
+      growStillHere &&
+      draft.ids.tentId != null &&
+      tentsQuery.data?.some(
+        (tent) => tent.id === draft.ids.tentId && tent.grow_id === draft.ids.growId,
+      );
+    const missingSavedTent =
+      growStillHere && !tentStillHere && (draft.ids.tentId != null || draft.step === "plant");
     setForm(draft.form);
-    setError(growStillHere || draft.step === "grow" ? draft.saveError : null);
-    if (draft.step === "grow" || growStillHere) {
+    setError(
+      !missingSavedTent && (growStillHere || draft.step === "grow") ? draft.saveError : null,
+    );
+    if (missingSavedTent) {
+      setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
+    } else if (draft.step === "grow" || growStillHere) {
       setPendingRowIds(draft.pendingRowIds);
     } else {
       setPendingRowIds({ ...EMPTY_START_YOUR_ROOM_PENDING_ROW_IDS });
     }
-    setIds(growStillHere ? draft.ids : { ...EMPTY_START_YOUR_ROOM_IDS });
+    if (growStillHere) {
+      setIds(missingSavedTent ? { ...draft.ids, tentId: null, plantId: null } : draft.ids);
+    } else {
+      setIds({ ...EMPTY_START_YOUR_ROOM_IDS });
+    }
     setDraftOwnerReady(ownerId);
-  }, [ownerId, grows, growsLoading, growsError]);
+  }, [
+    ownerId,
+    grows,
+    growsLoading,
+    growsError,
+    tentsQuery.data,
+    tentsQuery.isLoading,
+    tentsQuery.isError,
+  ]);
 
   // A grow whose create outcome was unknown before a reload may already exist
   // under the pending row id. Adopt it (the same steps a confirmed save takes).
@@ -305,16 +332,20 @@ export default function StartYourRoom() {
   // the grower created; after hydration an unlimited plan is not held.
   const rosterReadBlocksCreation =
     Boolean(growsError) && (growCountRequired || draftOwnerReady !== ownerId);
+  const tentReadBlocksCreation =
+    tentsQuery.isError && (tentCountRequired || draftOwnerReady !== ownerId);
   const creationVerificationFailed =
     entitlementLookupFailed ||
     plantReadFailed ||
     rosterReadBlocksCreation ||
-    (tentCountRequired && tentsQuery.isError);
+    tentReadBlocksCreation;
   const planVerificationReady = !entitlementLoading && !entitlementLookupFailed;
   const growVerificationReady =
     planVerificationReady && !rosterReadBlocksCreation && (!growCountRequired || !growsLoading);
   const tentVerificationReady =
-    planVerificationReady && (!tentCountRequired || (!tentsQuery.isLoading && !tentsQuery.isError));
+    planVerificationReady &&
+    !tentReadBlocksCreation &&
+    (!tentCountRequired || !tentsQuery.isLoading);
   const growGate = evaluateVerifiedGrowCreationGate(
     entitlement.capabilities,
     grows.length,

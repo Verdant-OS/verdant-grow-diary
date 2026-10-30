@@ -238,7 +238,11 @@ describe("Start your room saved-name summary", () => {
     await screen.findByTestId("start-room-save-retry");
     expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Private grow A");
     testState.userId = "55555555-5555-4555-8555-555555555555";
-    view.rerender(<MemoryRouter><StartYourRoom /></MemoryRouter>);
+    view.rerender(
+      <MemoryRouter>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
     expect(await screen.findByTestId("start-room-plant-name")).toHaveValue("");
     expect(screen.queryByTestId("start-room-bound-grow")).not.toBeInTheDocument();
     expect(screen.queryByText(/Private (grow|tent) A/)).not.toBeInTheDocument();

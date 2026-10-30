@@ -115,6 +115,14 @@ last_updated: 2026-10-28 06:26 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (
 - Remaining gates: normal hooks and final-tree checks; PR-body declaration; normal push and fresh CI; an eligible complete independent review at the resulting full SHA. This authoring session cannot provide its own acceptance. No eligible outside reviewer session has been established available.
 - Preserve the two #2565 owner decisions and #2582's partial-failure naming decisions. No owner disposition is inferred. #2582 remains based on #2565; no retarget before #2565 merges. No rebase, force-push, PR merge, deployment, or production operation is authorized.
 
+#### Codex hydration continuation — 2026-10-30
+
+- Matthew explicitly requested checking the restored tent ID against the current tents list. Starting head: `8e78951707b4e0d11866b24940a24a9c5de6d700`; Codex remains the sole claimed writer.
+- Hydration now waits for a successful tent read when the draft contains a saved tent. A missing tent or a tent bound to another grow clears the saved tent/plant IDs and obsolete retry IDs, returns to the tent step, and keeps unsent plant typing. A matching saved tent preserves the plant step and pending plant ID.
+- New regression: `src/test/start-your-room-deleted-tent-hydration.test.tsx`; RED 3 failed / 2 passed, GREEN 5 passed. The Start Your Room/source-reading selection passes 19 files / 117 tests; `bun run typecheck` passes. Bun automatic environment-file loading is disabled and explicit disposable client configuration is used for tests. Existing protected tests and `bun.lock` are unchanged by this repair.
+- Matthew also explicitly authorized refreshing the PR body. Its stale draft/file/count/validation statements will be replaced with final-head measured facts. The two pre-existing scorer additions remain separately declared; no new edits to them are authorized or made.
+- The deleted-tent decision is implemented under this new instruction; the separate account-switch busy decision remains open. Fresh CI and eligible outside complete-scope acceptance are still required at the resulting full head. This repair session cannot accept its own work. No merge or deployment is authorized.
+
 ### SETUP-QUICKLOG-DRAFT-RETRY
 
 ```text

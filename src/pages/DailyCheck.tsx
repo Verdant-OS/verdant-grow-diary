@@ -265,7 +265,7 @@ export default function DailyCheck() {
   );
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
-  const tentPickRouteKey = `${plantId ?? ""}|${plantResolution.status}`;
+  const tentPickRouteKey = `${initialPlantId ?? ""}|${plantResolution.status}`;
   const pickedTentId =
     explicitTentPick &&
     explicitTentPick.routeKey === tentPickRouteKey &&

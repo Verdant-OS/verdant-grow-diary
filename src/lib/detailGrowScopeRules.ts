@@ -43,6 +43,7 @@ export function readEntityTentGrowId(entity?: unknown): string | null {
 export function isQueryGrowScopeMismatch(entity: unknown, contextGrowId?: string | null): boolean {
   const requested = trimScopeId(contextGrowId);
   if (!requested) return false;
+  if (!isRecord(entity)) return true;
   const own = readEntityGrowId(entity);
   if (own) return own !== requested;
   // plants.grow_id is legitimately null; membership rolls up via the tent.

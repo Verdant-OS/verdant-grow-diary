@@ -78,29 +78,31 @@ why: Fahrenheit CSV readings displayed as Celsius after reload (VER-302).
 branch: codex/ver-302-imported-history-temperature-units
 base: verdant-grow-diary; integrated 0792349d57de2c1c0e2610f643920cf595486dfc, including merged dependency repair #2605
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2610
-head_sha: 15da00af1e2d130482f2281fcadef5f4222ab0d6 (published parent observed 2026-10-29; this commit integrates the current base and adds browser reload regressions; fetch the PR head before resuming)
-state: draft #2610; base integration resolves the handoff conflict and inherits #2605; new-head CI, browser proof and eligible outside acceptance pending
-current_step: run focused unit tests, publish the base integration plus browser regressions, and run existing CI workflows on that exact draft head
-next_action: verify the new head CI and both browser reload cases, then obtain eligible independent exact-head acceptance
+head_sha: 80eccc4a6e79a1322f94cf7cc6ef3522981c1de6 (verified remote repair baseline 2026-10-30; parent of this narrow correction checkpoint; read resulting full head from PR #2610)
+state: open non-draft #2610, confirmed through GitHub; two native CSV browser locators now match Temperature (°C); fresh hosted CI and eligible outside acceptance required
+current_step: publish the user-requested label-only correction with a normal commit/push; PR-body publication was rejected by automatic approval review and has not occurred
+next_action: read the resulting PR head and Native Save Retrieve Local CI; publish the prepared accurate PR body only after the approval blocker is cleared, then obtain eligible independent exact-head acceptance
 post_merge_check: after separately authorized release, verify both settings and hard reload against the four VER-302 CSV readings
-active_writer: Codex /root, ChatGPT Work Mode, workspace d0359f63e637; original assignment renewed by user Unblock on 2026-10-29
+active_writer: Codex /root, selected /workspace/verdant-grow-diary checkout; user-assigned narrow takeover 2026-10-30 after original writer thread completed; fresh remote head matched and no competing claim or dirty work observed
 decisions: reuse useTemperatureUnitPreference and convertCelsiusForDisplay; keep stored values, timestamps, source selection and metric ids unchanged
 tried_and_rejected: no new conversion implementation, data rewrite or duplicate VER-183 work
 commands: node node_modules/vitest/vitest.mjs run src/test/imported-sensor-history-temperature-units.test.tsx --reporter=dot
-files_touched: src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; src/test/imported-sensor-history-temperature-units.test.tsx; src/test/imported-sensor-history-panel.test.tsx; src/test/imported-sensor-history-read-honesty.test.tsx; src/test/imported-sensor-history-paused-read.test.tsx; src/test/csv-history-ai-doctor-full-chain.test.tsx; e2e/sensors-truth-closure.spec.ts; docs/agents/HANDOFF_LOG.md (this entry only; upstream blocks preserved)
+files_touched: src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; src/test/imported-sensor-history-temperature-units.test.tsx; src/test/imported-sensor-history-panel.test.tsx; src/test/imported-sensor-history-read-honesty.test.tsx; src/test/imported-sensor-history-paused-read.test.tsx; src/test/csv-history-ai-doctor-full-chain.test.tsx; e2e/sensors-truth-closure.spec.ts; e2e-local/native-csv-import-reopen.spec.ts; docs/agents/HANDOFF_LOG.md (this entry only; upstream blocks preserved). This repair changes only the native CSV spec and this receipt; complete PR scope is ten files.
 files_remaining: none planned; writer addresses verified review or CI findings
-blockers: eligible outside reviewer unavailable through current connected routes (desktop offline; no Claude CLI/reviewer endpoint); new-head checks and mocked browser reload proof pending. Production verification awaits separately authorized release.
+blockers: eligible outside acceptance remains unassigned; author/repairer Codex cannot accept this PR. Local frozen install with pinned Bun 1.3.14 failed HTTP 403 at the locked europe-west4-npm.pkg.dev Lovable mirror; Vitest cannot load pathe, so browser/runtime tests, full typecheck, lint and build are BLOCKED locally. PR-body update was denied by automatic approval review for missing trusted authorization for the exact publication; no retry or workaround. Fresh hosted results remain pending. Production verification awaits separately authorized release and is NOT_MEASURED.
 open_questions: none for implementation
 gotchas: #2536 owns a separate pagination browser; do not edit its branch; its new view-model caller must later pass the preference. VER-183 Canopy scope stays untouched. Existing tests pin Celsius presentation and require explicit Celsius setup and updated temperature labels; no assertion removal.
 links: https://linear.app/verdantgrowdiary/issue/VER-302/tent-page-imported-sensor-history-shows-csv-temperatures-in-c; https://linear.app/verdantgrowdiary/issue/VER-183/cf-setting-not-applied-everywhere-dashboard-strip-950f-in-c-mode; https://github.com/Verdant-OS/verdant-grow-diary/pull/2536#issuecomment-6489045891
 artifacts: Historical parent 15da00a: 11 unit suites / 163 PASS / 0 FAIL / 0 SKIP; hosted ci.yml run 40826545744 all 36 jobs passed; security/typecheck passed; dependency audit failed on the old base. Original-module negative control: 9 FAIL / 5 PASS. None of those results substitutes for this new head. Browser tests now save each preference through Settings, load Tent Detail, reload a cache-disabled fresh document, and assert the four readings, timestamps, CSV provenance and unrelated humidity/VPD; they intercept backend traffic and reject sensor-write claims. Results pending.
 reviewer_seat: eligible non-contributing Claude/Grok session; unassigned; writer and every contributor excluded
 reviewer_sha: NOT_MEASURED
-supplemental_review: Historical 15da00a: non-contributing Codex /root/ver302_source_review PASS, zero P1/P2. Not eligible outside acceptance under OWNERSHIP section 4.3; full review must refresh at the new head.
-session_state: one read-only supplemental reviewer; no routines, workflow changes, merge or deployment; draft-only hold
-claimed_by: Codex /root, 2026-10-29 05:47 UTC (initial draft receipt)
+supplemental_review: Historical 80eccc4a6e79a1322f94cf7cc6ef3522981c1de6: non-contributing Codex /root/ver302_source_review PASS, zero P1/P2, receipt issuecomment-6510546312. Not eligible outside acceptance under OWNERSHIP section 4.3 and invalidated for current acceptance by this correction; complete-scope review must refresh at the resulting head.
+repair_20261030: User explicitly requested lines 342 and 760 match Temperature (°C) instead of temperature_c. Both locator expressions now select that display label only for temperature_c; canonical payload IDs, row counts, numeric/suffix assertions, observation times, source labels, readback, deduplication and isolation checks are unchanged. Explicit scorer unlock declared for this spec with that reason; no whole-file formatting, scorer weakening or product change.
+repair_validation: Node 24 syntax check, diff whitespace check, docs-safety (three scanner categories), and strict scorer-lock against the verified repair baseline PASS. No runtime pass inferred. On the baseline, Native Save Retrieve Local run 40974006456 failed: 16 browser scenarios passed and seven CSV scenarios failed at the old display-label locators. Prior 163-unit-test/49-mocked-browser/36-CI-job passes are historical evidence at 80eccc4, not correction-head results.
+session_state: original writer cloud thread 01a1862f-779b-777d-b6c1-00a1efc8b0df completed; parent reports message resumption CloudThreadNotFoundError. No active subagents or new review request. PR comments remain gated, so takeover and resume facts are recorded here and in the prepared body. No routines, workflow changes, ready-state change, production QA, merge or deployment; no-merge/no-deploy hold remains.
+claimed_by: Codex /root, 2026-10-30 01:20 UTC (user-assigned two-locator correction; earlier writer completed)
 owner: Codex /root
-last_updated: 2026-10-29 22:58 UTC, by Codex (user requested Unblock)
+last_updated: 2026-10-30 01:23 UTC, by Codex (narrow correction; timestamps and hosted status must be refreshed from the PR)
 ```
 
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028

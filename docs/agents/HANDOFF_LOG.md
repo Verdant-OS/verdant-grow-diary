@@ -69,6 +69,64 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### VER-296-START-ROOM-ONE-STEP
+
+```text
+TASK VER-296-START-ROOM-ONE-STEP  priority: P2  status: OPEN
+goal: first win in one submit: Start Your Room creates the grow, tent and plant from one form, then opens Plant Detail with Quick Log.
+why: Toad Venom onboarding fix (Cheeko yes, 2026-10-27 3:56 PM CT); VER-296 SENTINEL prompt; Matthew: "yes to 296 tests", then "Push both" (2026-10-28).
+branch: claude/start-room-one-step (stacked on claude/setup-quicklog-draft-retry-p2s, PR #2565)
+base: claude/setup-quicklog-draft-retry-p2s; retarget to verdant-grow-diary once #2565 merges
+checkout: git fetch origin claude/start-room-one-step && git switch claude/start-room-one-step && git merge origin/claude/setup-quicklog-draft-retry-p2s
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: df6b28b141135a3c29c9d655e72d63f1e70b6647 is the last code commit (later commits change tests and this handoff only); read the current tip with git rev-parse origin/claude/start-room-one-step
+state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
+current_step: #2565 heads 0c825bf and c75b687 merged in (mismatch-review draft clear, chip baseline, roster gate scoped to pre-hydration for unlimited plans, commit-time owner ref, test global hygiene); 0e412c9 clears the setup draft before navigating; df547a7 skips the start-screen write and navigation when the grower left mid-save (pinned by test); df6b28b stops starting the tent or plant once the page is gone; awaiting CI and an independent exact-head review
+next_action: confirm required checks at the new head; route to an eligible reviewer who neither authored nor repaired this PR after #2565 settles; retarget to verdant-grow-diary once #2565 merges
+post_merge_check: after Publish, on the disposable fixture account with no grow, open Start Your Room, type a plant name, submit once: Plant Detail opens with Quick Log and the grow/tent/plant exist once each. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+decisions: review 5677102928: start-your-room-one-step pins the submitRoom double-submit guard and the unknown-outcome early return by submitting the form directly (deleting either guard fails its case); the test mock owner is a UUID because the unknown-outcome fence records only UUID owners. blank grow/tent names default to "My grow" / "Tent 1"; a partial resume creates only what is missing; plan gates block before any insert; Retry reuses the same preallocated row ids; Free with an existing grow keeps showing the grow-limit notice (unchanged) while tent+plant creation is allowed; paid with one grow still creates a new grow (unchanged appliedResume behaviour).
+tried_and_rejected: delegate:builder agents stopped at the 200k context mark before writing code; implemented in-session instead.
+commands: bunx vitest run src/test/start-your-room* src/test/start-room* src/test/hierarchy-create-response-loss.test.tsx
+files_touched: src/pages/StartYourRoom.tsx; src/lib/startYourRoomRules.ts; src/test/start-your-room-one-step.test.tsx (new); renegotiated (approved): src/test/hierarchy-create-response-loss.test.tsx and start-your-room-{draft-hydration,draft-owner-switch,draft-retry,enter-submits,entitlement-gate,quick-log-handoff,resume,review-regressions,save-reason-and-adopt}.test.tsx; src/test/start-your-room-plant-retry-id.test.tsx and src/test/start-your-room-draft-grows-read-error.test.tsx (adapted to the one-step form)
+files_remaining: none
+blockers: none for repository work
+open_questions: retry help text in startYourRoomDraftRules.ts still says "Retry saves this same step once" (copy left to Cheeko); put to Matthew 2026-10-28: Copilot 4397044004/4397135162, after a partial failure the bound line says "your grow" for a grow saved as "My grow" (cosmetic; not changed)
+gotchas: Start Your Room tests must clear sessionStorage in beforeEach (the draft store persists the form across tests); old step test ids (start-room-grow-submit etc.) are gone, use start-room-submit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
+artifacts: PR checks
+reviewer_seat: not assigned (excluded: session_017UoYKzLzTv1RAhx1Cc7Pme as author, session_017UoYKxgRTFgtyQW6ka38Ec as repairer)
+reviewer_sha: none
+session_state: the prior holder's check-in trig_01Hi7LCPDNjfdvVBvGoWUhCv belongs to that session; no paused workflows
+claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677102928; prior holder told to stop pushing)
+owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 06:19 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+```
+
+#### Codex partial-save continuation — 2026-10-30
+
+- Current owner and sole writer: Codex under the existing PR claim. Matthew explicitly requested showing saved grow/tent names after a partial save, listing all twelve existing scorer changes, restoring the dropped plant-retry assertions, and refreshing this PR body. Starting remote head: `1224948397ef0a336e411cd8d12c5eedd4cb21a1`.
+- The summary now resolves names by the shown saved IDs from owner-scoped lists, with owner-and-row-bound names from confirmed responses while lists refresh. Missing confirmation names retain the explicit unknown-name fallback. Submitted optional typing is not presented as a confirmed saved name. No persistence or schema behavior changes.
+- New regression file: `src/test/start-your-room-partial-save-names.test.tsx`, covering default/custom names after partial failure, same-parent retry, remount from saved records, missing names, and account switch. RED: 3 failed / 2 passed; GREEN after adding account-switch coverage: 6 passed. The initial broader Start Your Room selection passed 20 files / 129 tests before the account-switch case was added; final-tree checks are recorded on the PR body.
+- Matthew's specific plant-retry restoration authorizes only restoring the existing pending-plant-ID/plant-step assertion and checking the exact Plant Detail navigation replacing the removed done-screen assertion. Other existing scorer contents are preserved. The body must name all twelve changed scorers, including the previously omitted grows-read-error and plant-retry files; prior wording that no assertion was dropped was incorrect.
+- This branch stays stacked on #2565. Parent updates are normal merges; no retarget until #2565 merges. Ready status is preserved. Fresh applicable CI and complete eligible outside acceptance remain required at the resulting full head; this contributing session and its advisory agents are excluded. No merge, force-push, rebase, deployment, or production operation is authorized.
+
+- Final parent merge: `ff67c3603f38c099ee726291039a1f9bd6765664`. The sole source conflict preserves the inherited tent validation while retaining this branch's derived one-form step. Every current parent handoff block and this branch's own block is retained; the older LIVE-CHECKOUT block adopts its already-recorded closure from the parent. Final combined selection: 97 files / 1002 tests passed. Full typecheck passed before the parent merge; the final normal merge hook checks the merged project again. A new worktree needed its generated Husky entrypoints; `bun run prepare` restored them before this final commit. The first local partial-save commit preceded that setup, so its checks are supplied by the explicit test/typecheck/lint runs and final hook, not claimed as an initial hook pass.
+
+- Cached-roster follow-up: merged parent `80a2aa6cec0cf3bf034997ac0cd777b6d3993667` normally. The loading/progress source conflict retains this branch's oneStepProgressLabel and inherits the parent's wait for isFetching, its effect dependency and visible loading status. The shared regression preserves a valid saved tent and pending plant retry ID while cached data refetches on a paid account with two grows. Current combined source selection passes 97 files / 1003 tests. The unused copied test constant is removed. Existing twelve-scorer declaration is public; their contents are unchanged by this parent merge. Fresh CI and eligible outside acceptance still bind to the resulting head, with no retarget or integration authority.
+
+#### Codex refresh-continuation repair — 2026-10-30
+
+- Matthew's 16:22 UTC assignment continues the existing Codex claim for #2582. Starting remote head: `20b73f97a314ebe3fa424b21ff0cd965786100ce`. #2565 is now merged as `081f5132cb3ad3ec479d0af9a61390f1460ac316`; #2582 already targets `verdant-grow-diary` and remains ready. Earlier stacked-base, head and reviewer fields above describe prior checkpoints.
+- Two code defects were reproduced before changing production code: a rejected post-grow refresh could continue the old owner's tent write after an account switch, and an old unmounted post-plant continuation could clear a newer reopened draft. Baseline: 2 failed / 1 passed in the new regression file. Additional cases reproduced identical-content retry and an A-to-B-to-A owner round trip.
+- Each submission now captures its committed owner/writer epoch, with checks before and after persistence and refresh continuations. A new page instance claims draft ownership even when its text is identical; only that writer persists or clears the draft. Owner changes rotate the epoch. The existing durable unknown-outcome fence is still recorded for the owner after same-owner writer replacement, while stale local errors are suppressed. No draft format, row UUID allocation, auth store, schema or policy change is made.
+- New test file: `src/test/start-your-room-refresh-continuation.test.tsx` (6 cases). With the unchanged owner-switch, plant-retry-ID and hierarchy response-loss files: 4 files / 36 tests passed. Existing same-owner refresh rejection and unmounted completion without a replacement still pass. All existing scorer contents are unchanged by this repair; their prior approvals/declarations remain scoped to the recorded existing changes.
+- Final pre-commit checks: 98 relevant files / 1009 tests passed; `bun run typecheck` passed.
+- Changed paths for this repair: `src/pages/StartYourRoom.tsx`, the new regression file, and this task's continuation. `bun.lock` is unchanged. Relevant full-source tests, typecheck and normal commit hooks are recorded in the completion packet. No first-note redesign, production QA, rebase, force-push, base merge, PR merge or deployment is part of this repair.
+- Before the push, required CI was 0/35 present, with 17 successful and 1 skipped distinct supplemental checks. The retarget emitted edited, which Main CI does not subscribe to. This real source repair's ordinary synchronize event can run Main CI against the current deploy target; no denied manual dispatch is retried and no workflow is edited.
+- Jack Herer's PASS at the starting head named the former stacked base. The current base and this repair require fresh complete-scope acceptance; every contributing session is excluded. The three old naming threads describe a fixed issue and remain untouched. Generic retry wording and the separate busy-on-account-switch owner decision are not changed.
+- PR-body publication remains blocked by the earlier automatic approval rejection for new-head descriptions beyond the older exact text approved. The broad "fix #2582" assignment is not treated as permission to retry that denied operation. Prepare a factual current-head body and obtain specific owner approval before publication; preserve the earlier denial and history.
+
 ### SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541
 
 ```text

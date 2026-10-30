@@ -4,11 +4,13 @@ import { createGrowIdsEqual } from "@/lib/createDialogGrowBindingRules";
  * startYourRoomRules — pure step machine for the first-session
  * "Start your room" wizard.
  *
- * Goal: one guided path that creates grow → tent → plant with guaranteed
- * grow_id binding, then lands on Plant Detail for the first Quick Log.
+ * Goal: one form and one submit that create grow → tent → plant with
+ * guaranteed grow_id binding, then land on Plant Detail for the first Quick
+ * Log. The step is derived from which ids already exist (firstMissingStep).
  *
  * Pure: no React, no Supabase, no side effects. The page owns writes and
- * only submits when canProceed* is true. Payloads only include fields the
+ * submits the single form only when canSubmitRoom is true, filling blank
+ * names through startRoomFormWithDefaults. Payloads only include fields the
  * existing create dialogs already write (no schema expansion).
  */
 
@@ -43,18 +45,16 @@ export const START_YOUR_ROOM_STEPS: readonly StartYourRoomStep[] = [
 export const START_YOUR_ROOM_COPY = {
   pageTitle: "Start your room",
   pageSubtitle:
-    "One guided path: grow → tent → plant. Everything is linked so Quick Log works on the first try.",
-  growTitle: "Name your grow",
-  growHelp: "A grow is your current run or setup. You can archive it later.",
-  tentTitle: "Name your tent",
-  tentHelp: "Environment and sensors live on the tent. It will bind to this grow automatically.",
-  plantTitle: "Name your first plant",
-  plantHelp: "Plant memory starts here. This plant is bound to the grow and tent you just created.",
+    "Name your first plant and you're ready to log. Verdant links it to a grow and tent so Quick Log works on the first try.",
+  roomTitle: "Name your first plant",
+  roomHelp:
+    "Plant memory starts here. One tap creates the plant and the grow and tent it lives in.",
+  optionalNamesSummary: "Name your grow and tent (optional)",
+  optionalNamesHelp: "Leave these blank to use “My grow” and “Tent 1”. You can rename them later.",
+  ctaRoom: "Create plant & open Quick Log",
+  oneStepProgress: "One step",
   doneTitle: "Your room is ready",
   doneHelp: "Open Plant Detail to log your first note. Grow context is already linked.",
-  ctaGrow: "Create grow & continue",
-  ctaTent: "Create tent & continue",
-  ctaPlant: "Create plant & finish",
   ctaDone: "Open plant & Quick Log",
   skipToStartScreen: "Choose start screen instead",
 } as const;
@@ -74,6 +74,10 @@ export const EMPTY_START_YOUR_ROOM_IDS: StartYourRoomIds = {
   tentId: null,
   plantId: null,
 };
+
+/** Names used when the grower leaves the optional grow or tent name blank. */
+export const START_YOUR_ROOM_DEFAULT_GROW_NAME = "My grow";
+export const START_YOUR_ROOM_DEFAULT_TENT_NAME = "Tent 1";
 
 export function trimName(value: string | null | undefined): string {
   return typeof value === "string" ? value.trim() : "";
@@ -142,6 +146,43 @@ export function buildStartRoomPlantPayload(
     // No health: a new plant is not assessed; the column default applies
     // (QA 2026-09-24, BUG-009).
   };
+}
+
+/**
+ * The one-step form fills a blank grow or tent name with its default so the
+ * existing payload builders (which require a name) can be reused unchanged.
+ */
+export function startRoomFormWithDefaults(form: StartYourRoomForm): StartYourRoomForm {
+  return {
+    ...form,
+    growName: trimName(form.growName) ? form.growName : START_YOUR_ROOM_DEFAULT_GROW_NAME,
+    tentName: trimName(form.tentName) ? form.tentName : START_YOUR_ROOM_DEFAULT_TENT_NAME,
+  };
+}
+
+/** The first room item that still has to be created; "done" when all exist. */
+export function firstMissingStep(ids: StartYourRoomIds): StartYourRoomStep {
+  if (!ids.growId) return "grow";
+  if (!ids.tentId) return "tent";
+  if (!ids.plantId) return "plant";
+  return "done";
+}
+
+/**
+ * One submit is valid when the plant name is valid and any grow or tent name
+ * the grower typed for an item still to be created fits the name rules.
+ */
+export function canSubmitRoom(form: StartYourRoomForm, ids: StartYourRoomIds): boolean {
+  if (!isValidRoomName(form.plantName)) return false;
+  const withDefaults = startRoomFormWithDefaults(form);
+  if (!ids.growId && !isValidRoomName(withDefaults.growName)) return false;
+  if (!ids.tentId && !isValidRoomName(withDefaults.tentName)) return false;
+  return true;
+}
+
+/** Progress text for the one-step form. */
+export function oneStepProgressLabel(step: StartYourRoomStep): string {
+  return step === "done" ? "Complete" : START_YOUR_ROOM_COPY.oneStepProgress;
 }
 
 export function nextStepAfter(step: StartYourRoomStep): StartYourRoomStep {

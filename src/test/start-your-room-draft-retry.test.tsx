@@ -112,36 +112,46 @@ describe("Start your room keeps a failed save", () => {
     const user = userEvent.setup();
     const view = renderPage();
     await typeGrow(user, "North tent run");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
+    await user.type(screen.getByTestId("start-room-plant-name"), "North plant");
+    await user.click(screen.getByTestId("start-room-submit"));
     expect(await screen.findByTestId("start-your-room-error")).toHaveTextContent(
       "Verdant could not save this grow",
     );
     expect(screen.getByTestId("start-room-grow-name")).toHaveValue("North tent run");
-    expect(screen.queryByTestId("start-your-room-step-tent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("start-room-plant-name")).toHaveValue("North plant");
     expect(testState.insert).toHaveBeenCalledTimes(1);
     view.unmount();
 
     Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
     renderPage();
     expect(await screen.findByTestId("start-room-grow-name")).toHaveValue("North tent run");
-    expect(screen.queryByTestId("start-your-room-step-tent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("start-room-plant-name")).toHaveValue("North plant");
+    expect(screen.queryByTestId("start-your-room-step-done")).not.toBeInTheDocument();
     return user;
   }
 
-  it("keeps the grow name on a phone-width remount and retries the same row once", async () => {
+  it("keeps the room names on a phone-width remount and retries the same grow row once", async () => {
     await failThenRemount(390);
     testState.failSaves = false;
     const retry = screen.getByTestId("start-room-save-retry");
     fireEvent.click(retry);
     fireEvent.click(retry);
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    expect(testState.insert).toHaveBeenCalledTimes(2);
-    const ids = testState.insert.mock.calls.map((call) => call[1].id);
-    expect(ids).toEqual([ATTEMPT_ID, ATTEMPT_ID]);
-    expect(window.sessionStorage.length).toBeGreaterThan(0);
+    expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    const growIds = testState.insert.mock.calls
+      .filter(([table]) => table === "grows")
+      .map((call) => call[1].id);
+    expect(growIds).toEqual([ATTEMPT_ID, ATTEMPT_ID]);
+    expect(testState.insert.mock.calls.map(([table]) => table)).toEqual([
+      "grows",
+      "grows",
+      "tents",
+      "plants",
+    ]);
+    // The finished room clears its draft; nothing is left to resume.
+    expect(window.sessionStorage.length).toBe(0);
   });
 
-  it("keeps the grow name on a desktop-width remount", async () => {
+  it("keeps the room names on a desktop-width remount", async () => {
     await failThenRemount(1280);
     expect(screen.getByTestId("start-your-room")).toBeInTheDocument();
   });

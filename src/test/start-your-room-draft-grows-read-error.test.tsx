@@ -114,7 +114,9 @@ describe("Start your room draft hydration after a failed grow read", () => {
     testState.growsError = null;
     view.rerender(page());
 
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    // One-step form (VER-296): the resumed draft stays bound to its grow.
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent("North run");
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(draftKey)).toContain(PENDING_TENT_ID);
   });
 
@@ -126,14 +128,14 @@ describe("Start your room draft hydration after a failed grow read", () => {
     const view = render(page());
     expect(await screen.findByTestId("start-room-creation-gate")).toBeInTheDocument();
     expect(screen.getByTestId("start-room-creation-retry")).toBeEnabled();
-    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-your-room-step-room")).not.toBeInTheDocument();
 
     testState.growsError = null;
     view.rerender(page());
-    fireEvent.change(await screen.findByTestId("start-room-grow-name"), {
-      target: { value: "Spring run" },
+    fireEvent.change(await screen.findByTestId("start-room-plant-name"), {
+      target: { value: "Plant 1" },
     });
-    expect(screen.getByTestId("start-room-grow-submit")).toBeEnabled();
+    expect(screen.getByTestId("start-room-submit")).toBeEnabled();
     expect(screen.queryByTestId("start-room-creation-gate")).not.toBeInTheDocument();
   });
 
@@ -141,16 +143,16 @@ describe("Start your room draft hydration after a failed grow read", () => {
     testState.capabilities = { ...FREE_CAPABILITIES, maxActiveGrows: null, multiTent: true };
     testState.growsError = null;
     const view = render(page());
-    expect(await screen.findByTestId("start-room-grow-name")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-plant-name")).toBeInTheDocument();
 
     // A later refetch fails after the draft was restored; nothing would be
     // reset by a good read now, so an unlimited plan keeps going.
     testState.growsError = "Could not load grows";
     view.rerender(page());
-    fireEvent.change(screen.getByTestId("start-room-grow-name"), {
-      target: { value: "Spring run" },
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Plant 1" },
     });
-    expect(screen.getByTestId("start-room-grow-submit")).toBeEnabled();
+    expect(screen.getByTestId("start-room-submit")).toBeEnabled();
     expect(screen.queryByTestId("start-room-creation-gate")).not.toBeInTheDocument();
   });
 });

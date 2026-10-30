@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { SESSION_FORM_DRAFT_VERSION } from "@/lib/sessionFormDraftRules";
 import { START_YOUR_ROOM_DRAFT_FORM_ID } from "@/lib/startYourRoomDraftRules";
+import { getStartScreenChoice, setStartScreenChoice } from "@/lib/startScreenPreferences";
 
 const { OWNER_ID } = vi.hoisted(() => ({ OWNER_ID: "44444444-4444-4444-8444-444444444444" }));
 
@@ -126,12 +127,27 @@ describe("Start Your Room plant retry id (Codex review)", () => {
   it("keeps the plant's retry id in the draft until the finished plant is recorded", async () => {
     // The refresh after the plant insert hangs, as if the grower reloads
     // while Quick Log's selectors are still refreshing.
+    let plantInserted = false;
+    let refreshHanging = false;
     let releaseRefresh: () => void = () => undefined;
-    refreshMock
-      .mockImplementationOnce(async () => undefined)
-      .mockImplementationOnce(
-        () => new Promise<undefined>((resolve) => (releaseRefresh = () => resolve(undefined))),
-      );
+    const insertRow = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: "grows" | "tents" | "plants") => {
+      const query = insertRow(table);
+      if (table !== "plants") return query;
+      return {
+        ...query,
+        insert: (payload: Record<string, unknown>) => {
+          plantInserted = true;
+          return query.insert(payload);
+        },
+      };
+    });
+    refreshMock.mockImplementation(async () => {
+      if (!plantInserted) return undefined;
+      refreshHanging = true;
+      await new Promise<void>((resolve) => (releaseRefresh = resolve));
+      return undefined;
+    });
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={["/start-room"]}>
@@ -139,19 +155,175 @@ describe("Start Your Room plant retry id (Codex review)", () => {
       </MemoryRouter>,
     );
 
-    await user.type(await screen.findByTestId("start-room-grow-name"), "E2E Grow");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
-    await user.type(await screen.findByTestId("start-room-tent-name"), "E2E Tent");
-    await user.click(screen.getByTestId("start-room-tent-submit"));
     await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
-    await user.click(screen.getByTestId("start-room-plant-submit"));
+    await user.click(screen.getByTestId("start-room-submit"));
 
-    await waitFor(() => expect(refreshMock).toHaveBeenCalledTimes(2));
-    const stored = JSON.parse(window.sessionStorage.getItem(draftKey) ?? "null");
-    expect(JSON.stringify(stored)).toContain(`"plant":"${ATTEMPT_IDS.plant}"`);
-    expect(JSON.stringify(stored)).toContain('"step":"plant"');
+    await waitFor(() => expect(refreshHanging).toBe(true));
+    await act(async () => undefined);
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toMatchObject({
+      step: "plant",
+      pendingRowIds: { plant: ATTEMPT_IDS.plant },
+    });
 
     releaseRefresh();
-    expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    await waitFor(() => expect(navMock).toHaveBeenCalledTimes(1));
+    expect(navMock).toHaveBeenCalledWith(`/plants/${ATTEMPT_IDS.plant}?open=quick-log`, {
+      replace: true,
+    });
+  });
+
+  it("clears the setup draft before leaving for the new plant (Copilot review)", async () => {
+    // Real routing unmounts the page with the navigation, so the "done" effect
+    // never runs; the draft must already be gone when navigation starts.
+    refreshMock.mockImplementation(async () => undefined);
+    let draftAtNavigation: string | null = "not navigated";
+    navMock.mockImplementation(() => {
+      draftAtNavigation = window.sessionStorage.getItem(draftKey);
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+
+    await waitFor(() => expect(navMock).toHaveBeenCalledTimes(1));
+    expect(draftAtNavigation).toBeNull();
+    // The page stays mounted under the mocked router; the draft must stay gone.
+    await act(async () => undefined);
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+  });
+
+  it("does not pull a grower back to the plant after they left mid-save (Copilot review)", async () => {
+    let plantInserted = false;
+    let releaseRefresh: () => void = () => undefined;
+    const insertRow = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: "grows" | "tents" | "plants") => {
+      const query = insertRow(table);
+      if (table !== "plants") return query;
+      return {
+        ...query,
+        insert: (payload: Record<string, unknown>) => {
+          plantInserted = true;
+          return query.insert(payload);
+        },
+      };
+    });
+    let refreshHanging = false;
+    refreshMock.mockImplementation(async () => {
+      if (!plantInserted) return undefined;
+      refreshHanging = true;
+      await new Promise<void>((resolve) => (releaseRefresh = resolve));
+      return undefined;
+    });
+    const user = userEvent.setup();
+    const view = render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+    await waitFor(() => expect(refreshHanging).toBe(true));
+
+    view.unmount();
+    // The grower chose another start screen on the way out.
+    setStartScreenChoice(OWNER_ID, "timeline");
+    await act(async () => {
+      releaseRefresh();
+    });
+    expect(navMock).not.toHaveBeenCalled();
+    // Their choice survives the save finishing behind them.
+    expect(getStartScreenChoice(OWNER_ID)).toBe("timeline");
+    // The room was finished, so its draft is still cleared.
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+  });
+
+  it("starts no tent or plant after the grower left during the grow refresh (Codex review)", async () => {
+    const inserted: string[] = [];
+    const insertRow = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: "grows" | "tents" | "plants") => {
+      const query = insertRow(table);
+      return {
+        ...query,
+        insert: (payload: Record<string, unknown>) => {
+          inserted.push(table);
+          return query.insert(payload);
+        },
+      };
+    });
+    let releaseRefresh: () => void = () => undefined;
+    let refreshHanging = false;
+    refreshMock.mockImplementation(async () => {
+      refreshHanging = true;
+      await new Promise<void>((resolve) => (releaseRefresh = resolve));
+      return undefined;
+    });
+    const user = userEvent.setup();
+    const view = render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+    await waitFor(() => expect(refreshHanging).toBe(true));
+    expect(inserted).toEqual(["grows"]);
+
+    view.unmount();
+    await act(async () => {
+      releaseRefresh();
+    });
+    // The reopened page owns the rest; this instance adds nothing.
+    expect(inserted).toEqual(["grows"]);
+    expect(navMock).not.toHaveBeenCalled();
+  });
+
+  it("starts no plant after the grower left during the tent save (review nit)", async () => {
+    refreshMock.mockImplementation(async () => undefined);
+    const inserted: string[] = [];
+    let releaseTent: () => void = () => undefined;
+    let tentHanging = false;
+    const insertRow = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: "grows" | "tents" | "plants") => {
+      const query = insertRow(table);
+      return {
+        ...query,
+        insert: (payload: Record<string, unknown>) => {
+          inserted.push(table);
+          const chain = query.insert(payload);
+          if (table !== "tents") return chain;
+          return {
+            select: () => ({
+              single: async () => {
+                tentHanging = true;
+                await new Promise<void>((resolve) => (releaseTent = resolve));
+                return chain.select().single();
+              },
+            }),
+          };
+        },
+      };
+    });
+    const user = userEvent.setup();
+    const view = render(
+      <MemoryRouter initialEntries={["/start-room"]}>
+        <StartYourRoom />
+      </MemoryRouter>,
+    );
+    await user.type(await screen.findByTestId("start-room-plant-name"), "E2E Plant");
+    await user.click(screen.getByTestId("start-room-submit"));
+    await waitFor(() => expect(tentHanging).toBe(true));
+    expect(inserted).toEqual(["grows", "tents"]);
+
+    view.unmount();
+    await act(async () => {
+      releaseTent();
+    });
+    expect(inserted).toEqual(["grows", "tents"]);
+    expect(navMock).not.toHaveBeenCalled();
   });
 });

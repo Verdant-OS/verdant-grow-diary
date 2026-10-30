@@ -126,7 +126,7 @@ describe("Start your room draft hydration", () => {
       form: {
         growName: STORED_GROW_NAME,
         tentName: "",
-        plantName: "",
+        plantName: "Stored plant",
         plantStage: "seedling",
       },
       ids: { growId: null, tentId: null, plantId: null },
@@ -150,6 +150,7 @@ describe("Start your room draft hydration", () => {
     );
 
     expect(await screen.findByTestId("start-room-grow-name")).toHaveValue(STORED_GROW_NAME);
+    expect(screen.getByTestId("start-room-plant-name")).toHaveValue("Stored plant");
     expect(screen.getByTestId("start-your-room-error")).toHaveTextContent(STORED_ERROR);
     const afterResolve = window.sessionStorage.getItem(draftKey("user-1"));
     expect(afterResolve).toContain(STORED_GROW_NAME);
@@ -158,8 +159,12 @@ describe("Start your room draft hydration", () => {
 
     testState.failSaves = false;
     fireEvent.click(screen.getByTestId("start-room-save-retry"));
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    expect(testState.insert).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    expect(testState.insert.mock.calls.map(([table]) => table)).toEqual([
+      "grows",
+      "tents",
+      "plants",
+    ]);
     expect(testState.insert.mock.calls[0]?.[1].id).toBe(STORED_ROW_ID);
   });
 

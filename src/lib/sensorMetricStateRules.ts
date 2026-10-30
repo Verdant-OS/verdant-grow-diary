@@ -20,6 +20,7 @@
  */
 
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isKnownHardwareTransportSource } from "@/lib/sensorLiveMembership";
 
 export type SensorMetricKey = "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
 
@@ -186,7 +187,9 @@ function sourceKind(source: unknown): SensorMetricStateKind | null {
   // fallback at the call site; a PRESENT label is decided by the canon
   // (unrecognized → invalid, never Live or Demo).
   if (typeof source !== "string" || source.trim().length === 0) return null;
-  return normalizeSensorSource(source);
+  const canon = normalizeSensorSource(source);
+  if (canon === "invalid" && isKnownHardwareTransportSource(source)) return "live";
+  return canon;
 }
 
 const KIND_LABEL: Record<SensorMetricStateKind, string> = {

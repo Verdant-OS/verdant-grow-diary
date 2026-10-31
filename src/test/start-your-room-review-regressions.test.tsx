@@ -131,6 +131,7 @@ function renderPage() {
 
 describe("Start your room review regressions", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     testState.grows = [];
     testState.tents = [];
     testState.activeGrowId = null;
@@ -159,8 +160,9 @@ describe("Start your room review regressions", () => {
     const latest = testState.pendingPlants[testState.pendingPlants.length - 1];
     latest({ data: [], error: null });
 
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Bound to grow: QA Mid");
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent(
+      "Bound to grow: QA Mid",
+    );
     expect(screen.queryByRole("status")).not.toHaveTextContent(
       "Checking your plan and active room limits…",
     );
@@ -178,7 +180,7 @@ describe("Start your room review regressions", () => {
       "Checking your plan and active room limits…",
     );
     expect(screen.queryByTestId("start-room-creation-upgrade")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("start-your-room-step-tent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-bound-grow")).not.toBeInTheDocument();
 
     testState.entitlementLoading = false;
     view.rerender(
@@ -187,8 +189,8 @@ describe("Start your room review regressions", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByTestId("start-your-room-step-grow")).toBeInTheDocument();
-    expect(screen.queryByTestId("start-your-room-step-tent")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-grow-name")).toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-bound-grow")).not.toBeInTheDocument();
   });
 
   it("shows the loading copy while plan verification is unresolved", async () => {
@@ -221,24 +223,26 @@ describe("Start your room review regressions", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Bound to grow: QA Mid");
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent(
+      "Bound to grow: QA Mid",
+    );
     expect(testState.insert).not.toHaveBeenCalled();
   });
 
-  it("finishes a resumed plant step with the grow and tent names", async () => {
+  it("finishes a resumed room with the grow and tent names", async () => {
     testState.grows = [{ id: "grow-1", name: "QA Mid" }];
     testState.tents = [{ id: "tent-1", name: "QA Tent", grow_id: "grow-1" }];
     testState.activeGrowId = "grow-1";
     testState.plantsResult = { data: [], error: null };
     renderPage();
 
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
-    expect(screen.getByText(/Bound to grow \+ tent:/)).toHaveTextContent("QA Mid · QA Tent");
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent(
+      "Bound to grow: QA Mid · tent QA Tent",
+    );
     fireEvent.change(screen.getByTestId("start-room-plant-name"), {
       target: { value: "QA Plant" },
     });
-    fireEvent.click(screen.getByTestId("start-room-plant-submit"));
+    fireEvent.click(screen.getByTestId("start-room-submit"));
 
     expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
     expect(screen.getByText("Grow: QA Mid")).toBeInTheDocument();
@@ -258,14 +262,17 @@ describe("Start your room review regressions", () => {
     testState.plantsMode = "throw";
     renderPage();
 
-    expect(await screen.findByTestId("start-your-room-step-grow")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-grow-name")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "Bypass Grow" },
     });
-    const submit = screen.getByTestId("start-room-grow-submit");
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Bypass Plant" },
+    });
+    const submit = screen.getByTestId("start-room-submit");
     expect(submit).toBeDisabled();
     fireEvent.click(submit);
     fireEvent.submit(submit.closest("form")!);
-    expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
+    expect(testState.insert).not.toHaveBeenCalled();
   });
 });

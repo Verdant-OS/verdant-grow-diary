@@ -16,6 +16,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@/lib/react-router-compat";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,6 +81,7 @@ export default function ImportedSensorHistoryPanel({
 }: Props) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const location = useLocation();
+  const temperatureUnit = useTemperatureUnitPreference();
   const [selectedMetric, setSelectedMetric] = useState<ImportedSensorHistoryMetricFilter>(
     IMPORTED_SENSOR_HISTORY_ALL_METRICS,
   );
@@ -99,8 +101,9 @@ export default function ImportedSensorHistoryPanel({
         readings,
         limit,
         selectedMetric,
+        temperatureUnit,
       }),
-    [readings, limit, selectedMetric],
+    [readings, limit, selectedMetric, temperatureUnit],
   );
 
   const handoffVm = useMemo(
@@ -289,7 +292,7 @@ export default function ImportedSensorHistoryPanel({
                     className="border-t border-border/40"
                   >
                     <td className="py-1 pr-2">{formatTimestamp(r.capturedAt)}</td>
-                    <td className="py-1 pr-2">{r.metric}</td>
+                    <td className="py-1 pr-2">{r.metricLabel}</td>
                     <td className="py-1">
                       <span>{r.displayValue}</span>
                       {r.outOfRangeNote ? (

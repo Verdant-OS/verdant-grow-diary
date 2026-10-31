@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
@@ -163,6 +163,7 @@ describe("resolveStartYourRoomResume", () => {
 
 describe("Start your room resume", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     testState.grows = [];
     testState.tents = [];
     testState.growsLoading = false;
@@ -210,32 +211,36 @@ describe("Start your room resume", () => {
     expect(testState.insert).not.toHaveBeenCalled();
   });
 
-  it("opens the tent step bound to QA Mid after a remount when only that grow exists", async () => {
+  it("binds the room to QA Mid after a remount when only that grow exists", async () => {
     testState.grows = [{ id: "grow-mid", name: "QA Mid" }];
     testState.plantsResult = { data: [], error: null };
     const view = renderPage();
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Bound to grow: QA Mid");
-    expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent(
+      "Bound to grow: QA Mid",
+    );
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
+    expect(screen.getByTestId("start-room-tent-name")).toBeInTheDocument();
     view.unmount();
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-your-room-step-room")).toBeInTheDocument();
     expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Bound to grow: QA Mid");
     expect(testState.insert).not.toHaveBeenCalled();
   });
 
-  it("opens the plant step when a grow and tent exist and no plant does", async () => {
+  it("asks only for the plant when a grow and tent exist and no plant does", async () => {
     testState.grows = [{ id: "grow-1", name: "QA Mid" }];
     testState.tents = [{ id: "tent-1", name: "QA Tent", grow_id: "grow-1" }];
     testState.plantsResult = { data: [], error: null };
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
-    expect(screen.getByText(/Bound to grow \+ tent:/)).toHaveTextContent("QA Mid · QA Tent");
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent(
+      "Bound to grow: QA Mid · tent QA Tent",
+    );
     expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-optional-names")).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId("start-room-plant-name"), {
       target: { value: "QA Plant" },
     });
-    expect(screen.getByTestId("start-room-plant-submit")).toBeEnabled();
+    expect(screen.getByTestId("start-room-submit")).toBeEnabled();
     expect(testState.insert).not.toHaveBeenCalled();
   });
 
@@ -243,17 +248,21 @@ describe("Start your room resume", () => {
     testState.grows = [{ id: "grow-mid", name: "QA Mid" }];
     testState.plantsResult = { data: [], error: null };
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-bound-grow")).toHaveTextContent("QA Mid");
     fireEvent.change(screen.getByTestId("start-room-tent-name"), {
       target: { value: "Bound Tent" },
     });
-    fireEvent.click(screen.getByTestId("start-room-tent-submit"));
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
-    expect(screen.getByText(/Bound to grow \+ tent:/)).toHaveTextContent("QA Mid · Bound Tent");
     fireEvent.change(screen.getByTestId("start-room-plant-name"), {
       target: { value: "QA Plant" },
     });
-    expect(screen.getByTestId("start-room-plant-submit")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("start-room-submit"));
+    // This mock's plants table only reads, so the room stops after the tent;
+    // the confirmed tent must keep both resumed names on screen.
+    await waitFor(() =>
+      expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent(
+        "Bound to grow: QA Mid · tent Bound Tent",
+      ),
+    );
     expect(testState.insert).toHaveBeenCalledWith(
       "tents",
       expect.objectContaining({ grow_id: "grow-mid", name: "Bound Tent" }),
@@ -261,26 +270,32 @@ describe("Start your room resume", () => {
     expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
   });
 
-  it("renders the grow step with submit disabled on Free for a tent only", () => {
+  it("renders the room with submit disabled on Free for a tent only", () => {
     testState.plantsSelectable = false;
     testState.tents = [{ id: "tent-1", name: "Only tent" }];
     renderPage();
-    expect(screen.getByTestId("start-your-room-step-grow")).toBeInTheDocument();
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    expect(screen.getByTestId("start-room-grow-name")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "QA Plant" },
+    });
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
   });
 
-  it("falls back to the grow step when the plants read fails", async () => {
+  it("falls back to creating a grow when the plants read fails", async () => {
     testState.grows = [{ id: "grow-1", name: "QA Test" }];
     testState.tents = [{ id: "tent-1", name: "QA Test", grow_id: "grow-1" }];
     testState.plantsThrows = true;
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-grow")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-room-grow-name")).toBeInTheDocument();
     expect(screen.queryByTestId("start-your-room-step-done")).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "Second Grow" },
     });
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
-    fireEvent.click(screen.getByTestId("start-room-grow-submit"));
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "QA Plant" },
+    });
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("start-room-submit"));
     expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
   });
 
@@ -292,6 +307,6 @@ describe("Start your room resume", () => {
       "Checking your plan and active room limits…",
     );
     expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("start-your-room-step-grow")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-your-room-step-room")).not.toBeInTheDocument();
   });
 });

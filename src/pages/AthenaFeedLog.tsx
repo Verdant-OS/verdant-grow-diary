@@ -20,7 +20,6 @@ import {
   ATHENA_MEASURING_METHODS,
   ATHENA_PRO_LINE_PRODUCT_URL,
   ATHENA_PRO_LINE_SCHEDULE_URL,
-  ATHENA_RELATED_FEED_LOG_PATH,
   athenaLineLabel,
   athenaPlannedHelper,
   athenaScheduleUrl,
@@ -956,10 +955,6 @@ export default function AthenaFeedLog() {
           </p>
           <p className="mt-4 text-sm">
             Related logs:{" "}
-            <Link className="underline" to={ATHENA_RELATED_FEED_LOG_PATH}>
-              Advanced Nutrients feeding chart log
-            </Link>
-            {" · "}
             <Link className="underline" to="/guides">
               All grow guides
             </Link>

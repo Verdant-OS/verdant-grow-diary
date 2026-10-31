@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
@@ -24,6 +24,8 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateGrowCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
+import { describeCreateGrowPrimaryButton } from "@/lib/createDialogPrimaryButtonViewModel";
+import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 import {
   growRestoreFailureCopy,
   nextActiveGrowIdAfterArchive,
@@ -76,6 +78,13 @@ export default function Grows() {
     entLoading || entitlementLookupFailed ? null : entitlement.capabilities,
     grows.length,
   );
+  const nameFieldId = useId();
+  const disabledReasonId = useId();
+  const primary = describeCreateGrowPrimaryButton({
+    busy,
+    outcomeUnknown: createOutcomeUnknown,
+    name: form.name,
+  });
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -84,6 +93,7 @@ export default function Grows() {
       toast.error("Refresh this page before trying to create another grow.");
       return;
     }
+    if (!hasTrimmedRequiredIdentity(form.name)) return;
     if (!growGate.allowed) {
       toast.error(growGate.blockedCopy);
       return;
@@ -420,13 +430,20 @@ export default function Grows() {
           )}
           <form onSubmit={create} className="grid gap-3">
             <div>
-              <Label>Name</Label>
+              <Label htmlFor={nameFieldId}>Name</Label>
               <Input
+                id={nameFieldId}
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Tent #1, Backyard, Mothers…"
               />
+              <p
+                className="text-[11px] text-muted-foreground mt-1"
+                data-testid="grow-create-name-helper"
+              >
+                {primary.helperText}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -472,8 +489,18 @@ export default function Grows() {
                 rows={2}
               />
             </div>
+            {primary.reason ? (
+              <p
+                id={disabledReasonId}
+                className="text-xs text-muted-foreground"
+                data-testid="grow-create-disabled-reason"
+              >
+                {primary.reason}
+              </p>
+            ) : null}
             <Button
-              disabled={busy || createOutcomeUnknown}
+              disabled={primary.disabled}
+              aria-describedby={primary.reason ? disabledReasonId : undefined}
               className="gradient-leaf text-primary-foreground"
             >
               Create grow

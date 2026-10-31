@@ -214,6 +214,17 @@ import {
   shouldShowPhotoNonDiagnosticLabel,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
 import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
+import TimelineEntryDetailUnavailable from "@/components/TimelineEntryDetailUnavailable";
+import { useTimelineEntryDetailRecord } from "@/hooks/useTimelineEntryDetailRecord";
+import {
+  TIMELINE_ENTRY_DETAIL_PARAM,
+  parseTimelineEntryDetailId,
+  resolveTimelineEntryDetailView,
+  timelineEntryDetailGrowId,
+  timelineEntryDetailSearch,
+  timelineEntryDetailStatusCopy,
+  type TimelineEntryDetailRecord,
+} from "@/lib/timelineEntryDetailPermalinkRules";
 import TimelineSnapshotClock from "@/components/TimelineSnapshotClock";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import {
@@ -655,7 +666,6 @@ export default function Timeline() {
   const [didSeedTentFilter, setDidSeedTentFilter] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
-  const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
   // Source filter state is mirrored to/from the `?sensorSources=` URL
   // query param so the Sensors page summary widget can link directly into
   // a pre-filtered Timeline without introducing app-wide global state.
@@ -1530,6 +1540,39 @@ export default function Timeline() {
       ),
     [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
   );
+
+  const requestedEntryId = parseTimelineEntryDetailId(
+    searchParams.get(TIMELINE_ENTRY_DETAIL_PARAM),
+  );
+  const visibleDetailEntry =
+    requestedEntryId == null
+      ? null
+      : (displayEntries.find((row) => row.id === requestedEntryId) ?? null);
+  // Bumped after Correct / Retract so an off-page permalink row is re-read.
+  const [detailRecordRefreshKey, setDetailRecordRefreshKey] = useState(0);
+  const detailFetch = useTimelineEntryDetailRecord(
+    requestedEntryId,
+    user,
+    requestedEntryId != null &&
+      visibleDetailEntry == null &&
+      !isTimelineSensorDerivedDiaryId(requestedEntryId),
+    detailRecordRefreshKey,
+  );
+  const detailView = resolveTimelineEntryDetailView({
+    requestedId: requestedEntryId,
+    visibleEntries: displayEntries,
+    fetchedEntry: detailFetch.entry,
+    fetchState: detailFetch.fetchState,
+    sensorListSettled: !loading && !directorySensorsLoading && directorySensorEpoch > 0,
+  });
+  const openTimelineEntryDetail = (id: string) => {
+    const parsed = parseTimelineEntryDetailId(id);
+    if (!parsed) return;
+    setSearchParams((current) => timelineEntryDetailSearch(current, parsed));
+  };
+  const closeTimelineEntryDetail = () => {
+    setSearchParams((current) => timelineEntryDetailSearch(current, null), { replace: true });
+  };
 
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -3008,12 +3051,12 @@ export default function Timeline() {
                         : null}
                       <div
                         className="p-4"
-                        onClick={() => setDetailEntryId(e.id)}
+                        onClick={() => openTimelineEntryDetail(e.id)}
                         onKeyDown={(ev) => {
                           if (ev.target !== ev.currentTarget) return;
                           if (ev.key === "Enter" || ev.key === " ") {
                             ev.preventDefault();
-                            setDetailEntryId(e.id);
+                            openTimelineEntryDetail(e.id);
                           }
                         }}
                       >
@@ -3168,7 +3211,7 @@ export default function Timeline() {
                                 )}
                                 <TimelineEntryOpenButton
                                   label={openLabel}
-                                  onOpen={() => setDetailEntryId(e.id)}
+                                  onOpen={() => openTimelineEntryDetail(e.id)}
                                 />
                                 <span title={format(new Date(e.entry_at), "PPpp")}>
                                   {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
@@ -3267,7 +3310,7 @@ export default function Timeline() {
                                 onKeyDown={(ev) => {
                                   if (ev.key === "Enter" || ev.key === " ") {
                                     ev.preventDefault();
-                                    setDetailEntryId(e.id);
+                                    openTimelineEntryDetail(e.id);
                                   }
                                 }}
                               >
@@ -3674,33 +3717,77 @@ export default function Timeline() {
           onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
-      <TimelineEvidenceDetailPreview
-        open={!!detailEntryId}
-        entry={(() => {
-          const row = displayEntries.find((r) => r.id === detailEntryId);
-          if (!row) return null;
-          const labels = resolveTimelineCardPlaceLabels({
-            plantId: row.plant_id,
-            tentId: row.tent_id,
-            details: row.details,
+      {detailView.kind === "ready" ? (
+        <TimelineEvidenceDetailPreview
+          open
+          entry={timelineEntryDetailPreviewInput(detailView.entry, {
             plantNamesById,
             tentNamesById,
-          });
-          return {
-            id: row.id,
-            note: localizeReadingAtTimestamps(row.note),
-            photo_url: row.photo_url,
-            stage: resolveTimelineDiaryEntryStage(row),
-            entry_at: row.entry_at,
-            plant_id: row.plant_id,
-            tent_id: row.tent_id,
-            details: withResolvedTimelinePlaceDetails(row.details, labels),
-          };
-        })()}
-        onClose={() => setDetailEntryId(null)}
-      />
+          })}
+          actions={
+            !isTimelineSensorDerivedDiaryId(detailView.entry.id) &&
+            isLinkedQuickLogDiaryDetails(detailView.entry.details) ? (
+              <QuickLogEntryIntegrityControls
+                handle={{ diaryEntryId: detailView.entry.id }}
+                currentNote={detailView.entry.note}
+                currentOccurredAt={detailView.entry.entry_at}
+                currentPlantId={detailView.entry.plant_id}
+                plantId={detailView.entry.plant_id}
+                tentId={detailView.entry.tent_id}
+                growId={timelineEntryDetailGrowId(detailView.entry, activeGrowId)}
+                correctionValues={correctionValuesForTimelineDiaryEntry(detailView.entry, [
+                  ...timelineLinkedRoots,
+                  ...growEvents,
+                  ...supplementalLinkedGrowEvents,
+                  ...timelineSensorEvents,
+                ])}
+                environmentCheckDetails={detailView.entry.details}
+                onChanged={() => {
+                  setDetailRecordRefreshKey((key) => key + 1);
+                  void load();
+                }}
+              />
+            ) : null
+          }
+          onClose={closeTimelineEntryDetail}
+        />
+      ) : null}
+      {detailView.kind === "loading" ||
+      detailView.kind === "not_found" ||
+      detailView.kind === "unavailable" ? (
+        <TimelineEntryDetailUnavailable
+          {...timelineEntryDetailStatusCopy(detailView.kind)}
+          onClose={closeTimelineEntryDetail}
+        />
+      ) : null}
     </div>
   );
+}
+
+function timelineEntryDetailPreviewInput(
+  row: TimelineEntryDetailRecord & { eventType?: string | null },
+  names: {
+    plantNamesById: ReadonlyMap<string, string> | null;
+    tentNamesById: ReadonlyMap<string, string> | null;
+  },
+) {
+  const labels = resolveTimelineCardPlaceLabels({
+    plantId: row.plant_id,
+    tentId: row.tent_id,
+    details: row.details,
+    plantNamesById: names.plantNamesById,
+    tentNamesById: names.tentNamesById,
+  });
+  return {
+    id: row.id,
+    note: localizeReadingAtTimestamps(row.note),
+    photo_url: row.photo_url,
+    stage: resolveTimelineDiaryEntryStage(row),
+    entry_at: row.entry_at,
+    plant_id: row.plant_id,
+    tent_id: row.tent_id,
+    details: withResolvedTimelinePlaceDetails(row.details, labels),
+  };
 }
 
 function FilterChip({

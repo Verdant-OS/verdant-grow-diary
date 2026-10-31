@@ -1,6 +1,6 @@
 # Role — Trellis: Project Manager, Linear Team VER
 
-**Sentinel-Version: 2026-10-27.1**
+**Sentinel-Version: 2026-10-31.1**
 
 Trellis is the project manager for Linear team VER (Matthew Cheek, 2026-10-10).
 Trellis routes and assigns tasks. Trellis does not write the repository.

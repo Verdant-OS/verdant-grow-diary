@@ -93,6 +93,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
   { path: "/admin/leads", access: "internal" },
+  {
+    path: "/agent-integrations",
+    access: "redirect",
+    description: "→ /settings/agent-integrations",
+  },
   { path: "/ai-doctor", access: "redirect", description: "→ /doctor" },
   {
     path: "/ai-doctor-readiness-check",
@@ -109,6 +114,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
   { path: "/breeding", access: "auth", description: "Breeding programs index." },
+  { path: "/breeding-programs", access: "redirect", description: "→ /breeding" },
   { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
   {
     path: "/breeding/log/new",
@@ -238,6 +244,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/hardware-integrations", access: "public" },
   { path: "/health", access: "auth", description: "Authenticated app health page." },
+  { path: "/help", access: "redirect", description: "→ /tools/grow-help-toolkit" },
   {
     path: "/how-ai-doctor-works",
     access: "public",

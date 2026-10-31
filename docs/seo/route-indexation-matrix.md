@@ -2,7 +2,7 @@
 
 **Source of truth:** `src/lib/appRouteManifest.ts` in this commit, checked against the mounted route modules by `src/test/helpers/routeManifestSyncHarness.ts`.<br>
 **Live index status:** **NOT_MEASURED.** This file records repository metadata, `public/sitemap.xml`, and `public/robots.txt`. It is not a Search Console measurement and it does not claim what `https://verdantgrowdiary.com` returns.<br>
-**Coverage:** 146 of 146 manifest routes — 42 public, 46 authenticated, 32 operator, 6 internal, and 20 redirects.
+**Coverage:** 149 of 149 manifest routes — 42 public, 46 authenticated, 32 operator, 6 internal, and 23 redirects.
 
 ## Reading the matrix
 
@@ -193,7 +193,7 @@ Manifest paths (`access: "internal"`, 6):
 
 ## Redirect aliases
 
-These 20 manifest paths are `access: "redirect"`. `/founder` redirects to `/pricing`. Founder Lifetime is no longer sold. They are not sitemap `<loc>` values. They have no independent index document except the strain aliases in the inventory, which are `noindex, follow` and canonical to the cultivar URL.
+These 23 manifest paths are `access: "redirect"`. `/founder` redirects to `/pricing`. Founder Lifetime is no longer sold. They are not sitemap `<loc>` values. They have no independent index document except the strain aliases in the inventory, which are `noindex, follow` and canonical to the cultivar URL.
 
 Permanent Cloudflare Worker redirects (`src/lib/cloudflareHostRoutingRules.ts`, HTTP 308, query preserved; live application **NOT_MEASURED**):
 
@@ -211,7 +211,7 @@ Permanent `vercel.json` redirects (historical repository config from the earlier
 
 Client redirects in route modules:
 
-- `/welcome`, `/features`, `/demo` (all `/`), `/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`, `/login` (`/auth`), `/register` and `/signup` (`/auth?mode=signup`), `/logs` (`/timeline`), `/action-queue` and `/tasks` (`/actions`), `/ai-doctor` (`/doctor`), `/grow-room` (`/`), `/strains` (`/cultivars`) use `RouteAliasRedirect`.
+- `/welcome`, `/features`, `/demo` (all `/`), `/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`, `/login` (`/auth`), `/register` and `/signup` (`/auth?mode=signup`), `/logs` (`/timeline`), `/action-queue` and `/tasks` (`/actions`), `/ai-doctor` (`/doctor`), `/grow-room` (`/`), `/strains` (`/cultivars`); `/breeding-programs` (`/breeding`), `/agent-integrations` (`/settings/agent-integrations`) and `/help` (`/tools/grow-help-toolkit`) use `RouteAliasRedirect`.
 - `/strains/:slug` renders `LegacyStrainSlugRedirect` and also calls `staticRouteHead` for the alias document.
 - `/billing/:plan` renders `LegacyBillingRedirect` (`/pricing` with a canonical plan query). `founder-lifetime` resolves to bare `/pricing`.
 - `/founder` redirects to `/pricing`.
@@ -219,9 +219,9 @@ Client redirects in route modules:
 
 `Disallow` lines also name `/login`, `/signup`, `/register`, `/logs`, `/tasks`, `/action-queue`, and `/billing/`.
 
-Manifest paths (`access: "redirect"`, 20):
+Manifest paths (`access: "redirect"`, 23):
 
-`/action-queue`; `/ai-doctor`; `/billing/:plan`; `/demo`; `/features`; `/founder`; `/grow-room`; `/login`; `/logs`; `/privacy-policy`; `/refund-policy`; `/refunds`; `/register`; `/signup`; `/strains`; `/strains/:slug`; `/tasks`; `/terms-of-service`; `/upgrade`; `/welcome`.
+`/action-queue`; `/agent-integrations`; `/ai-doctor`; `/billing/:plan`; `/breeding-programs`; `/demo`; `/features`; `/founder`; `/grow-room`; `/help`; `/login`; `/logs`; `/privacy-policy`; `/refund-policy`; `/refunds`; `/register`; `/signup`; `/strains`; `/strains/:slug`; `/tasks`; `/terms-of-service`; `/upgrade`; `/welcome`.
 
 ## Retired routes
 

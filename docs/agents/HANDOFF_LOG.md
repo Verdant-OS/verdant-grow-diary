@@ -845,6 +845,44 @@ owner: Codex VER-285
 last_updated: 2026-10-25 01:52 CT, by Codex VER-285
 ```
 
+### CODEX-2287-ALIAS-LOAD-CRAWL-BOUNDARIES
+
+```text
+TASK CODEX-2287-ALIAS-LOAD-CRAWL-BOUNDARIES  priority: P2  status: OPEN
+goal: Finish the three existing alias findings without changing private access, existing component redirects or other active branches.
+why: The private agent-integrations alias lacked crawl exclusions, the redirect prose count was stale, and help only redirected after a root app-shell render.
+branch: claude/legacy-route-aliases
+base: verdant-grow-diary at c460712d3f59a15022d4d03b0dd371b424ff8e92 (normal base integration, 2026-10-27).
+checkout: Fetch the existing branch and base; verify live full head and scoped writer claim before adopting in an isolated authorized cloud worktree. Normal merges and pushes only.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2287
+head_sha: Read the resulting full published PR head and actual receipt after this commit. Source checkpoint e6c61349eeb0f318c785ba72cc552c9fea4b4340 was verified unchanged before integration; this receipt cannot name its own commit.
+state: Normal current-base integration into e6c61349. Only this own HANDOFF block conflicts; all9 authored nonlog blobs (matrix, robots, manifest, generated routes,3alias modules and2tests) remain exactly sourcee6. Every unrelated incoming base/log byte is preserved. No product, generated-route, protected-test or scorer change is authored.
+current_step: Current integrated tree: existing7file route/robot/alias selection reports83PASS/0FAIL/0SKIP (actual count; historical pre-home-consolidation receipt was82). No test was added/edited here. Canonical Bun1.3.14 project typecheck exit0; scoped ESLint0diagnostics; format,strict scorer,docs/release safety,Sentinel parity and whitespace PASS. Normal hooks/publication and fresh new-head hosted CI/outside acceptance are separate receipts.
+next_action: This writer normally commits and pushes the existing branch after exact remote-head guards, then sourceSTOP and root handles current full-head metadata, fresh required/applicable CI and canonical outside review6430723705retarget. No duplicate review request. Keep draft; no ready,queue,auto-merge,merge or deployment.
+post_merge_check: Existing Codex closeout coordinator verifies served version includes the merge; actual hosted redirect/crawler behavior remains NOT_MEASURED until authorized read-only release checks.
+active_writer: Codex bounded /root/preflight_1949, explicitly assigned by the existing root closeout holder for this single integration. Root claim6430524438 and original ownership/provenance remain; no concurrent writer/delegate. Only normal base integration and this own block resolution are authorized.
+decisions: Exclude agent-integrations in the three search-bot groups while preserving social preview policy; compare redirect prose with actual manifest count; add pre-render help redirect and retain existing component fallback/query/hash contract. No root-shell or auth change.
+tried_and_rejected: Counting a client-render redirect as a pre-provider boundary; assuming redirect aliases inherit destination crawl exclusions; changing existing locked tests; editing generated route content by hand; inferring independence from shared-account identity.
+commands: Canonical Bun1.3.14 runs the existing7file route/robot/alias Vitest selection and project typecheck; scoped lint/format, strict scorer againstc460, docs/release safety, Sentinel parity, whitespace and actual normal hooks. Exact commands/output are in /workspace/scratch/claude-closeout-20261026/2287-reintegration-20261027T0510Z. No install, build-driven regeneration or test modification.
+files_touched: This continuation authors only this HANDOFF block beyond normal imported-base content. Every9other authored PR path remains sourcee6 byte-for-byte; no hand-edited/generated route, robot, matrix, code or test change.
+files_remaining: No additional source repair within this integration scope. Fresh hosted CI and eligible independent full-scope acceptance belong to root after publication.
+blockers: New full-head required/applicable supplemental CI and independent outside acceptance remain mandatory. Codex root/this integration writer and all original Claude/Cursor contributors are excluded from acceptance. No prior-head green/verdict carries; no scorer unlock or production action.
+open_questions: Actual eligible outside reviewer pickup after current-head CI precheck; original Cursor contributor model/session provenance must be included in exclusions.
+gotchas: Sourcee6 preserves147total routes/22redirects, #2023 home consolidation and all3aliases. Normal base integration must preserve those complete authored blobs and all unrelated incoming content. Previous4b9898/e6CI, builds and reviews are historical for the new head. Private/other-chat unpublished coverage remains unavailable.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2287#discussion_r4354277826; https://github.com/Verdant-OS/verdant-grow-diary/pull/2287#discussion_r4354277840; https://github.com/Verdant-OS/verdant-grow-diary/pull/2287#discussion_r4354277844
+artifacts: Current integration /workspace/scratch/claude-closeout-20261026/2287-reintegration-20261027T0510Z contains ownership/head/conflict/source-blob proofs and exact check/hook/push receipts. Existing2287historical82/100case, RED/GREEN and build receipts remain preserved. Root owns publicmetadata/currentcanonical review retarget.
+reviewer_seat: Actually available eligible noncontributing Claude or Grok full-scope session, coordinated byroot; exclude originalClaude, actualCursor/base contributors, rootCodex and this integration writer.
+reviewer_sha: NOT_MEASURED at new integrated head; root preserves history and retargets only the existing canonical request.
+session_state: Isolated cloud writer only; single separately authorized1936/aux2312read-only queue lane continues. No desktop/browser/production/deploy access. SourceSTOP after normal published receipt.
+historical_e6_state: Current-base integration is resolved locally. Only the matrix conflict and this task block are authored changes beyond the automatic merge. All automatically merged application/test content is preserved. Actual publication must be verified from the resulting PR head/receipt, not inferred from this pre-push snapshot.
+historical_e6_current_step: Existing unchanged six-case boundary regression reproduced the merged-manifest mismatch: RED 1 failed / 5 passed (declared 21, actual 22); GREEN 6 passed / 0 failed after preserving welcome plus all three aliases. Nine focused suites, including home consolidation and contextual links: 100 passed / 0 failed / 0 skipped. Typecheck, scoped lint/format, strict scorer, docs/release safety and whitespace PASS. The full build/publication proof is measured separately at the resulting commit; required new-head hosted CI and outside acceptance remain NOT_MEASURED.
+historical_e6_commands: node node_modules/vitest/vitest.mjs run src/test/legacy-route-alias-load-and-crawl-boundaries.test.tsx src/test/legacy-route-aliases-2026-10-20.test.tsx src/test/route-manifest-sync.test.ts --pool=forks --maxWorkers=1; node node_modules/typescript/bin/tsc --noEmit; node scripts/scorer-lock.mjs --report --base be6d009dcf0110b92901b85bc8212b560e45cf62 --strict; node scripts/assert-docs-safety.mjs; git diff --check.
+historical_e6_files_touched: Current reconciliation authors docs/seo/route-indexation-matrix.md and this HANDOFF block only. Existing PR scope still includes robots exclusions, help load hook, three alias modules, manifest/generated tree and tests; independent review must cover the whole resulting diff.
+claimed_by: Codex closeout session 01a16de3-1885-74b8-8142-25b4c333d0cd, 2026-10-26 19:40 UTC.
+owner: Codex closeout coordinator for this bounded repair; outside acceptance and normal merge authority remain separate.
+last_updated: 2026-10-27 05:13 UTC, by Codex bounded integration writer under rootcontinuation.
+```
+
 ### PLANT-HASH-SCROLL-OFFSET
 
 ```text

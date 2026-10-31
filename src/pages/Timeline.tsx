@@ -1548,12 +1548,15 @@ export default function Timeline() {
     requestedEntryId == null
       ? null
       : (displayEntries.find((row) => row.id === requestedEntryId) ?? null);
+  // Bumped after Correct / Retract so an off-page permalink row is re-read.
+  const [detailRecordRefreshKey, setDetailRecordRefreshKey] = useState(0);
   const detailFetch = useTimelineEntryDetailRecord(
     requestedEntryId,
     user,
     requestedEntryId != null &&
       visibleDetailEntry == null &&
       !isTimelineSensorDerivedDiaryId(requestedEntryId),
+    detailRecordRefreshKey,
   );
   const detailView = resolveTimelineEntryDetailView({
     requestedId: requestedEntryId,
@@ -3738,7 +3741,10 @@ export default function Timeline() {
                   ...timelineSensorEvents,
                 ])}
                 environmentCheckDetails={detailView.entry.details}
-                onChanged={() => void load()}
+                onChanged={() => {
+                  setDetailRecordRefreshKey((key) => key + 1);
+                  void load();
+                }}
               />
             ) : null
           }

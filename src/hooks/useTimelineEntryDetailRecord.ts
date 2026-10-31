@@ -75,36 +75,41 @@ async function loadTimelineEntryDetailRecord(
  * visible timeline page, filtered to `user_id = viewerUserId` in the query
  * (not only by RLS, which also lets operators read other users' rows). With
  * no viewer the read is skipped and the entry is reported missing. Sensor
- * receipts stay on the list projection.
+ * receipts stay on the list projection. `refreshKey` re-reads the same id
+ * after Correct or Retract, which do not change the id.
  */
 export function useTimelineEntryDetailRecord(
   requestedId: string | null,
   viewerUserId: string | null,
   enabled: boolean,
+  refreshKey = 0,
 ): TimelineEntryDetailFetch {
-  const [snapshot, setSnapshot] = useState<TimelineEntryDetailFetch & { id: string | null }>({
+  const [snapshot, setSnapshot] = useState<
+    TimelineEntryDetailFetch & { id: string | null; refreshKey: number }
+  >({
     id: null,
+    refreshKey: 0,
     fetchState: "idle",
     entry: null,
   });
 
   useEffect(() => {
     if (!enabled || !requestedId || isTimelineSensorDerivedDiaryId(requestedId)) {
-      setSnapshot({ id: requestedId, fetchState: "idle", entry: null });
+      setSnapshot({ id: requestedId, refreshKey, fetchState: "idle", entry: null });
       return;
     }
     let cancelled = false;
-    setSnapshot({ id: requestedId, fetchState: "loading", entry: null });
+    setSnapshot({ id: requestedId, refreshKey, fetchState: "loading", entry: null });
     void loadTimelineEntryDetailRecord(requestedId, viewerUserId).then((result) => {
       if (cancelled) return;
-      setSnapshot({ id: requestedId, ...result });
+      setSnapshot({ id: requestedId, refreshKey, ...result });
     });
     return () => {
       cancelled = true;
     };
-  }, [enabled, requestedId, viewerUserId]);
+  }, [enabled, requestedId, refreshKey, viewerUserId]);
 
-  if (snapshot.id !== requestedId) {
+  if (snapshot.id !== requestedId || snapshot.refreshKey !== refreshKey) {
     return { fetchState: enabled && requestedId ? "loading" : "idle", entry: null };
   }
   return { fetchState: snapshot.fetchState, entry: snapshot.entry };

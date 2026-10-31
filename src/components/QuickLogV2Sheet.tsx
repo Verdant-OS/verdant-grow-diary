@@ -2,6 +2,15 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
+  beginQuickLogSubmit,
+  buildQuickLogSheetSubmissionSnapshot,
+  createQuickLogSubmitGuardState,
+  decideQuickLogSubmit,
+  finishQuickLogSubmit,
+  isQuickLogSaveBusy,
+  type QuickLogSubmitGuardState,
+} from "@/lib/quickLogDuplicateSubmitGuard";
+import {
   isQuickLogObservationDraftEmpty,
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
@@ -78,6 +87,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  deriveQuickLogV2SaveState,
+  quickLogV2SaveStateLabel,
+  quickLogV2SaveFailedError,
+  shouldFocusQuickLogV2NoteOnOpen,
+} from "@/lib/quickLogV2NoteFirstRules";
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -102,6 +117,7 @@ import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
+import { useRegisteredTentQuickLogTentId } from "@/context/TentQuickLogTargetContext";
 import { quickLogArchivedGrowActionBlock } from "@/lib/archivedGrowQuickLogRules";
 import {
   buildQuickLogV2TargetOptions,
@@ -111,6 +127,7 @@ import {
   partitionQuickLogV2TargetOptionsForTent,
   resolveQuickLogV2Target,
   resolveQuickLogV2TentContextId,
+  resolveSelectableTentId,
   resolveTentScopedQuickLogPlantSelection,
   EMPTY_QUICKLOG_V2_FORM,
   QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
@@ -624,11 +641,57 @@ function QuickLogV2SheetForOwner({
     );
   const retryPending = wateringRetryPending || exactRetryPending;
   const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialSubmission));
+  // Note-first: a fresh Note sheet puts the cursor in the note box. Focus
+  // happens in the sheet's onOpenAutoFocus (inside the open gesture) so iOS
+  // raises the keyboard. If a pending recovery clears while the sheet is
+  // already open, the note box is NOT refocused: focus is only decided once,
+  // when the sheet opens.
+  const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const handleSheetOpenAutoFocus = (event: Event) => {
+    if (
+      !shouldFocusQuickLogV2NoteOnOpen({
+        open,
+        action: form.action,
+        recoveryPending: retryPending,
+        submissionLocked,
+      })
+    ) {
+      return;
+    }
+    const note = noteInputRef.current;
+    if (!note) return;
+    event.preventDefault();
+    note.focus();
+  };
+  // The exact error message of a Note/Water save that was actually attempted
+  // and failed. Input checks and recovery/Timeline messages never set it, and
+  // any later different error (e.g. an unreadable photo) hides the line.
+  const [noteFirstSaveFailedMessage, setNoteFirstSaveFailedMessage] = useState<string | null>(null);
+  const [saveAttemptLocked, setSaveAttemptLocked] = useState(false);
+  const saveBusy = isQuickLogSaveBusy({
+    saving,
+    feedingSaving,
+    wateringSaving,
+    attemptLocked: saveAttemptLocked,
+  });
+  const noteFirstSaveState = deriveQuickLogV2SaveState({
+    saving: saveBusy,
+    saved: postSave !== null,
+    error: quickLogV2SaveFailedError({
+      saveFailed: noteFirstSaveFailedMessage !== null && noteFirstSaveFailedMessage === localError,
+      action: form.action,
+      error: localError,
+    }),
+  });
+  const noteFirstSaveLabel = quickLogV2SaveStateLabel(noteFirstSaveState);
   // Synchronous in-flight guard. The save-state flags are React
   // state and don't flip until the next paint, so rapid double-clicks
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
+  const submitGuardRef = useRef<QuickLogSubmitGuardState>(
+    createQuickLogSubmitGuardState(),
+  );
   const observationDraftSuppressedRef = useRef(false);
   // True once this open restored or wrote the stored draft, so emptying the
   // form may forget it. Opening for another target never clears its draft.
@@ -742,6 +805,8 @@ function QuickLogV2SheetForOwner({
       resolveQuickLogV2TentContextId(form.selectedKey)
     );
   }, [defaultTargetKey, form.selectedKey]);
+  const registeredTentId = useRegisteredTentQuickLogTentId();
+  const openTentId = tentContextId ?? resolveSelectableTentId(registeredTentId, baseOptions);
 
   const tentScopedPartitions = useMemo(
     () => partitionQuickLogV2TargetOptionsForTent(baseOptions, tentContextId),
@@ -1199,6 +1264,9 @@ function QuickLogV2SheetForOwner({
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
       setLocalError(restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
+      setNoteFirstSaveFailedMessage(
+        restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null,
+      );
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
@@ -1214,12 +1282,15 @@ function QuickLogV2SheetForOwner({
       wateringRetrySubmissionRef.current = null;
       submissionLockedRef.current = false;
       keepSubmissionLockedRef.current = false;
-      saveInFlightRef.current = false;
-      idempotencyKeyRef.current = 1;
-      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
-      observationUnconfirmedRef.current = Boolean(restorable?.saveFailed);
-      if (restorable?.saveFailed && restorable.idempotencyKey) {
-        saveIdempotencyKeyRef.current = restorable.idempotencyKey;
+      // A save already in flight keeps its key. Clearing the lock here let a
+      // second tap, about a minute later, mint a new key and write a duplicate.
+      if (!saveInFlightRef.current) {
+        idempotencyKeyRef.current = 1;
+        saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        observationUnconfirmedRef.current = Boolean(restorable?.saveFailed);
+        if (restorable?.saveFailed && restorable.idempotencyKey) {
+          saveIdempotencyKeyRef.current = restorable.idempotencyKey;
+        }
       }
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
@@ -1266,10 +1337,9 @@ function QuickLogV2SheetForOwner({
     // re-persists the ref-held saveFailed flag even though the form is unchanged.
   }, [user?.id, open, form, feedingForm.note, postSave, localError]);
 
-  // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
-  // Only when selectedKey is still empty/unset — never rewrite an explicit
-  // tent:<id> (or plant:) target. One-shot per open so a grower who later
-  // picks the tent again is not forced.
+  // Tent-scoped pick: recent plant in the tent, else the sole plant, else the
+  // selected tent. Only when selectedKey is still empty — never rewrite an
+  // explicit tent:<id> or plant: target. One-shot per open.
   useEffect(() => {
     if (submissionLockedRef.current || !open || contextBlocked || tentPlantAutoApplied) return;
     const recentPlantId = recentTargetSuggestion?.plantId ?? recentTargetRecord?.plantId ?? null;
@@ -1282,7 +1352,7 @@ function QuickLogV2SheetForOwner({
         ? form.selectedKey
         : (defaultTargetKey ?? null);
     const nextKey = resolveTentScopedQuickLogPlantSelection({
-      tentId: tentContextId,
+      tentId: openTentId,
       options,
       selectedKey: draftKey,
       recentPlantId,
@@ -1297,7 +1367,7 @@ function QuickLogV2SheetForOwner({
     open,
     contextBlocked,
     tentPlantAutoApplied,
-    tentContextId,
+    openTentId,
     options,
     form.selectedKey,
     defaultTargetKey,
@@ -1840,6 +1910,30 @@ function QuickLogV2SheetForOwner({
         return;
       }
     }
+    const decision = decideQuickLogSubmit(
+      submitGuardRef.current,
+      buildQuickLogSheetSubmissionSnapshot({
+        action: form.action,
+        selectedKey: form.selectedKey,
+        note: form.note,
+        volumeMl: form.volumeMl,
+        temperatureC: form.temperatureC,
+        humidityPct: form.humidityPct,
+        vpdKpa: form.vpdKpa,
+        watering: wateringForm,
+        feeding: feedingForm,
+        maturity: maturityEvidenceForm,
+        photo: photoFile,
+        video: videoFile,
+      }),
+    );
+    // In-flight only: an identical or different tap while a save is running
+    // writes nothing. Once it settles, a later deliberate save always writes.
+    if (decision.kind !== "begin") {
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
+    submitGuardRef.current = beginQuickLogSubmit(submitGuardRef.current, decision.fingerprint);
     // Freeze every supported submission before the first await, using the
     // same synchronous guard as Water. Local validation releases this lock.
     const lockSubmission =
@@ -1851,14 +1945,17 @@ function QuickLogV2SheetForOwner({
       if (form.action === "water") setWateringSaving(true);
     }
     saveInFlightRef.current = true;
+    setSaveAttemptLocked(true);
     try {
       await runHandleSave();
     } finally {
+      submitGuardRef.current = finishQuickLogSubmit(submitGuardRef.current, decision.fingerprint);
       largeWaterSessionRef.current = {
         ...largeWaterSessionRef.current,
         inFlight: false,
       };
       if (lifetime.active) {
+        setSaveAttemptLocked(false);
         saveInFlightRef.current = false;
         if (lockSubmission) {
           setWateringSaving(false);
@@ -1876,6 +1973,7 @@ function QuickLogV2SheetForOwner({
     const canContinueNote = () => lifetime.active && noteLifetimeRef.current === lifetime;
     setMismatchedReceipt(null);
     setLocalError(null);
+    setNoteFirstSaveFailedMessage(null);
     setSaveStatus("");
     const pendingWateringSubmission = wateringRetrySubmissionRef.current;
     const pendingManualSubmission = manualRetrySubmissionRef.current;
@@ -2482,6 +2580,8 @@ function QuickLogV2SheetForOwner({
           ? wateringFormReasonToHelper(wateringResult.reason)
           : WATERING_SAVE_FAILURE_MESSAGE;
         setLocalError(message);
+        // A released rejection is a form correction, not a failed save.
+        setNoteFirstSaveFailedMessage(released ? null : message);
         toast.error(message);
         setSaveStatus("");
         return;
@@ -2597,6 +2697,11 @@ function QuickLogV2SheetForOwner({
               : reason === "save_failed"
                 ? QUICK_LOG_SAVE_FAILED_MESSAGE
                 : reasonToMessage(reason),
+      );
+      // Only a plain failed save is retried from this sheet; history/receipt
+      // outcomes point to Timeline instead.
+      setNoteFirstSaveFailedMessage(
+        reason === "save_failed" ? QUICK_LOG_SAVE_FAILED_MESSAGE : null,
       );
       setSaveStatus("");
       return;
@@ -3115,6 +3220,7 @@ function QuickLogV2SheetForOwner({
         className="max-h-[92vh] overflow-y-auto text-base"
         aria-describedby="qlv2-sheet-description"
         onCloseAutoFocus={restoreOpenerFocus}
+        onOpenAutoFocus={handleSheetOpenAutoFocus}
       >
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>
@@ -3586,6 +3692,48 @@ function QuickLogV2SheetForOwner({
           )}
 
           {form.action !== "feed" && (
+            <div>
+              <Label htmlFor="qlv2-note">Note (optional)</Label>
+              <Textarea
+                ref={noteInputRef}
+                id="qlv2-note"
+                inputMode="text"
+                enterKeyHint="enter"
+                data-testid="qlv2-note"
+                value={form.note}
+                disabled={submissionLocked}
+                maxLength={NOTE_LIMIT}
+                aria-describedby="qlv2-note-helper qlv2-note-count"
+                onChange={(e) => setField("note", e.target.value)}
+                onInput={(e) => {
+                  // Native input events (paste, dictation, programmatic
+                  // dispatchEvent) can bypass React's synthetic onChange in
+                  // some environments. Mirror the DOM value into state so the
+                  // save payload always receives exactly what the grower
+                  // visibly typed. Same A1 sync pattern as the legacy QuickLog
+                  // note. Synchronization only — the note stays optional.
+                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
+                }}
+                onCompositionEnd={(e) => {
+                  // IME / dictation finalization: commit the composed value.
+                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
+                }}
+                onBlur={(e) => {
+                  // Last-chance sync before the grower taps Save.
+                  setField("note", e.currentTarget.value);
+                }}
+                placeholder="What did you observe?"
+              />
+              <div className="mt-1 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                <p id="qlv2-note-helper">Keep it short. Add more detail later from the timeline.</p>
+                <p id="qlv2-note-count" aria-live="polite">
+                  {noteLength}/{NOTE_LIMIT}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {form.action !== "feed" && (
             <div
               className="rounded-md border border-border p-3"
               data-testid="qlv2-photo-attachment"
@@ -3728,45 +3876,6 @@ function QuickLogV2SheetForOwner({
                   Checking video before save…
                 </p>
               )}
-            </div>
-          )}
-
-          {form.action !== "feed" && (
-            <div>
-              <Label htmlFor="qlv2-note">Note (optional)</Label>
-              <Textarea
-                id="qlv2-note"
-                data-testid="qlv2-note"
-                value={form.note}
-                disabled={submissionLocked}
-                maxLength={NOTE_LIMIT}
-                aria-describedby="qlv2-note-helper qlv2-note-count"
-                onChange={(e) => setField("note", e.target.value)}
-                onInput={(e) => {
-                  // Native input events (paste, dictation, programmatic
-                  // dispatchEvent) can bypass React's synthetic onChange in
-                  // some environments. Mirror the DOM value into state so the
-                  // save payload always receives exactly what the grower
-                  // visibly typed. Same A1 sync pattern as the legacy QuickLog
-                  // note. Synchronization only — the note stays optional.
-                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
-                }}
-                onCompositionEnd={(e) => {
-                  // IME / dictation finalization: commit the composed value.
-                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
-                }}
-                onBlur={(e) => {
-                  // Last-chance sync before the grower taps Save.
-                  setField("note", e.currentTarget.value);
-                }}
-                placeholder="What did you observe?"
-              />
-              <div className="mt-1 flex items-center justify-between gap-2 text-sm text-muted-foreground">
-                <p id="qlv2-note-helper">Keep it short. Add more detail later from the timeline.</p>
-                <p id="qlv2-note-count" aria-live="polite">
-                  {noteLength}/{NOTE_LIMIT}
-                </p>
-              </div>
             </div>
           )}
 
@@ -4002,12 +4111,7 @@ function QuickLogV2SheetForOwner({
                         : "Retry saving Quick Log"
                   }
                   disabled={
-                    saving ||
-                    feedingSaving ||
-                    wateringSaving ||
-                    videoChecking ||
-                    photoChecking ||
-                    (contextBlocked && !retryPending)
+                    saveBusy || videoChecking || photoChecking || (contextBlocked && !retryPending)
                   }
                   onClick={handleSave}
                 >
@@ -4026,6 +4130,17 @@ function QuickLogV2SheetForOwner({
               Original attachments are unavailable after reopening. Their status is unresolved;
               retry checks only the original {form.action === "water" ? "watering record" : "Note"}.
               Check its Timeline before adding the files separately.
+            </p>
+          )}
+
+          {noteFirstSaveLabel && (
+            <p
+              role="status"
+              className="text-sm text-muted-foreground"
+              data-testid="qlv2-note-first-save-state"
+              data-state={noteFirstSaveState}
+            >
+              {noteFirstSaveLabel}
             </p>
           )}
 
@@ -4129,7 +4244,7 @@ function QuickLogV2SheetForOwner({
                     variant="outline"
                     className="flex-1"
                     onClick={() => handleSheetOpenChange(false)}
-                    disabled={saving || feedingSaving || wateringSaving || exactRetryPending}
+                    disabled={saveBusy || exactRetryPending}
                   >
                     Cancel
                   </Button>
@@ -4138,9 +4253,7 @@ function QuickLogV2SheetForOwner({
                     className="flex-1"
                     onClick={handleSave}
                     disabled={
-                      saving ||
-                      feedingSaving ||
-                      wateringSaving ||
+                      saveBusy ||
                       videoChecking ||
                       photoChecking ||
                       historyCheckRequired ||
@@ -4156,7 +4269,7 @@ function QuickLogV2SheetForOwner({
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
                   >
-                    {saving || feedingSaving || wateringSaving
+                    {saveBusy
                       ? "Saving…"
                       : retryPending
                         ? "Retry exact record"

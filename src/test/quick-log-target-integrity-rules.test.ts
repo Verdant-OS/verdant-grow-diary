@@ -182,17 +182,22 @@ describe("resolveQuickLogWriteTarget", () => {
       reason: "missing_active_grow",
     },
     {
-      label: "selected plant",
-      input: { activeGrowId: "g1", selectedPlant: null, selectedTent: tents[0] },
-      reason: "missing_plant",
-    },
-    {
       label: "selected tent",
       input: { activeGrowId: "g1", selectedPlant: plants[0], selectedTent: null },
       reason: "tent_not_found",
     },
   ] as const)("blocks a missing $label", ({ input, reason }) => {
     expect(resolveQuickLogWriteTarget(input)).toEqual({ status: "blocked", reason });
+  });
+
+  it("blocks a missing selected plant even when an active selected tent is present", () => {
+    expect(
+      resolveQuickLogWriteTarget({
+        activeGrowId: "g1",
+        selectedPlant: null,
+        selectedTent: tents[0],
+      }),
+    ).toEqual({ status: "blocked", reason: "missing_plant" });
   });
 
   it("blocks every contradictory write relationship", () => {

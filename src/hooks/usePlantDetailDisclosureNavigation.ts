@@ -41,8 +41,9 @@ const HASH_SCROLL_FOLLOW_MS = 3000;
 export const HASH_SCROLL_CANCEL_CEILING_MS = 1200;
 /**
  * A hash landing aligns the section's top. "center" put a section taller than the
- * viewport hundreds of pixels above the screen; each section's `scroll-mt-16`
- * leaves room for the sticky header.
+ * viewport hundreds of pixels above the screen. Every scroll sets the target's
+ * inline scroll-margin-top to PLANT_DETAIL_JUMP_SCROLL_MARGIN_PX (sticky header
+ * from appShellHeaderMetrics + gap), which overrides the sections' `scroll-mt-16`.
  */
 const HASH_LANDING_BLOCK: ScrollLogicalPosition = "start";
 

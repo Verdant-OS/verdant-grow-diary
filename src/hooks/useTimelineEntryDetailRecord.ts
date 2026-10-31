@@ -44,12 +44,16 @@ async function loadTimelineEntryDetailRecord(
   requestedId: string,
   viewerUserId: string | null,
 ): Promise<TimelineEntryDetailFetch> {
+  // No signed-in viewer means no row can be the viewer's own; never query.
+  if (!viewerUserId) return { fetchState: "missing", entry: null };
   try {
     const result = await selectWithRetractionCompat((withRetractionFilter) => {
       let query = supabase
         .from("diary_entries")
         .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id,grow_id")
         .eq("id", requestedId)
+        // Explicit viewer filter: RLS alone also admits operator-visible rows.
+        .eq("user_id", viewerUserId)
         .limit(1);
       if (withRetractionFilter) query = query.is("retracted_at", null);
       return query;
@@ -67,8 +71,11 @@ async function loadTimelineEntryDetailRecord(
 }
 
 /**
- * Loads one owned diary row for a permalink that is not already on the
- * visible timeline page. Sensor receipts stay on the list projection.
+ * Loads one diary row by id for a permalink that is not already on the
+ * visible timeline page, filtered to `user_id = viewerUserId` in the query
+ * (not only by RLS, which also lets operators read other users' rows). With
+ * no viewer the read is skipped and the entry is reported missing. Sensor
+ * receipts stay on the list projection.
  */
 export function useTimelineEntryDetailRecord(
   requestedId: string | null,

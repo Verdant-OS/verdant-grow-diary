@@ -3,8 +3,12 @@
 **Pinned file.** This file is the one place to point at for who owns what in the Verdant engineering loop. `docs/agents/CURRENT_STATE.md` links here, and this file wins over `CURRENT_STATE.md`. `AGENTS.md` points here too, and this file wins over it on ownership and routing. Matthew Cheek's own words override both.
 
 - **Repo:** `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`
-- **Owner of this file:** the Coordinator seat. Any seat may propose an edit as a draft PR. The roster maps the holder.
-- **Last revised:** 2026-10-31, current duties are seats. The 2026-10-26 revision is unchanged below: Matthew's latest PR #1971 assignment recorded: OG Kush merges, Jack Herer independently accepts, Codex is repair-only; the earlier Codex exception is superseded and the explicit merge hold remains. The 2026-10-22 bounded reviewer-routing correction and historical Graft low-risk lane remain. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
+
+**Historical — no current seat.** The next two lines are the prior named-owner text, kept word for word.
+
+<!-- prettier-ignore -->
+- **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.
+- **Last revised:** 2026-10-26, Matthew's latest PR #1971 assignment recorded: OG Kush merges, Jack Herer independently accepts, Codex is repair-only; the earlier Codex exception is superseded and the explicit merge hold remains. The 2026-10-22 bounded reviewer-routing correction and historical Graft low-risk lane remain. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
 
 ---
 
@@ -12,7 +16,7 @@
 
 Governance docs define seats and duties. `docs/agents/constitution/roster.md` is the only file mapping seats to current agent names and GitHub accounts, and on who holds a seat the roster wins. Matthew's own words override both. Renaming an agent edits only the roster.
 
-Comms tags live in `docs/agents/ultra-comms-protocol-v3.md`. The PR thread is the ledger. Slack pings never count.
+Comms tags are PR comments. The PR thread is the ledger. Slack pings never count. The protocol is not stored in this repository.
 
 | Duty                                                   | Seat                  | Backup         |
 | ------------------------------------------------------ | --------------------- | -------------- |
@@ -25,9 +29,9 @@ Comms tags live in `docs/agents/ultra-comms-protocol-v3.md`. The PR thread is th
 | Bug sweep, file only                                   | Bug Sweep             |                |
 | Per-item approval, gated paths, exceptions             | Matthew only          |                |
 
-Ultra Builder 1, Ultra Builder 2, and Ultra Fixer write. They never approve, mark ready, enqueue, or merge. The Merge Steward is an Ultra seat that merges as `verdant-ultra-bot`, only after a non-author Reviewer seat APPROVES the exact head. The Merge Steward has no authority over the PR #1971 hold recorded in the historical section below.
+Ultra Builder 1, Ultra Builder 2, and Ultra Fixer write. They never approve, mark ready, enqueue, or merge. The Merge Steward is an Ultra seat that merges only after a non-author Reviewer seat APPROVES the exact head. The account is named only in the roster. The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 
-Reviewer C and QA are TBD pending Matthew. Durban Poison and Blue Dream are retired from routing.
+Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
 
 **Review-ready.** The Builder posts `READY FOR REVIEW <full-sha>`. The Coordinator then marks the PR ready if it touches no gated path, or after Matthew's yes if it does. That starts the full 35 checks. Review-ready is not merge approval. Skipped, missing, or neutral checks are `NOT_MEASURED`, never a pass. Full CI on drafts was not chosen.
 
@@ -48,7 +52,7 @@ Fallback is run by hand by the Coordinator. No automation is claimed. 60 minutes
 - Only the Merge Steward may dismiss a `REQUEST_CHANGES`, and only with Matthew's written exception naming the PR, SHA, and finding, linked in the dismissal message.
 - Open findings stay open until each is fixed at a sha or waived by Matthew in writing.
 
-**Merge Steward.** Queues only with `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only with: 35/35 required checks at that sha; a clean `APPROVE` from a non-contributing Reviewer seat at the current head (approvals from `verdant-ultra-bot` never count); a hard head re-check (`|| exit 1`) right before queueing; no conflicts; any gated `[BLOCKED-ON-MATTHEW]` cleared by Matthew; holds respected (#2532 and #2535 are never re-enqueued; #2539, #2526, #2231, #2536, and #2640 are held; #2593 and #2594 only after #2592). The Steward session never queues a PR it wrote, fixed, or base-merged. Builder and Fixer seats never approve, mark ready, enqueue, or merge. The Merge Steward has no authority over the PR #1971 hold.
+**Merge Steward.** Queues only with `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only with: 35/35 required checks at that sha; a clean `APPROVE` from a non-contributing Reviewer seat at the current head (an approval from the Ultra account named in the roster never counts); a hard head re-check (`|| exit 1`) right before queueing; no conflicts; any gated `[BLOCKED-ON-MATTHEW]` cleared by Matthew; holds respected (#2532 and #2535 are never re-enqueued; #2539, #2526, #2231, #2536, and #2640 are held; #2593 and #2594 only after #2592). The Steward session never queues a PR it wrote, fixed, or base-merged. Builder and Fixer seats never approve, mark ready, enqueue, or merge. The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 
 **Enforced by GitHub vs by agents.** Live ruleset `24445196`, the 35-check union, and the queue settings were not re-read for this change (`NOT_MEASURED`).
 
@@ -57,7 +61,7 @@ Fallback is run by hand by the Coordinator. No automation is claimed. 60 minutes
 - Pending or deferred: `CODEOWNERS`, required scorer-lock and sentinel checks (sentinel needs the follow-up workflow PR), and branch push restrictions (deferred by Matthew).
 - Only Reviewer seats' verdicts count as acceptance. Bot reviews (CodeRabbit, Cursor, Copilot, GitHub Advanced Security) are advisory input the reviewer must consider. CodeRabbit stays on.
 
-**After merge, not on a clock.** The `:03` / `:33` sweep schedule is not current. New-User Smoke runs when asked, after the deploy ping. Bug Sweep files findings only. QA posts `[VERIFY]`. A `FAIL` is not routed to a retired agent. The Coordinator routes it to a Builder or Fixer seat.
+**After merge, not on a clock.** The `:03` / `:33` sweep schedule is not current. New-User Smoke runs when asked, after the deploy ping. Bug Sweep files findings only. QA posts `[VERIFY]`. The Coordinator routes a FAIL to a Builder or Fixer seat.
 
 **Loop that replaces the historical steps 8–10.** Merge Readiness confirms 35/35 at the exact head. The Merge Steward queues with the command above after a non-author Reviewer `APPROVE`. QA, New-User Smoke, and Bug Sweep follow merge, on request or by filing.
 

@@ -6,7 +6,7 @@
 
 Governance docs define seats and duties. `docs/agents/constitution/roster.md` is the only file mapping seats to current agent names and GitHub accounts, and on who holds a seat the roster wins. Matthew's own words override both. Renaming an agent edits only the roster.
 
-Writers are Ultra Builder 1, Ultra Builder 2, and Ultra Fixer. They never approve, mark ready, enqueue, or merge. The Merge Steward is the only seat that queues or merges, and only after a non-author Reviewer seat APPROVES the exact head. The Coordinator routes. Reviewer A, B, C, and D give exact-head verdicts. Durban Poison is retired from routing. Reviewer C and QA are TBD pending Matthew. QA, New-User Smoke, and Bug Sweep run after merge. Matthew alone gives per-item approval. The Merge Steward has no authority over the PR #1971 hold, which stays with OG Kush.
+Writers are Ultra Builder 1, Ultra Builder 2, and Ultra Fixer. They never approve, mark ready, enqueue, or merge. The Merge Steward is the only seat that queues or merges, and only after a non-author Reviewer seat APPROVES the exact head. The Coordinator routes. Reviewer A, B, C, and D give exact-head verdicts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster. QA, New-User Smoke, and Bug Sweep run after merge. Matthew alone gives per-item approval. The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 
 Handoff guard: any active assignment or hold owned by a historical agent stays in force until an explicit Coordinator handoff or Matthew's release (he released Codex's work on 2026-10-30).
 
@@ -20,7 +20,7 @@ Ultra Builder 1 or 2    write
   -> Matthew            approve what ships
 ```
 
-Comms tags: `docs/agents/ultra-comms-protocol-v3.md`.
+Comms tags are PR comments. The protocol is not stored in this repository.
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -60,7 +60,7 @@ to <successor>` comment on the PR (see `AGENTS.md`), and the successor then clai
 confirm its remote head, and merge from base; never rename, recreate or force-push it.
 
 Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
-**Blue Dream, Critical Mass, and Durban Poison are retired from future routing**; preserve historical receipts.
+**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
 Exclude every author and repairer even after a task transfer. A shared GitHub identity
 alone does not establish independence: record session, role, contributor exclusions,
 full 40-character head SHA, complete scope, evidence and verdict.
@@ -152,8 +152,8 @@ files_touched:
 The current holder and acceptance reviewer must be independent; changing the claim
 does not erase earlier contributions. Record the Reviewer seat assigned under
 `docs/agents/OWNERSHIP.md` §4.3 (Merge Readiness confirms the checks; the Coordinator routes).
-Choose an actually available Reviewer seat for the complete scope. Durban Poison, Blue Dream,
-and Critical Mass are retired from future routing. Graft retains only its existing low-risk
+Choose an actually available Reviewer seat for the complete scope. Reviewer C, Reviewer D,
+and QA are active. Critical Mass is retired from future routing. Graft retains only its existing low-risk
 allowlist; governance, protected and mixed scopes require an eligible outside reviewer.
 Keep all supplemental evidence and protected-file gates. QA observations alone are not acceptance.
 Use one current review request per PR/full head and check existing receipts before
@@ -213,7 +213,7 @@ The assigned QA reviewer reports evidence; it does not authorize release.
 
 ## Historical routing
 
-The paragraphs below are the prior routing text, kept word for word. They do not assign a current seat. Durban Poison is retired from routing in the current section above.
+The paragraphs below are the prior routing text, kept word for word. They do not assign a current seat.
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

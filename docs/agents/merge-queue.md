@@ -7,7 +7,7 @@
 **Grouping:** `ALLGREEN` · max 1 entry merged per group · up to 5 building  
 **Check timeout:** 360 minutes  
 **Admin bypass:** repository **Admin** role may bypass on a pull request (emergency only; Cheek)  
-**Who may enqueue:** the Merge Steward seat only (backup: Steward Backup). The Merge Steward has no authority over the PR #1971 hold, which stays with OG Kush.
+**Who may enqueue:** the Merge Steward seat only (backup: Steward Backup). The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 
 ## Why
 
@@ -23,7 +23,7 @@ The Merge Steward queues only after a non-author Reviewer seat APPROVES the exac
 gh pr merge <N> --auto --match-head-commit <full-sha>
 ```
 
-Do **not** expect a direct `gh pr merge` without queue when the ruleset is active unless using admin bypass. Approvals from `verdant-ultra-bot` never count.
+Do **not** expect a direct `gh pr merge` without queue when the ruleset is active unless using admin bypass. An approval from the Ultra account named in the roster never counts.
 
 ## Required status checks (queue + ruleset)
 
@@ -54,15 +54,16 @@ Requires `gh` auth with repo read. Unit tests (no network):
 bunx vitest run src/test/merge-queue-snapshot.test.ts
 ```
 
-| Field                            | Meaning                                        |
-| -------------------------------- | ---------------------------------------------- |
-| `queue_depth`                    | Entries currently in the merge queue           |
-| `median_age_sec` / `max_age_sec` | Time since enqueue                             |
-| `DIRTY`                          | Content conflict — run CONFLICT_RECONCILIATION |
-| `BEHIND`                         | Base moved — update branch; re-run CI          |
-| `BLOCKED`                        | Required checks/reviews — not a git conflict   |
-| `UNSTABLE`                       | Non-required reds                              |
-| `auto_merge`                     | PRs with auto-merge / queue request enabled    |
+<!-- prettier-ignore -->
+| Field | Meaning |
+|-------|---------|
+| `queue_depth` | Entries currently in the merge queue |
+| `median_age_sec` / `max_age_sec` | Time since enqueue |
+| `DIRTY` | Content conflict — run CONFLICT_RECONCILIATION |
+| `BEHIND` | Base moved — update branch; re-run CI |
+| `BLOCKED` | Required checks/reviews — not a git conflict |
+| `UNSTABLE` | Non-required reds |
+| `auto_merge` | PRs with auto-merge / queue request enabled |
 
 Empty queue + high `DIRTY` count is an **ownership/serialisation** signal, not queue latency.
 
@@ -76,21 +77,23 @@ Enabled by default via `scaling` in [`merge-queue-thresholds.json`](../../script
 factor = clamp(open_pr_total / baseline_open_prs, min_factor, max_factor)
 ```
 
-| Setting             |                         Default | Role                                                                                |
-| ------------------- | ------------------------------: | ----------------------------------------------------------------------------------- |
-| `baseline_open_prs` |                              10 | Load reference                                                                      |
-| `min_factor`        |                             1.0 | Never loosen floors below base                                                      |
-| `max_factor`        |                             2.5 | Cap inflation under large backlogs                                                  |
-| `count_metrics`     | dirty/behind/blocked/auto_merge | Scale absolute counts                                                               |
-| `depth_metrics`     |                     queue_depth | Mild scale, capped at `depth_max_cap` (5)                                           |
-| age metrics         |                           fixed | Existing monitor thresholds (30m / 90m), not a live read of the 360-minute contract |
+<!-- prettier-ignore -->
+| Setting | Default | Role |
+|---------|--------:|------|
+| `baseline_open_prs` | 10 | Load reference |
+| `min_factor` | 1.0 | Never loosen floors below base |
+| `max_factor` | 2.5 | Cap inflation under large backlogs |
+| `count_metrics` | dirty/behind/blocked/auto_merge | Scale absolute counts |
+| `depth_metrics` | queue_depth | Mild scale, capped at `depth_max_cap` (5) |
+| age metrics | fixed | Stay timeout-bound (30m / 90m) |
 
 **Ratio alerts** (when `open >= min_open_prs`):
 
-| Ratio           | Warn | Critical |
-| --------------- | ---: | -------: |
-| `dirty / open`  | 0.45 |     0.70 |
-| `behind / open` | 0.40 |     0.65 |
+<!-- prettier-ignore -->
+| Ratio | Warn | Critical |
+|-------|-----:|---------:|
+| `dirty / open` | 0.45 | 0.70 |
+| `behind / open` | 0.40 | 0.65 |
 
 Disable scaling:
 
@@ -103,15 +106,16 @@ Example: 13 open PRs → factor ≈ 1.3 → `dirty_open_prs` warn rises from 5 �
 
 Canonical config: [`scripts/ci/merge-queue-thresholds.json`](../../scripts/ci/merge-queue-thresholds.json)
 
-| Metric               |       Warn |   Critical | Intent                                                                 |
-| -------------------- | ---------: | ---------: | ---------------------------------------------------------------------- |
-| `queue_depth`        |          3 |          5 | Sustained serial backlog                                               |
-| `max_age_sec`        | 1800 (30m) | 5400 (90m) | Existing monitor threshold, not a live read of the 360-minute contract |
-| `median_age_sec`     |        900 |       2700 | Typical clear time when CI green                                       |
-| `dirty_open_prs`     |          5 |         10 | Conflicts never enqueue                                                |
-| `behind_open_prs`    |          5 |         12 | Stale heads                                                            |
-| `blocked_open_prs`   |          8 |         15 | Required gates stuck                                                   |
-| `auto_merge_waiting` |          3 |          6 | Queue requests not draining                                            |
+<!-- prettier-ignore -->
+| Metric | Warn | Critical | Intent |
+|--------|-----:|---------:|--------|
+| `queue_depth` | 3 | 5 | Sustained serial backlog |
+| `max_age_sec` | 1800 (30m) | 5400 (90m) | Near ruleset check timeout |
+| `median_age_sec` | 900 | 2700 | Typical clear time when CI green |
+| `dirty_open_prs` | 5 | 10 | Conflicts never enqueue |
+| `behind_open_prs` | 5 | 12 | Stale heads |
+| `blocked_open_prs` | 8 | 15 | Required gates stuck |
+| `auto_merge_waiting` | 3 | 6 | Queue requests not draining |
 
 ```bash
 bun run merge-queue:snapshot:alert          # exit 4 on critical
@@ -125,12 +129,13 @@ Null ages (empty queue) **do not** alert. High `DIRTY` with empty queue is an ow
 
 ## Conflict flags vs queue
 
-| GitHub state             | Meaning                 | Queue action                                              |
-| ------------------------ | ----------------------- | --------------------------------------------------------- |
-| `CONFLICTING` / `DIRTY`  | Content conflict        | **Cannot enqueue** until resolved or PR closed superseded |
-| `MERGEABLE` + `BLOCKED`  | Required checks/reviews | Fix gates; then enqueue                                   |
-| `MERGEABLE` + `UNSTABLE` | Non-required reds       | May enqueue if required are green                         |
-| `BEHIND`                 | Base moved              | Update/rebase; **re-run CI**; then enqueue                |
+<!-- prettier-ignore -->
+| GitHub state | Meaning | Queue action |
+|--------------|---------|--------------|
+| `CONFLICTING` / `DIRTY` | Content conflict | **Cannot enqueue** until resolved or PR closed superseded |
+| `MERGEABLE` + `BLOCKED` | Required checks/reviews | Fix gates; then enqueue |
+| `MERGEABLE` + `UNSTABLE` | Non-required reds | May enqueue if required are green |
+| `BEHIND` | Base moved | Update/rebase; **re-run CI**; then enqueue |
 
 Merge queue does **not** replace the Verdant conflict-resolution rule:
 
@@ -142,12 +147,13 @@ Never reuse green checks from pre-resolution SHA
 
 ## Failure modes
 
-| Event                               | Expected outcome                                                 |
-| ----------------------------------- | ---------------------------------------------------------------- |
-| Queue entry conflicts with tip      | Entry removed / fails; author rebases                            |
-| Required check fails on queue build | Entry fails; not merged                                          |
-| Timeout (360m, not re-measured)     | Entry fails                                                      |
-| Two PRs same files                  | Second waits; may go dirty when first lands → supersession audit |
+<!-- prettier-ignore -->
+| Event | Expected outcome |
+|-------|------------------|
+| Queue entry conflicts with tip | Entry removed / fails; author rebases |
+| Required check fails on queue build | Entry fails; not merged |
+| Timeout (360m, not re-measured) | Entry fails |
+| Two PRs same files | Second waits; may go dirty when first lands → supersession audit |
 
 ## Safety
 

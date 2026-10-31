@@ -302,7 +302,7 @@ ran and what you skipped.
   `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only after a
   non-author Reviewer seat APPROVES that exact head. Builder and Fixer seats
   never approve, mark ready, enqueue, or merge. The Merge Steward has no
-  authority over the PR #1971 hold, which stays with OG Kush. Skipped, missing,
+  authority over the PR #1971 hold, which stays with the Coordinator. Skipped, missing,
   or neutral checks are `NOT_MEASURED`, never a pass.
   Protected and mixed scopes still need an eligible outside reviewer and their
   supplemental evidence.
@@ -388,16 +388,15 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
   cannot pass it.
 - Who may sit the review is the roster, applied to the whole scope, including
   protected files and supplemental evidence. Current review routing uses Reviewer
-  seats A, B, C, and D. Durban Poison is retired from routing. Reviewer C and QA
-  are TBD pending Matthew.
+  seats A, B, C, and D. Reviewer C, Reviewer D, and QA are active. Holders are
+  named only in the roster.
 - The review record is PR comments: `[ROUTE]`, `[ACK]`, `[CLAIM]`, then a GitHub
   review at that commit. An adverse verdict (any P1 or P2) is `REQUEST_CHANGES`.
   A clean verdict on a non-gated pull request is `APPROVE` at that commit by the
   reviewer seat. A clean verdict on a gated pull request is `COMMENT` until
   Matthew's own yes names the pull request and SHA. Only the Merge Steward may
   dismiss `REQUEST_CHANGES`, and only with Matthew's written exception naming
-  the pull request, SHA, and finding. Detail is in `docs/agents/OWNERSHIP.md`
-  and `docs/agents/ultra-comms-protocol-v3.md`.
+  the pull request, SHA, and finding. Detail is in `docs/agents/OWNERSHIP.md`.
 - Role files say each seat's default strength. Strength is not rank. Before
   work beyond the startup read, the seat reads its role file:
   `docs/agents/roles/codex.md`, `docs/agents/roles/grok.md`,
@@ -557,7 +556,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
-- **2026-10-31.1** — Seats and duties stay in the governance docs. The roster is the only holder map. The Merge Steward queues only after a non-author Reviewer APPROVE at the exact head and has no authority over the PR #1971 hold. Durban Poison is retired from routing. Reviewer C and QA are TBD pending Matthew.
+- **2026-10-31.1** — Seats and duties stay in the governance docs. The roster is the only holder map. The Merge Steward queues only after a non-author Reviewer APPROVE at the exact head and has no authority over the PR #1971 hold, which stays with the Coordinator. Reviewer C, Reviewer D, and QA are active seats.
 - **2026-10-27.1** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.
 - **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants
   in the per-item merge rule, matching the roster and ownership policy. No new merge

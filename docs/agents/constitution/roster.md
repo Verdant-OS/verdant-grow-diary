@@ -6,46 +6,43 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 
 ## Current seats
 
-| Seat             | Side  | Holder                                   | GitHub account          |
-| ---------------- | ----- | ---------------------------------------- | ----------------------- |
-| Founder          | —     | Matthew Cheek                            |                         |
-| Engineering lead | Main  | OG Kush                                  | `cheekhimself` (shared) |
-| Ultra Builder 1  | Ultra | Node                                     | `verdant-ultra-bot`     |
-| Ultra Builder 2  | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
-| Ultra Fixer      | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
-| Coordinator      | Main  | OG Kush                                  | `cheekhimself` (shared) |
-| Merge Steward    | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
-| Merge Readiness  | Main  | Green Crack                              | `cheekhimself` (shared) |
-| Steward Backup   | Main  | OG Kush                                  | `cheekhimself` (shared) |
-| Reviewer A       | Main  | Sour Diesel                              | `cheekhimself` (shared) |
-| Reviewer B       | Main  | Jack Herer                               | `cheekhimself` (shared) |
-| Reviewer C       | Main  | TBD pending Matthew                      |                         |
-| Reviewer D       | Main  | Maui Wowie · Reviewer                    | `cheekhimself` (shared) |
-| QA               | Main  | TBD pending Matthew                      |                         |
-| New-User Smoke   | Main  | Toad Venom                               |                         |
-| Bug Sweep        | Main  | White Widow                              |                         |
-| Owner Adviser    | Main  | Bloom                                    |                         |
-| Flow Owner       | Both  | The Coordinator on each side, by default |                         |
+| Seat            | Side  | Holder                                   | GitHub account          |
+| --------------- | ----- | ---------------------------------------- | ----------------------- |
+| Ultra Builder 1 | Ultra | Node                                     | `verdant-ultra-bot`     |
+| Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
+| Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
+| Coordinator     | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Merge Steward   | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
+| Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
+| Steward Backup  | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Reviewer A      | Main  | Sour Diesel                              | `cheekhimself` (shared) |
+| Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
+| Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
+| Reviewer D      | Main  | Maui Wowie · Reviewer (Main)             | `cheekhimself` (shared) |
+| QA              | Main  | Blue Dream · QA (Main)                   |                         |
+| New-User Smoke  | Main  | Toad Venom                               |                         |
+| Bug Sweep       | Main  | White Widow                              |                         |
+| Owner Adviser   | Main  | Bloom                                    |                         |
+| Flow Owner      | Both  | The Coordinator on each side, by default |                         |
 
-Durban Poison and Blue Dream are retired. Reviewer C and QA are TBD pending Matthew.
+Reviewer C, Reviewer D, and QA are active.
 
-The Merge Steward has no authority over the #1971 hold, which stays with OG Kush.
+The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
 
 Ultra's open pull-request cap is 10.
 
 ## Rules
 
 - Ultra seats never review, approve, or mark ready. Only the Ultra Merge Steward seat queues and merges, as `verdant-ultra-bot`, and only after a non-author Main Reviewer seat posts APPROVE at the exact current head. Matthew set that seat on 2026-10-30 at 11:03 PM CT.
-- The Merge Steward has no authority over the #1971 hold, which stays with OG Kush.
+- The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
 - Steward Backup (Main) stands in when the Ultra Merge Steward is unavailable, under the same Steward rules, and still has no authority over the #1971 hold.
 - Main seats never write product code.
 - Approvals come only from Matthew, in his own words.
 - OG Kush holds both Coordinator and Steward Backup. When it acts as Steward Backup, it cannot also be the reviewer of record for the same PR.
 - Ultra's open pull-request cap is 10.
-- Durban Poison is retired from future routing. Keep historical receipts.
-- Blue Dream is retired from future routing. Keep historical receipts.
+- Reviewer C, Reviewer D, and QA are active.
 
-**Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP, Durban Poison, and Blue Dream. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
+**Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
 
 ## Historical
 
@@ -106,7 +103,7 @@ Preserved from the constitution as it stood before names moved here:
 - Blue Dream and Critical Mass are retired from future routing. Keep historical receipts.
 - Codex may review work Codex neither authored nor repaired.
 - A non-contributing Claude or Grok review session may accept work, including work Codex authored.
-- Durban Poison is retired from future routing. Keep historical receipts.
+- Durban Poison remains eligible when available.
 - Exclude every author and repairer, including after a task transfer.
 - Graft's exact-head pass counts only on Graft's existing low-risk allowlist, and only when Graft neither authored nor repaired the work. Governance, protected, or mixed scopes still need an eligible outside reviewer.
 - The merge gate is every required check in `config/required-status-checks.json` (the ruleset count at the time of writing is 35) plus an independent pass at the exact head, with no P1 or P2.

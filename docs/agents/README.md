@@ -3,7 +3,7 @@
 **Sentinel-Version: 2026-10-31.1**
 
 Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
-**Blue Dream, Critical Mass, and Durban Poison are retired from future routing**; preserve historical receipts.
+**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
 Exclude every author and repairer even after a task transfer. A shared GitHub identity
 alone does not establish independence: record session, role, contributor exclusions,
 full 40-character head SHA, complete scope, evidence and verdict.
@@ -14,7 +14,7 @@ protected or mixed scopes still need an eligible outside reviewer. Required CI a
 supplemental evidence, protected-file gates, holds, merge queue and founder-only
 production controls remain. Builder and Fixer seats use normal pushes only: no force-push, merge,
 Publish, SQL apply or production Supabase writes. Drafts remain draft.
-The Merge Steward has no authority over the PR #1971 hold, which stays with OG Kush.
+The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 Check the existing request and receipt before pinging; keep one current review request
 per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
 state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record
@@ -57,7 +57,6 @@ OPERATING STATE
   docs/agents/cheek-approval-workflow.md  Cheek ship-authority decision workflow
   docs/agents/merge-queue.md       deploy-branch merge queue + snapshot script
   docs/agents/constitution/roster.md  seat-to-holder map; wins on who holds a seat
-  docs/agents/ultra-comms-protocol-v3.md  Main and Ultra comms tags
 
 HISTORICAL — never active instructions
   docs/archive/legacy/verdant-master-prompt-legacy.md

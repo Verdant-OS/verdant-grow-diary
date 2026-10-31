@@ -12,14 +12,21 @@ import { useMemo } from "react";
 import { ArrowRight, History, Sprout, Stethoscope } from "lucide-react";
 import { Link, useSearchParams } from "@/lib/react-router-compat";
 
+import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import DoctorGrowNextStepsCard from "@/components/DoctorGrowNextStepsCard";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import { useAiDoctorGrowCreditUsage } from "@/hooks/useAiDoctorGrowCreditUsage";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
+import {
+  buildAiDoctorSurfaceCreditViewModel,
+  resolveAiDoctorEffectiveMonthlyLimit,
+} from "@/lib/aiDoctorSurfaceCreditViewModel";
 import {
   DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY,
   partitionDoctorEntryOptionsByTent,
@@ -133,6 +140,50 @@ export default function AiDoctorStart() {
       ? scope
       : { growId: null, growName: null, tentId: null, tentName: null, hasInvalidScope: false };
 
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+  } = useMyEntitlements();
+  const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
+  const effectiveMonthlyLimit = resolveAiDoctorEffectiveMonthlyLimit(entitlement);
+  const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
+  const singleGrowId =
+    !growsLoading && !growsError && grows.length === 1 && typeof grows[0]?.id === "string"
+      ? grows[0].id
+      : null;
+  const creditGrowId = resolvedScope.growId ?? singleGrowId;
+  const creditUsage = useAiDoctorGrowCreditUsage({
+    growId: creditGrowId,
+    perGrowEnabled:
+      entitlementReady &&
+      effectiveMonthlyLimit === null &&
+      typeof perGrowAiCredits === "number" &&
+      perGrowAiCredits > 0,
+    monthlyEnabled: entitlementReady && effectiveMonthlyLimit !== null,
+  });
+  const surfaceCredit = useMemo(
+    () =>
+      buildAiDoctorSurfaceCreditViewModel({
+        entitlement,
+        entitlementLoading,
+        entitlementLookupFailed,
+        allowanceUsed: creditUsage.isError ? null : creditUsage.allowanceUsed,
+        monthlyUsed: creditUsage.isError ? null : creditUsage.monthlyUsed,
+        packBalance: creditUsage.isError ? null : creditUsage.packBalance,
+        allowanceReadFailed: creditUsage.isError,
+      }),
+    [
+      creditUsage.allowanceUsed,
+      creditUsage.isError,
+      creditUsage.monthlyUsed,
+      creditUsage.packBalance,
+      entitlement,
+      entitlementLoading,
+      entitlementLookupFailed,
+    ],
+  );
+
   // Carried tent scope reorders and labels the choices. It never removes one:
   // the explicit plant choice below is doctrine, and a shorter list is a
   // softer way of guessing. A carried plant may be ordered/badged; it is
@@ -221,6 +272,20 @@ export default function AiDoctorStart() {
             Verdant will not guess which plant you mean. Opening a plant prepares its existing
             context; AI Doctor runs only after you press the review button there.
           </p>
+          {surfaceCredit.creditRemaining ? (
+            <AiCreditRemainingBadge
+              credit={surfaceCredit.creditRemaining}
+              data-testid="ai-doctor-start-credit-remaining"
+            />
+          ) : null}
+          {surfaceCredit.freePlanCreditCopy ? (
+            <p
+              className="mt-1 text-xs text-muted-foreground"
+              data-testid="ai-doctor-start-free-credit-note"
+            >
+              {surfaceCredit.freePlanCreditCopy}
+            </p>
+          ) : null}
           {resolvedScope.tentName ? (
             <p
               className="mt-2 text-sm text-muted-foreground"

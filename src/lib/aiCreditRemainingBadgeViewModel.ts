@@ -38,6 +38,12 @@ export interface AiCreditRemainingInput {
   funded_by?: "allowance" | "pack" | string | null;
   /** True when the edge function returned a cached same-key result. */
   replayed?: boolean | null;
+  /**
+   * True when the figures describe only the included plan allowance because
+   * the credit-pack balance could not be resolved. The label then says
+   * "included" and never claims a total balance or shows a pack suffix.
+   */
+  allowance_only?: boolean | null;
 }
 
 export interface AiCreditRemainingBadgeViewModel {
@@ -95,7 +101,10 @@ export function buildAiCreditRemainingBadgeViewModel(
   const remainingClamped = clampNonNegative(remaining);
   const limitClamped = clampNonNegative(scopeLimit);
   const noun = nounFor(options?.surface ?? "doctor");
-  const packBalance = isFiniteInt(input.pack_balance) ? clampNonNegative(input.pack_balance) : 0;
+  const allowanceOnly = input.allowance_only === true;
+  const packBalance =
+    !allowanceOnly && isFiniteInt(input.pack_balance) ? clampNonNegative(input.pack_balance) : 0;
+  const allowanceNoun = allowanceOnly ? `included ${noun}` : noun;
   const packSuffix =
     packBalance > 0
       ? ` · ${packBalance} pack ${packBalance === 1 ? "credit" : "credits"} available`
@@ -104,7 +113,7 @@ export function buildAiCreditRemainingBadgeViewModel(
   if (scope === "per_grow") {
     return {
       visible: true,
-      label: `${remainingClamped} of ${limitClamped} ${noun} left for this grow${packSuffix}`,
+      label: `${remainingClamped} of ${limitClamped} ${allowanceNoun} left for this grow${packSuffix}`,
       scope: "per_grow",
       remaining: remainingClamped,
       scopeLimit: limitClamped,
@@ -112,7 +121,7 @@ export function buildAiCreditRemainingBadgeViewModel(
     };
   }
 
-  const monthLabel = `${remainingClamped} of ${limitClamped} ${noun} left this month`;
+  const monthLabel = `${remainingClamped} of ${limitClamped} ${allowanceNoun} left this month`;
 
   return {
     visible: true,

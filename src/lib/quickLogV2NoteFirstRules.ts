@@ -45,7 +45,7 @@ export function quickLogV2SaveStateLabel(state: QuickLogV2SaveState): string {
     case "saved":
       return "Saved";
     case "failed":
-      return "Not saved yet. Your note is kept — try again.";
+      return "Not saved yet. Your note is kept — tap Save to try again.";
     case "idle":
       return "";
     default: {

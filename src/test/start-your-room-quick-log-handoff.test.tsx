@@ -112,7 +112,7 @@ beforeEach(() => {
 });
 
 describe("Start Your Room Quick Log handoff", () => {
-  it("finishes the wizard on encoded Plant Detail with the global one-shot Quick Log intent", async () => {
+  it("hands one submit off to encoded Plant Detail with the global one-shot Quick Log intent", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={["/start-room"]}>
@@ -120,23 +120,16 @@ describe("Start Your Room Quick Log handoff", () => {
       </MemoryRouter>,
     );
 
-    await user.type(screen.getByTestId("start-room-grow-name"), "E2E Grow");
-    await user.click(screen.getByTestId("start-room-grow-submit"));
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-
-    await user.type(screen.getByTestId("start-room-tent-name"), "E2E Tent");
-    await user.click(screen.getByTestId("start-room-tent-submit"));
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
-
     await user.type(screen.getByTestId("start-room-plant-name"), "E2E Plant");
-    await user.click(screen.getByTestId("start-room-plant-submit"));
+    await user.type(screen.getByTestId("start-room-grow-name"), "E2E Grow");
+    await user.type(screen.getByTestId("start-room-tent-name"), "E2E Tent");
+    await user.click(screen.getByTestId("start-room-submit"));
     expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["tents"] });
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["plants"] });
     expect(refreshMock).toHaveBeenCalledTimes(2);
 
-    await user.click(screen.getByTestId("start-room-finish"));
-
+    // One submit hands straight off to Plant Detail; no second tap on Done.
     expect(navMock).toHaveBeenCalledTimes(1);
     expect(navMock).toHaveBeenCalledWith(`/plants/${ATTEMPT_IDS.plant}?open=quick-log`, {
       replace: true,

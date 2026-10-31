@@ -3,18 +3,23 @@
  *
  * SAFETY:
  *  - The client token is public by design (see paddle-security knowledge).
- *  - Development and production builds intentionally carry sandbox-class
- *    client tokens. Live tokens fail closed on every host.
+ *  - Development builds carry a sandbox-class `test_` token. Production
+ *    carries a `live_` token, which opens live checkout only on the
+ *    production hostnames (`paddleEnvironment.ts`) and fails closed on every
+ *    other host.
  *  - This module is client-side only. It does not touch the existing
  *    BYO Paddle stack (`src/lib/paddleConfig.ts`, `billing_subscriptions`,
  *    `paddle-webhook`) — those remain in place for the operator audit
  *    surfaces until Phase 2 explicitly bridges the two systems.
  */
 
+import { renderHostname } from "@/lib/requestHostname";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsFetchError } from "@supabase/supabase-js";
 import {
   resolvePaddleCheckoutEnvironment,
+  isCheckoutDisabledFlag,
+  CHECKOUT_PAUSED_MESSAGE,
   classifyPaddleToken,
   CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
   CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
@@ -24,44 +29,73 @@ import { handlePaddleCheckoutEvent } from "@/lib/checkoutOverlaySession";
 import { readEdgeFunctionErrorCode } from "@/lib/edgeFunctionError";
 
 const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined;
+// Rollback artifact switch: a build with VITE_CHECKOUT_DISABLED="true" never
+// opens checkout on any host. See docs/billing.md, "Live checkout rollback".
+const checkoutDisabled = isCheckoutDisabledFlag(import.meta.env.VITE_CHECKOUT_DISABLED);
+
+/** True when this build was produced with the checkout kill switch on. */
+export function isPaddleCheckoutPaused(): boolean {
+  return checkoutDisabled;
+}
 
 // Global `(window as any).Paddle` typing is already declared by src/pages/Upgrade.tsx
 // (loose PaddleGlobal shape). We access it via `(window as any).Paddle` here
 // to avoid conflicting declarations while calling methods not modeled there
 // (e.g. `Checkout.open({ customer, customData, settings })`).
 
+// Server: the request host; browser: window.location.hostname (see renderHostname).
 function currentHostname(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.location?.hostname ?? null;
+  return renderHostname();
 }
 
 /**
- * Entitlement reads stay pinned to sandbox while the product is test-only.
- * Checkout uses the stricter `resolvePaddleCheckout()` gate below.
+ * Billing environment this client expects for entitlement reads. Only an
+ * explicit, well-formed `test_` token selects sandbox; a live, missing or
+ * malformed token falls back to live, matching the server, which grants
+ * sandbox rows only when it is explicitly sandbox. Host-independent, so it is
+ * the same on the server, during hydration and after. Live rows always count
+ * in entitlement reads; sandbox rows count only when this returns "sandbox".
  */
-export function getPaddleEnvironment(): "sandbox" {
-  return "sandbox";
+export function getPaddleEnvironment(): "sandbox" | "live" {
+  return classifyPaddleToken(clientToken) === "sandbox" ? "sandbox" : "live";
 }
 
 /**
- * Deterministic checkout gate. Only `'sandbox'` authorizes checkout. The
- * broader return type is retained for compatibility with existing callers,
- * but the resolver currently returns only `'sandbox'` or `'unavailable'`.
+ * Deterministic checkout gate: `'sandbox'` and `'live'` authorize
+ * checkout; `'unavailable'` never does.
  */
 export function resolvePaddleCheckout(): PaddleCheckoutEnvironment {
+  // Only a well-formed live token depends on the host. For a sandbox, missing,
+  // malformed or switched-off token the host cannot change the answer, so the
+  // request-host lookup (a server-side getRequest() during SSR) is skipped.
+  const hostDecides = !checkoutDisabled && classifyPaddleToken(clientToken) === "live";
   return resolvePaddleCheckoutEnvironment({
     token: clientToken,
-    hostname: currentHostname(),
+    hostname: hostDecides ? currentHostname() : null,
+    checkoutDisabled,
   });
 }
 
 /**
  * Grower-facing blocking copy for the current unavailable case. Returns
- * `null` only when sandbox checkout is available. Never reveals a token.
+ * `null` when sandbox or live checkout is available. Never reveals a token.
  */
+/**
+ * Presentation-only value for the server render and the hydration pass. Both
+ * sides resolve against the same host (the request host on the server,
+ * `window.location.hostname` in the browser), so the markup matches. Never
+ * authorizes checkout; render through `useRenderedPaddleCheckoutEnvironment`.
+ */
+export function resolvePaddleCheckoutBeforeHydration(): PaddleCheckoutEnvironment {
+  // Host-aware on the server too: the request host decides, so a live token on
+  // a non-production hostname never renders as live in server HTML.
+  return resolvePaddleCheckout();
+}
+
 export function getCheckoutUnavailableMessage(): string | null {
   const env = resolvePaddleCheckout();
-  if (env === "sandbox") return null;
+  if (env === "sandbox" || env === "live") return null;
+  if (checkoutDisabled) return CHECKOUT_PAUSED_MESSAGE;
   if (classifyPaddleToken(clientToken) === "live") {
     return CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE;
   }
@@ -174,7 +208,7 @@ export function getPaddleCheckoutCatalogMessage(reason: PaddleCheckoutCatalogRea
       return "Checkout didn't return what Verdant needs to continue, and nothing was charged. Please try again in a moment.";
     case "price_resolution_unavailable":
     default:
-      return "Checkout is temporarily unavailable for this plan. Please try again in a moment or pick another plan.";
+      return "Checkout is temporarily unavailable. Please try again in a moment.";
   }
 }
 
@@ -269,10 +303,16 @@ export async function initializePaddle(): Promise<void> {
   if (paddleInitialized) return;
   if (paddleInitPromise) return paddleInitPromise;
 
-  // Fail closed before loading Paddle.js unless the environment is exactly
-  // sandbox. This protects every host from a stray live client token.
+  // Constant kill switch so a checkout-disabled production build drops the
+  // Paddle.js init that follows. Exact "true" only, same as the runtime flag.
+  if (import.meta.env.VITE_CHECKOUT_DISABLED === "true") {
+    throw new PaddleCheckoutUnavailableError(CHECKOUT_PAUSED_MESSAGE);
+  }
+
+  // Fail closed before loading Paddle.js unless checkout resolved to sandbox
+  // or live. A live token resolves live only on a production hostname.
   const env = resolvePaddleCheckout();
-  if (env !== "sandbox") {
+  if (env !== "sandbox" && env !== "live") {
     throw new PaddleCheckoutUnavailableError(
       getCheckoutUnavailableMessage() ?? CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
     );
@@ -282,7 +322,9 @@ export async function initializePaddle(): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>('script[data-paddle-loader="true"]');
     const onLoad = () => {
       try {
-        (window as any).Paddle.Environment.set("sandbox");
+        // One explicit map at the single Environment.set call: the SDK takes
+        // "sandbox" | "production", never "live".
+        (window as any).Paddle.Environment.set(env === "live" ? "production" : "sandbox");
         // Slice D: single module-level event router. Registered exactly
         // once at Initialize time — StrictMode-safe because
         // `paddleInitialized` guards re-entry.
@@ -313,15 +355,17 @@ export async function initializePaddle(): Promise<void> {
 }
 
 export async function getPaddlePriceId(priceId: string): Promise<string> {
-  // Never ask the catalog for a price unless checkout is exactly sandbox.
+  // Never ask the catalog for a price unless checkout resolved to sandbox or
+  // live. The resolver picks the billing environment server-side
+  // (PAYMENTS_ENVIRONMENT) and ignores this field; it is sent for logs.
   const env = resolvePaddleCheckout();
-  if (env !== "sandbox") {
+  if (env !== "sandbox" && env !== "live") {
     throw new PaddleCheckoutUnavailableError(
       getCheckoutUnavailableMessage() ?? CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
     );
   }
   const { data, error } = await supabase.functions.invoke("get-paddle-price", {
-    body: { priceId, environment: "sandbox" },
+    body: { priceId, environment: env },
   });
   if (error || !data?.paddleId) {
     // Prefer what the resolver said about itself; fall back to what its

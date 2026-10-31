@@ -10,6 +10,7 @@
  * Safety: the database boundary is in-memory; no network/model calls, alerts,
  * Action Queue writes, automation, or device control are available.
  */
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import {
@@ -357,6 +358,7 @@ async function uploadAndConfirmCsv() {
 }
 
 beforeEach(() => {
+  saveTemperatureUnitPreference("celsius");
   database.rows = [];
   database.tables = [];
   database.insertedBatches = [];
@@ -512,10 +514,10 @@ describe("CSV history -> AI Doctor full-chain regression", () => {
       });
     expect(visibleRows).toEqual([
       ["humidity_pct", "58%"],
-      ["temperature_c", "26 °C"],
+      ["Temperature (°C)", "26 °C"],
       ["vpd_kpa", "1.41 kPa"],
       ["humidity_pct", "54%"],
-      ["temperature_c", "24 °C"],
+      ["Temperature (°C)", "24 °C"],
       ["vpd_kpa", "1.37 kPa"],
     ]);
 

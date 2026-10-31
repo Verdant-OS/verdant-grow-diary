@@ -141,6 +141,86 @@ describe("secret-scan workflow", () => {
     });
   });
 
+  it("fetches a missing before sha and still scans before..after", () => {
+    const origin = fixture();
+    git(origin, "checkout", "-qb", "side");
+    writeFileSync(join(origin, "old.txt"), "OLD_TIP_MARKER\n");
+    git(origin, "add", ".");
+    git(origin, "commit", "-qm", "old");
+    const before = git(origin, "rev-parse", "HEAD");
+    git(origin, "checkout", "-q", "verdant-grow-diary");
+    writeFileSync(join(origin, "new.txt"), "NEW_TIP_MARKER\n");
+    git(origin, "add", ".");
+    git(origin, "commit", "-qm", "new");
+    const after = git(origin, "rev-parse", "HEAD");
+    const runner = mkdtempSync(join(tmpdir(), "secret-scan-runner-"));
+    dirs.push(runner);
+    execFileSync(
+      "git",
+      [
+        "clone",
+        "-q",
+        "--no-local",
+        "--single-branch",
+        "--branch",
+        "verdant-grow-diary",
+        origin,
+        runner,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(() => git(runner, "cat-file", "-e", `${before}^{commit}`)).toThrow();
+    const result = runRange(runner, {
+      EVENT_NAME: "push",
+      PUSH_BEFORE: before,
+      PUSH_AFTER: after,
+      PUSH_DELETED: "false",
+      PUSH_REF: "refs/heads/verdant-grow-diary",
+    });
+    expect(result).toEqual({ skip: "false", range: `${before}..${after}` });
+    const patch = git(runner, "log", "-p", "-U0", "-m", result.range ?? "");
+    expect(patch).toContain("NEW_TIP_MARKER");
+    expect(patch).not.toContain("OLD_TIP_MARKER");
+  });
+
+  it("scans the new deploy tip when a rewrite leaves no reachable before", () => {
+    const dir = fixture();
+    writeFileSync(join(dir, "leak.txt"), "REWRITTEN_DEPLOY_MARKER\n");
+    git(dir, "add", ".");
+    git(dir, "commit", "-qm", "rewrite");
+    const after = git(dir, "rev-parse", "HEAD");
+    const gone = "1234567890abcdef1234567890abcdef12345678";
+    const result = runRange(dir, {
+      EVENT_NAME: "push",
+      PUSH_BEFORE: gone,
+      PUSH_AFTER: after,
+      PUSH_DELETED: "false",
+      PUSH_REF: "refs/heads/verdant-grow-diary",
+    });
+    expect(result).toEqual({ skip: "false", range: after });
+    expect(git(dir, "log", "-p", "-U0", "-m", result.range ?? "")).toContain(
+      "REWRITTEN_DEPLOY_MARKER",
+    );
+    expect(git(dir, "log", "-p", "-U0", "-m", `${after}..${after}`)).not.toContain(
+      "REWRITTEN_DEPLOY_MARKER",
+    );
+  });
+
+  it("does not rescan deploy history when another ref already matches that tip", () => {
+    const dir = fixture();
+    const after = git(dir, "rev-parse", "HEAD");
+    const gone = "abcdef1234567890abcdef1234567890abcdef12";
+    expect(
+      runRange(dir, {
+        EVENT_NAME: "push",
+        PUSH_BEFORE: gone,
+        PUSH_AFTER: after,
+        PUSH_DELETED: "false",
+        PUSH_REF: "refs/heads/feature",
+      }),
+    ).toEqual({ skip: "false", range: `${after}..${after}` });
+  });
+
   it("still rejects a malformed push sha (detection not weakened)", () => {
     const dir = fixture();
     expect(() =>

@@ -5,6 +5,10 @@ import {
   resolvePlantDetailDisclosureTarget,
   type PlantDetailDisclosureGroup,
 } from "@/lib/plantDetailDisclosureRules";
+import {
+  applyPlantDetailJumpOffset,
+  resolvePlantDetailJumpBlock,
+} from "@/lib/plantDetailJumpScroll";
 
 export interface PlantDetailDisclosureOpenState {
   history: boolean;
@@ -37,8 +41,9 @@ const HASH_SCROLL_FOLLOW_MS = 3000;
 export const HASH_SCROLL_CANCEL_CEILING_MS = 1200;
 /**
  * A hash landing aligns the section's top. "center" put a section taller than the
- * viewport hundreds of pixels above the screen; each section's `scroll-mt-16`
- * leaves room for the sticky header.
+ * viewport hundreds of pixels above the screen. Every scroll sets the target's
+ * inline scroll-margin-top to PLANT_DETAIL_JUMP_SCROLL_MARGIN_PX (sticky header
+ * from appShellHeaderMetrics + gap), which overrides the sections' `scroll-mt-16`.
  */
 const HASH_LANDING_BLOCK: ScrollLogicalPosition = "start";
 
@@ -168,6 +173,7 @@ function openStateFor(group: PlantDetailDisclosureGroup | null): PlantDetailDisc
 }
 
 function safelyFocusAndScroll(target: HTMLElement, block: ScrollLogicalPosition = "center") {
+  applyPlantDetailJumpOffset(target);
   try {
     target.scrollIntoView?.({ behavior: "smooth", block });
   } catch {
@@ -246,7 +252,12 @@ export function usePlantDetailDisclosureNavigation({
           (typeof preferredTarget.isConnected !== "boolean" || preferredTarget.isConnected);
         const target =
           (preferredIsMounted ? preferredTarget : null) ?? document.getElementById(anchorId);
-        if (target) safelyFocusAndScroll(target, block);
+        if (target) {
+          safelyFocusAndScroll(
+            target,
+            resolvePlantDetailJumpBlock(Boolean(preferredIsMounted), block),
+          );
+        }
       });
     },
     [cancelPendingFrame],

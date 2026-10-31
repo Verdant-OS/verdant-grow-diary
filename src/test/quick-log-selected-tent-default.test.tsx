@@ -206,17 +206,13 @@ describe("resolveQuickLogWriteTarget — selected tent default", () => {
     ).toEqual({ status: "blocked", reason: "missing_plant" });
   });
 
-  it("defaults the write target to the selected tent", () => {
+  it('still blocks a missing plant for an active selected tent (never plantId "")', () => {
     const result = resolveQuickLogWriteTarget({
       activeGrowId: "grow-1",
       selectedPlant: null,
       selectedTent: activeTent,
     });
-    expect(result).toEqual({
-      status: "ready",
-      target: { plantId: "", growId: "grow-1", tentId: "tent-1" },
-    });
-    expect(result.status === "ready" && Object.isFrozen(result.target)).toBe(true);
+    expect(result).toEqual({ status: "blocked", reason: "missing_plant" });
   });
 });
 

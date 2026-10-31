@@ -190,17 +190,14 @@ describe("resolveQuickLogWriteTarget", () => {
     expect(resolveQuickLogWriteTarget(input)).toEqual({ status: "blocked", reason });
   });
 
-  it("blocks a missing selected plant by defaulting the write to the selected tent", () => {
+  it("blocks a missing selected plant even when an active selected tent is present", () => {
     expect(
       resolveQuickLogWriteTarget({
         activeGrowId: "g1",
         selectedPlant: null,
         selectedTent: tents[0],
       }),
-    ).toEqual({
-      status: "ready",
-      target: { plantId: "", growId: "g1", tentId: "t1" },
-    });
+    ).toEqual({ status: "blocked", reason: "missing_plant" });
   });
 
   it("blocks every contradictory write relationship", () => {

@@ -6,7 +6,7 @@
  * sensor / device side effects. The "Useful for AI Doctor context"
  * line is a static hint string — it does NOT trigger AI.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   X,
   Camera,
@@ -29,10 +29,19 @@ import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRul
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { formatSnapshotCapturedAt } from "@/lib/localDateTimeDisplayRules";
 
+interface ReadingLine {
+  key: string;
+  label: string;
+  value: string;
+}
+
 interface Props {
   viewModel: TimelineEvidenceDetailViewModel | null;
   open: boolean;
   onClose: () => void;
+  photoSrc?: string | null;
+  readingLines?: readonly ReadingLine[];
+  actions?: ReactNode;
 }
 
 /**
@@ -45,7 +54,14 @@ function fmtChipTemp(tempC: number, unit: TemperatureUnitPreference): string {
   return `${celsiusToFahrenheit(tempC).toFixed(1)}°F`;
 }
 
-export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose }: Props) {
+export default function TimelineEvidenceDetailDrawer({
+  viewModel,
+  open,
+  onClose,
+  photoSrc,
+  readingLines,
+  actions,
+}: Props) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const temperatureUnit = useTemperatureUnitPreference();
 
@@ -87,7 +103,10 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="glass relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 border border-border/50">
+      <div
+        data-testid="timeline-evidence-drawer-panel"
+        className="glass relative max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-border/50 p-5 sm:max-w-lg sm:rounded-2xl"
+      >
         <button
           ref={closeRef}
           type="button"
@@ -190,6 +209,31 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
             </p>
           </section>
         )}
+
+        {photoSrc ? (
+          <img
+            src={photoSrc}
+            alt={vm.photo?.altText ?? "Timeline photo"}
+            data-testid="timeline-evidence-drawer-photo"
+            className="mb-4 max-h-72 w-full rounded-lg object-cover"
+          />
+        ) : null}
+
+        {readingLines && readingLines.length > 0 ? (
+          <section className="mb-4" data-testid="timeline-evidence-drawer-readings">
+            <p className="mb-1 text-[10px] tracking-wide text-muted-foreground uppercase">
+              Readings
+            </p>
+            <dl className="grid grid-cols-1 gap-y-1 text-xs sm:grid-cols-2 sm:gap-x-3">
+              {readingLines.map((line) => (
+                <div key={line.key} className="min-w-0">
+                  <dt className="text-muted-foreground">{line.label}</dt>
+                  <dd className="break-words">{line.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
 
         {vm.maturityEvidence && (
           <section className="mb-4" data-testid="timeline-maturity-evidence">
@@ -296,6 +340,15 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
             </div>
           </section>
         )}
+
+        {actions ? (
+          <div
+            className="mt-4 border-t border-border/40 pt-3"
+            data-testid="timeline-entry-detail-actions"
+          >
+            {actions}
+          </div>
+        ) : null}
       </div>
     </div>
   );

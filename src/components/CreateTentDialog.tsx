@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { tentSizeValidationMessage } from "@/lib/tentManagementRules";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,7 @@ import {
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
+import { describeCreateTentPrimaryButton } from "@/lib/createDialogPrimaryButtonViewModel";
 
 export interface CreatedTent {
   id: string;
@@ -126,6 +127,18 @@ export default function CreateTentDialog({
   });
 
   const formBlocked = writeBlocked || binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
+  const nameFieldId = useId();
+  const disabledReasonId = useId();
+  const primary = describeCreateTentPrimaryButton({
+    busy,
+    outcomeUnknown: createOutcomeUnknown,
+    gateAllowed: tentGate.allowed,
+    gateBlockedCopy: tentGate.blockedCopy,
+    formBlocked,
+    formBlockedDetail: binding.title || binding.body,
+    name: form.name,
+  });
+  const sizeMessage = tentSizeValidationMessage(form.size);
 
   function resetForm() {
     setForm(EMPTY_TENT_FORM);
@@ -419,15 +432,19 @@ export default function CreateTentDialog({
         {!formBlocked && (
           <form onSubmit={submit} className="grid gap-3" data-testid="create-tent-form">
             <div>
-              <Label>Name</Label>
+              <Label htmlFor={nameFieldId}>Name</Label>
               <Input
+                id={nameFieldId}
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Tent #1"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Only a name is required to get started.
+              <p
+                className="text-[11px] text-muted-foreground mt-1"
+                data-testid="tent-create-name-helper"
+              >
+                {primary.helperText}
               </p>
             </div>
             <details className="rounded-md border border-border/40 px-3 py-2">
@@ -442,7 +459,16 @@ export default function CreateTentDialog({
                       value={form.size}
                       onChange={(e) => setForm({ ...form, size: e.target.value })}
                       placeholder="4x4"
+                      aria-invalid={sizeMessage ? true : undefined}
                     />
+                    {sizeMessage ? (
+                      <p
+                        className="text-[11px] text-destructive mt-1"
+                        data-testid="tent-create-size-error"
+                      >
+                        {sizeMessage}
+                      </p>
+                    ) : null}
                   </div>
                   <div>
                     <Label>Brand (optional)</Label>
@@ -472,6 +498,15 @@ export default function CreateTentDialog({
                 </div>
               </div>
             </details>
+            {primary.reason ? (
+              <p
+                id={disabledReasonId}
+                className="text-xs text-muted-foreground"
+                data-testid="tent-create-disabled-reason"
+              >
+                {primary.reason}
+              </p>
+            ) : null}
             <Button
               disabled={
                 busy ||
@@ -480,6 +515,7 @@ export default function CreateTentDialog({
                 formBlocked ||
                 !hasTrimmedRequiredIdentity(form.name)
               }
+              aria-describedby={primary.reason ? disabledReasonId : undefined}
               className="gradient-leaf text-primary-foreground"
               data-testid="tent-create-submit"
             >

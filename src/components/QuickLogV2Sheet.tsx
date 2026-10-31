@@ -2387,7 +2387,11 @@ function QuickLogV2SheetForOwner({
         await releaseUnsentWatering();
         releaseUnsentNote();
         if (exactWateringSubmission) setFailedWaterPhotoUpload(true);
-        setLocalError((upload as { message: string }).message);
+        const uploadMessage = (upload as { message: string }).message;
+        setLocalError(uploadMessage);
+        // The photo never reached storage, so neither the note nor the watering
+        // was written. That is a failed save the grower retries from this sheet.
+        setNoteFirstSaveFailedMessage(uploadMessage);
         setSaveStatus("");
         return;
       }
@@ -2631,7 +2635,7 @@ function QuickLogV2SheetForOwner({
         });
         if (navigation) setMismatchedReceipt({ note: res.persistedNote, navigation });
       }
-      setLocalError(
+      const message =
         reason === "receipt_unverified"
           ? "The saved note could not be confirmed. Retry to check the original submission."
           : reason === "receipt_mismatch"
@@ -2644,13 +2648,17 @@ function QuickLogV2SheetForOwner({
                 })
               : reason === "save_failed"
                 ? QUICK_LOG_SAVE_FAILED_MESSAGE
-                : reasonToMessage(reason),
-      );
-      // Only a plain failed save is retried from this sheet; history/receipt
-      // outcomes point to Timeline instead.
-      setNoteFirstSaveFailedMessage(
-        reason === "save_failed" ? QUICK_LOG_SAVE_FAILED_MESSAGE : null,
-      );
+                : reasonToMessage(reason);
+      setLocalError(message);
+      // History and receipt outcomes point to Timeline. Every other unresolved
+      // Note failure is retried from this sheet, including classified transport
+      // errors such as network_error and rpc_unavailable.
+      const pointsAtTimeline =
+        quickLogSaveRequiresHistoryCheck(reason) ||
+        reason === "receipt_mismatch" ||
+        reason === "receipt_unverified" ||
+        reason === "receipt_target_moved";
+      setNoteFirstSaveFailedMessage(!pointsAtTimeline && unresolved ? message : null);
       setSaveStatus("");
       return;
     }

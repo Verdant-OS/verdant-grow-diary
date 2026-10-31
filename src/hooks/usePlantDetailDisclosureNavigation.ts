@@ -5,6 +5,10 @@ import {
   resolvePlantDetailDisclosureTarget,
   type PlantDetailDisclosureGroup,
 } from "@/lib/plantDetailDisclosureRules";
+import {
+  applyPlantDetailJumpOffset,
+  resolvePlantDetailJumpBlock,
+} from "@/lib/plantDetailJumpScroll";
 
 export interface PlantDetailDisclosureOpenState {
   history: boolean;
@@ -168,6 +172,7 @@ function openStateFor(group: PlantDetailDisclosureGroup | null): PlantDetailDisc
 }
 
 function safelyFocusAndScroll(target: HTMLElement, block: ScrollLogicalPosition = "center") {
+  applyPlantDetailJumpOffset(target);
   try {
     target.scrollIntoView?.({ behavior: "smooth", block });
   } catch {
@@ -246,7 +251,12 @@ export function usePlantDetailDisclosureNavigation({
           (typeof preferredTarget.isConnected !== "boolean" || preferredTarget.isConnected);
         const target =
           (preferredIsMounted ? preferredTarget : null) ?? document.getElementById(anchorId);
-        if (target) safelyFocusAndScroll(target, block);
+        if (target) {
+          safelyFocusAndScroll(
+            target,
+            resolvePlantDetailJumpBlock(Boolean(preferredIsMounted), block),
+          );
+        }
       });
     },
     [cancelPendingFrame],

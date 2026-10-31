@@ -110,6 +110,22 @@ function normalizeId(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+/**
+ * A selected active tent can stand as the write target when no plant is chosen.
+ * Archived, blank, or cross-grow tents return null so the caller keeps the
+ * missing-plant block.
+ */
+function resolveSelectedTentWriteTarget(
+  activeGrowId: string,
+  selectedTent: QuickLogTargetTent | null | undefined,
+): QuickLogTargetResolution | null {
+  const tentId = normalizeId(selectedTent?.id);
+  if (!selectedTent || !tentId || tentIsInactive(selectedTent)) return null;
+  const tentGrowId = normalizeId(selectedTent.grow_id);
+  if (!tentGrowId || tentGrowId !== activeGrowId) return null;
+  return ready("", activeGrowId, tentId);
+}
+
 function ready(plantId: string, growId: string, tentId: string | null): QuickLogTargetResolution {
   return {
     status: "ready",
@@ -242,7 +258,10 @@ export function resolveQuickLogWriteTarget(
 
   const plant = input.selectedPlant;
   const plantId = normalizeId(plant?.id);
-  if (!plant || !plantId) return blocked("missing_plant");
+  if (!plant || !plantId) {
+    const tentTarget = resolveSelectedTentWriteTarget(activeGrowId, input.selectedTent);
+    return tentTarget ?? blocked("missing_plant");
+  }
   if (isInactiveQuickLogPlant(plant)) return blocked("plant_inactive");
 
   const plantGrowId = normalizeId(plant.grow_id);

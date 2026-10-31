@@ -71,23 +71,16 @@ vi.mock("@/integrations/supabase/client", () => ({
         testState.insert(table, payload);
         return {
           select: () => ({
-            single: async () => {
-              if (table === "grows") {
-                return { data: { id: "grow-created", name: payload.name }, error: null };
-              }
-              if (table === "tents") {
-                return { data: { id: "tent-created", name: payload.name }, error: null };
-              }
-              return {
-                data: {
-                  id: "plant-created",
-                  name: payload.name,
-                  grow_id: payload.grow_id,
-                  tent_id: payload.tent_id,
-                },
-                error: null,
-              };
-            },
+            single: async () => ({
+              data: {
+                id: payload.id,
+                name: payload.name,
+                user_id: payload.user_id,
+                ...(table === "grows" ? {} : { grow_id: payload.grow_id }),
+                ...(table === "plants" ? { tent_id: payload.tent_id } : {}),
+              },
+              error: null,
+            }),
           }),
         };
       },
@@ -107,6 +100,7 @@ function renderPage() {
 
 describe("StartYourRoom entitlement creation gates", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     testState.grows = [];
     testState.tents = [];
     testState.entitlementLoading = false;
@@ -128,17 +122,22 @@ describe("StartYourRoom entitlement creation gates", () => {
     testState.grows = [{ id: "grow-existing", name: "Existing Grow" }];
     renderPage();
 
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-your-room-step-room")).toBeInTheDocument();
     expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent(
       "Bound to grow: Existing Grow",
     );
-    expect(screen.queryByTestId("start-your-room-step-grow")).not.toBeInTheDocument();
     expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
     expect(screen.getByTestId("start-room-creation-upgrade")).toHaveAttribute("href", "/pricing");
-    fireEvent.click(screen.getByTestId("start-room-tent-submit"));
-    fireEvent.click(screen.getByTestId("start-your-room-skip-start-screen"));
-    expect(testState.insert).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Bound Plant" },
+    });
+    fireEvent.click(screen.getByTestId("start-room-submit"));
+    await waitFor(() =>
+      expect(testState.insert).toHaveBeenCalledWith(
+        "plants",
+        expect.objectContaining({ grow_id: "grow-existing" }),
+      ),
+    );
     expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
   });
 
@@ -149,7 +148,10 @@ describe("StartYourRoom entitlement creation gates", () => {
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "First Grow" },
     });
-    const submit = screen.getByTestId("start-room-grow-submit");
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Gate Plant" },
+    });
+    const submit = screen.getByTestId("start-room-submit");
     expect(submit).toBeDisabled();
     fireEvent.click(submit);
     expect(testState.insert).not.toHaveBeenCalled();
@@ -162,8 +164,11 @@ describe("StartYourRoom entitlement creation gates", () => {
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "Unverified Grow" },
     });
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Gate Plant" },
+    });
 
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
     expect(testState.insert).not.toHaveBeenCalled();
   });
 
@@ -186,7 +191,10 @@ describe("StartYourRoom entitlement creation gates", () => {
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "Recovered Grow" },
     });
-    await waitFor(() => expect(screen.getByTestId("start-room-grow-submit")).toBeEnabled());
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Gate Plant" },
+    });
+    await waitFor(() => expect(screen.getByTestId("start-room-submit")).toBeEnabled());
     expect(screen.queryByTestId("start-room-creation-retry")).not.toBeInTheDocument();
     expect(testState.insert).not.toHaveBeenCalled();
   });
@@ -195,7 +203,7 @@ describe("StartYourRoom entitlement creation gates", () => {
     testState.grows = [{ id: "grow-existing", name: "Existing Grow" }];
     renderPage();
 
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-your-room-step-room")).toBeInTheDocument();
     expect(screen.getByTestId("start-room-creation-upgrade")).toHaveAttribute("href", "/pricing");
     expect(screen.queryByTestId("start-room-creation-retry")).not.toBeInTheDocument();
   });
@@ -205,11 +213,14 @@ describe("StartYourRoom entitlement creation gates", () => {
     testState.capabilities = PLAN_CATALOG.pro_monthly;
     renderPage();
 
-    expect(screen.getByTestId("start-your-room-step-grow")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-grow-name")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "Paid Grow" },
     });
-    fireEvent.click(screen.getByTestId("start-room-grow-submit"));
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Gate Plant" },
+    });
+    fireEvent.click(screen.getByTestId("start-room-submit"));
 
     await waitFor(() => {
       expect(testState.insert).toHaveBeenCalledWith(
@@ -227,7 +238,10 @@ describe("StartYourRoom entitlement creation gates", () => {
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "Paid Grow During Tent Read Outage" },
     });
-    fireEvent.click(screen.getByTestId("start-room-grow-submit"));
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "Gate Plant" },
+    });
+    fireEvent.click(screen.getByTestId("start-room-submit"));
 
     await waitFor(() => {
       expect(testState.insert).toHaveBeenCalledWith(

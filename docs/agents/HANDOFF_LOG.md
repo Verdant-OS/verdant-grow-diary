@@ -69,38 +69,263 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### TENT-CARD-SUBTITLE-SEPARATOR
+### CREATE-DIALOG-DISABLED-REASON
 
 ```text
-TASK TENT-CARD-SUBTITLE-SEPARATOR  priority: P3  status: OPEN
-goal: a /tents card with a blank brand or size shows only what was saved, never a dangling " · " or an empty subtitle line.
-why: tent-card unavailable-readings note 2026-10-28 (D2); Matthew 2026-10-29 "execute all" with defaults, since no audit answers were given.
-branch: claude/tent-card-subtitle-separator
+TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
+goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
+why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.
+branch: ultra/create-dialog-reasons
 base: verdant-grow-diary
-checkout: git fetch origin claude/tent-card-subtitle-separator verdant-grow-diary && git switch claude/tent-card-subtitle-separator && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read URL and head from GitHub
-head_sha: read the head from the PR
-state: draft; awaiting CI and an independent exact-head review
-current_step: D2 fixed in src/pages/Tents.tsx by reusing formatTentHeaderDescription (the Tent Detail header helper); new render test src/test/tents-list-card-subtitle.test.tsx
-next_action: confirm 35/35 required checks, then route to an eligible reviewer who did not author this PR
-post_merge_check: after Publish, on the disposable fixture account, a tent with a blank size shows only its brand on /tents. NOT_MEASURED until live /version.json reports the SHA.
-active_writer: Claude session_017UoYKuwk7Z3wSC7syg3jnF
-decisions: D1 (unavailable readings) and D3 (stale threshold) left as they are, with no new data query and the existing stale threshold kept; only D2 changes. Reused the existing helper instead of adding a second one.
-tried_and_rejected: editing tents-list-sensor-truth.test.tsx (locked; a new test file needs no unlock)
-commands: bunx vitest run src/test/tents-list-card-subtitle.test.tsx src/test/tents-list-sensor-truth.test.tsx src/test/tent-detail-blank-header-fields.test.ts
-files_touched: src/pages/Tents.tsx; src/test/tents-list-card-subtitle.test.tsx (new); docs/agents/HANDOFF_LOG.md
+checkout: git fetch origin ultra/create-dialog-reasons verdant-grow-diary && git switch ultra/create-dialog-reasons
+pr: draft; read the URL from GitHub after push
+head_sha: the commit that adds this block; read git rev-parse HEAD after checkout
+state: local until pushed; draft only
+current_step: view-model, dialog wiring, and new unit tests are in the working tree
+next_action: confirm the draft PR stays draft; do not mark ready, request review, or merge
+post_merge_check: after Publish, open New tent on the fixture account, leave the name blank, and confirm the Create tent button is disabled with the visible reason "Enter a tent name." Type a name and confirm the button enables. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: disabled-reason and helper copy live in src/lib/createDialogPrimaryButtonViewModel.ts. Create tent and Create plant keep their pinned disabled expressions. Create grow now disables until the name is non-blank, matching the other two dialogs. A plan limit replaces the "only a name" helper. An optional plant tent no longer says "Create a tent first." Invalid optional tent size is shown on the size field and does not change the pinned disable expression.
+tried_and_rejected: adding the size check to Create tent's disabled expression. Source scans pin that expression, and existing tests cannot be edited in this task.
+commands: bunx vitest run src/test/create-dialog-primary-button-view-model.test.ts --reporter=dot
+files_touched: src/lib/createDialogPrimaryButtonViewModel.ts; src/test/create-dialog-primary-button-view-model.test.ts; src/components/CreateTentDialog.tsx; src/components/CreatePlantDialog.tsx; src/pages/Grows.tsx; docs/agents/HANDOFF_LOG.md
 files_remaining: none
-blockers: none for repository work; Publish and the live check are Matthew's
-open_questions: whether D1 or D3 should change (needs Matthew)
-gotchas: RED without the fix is 3 failed / 1 passed; the plain brand+size case passes either way
-links: none
+blockers: none for repository work
+open_questions: none
+gotchas: do not edit the pinned disabled JSX in CreateTentDialog or CreatePlantDialog. Do not modify tests that already exist on the base.
+links: uploads brief Issue 3
+artifacts: accessibility captures are local to the agent run, not this repo
+reviewer_seat: not requested; this draft does not ask for review
+reviewer_sha: NOT_MEASURED
+session_state: no paused workflows; no production writes
+claimed_by: Grok, 2026-10-31
+owner: Grok
+last_updated: 2026-10-31 01:40 CT, by Grok
+```
+
+### VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS
+
+```text
+TASK VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS priority: other status: OPEN
+goal: Tent Detail imported CSV history follows the saved temperature unit, including labels and filters.
+why: Fahrenheit CSV readings displayed as Celsius after reload (VER-302).
+branch: codex/ver-302-imported-history-temperature-units
+base: verdant-grow-diary; current integrated base ffc6076aeb3723f17d85057154f8e9772ed9c222; upstream merge preserved
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2610
+head_sha: 0683e974f57e0a310fdb736cc9a307b3b4e883fa (verified remote parent of this correction checkpoint; read resulting full SHA from PR #2610)
+state: open non-draft #2610; user explicitly authorized takeover and finish through merge after required checks and eligible independent acceptance; deployment and production QA remain unauthorized
+current_step: fix the reviewed native CSV fixture default-unit regression, refresh PR evidence and obtain fresh complete-scope acceptance before merge queue
+next_action: verify the resulting full head and Native Save Retrieve Local / required CI; route the complete ten-file scope and scorer declarations to an eligible independent reviewer; merge only after every gate passes
+post_merge_check: after separately authorized release, verify both settings and hard reload against the four VER-302 CSV readings
+active_writer: Codex /root in /workspace/verdant-grow-diary; explicit user takeover on 2026-10-30 at 22:10 UTC; former local head fast-forwarded through the owner base merge after ancestry and clean-state checks
+decisions: reuse useTemperatureUnitPreference and convertCelsiusForDisplay; keep stored values, timestamps, source selection and metric ids unchanged
+tried_and_rejected: no new conversion implementation, data rewrite or duplicate VER-183 work
+commands: node node_modules/vitest/vitest.mjs run src/test/imported-sensor-history-temperature-units.test.tsx --reporter=dot
+files_touched: src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; src/test/imported-sensor-history-temperature-units.test.tsx; src/test/imported-sensor-history-panel.test.tsx; src/test/imported-sensor-history-read-honesty.test.tsx; src/test/imported-sensor-history-paused-read.test.tsx; src/test/csv-history-ai-doctor-full-chain.test.tsx; e2e/sensors-truth-closure.spec.ts; e2e-local/native-csv-import-reopen.spec.ts; docs/agents/HANDOFF_LOG.md (this entry only; upstream blocks preserved). This repair changes only the native CSV spec and this receipt; complete PR scope is ten files.
+files_remaining: none planned; repair verified findings within this task only
+blockers: fresh eligible complete-scope independent acceptance unavailable through connected routes; desktop offline, no Claude/Grok CLI. Jack Herer historical review at 80eccc4 is PASS-with-P2, not acceptance; all contributors remain excluded. Local runtime/typecheck/lint/build blocked by locked Lovable mirror HTTP 403. Fresh hosted CI required; production NOT_MEASURED.
+open_questions: eligible reviewer must assess the direct-user takeover/completion authorization and six named scorer declarations, including historical P2-3; no invented owner-authored GitHub unlock receipt
+gotchas: default temperature preference is Fahrenheit. Native CSV tests asserting Celsius must initialize the display preference before navigation. Latest owner base merge dropped this entire task block; restored here without altering any incoming block. #2536 pagination and VER-183 scope remain untouched.
+links: https://linear.app/verdantgrowdiary/issue/VER-302/tent-page-imported-sensor-history-shows-csv-temperatures-in-c; https://linear.app/verdantgrowdiary/issue/VER-183/cf-setting-not-applied-everywhere-dashboard-strip-950f-in-c-mode; https://github.com/Verdant-OS/verdant-grow-diary/pull/2536#issuecomment-6489045891
+artifacts: Historical parent 15da00a: 11 unit suites / 163 PASS / 0 FAIL / 0 SKIP; hosted ci.yml run 40826545744 all 36 jobs passed; security/typecheck passed; dependency audit failed on the old base. Original-module negative control: 9 FAIL / 5 PASS. None of those results substitutes for this new head. Browser tests now save each preference through Settings, load Tent Detail, reload a cache-disabled fresh document, and assert the four readings, timestamps, CSV provenance and unrelated humidity/VPD; they intercept backend traffic and reject sensor-write claims. Results pending.
+reviewer_seat: eligible non-contributing Claude/Grok session; unassigned; writer and every contributor excluded
+reviewer_sha: NOT_MEASURED
+supplemental_review: Historical Codex /root/ver302_source_review PASS at 80eccc4, zero P1/P2; supplemental only. Historical Jack Herer Grok review 5707022035 at 80eccc4: PASS-with-P2, zero P1/three P2; no valid current-head acceptance. Blank bot approval does not establish eligible independent session provenance.
+repair_20261030: Earlier 9c30ac3db corrects both display-label locators. This follow-up seeds only verdant:temperatureUnit=celsius via this spec's context init script so fresh documents/reloads match its existing Celsius numeric assertions. No auth/session, sensor row, service-role, numeric assertion, dedupe, readback or isolation change.
+repair_validation: Latest parent 0683e974f Native Save Retrieve Local run 41132382622 FAIL: 16 passed / 7 CSV failures at Celsius locators, consistent with default Fahrenheit. Prediction: explicit Celsius initialization makes all 23 scenarios pass unchanged. Current correction validation and new-head hosted results are recorded in the PR body, not inferred here.
+session_state: no active subagents, paused workflows, production QA or deployment. Prior PR-body denial cleared by successful direct-authorized update on 2026-10-30 22:10 UTC. Merge intent is authorized; required CI, independent acceptance, scorer gates and queue remain. No outside request delivered because no eligible transport is available.
+claimed_by: Codex /root, 2026-10-30 22:10 UTC; direct user: "explict authorize to takeover and finish thru merge"
+owner: Codex /root
+last_updated: 2026-10-30 17:12 CT, by Codex (explicit takeover and native CSV Celsius fixture correction)
+```
+
+### VER-296-START-ROOM-ONE-STEP
+
+```text
+TASK VER-296-START-ROOM-ONE-STEP  priority: P2  status: OPEN
+goal: first win in one submit: Start Your Room creates the grow, tent and plant from one form, then opens Plant Detail with Quick Log.
+why: Toad Venom onboarding fix (Cheeko yes, 2026-10-27 3:56 PM CT); VER-296 SENTINEL prompt; Matthew: "yes to 296 tests", then "Push both" (2026-10-28).
+branch: claude/start-room-one-step (stacked on claude/setup-quicklog-draft-retry-p2s, PR #2565)
+base: claude/setup-quicklog-draft-retry-p2s; retarget to verdant-grow-diary once #2565 merges
+checkout: git fetch origin claude/start-room-one-step && git switch claude/start-room-one-step && git merge origin/claude/setup-quicklog-draft-retry-p2s
+pr: opened as a draft from this branch; read URL and head from GitHub
+head_sha: df6b28b141135a3c29c9d655e72d63f1e70b6647 is the last code commit (later commits change tests and this handoff only); read the current tip with git rev-parse origin/claude/start-room-one-step
+state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
+current_step: #2565 heads 0c825bf and c75b687 merged in (mismatch-review draft clear, chip baseline, roster gate scoped to pre-hydration for unlimited plans, commit-time owner ref, test global hygiene); 0e412c9 clears the setup draft before navigating; df547a7 skips the start-screen write and navigation when the grower left mid-save (pinned by test); df6b28b stops starting the tent or plant once the page is gone; awaiting CI and an independent exact-head review
+next_action: confirm required checks at the new head; route to an eligible reviewer who neither authored nor repaired this PR after #2565 settles; retarget to verdant-grow-diary once #2565 merges
+post_merge_check: after Publish, on the disposable fixture account with no grow, open Start Your Room, type a plant name, submit once: Plant Detail opens with Quick Log and the grow/tent/plant exist once each. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+decisions: review 5677102928: start-your-room-one-step pins the submitRoom double-submit guard and the unknown-outcome early return by submitting the form directly (deleting either guard fails its case); the test mock owner is a UUID because the unknown-outcome fence records only UUID owners. blank grow/tent names default to "My grow" / "Tent 1"; a partial resume creates only what is missing; plan gates block before any insert; Retry reuses the same preallocated row ids; Free with an existing grow keeps showing the grow-limit notice (unchanged) while tent+plant creation is allowed; paid with one grow still creates a new grow (unchanged appliedResume behaviour).
+tried_and_rejected: delegate:builder agents stopped at the 200k context mark before writing code; implemented in-session instead.
+commands: bunx vitest run src/test/start-your-room* src/test/start-room* src/test/hierarchy-create-response-loss.test.tsx
+files_touched: src/pages/StartYourRoom.tsx; src/lib/startYourRoomRules.ts; src/test/start-your-room-one-step.test.tsx (new); renegotiated (approved): src/test/hierarchy-create-response-loss.test.tsx and start-your-room-{draft-hydration,draft-owner-switch,draft-retry,enter-submits,entitlement-gate,quick-log-handoff,resume,review-regressions,save-reason-and-adopt}.test.tsx; src/test/start-your-room-plant-retry-id.test.tsx and src/test/start-your-room-draft-grows-read-error.test.tsx (adapted to the one-step form)
+files_remaining: none
+blockers: none for repository work
+open_questions: retry help text in startYourRoomDraftRules.ts still says "Retry saves this same step once" (copy left to Cheeko); put to Matthew 2026-10-28: Copilot 4397044004/4397135162, after a partial failure the bound line says "your grow" for a grow saved as "My grow" (cosmetic; not changed)
+gotchas: Start Your Room tests must clear sessionStorage in beforeEach (the draft store persists the form across tests); old step test ids (start-room-grow-submit etc.) are gone, use start-room-submit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
 artifacts: PR checks
-reviewer_seat: not assigned (excluded: session_017UoYKuwk7Z3wSC7syg3jnF as author)
+reviewer_seat: not assigned (excluded: session_017UoYKzLzTv1RAhx1Cc7Pme as author, session_017UoYKxgRTFgtyQW6ka38Ec as repairer)
 reviewer_sha: none
-session_state: check-ins armed by this session via send_later; no paused workflows
-claimed_by: Claude session_017UoYKuwk7Z3wSC7syg3jnF, 2026-10-29
-owner: Claude session_017UoYKuwk7Z3wSC7syg3jnF
-last_updated: 2026-10-29 05:20 UTC, by Claude session_017UoYKuwk7Z3wSC7syg3jnF
+session_state: the prior holder's check-in trig_01Hi7LCPDNjfdvVBvGoWUhCv belongs to that session; no paused workflows
+claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677102928; prior holder told to stop pushing)
+owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 06:19 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec
+```
+
+#### Codex partial-save continuation — 2026-10-30
+
+- Current owner and sole writer: Codex under the existing PR claim. Matthew explicitly requested showing saved grow/tent names after a partial save, listing all twelve existing scorer changes, restoring the dropped plant-retry assertions, and refreshing this PR body. Starting remote head: `1224948397ef0a336e411cd8d12c5eedd4cb21a1`.
+- The summary now resolves names by the shown saved IDs from owner-scoped lists, with owner-and-row-bound names from confirmed responses while lists refresh. Missing confirmation names retain the explicit unknown-name fallback. Submitted optional typing is not presented as a confirmed saved name. No persistence or schema behavior changes.
+- New regression file: `src/test/start-your-room-partial-save-names.test.tsx`, covering default/custom names after partial failure, same-parent retry, remount from saved records, missing names, and account switch. RED: 3 failed / 2 passed; GREEN after adding account-switch coverage: 6 passed. The initial broader Start Your Room selection passed 20 files / 129 tests before the account-switch case was added; final-tree checks are recorded on the PR body.
+- Matthew's specific plant-retry restoration authorizes only restoring the existing pending-plant-ID/plant-step assertion and checking the exact Plant Detail navigation replacing the removed done-screen assertion. Other existing scorer contents are preserved. The body must name all twelve changed scorers, including the previously omitted grows-read-error and plant-retry files; prior wording that no assertion was dropped was incorrect.
+- This branch stays stacked on #2565. Parent updates are normal merges; no retarget until #2565 merges. Ready status is preserved. Fresh applicable CI and complete eligible outside acceptance remain required at the resulting full head; this contributing session and its advisory agents are excluded. No merge, force-push, rebase, deployment, or production operation is authorized.
+
+- Final parent merge: `ff67c3603f38c099ee726291039a1f9bd6765664`. The sole source conflict preserves the inherited tent validation while retaining this branch's derived one-form step. Every current parent handoff block and this branch's own block is retained; the older LIVE-CHECKOUT block adopts its already-recorded closure from the parent. Final combined selection: 97 files / 1002 tests passed. Full typecheck passed before the parent merge; the final normal merge hook checks the merged project again. A new worktree needed its generated Husky entrypoints; `bun run prepare` restored them before this final commit. The first local partial-save commit preceded that setup, so its checks are supplied by the explicit test/typecheck/lint runs and final hook, not claimed as an initial hook pass.
+
+- Cached-roster follow-up: merged parent `80a2aa6cec0cf3bf034997ac0cd777b6d3993667` normally. The loading/progress source conflict retains this branch's oneStepProgressLabel and inherits the parent's wait for isFetching, its effect dependency and visible loading status. The shared regression preserves a valid saved tent and pending plant retry ID while cached data refetches on a paid account with two grows. Current combined source selection passes 97 files / 1003 tests. The unused copied test constant is removed. Existing twelve-scorer declaration is public; their contents are unchanged by this parent merge. Fresh CI and eligible outside acceptance still bind to the resulting head, with no retarget or integration authority.
+
+#### Codex refresh-continuation repair — 2026-10-30
+
+- Matthew's 16:22 UTC assignment continues the existing Codex claim for #2582. Starting remote head: `20b73f97a314ebe3fa424b21ff0cd965786100ce`. #2565 is now merged as `081f5132cb3ad3ec479d0af9a61390f1460ac316`; #2582 already targets `verdant-grow-diary` and remains ready. Earlier stacked-base, head and reviewer fields above describe prior checkpoints.
+- Two code defects were reproduced before changing production code: a rejected post-grow refresh could continue the old owner's tent write after an account switch, and an old unmounted post-plant continuation could clear a newer reopened draft. Baseline: 2 failed / 1 passed in the new regression file. Additional cases reproduced identical-content retry and an A-to-B-to-A owner round trip.
+- Each submission now captures its committed owner/writer epoch, with checks before and after persistence and refresh continuations. A new page instance claims draft ownership even when its text is identical; only that writer persists or clears the draft. Owner changes rotate the epoch. The existing durable unknown-outcome fence is still recorded for the owner after same-owner writer replacement, while stale local errors are suppressed. No draft format, row UUID allocation, auth store, schema or policy change is made.
+- New test file: `src/test/start-your-room-refresh-continuation.test.tsx` (6 cases). With the unchanged owner-switch, plant-retry-ID and hierarchy response-loss files: 4 files / 36 tests passed. Existing same-owner refresh rejection and unmounted completion without a replacement still pass. All existing scorer contents are unchanged by this repair; their prior approvals/declarations remain scoped to the recorded existing changes.
+- Final pre-commit checks: 98 relevant files / 1009 tests passed; `bun run typecheck` passed.
+- Changed paths for this repair: `src/pages/StartYourRoom.tsx`, the new regression file, and this task's continuation. `bun.lock` is unchanged. Relevant full-source tests, typecheck and normal commit hooks are recorded in the completion packet. No first-note redesign, production QA, rebase, force-push, base merge, PR merge or deployment is part of this repair.
+- Before the push, required CI was 0/35 present, with 17 successful and 1 skipped distinct supplemental checks. The retarget emitted edited, which Main CI does not subscribe to. This real source repair's ordinary synchronize event can run Main CI against the current deploy target; no denied manual dispatch is retried and no workflow is edited.
+- Jack Herer's PASS at the starting head named the former stacked base. The current base and this repair require fresh complete-scope acceptance; every contributing session is excluded. The three old naming threads describe a fixed issue and remain untouched. Generic retry wording and the separate busy-on-account-switch owner decision are not changed.
+- PR-body publication remains blocked by the earlier automatic approval rejection for new-head descriptions beyond the older exact text approved. The broad "fix #2582" assignment is not treated as permission to retry that denied operation. Prepare a factual current-head body and obtain specific owner approval before publication; preserve the earlier denial and history.
+
+### SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541
+
+```text
+TASK SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541  priority: P2  status: OPEN
+goal: supersede draft #2541 (head 7250689864da30155a4bb85d1f0eedb6de1298a9) with Sour Diesel review 5674348317's P2s addressed.
+why: Matthew (2026-10-27) asked for a replacement PR for #2541 even though its handoff block names a Grok cloud agent as writer; cursor/setup-quicklog-draft-retry-8b19 was not touched.
+branch: claude/setup-quicklog-draft-retry-p2s (created at 7250689864da30155a4bb85d1f0eedb6de1298a9)
+base: verdant-grow-diary
+checkout: git fetch origin claude/setup-quicklog-draft-retry-p2s verdant-grow-diary && git switch claude/setup-quicklog-draft-retry-p2s && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
+head_sha: 0b96e783706335b8b4b88ada3914fc16264af571 was the remote tip, observed on origin at 2026-10-28 05:47 UTC, before this commit; the tip after it is the commit that carries this block (git rev-parse origin/claude/setup-quicklog-draft-retry-p2s)
+state: ready for review; Matthew granted Claude authority to mark it ready (2026-10-28, session_017UoYKxgRTFgtyQW6ka38Ec); base verdant-grow-diary merged in. Ready is not merge: merge still needs 35/35 required checks, an independent exact-head PASS and the merge gate
+current_step: Codex 2026-10-28 P2s addressed: stale reopen write (3f10b42), every-plan roster gate with step forms hidden until hydration (289b15f), plant retry id held until the plant id is recorded (de0101a); Copilot plantStage validation and sessionStorage test read (de0101a). Codex 4397081026 (clear the session draft when reviewing a mismatched saved note) and 4397081028 (re-baseline the response target on a mounted reopen) fixed; reviewer nits: STAGES derived from START_YOUR_ROOM_PLANT_STAGES, crypto unstubbed, roster-error gate scoped to before hydration for unlimited plans. Awaiting CI and an independent exact-head review
+next_action: confirm 35/35 required checks at the new head, then route to an eligible reviewer who neither authored nor repaired this PR; then merge this branch into claude/start-room-one-step (#2582)
+post_merge_check: after Publish, on the fixture account, open Quick Log for plant A, type a note, close; open for plant B: no note. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+decisions: review 5677106832 P2 (Matthew 2026-10-28, "restore text, no target"): with no explicit or route target, restorableQuickLogObservationDraft returns the draft's words with selectedKey null, saveFailed false and no idempotency key (only definitive rejections are stored, so nothing committed under that key); the notice reads QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY; the remembered-target ban holds. CodeRabbit 4395104891: Retry button and retry copy show only for definitive save errors (isStartRoomRetryableSaveError), not validation, gate, safe-save-start or unknown-outcome errors; P2-1 restore only when draft target equals the sheet's explicit/route target, plus a visible restored line; P2-3 append the server reason to the existing plain copy (keeps scorer-locked tests); P2-4 adopt a pending grow id already in the owned grows list after hydrate; P2-2 NOT changed (see tried_and_rejected).
+tried_and_rejected: P2-2 persisting the idempotency key for ambiguous outcomes. It broke quick-log-v2-exact-recovery ("verified but subsequently edited saved note") by resurrecting the old key for a deliberate new entry. Durable Note/Watering recovery already keeps the key across reloads.
+commands: bunx vitest run $(grep -rlE "StartYourRoom|startYourRoom|QuickLogV2Sheet|quickLogObservationDraft" src/test) (93 files / 970 tests at de0101a); NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/components/QuickLogV2Sheet.tsx; src/lib/quickLogObservationDraftRules.ts; src/lib/startYourRoomDraftRules.ts; src/lib/startYourRoomRules.ts; src/pages/StartYourRoom.tsx; src/test/quick-log-observation-draft-scope.test.tsx; src/test/start-your-room-save-reason-and-adopt.test.tsx; src/test/start-room-quick-log-draft-p2-rules.test.ts; src/test/start-your-room-draft-grows-read-error.test.tsx; src/test/start-your-room-plant-retry-id.test.tsx; src/test/quick-log-v2-exact-recovery.test.tsx
+files_remaining: none
+blockers: none for repository work
+open_questions: put to Matthew 2026-10-28: (1) Codex 4396973931, a deleted tent restores the plant step and every plant insert fails closed; fix here or in a follow-up? (2) Copilot 4397048019, busy flag can carry across an account switch during one in-flight save; no data crosses accounts; not changed. (3) CodeRabbit Major 2, persist Water/Feed inputs. (4) Copilot 4396952153, keep typed tent/plant names when the stored grow is gone (kept by design)
+gotchas: src/test/start-your-room-draft-retry.test.tsx and start-your-room-draft-hydration.test.tsx are scorer-locked and unchanged; do not add saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignments (counted by quicklog-manual-idempotency-static.test.ts)
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565 (this PR); https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 (superseded); https://github.com/Verdant-OS/verdant-grow-diary/pull/2582 (stacked on this branch)
+artifacts: PR checks
+reviewer_seat: not assigned (OG Kush routes; excluded: session_017UoYKzLzTv1RAhx1Cc7Pme as author, session_017UoYKxgRTFgtyQW6ka38Ec as repairer)
+reviewer_sha: none
+session_state: no routines; no paused workflows
+claimed_by: Claude session_017UoYKxgRTFgtyQW6ka38Ec, 2026-10-28 (Matthew reassigned this branch from session_017UoYKzLzTv1RAhx1Cc7Pme to address review 5677106832; prior holder told to stop pushing)
+owner: Claude session_017UoYKxgRTFgtyQW6ka38Ec
+last_updated: 2026-10-28 06:26 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (merged verdant-grow-diary a5ac6a9; HANDOFF_LOG conflict resolved by keeping both blocks)
+```
+
+#### Codex continuation — 2026-10-29
+
+- Current owner and sole writer: Codex. Matthew directed the takeover and confirmed Claude has stopped writing to #2565 and #2582. Effective claims: https://github.com/Verdant-OS/verdant-grow-diary/pull/2565#issuecomment-6510510241 and https://github.com/Verdant-OS/verdant-grow-diary/pull/2582#issuecomment-6510555039. Earlier ownership fields above are retained as history.
+- Starting remote head: `c9240ed18b15b89c5b0f382feeea6e4605186824`. Normal merge of deploy `0792349d57de2c1c0e2610f643920cf595486dfc`: `9f3e779ab2c648012ef6d5df17f2f1769d6fc792`. The merge changes only the handoff log, preserving the completed LIVE-CHECKOUT closure and all 91 block headings. `bun.lock` is unchanged.
+- Additional repair: a restored Feed note lacked the visible draft-restored notice, because the notice rendered only inside the non-Feed form. The same notice now renders once in shared JSX. New regression file: `src/test/quick-log-feed-draft-restored-notice.test.tsx`; no existing test was edited by this repair.
+- RED: the new regression failed because `qlv2-draft-restored` was absent after the Feed note restored. GREEN: the new regression plus draft scope passed 16/16; the broader Quick Log and source-reading selection passed 34 files / 504 tests. Full typecheck passed. The broader run used an empty environment-file directory and explicit test-only public client configuration; its first attempt had three setup failures from missing client configuration, corrected for the passing run. Existing router-provider warnings remain.
+- Dependency setup: Bun 1.3.14; original frozen mirror returned HTTP 403. Matthew authorized providing a matching frozen tree. A scratch lock changed only 978 tarball URL prefixes to public npm; all versions, dependency metadata and integrity values were preserved. All 103 direct dependencies and required dependency edges matched the original lock. Every one of the 814 unique installed mirrored archives independently matched its original SHA-512. Repository lock SHA-256 remains `290ff1274a031b32ab4b4a66dc2b115d97692d6f1cd77b126921b641265bd9da`. Root Husky setup and the trusted esbuild lifecycle ran; the default untrusted resolver lifecycle remains blocked. Bun automatic environment-file loading was disabled for further commands.
+- Existing scorer additions: Matthew approved recording the changes already present in `src/test/quick-log-v2-exact-recovery.test.tsx` (reviewed saved note does not return as unsaved) and `src/test/quick-log-v2-sheet-watering.test.tsx` (Watering for B preserves A's unrelated draft). No assertion was removed or weakened. A local declaration covers only these existing additions; strict scorer reporting against deploy passes. The PR-body declaration must also be recorded; its first tool update failed and readback showed no body change.
+- Before this repair, the deploy ruleset's 35 required checks passed at `c9240ed18b15b89c5b0f382feeea6e4605186824`. The non-required authenticated census failed its 30-minute batch timeout; root cause is not established. The security-review bot reported usage limits. Those results do not cover a new head.
+- Remaining gates: normal hooks and final-tree checks; PR-body declaration; normal push and fresh CI; an eligible complete independent review at the resulting full SHA. This authoring session cannot provide its own acceptance. No eligible outside reviewer session has been established available.
+- Preserve the two #2565 owner decisions and #2582's partial-failure naming decisions. No owner disposition is inferred. #2582 remains based on #2565; no retarget before #2565 merges. No rebase, force-push, PR merge, deployment, or production operation is authorized.
+
+#### Codex hydration continuation — 2026-10-30
+
+- Matthew explicitly requested checking the restored tent ID against the current tents list. Starting head: `8e78951707b4e0d11866b24940a24a9c5de6d700`; Codex remains the sole claimed writer.
+- Hydration now waits for a successful tent read when the draft contains a saved tent. A missing tent or a tent bound to another grow clears the saved tent/plant IDs and obsolete retry IDs, returns to the tent step, and keeps unsent plant typing. A matching saved tent preserves the plant step and pending plant ID.
+- New regression: `src/test/start-your-room-deleted-tent-hydration.test.tsx`; RED 3 failed / 2 passed, GREEN 5 passed. The Start Your Room/source-reading selection passes 19 files / 117 tests; `bun run typecheck` passes. Bun automatic environment-file loading is disabled and explicit disposable client configuration is used for tests. Existing protected tests and `bun.lock` are unchanged by this repair.
+- Matthew also explicitly authorized refreshing the PR body. Its stale draft/file/count/validation statements will be replaced with final-head measured facts. The two pre-existing scorer additions remain separately declared; no new edits to them are authorized or made.
+- The deleted-tent decision is implemented under this new instruction; the separate account-switch busy decision remains open. Fresh CI and eligible outside complete-scope acceptance are still required at the resulting full head. This repair session cannot accept its own work. No merge or deployment is authorized.
+
+- Follow-up review found that a failed tent read hid the forms without a retry on multi-tent plans. The existing verification UI now includes tent failures that block hydration. RED: the visible retry was missing (1 failed / 4 passed); the regression now recovers through that button. New test selectors name the shared form fields so the same hydration safety checks apply to both stacked flows. Deploy base `e312c3fac` is merged normally; the sole handoff conflict retains every block from both parents verbatim.
+
+#### Codex cached-roster follow-up — 2026-10-30 UTC
+
+- Starting head: `ff67c3603f38c099ee726291039a1f9bd6765664`. Matthew directed Codex to fix the remaining work and directly approved publishing both exact prepared PR bodies; both were confirmed public. #2582 then pushed normally to `c5d275865dc1190dfbf8ebdcc9c2bf6f84f4903d`, preserving its stacked base and ready state.
+- Current-head review r4419637976 identified a real gap: cached tent data can still be refreshing while isLoading/isError are false. RED on the new cached-empty roster/two-grow case: the stored tent and pending plant ID were incorrectly cleared (1 failed / 5 passed). Hydration now also waits on isFetching, resumes when it settles, and shows the existing loading status during that wait. GREEN: all 6 hydration cases pass. The unused MINTED_ROW_ID copied into this new test file was removed for r4419647614.
+- The existing 11 unrelated #2582 scorers and the two pre-existing #2565 scorer additions remain unchanged. No auth/store/query-key policy change is made. Fresh required CI and complete eligible outside acceptance must cover the resulting heads; this contributing session and advisory agents are excluded from acceptance. Owner account-switch busy decision remains open.
+- Latest observed deploy `ab4aaa2f3a648c28860c682ddec3ec0103347246` advances analytics/handoff work. Read-only merge-tree against it is clean; no unrelated base churn is needed for this repair. Preserve all prior handoff entries. #2582 inherits this patch by normal parent merge, with no retarget, rebase, force-push, PR merge or deployment.
+
+### SETUP-QUICKLOG-DRAFT-RETRY
+
+```text
+TASK SETUP-QUICKLOG-DRAFT-RETRY  priority: other  status: OPEN
+goal: Keep every typed field in Start Your Room and the first Quick Log observation when a save fails or the grower leaves mid-flow, show a plain error, and let Retry write that same save once. Advance only after the server confirms the save.
+why: A failed or abandoned setup step was dropping names and notes, and a second tap could start another write.
+branch: cursor/setup-quicklog-draft-retry-8b19
+base: verdant-grow-diary
+checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-diary && git switch cursor/setup-quicklog-draft-retry-8b19 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
+head_sha: 4c8b625c6db91502c161468608a4f241c869cc1e is the owner-switch repair. The branch tip is the handoff commit whose parent is that SHA; confirm with git rev-parse origin/cursor/setup-quicklog-draft-retry-8b19
+state: pushed draft
+current_step: Jack Herer review 5669691346 at bb54282818838544c0090493529a69f4274dd60d FAILed. The repair ignores a grow, tent, or plant save that finishes after the owner changes, and clears a tent or plant error when hydration falls back to the grow step. Quick Log was not changed.
+next_action: read the 35 required checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 at the post-repair head and do not merge. Review 5669691346 does not cover the new head.
+post_merge_check: Full test suite shards and Lint, typecheck, test, build on the merged deploy head; if a required check fails, reopen this task with the same owner
+active_writer: Grok cloud agent on cursor/setup-quicklog-draft-retry-8b19
+decisions: Drafts live in sessionStorage under verdant.session-form.1.{userId}.{formId} and clear only after a confirmed save. Start Your Room reuses one hierarchy row id until that confirmation and blanks a name in the stored draft once its id is set so a later empty form does not inherit a confirmed name. Confirmed Quick Log observation retries keep the same p_idempotency_key, including after remount, by storing that key on the draft. The open-sheet key mint line stays so the existing five-rotation source pin still matches; a stored key overwrites it when present. Viewport coverage is jsdom innerWidth 390 and 1280 because the sheet is not viewport-branched.
+tried_and_rejected: Editing src/test/start-your-room-enter-submits.test.tsx is refused by scripts/scorer-lock.mjs. Restoring confirmed names into sessionStorage made the next test read "Bound TentEnter Tent". Awaiting the first Retry click advanced the wizard before the second click. Treating two sequential Retry clicks as one RPC was wrong: the in-flight flag releases after a definitive rejection, so the second click is a second call with the same key. A remount that minted a new key was rejected because Retry would no longer be one logical save.
+commands: export PATH="$HOME/.bun/bin:$PATH"; NODE_OPTIONS="--max-old-space-size=8192" bun run typecheck; bunx vitest run src/test/start-your-room-draft-owner-switch.test.tsx src/test/start-your-room-draft-hydration.test.tsx src/test/start-your-room-draft-retry.test.tsx src/test/start-your-room-enter-submits.test.tsx src/test/start-your-room-resume.test.tsx --reporter=dot
+files_touched: src/pages/StartYourRoom.tsx src/components/QuickLogV2Sheet.tsx src/lib/sessionFormDraftRules.ts src/lib/sessionFormDraftStore.ts src/lib/startYourRoomDraftRules.ts src/lib/quickLogObservationDraftRules.ts src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx src/test/start-your-room-draft-hydration.test.tsx src/test/start-your-room-draft-owner-switch.test.tsx docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none for the code change. Merge, auto-merge, publish, and production writes are out of scope.
+open_questions: none
+gotchas: Do not restore a confirmed grow, tent, or plant name into the stored draft. Do not add another saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignment; quicklog-manual-idempotency-static.test.ts counts five outside the two abandonment functions. Hydrate Start Your Room only after growsLoading is false, and only restore step when draft.ids.growId is still in the grows list. Do not persist until draftHydratedFor matches the current owner and the hydrated state has committed. An owner change with no draft must reset the form, ids, pending row ids, error, and step before any write under the new key. After each save await, return without setIds or setStep when ownerIdRef no longer matches the owner captured before that await. A tent or plant save error is cleared when hydration falls back to the grow step because that grow is gone. src/test/start-your-room-draft-retry.test.tsx and src/test/start-your-room-draft-hydration.test.tsx are scorer-locked; owner-switch cases live in src/test/start-your-room-draft-owner-switch.test.tsx. Effects that read ownerId must be declared after const ownerId. Free plan still does not create a grow automatically.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
+artifacts: RED then GREEN on src/test/start-your-room-draft-owner-switch.test.tsx (2 failed, then 5 files / 18 passed including hydration, draft-retry, resume, and enter-submits). typecheck passed with NODE_OPTIONS=--max-old-space-size=8192.
+reviewer_seat: Jack Herer review 5669691346 FAILed bb54282818838544c0090493529a69f4274dd60d. That verdict does not cover the repair head.
+reviewer_sha: bb54282818838544c0090493529a69f4274dd60d (FAIL, superseded by the repair)
+session_state: Cursor cloud agent on cursor/setup-quicklog-draft-retry-8b19. No production smoke write.
+claimed_by: Grok, 2026-10-26 11:15 CT
+owner: Grok
+last_updated: 2026-10-27 10:30 CT, by Grok
+```
+
+### ARCH-CONTRACT-RESTAMP-20261029
+
+```text
+TASK ARCH-CONTRACT-RESTAMP-20261029  priority: other  status: OPEN
+goal: re-verify docs/architecture-contract.md against deploy tip 479cadb3032ddc3ad80d93f105283609179d6c0a (#2581) and correct every clause that drifted since the 27991451 stamp and its 0200d255 post-stamp merge.
+why: the founder chose option A (docs-only refresh) on 2026-10-29, after a collision audit found that the contract (#2564) and docs/specs/release-topology-specification.md already exist, so a new contract would duplicate them.
+branch: claude/new-session-kulf08
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head; only the writer then runs git merge origin/verdant-grow-diary and pushes a new head)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622 (draft)
+head_sha: a commit cannot record its own SHA; read the full head from the PR
+state: pushed; ready for review. Independent verdicts by session_017UoYKvqHhSHehpNuWHT7qV, each stale once the head moved: 4c718a4 PASS-with-findings (6505081663), 37f2756 PASS-with-findings (6505693483), 8e06a5d PASS-with-findings (6506351031), d16efc2 PASS-with-findings (6508569894). Founder yes given at 37f2756 and 8e06a5d, both superseded by base merges. This commit fixes F6 and the Codex P2 on next_action, so the d16efc2 verdict is stale too.
+current_step: restamp written. 419 path:line cites re-read by text (9 moved, 3 live in AC-8.1, all in scripts/check-bun-lockfile-policy.mjs after #2569); AC-3.2, AC-4.3 and AC-10.2 counts unchanged; AC-3.4 940 in 939 -> 945 in 944.
+next_action: an eligible independent reviewer (not session 017UoYKx8T6Y6eyPhvDvxPjS or 017UoYKxQUVr5LNsENPKJ59K) does a complete re-review of the whole PR at the new full head SHA (OWNERSHIP.md section 4.3; a delta-only re-review is not acceptance). Then 35/35 required checks and the founder's per-item yes at that exact head.
+post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
+active_writer: Claude
+decisions: (1) no new contract and no topology edit; slice C (topology) waits for #2539, #2609 and #2589. (2) the six moved cites inside the 27991451 header record stay as that tree's lines, because a stamp record describes its own tree. (3) the counts were reproduced at 27991451 before measuring 479cadb, so the same method gives both. (4) the stale CLAUDE.md lockfile wording (option B) is out of scope; it would need the 18-file Sentinel bump.
+tried_and_rejected: a first cite pass that ignored bare `:NN` cites missed the AC-8.1 drift; the binder now ties each bare cite to the last full path in the same paragraph. Comparing topology-spec cites against 0200d255 gave false drift; 604274a7 is the right base because #2564 merged the spec and the contract together.
+commands: format and safety: bunx prettier --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs. Counts, run at both 27991451 and the head (replace REF): rules=$(git ls-tree --name-only REF src/lib/ | grep -E 'Rules\.ts$'); echo "$rules" | wc -l; git grep -l 'Date\.now()' REF -- $rules | wc -l; git grep -l 'Math\.random()' REF -- $rules | wc -l; git grep -h -o 'from "@/lib/react-router-compat"' REF -- src | wc -l; git grep -liE 'nelson|modified z|modifiedZ|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' REF -- src supabase scripts e2e tools plugins spikes | wc -l. The cite re-read and the AC-4.3 pair count used session-local scripts that are not committed; their method is in the contract header and the PR body. SKIPPED, not passed: Vitest, bun run typecheck and the pre-commit full tsc, because this session has no node_modules and no test reads either file.
+files_touched: docs/architecture-contract.md, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: whether to run option B (fix CLAUDE.md:117 and :297, which still call package-lock.json a compatibility lock) as a governance PR.
+gotchas: docs/specs/release-topology-specification.md:1012 records `PASS` for "AI Doctor inference through the Lovable AI gateway", citing GATEWAY_URL and LOVABLE_API_KEY, but AI Doctor is Gemini-direct since #1982 (contract AC-5.1). In slice C, confirm whether that §6.1 row is a dated measurement that a later section supersedes; if not, correct it.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564
+artifacts: the PR's check runs
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3. A non-contributing Claude session qualifies. Excluded: author session 017UoYKx8T6Y6eyPhvDvxPjS and holder session 017UoYKxQUVr5LNsENPKJ59K
+reviewer_sha: none at the current head. Latest stale verdict: d16efc2aad329264b8f1f3dd1c6ba808b56e50e5, PASS-with-findings (P3 only), comment 6508569894; earlier ones are listed under state. F3 and F4 go to the next restamp, per the founder.
+session_state: Claude cloud session 017UoYKx8T6Y6eyPhvDvxPjS; separate one-shot check-in trig_01F8BsQcKVPKV5VDk4EPy3X1 is for #2597 CI
+claimed_by: Claude, 2026-10-29 12:20 CT
+owner: Claude
+last_updated: 2026-10-29 21:35 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K (F6; full re-review scope per Codex P2)
 ```
 
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
@@ -168,40 +393,6 @@ session_state: no routines, no paused workflows; pending owner decision on GSC p
 claimed_by: Claude, 2026-10-28 17:45 CT (first push of this block)
 owner: Claude
 last_updated: 2026-10-29 13:58 CT, by Claude (second base merge after #2539)
-```
-
-### LIVE-CHECKOUT-2497-REBASE
-
-```text
-TASK LIVE-CHECKOUT-2497-REBASE  priority: P1  status: OPEN
-goal: Finish Paddle live billing on PR #2539 through a verified live purchase: live checkout opens only with a well-formed live_ client token on verdantgrowdiary.com / www.verdantgrowdiary.com, every other host and token fails closed, a build-time kill switch (VITE_CHECKOUT_DISABLED="true") is the deployable rollback, and get-paddle-price reads its catalog through the pure helper.
-why: Live checkout code existed only on closed #2497; this draft replays it. Matthew (2026-10-29, direct instruction to this Claude session) owns the release decisions and asked Claude to own investigation, repair, validation, coordination and the release packet, with every production, payment and refund action approved by him per item at the verified head.
-branch: cursor/live-checkout-2497-rebase-c00d
-base: verdant-grow-diary
-checkout: git fetch origin cursor/live-checkout-2497-rebase-c00d verdant-grow-diary && git switch cursor/live-checkout-2497-rebase-c00d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2539 (draft)
-head_sha: 01c26b0 (2026-10-29 ~15:42 UTC) fixes the two Codex P2 findings posted at 3b80e7c28c1e5942bdae97a3e70ecb7b96a384ce; the commit that records this line follows it. Read origin/cursor/live-checkout-2497-rebase-c00d for the exact head.
-state: base verdant-grow-diary 9b60f907 merged at 84fe871; Founder retirement reconciled at f4936dd; all seven review threads answered and resolved; marked ready for review on Matthew's instruction (2026-10-29, this session) so the 35 required contexts run. Local at 91a91f7: full vitest 3749 files passed / 6 BLOCKED (PostgreSQL proofs refuse root) / 49575 tests passed; tsc strict PASS; bun run build PASS with postbuild SEO validators OK.
-current_step: ready for review. Codex code review at 3b80e7c: two P2 (the rollback verifier assumed the .output layout; the runbook gates lacked the Founder archive), fixed in 01c26b0 (layout discovery from nitro.json with .output, dist and .vercel/output fallbacks, plus src/test/checkout-disabled-bundle-roots.test.ts; runbook prerequisite 10 and release step 4). Codex security review at 3b80e7c completed with no finding posted. Re-review requested at the new head; required CI re-running there.
-next_action: Codex reviews the exact pushed head (full 40-character SHA from the PR) under OWNERSHIP.md section 4.3; this session fixes findings and re-requests at the new head. After a clean PASS at the head with 35/35 green: Matthew's per-item yes, then the merge queue (squash) at that exact SHA. No deploy, secret, webhook, charge or refund without Matthew's per-item yes.
-post_merge_check: live /version.json reports the merge commit; /pricing on verdantgrowdiary.com shows "Secure checkout by Paddle" and opens live checkout for pro_monthly; Craft shows the scoped "Join the Craft launch list" block; founder_lifetime is refused. NOT_MEASURED until that deploy.
-active_writer: Claude session_017UoYKz9AZWshNbyKnd1ck6 (took over from the Cursor Grok cloud agent, idle since 2026-10-27 21:04 UTC, on Matthew's 2026-10-29 instruction)
-decisions: Reuse this PR, not a new one (Matthew). Sellable catalog is pro_monthly, pro_annual, credit_pack_50, credit_pack_150 (live Paddle read 2026-10-29: five active prices, no Craft product; the Founder price is still active in Paddle and must be archived by Matthew before any live client ships). Craft stays offered with a scoped unavailable block; do not create Craft products. founder_lifetime keeps its env name only for the cold-start drift guard; the function answers 410 plan_retired first. Founder refusal in usePaddleCheckout runs before the kill switch and is scoped to the plan. Rollback workflow: permissions contents: read, persist-credentials false, receipt upload also on verify failure.
-tried_and_rejected: a rebase or force-push (forbidden; the base was merged with one merge commit). Resolving the 32 conflicts file by file against the virtual merge base (criss-cross bases 7f2f974a, 65d9964e, bfd2a85c inflated the list); instead files unchanged since 7f2f974a take the tip and only the four changed files were merged three-way.
-commands: bunx vitest run src/test/*paddle*.test.ts* src/test/*checkout*.test.ts* src/test/sellable-tier-chain.test.ts src/test/get-paddle-price*.test.ts src/test/request-hostname*.test.ts src/test/pricing*.test.ts* src/test/ci-pr-concurrency.test.ts --reporter=dot ; NODE_OPTIONS=--max-old-space-size=8192 bunx tsc -p tsconfig.json --noEmit ; node scripts/check-contract-test-resolution.mjs ; node scripts/verify-edge-shared-in-sync.mjs ; node scripts/assert-paddle-production-sandbox.mjs
-files_touched: .env.example; .env.production; .github/workflows/checkout-disabled-rollback-artifact.yml; docs/billing.md; docs/paddle-paid-launch-runbook.md; docs/codebase-map.md; src/lib/paddle.ts; src/lib/paddleEnvironment.ts; src/lib/requestHostname.ts; src/lib/requestHostname.server.ts; src/lib/checkoutBlockedScopeRules.ts; src/lib/checkoutTrustCopyRules.ts; src/hooks/usePaddleCheckout.ts; src/hooks/useRenderedPaddleCheckoutEnvironment.ts; src/pages/Pricing.tsx; src/server.ts; supabase/functions/_shared/getPaddlePriceCatalogEnv.ts; supabase/functions/get-paddle-price/index.ts; scripts/verify-checkout-disabled-bundle.mjs; the paddle/checkout/pricing tests; docs/agents/HANDOFF_LOG.md (this block)
-files_remaining: none in the code slice. Outside the repo, Matthew: production secrets (PAYMENTS_ENVIRONMENT=live, PADDLE_LIVE_API_KEY, PAYMENTS_LIVE_WEBHOOK_SECRET, the four live PADDLE_PRICE_* values), deploy of get-paddle-price and payments-webhook, the live webhook destination (traffic_source platform, per #2589), archiving the live Founder price, Publish, the approved purchase and any refund.
-blockers: Paddle-side: archiving the live Founder price pri_01kx3dsezn1d73dghffdxnr2za was ordered by Matthew (2026-10-29) but this session's Paddle MCP connection lacks price.write (request 2ea301d4-42f5-49a7-bcde-5527f1e29163); Matthew archives it in the Paddle dashboard or grants price.write at vendors.paddle.com/mcps. Webhook destinations (read-only inventory 2026-10-29 ~15:36 UTC; all three show zero notifications in 30 days): "Test" (simulation traffic to the website root, all 57 events, sensitive fields on); the Lovable relay (platform traffic, 20 events); the direct payments-webhook?env=live destination (platform traffic, 5 events: transaction.completed, transaction.payment_failed, subscription.created/updated/canceled; it misses adjustment.created, the refund event the function handles). Recommendation, each its own approval: widen the direct destination to the 13 handled types; deactivate "Test" after the purchase; keep the relay until the first purchase proves the direct path. Matthew (2026-10-29): review exact events and destinations before approving; nothing applied. Production deployed-function receipts for get-paddle-price and payments-webhook: BLOCKED from this session (Supabase MCP sees only bzatgtgjvuojpoxcknaa). Dependency-audit lane red repo-wide on @hono/node-server (fix PR #2605), UNSTABLE not blocking.
-open_questions: Matthew: apply the webhook recommendation (one word); archive the Founder price or grant price.write; production secrets and the two Edge deploys with receipts; the exact purchase (plan, tax-inclusive total, method, refund plan) before any charge.
-gotchas: Drafts skip the 32 shard contexts (#2555), so a draft's green header is not required CI. assert-paddle-production-sandbox and restore-env-production-from-head run in prebuild; the committed .env.production holds the live client token, which is public by design. Local DB proofs (founder-*-db, founder-refund-grant-concurrency) are BLOCKED as root or without PostgreSQL tools; that is environment, not a code result. Three merge bases exist with the tip; a plain merge-tree overstates conflicts. The husky pre-commit tsc needs NODE_OPTIONS=--max-old-space-size=8192 on this box.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2497 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2589 (webhook readiness audit) ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 ; docs/specs/paddle-live-checkout-runtime-slice.md
-artifacts: PR body and checks; checkout-disabled-rollback-receipt artifact from the rollback workflow at the pushed head
-reviewer_seat: Codex (named by Matthew 2026-10-29) as independent exact-head reviewer under OWNERSHIP.md section 4.3; excluded: the Cursor Grok cloud agent (author), Claude session_017UoYKz9AZWshNbyKnd1ck6 (repairer)
-reviewer_sha: none at the current head (Codex code review at 3b80e7c found two P2, both fixed in 01c26b0; CodeRabbit comments are not acceptance)
-session_state: Claude Code cloud session session_017UoYKz9AZWshNbyKnd1ck6; no routines; no paused workflows; pending Matthew decisions listed under open_questions
-claimed_by: Claude session_017UoYKz9AZWshNbyKnd1ck6, 2026-10-29 (Matthew's direct assignment)
-owner: Claude session_017UoYKz9AZWshNbyKnd1ck6
-last_updated: 2026-10-29 ~15:45 UTC by Claude session_017UoYKz9AZWshNbyKnd1ck6 (Codex P2s fixed in 01c26b0; Founder archive still BLOCKED on price.write at 15:34 UTC, Matthew routes it to the Paddle operator; Pro Monthly read-only tax preview for US 64154: $12.00 subtotal, $0.00 tax, $12.00 USD total; no charge made)
 ```
 
 ### ONBOARDING-GROWS-READ-ERROR-SUPERSEDES-2540
@@ -1018,20 +1209,56 @@ claimed_by: cursor cloud agent, 2026-10-14
 last_updated: 2026-10-14 01:10 CT, by Grok
 ```
 
+### AHREFS-WEB-ANALYTICS-KEY-SWAP
+
+```text
+TASK AHREFS-WEB-ANALYTICS-KEY-SWAP  priority: other  status: OPEN
+goal: Replace the Ahrefs Web Analytics public data-key GRdwmweqUZoPO7SfmEsPZg with KZfnjSoVSRYkyDJq+SUsow. Loading stays consent-gated (no static <head> tag).
+why: Matthew pasted Ahrefs' install snippet with the new key and chose "Replace the key" (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-28).
+branch: claude/admiring-dirac-3vaz57
+base: verdant-grow-diary
+checkout: git fetch origin claude/admiring-dirac-3vaz57 verdant-grow-diary && git switch claude/admiring-dirac-3vaz57 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2602 (from claude/admiring-dirac-3vaz57)
+head_sha: read the PR head; this commit cannot name itself
+state: pushed; marked ready for review 2026-10-29 18:06 UTC on Matthew's instruction
+current_step: 35/35 required CI and an independent exact-head review (request: see the PR conversation)
+next_action: independent exact-head review of the PR; after publish, check the live site per post_merge_check
+post_merge_check: on https://verdantgrowdiary.com accept analytics and confirm script[src="https://analytics.ahrefs.com/analytics.js"] carries data-key KZfnjSoVSRYkyDJq+SUsow; NOT_MEASURED until live /version.json reports the merge SHA
+active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
+decisions: keep the consent gate; a static tag would load before consent and contradict the privacy policy and consent settings page. CSP allowance for analytics.ahrefs.com goes in a separate PR (owner choice).
+tried_and_rejected: pasting the snippet into src/routes/__root.tsx <head>; rejected for the consent reason above
+commands: bunx vitest run src/test/ahrefs-analytics-loader.test.ts --reporter=dot; bun run typecheck; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/constants/analytics.ts, src/test/ahrefs-analytics-loader.test.ts, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: Ahrefs "Recheck installation" looks for the tag in static HTML, which this site does not serve before consent; whether Ahrefs accepts the consent-gated install is NOT_MEASURED
+gotchas: the key test is scorer-locked; unlock recorded with reason before commit
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2600 (docs: Ahrefs project of record; no code overlap)
+artifacts: PR body
+reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3; this Claude session excluded
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-10-28 23:10 UTC
+owner: Claude
+last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
+```
+
+## Closed
+
 ### HONO-NODE-SERVER-GHSA-RMXM
 
 ```text
-TASK HONO-NODE-SERVER-GHSA-RMXM  priority: P2  status: OPEN
+TASK HONO-NODE-SERVER-GHSA-RMXM  priority: P2  status: CLOSED
 goal: Clear GHSA-rmxm-3fg6-px4f (moderate, @hono/node-server >=1.19.10 <2.1.3), which blocks check:deps on every PR and on the deploy tip bbc77ae23. Raise the exact override and BUN_LOCK_SECURITY_FLOORS from 2.0.10 to 2.1.3 and regenerate bun.lock with CI's bun 1.3.14.
 why: a dependency audit red across PRs is top-priority work (CURRENT_STATE Start here). Matthew approved the scorer unlock, a separate PR and porting into #2602/#2603 (Claude session_017UoYKzCisV3nBJG6Dhco3K, 2026-10-29).
 branch: claude/hono-node-server-2-1-3
 base: verdant-grow-diary
-checkout: git fetch origin claude/hono-node-server-2-1-3 verdant-grow-diary && git switch claude/hono-node-server-2-1-3 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+checkout: None; closed (merged). Historical branch: claude/hono-node-server-2-1-3
 pr: draft PR from claude/hono-node-server-2-1-3 (link in the PR list)
-head_sha: read the PR head; this commit cannot name itself
-state: pushed; marked ready for review
-current_step: fresh exact-head review and 35/35 required CI at the head after this handoff fix
-next_action: independent exact-head review at the new head (session_017UoYKuwk7Z3wSC7syg3jnF offered); then 35/35 required CI, the founder's per-item yes and the merge queue. The same three-file dependency change is ported into #2602 and #2603
+head_sha: 7c09de3413c556389da7677341d340da6c660b4a (final PR head)
+state: CLOSED (merged). #2605 merged by cheekhimself at 2026-10-29 17:24:03 UTC from final head 7c09de34 as dcf39fdb605de7ea89884e5a884978857f99b18a
+current_step: none; closed
+next_action: None; closed. post_merge_check PASS: Dependency & Security CI run 40920963434 succeeded on deploy tip dcf39fdb (the two prior tips 479cadb3 and 9b60f907 failed it on this advisory)
 post_merge_check: Dependency & Security CI check:deps passes on the deploy branch tip after merge
 active_writer: Claude (session_017UoYKzCisV3nBJG6Dhco3K)
 decisions: 2.1.3 is the first fixed release in major 2 (advisory range <2.1.3); follow the ip-address 10.7.4 precedent (6f937d3): override + floor + bun.lock only
@@ -1045,14 +1272,50 @@ gotchas: regenerate bun.lock with bun 1.3.14 (CI pin), not a newer local bun; pa
 links: https://github.com/advisories/GHSA-rmxm-3fg6-px4f
 artifacts: PR body
 reviewer_seat: eligible independent session under OWNERSHIP.md section 4.3 (dependency/lockfile scope); this Claude session excluded
-reviewer_sha: none valid. session_017UoYKuwk7Z3wSC7syg3jnF: PASS for code scope at 4d9defc1c, then FAIL at 02f83c7e1 on this block's files_touched and commands (comment 6500943336); this commit fixes that and needs a fresh review
+reviewer_sha: 7c09de3413c556389da7677341d340da6c660b4a, PASS by session_017UoYKuwk7Z3wSC7syg3jnF (earlier verdicts at 4d9defc1c and 02f83c7e1 superseded)
+closure: merged as dcf39fdb605de7ea89884e5a884978857f99b18a; ports in #2602 and #2603 are no-ops after their base merges
 session_state: none
 claimed_by: Claude, 2026-10-29 00:24 UTC
 owner: Claude
-last_updated: 2026-10-29 16:08 UTC, by Claude
+last_updated: 2026-10-29 17:50 UTC, by Claude (closed in the #2602 base merge)
 ```
 
 ## Closed
+
+### LIVE-CHECKOUT-2497-REBASE
+
+```text
+TASK LIVE-CHECKOUT-2497-REBASE  priority: P1  status: CLOSED
+goal: Finish Paddle live billing on PR #2539 through a verified live purchase: live checkout opens only with a well-formed live_ client token on verdantgrowdiary.com / www.verdantgrowdiary.com, every other host and token fails closed, a build-time kill switch (VITE_CHECKOUT_DISABLED="true") is the deployable rollback, and get-paddle-price reads its catalog through the pure helper.
+why: Live checkout code existed only on closed #2497; this draft replays it. Matthew (2026-10-29, direct instruction to this Claude session) owns the release decisions and asked Claude to own investigation, repair, validation, coordination and the release packet, with every production, payment and refund action approved by him per item at the verified head.
+branch: cursor/live-checkout-2497-rebase-c00d
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin cursor/live-checkout-2497-rebase-c00d verdant-grow-diary && git switch cursor/live-checkout-2497-rebase-c00d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2539 (merged)
+head_sha: 82a3d2525d4f71a9bbea4f602238b516a9c27596 (final PR head: merge of verdant-grow-diary 479cadb into 69bf1bd, only conflict docs/agents/HANDOFF_LOG.md, both blocks kept); merge commit d55c5575ba79b4602c394423f5acde25c16ec5e1 on the deploy branch, squashed onto base dcf39fdb605de7ea89884e5a884978857f99b18a
+state: CLOSED (merged). Last recorded open state: base verdant-grow-diary 9b60f907 merged at 84fe871; Founder retirement reconciled at f4936dd; all seven review threads answered and resolved; marked ready for review on Matthew's instruction (2026-10-29, this session) so the 35 required contexts run. Local at 91a91f7: full vitest 3749 files passed / 6 BLOCKED (PostgreSQL proofs refuse root) / 49575 tests passed; tsc strict PASS; bun run build PASS with postbuild SEO validators OK.
+current_step: Closed. Last open step: ready for review. Codex code review at 3b80e7c: two P2 (the rollback verifier assumed the .output layout; the runbook gates lacked the Founder archive), fixed in 01c26b0 (layout discovery from nitro.json with .output, dist and .vercel/output fallbacks, plus src/test/checkout-disabled-bundle-roots.test.ts; runbook prerequisite 10 and release step 4). Codex security review at 3b80e7c completed with no finding posted. Re-review requested at the new head; required CI re-running there.
+next_action: None; closed. The post_merge_check below stays owned by this block: if the live check fails after Publish, this work reopens with the same owner. Outside the repo, each still Matthew's per-item call: Founder price pri_01kx3dsezn1d73dghffdxnr2za archived in live Paddle (read back archived); PAYMENTS_ENVIRONMENT=live and the live secrets in Lovable Cloud; deploy of get-paddle-price and payments-webhook with nonsecret version receipts; the live webhook destination decisions; the $12.00 USD Pro Monthly test purchase; the separate refund or cancellation.
+post_merge_check: live /version.json reports the merge commit; /pricing on verdantgrowdiary.com shows "Secure checkout by Paddle" and opens live checkout for pro_monthly; Craft shows the scoped "Join the Craft launch list" block; founder_lifetime is refused. Measured 2026-10-29 18:56-18:58 UTC for the signed-out surface; the signed-in checkout open stays NOT_MEASURED (see closure).
+active_writer: none; branch cursor/live-checkout-2497-rebase-c00d retired after merge
+decisions: Reuse this PR, not a new one (Matthew). Sellable catalog is pro_monthly, pro_annual, credit_pack_50, credit_pack_150 (live Paddle read 2026-10-29: five active prices, no Craft product; the Founder price is still active in Paddle and must be archived by Matthew before any live client ships). Craft stays offered with a scoped unavailable block; do not create Craft products. founder_lifetime keeps its env name only for the cold-start drift guard; the function answers 410 plan_retired first. Founder refusal in usePaddleCheckout runs before the kill switch and is scoped to the plan. Rollback workflow: permissions contents: read, persist-credentials false, receipt upload also on verify failure.
+tried_and_rejected: a rebase or force-push (forbidden; the base was merged with one merge commit). Resolving the 32 conflicts file by file against the virtual merge base (criss-cross bases 7f2f974a, 65d9964e, bfd2a85c inflated the list); instead files unchanged since 7f2f974a take the tip and only the four changed files were merged three-way.
+commands: bunx vitest run src/test/*paddle*.test.ts* src/test/*checkout*.test.ts* src/test/sellable-tier-chain.test.ts src/test/get-paddle-price*.test.ts src/test/request-hostname*.test.ts src/test/pricing*.test.ts* src/test/ci-pr-concurrency.test.ts --reporter=dot ; NODE_OPTIONS=--max-old-space-size=8192 bunx tsc -p tsconfig.json --noEmit ; node scripts/check-contract-test-resolution.mjs ; node scripts/verify-edge-shared-in-sync.mjs ; node scripts/assert-paddle-production-sandbox.mjs
+files_touched: .env.example; .env.production; .github/workflows/checkout-disabled-rollback-artifact.yml; docs/billing.md; docs/paddle-paid-launch-runbook.md; docs/codebase-map.md; src/lib/paddle.ts; src/lib/paddleEnvironment.ts; src/lib/requestHostname.ts; src/lib/requestHostname.server.ts; src/lib/checkoutBlockedScopeRules.ts; src/lib/checkoutTrustCopyRules.ts; src/hooks/usePaddleCheckout.ts; src/hooks/useRenderedPaddleCheckoutEnvironment.ts; src/pages/Pricing.tsx; src/server.ts; supabase/functions/_shared/getPaddlePriceCatalogEnv.ts; supabase/functions/get-paddle-price/index.ts; scripts/verify-checkout-disabled-bundle.mjs; the paddle/checkout/pricing tests; docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: none in the code slice. Outside the repo, Matthew: production secrets (PAYMENTS_ENVIRONMENT=live, PADDLE_LIVE_API_KEY, PAYMENTS_LIVE_WEBHOOK_SECRET, the four live PADDLE_PRICE_* values), deploy of get-paddle-price and payments-webhook, the live webhook destination (traffic_source platform, per #2589), archiving the live Founder price, Publish, the approved purchase and any refund.
+blockers: Paddle-side: archiving the live Founder price pri_01kx3dsezn1d73dghffdxnr2za was ordered by Matthew (2026-10-29) but this session's Paddle MCP connection lacks price.write (request 2ea301d4-42f5-49a7-bcde-5527f1e29163); Matthew archives it in the Paddle dashboard or grants price.write at vendors.paddle.com/mcps. Webhook destinations (read-only inventory 2026-10-29 ~15:36 UTC; all three show zero notifications in 30 days): "Test" (simulation traffic to the website root, all 57 events, sensitive fields on); the Lovable relay (platform traffic, 20 events); the direct payments-webhook?env=live destination (platform traffic, 5 events: transaction.completed, transaction.payment_failed, subscription.created/updated/canceled; it misses adjustment.created, the refund event the function handles). Recommendation, each its own approval: widen the direct destination to the 13 handled types; deactivate "Test" after the purchase; keep the relay until the first purchase proves the direct path. Matthew (2026-10-29): review exact events and destinations before approving; nothing applied. Production deployed-function receipts for get-paddle-price and payments-webhook: BLOCKED from this session (Supabase MCP sees only bzatgtgjvuojpoxcknaa). Dependency-audit lane red repo-wide on @hono/node-server (fix PR #2605), UNSTABLE not blocking.
+open_questions: Matthew: apply the webhook recommendation (one word); archive the Founder price or grant price.write; production secrets and the two Edge deploys with receipts; the exact purchase (plan, tax-inclusive total, method, refund plan) before any charge.
+gotchas: Drafts skip the 32 shard contexts (#2555), so a draft's green header is not required CI. assert-paddle-production-sandbox and restore-env-production-from-head run in prebuild; the committed .env.production holds the live client token, which is public by design. Local DB proofs (founder-*-db, founder-refund-grant-concurrency) are BLOCKED as root or without PostgreSQL tools; that is environment, not a code result. Three merge bases exist with the tip; a plain merge-tree overstates conflicts. The husky pre-commit tsc needs NODE_OPTIONS=--max-old-space-size=8192 on this box. The 82a3d25 conflict resolution left this block's code fence unclosed (an opening four-backtick fence with no closer, so the VER-300 block rendered inside it); the base repaired the fences before this close-out landed.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2497 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2589 (webhook readiness audit) ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2570 ; docs/specs/paddle-live-checkout-runtime-slice.md
+artifacts: PR body and checks; checkout-disabled-rollback-receipt artifact from the rollback workflow at the pushed head
+reviewer_seat: Codex (named by Matthew 2026-10-29) as independent exact-head reviewer under OWNERSHIP.md section 4.3; excluded: the Cursor Grok cloud agent (author), Claude session_017UoYKz9AZWshNbyKnd1ck6 (repairer)
+reviewer_sha: 82a3d2525d4f71a9bbea4f602238b516a9c27596: Codex code review completed 2026-10-29T17:04:05Z with no findings (comment 6503199636, reviewed commit 82a3d2525d; Codex Review Summary comment 6500728610 has_any_findings false); Codex security review completed 2026-10-29T16:09:36Z with no finding posted. Earlier: two P2 at 3b80e7c fixed in 01c26b0; clean at fb5bf77 and 69bf1bd. CodeRabbit paused after fb5bf77 and is not acceptance.
+session_state: Claude Code cloud session session_017UoYKz9AZWshNbyKnd1ck6; no routines; no paused workflows; pending Matthew decisions listed under open_questions
+claimed_by: Claude session_017UoYKz9AZWshNbyKnd1ck6, 2026-10-29 (Matthew's direct assignment)
+owner: Claude session_017UoYKz9AZWshNbyKnd1ck6
+last_updated: 2026-10-29 21:20 UTC, by Claude session_017UoYKz9AZWshNbyKnd1ck6 (closure)
+closure: #2539 merged as d55c5575ba79b4602c394423f5acde25c16ec5e1 at 2026-10-29 18:54:04 UTC via the merge queue (squash) from final head 82a3d2525d4f71a9bbea4f602238b516a9c27596 onto base dcf39fdb605de7ea89884e5a884978857f99b18a (#2605); GitHub API: merged true, merged_by cheekhimself. Required checks at the final head: 35/35 SUCCESS (run 40908126103, 17:01 UTC); merge-queue CI run 40929303961 on queue head d55c5575ba79b4602c394423f5acde25c16ec5e1: success at 18:53:47 UTC. Independent acceptance: Codex at the exact head (reviewer_sha). Enqueued at ~18:16 UTC on Matthew's reaffirmed "merge" (first "merge" ~17:28 UTC, held on this session's concern) with the Founder price still active in live Paddle and no receipt for PAYMENTS_ENVIRONMENT=live, the live secrets or the two function deploys; recorded on the PR body and merge-receipt comment 6505641503. Post-merge live check at closure: live /version.json reported d55c5575ba79 (buildTime 2026-10-29T18:54:34Z) at 18:56 UTC, publish PASS. Signed-out read-only probe of /pricing on verdantgrowdiary.com at 18:58 UTC (HTTP 200, same commit, no console errors): "Secure checkout by Paddle" copy shown; no test-mode banner; no paused or unavailable copy; Founder Lifetime absent; Pro $99/year and Craft $249/year CTAs on the default Annual toggle; credit packs read unavailable while signed out; Paddle.js not loaded before a checkout attempt (lazy by design): PASS for the signed-out surface. Opening live checkout for pro_monthly needs a signed-in owner session and is the first step of the not-yet-approved test purchase: NOT_MEASURED; it reopens this block with the same owner if it fails. Closed by this follow-up PR.
+```
 
 ### VER-300-ALERT-ARCHIVED-TARGETS
 

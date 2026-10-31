@@ -105,6 +105,7 @@ async function mockSignedInSupabase(
     tents: Array<ReturnType<typeof tent>>;
     sensorRows: Array<ReturnType<typeof sensorRow>>;
     onTentScopedSensorRead?: (tentId: string) => void;
+    onSensorWrite?: () => void;
   },
 ) {
   await page.route(/\/auth\/v1\//, async (route, request) => {
@@ -137,10 +138,16 @@ async function mockSignedInSupabase(
     }
 
     if (pathname.endsWith("/rest/v1/tents")) {
+      const id = url.searchParams.get("id")?.replace(/^eq\./, "");
+      const rows = id ? options.tents.filter((row) => row.id === id) : options.tents;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(options.tents),
+        body: JSON.stringify(
+          request.headers().accept?.includes("application/vnd.pgrst.object+json")
+            ? (rows[0] ?? null)
+            : rows,
+        ),
       });
       return;
     }
@@ -151,6 +158,7 @@ async function mockSignedInSupabase(
       pathname.endsWith("/rest/v1/sensor_readings") ||
       pathname.endsWith("/rest/v1/sensor_readings_effective")
     ) {
+      if (!["GET", "HEAD"].includes(request.method())) options.onSensorWrite?.();
       const rawTentScope = url.searchParams.get("tent_id");
       const scopedTentId = rawTentScope?.startsWith("eq.") ? rawTentScope.slice(3) : null;
       if (scopedTentId) options.onTentScopedSensorRead?.(scopedTentId);
@@ -264,4 +272,84 @@ test.describe("Sensors truth closure", () => {
     await expect(page.getByRole("button", { name: /^Tent [A-D]$/ })).toHaveCount(0);
     expect(scopedReads).toEqual([]);
   });
+
+  // VER-302: exercise Settings persistence and a fresh document reload on the
+  // real Tent Detail route. All backend traffic remains mocked above. Expected
+  // values are literals, independent of the product's conversion helpers.
+  for (const unit of ["fahrenheit", "celsius"] as const) {
+    test(`imported CSV history retains ${unit} after a browser reload`, async ({ page }) => {
+      const observations = [
+        ["2026-10-28T11:00:00.000Z", 24.5, 58, "76.1 °F", "24.5 °C"],
+        ["2026-10-28T11:30:00.000Z", 24.88888888888889, 57, "76.8 °F", "24.9 °C"],
+        ["2026-10-28T12:00:00.000Z", 25.222222222222225, 56, "77.4 °F", "25.2 °C"],
+        ["2026-10-28T12:30:00.000Z", 25.555555555555557, 55, "78 °F", "25.6 °C"],
+      ] as const;
+      const rows = observations.flatMap(([capturedAt, temperature, humidity], index) =>
+        [
+          sensorRow(index * 3 + 1, TENT_A_ID, capturedAt, "temperature_c", temperature),
+          sensorRow(index * 3 + 2, TENT_A_ID, capturedAt, "humidity_pct", humidity),
+          sensorRow(index * 3 + 3, TENT_A_ID, capturedAt, "vpd_kpa", 1.3),
+        ].map((row) => ({ ...row, ts: "2026-10-28T13:10:00.000Z" })),
+      );
+      const originalRows = JSON.stringify(rows);
+      let sensorWrites = 0;
+      await seedFakeSession(page);
+      await mockSignedInSupabase(page, {
+        tents: [tent(TENT_A_ID, "VER-302 CSV Tent")],
+        sensorRows: rows,
+        onSensorWrite: () => sensorWrites++,
+      });
+
+      await page.goto("/settings");
+      await acceptReconsentGateIfShown(page);
+      await page.getByTestId(`temperature-unit-option-${unit}`).check();
+      await page.getByTestId("temperature-unit-save").click();
+      await expect(page.getByTestId("temperature-unit-saved")).toHaveText(
+        "Display temperature preference saved.",
+      );
+
+      await page.goto(`/tents/${TENT_A_ID}#imported-sensor-history`);
+      const panel = page.getByTestId("imported-sensor-history-panel");
+      const symbol = unit === "fahrenheit" ? "°F" : "°C";
+      const expectedValues = [...observations]
+        .reverse()
+        .map((row) => row[unit === "fahrenheit" ? 3 : 4]);
+      const expectedTimes = await page.evaluate(
+        (timestamps) => timestamps.map((time) => new Date(time).toLocaleString()),
+        [...observations].reverse().map((row) => row[0]),
+      );
+      for (const reload of [false, true]) {
+        // page.route disables the HTTP cache; reload creates a fresh document
+        // and loads the saved preference, rather than just remounting React.
+        if (reload) await page.reload();
+        await expect(panel.getByTestId("imported-history-total")).toHaveText("12");
+        await expect(panel.getByTestId("imported-history-source-badge")).toHaveText("Source: CSV");
+        await expect(panel.getByTestId("imported-history-not-live-badge")).toHaveText(
+          "Not live data",
+        );
+        const filter = panel.getByTestId("imported-history-metric-filter-temperature_c");
+        await expect(filter).toHaveText(`Temperature (${symbol})(4)`);
+        await filter.click();
+        await expect(filter).toHaveAttribute("aria-pressed", "true");
+        await expect(panel.locator("tbody tr td:nth-child(2)")).toHaveText(
+          Array(4).fill(`Temperature (${symbol})`),
+        );
+        await expect(panel.locator("tbody tr td:nth-child(3)")).toHaveText(expectedValues);
+        await expect(panel.locator("tbody tr td:first-child")).toHaveText(expectedTimes);
+        await panel.getByTestId("imported-history-metric-filter-humidity_pct").click();
+        await expect(panel.locator("tbody tr td:nth-child(3)")).toHaveText([
+          "55%",
+          "56%",
+          "57%",
+          "58%",
+        ]);
+        await panel.getByTestId("imported-history-metric-filter-vpd_kpa").click();
+        await expect(panel.locator("tbody tr td:nth-child(3)")).toHaveText(
+          Array(4).fill("1.3 kPa"),
+        );
+      }
+      expect(sensorWrites).toBe(0);
+      expect(JSON.stringify(rows)).toBe(originalRows);
+    });
+  }
 });

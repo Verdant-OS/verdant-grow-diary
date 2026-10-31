@@ -1,6 +1,8 @@
 # Role — Claude: Knowledge Library and Product Specification Architect
 
-**Sentinel-Version: 2026-10-27.1**
+**Historical — no current seat.**
+
+**Sentinel-Version: 2026-10-31.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

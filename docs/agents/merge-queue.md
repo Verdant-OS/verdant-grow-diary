@@ -1,12 +1,13 @@
 # Merge queue — `verdant-grow-diary`
 
 **Status:** Active (repository ruleset)  
-**Ruleset:** [verdant-grow-diary merge queue](https://github.com/Verdant-OS/verdant-grow-diary/rules/20421416) (id `20421416`)  
+**Ruleset:** union of classic protection and ruleset 24445196 (currently 35 required checks). The previously written ruleset id was `20421416`. Live ruleset 24445196, the 35-check union, and the queue settings were not re-read for this change (`NOT_MEASURED`).  
 **Target branch:** `verdant-grow-diary` only  
-**Merge method:** **Squash**  
+**Merge method:** **MERGE**  
 **Grouping:** `ALLGREEN` · max 1 entry merged per group · up to 5 building  
-**Check timeout:** 90 minutes  
-**Admin bypass:** repository **Admin** role may bypass on a pull request (emergency only; Cheek)
+**Check timeout:** 360 minutes  
+**Admin bypass:** repository **Admin** role may bypass on a pull request (emergency only; Cheek)  
+**Who may enqueue:** the Merge Steward seat only (backup: Steward Backup). The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 
 ## Why
 
@@ -14,15 +15,15 @@ Serializes merges so two PRs cannot race the same base (the #720/#721 class of p
 
 ## How agents / humans merge
 
-After Cheek approval and a clean tree:
+The Merge Steward queues only after a non-author Reviewer seat APPROVES the exact head, 35/35 required checks are green at that sha, and the other Steward preconditions in `docs/agents/OWNERSHIP.md` hold. Builder and Fixer seats never enqueue.
 
 ```bash
-# Preferred: enqueue (do not direct-merge when queue is required)
-gh pr merge <N> --squash --auto
-# or in UI: "Merge when ready" / "Add to merge queue"
+# Steward only. Pin the head. A mismatch must abort.
+[ "$(gh pr view <N> --json headRefOid -q .headRefOid)" = "<full-sha>" ] || exit 1
+gh pr merge <N> --auto --match-head-commit <full-sha>
 ```
 
-Do **not** expect a direct `gh pr merge` without queue when the ruleset is active unless using admin bypass.
+Do **not** expect a direct `gh pr merge` without queue when the ruleset is active unless using admin bypass. An approval from the Ultra account named in the roster never counts.
 
 ## Required status checks (queue + ruleset)
 
@@ -53,6 +54,7 @@ Requires `gh` auth with repo read. Unit tests (no network):
 bunx vitest run src/test/merge-queue-snapshot.test.ts
 ```
 
+<!-- prettier-ignore -->
 | Field | Meaning |
 |-------|---------|
 | `queue_depth` | Entries currently in the merge queue |
@@ -65,7 +67,6 @@ bunx vitest run src/test/merge-queue-snapshot.test.ts
 
 Empty queue + high `DIRTY` count is an **ownership/serialisation** signal, not queue latency.
 
-
 ## Alert thresholds
 
 ## Dynamic threshold scaling
@@ -76,6 +77,7 @@ Enabled by default via `scaling` in [`merge-queue-thresholds.json`](../../script
 factor = clamp(open_pr_total / baseline_open_prs, min_factor, max_factor)
 ```
 
+<!-- prettier-ignore -->
 | Setting | Default | Role |
 |---------|--------:|------|
 | `baseline_open_prs` | 10 | Load reference |
@@ -87,6 +89,7 @@ factor = clamp(open_pr_total / baseline_open_prs, min_factor, max_factor)
 
 **Ratio alerts** (when `open >= min_open_prs`):
 
+<!-- prettier-ignore -->
 | Ratio | Warn | Critical |
 |-------|-----:|---------:|
 | `dirty / open` | 0.45 | 0.70 |
@@ -101,10 +104,9 @@ MERGE_QUEUE_SCALE=0 bun run merge-queue:snapshot:alert
 
 Example: 13 open PRs → factor ≈ 1.3 → `dirty_open_prs` warn rises from 5 → 7. Absolute `dirty=6` may clear while `dirty_ratio=0.46` still warns.
 
-
-
 Canonical config: [`scripts/ci/merge-queue-thresholds.json`](../../scripts/ci/merge-queue-thresholds.json)
 
+<!-- prettier-ignore -->
 | Metric | Warn | Critical | Intent |
 |--------|-----:|---------:|--------|
 | `queue_depth` | 3 | 5 | Sustained serial backlog |
@@ -127,6 +129,7 @@ Null ages (empty queue) **do not** alert. High `DIRTY` with empty queue is an ow
 
 ## Conflict flags vs queue
 
+<!-- prettier-ignore -->
 | GitHub state | Meaning | Queue action |
 |--------------|---------|--------------|
 | `CONFLICTING` / `DIRTY` | Content conflict | **Cannot enqueue** until resolved or PR closed superseded |
@@ -144,11 +147,12 @@ Never reuse green checks from pre-resolution SHA
 
 ## Failure modes
 
+<!-- prettier-ignore -->
 | Event | Expected outcome |
 |-------|------------------|
 | Queue entry conflicts with tip | Entry removed / fails; author rebases |
 | Required check fails on queue build | Entry fails; not merged |
-| Timeout (90m) | Entry fails |
+| Timeout (360m, not re-measured) | Entry fails |
 | Two PRs same files | Second waits; may go dirty when first lands → supersession audit |
 
 ## Safety
@@ -159,9 +163,13 @@ Never reuse green checks from pre-resolution SHA
 
 ## Verify ruleset
 
+Not run for this document change (`NOT_MEASURED`). When someone measures it:
+
 ```bash
-gh api repos/Verdant-OS/verdant-grow-diary/rulesets/20421416
+gh api repos/Verdant-OS/verdant-grow-diary/rulesets/24445196
 ```
+
+The earlier written id was `20421416`.
 
 ## Related
 

@@ -6,8 +6,8 @@
  * readings with clear CSV/imported/Not-live labels. Pending and failed reads
  * remain explicit and can never render as an established empty history.
  *
- * Local-only metric filtering. No new queries, no query params, no
- * route changes. Logic lives in importedSensorHistoryViewModel.
+ * The newest preview keeps local metric filtering. An opt-in browser reads
+ * bounded historical pages without changing AI context or route state.
  *
  * Safety:
  *   - Never reads or renders `raw_payload`.
@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@/lib/react-router-compat";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { Badge } from "@/components/ui/badge";
+import ImportedSensorHistoryBrowser from "@/components/ImportedSensorHistoryBrowser";
 import { Button } from "@/components/ui/button";
 import {
   UNKNOWN_CSV_HISTORY_WINDOW,
@@ -179,6 +180,9 @@ export default function ImportedSensorHistoryPanel({
           </Button>
         ) : null}
       </div>
+      <ImportedSensorHistoryBrowser key={tentId} tentId={tentId} />
+
+      <h3 className="text-sm font-medium">Newest CSV preview</h3>
       {queryLimit ? (
         <p data-testid="imported-history-query-limit" className="text-xs text-muted-foreground">
           This view requests the newest {queryLimit} available CSV readings by observation time.
@@ -323,3 +327,4 @@ export default function ImportedSensorHistoryPanel({
     </section>
   );
 }
+

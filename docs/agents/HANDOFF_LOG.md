@@ -10,6 +10,28 @@ Owner locks remain binding even when a block is unclaimed or older than 24 hours
 Remote heads below are observations at their named times; confirm them before resuming.
 An unpushed candidate is not a remote head and must never be treated as hosted CI evidence.
 
+## VER-284 — bounded imported sensor history browser
+
+```text
+TASK VER-284  priority: P2  status: OPEN
+owner: Codex (this implementation session)
+claimed_by: Codex, 2026-10-25 00:35 UTC
+branch: codex/ver-284-imported-history-browser
+base: verdant-grow-diary
+base_sha: cd327ba62db12db9ed64f10e2fcbfbde10dcfe67
+goal: Make beginning and middle observations in a large CSV import accessible without loading the entire history into the browser.
+state: Implemented bounded opt-in browser and regression suites; stay draft. Advisory Codex review of 29163b1d477c23b5ae460cbbb9026392a6c1c3c7 found one P2 (ingestion timestamp fallback) and one P3 (preview scope). Both corrected: browser uses captured_at only, unknown-time rows are withheld with a count disclosure, and the newest preview is explicitly titled. Outside acceptance remains BLOCKED.
+decision: Add an opt-in bounded date/page browser in ImportedSensorHistoryPanel. Keep the existing newest-only hook and AI consumers unchanged. Preserve account history-window disclosures and database read authority.
+files: src/components/ImportedSensorHistoryPanel.tsx; new src/components/ImportedSensorHistoryBrowser.tsx; new src/hooks/useImportedSensorHistoryPage.ts; new src/lib/importedSensorHistoryPageRules.ts; new src/test/imported-sensor-history-page-rules.test.ts; new src/test/use-imported-sensor-history-page.test.tsx; new src/test/imported-sensor-history-browser.test.tsx; docs/agents/HANDOFF_LOG.md
+collision_audit: 130 open PRs / 978 file entries checked, zero read failures. No hook/panel/view-model overlap. TentDetail.tsx overlaps #1986 and #2509 and stays untouched. Historical #1769 is merged/closed.
+independent_reviewer: BLOCKED under OWNERSHIP.md §4.3. Local Claude Code auth status loggedIn=false; Grok CLI is logged in but its model-catalog endpoint fails through the restricted proxy (connection refused). No review request or PASS invented. All Codex contributors excluded from acceptance. Current exact head and CI are in the PR body.
+validation: Supplemental Node24 direct-import harness 14 PASS / 0 FAIL / 0 SKIP against actual page fetch/rules with controlled database transport (large import, dates, ordering, source/tent scope, cache options, failures). First node --test attempt BLOCKED by spawn EPERM; node verify-page.mjs passed. Vitest/typecheck/full suite/build NOT_MEASURED locally: Bun/node_modules absent; cached runtime directories contain no executable packages. Required hosted CI and outside exact-head review pending. No runtime RLS or production acceptance claim.
+next_action: Run bunx vitest run src/test/imported-sensor-history-page-rules.test.ts src/test/use-imported-sensor-history-page.test.tsx src/test/imported-sensor-history-browser.test.tsx src/test/use-imported-sensor-history.test.tsx src/test/imported-sensor-history-panel.test.tsx src/test/imported-sensor-history-view-model.test.ts src/test/imported-sensor-history-read-honesty.test.tsx src/test/csv-history-window-presentation.test.tsx --reporter=dot; bun run typecheck. Inspect hosted CI at the full head and obtain eligible outside exact-head acceptance. Stay draft, no merge or deploy.
+post_merge_check: After authorized release, verify version SHA and use authorized tent history to reach newest, middle and beginning observations; confirm source, count, window and bounded requests.
+release_steps_measured: NOT_MEASURED — draft only; no merge, deploy or production record changes.
+last_updated: 2026-10-25 00:47 UTC, Codex
+```
+
 ## Template
 
 A cold agent (Claude Code, Codex, Cursor, or Grok) must be able to take the next step

@@ -1,3 +1,4 @@
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -117,6 +118,7 @@ function panel() {
 }
 
 beforeEach(() => {
+  saveTemperatureUnitPreference("celsius");
   onlineManager.setOnline(true);
   server.read.mockReset().mockResolvedValue({ data: [], error: null });
 });

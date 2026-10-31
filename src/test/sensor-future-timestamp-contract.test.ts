@@ -55,6 +55,8 @@ describe("future capture time cannot become healthy sensor evidence", () => {
       const capturedAt = at(600_000);
       const row: SensorReadingRow = {
         id: "reading-a",
+        notes: null,
+        unit_unconfirmed: false,
         user_id: "owner-a",
         tent_id: "tent-a",
         source,

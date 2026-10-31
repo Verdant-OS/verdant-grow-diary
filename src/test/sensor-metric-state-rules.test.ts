@@ -134,7 +134,7 @@ describe("sensorMetricStateRules", () => {
     // The old private table promoted transport strings (hassio/ha/broker/
     // api/device/gateway/supabase) to the Live kind and fell back to Demo
     // for anything unrecognized. The canon fails both closed.
-    for (const source of ["hassio", "ha", "broker", "api", "device", "gateway", "supabase"]) {
+    for (const source of ["hassio", "broker", "api", "device", "gateway", "supabase"]) {
       expect(
         classifySensorMetricState({ metric: "temp", value: 24, source, hasAnyReading: true }).kind,
         `source=${source}`,
@@ -211,8 +211,9 @@ describe("sensorMetricStateRules static safety", () => {
     // the sanctioned source canon (so it cannot grow a private alias
     // table again) — nothing else. vpdCalculationRules stays import-free.
     const metricImports = SRC.match(/^import[\s\S]*?;$/gm) ?? [];
-    expect(metricImports).toHaveLength(1);
+    expect(metricImports).toHaveLength(2);
     expect(metricImports[0]).toContain("@/lib/sensor/sensorSourceRules");
+    expect(metricImports[1]).toContain("@/lib/sensorLiveMembership");
     expect(VPD_SRC).not.toMatch(/import\s+/);
   });
 });

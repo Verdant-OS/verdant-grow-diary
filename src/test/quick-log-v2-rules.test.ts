@@ -127,24 +127,32 @@ describe("quickLogV2Rules — archived/merged plant target hardening", () => {
   ];
 
   it("excludes plants soft-archived via archived_at even when is_archived is unset", () => {
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, [
+      "g1",
+    ]);
     expect(opts.find((o) => o.id === "p2")).toBeUndefined();
   });
 
   it("excludes merged plants (merged_into_plant_id set, is_archived false)", () => {
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, [
+      "g1",
+    ]);
     expect(opts.find((o) => o.id === "p3")).toBeUndefined();
   });
 
   it("still offers the active plant and its tent", () => {
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, [
+      "g1",
+    ]);
     expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual(["plant:p1", "tent:t1"]);
   });
 
   it("resolver cannot resolve a merged plant selection (no stale-key escape)", () => {
     // Even if a stale UI selection key for a merged plant survives in form
     // state, resolution must fail closed rather than write against it.
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, [
+      "g1",
+    ]);
     const r = resolveQuickLogV2Target(opts, "plant:p3");
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("selection_not_found");
@@ -164,10 +172,7 @@ describe("quickLogV2Rules — exclude unlinked / dangling grow targets", () => {
       { id: "loose", name: "Loose Plant", tent_id: "orphan-flower", grow_id: null },
     ];
     const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, visibleMcdonalds);
-    expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual([
-      "plant:m1",
-      "tent:flower-tent",
-    ]);
+    expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual(["plant:m1", "tent:flower-tent"]);
     expect(opts.find((o) => o.id === "orphan-flower")).toBeUndefined();
     expect(opts.find((o) => o.id === "loose")).toBeUndefined();
   });
@@ -198,10 +203,7 @@ describe("quickLogV2Rules — exclude unlinked / dangling grow targets", () => {
       { id: "ghost", name: "Ghost Plant", tent_id: "orphan-flower", grow_id: "dangling-grow-uuid" },
     ];
     const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, visibleMcdonalds);
-    expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual([
-      "plant:m1",
-      "tent:flower-tent",
-    ]);
+    expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual(["plant:m1", "tent:flower-tent"]);
     expect(opts.find((o) => o.id === "orphan-flower")).toBeUndefined();
     expect(opts.find((o) => o.id === "seedling")).toBeUndefined();
     expect(opts.find((o) => o.id === "e2e-junk")).toBeUndefined();
@@ -384,7 +386,7 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
         selectedKey: null,
         recentPlantId: "c1",
       }),
-    ).toBeNull();
+    ).toBe("tent:veg-b");
   });
 
   it("keeps the filter threshold at 8 options", () => {

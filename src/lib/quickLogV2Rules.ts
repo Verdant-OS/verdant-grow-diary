@@ -314,28 +314,58 @@ export interface ResolveTentScopedQuickLogPlantSelectionInput {
 }
 
 /**
+ * A tent id is selectable only when Target Select already admitted that tent.
+ * Archived and invalid tents are absent from that list, so they stay unselected.
+ */
+export function resolveSelectableTentId(
+  tentId: string | null | undefined,
+  options: readonly QuickLogV2TargetOption[] | null | undefined,
+): string | null {
+  if (typeof tentId !== "string") return null;
+  const normalized = tentId.trim();
+  if (normalized.length === 0) return null;
+  const list = options ?? [];
+  return list.some((option) => option?.type === "tent" && option.id === normalized)
+    ? normalized
+    : null;
+}
+
+function selectableTentTargetKey(
+  tentId: string,
+  options: readonly QuickLogV2TargetOption[] | null | undefined,
+): string | null {
+  const selectable = resolveSelectableTentId(tentId, options);
+  return selectable ? `tent:${selectable}` : null;
+}
+
+/**
  * When tent context is active and selectedKey is still empty/unset:
  * 1) prefer a recent plant that belongs to the tent
  * 2) else auto-select when exactly one plant is in that tent
+ * 3) else default to the selected tent itself when that tent is selectable
  *
  * Fence: never rewrite an explicit `tent:<id>` (or plant:/any non-empty key).
  * Tent open intent may still supply tentContextId via defaultTargetKey while
- * the draft target stays a tent the grower (or test) chose.
+ * the draft target stays a tent the grower (or test) chose. A missing,
+ * archived, or otherwise invalid tent does not become a target.
  */
 export function resolveTentScopedQuickLogPlantSelection(
   input: ResolveTentScopedQuickLogPlantSelectionInput,
 ): string | null {
-  const tentId = typeof input.tentId === "string" && input.tentId.length > 0 ? input.tentId : null;
+  const tentId =
+    typeof input.tentId === "string" && input.tentId.trim().length > 0 ? input.tentId.trim() : null;
   if (!tentId) return null;
 
   const selected = typeof input.selectedKey === "string" ? input.selectedKey.trim() : "";
   // Explicit tent/plant (or any other) selection must not be rewritten.
   if (selected.length > 0) return null;
 
-  const plantsInTent = input.options.filter(
-    (option) => option.type === "plant" && option.tentId === tentId,
+  const options = input.options ?? [];
+  const plantsInTent = options.filter(
+    (option) => option?.type === "plant" && option.tentId === tentId,
   );
-  if (plantsInTent.length === 0) return null;
+  const tentKey = selectableTentTargetKey(tentId, options);
+  if (plantsInTent.length === 0) return tentKey;
 
   const recentPlantId =
     typeof input.recentPlantId === "string" && input.recentPlantId.length > 0
@@ -349,5 +379,5 @@ export function resolveTentScopedQuickLogPlantSelection(
     return `plant:${plantsInTent[0].id}`;
   }
 
-  return null;
+  return tentKey;
 }

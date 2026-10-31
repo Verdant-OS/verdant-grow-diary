@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
-import { PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
 
 const ATTEMPT_IDS = [
   "11111111-1111-4111-8111-111111111111",
@@ -96,6 +95,7 @@ function renderPage() {
 
 describe("Start your room Enter submits", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     testState.grows = [];
     testState.tents = [];
     testState.capabilities = FREE_CAPABILITIES;
@@ -106,13 +106,18 @@ describe("Start your room Enter submits", () => {
     });
   });
 
-  it("submits the grow once on Enter when allowed, and not when the Free gate blocks it", async () => {
+  it("submits the whole room once on Enter when allowed, and not when the Free gate blocks it", async () => {
     const user = userEvent.setup();
     const view = renderPage();
     await user.type(screen.getByTestId("start-room-grow-name"), "Enter Grow");
+    await user.type(screen.getByTestId("start-room-plant-name"), "Enter Plant");
     await user.keyboard("{Enter}");
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    expect(testState.insert).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    expect(testState.insert.mock.calls.map(([table]) => table)).toEqual([
+      "grows",
+      "tents",
+      "plants",
+    ]);
     expect(testState.insert).toHaveBeenCalledWith(
       "grows",
       expect.objectContaining({ name: "Enter Grow" }),
@@ -122,65 +127,42 @@ describe("Start your room Enter submits", () => {
     testState.grows = [{ id: "grow-existing", name: "Existing" }];
     testState.insert.mockClear();
     renderPage();
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(await screen.findByTestId("start-your-room-step-room")).toBeInTheDocument();
     expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Existing");
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
     await user.type(screen.getByTestId("start-room-tent-name"), "Bound Tent");
+    await user.type(screen.getByTestId("start-room-plant-name"), "Bound Plant");
     await user.keyboard("{Enter}");
     expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
     expect(testState.insert).toHaveBeenCalledWith(
       "tents",
       expect.objectContaining({ name: "Bound Tent", grow_id: "grow-existing" }),
     );
-    expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
   });
 
-  it("submits the tent once on Enter when allowed, and not when the tent gate blocks it", async () => {
+  it("does not insert on Enter when the tent gate blocks the room", async () => {
     const user = userEvent.setup();
-    testState.capabilities = PLAN_CATALOG.pro_monthly;
-    const view = renderPage();
-    await user.type(screen.getByTestId("start-room-grow-name"), "Paid Grow");
-    await user.keyboard("{Enter}");
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    testState.insert.mockClear();
-    await user.type(screen.getByTestId("start-room-tent-name"), "Enter Tent");
-    await user.keyboard("{Enter}");
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
-    expect(testState.insert).toHaveBeenCalledTimes(1);
-    expect(testState.insert).toHaveBeenCalledWith(
-      "tents",
-      expect.objectContaining({ name: "Enter Tent" }),
-    );
-
-    view.unmount();
-    testState.capabilities = FREE_CAPABILITIES;
-    testState.grows = [];
     testState.tents = [{ id: "tent-existing", name: "Existing tent" }];
-    testState.insert.mockClear();
     renderPage();
     await user.type(screen.getByTestId("start-room-grow-name"), "Needs a tent");
+    await user.type(screen.getByTestId("start-room-plant-name"), "Blocked Plant");
     await user.keyboard("{Enter}");
     expect(testState.insert).not.toHaveBeenCalled();
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
   });
 
-  it("submits the plant once on Enter when allowed, and not when the plant name is empty", async () => {
+  it("does not submit on Enter while the plant name is empty", async () => {
     const user = userEvent.setup();
     renderPage();
     await user.type(screen.getByTestId("start-room-grow-name"), "Grow");
     await user.keyboard("{Enter}");
-    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
-    await user.type(screen.getByTestId("start-room-tent-name"), "Tent");
-    await user.keyboard("{Enter}");
-    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
-    testState.insert.mockClear();
-    await user.keyboard("{Enter}");
     expect(testState.insert).not.toHaveBeenCalled();
-    expect(screen.getByTestId("start-room-plant-submit")).toBeDisabled();
+    expect(screen.getByTestId("start-room-submit")).toBeDisabled();
 
     await user.type(screen.getByTestId("start-room-plant-name"), "Enter Plant");
     await user.keyboard("{Enter}");
     expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
-    expect(testState.insert).toHaveBeenCalledTimes(1);
+    expect(testState.insert).toHaveBeenCalledTimes(3);
     expect(testState.insert).toHaveBeenCalledWith(
       "plants",
       expect.objectContaining({ name: "Enter Plant" }),

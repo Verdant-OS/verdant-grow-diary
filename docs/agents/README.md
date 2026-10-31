@@ -1,22 +1,25 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-31.1**
 
-Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
-publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. **Codex** is an equal independent
-exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
-Claude may add peer observations but is not the acceptance reviewer.
-Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
-**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
-PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
-tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
-billing, `.github` workflows, security or auth, and dependency or lockfile changes
-still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
-Mass, or Durban Poison.
-Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
-Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
+Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
+**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
+Exclude every author and repairer even after a task transfer. A shared GitHub identity
+alone does not establish independence: record session, role, contributor exclusions,
+full 40-character head SHA, complete scope, evidence and verdict.
+The Merge Steward's gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
+protected or mixed scopes still need an eligible outside reviewer. Required CI and
+supplemental evidence, protected-file gates, holds, merge queue and founder-only
+production controls remain. Builder and Fixer seats use normal pushes only: no force-push, merge,
+Publish, SQL apply or production Supabase writes. Drafts remain draft.
+The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
+Check the existing request and receipt before pinging; keep one current review request
+per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
+state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record
+BLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence
+are not PASS. Preserve a still-valid independent review without a duplicate request.
 
 Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
 E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
@@ -45,7 +48,7 @@ ROOT — auto-loaded by the platforms
   .grok/rules/verdant-grok-role.md   Grok's automatic role rules
 
 ROLE DOCUMENTS
-  docs/agents/roles/{grok,claude,codex,security,gemini,council-chair}.md
+  docs/agents/roles/{grok,claude,codex,gemini,canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad,harvest}.md
 
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
@@ -53,6 +56,7 @@ OPERATING STATE
   docs/agents/HANDOFF_PROTOCOL.md  handoff format and rules
   docs/agents/cheek-approval-workflow.md  Cheek ship-authority decision workflow
   docs/agents/merge-queue.md       deploy-branch merge queue + snapshot script
+  docs/agents/constitution/roster.md  seat-to-holder map; wins on who holds a seat
 
 HISTORICAL — never active instructions
   docs/archive/legacy/verdant-master-prompt-legacy.md
@@ -60,21 +64,20 @@ HISTORICAL — never active instructions
 
 ## Which files each agent loads
 
-| Agent         | Auto-loads                                | Must also read                                                                      |
-| ------------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
-| Codex         | `AGENTS.md`                               | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                  |
-| Claude        | `CLAUDE.md` (imports constitution + role) | `CURRENT_STATE.md`, `HANDOFF_LOG.md` — read before `SENTINEL_ACK`                   |
-| Grok          | `AGENTS.md`, `.grok/rules/*`              | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                   |
-| Gemini        | `GEMINI.md`                               | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                 |
-| Security      | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, `roles/security.md`      |
-| Council Chair | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, `roles/council-chair.md` |
+| Agent                    | Auto-loads                                  | Must also read                                                                                                                                         |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Codex                    | `AGENTS.md`                                 | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                     |
+| Claude                   | `CLAUDE.md` (imports constitution + role)   | `CURRENT_STATE.md`, `HANDOFF_LOG.md` — read before `SENTINEL_ACK`                                                                                      |
+| Grok                     | `AGENTS.md`, `.grok/rules/*`                | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                      |
+| Gemini                   | `GEMINI.md`                                 | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                    |
+| Additional role profiles | Platform-specific bootstrap, when available | `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, and the assigned `roles/{canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad,harvest}.md` |
 
 Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records
 `open_handoffs_checked`. After acknowledgment, keep an explicit assignment. If
 unassigned, select the highest-priority open block as `AGENTS.md` defines it (a pushed
 branch and a PR, with no effective claim or a last activity older than 24 hours); do not take a fresh claim or bypass a named lock.
-Security and Council Chair have no repository access, so they never select or resume a
-block; they act only on an explicit assignment.
+Security and Council Chair are retired. Historical receipts stay as history.
+The additional role profiles listed above use the same four-file startup gate.
 
 Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
 (Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,
@@ -86,14 +89,11 @@ task holder. See `docs/agents/roles/grok.md` and
 
 Verify Grok's discovery with `grok inspect`.
 
-**Security and Council Chair run as web-chat agents with no repository access.** A file in
-GitHub does not reach a disconnected chat session. Those two need the role prompt pasted
-into their persistent project instructions, or the files attached as project knowledge.
-Assuming otherwise is how an agent operates with no constitution at all.
+Security and Council Chair are retired; do not route new work to those roles.
 
 ## Why the constitution is not the whole prompt pack
 
-`AGENTS.md` deliberately does not contain all six role prompts. Every agent reads it, and
+`AGENTS.md` deliberately does not contain all twelve role prompts. Every agent reads it, and
 an agent that reads everyone else's role tends to blur responsibilities and absorb work
 that was not assigned. Roles stay in separate files for that reason.
 
@@ -120,3 +120,29 @@ node scripts/check-sentinel-version-parity.mjs <base-commit>
 The CI workflow supplies the pull-request base or exact pre-push commit automatically.
 The legacy archive is historical evidence only; its header makes clear that it must not
 be loaded as active agent context.
+
+## Historical routing
+
+The paragraph below is the prior index text, kept word for word. It does not assign a current seat.
+
+Independent acceptance routing: select an **actually available, eligible independent
+reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
+**Blue Dream and Critical Mass are retired from future routing**; preserve historical
+receipts. **Codex** remains eligible on work Codex neither authored nor repaired.
+A **non-contributing Claude or Grok review session** may give independent acceptance,
+including for Codex-authored work; **Durban Poison** remains eligible when available.
+Exclude every author and repairer even after a task transfer. A shared GitHub identity
+alone does not establish independence: record session, role, contributor exclusions,
+full 40-character head SHA, complete scope, evidence and verdict.
+Chemdawg's existing merge gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
+protected or mixed scopes still need an eligible outside reviewer. Required CI and
+supplemental evidence, protected-file gates, holds, merge queue and founder-only
+production controls remain. Codex uses normal pushes only: no force-push, merge,
+Publish, SQL apply or production Supabase writes. Drafts remain draft.
+Check the existing request and receipt before pinging; keep one current review request
+per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
+state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record
+BLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence
+are not PASS. Preserve a still-valid independent review without a duplicate request.

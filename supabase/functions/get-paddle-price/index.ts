@@ -12,6 +12,10 @@ import {
   PAID_PLAN_IDS,
 } from "../_shared/lib/lib/paidPlanAllowlist.ts";
 import { creditPackPurchaseEligible } from "../_shared/lib/lib/creditPackEligibility.ts";
+import {
+  GET_PADDLE_PRICE_PLAN_IDS,
+  readGetPaddlePriceCatalog,
+} from "../_shared/getPaddlePriceCatalogEnv.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
@@ -47,21 +51,16 @@ import { creditPackPurchaseEligible } from "../_shared/lib/lib/creditPackEligibi
  * below throws if a plan id is added to the shared allowlist without a
  * corresponding env-var wiring here.
  */
-const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
-  pro_monthly: Deno.env.get("PADDLE_PRICE_PRO_MONTHLY") ?? "",
-  pro_annual: Deno.env.get("PADDLE_PRICE_PRO_ANNUAL") ?? "",
-  craft_monthly: Deno.env.get("PADDLE_PRICE_CRAFT_MONTHLY") ?? "",
-  craft_annual: Deno.env.get("PADDLE_PRICE_CRAFT_ANNUAL") ?? "",
-  founder_lifetime: Deno.env.get("PADDLE_PRICE_FOUNDER_LIFETIME") ?? "",
-  credit_pack_50: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_50") ?? "",
-  credit_pack_150: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_150") ?? "",
-};
+const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = readGetPaddlePriceCatalog((name) =>
+  Deno.env.get(name),
+);
 
 // Cold-start drift guard: fail loudly if PAID_PLAN_IDS gains an entry that
 // SERVER_PRICE_CONFIG doesn't wire an env var for. Silent absence here would
 // otherwise fail-closed only after a checkout attempt.
+const wiredPlanIds: ReadonlySet<string> = new Set(GET_PADDLE_PRICE_PLAN_IDS);
 for (const id of PAID_PLAN_IDS) {
-  if (!(id in SERVER_PRICE_CONFIG)) {
+  if (!(id in SERVER_PRICE_CONFIG) || !wiredPlanIds.has(id)) {
     throw new Error(`SERVER_PRICE_CONFIG missing env wiring for plan id: ${id}`);
   }
 }
@@ -99,9 +98,9 @@ function logCatalogUnavailable(fields: {
     | "auth"
     | "method"
     | "allowlist"
+    | "plan_retired"
     | "entitlement"
     | "environment"
-    | "founder_cap"
     | "gateway"
     | "gateway_body"
     | "config_drift"
@@ -175,6 +174,17 @@ Deno.serve(async (req) => {
       return json(400, { error: "unknown_plan" });
     }
 
+    // 2.0 Founder Lifetime is no longer sold (#2028). Refuse it here, before
+    //     the slot lookup or any Paddle call, so a direct call to this
+    //     function cannot open a Founder checkout. Existing Founder rows are
+    //     still honoured by the webhook and entitlement resolution.
+    if (requested === "founder_lifetime") {
+      // Telemetry keeps the sanitized reason enum; the stage separates a
+      // Founder probe from a junk plan id at the allowlist above.
+      logCatalogUnavailable({ plan: requested, reason: "unknown_plan", stage: "plan_retired" });
+      return json(410, { error: "plan_retired" });
+    }
+
     // 2a. Credit packs are merchandised as paid-plan top-ups. Already-owned
     //     grant balance remains portable in the authoritative spend function,
     //     but starting a NEW checkout still requires a verified paid plan.
@@ -215,37 +225,6 @@ Deno.serve(async (req) => {
           stage: "entitlement",
         });
         return json(403, { error: "pack_requires_monthly_plan" });
-      }
-    }
-
-    // 2b. Founder Lifetime is a capped one-time plan (75 slots). Block a
-    //     sold-out checkout HERE, before a price is ever returned, so a user
-    //     is never charged for a slot allocate_founder_lifetime would then
-    //     refuse to entitle. The RPC exposes only an aggregate remaining count
-    //     (no rows, no PII) and runs as the verified caller. It is the
-    //     pre-payment guard; the allocation RPC's advisory-locked cap check
-    //     stays the authoritative backstop for the tiny residual race between
-    //     this read and settlement (operator refund case, per the runbook).
-    if (requested === "founder_lifetime") {
-      const { data: remaining, error: capError } = await supabase.rpc(
-        "founder_lifetime_slots_remaining",
-      );
-      if (capError) {
-        logCatalogUnavailable({
-          plan: requested,
-          reason: "price_resolution_unavailable",
-          stage: "founder_cap",
-        });
-        // Fail closed: if availability cannot be proven, no founder checkout.
-        return json(503, { error: "price_resolution_unavailable" });
-      }
-      if (typeof remaining !== "number" || remaining <= 0) {
-        logCatalogUnavailable({
-          plan: requested,
-          reason: "plan_sold_out",
-          stage: "founder_cap",
-        });
-        return json(409, { error: "plan_sold_out" });
       }
     }
 

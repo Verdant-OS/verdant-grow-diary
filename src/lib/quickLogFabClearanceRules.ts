@@ -58,3 +58,83 @@ export const QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS =
  * shell's legal footer.
  */
 export const QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS = "pb-24 md:pb-6";
+
+/** `right-4` on the mobile shell FAB. */
+export const MOBILE_QUICK_LOG_FAB_RIGHT_REM = 1;
+
+/** `px-3` on `#main-content` below `sm`. */
+export const SHELL_MAIN_PADDING_X_REM = 0.75;
+
+/** `sm:px-5` on `#main-content` from `sm` until `md`. */
+export const SHELL_MAIN_PADDING_X_SM_REM = 1.25;
+
+/**
+ * Extra inline-end padding (rem) for the Timeline filter row only, so the
+ * "All plants" control clears the FAB. `mainPaddingRem` is the shell's
+ * horizontal padding already applied outside the row (`px-3` or `sm:px-5`).
+ */
+export function mobileQuickLogSideClearanceRem(mainPaddingRem: number): number {
+  return (
+    MOBILE_QUICK_LOG_FAB_RIGHT_REM +
+    MOBILE_QUICK_LOG_FAB_HEIGHT_REM +
+    QUICK_LOG_FAB_CONTENT_GAP_REM -
+    mainPaddingRem
+  );
+}
+
+/**
+ * Timeline filter row only. Not used on the shell page body.
+ * Literal Tailwind classes — do not build these with a template. Tailwind v4
+ * scans source text (`@source "../src"`) and skips dynamically constructed names.
+ */
+export const QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS = "pr-[4.75rem] sm:pr-[4.25rem] md:pr-0";
+
+/**
+ * Bottom edge of a toast while the signed-in shell's bottom nav and FAB are
+ * on screen: the same 9.5rem stack as `mobileQuickLogContentClearanceRem`
+ * (FAB bottom + height + gap) plus the safe-area inset. Above the FAB, so a
+ * toast does not cover Quick Log.
+ */
+/**
+ * Raw CSS length, written into a `<style>` tag by `AppShell`. This is not a
+ * Tailwind class, so the scanner does not need to see it.
+ */
+export const MOBILE_SHELL_TOAST_BOTTOM_OFFSET = "calc(9.5rem + env(safe-area-inset-bottom))";
+
+export function mobileShellToastBottomOffset(): string {
+  return MOBILE_SHELL_TOAST_BOTTOM_OFFSET;
+}
+
+/**
+ * Document-level CSS injected only while `AppShell` (bottom nav) is mounted.
+ * The media queries keep `md+` and, by absence of the tag, public routes on
+ * the library default toast position.
+ */
+export function mobileShellToastOffsetCss(): string {
+  const offset = MOBILE_SHELL_TOAST_BOTTOM_OFFSET;
+  return [
+    "@media (max-width: 767px) {",
+    "  [data-sonner-toaster] {",
+    `    --offset-bottom: ${offset} !important;`,
+    `    --mobile-offset-bottom: ${offset} !important;`,
+    "  }",
+    "}",
+    "@media (min-width: 640px) and (max-width: 767px) {",
+    "  [data-verdant-toast-viewport] {",
+    "    top: auto !important;",
+    `    bottom: ${offset} !important;`,
+    "  }",
+    "}",
+  ].join("\n");
+}
+
+/** Right edge of the Timeline filter content, in CSS pixels, for a viewport width. */
+export function timelineFilterRightPx(viewportPx: number, mainPaddingRem: number): number {
+  const extra = mobileQuickLogSideClearanceRem(mainPaddingRem);
+  return viewportPx - (mainPaddingRem + extra) * 16;
+}
+
+/** Left edge of the mobile FAB, in CSS pixels. */
+export function mobileFabLeftPx(viewportPx: number): number {
+  return viewportPx - (MOBILE_QUICK_LOG_FAB_RIGHT_REM + MOBILE_QUICK_LOG_FAB_HEIGHT_REM) * 16;
+}

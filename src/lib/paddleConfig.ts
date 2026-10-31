@@ -44,7 +44,7 @@ export interface PaddleConfig {
   environment: string | null;
   reason?: PaddleConfigUnavailableReason;
   clientToken?: string;
-  priceIds?: Record<PaddlePlanSlug, string>;
+  priceIds?: Partial<Record<PaddlePlanSlug, string>>;
 }
 
 interface PaddleEnvSource {
@@ -85,7 +85,9 @@ export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv(
 
   const clientToken = (source.VITE_PADDLE_CLIENT_TOKEN ?? "").trim();
   const tokenClass = classifyPaddleToken(clientToken);
-  if (tokenClass === "live") {
+  // The legacy BYO lane refuses every `live_` value, well-formed or not, so
+  // check the prefix here rather than the shape-checked live class.
+  if (tokenClass === "live" || clientToken.startsWith("live_")) {
     return { available: false, reason: "live_not_allowed", environment: env };
   }
   if (tokenClass !== "sandbox") {
@@ -96,7 +98,7 @@ export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv(
   const proAnnual = (source.VITE_PADDLE_PRICE_PRO_ANNUAL ?? "").trim();
   const founderLifetime = (source.VITE_PADDLE_PRICE_FOUNDER_LIFETIME ?? "").trim();
 
-  if (!proMonthly || !proAnnual || !founderLifetime) {
+  if (!proMonthly || !proAnnual) {
     return { available: false, reason: "missing_price_id", environment: env };
   }
 
@@ -107,7 +109,7 @@ export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv(
     priceIds: {
       "pro-monthly": proMonthly,
       "pro-annual": proAnnual,
-      "founder-lifetime": founderLifetime,
+      ...(founderLifetime ? { "founder-lifetime": founderLifetime } : {}),
     },
   };
 }

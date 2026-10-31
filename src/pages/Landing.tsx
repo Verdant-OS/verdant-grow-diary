@@ -44,7 +44,7 @@ import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
  * presenter only.
  */
 export interface LandingProps {
-  canonicalPath?: "/" | "/welcome";
+  canonicalPath?: "/";
   /**
    * Defers the automatic acquisition page-view until an auth-gated caller has
    * conclusively resolved to signed out. Direct public routes track by default.
@@ -52,10 +52,7 @@ export interface LandingProps {
   trackPageView?: boolean;
 }
 
-export default function Landing({
-  canonicalPath = "/welcome",
-  trackPageView = true,
-}: LandingProps) {
+export default function Landing({ canonicalPath = "/", trackPageView = true }: LandingProps) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const acquisitionSource = resolvePaidAcquisitionSource(searchParams) ?? "landing_page";
@@ -412,6 +409,13 @@ export default function Landing({
           <p className="mt-4 text-sm text-muted-foreground">
             Verdant Grow Diary is currently in early build. Join the beta list or reach out about
             read-only hardware integrations. Grower stays in control. No blind automation.
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Serious grower, breeder, or grower-educator? The{" "}
+            <Link to="/creator-beta" className="font-medium text-primary hover:underline">
+              Creator and breeder beta
+            </Link>{" "}
+            is a controlled beta with a written demo walkthrough.
           </p>
         </div>
         <LeadCaptureForm />

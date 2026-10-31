@@ -17,6 +17,14 @@ import {
   type CsvFixture as LocalFixture,
 } from "./lib/nativeCsvFixtures";
 
+test.beforeEach(async ({ context }) => {
+  // These import/readback scenarios assert canonical Celsius values. Set only
+  // the display preference before each document loads; auth remains real.
+  await context.addInitScript(() => {
+    window.localStorage.setItem("verdant:temperatureUnit", "celsius");
+  });
+});
+
 // Actual browser import + PostgREST + disposable PostgreSQL. No mocked save,
 // injected session, hosted backend, or published-site acceptance claim.
 function recentCsv(agesInMinutes: readonly [number, number] = [2, 1]) {
@@ -340,7 +348,7 @@ async function assertHistory(page: Page, csv: Csv) {
       const row = table
         .locator("tbody tr")
         .filter({ hasText: shownAt })
-        .filter({ hasText: metric });
+        .filter({ hasText: metric === "temperature_c" ? "Temperature (°C)" : metric });
       await expect(row).toHaveCount(1);
       await expect(row.locator("td").nth(2)).toHaveText(
         `${observation[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,
@@ -758,7 +766,7 @@ test("a multi-batch CSV import reconciles a lost final reply beyond the read cap
           .getByTestId("imported-history-recent-rows")
           .locator("tbody tr")
           .filter({ hasText: shownAt })
-          .filter({ hasText: metric });
+          .filter({ hasText: metric === "temperature_c" ? "Temperature (°C)" : metric });
         await expect(row).toHaveCount(1);
         await expect(row.locator("td").nth(2)).toHaveText(
           `${latest[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,

@@ -9,19 +9,24 @@
  *    cannot mint a portal for anyone else's subscription.
  *  - Selects the caller's most recent recurring subscription (skips
  *    lifetime_ rows — Paddle has no portal surface for one-off purchases).
- *  - Env is derived from the subscription row's `environment` column, not
- *    from client input.
+ *  - Env is resolved from explicit server configuration; the subscription
+ *    and any present customer mirror must match it. Client input is ignored.
  *  - Returns { url } only; never the customer id, subscription id, or
  *    portal session id itself.
  */
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getPaddleClient, type PaddleEnv } from "../_shared/paddle.ts";
+import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
   });
 }
 
@@ -35,8 +40,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    if (!supabaseUrl || !anonKey) {
       return json(503, { error: "unavailable" });
     }
 
@@ -48,19 +52,26 @@ Deno.serve(async (req) => {
     if (userError || !userData?.user) return json(401, { error: "auth_required" });
     const uid = userData.user.id;
 
+    const resolution = resolveRequiredServerBillingEnvironment();
+    if (!resolution.ok) return json(503, { error: "unavailable" });
+    const environment = resolution.environment;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceRoleKey) return json(503, { error: "unavailable" });
+
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     });
 
-    // Newest recurring subscription for this user (skip lifetime — no portal
-    // surface for one-off purchases). Return the environment column verbatim
-    // so we route to the matching sandbox/live gateway credentials.
+    // Resolve ownership and environment server-side. Canceled rows still
+    // provide invoice history; status does not decide portal eligibility.
     const { data: rows, error: subError } = await admin
       .from("subscriptions")
       .select("paddle_subscription_id, paddle_customer_id, environment, status")
       .eq("user_id", uid)
+      .eq("environment", environment)
       .not("paddle_subscription_id", "like", "lifetime_%")
       .order("created_at", { ascending: false })
+      .order("paddle_subscription_id", { ascending: false })
       .limit(1);
     if (subError) return json(503, { error: "unavailable" });
     const sub = (rows ?? [])[0] as
@@ -77,34 +88,72 @@ Deno.serve(async (req) => {
       // instead of a misleading generic error. Lifetime rows are
       // recognised by the `lifetime_%` pseudo-subscription id shape
       // written by the webhook's record_lifetime path.
-      const { data: lifetimeRows } = await admin
+      const { data: lifetimeRows, error: lifetimeError } = await admin
         .from("subscriptions")
         .select("paddle_subscription_id")
         .eq("user_id", uid)
+        .eq("environment", environment)
         .like("paddle_subscription_id", "lifetime_%")
         .limit(1);
+      if (lifetimeError) return json(503, { error: "unavailable" });
       if ((lifetimeRows ?? []).length > 0) {
         return json(404, { error: "lifetime_only" });
       }
       return json(404, { error: "no_subscription" });
     }
 
-    const paddle = getPaddleClient(sub.environment);
+    if (
+      sub.environment !== environment ||
+      typeof sub.paddle_customer_id !== "string" ||
+      !sub.paddle_customer_id.trim() ||
+      typeof sub.paddle_subscription_id !== "string" ||
+      !sub.paddle_subscription_id.trim()
+    ) {
+      return json(503, { error: "unavailable" });
+    }
+
+    // Customer events arrive independently of subscription events, so a valid
+    // owned subscription can predate its customer mirror. The mirror has no
+    // app user_id: ownership comes from the subscription above. Look up by
+    // customer ID alone so an existing conflicting environment is not hidden
+    // as an absent row. A lookup failure is not evidence of absence.
+    const { data: customer, error: customerError } = await admin
+      .from("paddle_customers")
+      .select("paddle_customer_id, environment")
+      .eq("paddle_customer_id", sub.paddle_customer_id)
+      .maybeSingle();
+    if (customerError) {
+      console.error("portal_customer_mirror_lookup_failed");
+      return json(503, { error: "unavailable" });
+    }
+    if (
+      customer &&
+      (customer.paddle_customer_id !== sub.paddle_customer_id ||
+        customer.environment !== environment)
+    ) {
+      console.error("portal_customer_mirror_mismatch");
+      return json(503, { error: "unavailable" });
+    }
+    if (!customer) console.warn("portal_customer_mirror_missing");
+
+    const paddle = getPaddleClient(environment);
     let portal: { urls?: { general?: { overview?: string } } };
     try {
       portal = (await paddle.customerPortalSessions.create(sub.paddle_customer_id, [
         sub.paddle_subscription_id,
       ])) as { urls?: { general?: { overview?: string } } };
-    } catch (e) {
-      console.error("portal_create_failed", String(e));
+    } catch {
+      console.error("portal_create_failed");
       return json(502, { error: "portal_create_failed" });
     }
     const url = portal.urls?.general?.overview;
-    if (!url) return json(502, { error: "portal_create_failed" });
+    if (typeof url !== "string" || !url.trim()) {
+      return json(502, { error: "portal_create_failed" });
+    }
 
     return json(200, { url });
-  } catch (e) {
-    console.error("paddle-portal-session error", String(e));
+  } catch {
+    console.error("paddle-portal-session error");
     return json(503, { error: "unavailable" });
   }
 });

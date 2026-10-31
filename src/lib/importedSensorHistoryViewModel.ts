@@ -24,6 +24,11 @@ import {
   VWC_RANGE,
 } from "@/constants/csvValidationRanges";
 import { VPD_REALISTIC_RANGE } from "@/lib/manualSensorSnapshotQualityRules";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export const IMPORTED_SENSOR_HISTORY_SOURCE = "csv" as const;
 export const IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT = 25;
@@ -71,6 +76,8 @@ export interface ImportedSensorHistoryInputRow {
 export interface ImportedSensorHistoryDisplayRow {
   capturedAt: string;
   metric: string;
+  /** User-facing label; the canonical metric remains the stable filter key. */
+  metricLabel: string;
   value: number | null;
   /** Display-only rounded value; `value` retains the stored precision. Units are known CSV keys only. */
   displayValue: string;
@@ -124,12 +131,28 @@ function normalizeSelected(
   return selected;
 }
 
-function formatImportedValue(metric: string, value: number | null): string {
+function formatMetricLabel(metric: string, temperatureUnit: TemperatureUnitPreference): string {
+  if (metric === "temperature_c")
+    return `Temperature (${getTemperatureUnitSymbol(temperatureUnit)})`;
+  if (metric === "soil_temp_c")
+    return `Soil temperature (${getTemperatureUnitSymbol(temperatureUnit)})`;
+  return metric;
+}
+
+function formatImportedValue(
+  metric: string,
+  value: number | null,
+  temperatureUnit: TemperatureUnitPreference,
+): string {
   if (value === null) return "—";
   switch (metric) {
     case "temperature_c":
-    case "soil_temp_c":
-      return `${Number(value.toFixed(1))} °C`;
+    case "soil_temp_c": {
+      const displayed = convertCelsiusForDisplay(value, temperatureUnit);
+      return displayed === null
+        ? "—"
+        : `${Number(displayed.toFixed(1))} ${getTemperatureUnitSymbol(temperatureUnit)}`;
+    }
     case "humidity_pct":
     case "soil_moisture_pct":
       return `${Number(value.toFixed(1))}%`;
@@ -179,7 +202,10 @@ export function buildImportedSensorHistoryViewModel(args: {
   readings: ReadonlyArray<ImportedSensorHistoryInputRow>;
   limit?: number;
   selectedMetric?: ImportedSensorHistoryMetricFilter | null;
+  /** Explicit display unit. Omitted callers retain canonical Celsius; no storage reads here. */
+  temperatureUnit?: TemperatureUnitPreference;
 }): ImportedSensorHistoryViewModel {
+  const temperatureUnit = args.temperatureUnit ?? "celsius";
   const limit = Math.max(1, Math.floor(args.limit ?? IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT));
   const csvRows = (args.readings ?? []).filter((r) => r && isCsvHistoryRow(r));
 
@@ -225,7 +251,7 @@ export function buildImportedSensorHistoryViewModel(args: {
     },
     ...metrics.map((m) => ({
       id: m,
-      label: m,
+      label: formatMetricLabel(m, temperatureUnit),
       count: metricCounts.get(m) ?? 0,
     })),
   ];
@@ -253,8 +279,9 @@ export function buildImportedSensorHistoryViewModel(args: {
     recentRows.push({
       capturedAt,
       metric: r.metric,
+      metricLabel: formatMetricLabel(r.metric, temperatureUnit),
       value,
-      displayValue: formatImportedValue(r.metric, value),
+      displayValue: formatImportedValue(r.metric, value, temperatureUnit),
       outOfRangeNote: resolveOutOfRangeNote(r.metric, value),
     });
   }

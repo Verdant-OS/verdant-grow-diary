@@ -426,6 +426,31 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     },
   );
 
+  it("keeps plant A's unsaved note when a Watering is saved for plant B (Codex review)", async () => {
+    plantContextState.data.push({
+      ...plantContextState.data[0],
+      id: "77777777-7777-4777-8777-777777777777",
+      name: "Plant B",
+    });
+    const first = renderSheet("plant:33333333-3333-4333-8333-333333333333", "note");
+    fireEvent.change(screen.getByTestId("qlv2-note"), {
+      target: { value: "Plant A leaves look pale" },
+    });
+    await waitFor(() => expect(window.sessionStorage.length).toBeGreaterThan(0));
+    first.unmount();
+
+    const other = renderSheet("plant:77777777-7777-4777-8777-777777777777", "water");
+    expect(screen.getByTestId("qlv2-note")).toHaveValue("");
+    enterVolume("750");
+    clickSave();
+    expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
+    expect(wateringWriterMock).toHaveBeenCalledTimes(1);
+    other.unmount();
+
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "note");
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("Plant A leaves look pale");
+  });
+
   it("keeps A's uncertain Water private while B is active and restores it only when A returns", async () => {
     addSecondPlant();
     const committed = await installAcceptedWaterLedger();

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { Link } from "@/lib/react-router-compat";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -162,9 +163,9 @@ export default function GrowDetail() {
         {grow.notes && <p className="text-sm text-muted-foreground mt-1">{grow.notes}</p>}
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <Field label="Started" value={new Date(grow.started_at).toLocaleString()} />
-          <Field label="Created" value={new Date(grow.created_at).toLocaleString()} />
-          <Field label="Updated" value={new Date(grow.updated_at).toLocaleString()} />
+          <Field label="Started" value={formatSnapshotTimestamp(grow.started_at)} />
+          <Field label="Created" value={formatSnapshotTimestamp(grow.created_at)} />
+          <Field label="Updated" value={formatSnapshotTimestamp(grow.updated_at)} />
         </dl>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -338,7 +339,7 @@ export default function GrowDetail() {
                   </Badge>
                   <span className="text-xs truncate">{item.title}</span>
                   <span className="ml-auto text-xs text-muted-foreground">
-                    {new Date(item.ts).toLocaleString()}
+                    {formatSnapshotTimestamp(item.ts)}
                   </span>
                 </div>
                 {item.detail && (
@@ -410,7 +411,7 @@ function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
                   <span className="text-[11px] text-muted-foreground">metric: {o.metric}</span>
                 )}
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {o.recorded_at ? new Date(o.recorded_at).toLocaleString() : "—"}
+                  {o.recorded_at ? formatSnapshotTimestamp(o.recorded_at) : "—"}
                 </span>
               </div>
               {o.suggested_change && (
@@ -577,7 +578,7 @@ function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string
         </div>
         <div>
           <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">Last diary</dt>
-          <dd>{status.lastDiaryAt ? new Date(status.lastDiaryAt).toLocaleDateString() : "—"}</dd>
+          <dd>{status.lastDiaryAt ? formatSnapshotTimestamp(status.lastDiaryAt) : "—"}</dd>
         </div>
       </dl>
       <div className="flex gap-3 mt-3 text-xs">

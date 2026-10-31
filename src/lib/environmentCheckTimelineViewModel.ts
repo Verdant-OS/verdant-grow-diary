@@ -21,6 +21,8 @@ import {
   loadTemperatureUnitPreference,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import { ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS } from "@/lib/environmentCheckQuickLogRules";
+import { hasQuickLogNoteMarker, isQuickLogIssueSubtype } from "@/lib/quickLogActivityRules";
 import type { EnvironmentCheckEntryInput } from "@/lib/environmentCheckViewModel";
 import { isAirTempCRealistic, isHumidityRealistic, isVpdRealistic } from "@/lib/sensorTruthRules";
 
@@ -84,6 +86,10 @@ function asString(v: unknown): string | null {
  * envelope is authoritative only for generic note/observation rows. A real
  * typed care event such as Watering stays Watering even when it carries
  * sensor or environment context.
+ *
+ * Note and Issue both persist as observations: a marked new note resolves to
+ * "note" and an observation with details.subtype "issue" to "issue". An old
+ * unmarked note keeps its current kind.
  */
 export function resolveEffectiveQuickLogCareType(
   entry: EnvironmentCheckTimelineRawEntry | null | undefined,
@@ -108,18 +114,24 @@ export function resolveEffectiveQuickLogCareType(
     return ENV_KIND_ALIASES.has(directKind) ? "environment" : directKind;
   }
 
+  const environmentEnvelope = details?.environment_check;
+  const hasEnvironmentEnvelope =
+    !!environmentEnvelope &&
+    typeof environmentEnvelope === "object" &&
+    !Array.isArray(environmentEnvelope);
+
+  // A new note carries the note marker. Its unstamped mirror still says
+  // event_type "quick_log", so the marker is read before that wrapper type.
+  if (!hasEnvironmentEnvelope && hasQuickLogNoteMarker(details)) return "note";
+
   if (detailKind && detailKind !== "observation" && detailKind !== "note") {
     return ENV_KIND_ALIASES.has(detailKind) ? "environment" : detailKind;
   }
 
-  const environmentEnvelope = details?.environment_check;
-  if (
-    environmentEnvelope &&
-    typeof environmentEnvelope === "object" &&
-    !Array.isArray(environmentEnvelope)
-  ) {
-    return "environment";
-  }
+  if (hasEnvironmentEnvelope) return "environment";
+
+  const isObservation = directKind === "observation" || detailKind === "observation";
+  if (isObservation && isQuickLogIssueSubtype(details?.subtype)) return "issue";
 
   if (directKind) return directKind;
   if (detailKind) return detailKind;
@@ -167,6 +179,47 @@ function pickEnvelope(details: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * The readings a `details.environment_check` envelope carries, by every alias
+ * a persisted row may use (legacy Fahrenheit-only and numeric-string values
+ * included). Null for each reading that is absent or not a finite number.
+ */
+export function environmentCheckEnvelopeReadings(envelope: unknown): {
+  tempC: number | null;
+  tempF: number | null;
+  rhPercent: number | null;
+  vpdKpa: number | null;
+  co2Ppm: number | null;
+} {
+  const env =
+    envelope && typeof envelope === "object" && !Array.isArray(envelope)
+      ? (envelope as Record<string, unknown>)
+      : null;
+  return {
+    tempC: asFiniteNumber(env?.temp_c ?? env?.tempC ?? env?.air_temp_c),
+    tempF: asFiniteNumber(env?.room_temp_f ?? env?.tempF ?? env?.air_temp_f),
+    rhPercent: asFiniteNumber(
+      env?.humidity_pct ?? env?.rhPercent ?? env?.rh_percent ?? env?.humidity,
+    ),
+    vpdKpa: asFiniteNumber(env?.vpd_kpa ?? env?.vpdKpa),
+    co2Ppm: asFiniteNumber(env?.co2_ppm ?? env?.co2Ppm ?? env?.co2),
+  };
+}
+
+/**
+ * Whether an envelope carries any recorded reading: under every alias a
+ * reader accepts (above) or any key the writer persists
+ * (ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS, kept complete by typecheck).
+ */
+export function environmentCheckEnvelopeHasRecordedReading(envelope: unknown): boolean {
+  if (Object.values(environmentCheckEnvelopeReadings(envelope)).some((v) => v !== null)) {
+    return true;
+  }
+  if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) return false;
+  const env = envelope as Record<string, unknown>;
+  return ENVIRONMENT_CHECK_ENVELOPE_READING_KEYS.some((key) => asFiniteNumber(env[key]) !== null);
+}
+
+/**
  * Adapt one diary row into the canonical Environment Check rule input.
  * Measurements stay nested under `details.environment_check`; generic diary
  * fields never masquerade as live telemetry. Invalid rows return null.
@@ -183,14 +236,10 @@ export function buildEnvironmentCheckDiaryEntryInput(
     raw.details && typeof raw.details === "object" && !Array.isArray(raw.details)
       ? (raw.details as Record<string, unknown>)
       : null;
-  const envelope = pickEnvelope(details);
-  const tempC = asFiniteNumber(envelope?.temp_c ?? envelope?.tempC ?? envelope?.air_temp_c);
-  const tempF = asFiniteNumber(envelope?.room_temp_f ?? envelope?.tempF ?? envelope?.air_temp_f);
-  const normalizedTempC = tempC ?? (tempF == null ? null : fahrenheitToCelsius(tempF));
-  const rhPercent = asFiniteNumber(
-    envelope?.humidity_pct ?? envelope?.rhPercent ?? envelope?.rh_percent ?? envelope?.humidity,
+  const { tempC, tempF, rhPercent, vpdKpa } = environmentCheckEnvelopeReadings(
+    pickEnvelope(details),
   );
-  const vpdKpa = asFiniteNumber(envelope?.vpd_kpa ?? envelope?.vpdKpa);
+  const normalizedTempC = tempC ?? (tempF == null ? null : fahrenheitToCelsius(tempF));
 
   if (
     !isAirTempCRealistic(normalizedTempC) ||
@@ -225,8 +274,13 @@ function buildFields(
   // source converts exactly once, at string-build time, to match `tempUnit`
   // — never double-converted, never left in the wrong unit just because the
   // stored shape happened to be Fahrenheit-only.
-  const tempC = asFiniteNumber(envelope.temp_c ?? envelope.tempC ?? envelope.air_temp_c);
-  const tempF = asFiniteNumber(envelope.room_temp_f ?? envelope.tempF ?? envelope.air_temp_f);
+  const {
+    tempC,
+    tempF,
+    rhPercent: rh,
+    vpdKpa: vpd,
+    co2Ppm: co2,
+  } = environmentCheckEnvelopeReadings(envelope);
   if (tempC != null) {
     fields.push({
       key: "temp",
@@ -247,17 +301,14 @@ function buildFields(
     });
   }
 
-  const rh = asFiniteNumber(envelope.humidity_pct ?? envelope.rhPercent ?? envelope.rh_percent);
   if (rh != null) {
     fields.push({ key: "humidity", label: "RH", value: `${rh.toFixed(0)}%` });
   }
 
-  const vpd = asFiniteNumber(envelope.vpd_kpa ?? envelope.vpdKpa);
   if (vpd != null) {
     fields.push({ key: "vpd", label: "VPD", value: `${vpd.toFixed(2)} kPa` });
   }
 
-  const co2 = asFiniteNumber(envelope.co2_ppm ?? envelope.co2Ppm ?? envelope.co2);
   if (co2 != null) {
     fields.push({ key: "co2", label: "CO₂", value: `${Math.round(co2)} ppm` });
   }

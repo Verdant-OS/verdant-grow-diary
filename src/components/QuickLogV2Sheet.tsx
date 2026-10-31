@@ -2,6 +2,19 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
+  isQuickLogObservationDraftEmpty,
+  parseQuickLogObservationDraft,
+  QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+  quickLogObservationDraftRestoredCopy,
+  QUICK_LOG_OBSERVATION_SAVE_ERROR,
+  restorableQuickLogObservationDraft,
+} from "@/lib/quickLogObservationDraftRules";
+import {
+  clearBrowserSessionFormDraft,
+  readBrowserSessionFormDraft,
+  writeBrowserSessionFormDraft,
+} from "@/lib/sessionFormDraftStore";
+import {
   readPendingQuickLogNote,
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
@@ -135,6 +148,7 @@ import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
   FEEDING_SAVE_SUCCESS_MESSAGE,
+  assessFeedingEcFields,
   buildFeedingFormPayload,
   feedingFormReasonToHelper,
   findFeedingPayloadRangeViolation,
@@ -615,6 +629,21 @@ function QuickLogV2SheetForOwner({
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
+  const observationDraftSuppressedRef = useRef(false);
+  // True once this open restored or wrote the stored draft, so emptying the
+  // form may forget it. Opening for another target never clears its draft.
+  const observationDraftOwnedRef = useRef(false);
+  // Set when an open resets the form. The sheet stays mounted across opens, so
+  // the draft write effect in that same commit still sees the previous open's
+  // form; it must skip that one run or it rewrites (then clears) a draft that
+  // belongs to another target.
+  const observationDraftResetPendingRef = useRef(false);
+  // An open re-baselines the response target. "armed" in the open's own commit
+  // (the form is still the previous open's), "ready" in the next, which holds
+  // the reset form; retarget checks wait until then.
+  const responseBaselineResetRef = useRef<"armed" | "ready" | null>(null);
+  const observationUnconfirmedRef = useRef(false);
+  const [observationDraftRestored, setObservationDraftRestored] = useState<string | null>(null);
   // Rotates on "Log another" so a fresh save cycle can't reuse the
   // previous saved-summary state. Bumped whenever the grower starts
   // a new logical submission from the same open sheet.
@@ -987,6 +1016,11 @@ function QuickLogV2SheetForOwner({
   const waterFieldMessage = retryPending
     ? null
     : (waterSaveGate?.footerMessage ?? snapshotGate?.footerMessage ?? null);
+  // #2159: a negative feeding EC is named under its field and blocks Save
+  // while typed, not only when the save is attempted.
+  const feedingEcGate =
+    form.action === "feed" && !retryPending ? assessFeedingEcFields(feedingForm) : null;
+  const feedingFieldMessage = feedingEcGate?.footerMessage ?? null;
   const largeWaterAssessment =
     form.action === "water" && !retryPending
       ? assessLargeWaterAmount({
@@ -1063,6 +1097,7 @@ function QuickLogV2SheetForOwner({
           selectedTargetMissing,
           volumeMissing,
           waterFieldMessage,
+          feedingFieldMessage,
           largeWaterMessage: largeWaterAssessment?.needsConfirmation
             ? largeWaterAssessment.message
             : null,
@@ -1114,17 +1149,48 @@ function QuickLogV2SheetForOwner({
     if (open) {
       setRestoredMediaPending(false);
       setVisitMode("fast_check");
+      const storedDraft = observationDraftSuppressedRef.current
+        ? null
+        : readBrowserSessionFormDraft(
+            user?.id ?? "",
+            QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+            parseQuickLogObservationDraft,
+          );
+      // A draft returns for its own target, or as text only when the sheet has
+      // none; never into another plant's target.
+      const restorable = restorableQuickLogObservationDraft(storedDraft, defaultTargetKey);
+      const restoredDraft = restorable ? restorable.form : null;
+      setObservationDraftRestored(
+        restorable ? quickLogObservationDraftRestoredCopy(restorable) : null,
+      );
+      observationDraftOwnedRef.current = Boolean(restorable);
+      observationDraftResetPendingRef.current = true;
+      // A new open starts the response-target baseline over, so restoring a
+      // draft is never read as a retarget from whatever the sheet showed last.
+      responseBaselineResetRef.current = "armed";
       setForm({
-        ...EMPTY_QUICKLOG_V2_FORM,
-        selectedKey: defaultTargetKey ?? null,
-        action: defaultAction,
+        ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
+        selectedKey: restoredDraft?.selectedKey ?? defaultTargetKey ?? null,
+        action: restoredDraft?.action ?? defaultAction,
       });
       manualTempEntryUnitRef.current = null;
       // A new draft has no chip-authored marker, so the provenance record must
       // not survive from the previous one. A stale status would let the
       // cleanup strip prose this draft's grower typed.
       chipAuthoredStatusRef.current = null;
-      setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      // A restored draft keeps the unit its temperature was typed in and the
+      // chip that owns its response line, so neither can be relabelled.
+      if (restorable) {
+        manualTempEntryUnitRef.current = restorable.tempEntryUnit;
+        chipAuthoredStatusRef.current = restorable.chipStatus;
+      }
+      // A draft saved while Feed was active carries its words in form.note, but
+      // Feed shows and submits feedingForm.note; hand them over as switching does.
+      setFeedingForm(
+        restoredDraft?.action === "feed"
+          ? { ...EMPTY_QUICKLOG_FEEDING_FORM, note: restoredDraft.note }
+          : EMPTY_QUICKLOG_FEEDING_FORM,
+      );
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
@@ -1132,7 +1198,7 @@ function QuickLogV2SheetForOwner({
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
-      setLocalError(null);
+      setLocalError(restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
@@ -1151,6 +1217,10 @@ function QuickLogV2SheetForOwner({
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      observationUnconfirmedRef.current = Boolean(restorable?.saveFailed);
+      if (restorable?.saveFailed && restorable.idempotencyKey) {
+        saveIdempotencyKeyRef.current = restorable.idempotencyKey;
+      }
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
       setTentPlantAutoApplied(false);
@@ -1159,7 +1229,42 @@ function QuickLogV2SheetForOwner({
       setTargetFilterQuery("");
       setTentPlantAutoApplied(false);
     }
-  }, [open, defaultTargetKey, defaultAction]);
+  }, [open, defaultTargetKey, defaultAction, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (observationDraftResetPendingRef.current) {
+      observationDraftResetPendingRef.current = false;
+      return;
+    }
+    // Feed shows and submits feedingForm.note, so while Feed is active that is
+    // the note the grower sees; persist it, not the hidden form.note.
+    const draftForm = form.action === "feed" ? { ...form, note: feedingForm.note } : form;
+    if (observationDraftSuppressedRef.current) {
+      if (open && isQuickLogObservationDraftEmpty(draftForm)) {
+        observationDraftSuppressedRef.current = false;
+      }
+      return;
+    }
+    if (!open || postSave) return;
+    if (isQuickLogObservationDraftEmpty(draftForm)) {
+      if (observationDraftOwnedRef.current) {
+        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+        observationDraftOwnedRef.current = false;
+      }
+      return;
+    }
+    observationDraftOwnedRef.current = true;
+    writeBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
+      form: draftForm,
+      saveFailed: observationUnconfirmedRef.current,
+      idempotencyKey: observationUnconfirmedRef.current ? saveIdempotencyKeyRef.current : null,
+      tempEntryUnit: manualTempEntryUnitRef.current,
+      chipStatus: chipAuthoredStatusRef.current,
+    });
+    // localError is a trigger, not an input: when only the error flips, this
+    // re-persists the ref-held saveFailed flag even though the form is unchanged.
+  }, [user?.id, open, form, feedingForm.note, postSave, localError]);
 
   // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
   // Only when selectedKey is still empty/unset — never rewrite an explicit
@@ -1302,7 +1407,7 @@ function QuickLogV2SheetForOwner({
       : null;
   const responseTargetPlantIdRef = useRef(responseTargetPlantId);
   useEffect(() => {
-    if (submissionLockedRef.current) return;
+    if (submissionLockedRef.current || responseBaselineResetRef.current) return;
     const previousPlantId = responseTargetPlantIdRef.current;
     responseTargetPlantIdRef.current = responseTargetPlantId;
     // Fire when the plant the marker DESCRIBES changes — to a different plant,
@@ -1334,6 +1439,16 @@ function QuickLogV2SheetForOwner({
       return nextFeedingNote === previous.note ? previous : { ...previous, note: nextFeedingNote };
     });
   }, [responseTargetPlantId, form.note, setField]);
+  // Runs every commit, after the retarget check: take the reset form's plant as
+  // the baseline once that form has committed.
+  useEffect(() => {
+    if (responseBaselineResetRef.current === "armed") {
+      responseBaselineResetRef.current = "ready";
+    } else if (responseBaselineResetRef.current === "ready") {
+      responseBaselineResetRef.current = null;
+      responseTargetPlantIdRef.current = responseTargetPlantId;
+    }
+  });
 
   const handleAction = (a: QuickLogV2Action) => {
     if (submissionLockedRef.current) return;
@@ -1944,6 +2059,14 @@ function QuickLogV2SheetForOwner({
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      // A Feed's fields live in feedingForm, so the stored observation draft
+      // may still be another plant's unsaved note; only clear one this sheet owns.
+      if (observationDraftOwnedRef.current) {
+        observationDraftSuppressedRef.current = true;
+        if (user?.id) {
+          clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+        }
+      }
       const savedPlantId = resolved.plantId ?? null;
       if (savedPlantId) {
         const refetchAfter = Date.now();
@@ -2112,6 +2235,14 @@ function QuickLogV2SheetForOwner({
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
+        // New manual Note saves only. Feed returns above this call. Water
+        // builds its own payload and skips this builder. A retry replays the
+        // stored payload, so a later stage change does not rewrite it.
+        // Pass the stage stored on the resolved target: the plant's stage for
+        // a plant, the tent's stage for a tent. Neither target borrows the
+        // other's stage. The builder keeps a canonical stage and omits a
+        // missing or unknown one.
+        stage: targetStage,
         volumeMl: form.volumeMl,
         note: form.note,
         temperatureC: typedTempToCelsiusInput(
@@ -2406,6 +2537,15 @@ function QuickLogV2SheetForOwner({
       }
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
+      // Ambiguous outcomes stay with the durable Note/Watering recovery, which
+      // keeps the original key until history is checked. Persisting that key in
+      // this draft would resurrect it for a deliberate new entry afterwards
+      // (quick-log-v2-exact-recovery "verified but subsequently edited").
+      observationUnconfirmedRef.current =
+        !quickLogSaveRequiresHistoryCheck(reason) &&
+        reason !== "receipt_mismatch" &&
+        reason !== "receipt_unverified" &&
+        reason !== "receipt_target_moved";
       if (quickLogSaveRequiresHistoryCheck(reason) && exactManualSubmission) {
         const movedScope =
           reason === "receipt_target_moved" ? resolveQuickLogConfirmedScope(resolved, res) : null;
@@ -2472,6 +2612,11 @@ function QuickLogV2SheetForOwner({
     // best-effort attachment work, so a rejected media promise can never
     // leave the committed server key attached to a new editable draft.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    // A Watering keeps its measurements in wateringForm, so the stored draft
+    // may still be another plant's unsaved note; only retire one this sheet owns.
+    if (observationDraftOwnedRef.current) observationDraftSuppressedRef.current = true;
+    observationUnconfirmedRef.current = false;
+    setObservationDraftRestored(null);
 
     // The log row is committed from here on. Companion-media failures are
     // PARTIAL SUCCESS: the grower's entry is saved and must be presented as
@@ -2605,6 +2750,9 @@ function QuickLogV2SheetForOwner({
         : null;
       if (recoveryClearFailed) setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
       manualRetrySubmissionRef.current = null;
+    }
+    if (user?.id && observationDraftOwnedRef.current) {
+      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
     }
     const successMessage =
       submissionAction === "water"
@@ -2897,6 +3045,14 @@ function QuickLogV2SheetForOwner({
     // The grower deliberately opens the verified existing record for review.
     // This is a resolution action, never a successful receipt for this draft.
     manualRetrySubmissionRef.current = null;
+    // The words are already saved; a restored draft would save them again
+    // under a new key. Another plant's unsaved draft is not this record's.
+    if (observationDraftOwnedRef.current) {
+      observationDraftSuppressedRef.current = true;
+      if (user?.id) {
+        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+      }
+    }
     keepSubmissionLockedRef.current = false;
     submissionLockedRef.current = false;
     setSubmissionLocked(false);
@@ -3309,6 +3465,12 @@ function QuickLogV2SheetForOwner({
             </div>
           </div>
 
+          {observationDraftRestored ? (
+            <p className="text-xs text-muted-foreground" data-testid="qlv2-draft-restored">
+              {observationDraftRestored}
+            </p>
+          ) : null}
+
           {form.action === "feed" && (
             <div className="space-y-2">
               {feedingDefaultsApplied && feedingDefaults.label && (
@@ -3337,6 +3499,7 @@ function QuickLogV2SheetForOwner({
                 disabled={feedingSaving || wateringSaving || saving || submissionLocked}
                 defaultsApplied={feedingDefaultsApplied}
                 entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
+                ecFieldErrors={feedingEcGate?.fields}
               />
             </div>
           )}
@@ -3573,6 +3736,7 @@ function QuickLogV2SheetForOwner({
               <Label htmlFor="qlv2-note">Note (optional)</Label>
               <Textarea
                 id="qlv2-note"
+                data-testid="qlv2-note"
                 value={form.note}
                 disabled={submissionLocked}
                 maxLength={NOTE_LIMIT}
@@ -3985,6 +4149,7 @@ function QuickLogV2SheetForOwner({
                       (selectedTargetStale && !retryPending) ||
                       (criticalContentMissing && !retryPending) ||
                       (Boolean(waterFieldMessage) && !retryPending) ||
+                      Boolean(feedingFieldMessage) ||
                       Boolean(largeWaterAssessment?.needsConfirmation) ||
                       Boolean(archivedGrowActionBlock)
                     }
@@ -4015,6 +4180,7 @@ function getSaveHelperMessage(input: {
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
   waterFieldMessage: string | null;
+  feedingFieldMessage?: string | null;
   largeWaterMessage?: string | null;
   criticalContentMissing: boolean;
   saving: boolean;
@@ -4025,6 +4191,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.waterFieldMessage) return input.waterFieldMessage;
+  if (input.feedingFieldMessage) return input.feedingFieldMessage;
   if (input.largeWaterMessage) return input.largeWaterMessage;
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;

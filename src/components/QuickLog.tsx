@@ -436,7 +436,21 @@ export default function QuickLog({
   successMessage = "Logged 🌱",
 }: Props) {
   const { user } = useAuth();
-  const { grows, archivedGrows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
+  const {
+    grows,
+    archivedGrows,
+    activeGrow,
+    activeGrowId,
+    setActiveGrowId,
+    loading: growsLoading,
+    error: growsError,
+    refresh: refreshGrows,
+  } = useGrows();
+  const growsLookupPending = growsLoading === true;
+  const growsLookupFailed =
+    !growsLookupPending && typeof growsError === "string" && growsError.length > 0;
+  const growsLookupEmpty = !growsLookupPending && !growsLookupFailed && grows.length === 0;
+  const growsLookupBlocksSave = growsLookupPending || growsLookupFailed || growsLookupEmpty;
   const archivedGrowList = useMemo(() => archivedGrows ?? [], [archivedGrows]);
   const plantsQuery = usePlants();
   const tentsQuery = useTents();
@@ -1439,8 +1453,14 @@ export default function QuickLog({
     }, 0);
   }
 
+  async function retryGrowsLookup() {
+    if (typeof refreshGrows !== "function") return;
+    await refreshGrows();
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (growsLookupBlocksSave) return;
     const pendingSectionPhotoBlock = resolveQuickLogPendingSectionPhotoBlock(sectionPhotoPending);
     if (pendingSectionPhotoBlock) {
       setSaveError(pendingSectionPhotoBlock);
@@ -2174,7 +2194,8 @@ export default function QuickLog({
   const showWateringErr = !!wateringError;
   const targetQueryPending = inFlightSaveContext === null && namedPrefillQueryPending;
   const targetQueryError = inFlightSaveContext === null && namedPrefillQueryError;
-  const targetSelectionLocked = saveLocked || targetQueryPending || targetQueryError;
+  const targetSelectionLocked =
+    saveLocked || targetQueryPending || targetQueryError || growsLookupBlocksSave;
   const displayedPlantId = inFlightSaveContext?.target.plantId ?? editorPlantId;
   const displayedGrowId = inFlightSaveContext?.target.growId ?? activeGrowId ?? "";
   const displayedEventType = inFlightSaveContext?.eventType ?? eventType;
@@ -2189,7 +2210,15 @@ export default function QuickLog({
       : "Plant required before save");
   const targetGrowName =
     inFlightSaveContext?.growName ??
-    (resolvedTarget ? (resolvedTargetGrow?.name ?? "Assigned grow") : "No setup selected");
+    (growsLookupPending
+      ? "Loading grows…"
+      : growsLookupFailed
+        ? "Grows unavailable"
+        : growsLookupEmpty
+          ? "No grows yet"
+          : resolvedTarget
+            ? (resolvedTargetGrow?.name ?? "Assigned grow")
+            : "No setup selected");
   const mainFormRequiresTent = legacyQuickLogEventRequiresTent(displayedEventType) || snapshot;
   const mainFormTarget =
     inFlightSaveContext === null && mainFormRequiresTent ? strictEditorTarget : editorTarget;
@@ -2754,7 +2783,47 @@ export default function QuickLog({
                   </Select>
                 </div>
               </div>
-              {targetQueryPending ? (
+              {growsLookupPending ? (
+                <p
+                  id="quick-log-grows-lookup-loading"
+                  role="status"
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="quick-log-grows-lookup-loading"
+                >
+                  Loading grows…
+                </p>
+              ) : growsLookupFailed ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p
+                    id="quick-log-grows-lookup-error"
+                    role="alert"
+                    className="text-[11px] text-destructive"
+                    data-testid="quick-log-grows-lookup-error"
+                  >
+                    We couldn&apos;t load your grows. Retry to continue.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="quick-log-grows-lookup-retry"
+                    onClick={() => {
+                      void retryGrowsLookup();
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : growsLookupEmpty ? (
+                <p
+                  id="quick-log-grows-lookup-empty"
+                  role="status"
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="quick-log-grows-lookup-empty"
+                >
+                  No grows yet. Add a grow before saving this entry.
+                </p>
+              ) : targetQueryPending ? (
                 <p
                   id="quick-log-target-loading"
                   role="status"
@@ -3933,6 +4002,7 @@ export default function QuickLog({
                 saveLocked ||
                 recoveryLocked ||
                 sameTargetRecoveryLocked ||
+                growsLookupBlocksSave ||
                 !mainFormResolvedTarget ||
                 !!savedTarget
               }

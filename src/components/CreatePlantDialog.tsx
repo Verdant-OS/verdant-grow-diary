@@ -69,7 +69,7 @@ import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 import {
   describeCreatePlantPrimaryButton,
-  plantCreateNoTentsHintCopy,
+  PLANT_NO_TENTS_OPTIONAL_HINT,
 } from "@/lib/createDialogPrimaryButtonViewModel";
 
 const STAGES = [
@@ -957,8 +957,8 @@ export default function CreatePlantDialog({
             <div>
               <Label htmlFor={nameFieldId}>Name</Label>
               <Input
-                id={nameFieldId}
                 required
+                id={nameFieldId}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Plant A"
@@ -1066,7 +1066,7 @@ export default function CreatePlantDialog({
                   className="text-xs text-muted-foreground mt-1"
                   data-testid="create-plant-no-tents-hint"
                 >
-                  {plantCreateNoTentsHintCopy(tentRequired)}
+                  {tentRequired ? "No tents yet. Create a tent first." : PLANT_NO_TENTS_OPTIONAL_HINT}
                 </p>
               )}
             </div>

@@ -434,8 +434,8 @@ export default function CreateTentDialog({
             <div>
               <Label htmlFor={nameFieldId}>Name</Label>
               <Input
-                id={nameFieldId}
                 required
+                id={nameFieldId}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Tent #1"

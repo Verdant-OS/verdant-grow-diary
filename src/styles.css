@@ -388,7 +388,9 @@
   [data-print-section="diary-range-report"],
   [data-print-section="diary-range-report"] *,
   [data-print-section="ai-doctor-report"],
-  [data-print-section="ai-doctor-report"] * {
+  [data-print-section="ai-doctor-report"] *,
+  [data-print-section="public-guide-tool"],
+  [data-print-section="public-guide-tool"] * {
     visibility: visible;
   }
   [data-print-section="environment-summary-report"],

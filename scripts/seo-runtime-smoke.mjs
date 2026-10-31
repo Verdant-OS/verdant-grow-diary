@@ -33,6 +33,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/grow-help-toolkit`,
   },
   {
+    path: "/guides/cannabis-flowering-stages-week-by-week",
+    expectTitle: /Cannabis Flowering Stages Week by Week/,
+    canonical: `${ORIGIN}/guides/cannabis-flowering-stages-week-by-week`,
+  },
+  {
     path: "/guides/athena-feed-chart-log",
     expectTitle: /Athena Feed Chart Log/,
     canonical: `${ORIGIN}/guides/athena-feed-chart-log`,

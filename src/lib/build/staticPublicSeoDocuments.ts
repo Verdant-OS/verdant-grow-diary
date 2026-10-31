@@ -25,6 +25,15 @@ import {
   athenaFeedLogWebApplicationJsonLd,
 } from "../athenaFeedLogRules";
 import {
+  FLOWERING_PLAN_DATE_MODIFIED,
+  FLOWERING_PLAN_DESCRIPTION,
+  FLOWERING_PLAN_FAQ,
+  FLOWERING_PLAN_H1,
+  FLOWERING_PLAN_PATH,
+  FLOWERING_PLAN_TITLE,
+  floweringPlanWebApplicationJsonLd,
+} from "../floweringWeekPlanRules";
+import {
   CARE_CATEGORY_LABELS,
   CARE_CATEGORY_ORDER,
   GROW_STAGE_CARE_CHECKLIST,
@@ -565,6 +574,42 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
           },
         ],
       }),
+    ],
+  }),
+  publicDocument(FLOWERING_PLAN_PATH, {
+    title: `${FLOWERING_PLAN_TITLE} | Verdant Grow Diary`,
+    description: FLOWERING_PLAN_DESCRIPTION,
+    imageAlt: "Cannabis flowering stages week-by-week planner",
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: `${FLOWERING_PLAN_TITLE} | Verdant Grow Diary`,
+        description: FLOWERING_PLAN_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${FLOWERING_PLAN_PATH}`,
+      }),
+      buildArticleJsonLd({
+        headline: FLOWERING_PLAN_H1,
+        description: FLOWERING_PLAN_DESCRIPTION,
+        url: `${VERDANT_SITE_ORIGIN}${FLOWERING_PLAN_PATH}`,
+        datePublished: FLOWERING_PLAN_DATE_MODIFIED,
+        dateModified: FLOWERING_PLAN_DATE_MODIFIED,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}${FLOWERING_PLAN_PATH}`,
+        questions: FLOWERING_PLAN_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Cannabis Flowering Stages Week by Week",
+            url: `${VERDANT_SITE_ORIGIN}${FLOWERING_PLAN_PATH}`,
+          },
+        ],
+      }),
+      floweringPlanWebApplicationJsonLd(`${VERDANT_SITE_ORIGIN}${FLOWERING_PLAN_PATH}`),
     ],
   }),
   publicDocument(ATHENA_FEED_LOG_PATH, {

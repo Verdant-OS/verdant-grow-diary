@@ -32,6 +32,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { activeDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
@@ -1520,6 +1521,15 @@ export default function QuickLog({
       return;
     }
     const saveTarget = Object.freeze({ ...saveTargetResolution.target });
+    const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+    if (archiveGuard && saveTarget.plantId) {
+      const archiveDecision = await archiveGuard(saveTarget.plantId);
+      if (archiveDecision.block) {
+        setSaveError(archiveDecision.message);
+        toast.error(archiveDecision.message);
+        return;
+      }
+    }
     const saveDraftHandoffKey = draftHandoffKey;
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
@@ -2021,6 +2031,17 @@ export default function QuickLog({
       stageWasUserTouched: record.stageWasUserTouched,
     });
     try {
+      // The retry re-saves the stored target, so it gets the same Daily Check
+      // archive re-check as a fresh save. A block keeps the pending record.
+      const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+      if (archiveGuard && record.target.plantId) {
+        const archiveDecision = await archiveGuard(record.target.plantId);
+        if (archiveDecision.block) {
+          setSaveError(archiveDecision.message);
+          toast.error(archiveDecision.message);
+          return;
+        }
+      }
       const result = await saveViaRpc(record.payload, { expectedWaterTarget: record.target });
       if (!result.ok) {
         // A sign-in refusal is returned before the idempotency lookup, so on a
@@ -3937,6 +3958,7 @@ export default function QuickLog({
                 !!savedTarget
               }
               data-testid="quick-log-save"
+              data-daily-check-save-plant={resolvedTarget?.plantId ?? ""}
               className="gradient-leaf text-primary-foreground"
             >
               {busy || childSaveBusy ? (

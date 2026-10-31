@@ -39,11 +39,45 @@ export interface GuideSectionLink {
   readonly to: string;
 }
 
+export interface GuideAnchor {
+  readonly label: string;
+  readonly href: string;
+}
+
+export interface GuideContinuation {
+  readonly heading: string;
+  /** Defaults to a level-2 heading. Use 3 for a subsection under the parent. */
+  readonly headingLevel?: 2 | 3;
+  readonly body?: string;
+  /** Links `label` where it appears inside `body`. */
+  readonly bodyLink?: GuideAnchor;
+  readonly steps?: ReadonlyArray<string>;
+  readonly closing?: string;
+  /** Links `label` where it appears inside `closing`. */
+  readonly closingLink?: GuideAnchor;
+  readonly cta?: GuideAnchor;
+}
+
 export interface GuideSection {
   readonly heading: string;
   readonly body: string;
   /** Optional in-app internal links surfaced under the section body. */
   readonly links?: ReadonlyArray<GuideSectionLink>;
+  /** Links `label` where it appears inside `body`. */
+  readonly bodyLink?: GuideAnchor;
+  readonly steps?: ReadonlyArray<string>;
+  readonly closing?: string;
+  /** Links `label` where it appears inside `closing`. */
+  readonly closingLink?: GuideAnchor;
+  readonly cta?: GuideAnchor;
+  /** Extra headings rendered after this section, in order. */
+  readonly continuations?: ReadonlyArray<GuideContinuation>;
+}
+
+export interface GuideFaqFooter {
+  readonly lead: string;
+  readonly links: ReadonlyArray<GuideAnchor>;
+  readonly cta?: GuideAnchor;
 }
 
 export interface GuideCallToAction {
@@ -86,8 +120,13 @@ export interface SeoGuidePage {
   readonly description: string;
   readonly targetKeyword: string;
   readonly intro: string;
+  /** Optional heading rendered above the intro paragraph. */
+  readonly introHeading?: string;
+  readonly introCta?: GuideAnchor;
   readonly sections: ReadonlyArray<GuideSection>;
   readonly faq: ReadonlyArray<FaqEntry>;
+  /** Related line and signup link rendered with the visible FAQ. */
+  readonly faqFooter?: GuideFaqFooter;
   /** Related guide slugs surfaced as internal links. */
   readonly related: ReadonlyArray<string>;
   /** Optional prominent CTA rendered near the top of the guide. */
@@ -185,6 +224,14 @@ export const OREOZ_VS_GELONADE_FAQ: ReadonlyArray<FaqEntry> = [
 /* ------------------------------------------------------------------ */
 /* Seven SEO guide pages                                               */
 /* ------------------------------------------------------------------ */
+
+const AC_INFINITY_CSV_IMPORT_CTA_HREF =
+  "https://verdantgrowdiary.com/auth?mode=signup&utm_source=organic_guide&utm_medium=owned&utm_campaign=search_to_first_value&utm_content=ac-infinity-data-logging";
+
+const SPIDER_FARMER_CSV_IMPORT_CTA_HREF =
+  "https://verdantgrowdiary.com/auth?mode=signup&utm_source=organic_guide&utm_medium=owned&utm_campaign=search_to_first_value&utm_content=spider-farmer-data-logging";
+
+const CSV_IMPORT_CTA_LABEL = "Import your first CSV free";
 
 export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   {
@@ -493,29 +540,86 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     description:
       "How to use AC Infinity data in a grow diary — CSV imports, source-labeled snapshots, and plant-scoped context — without replacing your controller.",
     targetKeyword: "AC Infinity data logging",
+    introHeading:
+      "How do I get my AC Infinity or Spider Farmer sensor logs (CSV) into a grow diary app?",
     intro:
-      "AC Infinity controllers already record temperature, humidity, and VPD. What they do not do is tie those readings to a specific plant, day, and diary entry. That is where a grow diary app closes the loop. Verdant is hardware-neutral: it turns AC Infinity data logging into plant history without replacing the controller.",
+      "Export a CSV from your AC Infinity or Spider Farmer app, then import it in Verdant on the Sensors page under \"Import historical data\". It's included on the Free plan, each reading keeps its original time, and it's source-labeled as CSV so it's never passed off as live.",
+    introCta: { label: CSV_IMPORT_CTA_LABEL, href: AC_INFINITY_CSV_IMPORT_CTA_HREF },
     sections: [
       {
-        heading: "Import controller history as CSV",
-        body: "Export from your AC Infinity app and import the CSV into Verdant. Readings land with source = 'csv' and their captured_at preserved. Vendor lineage is kept in the raw payload so nothing is silently rewritten.",
+        heading: "Why controller apps alone don't give you plant history",
+        body: "Controllers record temperature, humidity and VPD. They don't tie those readings to a tent, a day, or a diary entry. Verdant is hardware-neutral: it turns that controller data into grow history without replacing the controller.",
       },
       {
-        heading: "Attach snapshots to Quick Log entries",
-        body: "Once controller history is in Verdant, Quick Log entries can carry the nearest sensor snapshot automatically. A watering note gains its temp/RH/VPD context without extra typing.",
+        heading: "Import your CSV into Verdant",
+        body: "",
+        steps: [
+          "Export a CSV from your AC Infinity or Spider Farmer app.",
+          'In Verdant, open Sensors and choose "Import historical data".',
+          "Pick your file and import it.",
+        ],
+        closing:
+          "This works on the Free plan with no upgrade step. AC Infinity and Spider Farmer files both import, including into the same account.",
       },
       {
-        heading: "Verdant does not control your AC Infinity gear",
-        body: "Verdant is not a controller. It does not change fan speeds, light schedules, or vent behavior. AC Infinity keeps doing what it does; Verdant makes the data useful.",
+        heading: "What happens to the readings",
+        body: "Each reading keeps its original time and is source-labeled as CSV, so it's never relabeled as live. Temperatures show in °F.",
+        cta: { label: CSV_IMPORT_CTA_LABEL, href: AC_INFINITY_CSV_IMPORT_CTA_HREF },
+        continuations: [
+          {
+            heading: "See it in your tent history",
+            body: "Imported readings show in the tent's sensor history, so you can read a diary note against the conditions that led up to it.",
+          },
+          {
+            heading: "Attach snapshots to Quick Log entries",
+            body: "Once controller history is in Verdant, Quick Log entries can carry the nearest sensor snapshot automatically. A watering note gains its temp/RH/VPD context without extra typing.",
+          },
+        ],
+      },
+      {
+        heading: "Running several tents",
+        body: 'Import one CSV per controller, so each import maps to one tent. I run Spider Farmer GGS tents with one controller per tent, named for the tent (for example "Vegetation Alpha"), plus AC Infinity gear.',
+        continuations: [
+          {
+            heading: "Free and Pro",
+            body: "CSV import is included on Free. See plans for what Pro adds.",
+            bodyLink: { label: "plans", href: "/pricing" },
+          },
+        ],
+      },
+      {
+        heading: "What Verdant doesn't do",
+        body: "Verdant is not a controller. It doesn't change fan speeds, light schedules or vent settings. Approving an item in the Action Queue sends no command to a device. AI Doctor suggests and cites the evidence; you decide.",
       },
     ],
     faq: [
       {
-        question: "Can I use AC Infinity data in a grow diary?",
-        answer:
-          "Yes. Export your AC Infinity readings as CSV and import them into Verdant. Each reading is labeled source = 'csv' with vendor lineage preserved, and can be attached to diary entries on the plant timeline.",
+        question: "Can I mix AC Infinity and Spider Farmer data?",
+        answer: "Yes. Both import into the same account, one CSV per controller.",
+      },
+      {
+        question: "Will imported readings look like live data?",
+        answer: "No. They're source-labeled as CSV and keep their original times.",
+      },
+      {
+        question: "What temperature units will I see?",
+        answer: "Temperatures show in °F.",
+      },
+      {
+        question: "Does Verdant control my gear?",
+        answer: "No. It reads the data your gear already produces and sends no device commands.",
       },
     ],
+    faqFooter: {
+      lead: "Related:",
+      links: [
+        { label: "Grow diary app", href: "/guides/grow-diary-app" },
+        { label: "Spider Farmer data logging", href: "/guides/spider-farmer-data-logging" },
+        { label: "Sensor truth in the grow room", href: "/guides/sensor-truth-grow-room" },
+        { label: "Plans", href: "/pricing" },
+      ],
+      cta: { label: CSV_IMPORT_CTA_LABEL, href: AC_INFINITY_CSV_IMPORT_CTA_HREF },
+    },
     related: ["spider-farmer-data-logging", "sensor-truth-grow-room"],
   },
   {
@@ -531,6 +635,23 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Bring Spider Farmer readings in as CSV",
         body: "Import Spider Farmer environment history into Verdant. Each reading is stored with source = 'csv', captured_at, and confidence — never relabeled as live.",
+        continuations: [
+          {
+            heading: "How to import your Spider Farmer CSV",
+            headingLevel: 3,
+            steps: [
+              "Export a CSV from your Spider Farmer app.",
+              'In Verdant, open Sensors and choose "Import historical data". It\'s included on Free.',
+              "Find the readings in your tent's sensor history, source-labeled as CSV with their original times.",
+            ],
+            closing: "Full guide for both brands: AC Infinity and Spider Farmer CSV import",
+            closingLink: {
+              label: "AC Infinity and Spider Farmer CSV import",
+              href: "/guides/ac-infinity-data-logging",
+            },
+            cta: { label: CSV_IMPORT_CTA_LABEL, href: SPIDER_FARMER_CSV_IMPORT_CTA_HREF },
+          },
+        ],
       },
       {
         heading: "See readings against the plant timeline",

@@ -80,6 +80,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   deriveQuickLogV2SaveState,
   quickLogV2SaveStateLabel,
+  quickLogV2SaveFailedError,
   shouldFocusQuickLogV2NoteOnOpen,
 } from "@/lib/quickLogV2NoteFirstRules";
 import {
@@ -629,9 +630,13 @@ function QuickLogV2SheetForOwner({
     );
   const retryPending = wateringRetryPending || exactRetryPending;
   const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialSubmission));
-  // Note-first: a fresh Note sheet puts the cursor in the note box.
+  // Note-first: a fresh Note sheet puts the cursor in the note box. Focus
+  // happens in the sheet's onOpenAutoFocus (inside the open gesture) so iOS
+  // raises the keyboard. If a pending recovery clears while the sheet is
+  // already open, the note box is NOT refocused: focus is only decided once,
+  // when the sheet opens.
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
-  useEffect(() => {
+  const handleSheetOpenAutoFocus = (event: Event) => {
     if (
       !shouldFocusQuickLogV2NoteOnOpen({
         open,
@@ -642,15 +647,23 @@ function QuickLogV2SheetForOwner({
     ) {
       return;
     }
-    const frame = requestAnimationFrame(() => noteInputRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-    // Focus once per open/action change; typing must not re-trigger it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, form.action]);
+    const note = noteInputRef.current;
+    if (!note) return;
+    event.preventDefault();
+    note.focus();
+  };
+  // The exact error message of a Note/Water save that was actually attempted
+  // and failed. Input checks and recovery/Timeline messages never set it, and
+  // any later different error (e.g. an unreadable photo) hides the line.
+  const [noteFirstSaveFailedMessage, setNoteFirstSaveFailedMessage] = useState<string | null>(null);
   const noteFirstSaveState = deriveQuickLogV2SaveState({
     saving: saving || feedingSaving || wateringSaving,
     saved: postSave !== null,
-    error: localError,
+    error: quickLogV2SaveFailedError({
+      saveFailed: noteFirstSaveFailedMessage !== null && noteFirstSaveFailedMessage === localError,
+      action: form.action,
+      error: localError,
+    }),
   });
   const noteFirstSaveLabel = quickLogV2SaveStateLabel(noteFirstSaveState);
   // Synchronous in-flight guard. The save-state flags are React
@@ -1228,6 +1241,9 @@ function QuickLogV2SheetForOwner({
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
       setLocalError(restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
+      setNoteFirstSaveFailedMessage(
+        restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null,
+      );
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
@@ -1905,6 +1921,7 @@ function QuickLogV2SheetForOwner({
     const canContinueNote = () => lifetime.active && noteLifetimeRef.current === lifetime;
     setMismatchedReceipt(null);
     setLocalError(null);
+    setNoteFirstSaveFailedMessage(null);
     setSaveStatus("");
     const pendingWateringSubmission = wateringRetrySubmissionRef.current;
     const pendingManualSubmission = manualRetrySubmissionRef.current;
@@ -2511,6 +2528,8 @@ function QuickLogV2SheetForOwner({
           ? wateringFormReasonToHelper(wateringResult.reason)
           : WATERING_SAVE_FAILURE_MESSAGE;
         setLocalError(message);
+        // A released rejection is a form correction, not a failed save.
+        setNoteFirstSaveFailedMessage(released ? null : message);
         toast.error(message);
         setSaveStatus("");
         return;
@@ -2626,6 +2645,11 @@ function QuickLogV2SheetForOwner({
               : reason === "save_failed"
                 ? QUICK_LOG_SAVE_FAILED_MESSAGE
                 : reasonToMessage(reason),
+      );
+      // Only a plain failed save is retried from this sheet; history/receipt
+      // outcomes point to Timeline instead.
+      setNoteFirstSaveFailedMessage(
+        reason === "save_failed" ? QUICK_LOG_SAVE_FAILED_MESSAGE : null,
       );
       setSaveStatus("");
       return;
@@ -3144,6 +3168,7 @@ function QuickLogV2SheetForOwner({
         className="max-h-[92vh] overflow-y-auto text-base"
         aria-describedby="qlv2-sheet-description"
         onCloseAutoFocus={restoreOpenerFocus}
+        onOpenAutoFocus={handleSheetOpenAutoFocus}
       >
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>
@@ -3620,6 +3645,8 @@ function QuickLogV2SheetForOwner({
               <Textarea
                 ref={noteInputRef}
                 id="qlv2-note"
+                inputMode="text"
+                enterKeyHint="enter"
                 data-testid="qlv2-note"
                 value={form.note}
                 disabled={submissionLocked}

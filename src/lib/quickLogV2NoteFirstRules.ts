@@ -18,6 +18,25 @@ export function deriveQuickLogV2SaveState(input: QuickLogV2SaveStateInput): Quic
   return "idle";
 }
 
+export interface QuickLogV2SaveFailedErrorInput {
+  /** True only where a save was actually attempted and failed (not input checks). */
+  saveFailed: boolean;
+  action: string;
+  error: string | null | undefined;
+}
+
+/**
+ * The note-first "Not saved yet" line belongs to a real failed save of a Note
+ * or Water entry. Input errors (no target, unreadable photo, pending video
+ * check, empty content), recovery/Timeline messages and Feed (no note box)
+ * never surface it. Returns the error to feed into deriveQuickLogV2SaveState.
+ */
+export function quickLogV2SaveFailedError(input: QuickLogV2SaveFailedErrorInput): string | null {
+  if (!input.saveFailed) return null;
+  if (input.action !== "note" && input.action !== "water") return null;
+  return input.error ?? null;
+}
+
 /** Short, plain status line shown next to Save. Empty when there is nothing to say. */
 export function quickLogV2SaveStateLabel(state: QuickLogV2SaveState): string {
   switch (state) {
@@ -26,7 +45,7 @@ export function quickLogV2SaveStateLabel(state: QuickLogV2SaveState): string {
     case "saved":
       return "Saved";
     case "failed":
-      return "Not saved yet. Your note is kept — tap Save to try again.";
+      return "Not saved yet. Your note is kept — try again.";
     case "idle":
       return "";
     default: {

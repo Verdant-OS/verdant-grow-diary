@@ -13,7 +13,11 @@
  *   - Manual sensor snapshot is out of scope here — the existing manual
  *     sensor reading path (ManualSensorReadingCard) already handles it.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import {
+  createQuickLogSubmitGuard,
+  type QuickLogSubmitGuardController,
+} from "@/lib/quickLogDuplicateSubmitGuard";
 import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -90,8 +94,19 @@ interface ManualRpcResponse {
 export function useQuickLogActivitySave() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<QuickLogActivitySaveReason | null>(null);
+  const guardRef = useRef<QuickLogSubmitGuardController<QuickLogActivitySaveResult> | null>(null);
+  if (guardRef.current === null) {
+    guardRef.current = createQuickLogSubmitGuard(
+      () => ({
+        ok: false,
+        reason: "save_failed",
+      }),
+      // A confirmed activity may be logged again. Only an in-flight tap is held.
+      { rememberCompleted: false },
+    );
+  }
 
-  const save = useCallback(
+  const saveRequest = useCallback(
     async (input: QuickLogActivitySaveInput): Promise<QuickLogActivitySaveResult> => {
       const def = QUICK_LOG_ACTIVITY_DEFINITIONS[input.activityId];
       if (!def) {
@@ -306,6 +321,15 @@ export function useQuickLogActivitySave() {
       }
     },
     [],
+  );
+
+  const save = useCallback(
+    (input: QuickLogActivitySaveInput): Promise<QuickLogActivitySaveResult> => {
+      const guard = guardRef.current;
+      if (!guard) return Promise.resolve({ ok: false, reason: "save_failed" });
+      return guard.run(input, () => saveRequest(input));
+    },
+    [saveRequest],
   );
 
   return { save, saving, error, ENTRY_CREATED_EVENT: QUICK_LOG_V2_ENTRY_CREATED_EVENT };

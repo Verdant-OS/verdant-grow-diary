@@ -2,6 +2,16 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
+  beginQuickLogSubmit,
+  buildQuickLogSheetSubmissionSnapshot,
+  createQuickLogSubmitGuardState,
+  decideQuickLogSubmit,
+  fingerprintQuickLogSubmission,
+  finishQuickLogSubmit,
+  isQuickLogSaveBusy,
+  type QuickLogSubmitGuardState,
+} from "@/lib/quickLogDuplicateSubmitGuard";
+import {
   isQuickLogObservationDraftEmpty,
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
@@ -656,9 +666,17 @@ function QuickLogV2SheetForOwner({
   // and failed. Input checks and recovery/Timeline messages never set it, and
   // any later different error (e.g. an unreadable photo) hides the line.
   const [noteFirstSaveFailedMessage, setNoteFirstSaveFailedMessage] = useState<string | null>(null);
+  const [saveAttemptLocked, setSaveAttemptLocked] = useState(false);
+  const [heldDuplicate, setHeldDuplicate] = useState(false);
+  const saveBusy = isQuickLogSaveBusy({
+    saving,
+    feedingSaving,
+    wateringSaving,
+    attemptLocked: saveAttemptLocked,
+  });
   const noteFirstSaveState = deriveQuickLogV2SaveState({
-    saving: saving || feedingSaving || wateringSaving,
-    saved: postSave !== null,
+    saving: saveBusy,
+    saved: postSave !== null || heldDuplicate,
     error: quickLogV2SaveFailedError({
       saveFailed: noteFirstSaveFailedMessage !== null && noteFirstSaveFailedMessage === localError,
       action: form.action,
@@ -671,6 +689,29 @@ function QuickLogV2SheetForOwner({
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
+  const saveCommittedRef = useRef(false);
+  const submitGuardRef = useRef<QuickLogSubmitGuardState<{ ok: boolean }>>(
+    createQuickLogSubmitGuardState(),
+  );
+  const submissionFingerprint = fingerprintQuickLogSubmission(
+    buildQuickLogSheetSubmissionSnapshot({
+      action: form.action,
+      selectedKey: form.selectedKey,
+      note: form.note,
+      volumeMl: form.volumeMl,
+      temperatureC: form.temperatureC,
+      humidityPct: form.humidityPct,
+      vpdKpa: form.vpdKpa,
+      watering: wateringForm,
+      feeding: feedingForm,
+      maturity: maturityEvidenceForm,
+      photo: photoFile,
+      video: videoFile,
+    }),
+  );
+  useEffect(() => {
+    setHeldDuplicate(false);
+  }, [submissionFingerprint]);
   const observationDraftSuppressedRef = useRef(false);
   // True once this open restored or wrote the stored draft, so emptying the
   // form may forget it. Opening for another target never clears its draft.
@@ -1259,12 +1300,15 @@ function QuickLogV2SheetForOwner({
       wateringRetrySubmissionRef.current = null;
       submissionLockedRef.current = false;
       keepSubmissionLockedRef.current = false;
-      saveInFlightRef.current = false;
-      idempotencyKeyRef.current = 1;
-      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
-      observationUnconfirmedRef.current = Boolean(restorable?.saveFailed);
-      if (restorable?.saveFailed && restorable.idempotencyKey) {
-        saveIdempotencyKeyRef.current = restorable.idempotencyKey;
+      // A save already in flight keeps its key. Clearing the lock here let a
+      // second tap, about a minute later, mint a new key and write a duplicate.
+      if (!saveInFlightRef.current) {
+        idempotencyKeyRef.current = 1;
+        saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        observationUnconfirmedRef.current = Boolean(restorable?.saveFailed);
+        if (restorable?.saveFailed && restorable.idempotencyKey) {
+          saveIdempotencyKeyRef.current = restorable.idempotencyKey;
+        }
       }
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
@@ -1885,6 +1929,34 @@ function QuickLogV2SheetForOwner({
         return;
       }
     }
+    const decision = decideQuickLogSubmit(
+      submitGuardRef.current,
+      buildQuickLogSheetSubmissionSnapshot({
+        action: form.action,
+        selectedKey: form.selectedKey,
+        note: form.note,
+        volumeMl: form.volumeMl,
+        temperatureC: form.temperatureC,
+        humidityPct: form.humidityPct,
+        vpdKpa: form.vpdKpa,
+        watering: wateringForm,
+        feeding: feedingForm,
+        maturity: maturityEvidenceForm,
+        photo: photoFile,
+        video: videoFile,
+      }),
+    );
+    if (decision.kind === "duplicate") {
+      setHeldDuplicate(true);
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
+    if (decision.kind === "in_flight") {
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
+    submitGuardRef.current = beginQuickLogSubmit(submitGuardRef.current, decision.fingerprint);
+    saveCommittedRef.current = false;
     // Freeze every supported submission before the first await, using the
     // same synchronous guard as Water. Local validation releases this lock.
     const lockSubmission =
@@ -1896,14 +1968,23 @@ function QuickLogV2SheetForOwner({
       if (form.action === "water") setWateringSaving(true);
     }
     saveInFlightRef.current = true;
+    setSaveAttemptLocked(true);
     try {
       await runHandleSave();
     } finally {
+      submitGuardRef.current = finishQuickLogSubmit(
+        submitGuardRef.current,
+        decision.fingerprint,
+        { ok: saveCommittedRef.current },
+        saveCommittedRef.current,
+      );
+      saveCommittedRef.current = false;
       largeWaterSessionRef.current = {
         ...largeWaterSessionRef.current,
         inFlight: false,
       };
       if (lifetime.active) {
+        setSaveAttemptLocked(false);
         saveInFlightRef.current = false;
         if (lockSubmission) {
           setWateringSaving(false);
@@ -2149,6 +2230,7 @@ function QuickLogV2SheetForOwner({
         growEventId,
         source: "quick_log_v2_feed",
       });
+      saveCommittedRef.current = true;
       setPostSave({
         growEventId,
         growId: resolved.growId ?? null,
@@ -2860,6 +2942,7 @@ function QuickLogV2SheetForOwner({
     });
     resetPhotoSelection();
     resetVideoSelection();
+    saveCommittedRef.current = true;
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
       growId: confirmedScope.growId,
@@ -4059,12 +4142,7 @@ function QuickLogV2SheetForOwner({
                         : "Retry saving Quick Log"
                   }
                   disabled={
-                    saving ||
-                    feedingSaving ||
-                    wateringSaving ||
-                    videoChecking ||
-                    photoChecking ||
-                    (contextBlocked && !retryPending)
+                    saveBusy || videoChecking || photoChecking || (contextBlocked && !retryPending)
                   }
                   onClick={handleSave}
                 >
@@ -4197,7 +4275,7 @@ function QuickLogV2SheetForOwner({
                     variant="outline"
                     className="flex-1"
                     onClick={() => handleSheetOpenChange(false)}
-                    disabled={saving || feedingSaving || wateringSaving || exactRetryPending}
+                    disabled={saveBusy || exactRetryPending}
                   >
                     Cancel
                   </Button>
@@ -4206,9 +4284,8 @@ function QuickLogV2SheetForOwner({
                     className="flex-1"
                     onClick={handleSave}
                     disabled={
-                      saving ||
-                      feedingSaving ||
-                      wateringSaving ||
+                      saveBusy ||
+                      heldDuplicate ||
                       videoChecking ||
                       photoChecking ||
                       historyCheckRequired ||
@@ -4224,11 +4301,13 @@ function QuickLogV2SheetForOwner({
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
                   >
-                    {saving || feedingSaving || wateringSaving
+                    {saveBusy
                       ? "Saving…"
-                      : retryPending
-                        ? "Retry exact record"
-                        : "Save"}
+                      : heldDuplicate
+                        ? "Saved"
+                        : retryPending
+                          ? "Retry exact record"
+                          : "Save"}
                   </Button>
                 </div>
               </>

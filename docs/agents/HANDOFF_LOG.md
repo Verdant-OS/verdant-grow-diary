@@ -710,6 +710,40 @@ owner: This Codex chat for the bounded repair, validation, CI and evidence only;
 last_updated: 2026-10-27 10:13 CT, by Codex
 ```
 
+### VER-293-BROWSER-OAUTH-CLIENT-TESTS
+
+```text
+TASK VER-293-BROWSER-OAUTH-CLIENT-TESTS  priority: other  status: OPEN
+goal: Add focused deterministic unit coverage for src/lib/mcp/browserOAuthClient.ts and open a draft PR linked to VER-293.
+why: The module had no unit tests. Callback, PKCE, token storage, and same-origin redirect behavior need regression locks without network or real credentials.
+branch: cursor/mcp-browser-oauth-client-tests-fd0f
+base: verdant-grow-diary at a18cb8479c8dd150c6e3c9b1147bb82c75ebac24
+checkout: git fetch origin cursor/mcp-browser-oauth-client-tests-fd0f verdant-grow-diary && git switch cursor/mcp-browser-oauth-client-tests-fd0f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2552 (draft)
+head_sha: read origin/cursor/mcp-browser-oauth-client-tests-fd0f after the Jack Herer follow-up push; parent is d4e98ae40fad58741d13fdb61a5007d82d487669
+state: tests only; browserOAuthClient.ts unchanged
+current_step: Merged origin/verdant-grow-diary 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae. The only conflict was HANDOFF_LOG.md: incoming Open blocks and this block are both kept. Jack Herer 5670094164 at d4e98ae40 was PASS-pending-CI 0/0/4 plus one UNVERIFIED storage-spy concern. Follow-up spies setItem on getLocalStorageMethodOwnerForTest and records only when this is localStorage. RED check: a temporary localStorage.setItem in the client failed sends code_verifier with localSets ["verdant.mcp.oauth.token.v1"]; that edit was reverted and is not in the commit. Added token-endpoint fetch rejection, RFC 7636 Appendix B vector, SyntaxError message for malformed JSON, and fake timers for the expiry boundary.
+next_action: Read the new draft head and required CI. Jack Herer's verdict was for d4e98ae40 and does not cover this head. Keep the PR draft.
+post_merge_check: bunx vitest run src/test/mcp-browser-oauth-client.test.ts on the deploy head; a failure reopens this work with the same owner.
+active_writer: Cursor Grok session on cursor/mcp-browser-oauth-client-tests-fd0f
+decisions: Do not clear the pending PKCE record on state mismatch. BrowserConnectPanel.tsx explicitly keeps a genuine pending authorization when the callback state was not issued by this browser, and it does not call completeAuthorization in that case. Document that behavior. Also document that a network failure, malformed token JSON, or a 200 body without access_token does not store a token and does not clear PKCE, while a non-2xx token response does clear PKCE. No authorization, scope, endpoint, or UI change.
+tried_and_rejected: Clearing PKCE on state mismatch was rejected because the panel comment treats that clear as the wrong security outcome (it would abort a real in-flight authorization on a forged callback).
+commands: bunx vitest run src/test/mcp-browser-oauth-client.test.ts --reporter=verbose; bunx eslint src/test/mcp-browser-oauth-client.test.ts; bun run typecheck
+files_touched: src/test/mcp-browser-oauth-client.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned
+blockers: independent exact-head review not requested; hosted CI NOT_MEASURED until the draft PR runs
+open_questions: none for the documented current behavior
+gotchas: Module-level discovery cache is reset by vi.resetModules per test. Tokens are asserted absent from localStorage.setItem. javascript: and data: URLs fail sameOriginRedirect because their origin is not the page origin.
+links: https://linear.app/verdantgrowdiary/issue/VER-293
+artifacts: src/test/mcp-browser-oauth-client.test.ts
+reviewer_seat: an eligible independent session that did not author this PR
+reviewer_sha: Jack Herer review 5670094164 covers d4e98ae40fad58741d13fdb61a5007d82d487669 only (PASS-pending-CI 0/0/4). It does not cover the follow-up head.
+session_state: no new review request; product file restored after the local RED check
+claimed_by: Cursor Grok, 2026-10-27 09:28 CT
+owner: Cursor Grok VER-293 session
+last_updated: 2026-10-27 16:10 CT, by Cursor Grok
+```
+
 ### PR2511-REQUIRED-TRIGGER-GUARDS
 
 ```text

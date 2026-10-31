@@ -47,12 +47,13 @@ function runRange(cwd: string, env: Record<string, string>) {
   return {
     skip: /^skip=(.*)$/m.exec(text)?.[1],
     range: /range<<EOF\n(.*)\nEOF/.exec(text)?.[1],
+    policyRef: /^policy_ref=(.*)$/m.exec(text)?.[1],
   };
 }
 
 describe("secret-scan workflow", () => {
-  it("passes -m so merge-commit diffs are scanned", () => {
-    expect(step("Scan commits").run).toMatch(/--log-opts="-m \$\{RANGE\}"/);
+  it("passes --diff-merges=remerge so merge resolutions are scanned", () => {
+    expect(step("Scan commits").run).toMatch(/--log-opts="--diff-merges=remerge \$\{RANGE\}"/);
   });
 
   it("a secret added only in a merge resolution shows up with the workflow's log opts", () => {
@@ -62,7 +63,7 @@ describe("secret-scan workflow", () => {
     git(dir, "add", ".");
     git(dir, "commit", "-qm", "feature");
     git(dir, "checkout", "-q", "verdant-grow-diary");
-    writeFileSync(join(dir, "b.txt"), "base2\n");
+    writeFileSync(join(dir, "b.txt"), "BASE_ONLY_MARKER\n");
     git(dir, "add", ".");
     git(dir, "commit", "-qm", "base2");
     const base = git(dir, "rev-parse", "HEAD");
@@ -73,7 +74,11 @@ describe("secret-scan workflow", () => {
     git(dir, "commit", "-qm", "merge");
     const range = `${base}..HEAD`;
     expect(git(dir, "log", "-p", "-U0", range)).not.toContain("MERGE_ONLY_MARKER");
-    expect(git(dir, "log", "-p", "-U0", "-m", range)).toContain("MERGE_ONLY_MARKER");
+    const opts = /--log-opts="([^ ]+) \$\{RANGE\}"/.exec(step("Scan commits").run)?.[1] ?? "";
+    const withOpts = git(dir, "log", "-p", "-U0", opts, `${base}..HEAD`);
+    expect(withOpts).toContain("MERGE_ONLY_MARKER");
+    // Lines merged in from base are not re-reported as new in the merge commit.
+    expect(withOpts).not.toContain("BASE_ONLY_MARKER");
   });
 
   it("loads config, baseline and ignore list from the base ref, not the PR tree", () => {
@@ -94,6 +99,7 @@ describe("secret-scan workflow", () => {
     expect(runRange(dir, { EVENT_NAME: "pull_request", PR_BASE: sha, PR_HEAD: sha })).toEqual({
       skip: "false",
       range: `${sha}..${sha}`,
+      policyRef: sha,
     });
   });
 
@@ -138,7 +144,56 @@ describe("secret-scan workflow", () => {
     ).toEqual({
       skip: "false",
       range: `${base}..${after}`,
+      policyRef: base,
     });
+  });
+
+  it("normal push takes policy from the pre-push tip, not the pushed commits", () => {
+    const dir = fixture();
+    const before = git(dir, "rev-parse", "HEAD");
+    writeFileSync(join(dir, "n.txt"), "n\n");
+    git(dir, "add", ".");
+    git(dir, "commit", "-qm", "n");
+    const after = git(dir, "rev-parse", "HEAD");
+    expect(
+      runRange(dir, {
+        EVENT_NAME: "push",
+        PUSH_BEFORE: before,
+        PUSH_AFTER: after,
+        PUSH_DELETED: "false",
+      }),
+    ).toEqual({
+      skip: "false",
+      range: `${before}..${after}`,
+      policyRef: before,
+    });
+  });
+
+  it("force-push to the base branch never yields an empty range or self-loaded policy", () => {
+    const dir = fixture();
+    writeFileSync(join(dir, "n.txt"), "n\n");
+    git(dir, "add", ".");
+    git(dir, "commit", "-qm", "n");
+    const after = git(dir, "rev-parse", "HEAD");
+    const gone = "1234567890abcdef1234567890abcdef12345678";
+    expect(
+      runRange(dir, {
+        EVENT_NAME: "push",
+        PUSH_BEFORE: gone,
+        PUSH_AFTER: after,
+        PUSH_DELETED: "false",
+      }),
+    ).toEqual({
+      skip: "false",
+      range: `${after}^!`,
+      policyRef: "",
+    });
+    expect(git(dir, "rev-list", `${after}^!`)).toBe(after);
+  });
+
+  it("empty policy ref falls back to defaults, not the working tree or index", () => {
+    const policy = step("Load scan policy from base").run;
+    expect(policy).toContain('has() { [ -n "$POLICY_REF" ] &&');
   });
 
   it("still rejects a malformed push sha (detection not weakened)", () => {

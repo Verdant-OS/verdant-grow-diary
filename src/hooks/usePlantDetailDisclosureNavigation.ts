@@ -35,6 +35,12 @@ const HASH_SCROLL_FOLLOW_MS = 3000;
  * when `scrollend` never fires (older Safari, a no-op scroll, or an aligned target).
  */
 export const HASH_SCROLL_CANCEL_CEILING_MS = 1200;
+/**
+ * A hash landing aligns the section's top. "center" put a section taller than the
+ * viewport hundreds of pixels above the screen; each section's `scroll-mt-16`
+ * leaves room for the sticky header.
+ */
+const HASH_LANDING_BLOCK: ScrollLogicalPosition = "start";
 
 function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () => void {
   if (
@@ -134,7 +140,7 @@ function startHashScrollFollow(anchorId: string, onUserInput?: () => void): () =
     const target = document.getElementById(anchorId);
     if (!target) return;
     noteSmoothScroll();
-    safelyFocusAndScroll(target);
+    safelyFocusAndScroll(target, HASH_LANDING_BLOCK);
   });
   observer.observe(document.documentElement);
   const timer = window.setTimeout(endObservation, HASH_SCROLL_FOLLOW_MS);
@@ -161,9 +167,9 @@ function openStateFor(group: PlantDetailDisclosureGroup | null): PlantDetailDisc
   return group ? { ...ALL_CLOSED, [group]: true } : { ...ALL_CLOSED };
 }
 
-function safelyFocusAndScroll(target: HTMLElement) {
+function safelyFocusAndScroll(target: HTMLElement, block: ScrollLogicalPosition = "center") {
   try {
-    target.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    target.scrollIntoView?.({ behavior: "smooth", block });
   } catch {
     try {
       target.scrollIntoView?.();
@@ -225,7 +231,7 @@ export function usePlantDetailDisclosureNavigation({
   );
 
   const scheduleNavigation = useCallback(
-    (anchorId: string, preferredTarget?: HTMLElement | null) => {
+    (anchorId: string, preferredTarget?: HTMLElement | null, block?: ScrollLogicalPosition) => {
       cancelPendingFrame();
       if (
         typeof document === "undefined" ||
@@ -240,7 +246,7 @@ export function usePlantDetailDisclosureNavigation({
           (typeof preferredTarget.isConnected !== "boolean" || preferredTarget.isConnected);
         const target =
           (preferredIsMounted ? preferredTarget : null) ?? document.getElementById(anchorId);
-        if (target) safelyFocusAndScroll(target);
+        if (target) safelyFocusAndScroll(target, block);
       });
     },
     [cancelPendingFrame],
@@ -323,7 +329,7 @@ export function usePlantDetailDisclosureNavigation({
       };
     });
     if (target) {
-      scheduleNavigation(target.anchorId);
+      scheduleNavigation(target.anchorId, null, HASH_LANDING_BLOCK);
       beginHashScrollFollow(target.anchorId);
     } else {
       endHashScrollFollow();
@@ -356,7 +362,7 @@ export function usePlantDetailDisclosureNavigation({
           };
         });
       }
-      scheduleNavigation(target.anchorId);
+      scheduleNavigation(target.anchorId, null, HASH_LANDING_BLOCK);
       beginHashScrollFollow(target.anchorId);
     };
     window.addEventListener("hashchange", handleHashChange);

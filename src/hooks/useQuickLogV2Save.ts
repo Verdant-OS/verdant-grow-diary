@@ -1,4 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import {
+  createQuickLogSubmitGuard,
+  type QuickLogSubmitGuardController,
+} from "@/lib/quickLogDuplicateSubmitGuard";
 import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyQuickLogThrownSaveError } from "@/lib/quickLogSaveErrorMessage";
@@ -80,8 +84,14 @@ const DEFINITIVE_MANUAL_REJECTIONS = new Set([
 export function useQuickLogV2Save() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const guardRef = useRef<QuickLogSubmitGuardController<QuickLogV2SaveResult> | null>(null);
+  if (guardRef.current === null) {
+    guardRef.current = createQuickLogSubmitGuard(
+      () => ({ ok: false, reason: "save_in_flight" }),
+    );
+  }
 
-  const save = useCallback(
+  const saveRequest = useCallback(
     async (
       payload: QuickLogV2SavePayload,
       options: QuickLogV2SaveOptions = {},
@@ -273,6 +283,22 @@ export function useQuickLogV2Save() {
       }
     },
     [],
+  );
+
+  const save = useCallback(
+    (
+      payload: QuickLogV2SavePayload,
+      options: QuickLogV2SaveOptions = {},
+    ): Promise<QuickLogV2SaveResult> => {
+      const guard = guardRef.current;
+      if (!guard) return Promise.resolve({ ok: false, reason: "save_in_flight" });
+      // Observation and environment can share one note RPC body. The intent
+      // is part of the submission, so those two saves are not duplicates.
+      return guard.run({ payload, telemetryIntent: options.telemetryIntent ?? null }, () =>
+        saveRequest(payload, options),
+      );
+    },
+    [saveRequest],
   );
 
   return { save, saving, error };

@@ -55,6 +55,8 @@ function recentCsv(agesInMinutes: readonly [number, number] = [2, 1]) {
 }
 type Csv = ReturnType<typeof recentCsv>;
 
+const TEMPERATURE_HISTORY_LABEL = "Temperature (°C)";
+
 const HISTORY_VALUE_SUFFIX = {
   temperature_c: " °C",
   humidity_pct: "%",
@@ -348,7 +350,7 @@ async function assertHistory(page: Page, csv: Csv) {
       const row = table
         .locator("tbody tr")
         .filter({ hasText: shownAt })
-        .filter({ hasText: metric === "temperature_c" ? "Temperature (°C)" : metric });
+        .filter({ hasText: metric === "temperature_c" ? TEMPERATURE_HISTORY_LABEL : metric });
       await expect(row).toHaveCount(1);
       await expect(row.locator("td").nth(2)).toHaveText(
         `${observation[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,
@@ -766,7 +768,7 @@ test("a multi-batch CSV import reconciles a lost final reply beyond the read cap
           .getByTestId("imported-history-recent-rows")
           .locator("tbody tr")
           .filter({ hasText: shownAt })
-          .filter({ hasText: metric === "temperature_c" ? "Temperature (°C)" : metric });
+          .filter({ hasText: metric === "temperature_c" ? TEMPERATURE_HISTORY_LABEL : metric });
         await expect(row).toHaveCount(1);
         await expect(row.locator("td").nth(2)).toHaveText(
           `${latest[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,

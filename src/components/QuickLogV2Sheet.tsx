@@ -6,7 +6,6 @@ import {
   buildQuickLogSheetSubmissionSnapshot,
   createQuickLogSubmitGuardState,
   decideQuickLogSubmit,
-  fingerprintQuickLogSubmission,
   finishQuickLogSubmit,
   isQuickLogSaveBusy,
   type QuickLogSubmitGuardState,
@@ -669,7 +668,6 @@ function QuickLogV2SheetForOwner({
   // any later different error (e.g. an unreadable photo) hides the line.
   const [noteFirstSaveFailedMessage, setNoteFirstSaveFailedMessage] = useState<string | null>(null);
   const [saveAttemptLocked, setSaveAttemptLocked] = useState(false);
-  const [heldDuplicate, setHeldDuplicate] = useState(false);
   const saveBusy = isQuickLogSaveBusy({
     saving,
     feedingSaving,
@@ -678,7 +676,7 @@ function QuickLogV2SheetForOwner({
   });
   const noteFirstSaveState = deriveQuickLogV2SaveState({
     saving: saveBusy,
-    saved: postSave !== null || heldDuplicate,
+    saved: postSave !== null,
     error: quickLogV2SaveFailedError({
       saveFailed: noteFirstSaveFailedMessage !== null && noteFirstSaveFailedMessage === localError,
       action: form.action,
@@ -691,29 +689,9 @@ function QuickLogV2SheetForOwner({
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
-  const saveCommittedRef = useRef(false);
-  const submitGuardRef = useRef<QuickLogSubmitGuardState<{ ok: boolean }>>(
+  const submitGuardRef = useRef<QuickLogSubmitGuardState>(
     createQuickLogSubmitGuardState(),
   );
-  const submissionFingerprint = fingerprintQuickLogSubmission(
-    buildQuickLogSheetSubmissionSnapshot({
-      action: form.action,
-      selectedKey: form.selectedKey,
-      note: form.note,
-      volumeMl: form.volumeMl,
-      temperatureC: form.temperatureC,
-      humidityPct: form.humidityPct,
-      vpdKpa: form.vpdKpa,
-      watering: wateringForm,
-      feeding: feedingForm,
-      maturity: maturityEvidenceForm,
-      photo: photoFile,
-      video: videoFile,
-    }),
-  );
-  useEffect(() => {
-    setHeldDuplicate(false);
-  }, [submissionFingerprint]);
   const observationDraftSuppressedRef = useRef(false);
   // True once this open restored or wrote the stored draft, so emptying the
   // form may forget it. Opening for another target never clears its draft.
@@ -1949,17 +1927,13 @@ function QuickLogV2SheetForOwner({
         video: videoFile,
       }),
     );
-    if (decision.kind === "duplicate") {
-      setHeldDuplicate(true);
-      releaseUnstartedLargeWaterConfirm();
-      return;
-    }
-    if (decision.kind === "in_flight") {
+    // In-flight only: an identical or different tap while a save is running
+    // writes nothing. Once it settles, a later deliberate save always writes.
+    if (decision.kind !== "begin") {
       releaseUnstartedLargeWaterConfirm();
       return;
     }
     submitGuardRef.current = beginQuickLogSubmit(submitGuardRef.current, decision.fingerprint);
-    saveCommittedRef.current = false;
     // Freeze every supported submission before the first await, using the
     // same synchronous guard as Water. Local validation releases this lock.
     const lockSubmission =
@@ -1975,13 +1949,7 @@ function QuickLogV2SheetForOwner({
     try {
       await runHandleSave();
     } finally {
-      submitGuardRef.current = finishQuickLogSubmit(
-        submitGuardRef.current,
-        decision.fingerprint,
-        { ok: saveCommittedRef.current },
-        saveCommittedRef.current,
-      );
-      saveCommittedRef.current = false;
+      submitGuardRef.current = finishQuickLogSubmit(submitGuardRef.current, decision.fingerprint);
       largeWaterSessionRef.current = {
         ...largeWaterSessionRef.current,
         inFlight: false,
@@ -2233,7 +2201,6 @@ function QuickLogV2SheetForOwner({
         growEventId,
         source: "quick_log_v2_feed",
       });
-      saveCommittedRef.current = true;
       setPostSave({
         growEventId,
         growId: resolved.growId ?? null,
@@ -2945,7 +2912,6 @@ function QuickLogV2SheetForOwner({
     });
     resetPhotoSelection();
     resetVideoSelection();
-    saveCommittedRef.current = true;
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
       growId: confirmedScope.growId,
@@ -4288,7 +4254,6 @@ function QuickLogV2SheetForOwner({
                     onClick={handleSave}
                     disabled={
                       saveBusy ||
-                      heldDuplicate ||
                       videoChecking ||
                       photoChecking ||
                       historyCheckRequired ||
@@ -4306,11 +4271,9 @@ function QuickLogV2SheetForOwner({
                   >
                     {saveBusy
                       ? "Saving…"
-                      : heldDuplicate
-                        ? "Saved"
-                        : retryPending
-                          ? "Retry exact record"
-                          : "Save"}
+                      : retryPending
+                        ? "Retry exact record"
+                        : "Save"}
                   </Button>
                 </div>
               </>

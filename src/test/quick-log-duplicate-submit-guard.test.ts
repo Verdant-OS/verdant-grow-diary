@@ -59,29 +59,27 @@ describe("decideQuickLogSubmit", () => {
     expect(decideQuickLogSubmit(createQuickLogSubmitGuardState(), undefined).kind).toBe("begin");
   });
 
-  it("joins an in-flight save and returns a completed duplicate", () => {
+  it("joins an identical in-flight save and begins again once it settles", () => {
     const fingerprint = fingerprintQuickLogSubmission(note);
-    const inFlight = beginQuickLogSubmit(createQuickLogSubmitGuardState<string>(), fingerprint);
+    const inFlight = beginQuickLogSubmit(createQuickLogSubmitGuardState(), fingerprint);
     expect(decideQuickLogSubmit(inFlight, { ...note, p_occurred_at: "later" }).kind).toBe(
       "in_flight",
     );
-    const completed = finishQuickLogSubmit(inFlight, fingerprint, "saved-row", true);
-    const decision = decideQuickLogSubmit(completed, note);
-    expect(decision.kind).toBe("duplicate");
-    if (decision.kind === "duplicate") expect(decision.result).toBe("saved-row");
+    const settled = finishQuickLogSubmit(inFlight, fingerprint);
+    expect(decideQuickLogSubmit(settled, note).kind).toBe("begin");
   });
 
   it("forgets a failed attempt so the same payload can retry", () => {
     const fingerprint = fingerprintQuickLogSubmission(note);
-    const inFlight = beginQuickLogSubmit(createQuickLogSubmitGuardState<string>(), fingerprint);
-    const failed = finishQuickLogSubmit(inFlight, fingerprint, null, false);
+    const inFlight = beginQuickLogSubmit(createQuickLogSubmitGuardState(), fingerprint);
+    const failed = finishQuickLogSubmit(inFlight, fingerprint);
     expect(failed.phase).toBe("idle");
     expect(decideQuickLogSubmit(failed, note).kind).toBe("begin");
   });
 });
 
 describe("createQuickLogSubmitGuard", () => {
-  it("sends one network call for two taps of the same note, including a minute later", async () => {
+  it("sends one network call for two in-flight taps, and writes a later deliberate save", async () => {
     const guard = createQuickLogSubmitGuard<{ ok: boolean; reused?: boolean; id: string }>(() => ({
       ok: false,
       id: "blocked",
@@ -114,7 +112,7 @@ describe("createQuickLogSubmitGuard", () => {
     await expect(first).resolves.toEqual({ ok: true, id: "row-1" });
     await expect(second).resolves.toEqual({ ok: true, id: "row-1" });
 
-    const third = await guard.run(
+    const third = guard.run(
       {
         ...payload,
         p_idempotency_key: "quicklog-v2-third-key",
@@ -122,8 +120,10 @@ describe("createQuickLogSubmitGuard", () => {
       },
       execute,
     );
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(third).toEqual({ ok: true, reused: true, id: "row-1" });
+    expect(execute).toHaveBeenCalledTimes(2);
+    release({ ok: true, id: "row-2" });
+    await expect(third).resolves.toEqual({ ok: true, id: "row-2" });
+    expect(guard.state.phase).toBe("idle");
   });
 
   it("allows a different note and a retry after failure", async () => {
@@ -144,10 +144,10 @@ describe("createQuickLogSubmitGuard", () => {
 
   it("does not call execute when the blocked fallback is used without a flight", async () => {
     const guard = createQuickLogSubmitGuard<{ ok: boolean }>(() => ({ ok: false }));
-    const state = beginQuickLogSubmit(createQuickLogSubmitGuardState<{ ok: boolean }>(), "stale");
+    const state = beginQuickLogSubmit(createQuickLogSubmitGuardState(), "stale");
     expect(state.phase).toBe("in_flight");
     const decision = decideQuickLogSubmit(state, { p_note: "other" });
-    expect(decision.kind).toBe("in_flight");
+    expect(decision.kind).toBe("busy");
     expect(guard.state.phase).toBe("idle");
   });
 });

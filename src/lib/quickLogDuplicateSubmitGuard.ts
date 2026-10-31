@@ -79,73 +79,64 @@ export function buildQuickLogSheetSubmissionSnapshot(
   };
 }
 
-export type QuickLogSubmitPhase = "idle" | "in_flight" | "completed";
+/*
+ * In-flight only (Main FIX REQUEST #2647 P1 / P2-1). Nothing is remembered
+ * after a save settles, so a later deliberate save of the same payload always
+ * writes. Only a tap whose fingerprint matches the save still in flight joins
+ * it; a different payload during flight is refused, never given the first
+ * save's result.
+ */
+export type QuickLogSubmitPhase = "idle" | "in_flight";
 
-export interface QuickLogSubmitGuardState<T> {
+export interface QuickLogSubmitGuardState {
   phase: QuickLogSubmitPhase;
   /** Fingerprint of the save currently in flight, when phase is in_flight. */
   fingerprint: string | null;
-  /** Every payload that already committed, keyed by fingerprint. */
-  completed: Record<string, T>;
 }
 
-export type QuickLogSubmitDecision<T> =
+export type QuickLogSubmitDecision =
   | { kind: "begin"; fingerprint: string }
+  /** Identical payload while that payload is still in flight. */
   | { kind: "in_flight"; fingerprint: string }
-  | { kind: "duplicate"; fingerprint: string; result: T };
+  /** A different payload while another save is still in flight. */
+  | { kind: "busy"; fingerprint: string };
 
-export function createQuickLogSubmitGuardState<T>(): QuickLogSubmitGuardState<T> {
-  return { phase: "idle", fingerprint: null, completed: {} };
+export function createQuickLogSubmitGuardState(): QuickLogSubmitGuardState {
+  return { phase: "idle", fingerprint: null };
 }
 
-export function decideQuickLogSubmit<T>(
-  state: QuickLogSubmitGuardState<T> | null | undefined,
+export function decideQuickLogSubmit(
+  state: QuickLogSubmitGuardState | null | undefined,
   payload: unknown,
-): QuickLogSubmitDecision<T> {
+): QuickLogSubmitDecision {
   const fingerprint = fingerprintQuickLogSubmission(payload);
-  const completed = state?.completed?.[fingerprint];
   if (state?.phase === "in_flight") {
-    return { kind: "in_flight", fingerprint: state.fingerprint ?? fingerprint };
+    return state.fingerprint === fingerprint
+      ? { kind: "in_flight", fingerprint }
+      : { kind: "busy", fingerprint };
   }
-  if (completed != null) return { kind: "duplicate", fingerprint, result: completed };
   return { kind: "begin", fingerprint };
 }
 
-export function beginQuickLogSubmit<T>(
-  state: QuickLogSubmitGuardState<T> | null | undefined,
+export function beginQuickLogSubmit(
+  _state: QuickLogSubmitGuardState | null | undefined,
   fingerprint: string | null | undefined,
-): QuickLogSubmitGuardState<T> {
-  const current = state ?? createQuickLogSubmitGuardState<T>();
+): QuickLogSubmitGuardState {
   return {
     phase: "in_flight",
     fingerprint: typeof fingerprint === "string" ? fingerprint : "",
-    completed: current.completed ?? {},
   };
 }
 
-export function finishQuickLogSubmit<T>(
-  state: QuickLogSubmitGuardState<T> | null | undefined,
+/** Settle (success, failure or throw): always back to idle for that flight. */
+export function finishQuickLogSubmit(
+  state: QuickLogSubmitGuardState | null | undefined,
   fingerprint: string | null | undefined,
-  result: T | null,
-  committed: boolean,
-): QuickLogSubmitGuardState<T> {
-  const current = state ?? createQuickLogSubmitGuardState<T>();
+): QuickLogSubmitGuardState {
+  const current = state ?? createQuickLogSubmitGuardState();
   const key = typeof fingerprint === "string" ? fingerprint : "";
   if (current.phase === "in_flight" && current.fingerprint !== key) return current;
-  const completed = current.completed ?? {};
-  if (!committed || result == null) {
-    return { phase: "idle", fingerprint: null, completed };
-  }
-  return {
-    phase: "idle",
-    fingerprint: null,
-    completed: { ...completed, [key]: result },
-  };
-}
-
-export function reuseQuickLogSubmitResult<T extends { reused?: boolean }>(result: T): T {
-  if (result == null || typeof result !== "object") return result;
-  return { ...result, reused: true };
+  return createQuickLogSubmitGuardState();
 }
 
 export interface QuickLogSaveBusyInput {
@@ -163,8 +154,8 @@ export function isQuickLogSaveBusy(input: QuickLogSaveBusyInput | null | undefin
   );
 }
 
-export interface QuickLogSubmitGuardController<T extends { ok: boolean; reused?: boolean }> {
-  readonly state: QuickLogSubmitGuardState<T>;
+export interface QuickLogSubmitGuardController<T extends { ok: boolean }> {
+  readonly state: QuickLogSubmitGuardState;
   run(payload: unknown, execute: () => Promise<T>): Promise<T>;
 }
 
@@ -174,18 +165,16 @@ interface QuickLogSubmitFlight<T> {
 }
 
 /**
- * Remembers one in-flight save and every completed payload for this caller.
- * A second tap joins the in-flight promise. The same payload after success
- * returns that result with `reused: true` and does not call `execute`.
- * A failed attempt is forgotten so Retry can send it again.
+ * Holds one in-flight save for this caller. A second tap with the identical
+ * payload joins that promise; a different payload gets `blocked()`. When the
+ * save settles (success, failure or throw) the guard is idle again, so the
+ * same payload saved later is a new write.
  */
-export function createQuickLogSubmitGuard<T extends { ok: boolean; reused?: boolean }>(
+export function createQuickLogSubmitGuard<T extends { ok: boolean }>(
   blocked: () => T,
-  options?: { rememberCompleted?: boolean },
 ): QuickLogSubmitGuardController<T> {
-  let state = createQuickLogSubmitGuardState<T>();
+  let state = createQuickLogSubmitGuardState();
   let flight: QuickLogSubmitFlight<T> | null = null;
-  const rememberCompleted = options?.rememberCompleted !== false;
   const fallback = { ok: false } as T;
   const refuse = typeof blocked === "function" ? blocked : () => fallback;
 
@@ -195,25 +184,17 @@ export function createQuickLogSubmitGuard<T extends { ok: boolean; reused?: bool
     },
     run(payload, execute) {
       const decision = decideQuickLogSubmit(state, payload);
-      if (decision.kind === "duplicate") {
-        return Promise.resolve(reuseQuickLogSubmitResult(decision.result));
+      if (decision.kind === "in_flight" && flight?.fingerprint === decision.fingerprint) {
+        return flight.promise;
       }
-      if (decision.kind === "in_flight") {
-        if (flight) return flight.promise;
-        return Promise.resolve(refuse());
-      }
+      if (decision.kind !== "begin") return Promise.resolve(refuse());
       const fingerprint = decision.fingerprint;
       state = beginQuickLogSubmit(state, fingerprint);
       const promise = (async () => {
         try {
-          const result = await execute();
-          const committed = rememberCompleted && result != null && result.ok === true;
-          state = finishQuickLogSubmit(state, fingerprint, result ?? null, committed);
-          return result;
-        } catch (error) {
-          state = finishQuickLogSubmit(state, fingerprint, null, false);
-          throw error;
+          return await execute();
         } finally {
+          state = finishQuickLogSubmit(state, fingerprint);
           if (flight?.fingerprint === fingerprint) flight = null;
         }
       })();

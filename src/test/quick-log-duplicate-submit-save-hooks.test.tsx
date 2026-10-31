@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe("useQuickLogV2Save duplicate note guard", () => {
-  it("keeps a second tap on the in-flight promise and does not write the same note again", async () => {
+  it("keeps a second tap on the in-flight promise, and a later save still writes", async () => {
     let release: (value: {
       data: { ok: true; grow_event_id: string; reused: false };
       error: null;
@@ -71,7 +71,10 @@ describe("useQuickLogV2Save duplicate note guard", () => {
     const pending = new Promise((resolve) => {
       release = resolve;
     });
-    rpcMock.mockReturnValue(pending);
+    rpcMock.mockReturnValueOnce(pending).mockResolvedValue({
+      data: { ok: true, grow_event_id: EVENT_ID, reused: false },
+      error: null,
+    });
     const { result } = renderHook(() => useQuickLogV2Save());
     const first = result.current.save(
       notePayload("quicklog-v2-first-key1", "2026-10-31T04:00:00.000Z"),
@@ -94,9 +97,10 @@ describe("useQuickLogV2Save duplicate note guard", () => {
         notePayload("quicklog-v2-third-keyy", "2026-10-31T04:02:00.000Z"),
       );
     });
-    expect(rpcMock).toHaveBeenCalledTimes(1);
+    // A later deliberate save of the same note is a new write (P1).
+    expect(rpcMock).toHaveBeenCalledTimes(2);
     expect(third.ok).toBe(true);
-    expect(third.reused).toBe(true);
+    expect(third.reused).toBe(false);
     expect(third.growEventId).toBe(EVENT_ID);
   });
 

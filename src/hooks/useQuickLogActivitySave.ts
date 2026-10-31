@@ -96,14 +96,11 @@ export function useQuickLogActivitySave() {
   const [error, setError] = useState<QuickLogActivitySaveReason | null>(null);
   const guardRef = useRef<QuickLogSubmitGuardController<QuickLogActivitySaveResult> | null>(null);
   if (guardRef.current === null) {
-    guardRef.current = createQuickLogSubmitGuard(
-      () => ({
-        ok: false,
-        reason: "save_failed",
-      }),
-      // A confirmed activity may be logged again. Only an in-flight tap is held.
-      { rememberCompleted: false },
-    );
+    // Only an in-flight tap is held; a confirmed activity may be logged again.
+    guardRef.current = createQuickLogSubmitGuard(() => ({
+      ok: false,
+      reason: "save_failed",
+    }));
   }
 
   const saveRequest = useCallback(

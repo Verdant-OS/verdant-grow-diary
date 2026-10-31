@@ -86,10 +86,9 @@ export function useQuickLogV2Save() {
   const [error, setError] = useState<string | null>(null);
   const guardRef = useRef<QuickLogSubmitGuardController<QuickLogV2SaveResult> | null>(null);
   if (guardRef.current === null) {
-    guardRef.current = createQuickLogSubmitGuard(() => ({
-      ok: false,
-      reason: "save_in_flight",
-    }));
+    guardRef.current = createQuickLogSubmitGuard(
+      () => ({ ok: false, reason: "save_in_flight" }),
+    );
   }
 
   const saveRequest = useCallback(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -67,6 +67,10 @@ import {
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
+import {
+  describeCreatePlantPrimaryButton,
+  PLANT_NO_TENTS_OPTIONAL_HINT,
+} from "@/lib/createDialogPrimaryButtonViewModel";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -366,6 +370,23 @@ export default function CreatePlantDialog({
     binding.blockSubmit ||
     !canWriteCreateGrowId(targetGrowId) ||
     tentBlocksWrite;
+  const nameFieldId = useId();
+  const disabledReasonId = useId();
+  const tentRequired = !plantCreateAllowsTentless({
+    suppliedTentId: defaultTentId,
+    requireTent,
+  });
+  const primary = describeCreatePlantPrimaryButton({
+    busy,
+    outcomeUnknown: createOutcomeUnknown,
+    formBlocked,
+    formBlockedDetail:
+      suppliedTent.title || tentCompat.title || binding.title || binding.body || null,
+    tentCompatible: tentCompat.compatible,
+    tentRequired,
+    tentBlockedDetail: tentCompat.title || tentCompat.body || null,
+    name: form.name,
+  });
 
   function outsideCreateDialogTarget(target: EventTarget | null): boolean {
     return (
@@ -934,16 +955,20 @@ export default function CreatePlantDialog({
         {!binding.blockSubmit && (
           <form onSubmit={submit} className="grid gap-3" data-testid="create-plant-form">
             <div>
-              <Label>Name</Label>
+              <Label htmlFor={nameFieldId}>Name</Label>
               <Input
                 required
+                id={nameFieldId}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Plant A"
                 data-testid="create-plant-name"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Only a name and stage are required to get started.
+              <p
+                className="text-[11px] text-muted-foreground mt-1"
+                data-testid="plant-create-name-helper"
+              >
+                {primary.helperText}
               </p>
             </div>
             <div>
@@ -1041,7 +1066,7 @@ export default function CreatePlantDialog({
                   className="text-xs text-muted-foreground mt-1"
                   data-testid="create-plant-no-tents-hint"
                 >
-                  No tents yet. Create a tent first.
+                  {tentRequired ? "No tents yet. Create a tent first." : PLANT_NO_TENTS_OPTIONAL_HINT}
                 </p>
               )}
             </div>
@@ -1101,6 +1126,15 @@ export default function CreatePlantDialog({
                 {saveError}
               </p>
             ) : null}
+            {primary.reason ? (
+              <p
+                id={disabledReasonId}
+                className="text-xs text-muted-foreground"
+                data-testid="plant-create-disabled-reason"
+              >
+                {primary.reason}
+              </p>
+            ) : null}
             <Button
               type="submit"
               disabled={
@@ -1109,6 +1143,7 @@ export default function CreatePlantDialog({
                 !tentCompat.compatible ||
                 !hasTrimmedRequiredIdentity(form.name)
               }
+              aria-describedby={primary.reason ? disabledReasonId : undefined}
               className="gradient-leaf text-primary-foreground"
               data-testid="plant-create-submit"
             >

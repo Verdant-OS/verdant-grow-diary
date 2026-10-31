@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-27.1**
+**Sentinel-Version: 2026-10-31.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -46,6 +46,8 @@ When two instructions conflict, higher wins. Report the conflict. Do not pick in
 3. This constitution.
 4. Role files.
 5. Task instructions, the handoff block, and the handoff protocol.
+
+Governance docs define seats and duties. `docs/agents/constitution/roster.md` is the only file mapping seats to current agent names and GitHub accounts, and on who holds a seat the roster wins. Matthew's own words override both. Renaming an agent edits only the roster.
 
 Operating state records facts, owners, and locks. It does not override a numbered
 rule or OWNERSHIP.md on ownership and review routing.
@@ -296,6 +298,12 @@ ran and what you skipped.
   that head and an independent exact-head review passes, with no P1 or P2.
   A skipped, missing, pending, or failed required check is not green. There is
   no author-integration exception. The merge seat is named in the roster.
+  The Merge Steward (Ultra) is the only seat that queues or merges, with
+  `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only after a
+  non-author Reviewer seat APPROVES that exact head. Builder and Fixer seats
+  never approve, mark ready, enqueue, or merge. The Merge Steward has no
+  authority over the PR #1971 hold, which stays with the Coordinator. Skipped, missing,
+  or neutral checks are `NOT_MEASURED`, never a pass.
   Protected and mixed scopes still need an eligible outside reviewer and their
   supplemental evidence.
 - Payment, migration, and production pull requests stay out of the queue until
@@ -379,7 +387,16 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
 - Peer comments are not the independent pass. Someone who touched the change
   cannot pass it.
 - Who may sit the review is the roster, applied to the whole scope, including
-  protected files and supplemental evidence.
+  protected files and supplemental evidence. Current review routing uses Reviewer
+  seats A, B, C, and D. Reviewer C, Reviewer D, and QA are active. Holders are
+  named only in the roster.
+- The review record is PR comments: `[ROUTE]`, `[ACK]`, `[CLAIM]`, then a GitHub
+  review at that commit. An adverse verdict (any P1 or P2) is `REQUEST_CHANGES`.
+  A clean verdict on a non-gated pull request is `APPROVE` at that commit by the
+  reviewer seat. A clean verdict on a gated pull request is `COMMENT` until
+  Matthew's own yes names the pull request and SHA. Only the Merge Steward may
+  dismiss `REQUEST_CHANGES`, and only with Matthew's written exception naming
+  the pull request, SHA, and finding. Detail is in `docs/agents/OWNERSHIP.md`.
 - Role files say each seat's default strength. Strength is not rank. Before
   work beyond the startup read, the seat reads its role file:
   `docs/agents/roles/codex.md`, `docs/agents/roles/grok.md`,
@@ -539,6 +556,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-10-31.1** — Seats and duties stay in the governance docs. The roster is the only holder map. The Merge Steward queues only after a non-author Reviewer APPROVE at the exact head and has no authority over the PR #1971 hold, which stays with the Coordinator. Reviewer C, Reviewer D, and QA are active seats.
 - **2026-10-27.1** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.
 - **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants
   in the per-item merge rule, matching the roster and ownership policy. No new merge

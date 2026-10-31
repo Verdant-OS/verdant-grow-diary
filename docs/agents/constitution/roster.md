@@ -1,8 +1,57 @@
 # Replaceable roster
 
+Normative names for seats cited by `AGENTS.md`. This file is the only map from seats to current agent names and GitHub accounts.
+
+Governance docs define seats and duties. `docs/agents/constitution/roster.md` is the only file mapping seats to current agent names and GitHub accounts, and on who holds a seat the roster wins. Matthew's own words override both. Renaming an agent edits only the roster.
+
+## Current seats
+
+| Seat            | Side  | Holder                                   | GitHub account          |
+| --------------- | ----- | ---------------------------------------- | ----------------------- |
+| Ultra Builder 1 | Ultra | Node                                     | `verdant-ultra-bot`     |
+| Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
+| Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
+| Coordinator     | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Merge Steward   | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
+| Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
+| Steward Backup  | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Reviewer A      | Main  | Sour Diesel                              | `cheekhimself` (shared) |
+| Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
+| Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
+| Reviewer D      | Main  | Maui Wowie · Reviewer (Main)             | `cheekhimself` (shared) |
+| QA              | Main  | Blue Dream · QA (Main)                   |                         |
+| New-User Smoke  | Main  | Toad Venom                               |                         |
+| Bug Sweep       | Main  | White Widow                              |                         |
+| Owner Adviser   | Main  | Bloom                                    |                         |
+| Flow Owner      | Both  | The Coordinator on each side, by default |                         |
+
+Reviewer C, Reviewer D, and QA are active.
+
+The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
+
+Ultra's open pull-request cap is 10.
+
+## Rules
+
+- Ultra seats never review, approve, or mark ready. Only the Ultra Merge Steward seat queues and merges, as `verdant-ultra-bot`, and only after a non-author Main Reviewer seat posts APPROVE at the exact current head. Matthew set that seat on 2026-10-30 at 11:03 PM CT.
+- The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
+- Steward Backup (Main) stands in when the Ultra Merge Steward is unavailable, under the same Steward rules, and still has no authority over the #1971 hold.
+- Main seats never write product code.
+- Approvals come only from Matthew, in his own words.
+- OG Kush holds both Coordinator and Steward Backup. When it acts as Steward Backup, it cannot also be the reviewer of record for the same PR.
+- Ultra's open pull-request cap is 10.
+- Reviewer C, Reviewer D, and QA are active.
+
+**Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
+
+## Historical
+
+# Replaceable roster
+
 Normative names for seats cited by `AGENTS.md`. Replace this file when seats change.
 Numbered rules in the constitution do not name tools, vendors, or people.
 
+<!-- prettier-ignore -->
 | Seat | What the constitution means | Current holder |
 | --- | --- | --- |
 | Founder | Explicit current instructions outrank the constitution. Production database changes, spend, publish gates, and the publish decision remain with this seat. Repository work does not authorize those operations. | Matthew Cheek |

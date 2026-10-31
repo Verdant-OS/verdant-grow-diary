@@ -108,6 +108,7 @@ import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
+import { useRegisteredTentQuickLogTentId } from "@/context/TentQuickLogTargetContext";
 import { quickLogArchivedGrowActionBlock } from "@/lib/archivedGrowQuickLogRules";
 import {
   buildQuickLogV2TargetOptions,
@@ -117,6 +118,7 @@ import {
   partitionQuickLogV2TargetOptionsForTent,
   resolveQuickLogV2Target,
   resolveQuickLogV2TentContextId,
+  resolveSelectableTentId,
   resolveTentScopedQuickLogPlantSelection,
   EMPTY_QUICKLOG_V2_FORM,
   QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
@@ -784,6 +786,8 @@ function QuickLogV2SheetForOwner({
       resolveQuickLogV2TentContextId(form.selectedKey)
     );
   }, [defaultTargetKey, form.selectedKey]);
+  const registeredTentId = useRegisteredTentQuickLogTentId();
+  const openTentId = tentContextId ?? resolveSelectableTentId(registeredTentId, baseOptions);
 
   const tentScopedPartitions = useMemo(
     () => partitionQuickLogV2TargetOptionsForTent(baseOptions, tentContextId),
@@ -1311,10 +1315,9 @@ function QuickLogV2SheetForOwner({
     // re-persists the ref-held saveFailed flag even though the form is unchanged.
   }, [user?.id, open, form, feedingForm.note, postSave, localError]);
 
-  // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
-  // Only when selectedKey is still empty/unset — never rewrite an explicit
-  // tent:<id> (or plant:) target. One-shot per open so a grower who later
-  // picks the tent again is not forced.
+  // Tent-scoped pick: recent plant in the tent, else the sole plant, else the
+  // selected tent. Only when selectedKey is still empty — never rewrite an
+  // explicit tent:<id> or plant: target. One-shot per open.
   useEffect(() => {
     if (submissionLockedRef.current || !open || contextBlocked || tentPlantAutoApplied) return;
     const recentPlantId = recentTargetSuggestion?.plantId ?? recentTargetRecord?.plantId ?? null;
@@ -1327,7 +1330,7 @@ function QuickLogV2SheetForOwner({
         ? form.selectedKey
         : (defaultTargetKey ?? null);
     const nextKey = resolveTentScopedQuickLogPlantSelection({
-      tentId: tentContextId,
+      tentId: openTentId,
       options,
       selectedKey: draftKey,
       recentPlantId,
@@ -1342,7 +1345,7 @@ function QuickLogV2SheetForOwner({
     open,
     contextBlocked,
     tentPlantAutoApplied,
-    tentContextId,
+    openTentId,
     options,
     form.selectedKey,
     defaultTargetKey,

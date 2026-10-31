@@ -15,6 +15,8 @@ import {
   VERDANT_GROWER_GUIDE_FAQ,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
+  type GuideAnchor,
+  type GuideSectionLink,
 } from "../../constants/verdantSeoContent";
 import {
   ATHENA_FEED_LOG_DESCRIPTION,
@@ -61,6 +63,7 @@ import {
 } from "../publicVpdChartRules";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
+import { isPublicGuideHref, splitAroundAnchor } from "../guidePublicCopyViewModel";
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
 const DEFAULT_OG_IMAGE = `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`;
@@ -118,23 +121,63 @@ function buildStaticGuideQuickLogStarterHref(guideSlug: string): string {
  * so crawlers that do not execute the application bundle still receive the
  * guide's real heading, evidence-first sections, FAQs, and internal links.
  */
+function renderStaticGuideAnchor(anchor: GuideAnchor): string {
+  if (!isPublicGuideHref(anchor.href)) return escapeStaticHtml(anchor.label);
+  return `<a href="${escapeStaticHtml(anchor.href)}">${escapeStaticHtml(anchor.label)}</a>`;
+}
+
+function renderStaticLinkedText(text: string, anchor: GuideAnchor | undefined): string {
+  const parts = splitAroundAnchor(text, anchor);
+  if (parts.kind === "plain") return escapeStaticHtml(text);
+  return `${escapeStaticHtml(parts.before)}${renderStaticGuideAnchor({
+    label: parts.label,
+    href: parts.href,
+  })}${escapeStaticHtml(parts.after)}`;
+}
+
+function renderStaticGuideBlock(block: {
+  heading: string;
+  headingLevel?: 2 | 3;
+  body?: string;
+  bodyLink?: GuideAnchor;
+  steps?: ReadonlyArray<string>;
+  closing?: string;
+  closingLink?: GuideAnchor;
+  cta?: GuideAnchor;
+  links?: ReadonlyArray<GuideSectionLink>;
+}): string {
+  const tag = block.headingLevel === 3 ? "h3" : "h2";
+  const links = (block.links ?? [])
+    .filter((link) => isSafeStaticInternalPath(link.to))
+    .map(
+      (link) => `<li><a href="${escapeStaticHtml(link.to)}">${escapeStaticHtml(link.label)}</a></li>`,
+    )
+    .join("");
+  const steps =
+    block.steps && block.steps.length > 0
+      ? `<ol>${block.steps.map((step) => `<li>${escapeStaticHtml(step)}</li>`).join("")}</ol>`
+      : "";
+  return [
+    `<section><${tag}>${escapeStaticHtml(block.heading)}</${tag}>`,
+    block.body && block.body.trim() ? `<p>${renderStaticLinkedText(block.body, block.bodyLink)}</p>` : "",
+    steps,
+    block.closing && block.closing.trim()
+      ? `<p>${renderStaticLinkedText(block.closing, block.closingLink)}</p>`
+      : "",
+    links ? `<ul>${links}</ul>` : "",
+    block.cta && isPublicGuideHref(block.cta.href) ? `<p>${renderStaticGuideAnchor(block.cta)}</p>` : "",
+    "</section>",
+  ].join("");
+}
+
 function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]): string {
   const sectionMarkup = guide.sections
-    .map((section) => {
-      const links = (section.links ?? [])
-        .filter((link) => isSafeStaticInternalPath(link.to))
-        .map(
-          (link) =>
-            `<li><a href="${escapeStaticHtml(link.to)}">${escapeStaticHtml(link.label)}</a></li>`,
-        )
-        .join("");
-      return [
-        `<section><h2>${escapeStaticHtml(section.heading)}</h2>`,
-        `<p>${escapeStaticHtml(section.body)}</p>`,
-        links ? `<ul>${links}</ul>` : "",
-        "</section>",
-      ].join("");
-    })
+    .map((section) =>
+      [
+        renderStaticGuideBlock(section),
+        ...(section.continuations ?? []).map((block) => renderStaticGuideBlock(block)),
+      ].join(""),
+    )
     .join("");
 
   const editorialProvenance =
@@ -157,6 +200,16 @@ function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]
         `<details><summary>${escapeStaticHtml(entry.question)}</summary><p>${escapeStaticHtml(entry.answer)}</p></details>`,
     )
     .join("");
+  const faqFooter = guide.faqFooter
+    ? [
+        `<p>${escapeStaticHtml(guide.faqFooter.lead)} ${guide.faqFooter.links
+          .map((link, index) => `${index > 0 ? " · " : ""}${renderStaticGuideAnchor(link)}`)
+          .join("")}</p>`,
+        guide.faqFooter.cta && isPublicGuideHref(guide.faqFooter.cta.href)
+          ? `<p>${renderStaticGuideAnchor(guide.faqFooter.cta)}</p>`
+          : "",
+      ].join("")
+    : "";
 
   const referenceTable = guide.referenceTable
     ? [
@@ -251,7 +304,11 @@ function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]
     `<main id="static-guide-fallback"><article data-guide-slug="${escapeStaticHtml(guide.slug)}">`,
     `<p><a href="/guides">Grower Guides</a></p>`,
     `<h1>${escapeStaticHtml(guide.h1)}</h1>`,
+    guide.introHeading ? `<h2>${escapeStaticHtml(guide.introHeading)}</h2>` : "",
     `<p>${escapeStaticHtml(guide.intro)}</p>`,
+    guide.introCta && isPublicGuideHref(guide.introCta.href)
+      ? `<p>${renderStaticGuideAnchor(guide.introCta)}</p>`
+      : "",
     editorialProvenance,
     referenceTable,
     cta,
@@ -260,7 +317,7 @@ function buildStaticGuideBodyFallback(guide: (typeof VERDANT_SEO_GUIDES)[number]
     budRotChecklist,
     vpdCalculator,
     customerComparison,
-    faq ? `<section><h2>Frequently asked questions</h2>${faq}</section>` : "",
+    faq ? `<section><h2>Frequently asked questions</h2>${faq}${faqFooter}</section>` : "",
     sources ? `<section><h2>Evidence and scope</h2><p>These sources support the measurement concepts and study-specific observations in this guide. They do not establish a universal fixture setting or diagnose a plant.</p><ul>${sources}</ul></section>` : "",
     standardCallsToAction,
     "</article></main>",

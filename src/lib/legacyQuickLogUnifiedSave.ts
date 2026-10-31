@@ -38,6 +38,10 @@ import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
 import type { PhenoEvidenceReceiptDetails } from "./phenoEvidenceCaptureRules";
 import {
+  QUICK_LOG_NOTE_OCCURRED_AT_INVALID,
+  canonicalQuickLogOccurredAtIso,
+} from "./quickLogNoteOccurredAtRules";
+import {
   assessWateringVolumeInput,
   QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
 } from "./quickLogWateringFormViewModel";
@@ -178,6 +182,12 @@ export interface LegacyQuickLogFormInput {
    * stay informative without depending on JSON details.
    */
   noteSuffix?: string | null;
+  /**
+   * Optional grower-chosen occurrence time for observation and note only.
+   * Omitted or blank keeps `p_occurred_at` null so the server stamps save
+   * time. Watering and environment checks ignore this field.
+   */
+  occurredAt?: string | null;
 }
 
 export type LegacyUnifiedBuildResult =
@@ -189,6 +199,29 @@ function trimStr(value: string | undefined | null): string {
 
 function finiteOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function legacyNoteOccurredAt(
+  eventType: string,
+  occurredAt: string | null | undefined,
+):
+  | { ok: true; value: string | null }
+  | { ok: false; reason: "invalid_occurred_at"; message: string } {
+  if (eventType !== "observation" && eventType !== "note") {
+    return { ok: true, value: null };
+  }
+  if (typeof occurredAt !== "string" || occurredAt.trim().length === 0) {
+    return { ok: true, value: null };
+  }
+  const canonical = canonicalQuickLogOccurredAtIso(occurredAt.trim());
+  if (!canonical) {
+    return {
+      ok: false,
+      reason: "invalid_occurred_at",
+      message: QUICK_LOG_NOTE_OCCURRED_AT_INVALID,
+    };
+  }
+  return { ok: true, value: canonical };
 }
 
 export function appendLegacyDetailsToNote(
@@ -324,6 +357,8 @@ export function buildLegacyQuickLogUnifiedPayload(
       message: "Add a note before saving.",
     };
   }
+  const occurred = legacyNoteOccurredAt(input.eventType, input.occurredAt);
+  if (occurred.ok !== true) return occurred;
   return {
     ok: true,
     payload: {
@@ -335,7 +370,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_temperature_c: envTempC,
       p_humidity_pct: envHumidityPct,
       p_vpd_kpa: envVpdKpa,
-      p_occurred_at: null,
+      p_occurred_at: occurred.value,
       p_details: detailsEnvelope,
       p_stage: stageTag,
       p_idempotency_key: input.idempotencyKey,

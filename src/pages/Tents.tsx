@@ -604,8 +604,9 @@ export default function Tents() {
                 // active plants in it (QA 2026-09-24, BUG-006 follow-up). A
                 // failed refresh keeps the cached stages. Until the tent's grow
                 // row and the plant rows are known, stage grading is withheld.
-                // The stage badge and tent menu still show the tent's own
-                // stage.
+                // The stage badge shows this resolved stage and stays hidden
+                // while it is unresolved. The tent menu still shows the
+                // tent's own stage.
                 const envStage = resolveTentEnvironmentStage({
                   tentId: t.id,
                   tentGrowId: t.growId ?? null,
@@ -638,7 +639,7 @@ export default function Tents() {
                           </p>
                         </div>
                         <div className="shrink-0">
-                          <StageBadge stage={t.stage} />
+                          {envStage ? <StageBadge stage={envStage} /> : null}
                         </div>
                       </div>
 

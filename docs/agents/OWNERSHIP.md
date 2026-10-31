@@ -3,10 +3,69 @@
 **Pinned file.** This file is the one place to point at for who owns what in the Verdant engineering loop. `docs/agents/CURRENT_STATE.md` links here, and this file wins over `CURRENT_STATE.md`. `AGENTS.md` points here too, and this file wins over it on ownership and routing. Matthew Cheek's own words override both.
 
 - **Repo:** `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`
-- **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.
-- **Last revised:** 2026-10-26, Matthew's latest PR #1971 assignment recorded: OG Kush merges, Jack Herer independently accepts, Codex is repair-only; the earlier Codex exception is superseded and the explicit merge hold remains. The 2026-10-22 bounded reviewer-routing correction and historical Graft low-risk lane remain. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
+- **Owner of this file:** the Coordinator seat. Any seat may propose an edit as a draft PR. The roster maps the holder.
+- **Last revised:** 2026-10-31, current duties are seats. The 2026-10-26 revision is unchanged below: Matthew's latest PR #1971 assignment recorded: OG Kush merges, Jack Herer independently accepts, Codex is repair-only; the earlier Codex exception is superseded and the explicit merge hold remains. The 2026-10-22 bounded reviewer-routing correction and historical Graft low-risk lane remain. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
 
 ---
+
+## Current seats
+
+Governance docs define seats and duties. `docs/agents/constitution/roster.md` is the only file mapping seats to current agent names and GitHub accounts, and on who holds a seat the roster wins. Matthew's own words override both. Renaming an agent edits only the roster.
+
+Comms tags live in `docs/agents/ultra-comms-protocol-v3.md`. The PR thread is the ledger. Slack pings never count.
+
+| Duty                                                   | Seat                  | Backup         |
+| ------------------------------------------------------ | --------------------- | -------------- |
+| Pre-check and CI chasing                               | Merge Readiness       | Coordinator    |
+| Routing, `[ROUTE]` / `[ACK]` / `[FALLBACK]`, intake    | Coordinator           | Steward Backup |
+| Review-ready transition                                | Coordinator           | Steward Backup |
+| Enqueue, merge, and post-merge `[LIVE]` reconciliation | Merge Steward (Ultra) | Steward Backup |
+| QA and `[VERIFY]`                                      | QA                    |                |
+| New-user smoke, on request after the deploy ping       | New-User Smoke        |                |
+| Bug sweep, file only                                   | Bug Sweep             |                |
+| Per-item approval, gated paths, exceptions             | Matthew only          |                |
+
+Ultra Builder 1, Ultra Builder 2, and Ultra Fixer write. They never approve, mark ready, enqueue, or merge. The Merge Steward is an Ultra seat that merges as `verdant-ultra-bot`, only after a non-author Reviewer seat APPROVES the exact head. The Merge Steward has no authority over the PR #1971 hold recorded in the historical section below.
+
+Reviewer C and QA are TBD pending Matthew. Durban Poison and Blue Dream are retired from routing.
+
+**Review-ready.** The Builder posts `READY FOR REVIEW <full-sha>`. The Coordinator then marks the PR ready if it touches no gated path, or after Matthew's yes if it does. That starts the full 35 checks. Review-ready is not merge approval. Skipped, missing, or neutral checks are `NOT_MEASURED`, never a pass. Full CI on drafts was not chosen.
+
+**Four-state review record.** All of these are PR comments:
+
+1. `[ROUTE] #N @<sha> → Reviewer X; excl: <contributor seats>; scope: <files>` (Coordinator; proves only that it was recorded).
+2. `[ACK]` (Coordinator, once delivery is confirmed or the reviewer replies). No ack in 15 minutes means delivery failed: resend once, then unavailable.
+3. `[CLAIM] Reviewer X @<sha>` (reviewer seat). First claim at the current sha wins; one reviewer per sha.
+4. Verdict: a GitHub review at `commit_id` = sha, body carrying seat, session, independence, scope, and P1/P2.
+
+Fallback is run by hand by the Coordinator. No automation is claimed. 60 minutes after `[ROUTE]` with no `[CLAIM]`: post `[WITHDRAWN]` for the first reviewer and `[FALLBACK 1] → Reviewer Y`. If that also misses, one question to Matthew. Late verdicts from a withdrawn reviewer are recorded and do not count; adverse ones are raised to the active reviewer and Matthew. A new head resets every state and goes to a different reviewer seat.
+
+**Verdict types.**
+
+- Adverse (`FAIL`, any P1 or P2) is `REQUEST_CHANGES`, never `COMMENT`.
+- Clean (0 P1 / 0 P2) on a non-gated PR is `APPROVE` at the exact commit, posted by the reviewer seat without asking Matthew.
+- Clean on a gated PR is `COMMENT`. `APPROVE` only after Matthew's own yes naming the PR and SHA.
+- Only the Merge Steward may dismiss a `REQUEST_CHANGES`, and only with Matthew's written exception naming the PR, SHA, and finding, linked in the dismissal message.
+- Open findings stay open until each is fixed at a sha or waived by Matthew in writing.
+
+**Merge Steward.** Queues only with `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only with: 35/35 required checks at that sha; a clean `APPROVE` from a non-contributing Reviewer seat at the current head (approvals from `verdant-ultra-bot` never count); a hard head re-check (`|| exit 1`) right before queueing; no conflicts; any gated `[BLOCKED-ON-MATTHEW]` cleared by Matthew; holds respected (#2532 and #2535 are never re-enqueued; #2539, #2526, #2231, #2536, and #2640 are held; #2593 and #2594 only after #2592). The Steward session never queues a PR it wrote, fixed, or base-merged. Builder and Fixer seats never approve, mark ready, enqueue, or merge. The Merge Steward has no authority over the PR #1971 hold.
+
+**Enforced by GitHub vs by agents.** Live ruleset `24445196`, the 35-check union, and the queue settings were not re-read for this change (`NOT_MEASURED`).
+
+- GitHub, as recorded for agents to follow until a live read replaces it: required checks are the union of classic protection and ruleset 24445196 (currently 35); merge queue (`MERGE`, `ALLGREEN`, 360-minute timeout); 1 approving review; stale approvals dismissed on push; last-push approval; enforce admins. The own-PR rule applies to the PR author, not commit authors.
+- Agents: reviewer independence, Matthew's per-item yes, protected paths, scorer lock, holds, mark-ready, and the Steward's preconditions.
+- Pending or deferred: `CODEOWNERS`, required scorer-lock and sentinel checks (sentinel needs the follow-up workflow PR), and branch push restrictions (deferred by Matthew).
+- Only Reviewer seats' verdicts count as acceptance. Bot reviews (CodeRabbit, Cursor, Copilot, GitHub Advanced Security) are advisory input the reviewer must consider. CodeRabbit stays on.
+
+**After merge, not on a clock.** The `:03` / `:33` sweep schedule is not current. New-User Smoke runs when asked, after the deploy ping. Bug Sweep files findings only. QA posts `[VERIFY]`. A `FAIL` is not routed to a retired agent. The Coordinator routes it to a Builder or Fixer seat.
+
+**Loop that replaces the historical steps 8–10.** Merge Readiness confirms 35/35 at the exact head. The Merge Steward queues with the command above after a non-author Reviewer `APPROVE`. QA, New-User Smoke, and Bug Sweep follow merge, on request or by filing.
+
+**Handoff guard.** Any active assignment or hold owned by a historical agent stays in force until an explicit Coordinator handoff or Matthew's release (he released Codex's work on 2026-10-30).
+
+## Historical named owners
+
+The sections below are the prior named-owner text, kept word for word. They do not assign a current seat. The PR #1971 hold in this file stays in force. The Merge Steward has no authority over that hold.
 
 ## 1. The one rule about Matthew
 
@@ -149,19 +208,19 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
 
 ### Tie-breakers
 
-| Item                                                     | Owner                                                                                                                                                |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Webhook creation, secret, receiver code                  | Codex                                                                                                                                                |
-| Re-running or fixing a failed check                      | Codex                                                                                                                                                |
-| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                                                                             |
-| Pre-check rules and verdicts                             | Chemdawg                                                                                                                                             |
-| Code that consumes pre-check verdicts                    | Codex                                                                                                                                                |
-| Reviewer assignment and claim ledger                     | Chemdawg's pre-check under §4.3; GDP can route within the same independence and evidence gates                                                       |
-| Review verdicts                                          | Available eligible independent session under §4.3; Codex excluded on Codex-authored/repaired work; Graft only within the existing low-risk allowlist |
-| Opening PRs                                              | Any agent with repository access may open its own authorized draft PR                                                                                                             |
+| Item                                                     | Owner                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Webhook creation, secret, receiver code                  | Codex                                                                                                                                                                                                                                                                                                                 |
+| Re-running or fixing a failed check                      | Codex                                                                                                                                                                                                                                                                                                                 |
+| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                                                                                                                                                                                                                                              |
+| Pre-check rules and verdicts                             | Chemdawg                                                                                                                                                                                                                                                                                                              |
+| Code that consumes pre-check verdicts                    | Codex                                                                                                                                                                                                                                                                                                                 |
+| Reviewer assignment and claim ledger                     | Chemdawg's pre-check under §4.3; GDP can route within the same independence and evidence gates                                                                                                                                                                                                                        |
+| Review verdicts                                          | Available eligible independent session under §4.3; Codex excluded on Codex-authored/repaired work; Graft only within the existing low-risk allowlist                                                                                                                                                                  |
+| Opening PRs                                              | Any agent with repository access may open its own authorized draft PR                                                                                                                                                                                                                                                 |
 | Merging PRs                                              | Matthew's current explicit actor assignment; PR #1971 assigns OG Kush to merge and Jack Herer to independent acceptance, with Codex repair-only; merge remains held. Per-item exact-head approval, 35/35 required SUCCESS, applicable supplemental checks and an eligible independent full-head PASS remain required. |
-| Edits to this file                                       | Codex                                                                                                                                                |
-| Anything not listed                                      | GDP decides and adds a row here                                                                                                                      |
+| Edits to this file                                       | Codex                                                                                                                                                                                                                                                                                                                 |
+| Anything not listed                                      | GDP decides and adds a row here                                                                                                                                                                                                                                                                                       |
 
 ## 3. Standing locks (unchanged)
 

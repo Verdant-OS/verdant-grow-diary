@@ -1,12 +1,13 @@
 # Merge queue — `verdant-grow-diary`
 
 **Status:** Active (repository ruleset)  
-**Ruleset:** [verdant-grow-diary merge queue](https://github.com/Verdant-OS/verdant-grow-diary/rules/20421416) (id `20421416`)  
+**Ruleset:** union of classic protection and ruleset 24445196 (currently 35 required checks). The previously written ruleset id was `20421416`. Live ruleset 24445196, the 35-check union, and the queue settings were not re-read for this change (`NOT_MEASURED`).  
 **Target branch:** `verdant-grow-diary` only  
-**Merge method:** **Squash**  
+**Merge method:** **MERGE**  
 **Grouping:** `ALLGREEN` · max 1 entry merged per group · up to 5 building  
-**Check timeout:** 90 minutes  
-**Admin bypass:** repository **Admin** role may bypass on a pull request (emergency only; Cheek)
+**Check timeout:** 360 minutes  
+**Admin bypass:** repository **Admin** role may bypass on a pull request (emergency only; Cheek)  
+**Who may enqueue:** the Merge Steward seat only (backup: Steward Backup). The Merge Steward has no authority over the PR #1971 hold, which stays with OG Kush.
 
 ## Why
 
@@ -14,15 +15,15 @@ Serializes merges so two PRs cannot race the same base (the #720/#721 class of p
 
 ## How agents / humans merge
 
-After Cheek approval and a clean tree:
+The Merge Steward queues only after a non-author Reviewer seat APPROVES the exact head, 35/35 required checks are green at that sha, and the other Steward preconditions in `docs/agents/OWNERSHIP.md` hold. Builder and Fixer seats never enqueue.
 
 ```bash
-# Preferred: enqueue (do not direct-merge when queue is required)
-gh pr merge <N> --squash --auto
-# or in UI: "Merge when ready" / "Add to merge queue"
+# Steward only. Pin the head. A mismatch must abort.
+[ "$(gh pr view <N> --json headRefOid -q .headRefOid)" = "<full-sha>" ] || exit 1
+gh pr merge <N> --auto --match-head-commit <full-sha>
 ```
 
-Do **not** expect a direct `gh pr merge` without queue when the ruleset is active unless using admin bypass.
+Do **not** expect a direct `gh pr merge` without queue when the ruleset is active unless using admin bypass. Approvals from `verdant-ultra-bot` never count.
 
 ## Required status checks (queue + ruleset)
 
@@ -53,18 +54,17 @@ Requires `gh` auth with repo read. Unit tests (no network):
 bunx vitest run src/test/merge-queue-snapshot.test.ts
 ```
 
-| Field | Meaning |
-|-------|---------|
-| `queue_depth` | Entries currently in the merge queue |
-| `median_age_sec` / `max_age_sec` | Time since enqueue |
-| `DIRTY` | Content conflict — run CONFLICT_RECONCILIATION |
-| `BEHIND` | Base moved — update branch; re-run CI |
-| `BLOCKED` | Required checks/reviews — not a git conflict |
-| `UNSTABLE` | Non-required reds |
-| `auto_merge` | PRs with auto-merge / queue request enabled |
+| Field                            | Meaning                                        |
+| -------------------------------- | ---------------------------------------------- |
+| `queue_depth`                    | Entries currently in the merge queue           |
+| `median_age_sec` / `max_age_sec` | Time since enqueue                             |
+| `DIRTY`                          | Content conflict — run CONFLICT_RECONCILIATION |
+| `BEHIND`                         | Base moved — update branch; re-run CI          |
+| `BLOCKED`                        | Required checks/reviews — not a git conflict   |
+| `UNSTABLE`                       | Non-required reds                              |
+| `auto_merge`                     | PRs with auto-merge / queue request enabled    |
 
 Empty queue + high `DIRTY` count is an **ownership/serialisation** signal, not queue latency.
-
 
 ## Alert thresholds
 
@@ -76,21 +76,21 @@ Enabled by default via `scaling` in [`merge-queue-thresholds.json`](../../script
 factor = clamp(open_pr_total / baseline_open_prs, min_factor, max_factor)
 ```
 
-| Setting | Default | Role |
-|---------|--------:|------|
-| `baseline_open_prs` | 10 | Load reference |
-| `min_factor` | 1.0 | Never loosen floors below base |
-| `max_factor` | 2.5 | Cap inflation under large backlogs |
-| `count_metrics` | dirty/behind/blocked/auto_merge | Scale absolute counts |
-| `depth_metrics` | queue_depth | Mild scale, capped at `depth_max_cap` (5) |
-| age metrics | fixed | Stay timeout-bound (30m / 90m) |
+| Setting             |                         Default | Role                                                                                |
+| ------------------- | ------------------------------: | ----------------------------------------------------------------------------------- |
+| `baseline_open_prs` |                              10 | Load reference                                                                      |
+| `min_factor`        |                             1.0 | Never loosen floors below base                                                      |
+| `max_factor`        |                             2.5 | Cap inflation under large backlogs                                                  |
+| `count_metrics`     | dirty/behind/blocked/auto_merge | Scale absolute counts                                                               |
+| `depth_metrics`     |                     queue_depth | Mild scale, capped at `depth_max_cap` (5)                                           |
+| age metrics         |                           fixed | Existing monitor thresholds (30m / 90m), not a live read of the 360-minute contract |
 
 **Ratio alerts** (when `open >= min_open_prs`):
 
-| Ratio | Warn | Critical |
-|-------|-----:|---------:|
-| `dirty / open` | 0.45 | 0.70 |
-| `behind / open` | 0.40 | 0.65 |
+| Ratio           | Warn | Critical |
+| --------------- | ---: | -------: |
+| `dirty / open`  | 0.45 |     0.70 |
+| `behind / open` | 0.40 |     0.65 |
 
 Disable scaling:
 
@@ -101,19 +101,17 @@ MERGE_QUEUE_SCALE=0 bun run merge-queue:snapshot:alert
 
 Example: 13 open PRs → factor ≈ 1.3 → `dirty_open_prs` warn rises from 5 → 7. Absolute `dirty=6` may clear while `dirty_ratio=0.46` still warns.
 
-
-
 Canonical config: [`scripts/ci/merge-queue-thresholds.json`](../../scripts/ci/merge-queue-thresholds.json)
 
-| Metric | Warn | Critical | Intent |
-|--------|-----:|---------:|--------|
-| `queue_depth` | 3 | 5 | Sustained serial backlog |
-| `max_age_sec` | 1800 (30m) | 5400 (90m) | Near ruleset check timeout |
-| `median_age_sec` | 900 | 2700 | Typical clear time when CI green |
-| `dirty_open_prs` | 5 | 10 | Conflicts never enqueue |
-| `behind_open_prs` | 5 | 12 | Stale heads |
-| `blocked_open_prs` | 8 | 15 | Required gates stuck |
-| `auto_merge_waiting` | 3 | 6 | Queue requests not draining |
+| Metric               |       Warn |   Critical | Intent                                                                 |
+| -------------------- | ---------: | ---------: | ---------------------------------------------------------------------- |
+| `queue_depth`        |          3 |          5 | Sustained serial backlog                                               |
+| `max_age_sec`        | 1800 (30m) | 5400 (90m) | Existing monitor threshold, not a live read of the 360-minute contract |
+| `median_age_sec`     |        900 |       2700 | Typical clear time when CI green                                       |
+| `dirty_open_prs`     |          5 |         10 | Conflicts never enqueue                                                |
+| `behind_open_prs`    |          5 |         12 | Stale heads                                                            |
+| `blocked_open_prs`   |          8 |         15 | Required gates stuck                                                   |
+| `auto_merge_waiting` |          3 |          6 | Queue requests not draining                                            |
 
 ```bash
 bun run merge-queue:snapshot:alert          # exit 4 on critical
@@ -127,12 +125,12 @@ Null ages (empty queue) **do not** alert. High `DIRTY` with empty queue is an ow
 
 ## Conflict flags vs queue
 
-| GitHub state | Meaning | Queue action |
-|--------------|---------|--------------|
-| `CONFLICTING` / `DIRTY` | Content conflict | **Cannot enqueue** until resolved or PR closed superseded |
-| `MERGEABLE` + `BLOCKED` | Required checks/reviews | Fix gates; then enqueue |
-| `MERGEABLE` + `UNSTABLE` | Non-required reds | May enqueue if required are green |
-| `BEHIND` | Base moved | Update/rebase; **re-run CI**; then enqueue |
+| GitHub state             | Meaning                 | Queue action                                              |
+| ------------------------ | ----------------------- | --------------------------------------------------------- |
+| `CONFLICTING` / `DIRTY`  | Content conflict        | **Cannot enqueue** until resolved or PR closed superseded |
+| `MERGEABLE` + `BLOCKED`  | Required checks/reviews | Fix gates; then enqueue                                   |
+| `MERGEABLE` + `UNSTABLE` | Non-required reds       | May enqueue if required are green                         |
+| `BEHIND`                 | Base moved              | Update/rebase; **re-run CI**; then enqueue                |
 
 Merge queue does **not** replace the Verdant conflict-resolution rule:
 
@@ -144,12 +142,12 @@ Never reuse green checks from pre-resolution SHA
 
 ## Failure modes
 
-| Event | Expected outcome |
-|-------|------------------|
-| Queue entry conflicts with tip | Entry removed / fails; author rebases |
-| Required check fails on queue build | Entry fails; not merged |
-| Timeout (90m) | Entry fails |
-| Two PRs same files | Second waits; may go dirty when first lands → supersession audit |
+| Event                               | Expected outcome                                                 |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| Queue entry conflicts with tip      | Entry removed / fails; author rebases                            |
+| Required check fails on queue build | Entry fails; not merged                                          |
+| Timeout (360m, not re-measured)     | Entry fails                                                      |
+| Two PRs same files                  | Second waits; may go dirty when first lands → supersession audit |
 
 ## Safety
 
@@ -159,9 +157,13 @@ Never reuse green checks from pre-resolution SHA
 
 ## Verify ruleset
 
+Not run for this document change (`NOT_MEASURED`). When someone measures it:
+
 ```bash
-gh api repos/Verdant-OS/verdant-grow-diary/rulesets/20421416
+gh api repos/Verdant-OS/verdant-grow-diary/rulesets/24445196
 ```
+
+The earlier written id was `20421416`.
 
 ## Related
 

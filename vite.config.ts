@@ -10,6 +10,8 @@
 // entry uses `import` and loads cleanly. Do not switch back to the
 // bare package specifier — Node will resolve `main` again.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config/dist/index.js";
+import { loadEnv } from "vite";
+import { fileURLToPath } from "node:url";
 
 // NOTE (TanStack migration): the legacy `staticSocialRouteDocuments` Vite
 // plugin (removed with the SPA shell) emitted 74 per-route HTML documents plus
@@ -29,6 +31,25 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config/dist/index.js";
 // vite dev/build rewrote a TREE_HASH_ROOTS path. The committed bundle stays
 // hand-synced; regenerate only via an explicit owner-approved path.
 export default defineConfig({
+  vite: {
+    plugins: [{
+      name: "verdant-email-server-env",
+      config: (_config, { mode }) => {
+        // Server-only: never add these values to Vite's client define block.
+        const serverEnv = loadEnv(mode, process.cwd(), "");
+        for (const [key, value] of Object.entries(serverEnv)) {
+          if (process.env[key] === undefined) process.env[key] = value;
+        }
+      },
+    }],
+    resolve: {
+      alias: {
+        "entities/lib/decode.js": fileURLToPath(new URL("./node_modules/entities/lib/decode.js", import.meta.url)),
+        "entities/lib/encode.js": fileURLToPath(new URL("./node_modules/entities/lib/encode.js", import.meta.url)),
+        entities: fileURLToPath(new URL("./node_modules/entities", import.meta.url)),
+      },
+    },
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

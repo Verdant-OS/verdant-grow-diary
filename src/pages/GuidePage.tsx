@@ -5,7 +5,7 @@
  * so visible copy and FAQPage JSON-LD share a single source of truth.
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
@@ -17,9 +17,19 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { findGuideBySlug, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
+import {
+  findGuideBySlug,
+  VERDANT_SEO_GUIDES,
+  type GuideAnchor,
+  type GuideSectionLink,
+} from "@/constants/verdantSeoContent";
+import { isPublicGuideHref, splitAroundAnchor } from "@/lib/guidePublicCopyViewModel";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
+import {
+  selectGuideAnswerFirstLayout,
+  visibleGuideAnswerFirstFaqItem,
+} from "@/lib/guideAnswerFirstLayoutRules";
 import { OREOZ_GELONADE_GUIDE_SLUG } from "@/constants/oreozGelonadeExperience";
 
 export default function GuidePage() {
@@ -76,6 +86,13 @@ export default function GuidePage() {
     return <Navigate to="/guides" replace />;
   }
 
+  const answerFirst = selectGuideAnswerFirstLayout({
+    question: guide.h1,
+    answer: guide.intro,
+    sources: guide.sources,
+    faq: guide.faq,
+  });
+
   const related = guide.related
     .map((s) => VERDANT_SEO_GUIDES.find((g) => g.slug === s))
     .filter((g): g is NonNullable<typeof g> => Boolean(g));
@@ -104,10 +121,56 @@ export default function GuidePage() {
         <p className="text-xs uppercase tracking-[0.18em] text-primary/80 font-medium">
           Grower Guide
         </p>
-        <h1 className="mt-3 font-display text-3xl md:text-4xl font-bold tracking-tight leading-tight">
-          {guide.h1}
-        </h1>
-        <p className="mt-5 text-lg text-muted-foreground">{guide.intro}</p>
+        {answerFirst.question ? (
+          <h1 className="mt-3 font-display text-3xl md:text-4xl font-bold tracking-tight leading-tight">
+            {guide.h1}
+          </h1>
+        ) : null}
+        {guide.introHeading ? (
+          <h2 className="mt-8 font-display text-xl md:text-2xl font-semibold">
+            {guide.introHeading}
+          </h2>
+        ) : null}
+        {answerFirst.answer ? (
+          <p
+            data-testid="guide-direct-answer"
+            className={
+              guide.introHeading
+                ? "mt-3 text-base text-foreground/90"
+                : "mt-5 text-lg text-muted-foreground"
+            }
+          >
+            {answerFirst.answer}
+          </p>
+        ) : null}
+        {answerFirst.source ? (
+          <p data-testid="guide-answer-source" className="mt-4 text-sm">
+            <a
+              href={answerFirst.source.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+            >
+              {answerFirst.source.label}
+            </a>
+          </p>
+        ) : null}
+        {answerFirst.answerRemainder ? (
+          <p
+            className={
+              guide.introHeading
+                ? "mt-3 text-base text-foreground/90"
+                : "mt-5 text-lg text-muted-foreground"
+            }
+          >
+            {answerFirst.answerRemainder}
+          </p>
+        ) : null}
+        {guide.introCta ? (
+          <p className="mt-3 text-base">
+            <GuideHref href={guide.introCta.href} label={guide.introCta.label} />
+          </p>
+        ) : null}
         {(guide.publishedOn || guide.modifiedOn) && (
           <p
             data-testid="guide-editorial-provenance"
@@ -160,32 +223,31 @@ export default function GuidePage() {
 
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
-            <section key={section.heading}>
-              <h2 className="font-display text-xl md:text-2xl font-semibold">{section.heading}</h2>
-              <p className="mt-3 text-base text-foreground/90">{section.body}</p>
-              {section.links && section.links.length > 0 && (
-                <nav
-                  aria-label={`In Verdant: ${section.heading}`}
-                  className="mt-4 rounded-md border border-border/60 bg-muted/30 px-4 py-3"
-                >
-                  <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-medium">
-                    In Verdant
-                  </p>
-                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                    {section.links.map((link) => (
-                      <li key={link.to}>
-                        <Link
-                          to={link.to}
-                          className="text-primary underline underline-offset-4 hover:text-primary/80"
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              )}
-            </section>
+            <Fragment key={section.heading}>
+              <GuideCopyBlockView
+                heading={section.heading}
+                body={section.body}
+                bodyLink={section.bodyLink}
+                steps={section.steps}
+                closing={section.closing}
+                closingLink={section.closingLink}
+                cta={section.cta}
+                links={section.links}
+              />
+              {section.continuations?.map((block) => (
+                <GuideCopyBlockView
+                  key={block.heading}
+                  heading={block.heading}
+                  headingLevel={block.headingLevel}
+                  body={block.body}
+                  bodyLink={block.bodyLink}
+                  steps={block.steps}
+                  closing={block.closing}
+                  closingLink={block.closingLink}
+                  cta={block.cta}
+                />
+              ))}
+            </Fragment>
           ))}
         </div>
 
@@ -251,53 +313,6 @@ export default function GuidePage() {
                 </tbody>
               </table>
             </div>
-          </section>
-        )}
-
-        {guide.faq.length > 0 && (
-          <section className="mt-12">
-            <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
-              Common questions
-            </h2>
-            <Accordion
-              type="single"
-              collapsible
-              className="w-full"
-              value={openFaq}
-              onValueChange={(v) => {
-                // Keep the accordion controlled by using an empty string
-                // for the collapsed state rather than undefined.
-                setOpenFaq(v ?? "");
-                // Clear the deep-link highlight when the user manually
-                // collapses the accordion; otherwise keep it visible.
-                if (!v) setHighlightedFaq(undefined);
-              }}
-            >
-              {guide.faq.map((entry, i) => {
-                const value = `faq-${i}`;
-                const isHighlighted = highlightedFaq === value;
-                return (
-                  <AccordionItem
-                    key={entry.question}
-                    value={value}
-                    id={value}
-                    ref={(el) => {
-                      faqItemRefs.current[value] = el;
-                    }}
-                    tabIndex={-1}
-                    data-highlighted={isHighlighted ? "true" : undefined}
-                    className={
-                      isHighlighted
-                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
-                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
-                    }
-                  >
-                    <AccordionTrigger className="text-left px-2">{entry.question}</AccordionTrigger>
-                    <AccordionContent className="px-2">{entry.answer}</AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
           </section>
         )}
 
@@ -451,7 +466,179 @@ export default function GuidePage() {
             </Link>
           </div>
         </section>
+
+        {answerFirst.faq.length > 0 && (
+          <section className="mt-12" data-testid="guide-closing-faq">
+            <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
+              Common questions
+            </h2>
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full"
+              value={openFaq}
+              onValueChange={(v) => {
+                // Keep the accordion controlled by using an empty string
+                // for the collapsed state rather than undefined.
+                setOpenFaq(v ?? "");
+                // Clear the deep-link highlight when the user manually
+                // collapses the accordion; otherwise keep it visible.
+                if (!v) setHighlightedFaq(undefined);
+              }}
+            >
+              {guide.faq.map((entry, i) => {
+                const item = visibleGuideAnswerFirstFaqItem(entry);
+                if (!item) return null;
+                const value = `faq-${i}`;
+                const isHighlighted = highlightedFaq === value;
+                return (
+                  <AccordionItem
+                    key={item.question}
+                    value={value}
+                    id={value}
+                    ref={(el) => {
+                      faqItemRefs.current[value] = el;
+                    }}
+                    tabIndex={-1}
+                    data-highlighted={isHighlighted ? "true" : undefined}
+                    className={
+                      isHighlighted
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                    }
+                  >
+                    <AccordionTrigger className="text-left px-2">{item.question}</AccordionTrigger>
+                    <AccordionContent className="px-2">{item.answer}</AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+            {guide.faqFooter ? (
+              <>
+                <p className="mt-4 text-base text-foreground/90">
+                  {guide.faqFooter.lead}{" "}
+                  {guide.faqFooter.links.map((link, index) => (
+                    <Fragment key={`${link.href}:${link.label}`}>
+                      {index > 0 ? " · " : null}
+                      <GuideHref href={link.href} label={link.label} />
+                    </Fragment>
+                  ))}
+                </p>
+                {guide.faqFooter.cta ? (
+                  <p className="mt-3 text-base">
+                    <GuideHref href={guide.faqFooter.cta.href} label={guide.faqFooter.cta.label} />
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </section>
+        )}
       </article>
     </main>
+  );
+}
+
+function GuideHref({ href, label }: { href: string; label: string }) {
+  const className = "text-primary underline underline-offset-4 hover:text-primary/80";
+  if (!isPublicGuideHref(href)) return <span>{label}</span>;
+  if (href.startsWith("/")) {
+    return (
+      <Link to={href} className={className}>
+        {label}
+      </Link>
+    );
+  }
+  return (
+    <a href={href} className={className}>
+      {label}
+    </a>
+  );
+}
+
+function GuideLinkedParagraph({ text, anchor }: { text: string; anchor?: GuideAnchor }) {
+  const parts = splitAroundAnchor(text, anchor);
+  return (
+    <p className="mt-3 text-base text-foreground/90">
+      {parts.kind === "plain" ? (
+        parts.text
+      ) : (
+        <>
+          {parts.before}
+          <GuideHref href={parts.href} label={parts.label} />
+          {parts.after}
+        </>
+      )}
+    </p>
+  );
+}
+
+function GuideCopyBlockView({
+  heading,
+  headingLevel = 2,
+  body,
+  bodyLink,
+  steps,
+  closing,
+  closingLink,
+  cta,
+  links,
+}: {
+  heading: string;
+  headingLevel?: 2 | 3;
+  body?: string;
+  bodyLink?: GuideAnchor;
+  steps?: ReadonlyArray<string>;
+  closing?: string;
+  closingLink?: GuideAnchor;
+  cta?: GuideAnchor;
+  links?: ReadonlyArray<GuideSectionLink>;
+}) {
+  const HeadingTag = headingLevel === 3 ? "h3" : "h2";
+  const headingClass =
+    headingLevel === 3
+      ? "font-display text-lg md:text-xl font-semibold"
+      : "font-display text-xl md:text-2xl font-semibold";
+  return (
+    <section>
+      <HeadingTag className={headingClass}>{heading}</HeadingTag>
+      {body && body.trim() ? <GuideLinkedParagraph text={body} anchor={bodyLink} /> : null}
+      {steps && steps.length > 0 ? (
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-base text-foreground/90">
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      ) : null}
+      {closing && closing.trim() ? (
+        <GuideLinkedParagraph text={closing} anchor={closingLink} />
+      ) : null}
+      {links && links.length > 0 ? (
+        <nav
+          aria-label={`In Verdant: ${heading}`}
+          className="mt-4 rounded-md border border-border/60 bg-muted/30 px-4 py-3"
+        >
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-medium">
+            In Verdant
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            {links.map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  className="text-primary underline underline-offset-4 hover:text-primary/80"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : null}
+      {cta && isPublicGuideHref(cta.href) ? (
+        <p className="mt-3 text-base">
+          <GuideHref href={cta.href} label={cta.label} />
+        </p>
+      ) : null}
+    </section>
   );
 }

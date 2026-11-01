@@ -69,16 +69,50 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CREATE-DIALOG-DISABLED-REASON
+
+```text
+TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
+goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
+why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.
+branch: ultra/create-dialog-reasons
+base: verdant-grow-diary
+checkout: git fetch origin ultra/create-dialog-reasons verdant-grow-diary && git switch ultra/create-dialog-reasons
+pr: draft; read the URL from GitHub after push
+head_sha: the commit that adds this block; read git rev-parse HEAD after checkout
+state: local until pushed; draft only
+current_step: view-model, dialog wiring, and new unit tests are in the working tree
+next_action: confirm the draft PR stays draft; do not mark ready, request review, or merge
+post_merge_check: after Publish, open New tent on the fixture account, leave the name blank, and confirm the Create tent button is disabled with the visible reason "Enter a tent name." Type a name and confirm the button enables. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: disabled-reason and helper copy live in src/lib/createDialogPrimaryButtonViewModel.ts. Create tent and Create plant keep their pinned disabled expressions. Create grow now disables until the name is non-blank, matching the other two dialogs. A plan limit replaces the "only a name" helper. An optional plant tent no longer says "Create a tent first." Invalid optional tent size is shown on the size field and does not change the pinned disable expression.
+tried_and_rejected: adding the size check to Create tent's disabled expression. Source scans pin that expression, and existing tests cannot be edited in this task.
+commands: bunx vitest run src/test/create-dialog-primary-button-view-model.test.ts --reporter=dot
+files_touched: src/lib/createDialogPrimaryButtonViewModel.ts; src/test/create-dialog-primary-button-view-model.test.ts; src/components/CreateTentDialog.tsx; src/components/CreatePlantDialog.tsx; src/pages/Grows.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: do not edit the pinned disabled JSX in CreateTentDialog or CreatePlantDialog. Do not modify tests that already exist on the base.
+links: uploads brief Issue 3
+artifacts: accessibility captures are local to the agent run, not this repo
+reviewer_seat: not requested; this draft does not ask for review
+reviewer_sha: NOT_MEASURED
+session_state: no paused workflows; no production writes
+claimed_by: Grok, 2026-10-31
+owner: Grok
+last_updated: 2026-10-31 01:40 CT, by Grok
+```
+
 ### VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS
 
 ```text
-TASK VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS priority: other status: OPEN
+TASK VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS priority: other status: CLOSED merged as 1eedde10ff17daac865fa49808d7ae898601ab71
 goal: Tent Detail imported CSV history follows the saved temperature unit, including labels and filters.
 why: Fahrenheit CSV readings displayed as Celsius after reload (VER-302).
 branch: codex/ver-302-imported-history-temperature-units
 base: verdant-grow-diary; current integrated base ffc6076aeb3723f17d85057154f8e9772ed9c222; upstream merge preserved
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2610
-head_sha: 0683e974f57e0a310fdb736cc9a307b3b4e883fa (verified remote parent of this correction checkpoint; read resulting full SHA from PR #2610)
+head_sha: merged as 1eedde10ff17daac865fa49808d7ae898601ab71 (#2610)
 state: open non-draft #2610; user explicitly authorized takeover and finish through merge after required checks and eligible independent acceptance; deployment and production QA remain unauthorized
 current_step: fix the reviewed native CSV fixture default-unit regression, refresh PR evidence and obtain fresh complete-scope acceptance before merge queue
 next_action: verify the resulting full head and Native Save Retrieve Local / required CI; route the complete ten-file scope and scorer declarations to an eligible independent reviewer; merge only after every gate passes

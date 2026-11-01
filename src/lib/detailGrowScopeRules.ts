@@ -28,11 +28,27 @@ export function readEntityGrowId(entity?: unknown): string | null {
   return trimScopeId(entity.growId ?? entity.grow_id);
 }
 
+/** Grow id inherited through the entity's tent, when the row carries it. */
+export function readEntityTentGrowId(entity?: unknown): string | null {
+  if (!isRecord(entity)) return null;
+  const direct = trimScopeId(entity.tentGrowId ?? entity.tent_grow_id);
+  if (direct) return direct;
+  const tent = entity.tent ?? entity.tents;
+  return isRecord(tent) ? trimScopeId(tent.growId ?? tent.grow_id) : null;
+}
+
 /**
  * True when query growId is present and does not match the entity's grow.
  */
 export function isQueryGrowScopeMismatch(entity: unknown, contextGrowId?: string | null): boolean {
   const requested = trimScopeId(contextGrowId);
   if (!requested) return false;
-  return readEntityGrowId(entity) !== requested;
+  if (!isRecord(entity)) return true;
+  const own = readEntityGrowId(entity);
+  if (own) return own !== requested;
+  // plants.grow_id is legitimately null; membership rolls up via the tent.
+  const tentGrow = readEntityTentGrowId(entity);
+  if (tentGrow) return tentGrow !== requested;
+  // No grow recorded on the entity: not a proven mismatch (RLS still scopes access).
+  return false;
 }

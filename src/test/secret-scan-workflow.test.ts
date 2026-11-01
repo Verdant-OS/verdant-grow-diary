@@ -53,7 +53,9 @@ function runRange(cwd: string, env: Record<string, string>) {
 
 describe("secret-scan workflow", () => {
   it("passes --diff-merges=remerge so merge resolutions are scanned", () => {
-    expect(step("Scan commits").run).toMatch(/--log-opts="--diff-merges=remerge \$\{RANGE\}"/);
+    expect(step("Scan commits").run).toMatch(
+      /--log-opts="--text --diff-merges=remerge \$\{RANGE\}"/,
+    );
   });
 
   it("a secret added only in a merge resolution shows up with the workflow's log opts", () => {
@@ -74,8 +76,8 @@ describe("secret-scan workflow", () => {
     git(dir, "commit", "-qm", "merge");
     const range = `${base}..HEAD`;
     expect(git(dir, "log", "-p", "-U0", range)).not.toContain("MERGE_ONLY_MARKER");
-    const opts = /--log-opts="([^ ]+) \$\{RANGE\}"/.exec(step("Scan commits").run)?.[1] ?? "";
-    const withOpts = git(dir, "log", "-p", "-U0", opts, `${base}..HEAD`);
+    const opts = /--log-opts="(.+) \$\{RANGE\}"/.exec(step("Scan commits").run)?.[1] ?? "";
+    const withOpts = git(dir, "log", "-p", "-U0", ...opts.split(/\s+/), `${base}..HEAD`);
     expect(withOpts).toContain("MERGE_ONLY_MARKER");
     // Lines merged in from base are not re-reported as new in the merge commit.
     expect(withOpts).not.toContain("BASE_ONLY_MARKER");
@@ -298,7 +300,9 @@ describe("secret-scan workflow", () => {
       const run = scan().run;
       expect(run.indexOf("gitleaks[:]allow")).toBeGreaterThan(-1);
       expect(run.indexOf("gitleaks[:]allow")).toBeLessThan(run.indexOf("gitleaks git "));
-      expect(run).toContain("--diff-merges=remerge --format= ${RANGE}");
+      expect(run).toContain(
+        "git log -p --text --no-color --no-ext-diff --diff-merges=remerge --format= ${RANGE}",
+      );
       expect(run).not.toContain(MARKER);
     });
 

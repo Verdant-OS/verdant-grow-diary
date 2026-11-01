@@ -20,7 +20,7 @@ interface SubscriptionLookup {
           eq(column: string, value: string): {
             order(column: string, options: { ascending: boolean }): {
               limit(count: number): {
-                maybeSingle(): Promise<{
+            maybeSingle(): PromiseLike<{
                   data: { stripe_customer_id: string | null } | null;
                   error: { message: string } | null;
                 }>;

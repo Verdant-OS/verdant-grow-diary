@@ -145,12 +145,26 @@ function fetchEntitlementSnapshot(
       !paidRowProven && (liveRes.error != null || (wantsSandbox && sandboxRes.error != null));
 
     const stripeTestRow = pickEntitlingLovableRow(
-      sandboxRows.filter((row) => row.billing_provider === "stripe"), "sandbox", now,
+      sandboxRows.filter((row) => row.billing_provider === "stripe"),
+      "sandbox",
+      now,
     );
-    const savedStripeTestSubscription = stripeTestRow ? resolveUnionEntitlements({
-      byoRow: null, lovableRow: stripeTestRow, expectedBillingEnvironment: "sandbox", now,
-    }) : null;
-    return { lookupFailed, lovableRow, resolvedEnvironment, isStaff, now, savedStripeTestSubscription };
+    const savedStripeTestSubscription = stripeTestRow
+      ? resolveUnionEntitlements({
+          byoRow: null,
+          lovableRow: stripeTestRow,
+          expectedBillingEnvironment: "sandbox",
+          now,
+        })
+      : null;
+    return {
+      lookupFailed,
+      lovableRow,
+      resolvedEnvironment,
+      isStaff,
+      now,
+      savedStripeTestSubscription,
+    };
   })();
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -168,9 +182,7 @@ function fetchEntitlementSnapshot(
   return tracked;
 }
 
-export function useMyEntitlements(
-  options?: { enabled?: boolean },
-): UseMyEntitlementsResult {
+export function useMyEntitlements(options?: { enabled?: boolean }): UseMyEntitlementsResult {
   // Default true: existing callers stay presentation-only and still load.
   // AppShell passes enabled: authStatus === "authenticated" so a cached
   // user during getUser miss (revalidation_failed) cannot fire
@@ -183,9 +195,14 @@ export function useMyEntitlements(
   const [loading, setLoading] = useState<boolean>(true);
   const [lookupFailed, setLookupFailed] = useState(false);
   const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(() => FREE_NOW());
-  const [savedStripeTestSubscription, setSavedStripeTestSubscription] = useState<ResolvedEntitlement | null>(null);
+  const [savedStripeTestSubscription, setSavedStripeTestSubscription] =
+    useState<ResolvedEntitlement | null>(null);
 
-  const expectedBillingEnvironment = useMemo(() => stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN) ?? getPaddleEnvironment(), []);
+  const expectedBillingEnvironment = useMemo(
+    () =>
+      stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN) ?? getPaddleEnvironment(),
+    [],
+  );
 
   // The subscription reads race unmount (route change, test teardown):
   // never setState after unmount.

@@ -160,6 +160,7 @@ import { Route as AppReportsPostGrowGrowIdRouteImport } from './routes/_app/repo
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
+import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as AppGeneticsHealthKindIdRouteImport } from './routes/_app/genetics.health.$kind.$id'
 import { Route as AppGeneticsTraceKindIdRouteImport } from './routes/_app/genetics.trace.$kind.$id'
 
@@ -962,6 +963,12 @@ const LovableEmailAuthWebhookRoute = LovableEmailAuthWebhookRouteImport.update({
   path: '/lovable/email/auth/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LovableEmailQueueProcessRoute =
+  LovableEmailQueueProcessRouteImport.update({
+    id: '/lovable/email/queue/process',
+    path: '/lovable/email/queue/process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppGeneticsHealthKindIdRoute = AppGeneticsHealthKindIdRouteImport.update({
   id: '/health/$kind/$id',
   path: '/health/$kind/$id',
@@ -1123,6 +1130,7 @@ export interface FileRoutesByFullPath {
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1275,6 +1283,7 @@ export interface FileRoutesByTo {
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1431,6 +1440,7 @@ export interface FileRoutesById {
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/_app/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/_app/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1586,6 +1596,7 @@ export interface FileRouteTypes {
     | '/api/public/payments/webhook'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
+    | '/lovable/email/queue/process'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -1738,6 +1749,7 @@ export interface FileRouteTypes {
     | '/api/public/payments/webhook'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
+    | '/lovable/email/queue/process'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   id:
@@ -1893,6 +1905,7 @@ export interface FileRouteTypes {
     | '/api/public/payments/webhook'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
+    | '/lovable/email/queue/process'
     | '/_app/genetics/health/$kind/$id'
     | '/_app/genetics/trace/$kind/$id'
   fileRoutesById: FileRoutesById
@@ -1960,6 +1973,7 @@ export interface RootRouteChildren {
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
+  LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -3021,6 +3035,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailAuthWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lovable/email/queue/process': {
+      id: '/lovable/email/queue/process'
+      path: '/lovable/email/queue/process'
+      fullPath: '/lovable/email/queue/process'
+      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/genetics/health/$kind/$id': {
       id: '/_app/genetics/health/$kind/$id'
       path: '/health/$kind/$id'
@@ -3335,6 +3356,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
+  LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

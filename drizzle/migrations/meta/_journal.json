@@ -15,6 +15,13 @@
       "when": 1793508773539,
       "tag": "0001_stripe_identity_upsert_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793509310587,
+      "tag": "0002_stripe_test_credit_spend_isolation",
+      "breakpoints": true
     }
   ]
 }

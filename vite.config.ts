@@ -52,7 +52,8 @@ export default defineConfig({
         "entities/lib/encode.js": fileURLToPath(
           new URL("./node_modules/entities/lib/encode.js", import.meta.url),
         ),
-        entities: fileURLToPath(new URL("./node_modules/entities", import.meta.url)),
+        // Keep package imports version-aware: htmlparser2 needs its own
+        // entities/decode export, which the root entities v4 does not expose.
       },
     },
   },

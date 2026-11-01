@@ -185,10 +185,12 @@ export default function Feedback() {
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 500) : null,
     };
 
-    const { error } = await supabase.from("customer_feedback").insert(payload);
-    if (error) {
+    try {
+      const { error } = await supabase.from("customer_feedback").insert(payload);
+      if (error) throw new Error("Feedback save failed");
+    } catch {
       setSubmitState("error");
-      setErrorMessage(error.message || "Something went wrong. Please try again.");
+      setErrorMessage("We couldn't save your feedback. Your text is still here. Please try again.");
       return;
     }
     recordSubmission("verdant.spam.feedback", fp);
@@ -209,8 +211,7 @@ export default function Feedback() {
         >
           <h1 className="text-xl font-semibold tracking-tight">Thanks.</h1>
           <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-            A human on the Verdant team will read this. Your input directly shapes what we build
-            next. Grower stays in control.
+            Your feedback has been saved for the Verdant team. Thank you for sharing it.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Button asChild variant="outline">

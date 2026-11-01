@@ -34,6 +34,7 @@ export default function SubscriberInterestForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
     const lead = buildSubscriberInterestLead({ email, planId, leadSource });
     if (lead.ok === false) {
       setError(
@@ -46,13 +47,15 @@ export default function SubscriberInterestForm({
 
     setSubmitting(true);
     setError(null);
-    const { error: insertError } = await supabase.from("leads").insert(lead.payload);
-    setSubmitting(false);
-
-    if (insertError) {
+    try {
+      const { error: insertError } = await supabase.from("leads").insert(lead.payload);
+      if (insertError) throw new Error("Interest save failed");
+    } catch {
       setError("We couldn't save your request. Please try again.");
       trackPricingEvent("pricing_interest_submit_failed", { plan: planId, source: leadSource });
       return;
+    } finally {
+      setSubmitting(false);
     }
 
     setSubmitted(true);

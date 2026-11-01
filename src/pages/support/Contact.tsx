@@ -98,10 +98,12 @@ export default function Contact() {
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 500) : null,
     };
 
-    const { error } = await supabase.from("contact_messages").insert(payload);
-    if (error) {
+    try {
+      const { error } = await supabase.from("contact_messages").insert(payload);
+      if (error) throw new Error("Contact save failed");
+    } catch {
       setSubmitState("error");
-      setErrorMessage(error.message || "Something went wrong. Please try again.");
+      setErrorMessage("We couldn't save your message. Your text is still here. Please try again.");
       return;
     }
     recordSubmission("verdant.spam.contact", fp);
@@ -112,7 +114,7 @@ export default function Contact() {
     return (
       <SupportLayout
         title="Message received"
-        description="Your message has been received. Expect a human reply within 1–2 business days."
+        description="Your message has been saved for the Verdant team."
         path="/contact"
       >
         <div
@@ -122,8 +124,7 @@ export default function Contact() {
         >
           <h1 className="text-xl font-semibold tracking-tight">Message received.</h1>
           <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-            Expect a human reply within 1–2 business days (usually faster). We never use your grow
-            details for anything except helping you.
+            Your message has been saved for the Verdant team. Thank you for reaching out.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Button asChild variant="outline">

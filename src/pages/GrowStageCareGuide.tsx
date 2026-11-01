@@ -30,6 +30,7 @@ import {
   type CareChecklistItem,
   type GrowStage,
 } from "@/constants/growStageCareGuide";
+import { selectGuideAnswerFirstLayout } from "@/lib/guideAnswerFirstLayoutRules";
 
 type StageFilter = "all" | GrowStage;
 
@@ -94,6 +95,10 @@ export default function GrowStageCareGuide() {
       return next;
     });
   };
+
+  const answerFirst = selectGuideAnswerFirstLayout({
+    faq: GROW_STAGE_CARE_FAQ,
+  });
 
   const visibleStages: ReadonlyArray<GrowStage> = useMemo(() => {
     return (
@@ -270,19 +275,6 @@ export default function GrowStageCareGuide() {
           })}
         </section>
 
-        {/* FAQ */}
-        <section className="mt-14">
-          <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">Common questions</h2>
-          <Accordion type="single" collapsible className="w-full">
-            {GROW_STAGE_CARE_FAQ.map((entry, i) => (
-              <AccordionItem key={entry.question} value={`faq-${i}`}>
-                <AccordionTrigger className="text-left">{entry.question}</AccordionTrigger>
-                <AccordionContent>{entry.answer}</AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </section>
-
         {/* Related links */}
         <section className="mt-12 rounded-lg border border-border/60 p-5">
           <h2 className="font-display text-lg font-semibold">Keep reading</h2>
@@ -337,6 +329,22 @@ export default function GrowStageCareGuide() {
             </Link>
           </div>
         </section>
+
+        {answerFirst.faq.length > 0 && (
+          <section className="mt-14" data-testid="guide-closing-faq">
+            <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
+              Common questions
+            </h2>
+            <Accordion type="single" collapsible className="w-full">
+              {answerFirst.faq.map((entry, i) => (
+                <AccordionItem key={entry.question} value={`faq-${i}`}>
+                  <AccordionTrigger className="text-left">{entry.question}</AccordionTrigger>
+                  <AccordionContent>{entry.answer}</AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </section>
+        )}
       </article>
     </main>
   );

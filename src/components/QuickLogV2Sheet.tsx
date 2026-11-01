@@ -683,7 +683,7 @@ function QuickLogV2SheetForOwner({
       error: localError,
     }),
   });
-  const noteFirstSaveLabel = quickLogV2SaveStateLabel(noteFirstSaveState);
+  const noteFirstSaveLabel = quickLogV2SaveStateLabel(noteFirstSaveState, { retryPending });
   // Synchronous in-flight guard. The save-state flags are React
   // state and don't flip until the next paint, so rapid double-clicks
   // can slip a second save through. This ref locks the entry point

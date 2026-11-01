@@ -38,14 +38,24 @@ export function quickLogV2SaveFailedError(input: QuickLogV2SaveFailedErrorInput)
 }
 
 /** Short, plain status line shown next to Save. Empty when there is nothing to say. */
-export function quickLogV2SaveStateLabel(state: QuickLogV2SaveState): string {
+/**
+ * `retryPending` mirrors the sheet's Save control: when an earlier result was
+ * uncertain the button reads "Retry exact record", so the copy names that
+ * control instead of "Save".
+ */
+export function quickLogV2SaveStateLabel(
+  state: QuickLogV2SaveState,
+  options: { retryPending?: boolean } = {},
+): string {
   switch (state) {
     case "saving":
       return "Saving…";
     case "saved":
       return "Saved";
     case "failed":
-      return "Not saved yet. Your note is kept — tap Save to try again.";
+      return options.retryPending
+        ? "Not saved yet. Your note is kept — tap Retry exact record to try again."
+        : "Not saved yet. Your note is kept — tap Save to try again.";
     case "idle":
       return "";
     default: {

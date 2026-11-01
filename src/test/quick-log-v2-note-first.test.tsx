@@ -74,6 +74,15 @@ describe("quickLogV2NoteFirstRules", () => {
     expect(quickLogV2SaveStateLabel("idle")).toBe("");
   });
 
+  it("names the control the sheet actually shows on a failed save", () => {
+    expect(quickLogV2SaveStateLabel("failed")).toMatch(/tap Save to try again/);
+    expect(quickLogV2SaveStateLabel("failed", { retryPending: true })).toMatch(
+      /tap Retry exact record to try again/,
+    );
+    expect(quickLogV2SaveStateLabel("failed", { retryPending: true })).not.toMatch(/tap Save/);
+    expect(quickLogV2SaveStateLabel("saved", { retryPending: true })).toBe("Saved");
+  });
+
   it("focuses the note only on a fresh, unlocked Note sheet", () => {
     const base = { open: true, action: "note", recoveryPending: false, submissionLocked: false };
     expect(shouldFocusQuickLogV2NoteOnOpen(base)).toBe(true);

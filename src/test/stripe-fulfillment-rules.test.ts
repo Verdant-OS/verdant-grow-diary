@@ -15,6 +15,12 @@ describe('Stripe settlement fences', () => {
  it('treats unsupported initial subscription statuses as expired', () => expect(stripeSubscriptionStatus('incomplete')).toBe('expired'));
 });
 describe('Stripe canonical access', () => {
+ it.each(['pro_monthly', 'pro_annual', 'craft_monthly', 'craft_annual'])('unlocks the exact %s plan only in test', price_id => {
+   const testAccess = resolveUnionEntitlements({ byoRow: null, lovableRow: { ...row, price_id }, expectedBillingEnvironment: 'sandbox', now });
+   expect(testAccess.isActive).toBe(true);
+   expect(testAccess.effectivePlanId).toBe(price_id);
+   expect(resolveUnionEntitlements({ byoRow: null, lovableRow: { ...row, price_id }, expectedBillingEnvironment: 'live', now }).effectivePlanId).toBe('free');
+ });
  it('unlocks Pro test access with 100 monthly credits and paid pack eligibility', () => { const entitlement=resolveUnionEntitlements({byoRow:null,lovableRow:row,expectedBillingEnvironment:'sandbox',now}); expect(entitlement.effectivePlanId).toBe('pro_monthly'); expect(entitlement.capabilities.aiMonthlyCredits).toBe(100); expect(creditPackPurchaseEligible(entitlement)).toBe(true); });
  it('does not unlock production from a test row', () => expect(resolveUnionEntitlements({byoRow:null,lovableRow:row,expectedBillingEnvironment:'live',now}).effectivePlanId).toBe('free'));
  it('does not turn a credit pack into paid plan access', () => expect(resolveUnionEntitlements({byoRow:null,lovableRow:{...row,price_id:'credit_pack_50'},expectedBillingEnvironment:'sandbox',now}).effectivePlanId).toBe('free'));

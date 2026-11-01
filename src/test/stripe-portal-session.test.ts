@@ -51,7 +51,7 @@ describe("createStripePortalSessionForUser", () => {
       error: null,
     });
     const result = await createStripePortalSessionForUser({
-      supabase: from as never,
+      supabase: { from } as never,
       userId: "user-1",
       environment: "sandbox",
       returnUrl: "https://verdantgrowdiary.com/settings",
@@ -70,7 +70,7 @@ describe("createStripePortalSessionForUser", () => {
   it("returns a calm error when the account has no saved Stripe subscription", async () => {
     const { from } = fakeSupabase({ data: null, error: null });
     const result = await createStripePortalSessionForUser({
-      supabase: from as never,
+      supabase: { from } as never,
       userId: "user-1",
       environment: "sandbox",
     });
@@ -81,7 +81,7 @@ describe("createStripePortalSessionForUser", () => {
   it("returns a calm error when the subscription row has no Stripe customer", async () => {
     const { from } = fakeSupabase({ data: { stripe_customer_id: null }, error: null });
     const result = await createStripePortalSessionForUser({
-      supabase: from as never,
+      supabase: { from } as never,
       userId: "user-1",
       environment: "sandbox",
     });
@@ -96,7 +96,7 @@ describe("createStripePortalSessionForUser", () => {
       error: null,
     });
     const result = await createStripePortalSessionForUser({
-      supabase: from as never,
+      supabase: { from } as never,
       userId: "user-1",
       environment: "sandbox",
     });
@@ -106,7 +106,7 @@ describe("createStripePortalSessionForUser", () => {
   it("returns a lookup error when the subscription read fails", async () => {
     const { from } = fakeSupabase({ data: null, error: { message: "rls denied" } });
     const result = await createStripePortalSessionForUser({
-      supabase: from as never,
+      supabase: { from } as never,
       userId: "user-1",
       environment: "sandbox",
     });

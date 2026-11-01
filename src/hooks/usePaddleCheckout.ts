@@ -32,6 +32,7 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
 import { clearCheckoutStarted, markCheckoutStarted } from "@/lib/checkoutContextRules";
 import { CREDIT_PACKS } from "@/constants/pricing";
+import { stripeTokenEnvironment, STRIPE_FULFILLMENT_PENDING_MESSAGE } from "@/lib/stripeCheckoutRules";
 import {
   FOUNDER_LIFETIME_CHECKOUT_REFUSAL,
   isFounderLifetimeCheckoutSku,
@@ -157,6 +158,15 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         setBlockedReasonCode(null);
         setBlockedScope("plan");
         setBlockedReason(FOUNDER_LIFETIME_CHECKOUT_REFUSAL);
+        return;
+      }
+
+      // Do not send a Stripe-configured build to the retired Paddle checkout.
+      // Purchases remain closed until Stripe fulfillment is implemented and verified.
+      if (stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN)) {
+        setBlockedReasonCode(null);
+        setBlockedScope("checkout");
+        setBlockedReason(STRIPE_FULFILLMENT_PENDING_MESSAGE);
         return;
       }
 

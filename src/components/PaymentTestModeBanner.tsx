@@ -3,6 +3,7 @@ import { shouldShowPaddleSandboxTestModeBanner } from "@/lib/paymentTestModeBann
 import { getCheckoutUnavailableMessage } from "@/lib/paddle";
 import { useRenderedPaddleCheckoutEnvironment } from "@/hooks/useRenderedPaddleCheckoutEnvironment";
 import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
+import { stripeTokenEnvironment, STRIPE_FULFILLMENT_PENDING_MESSAGE } from "@/lib/stripeCheckoutRules";
 
 /**
  * Payments banner.
@@ -24,6 +25,20 @@ export function PaymentTestModeBanner({
 } = {}) {
   // Hydration-stable: matches the server markup, then applies the host rule.
   const env = useRenderedPaddleCheckoutEnvironment();
+  const stripeEnvironment = stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN);
+  if (stripeEnvironment) {
+    return (
+      <aside
+        aria-label="Payment availability"
+        aria-live="polite"
+        data-payment-env={stripeEnvironment}
+        className="w-full border-b border-border bg-muted px-4 py-2 text-center text-sm text-foreground"
+      >
+        {stripeEnvironment === "sandbox" ? "Payments are in test mode. No real charges. " : ""}
+        {STRIPE_FULFILLMENT_PENDING_MESSAGE}
+      </aside>
+    );
+  }
   if (env === "live") return null;
 
   if (env === "sandbox") {

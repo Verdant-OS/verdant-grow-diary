@@ -1,3 +1,4 @@
+import type Stripe from "stripe";
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
@@ -61,7 +62,7 @@ export const createStripeCheckout = createServerFn({ method: 'POST' })
         metadata,
         ...(offer.kind === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { description: product.name, metadata } }),
         managed_payments: { enabled: true },
-      });
+      } as Stripe.Checkout.SessionCreateParams);
       if (!session.client_secret) throw new Error('Stripe did not return a checkout secret');
       return { clientSecret: session.client_secret };
     } catch (error) { return { error: getStripeErrorMessage(error) }; }

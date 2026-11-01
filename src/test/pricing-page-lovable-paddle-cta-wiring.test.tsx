@@ -88,7 +88,7 @@ describe("Pricing page — built-in Paddle wiring", () => {
 
     const trust = screen.getByTestId("pricing-checkout-trust");
     expect(trust).toHaveAttribute("data-checkout-state", "sandbox");
-    expect(trust).toHaveTextContent("Paddle sandbox");
+    expect(trust).toHaveTextContent("Stripe test mode");
     expect(trust).toHaveTextContent("Test only");
     expect(trust).toHaveTextContent("No real charges");
 

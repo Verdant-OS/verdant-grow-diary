@@ -37,8 +37,8 @@ export const CHECKOUT_MECHANISM_FAQ_ANSWER =
 
 const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
   state: "sandbox",
-  label: "Paddle sandbox — Test only",
-  summary: "No real charges can be made. This app uses Paddle's sandbox for checkout testing.",
+  label: "Stripe test mode — Test only",
+  summary: "No real charges can be made. This app uses Stripe's test mode for checkout testing.",
   faqQuestion: "Is checkout live?",
   faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
   canCreateLiveCharge: false,

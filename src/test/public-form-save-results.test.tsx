@@ -11,6 +11,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: mocks.from },
 }));
 vi.mock("@/pages/support/spamGuard", () => ({
+  HONEYPOT_FIELD: "website_url",
   checkSpam: () => ({ ok: true }), fingerprint: () => "test", recordSubmission: vi.fn(),
 }));
 vi.mock("@/lib/pricingAnalytics", () => ({ trackPricingEvent: vi.fn() }));

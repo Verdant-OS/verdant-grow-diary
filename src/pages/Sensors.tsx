@@ -22,6 +22,7 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
+import { Button } from "@/components/ui/button";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { usePlants } from "@/hooks/use-plants";
@@ -44,6 +45,8 @@ import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
 import { useLocation, useSearchParams } from "@/lib/react-router-compat";
+import { useSensorCsvImportEntry } from "@/hooks/useSensorCsvImportEntry";
+import { isSensorHashAnchorMounted } from "@/lib/sensorHashAnchorRules";
 import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { SENSOR_SOURCES_PARAM, parseSensorSourcesParam } from "@/lib/sensorSourceUrlRules";
 import { classifySensorMetricState, type SensorMetricKey } from "@/lib/sensorMetricStateRules";
@@ -230,6 +233,21 @@ export default function Sensors() {
     session,
   ]);
 
+  const selectedTent = tents.find((t) => t.id === activeTentId) ?? null;
+  const selectedGrowId = selectedTent?.growId ?? null;
+  // Loading and error shells omit #csv-import. The hash effect has to
+  // subscribe to that mount or a fast tent response focuses nothing.
+  const sensorHashAnchorMounted = isSensorHashAnchorMounted({
+    tentsQueryError: tentsQuery.isError,
+    readingsQueryError: readingsQuery.isError,
+    tentsQueryLoading: tentsQuery.isLoading,
+    readingsQueryLoading: readingsQuery.isLoading,
+    resolutionPending: requiredTentGate.resolutionPending,
+    reselectionRequired: requiredTentGate.reselectionRequired,
+    tentCount: tents.length,
+    selectedTentPresent: selectedTent !== null,
+  });
+
   // React Router updates hashes without a full browser navigation, so make
   // the supported manual-reading and CSV-import deep links deterministic.
   // This only moves viewport/focus; it never opens a picker or starts import.
@@ -248,12 +266,19 @@ export default function Sensors() {
     // route selection before moving focus, so the grower lands on a usable
     // importer rather than a transient empty shell.
     if (anchorId === "csv-import" && (!tentsQuery.isSuccess || !activeTentId)) return;
+    if (!sensorHashAnchorMounted) return;
     const target = document.getElementById(anchorId);
     if (!target) return;
     target.scrollIntoView?.({ behavior: "smooth", block: "start" });
     target.focus?.({ preventScroll: true });
     focusedSensorAnchorHashRef.current = location.hash;
-  }, [activeTentId, appliedTentRouteIntentKey, location.hash, tentsQuery.isSuccess]);
+  }, [
+    activeTentId,
+    appliedTentRouteIntentKey,
+    location.hash,
+    sensorHashAnchorMounted,
+    tentsQuery.isSuccess,
+  ]);
   const correctionCtx = useMemo(() => decodeManualCorrectionHash(location.hash), [location.hash]);
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = useMemo(
@@ -272,8 +297,6 @@ export default function Sensors() {
     [readingsByMetric],
   );
   const vpdStabilityReadings = readingsByMetric.vpd;
-  const selectedTent = tents.find((t) => t.id === activeTentId) ?? null;
-  const selectedGrowId = selectedTent?.growId ?? null;
   const soilMoistureCalibrationsQuery = useSoilMoistureCalibrations({
     growId: selectedGrowId,
     tentId: activeTentId,
@@ -426,14 +449,7 @@ export default function Sensors() {
     );
   }
 
-  const sensorPageLoading =
-    tentsQuery.isLoading ||
-    requiredTentGate.resolutionPending ||
-    (tents.length > 0 &&
-      !requiredTentGate.reselectionRequired &&
-      (selectedTent === null || readingsQuery.isLoading));
-
-  if (sensorPageLoading) {
+  if (!sensorHashAnchorMounted) {
     return (
       <div>
         <PageHeader
@@ -453,6 +469,7 @@ export default function Sensors() {
         description="Environmental telemetry across tents."
         icon={<Activity className="h-5 w-5" />}
       />
+      <SensorsCsvImportEntry />
       <OneTentLoopNextStepCard
         current="sensor-snapshot"
         ids={{
@@ -888,7 +905,7 @@ export default function Sensors() {
       <div
         id="csv-import"
         tabIndex={-1}
-        className="mt-4 max-w-xl scroll-mt-24"
+        className="mt-4 max-w-xl scroll-mt-24 rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:ring-2"
         data-testid="sensors-csv-import-anchor"
       >
         {requiredTentGate.reselectionRequired ? (
@@ -1031,5 +1048,20 @@ export default function Sensors() {
         </section>
       )}
     </div>
+  );
+}
+
+function SensorsCsvImportEntry() {
+  const entry = useSensorCsvImportEntry();
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="mb-3"
+      data-testid="sensors-csv-import-entry"
+      onClick={entry.open}
+    >
+      {entry.label}
+    </Button>
   );
 }

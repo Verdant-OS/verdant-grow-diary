@@ -16,6 +16,7 @@
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { normalizePersistedGrowTentId } from "@/lib/growTentSelectionRules";
 import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
+import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -146,7 +147,11 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * "no constraint" rather than guessed at.
  */
 export function isTimelineDateFilterValue(value: string | null | undefined): value is string {
-  return typeof value === "string" && ISO_DATE_RE.test(value);
+  return (
+    typeof value === "string" &&
+    ISO_DATE_RE.test(value) &&
+    buildTimelineLocalDateRangeBounds({ startDate: value }).startIso !== null
+  );
 }
 
 /**

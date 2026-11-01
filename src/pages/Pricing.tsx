@@ -69,6 +69,7 @@ import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
 import { buildCheckoutPlanReturnPath, savePlanIntent } from "@/lib/checkoutPlanIntent";
 import { resolvePricingCheckoutRetryGate } from "@/lib/pricingCheckoutRetryRules";
 import { isFounderLifetimeCheckoutSku } from "@/lib/founderLifetimeCheckoutGuard";
+import { buildPlansComparisonTable } from "@/lib/pricingPlansComparisonViewModel";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -611,6 +612,11 @@ export default function Pricing() {
     billing === "annual"
       ? `~${PRICING.craft.annualSavingsPercent}% savings vs. monthly`
       : `Or $${CRAFT_ANNUAL_PRICE_USD}/year — save ~${PRICING.craft.annualSavingsPercent}%`;
+
+  // Simple Pro vs Craft table under the cards. Prices derive from the same
+  // constants the cards use and follow the toggle, so the two can never
+  // disagree on the number a grower sees.
+  const plansComparison = buildPlansComparisonTable(billing);
 
   return (
     <main

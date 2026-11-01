@@ -190,7 +190,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
-  { path: "/features", access: "redirect", description: "→ /" },
+  {
+    path: "/features",
+    access: "public",
+    description: "Public capability index: diary, sensor truth, AI Doctor, alerts, and free tools.",
+  },
   { path: "/feedback", access: "public", description: "Public support feedback page." },
   {
     path: "/founder",
@@ -551,7 +555,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Public VPD chart by growth stage with a leaf-offset calculator.",
   },
-  { path: "/welcome", access: "redirect", description: "→ /" },
+  {
+    path: "/welcome",
+    access: "public",
+    description: "Public start-here guide; the marketing landing and sign-out exit.",
+  },
 ];
 
 /** All manifest paths in the manifest's deterministic (path-ascending) order. */

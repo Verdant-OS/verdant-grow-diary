@@ -157,6 +157,7 @@ import { Route as AppGrowsGrowIdLearningRouteImport } from './routes/_app/grows_
 import { Route as AppPhenoHuntsIdKeepersRouteImport } from './routes/_app/pheno-hunts_.$id.keepers'
 import { Route as AppPhenoHuntsIdWorkspaceRouteImport } from './routes/_app/pheno-hunts_.$id.workspace'
 import { Route as AppReportsPostGrowGrowIdRouteImport } from './routes/_app/reports_.post-grow.$growId'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as AppGeneticsHealthKindIdRouteImport } from './routes/_app/genetics.health.$kind.$id'
 import { Route as AppGeneticsTraceKindIdRouteImport } from './routes/_app/genetics.trace.$kind.$id'
 
@@ -943,6 +944,12 @@ const AppReportsPostGrowGrowIdRoute =
     path: '/reports/post-grow/$growId',
     getParentRoute: () => AppRoute,
   } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppGeneticsHealthKindIdRoute = AppGeneticsHealthKindIdRouteImport.update({
   id: '/health/$kind/$id',
   path: '/health/$kind/$id',
@@ -1101,6 +1108,7 @@ export interface FileRoutesByFullPath {
   '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1250,6 +1258,7 @@ export interface FileRoutesByTo {
   '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1403,6 +1412,7 @@ export interface FileRoutesById {
   '/_app/pheno-hunts_/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/_app/pheno-hunts_/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/_app/reports_/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/_app/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/_app/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1555,6 +1565,7 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/keepers'
     | '/pheno-hunts/$id/workspace'
     | '/reports/post-grow/$growId'
+    | '/api/public/payments/webhook'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -1704,6 +1715,7 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/keepers'
     | '/pheno-hunts/$id/workspace'
     | '/reports/post-grow/$growId'
+    | '/api/public/payments/webhook'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   id:
@@ -1856,6 +1868,7 @@ export interface FileRouteTypes {
     | '/_app/pheno-hunts_/$id/keepers'
     | '/_app/pheno-hunts_/$id/workspace'
     | '/_app/reports_/post-grow/$growId'
+    | '/api/public/payments/webhook'
     | '/_app/genetics/health/$kind/$id'
     | '/_app/genetics/trace/$kind/$id'
   fileRoutesById: FileRoutesById
@@ -1920,6 +1933,7 @@ export interface RootRouteChildren {
   CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
   PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute
   PhenoHuntsIdShowcaseRoute: typeof PhenoHuntsIdShowcaseRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2960,6 +2974,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsPostGrowGrowIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/genetics/health/$kind/$id': {
       id: '/_app/genetics/health/$kind/$id'
       path: '/health/$kind/$id'
@@ -3271,6 +3292,7 @@ const rootRouteChildren: RootRouteChildren = {
     CustomerGuideOreozVsGelonadeComparisonRoute,
   PhenoHuntsIdCompareRoute: PhenoHuntsIdCompareRoute,
   PhenoHuntsIdShowcaseRoute: PhenoHuntsIdShowcaseRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

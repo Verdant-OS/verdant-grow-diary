@@ -120,6 +120,10 @@ import TentPendingOutcomeNotice from "@/components/TentPendingOutcomeNotice";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
 import {
+  resolveDisplayedTentClimateSnapshot,
+  tonightRowsFromQuickLogManualReadings,
+} from "@/lib/tentManualEnvironmentSnapshotRules";
+import {
   resolveTentDetailVpd,
   tentDetailHeaderRejection,
   tentDetailVpdRowUntrusted,
@@ -221,6 +225,14 @@ export default function TentDetail() {
   const nowMs = useNowTick();
   const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
+  const displayedClimate = resolveDisplayedTentClimateSnapshot({
+    sensorSnapshot: header.snapshot,
+    manuals: quickLogManuals.data,
+    tentId: tent?.id ?? null,
+    nowMs,
+  });
+  const climateSnap = displayedClimate.fromManual ? displayedClimate.snapshot : snap;
+  const climateStale = displayedClimate.fromManual ? displayedClimate.stale : header.stale;
   // The header's truth check is realism only and keeps a vpd_kpa row whose own
   // intake quality flag is not ok. The Dashboard selector drops that row, so
   // the tent page withholds it the same way the header withholds a realism
@@ -251,7 +263,10 @@ export default function TentDetail() {
   // newer same-capture temperature and RH pair beats an older stored VPD here too.
   const tonightSnapshot = useLatestSensorSnapshot(tent?.growId ?? null, tent ? [tent.id] : []);
   const tonightMetrics = buildTonightTentMetrics({
-    rows: readings,
+    rows: [
+      ...readings,
+      ...tonightRowsFromQuickLogManualReadings(quickLogManuals.data, tent?.id ?? null),
+    ],
     rowsRead: {
       status: sensorReadings.isError ? "error" : sensorReadings.isPending ? "loading" : "success",
     },
@@ -503,23 +518,23 @@ export default function TentDetail() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
-        {snap?.temp !== null && snap?.temp !== undefined && (
+        {climateSnap?.temp !== null && climateSnap?.temp !== undefined && (
           <MetricChip
             label="T"
-            value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
+            value={(convertCelsiusForDisplay(climateSnap.temp) ?? 0).toFixed(1)}
             unit={getTemperatureUnitSymbol()}
             status={environmentMetricChipStatus(
-              classifyTempAgainstStage(snap.temp, { stage: envStage, stale: header.stale }),
+              classifyTempAgainstStage(climateSnap.temp, { stage: envStage, stale: climateStale }),
             )}
           />
         )}
-        {snap?.rh !== null && snap?.rh !== undefined && (
+        {climateSnap?.rh !== null && climateSnap?.rh !== undefined && (
           <MetricChip
             label="RH"
-            value={snap.rh}
+            value={climateSnap.rh}
             unit="%"
             status={environmentMetricChipStatus(
-              classifyRhAgainstStage(snap.rh, { stage: envStage, stale: header.stale }),
+              classifyRhAgainstStage(climateSnap.rh, { stage: envStage, stale: climateStale }),
             )}
           />
         )}
@@ -542,8 +557,8 @@ export default function TentDetail() {
               />
             );
           })()}
-        {snap?.co2 !== null && snap?.co2 !== undefined && (
-          <MetricChip label="CO₂" value={snap.co2} unit=" ppm" />
+        {climateSnap?.co2 !== null && climateSnap?.co2 !== undefined && (
+          <MetricChip label="CO₂" value={climateSnap.co2} unit=" ppm" />
         )}
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <Lightbulb
@@ -671,10 +686,11 @@ export default function TentDetail() {
           )}
         </div>
         <SensorSnapshotTruthStrip
-          model={buildSensorSnapshotReadModel({
-            snapshot: header.snapshot,
-            truth: header.truth,
-          })}
+          model={buildSensorSnapshotReadModel(
+            displayedClimate.fromManual
+              ? { snapshot: displayedClimate.snapshot, now: nowMs }
+              : { snapshot: header.snapshot, truth: header.truth },
+          )}
           className="mb-3"
           testId="tent-detail-sensor-snapshot-truth"
         />

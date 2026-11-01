@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { useOpenStripeCustomerPortalState } from "@/lib/payments/stripePortal";
 import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
 
 import {

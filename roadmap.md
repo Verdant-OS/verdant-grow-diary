@@ -1,5 +1,7 @@
 # Current tasks
 
+- [ ] Email new lead and contact submissions to matt@verdantgrowdiary.com using managed app emails; preserve saved submissions on notification failure and verify an individual send. No publish authorized.
+
 - [x] Feedback, contact and both lead forms retain their existing validated insert paths; interrupted saves now settle with visible retry errors and success follows confirmed saving. Contact test saved through public UI, database readback confirmed it, and only that test row was removed. Owner notifications blocked by unpublished email setup.
 
 - [x] Add account navigation after exact-plan Stripe confirmation. Existing ownership, settlement, and account tests: 45 passed across 4 files.

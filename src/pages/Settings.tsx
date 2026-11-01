@@ -317,7 +317,8 @@ function TemperatureUnitTile() {
  * billing status directly.
  */
 function SubscriptionTile() {
-  const { loading, lookupFailed, entitlement, refetch } = useMyEntitlements();
+  const { loading, lookupFailed, entitlement, savedStripeTestSubscription, refetch } =
+    useMyEntitlements();
   const {
     opening,
     error: portalError,
@@ -364,6 +365,13 @@ function SubscriptionTile() {
               data-testid="settings-subscription-staff-note"
             >
               Internal staff — Pro capabilities, 10,000 AI credits/month.
+            </p>
+          )}
+          {!loading && !lookupFailed && (
+            <p className="text-xs text-muted-foreground mt-2" role="status">
+              {savedStripeTestSubscription
+                ? `Saved Stripe test subscription: ${savedStripeTestSubscription.displayPlanId.replaceAll("_", " ")} — ${savedStripeTestSubscription.status}. ${savedStripeTestSubscription.isActive ? "Test plan access active." : "Test plan access inactive."}`
+                : "No saved Stripe test subscription in this account’s current billing environment."}
             </p>
           )}
           {entitlement?.status === "past_due" && (

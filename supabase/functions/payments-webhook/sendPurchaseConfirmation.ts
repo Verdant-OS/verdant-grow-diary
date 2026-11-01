@@ -149,25 +149,40 @@ export async function maybeSendPurchaseConfirmation(
     const text = await renderAsync(element, { plainText: true });
     const writeLog = async (status: "sent" | "suppressed" | "failed", errorMessage?: string) => {
       const { error } = await supabase.from("email_send_log").insert({
-        template_name: "order-confirmation", recipient_email: recipient, status,
+        template_name: "order-confirmation",
+        recipient_email: recipient,
+        status,
         error_message: errorMessage ?? null,
       });
-      if (error) console.error("Purchase email audit failed", { code: error.code, message: error.message });
+      if (error)
+        console.error("Purchase email audit failed", { code: error.code, message: error.message });
     };
     try {
       const apiKey = Deno.env.get("LOVABLE_API_KEY");
       if (!apiKey) throw new Error("Email configuration unavailable");
-      await sendLovableEmail({
-        to: recipient,
-        from: { name: "Matt at Verdant Grow Diary", address: "matt@notify.verdantgrowdiary.com" },
-        reply_to: "matt@verdantgrowdiary.com", sender_domain: "notify.verdantgrowdiary.com",
-        subject: template.subject(templateData), html, text, purpose: "transactional",
-        label: "order-confirmation", idempotency_key: idempotencyKey,
-      }, { apiKey, sendUrl: Deno.env.get("LOVABLE_SEND_URL") });
+      await sendLovableEmail(
+        {
+          to: recipient,
+          from: { name: "Matt at Verdant Grow Diary", address: "matt@notify.verdantgrowdiary.com" },
+          reply_to: "matt@verdantgrowdiary.com",
+          sender_domain: "notify.verdantgrowdiary.com",
+          subject: template.subject(templateData),
+          html,
+          text,
+          purpose: "transactional",
+          label: "order-confirmation",
+          idempotency_key: idempotencyKey,
+        },
+        { apiKey, sendUrl: Deno.env.get("LOVABLE_SEND_URL") },
+      );
       await writeLog("sent");
     } catch (error) {
-      await writeLog(error instanceof EmailAPIError && error.code === "recipient_suppressed" ? "suppressed" : "failed",
-        error instanceof Error ? error.message.slice(0, 1000) : "Email send failed");
+      await writeLog(
+        error instanceof EmailAPIError && error.code === "recipient_suppressed"
+          ? "suppressed"
+          : "failed",
+        error instanceof Error ? error.message.slice(0, 1000) : "Email send failed",
+      );
       return logSkip({ reason: "skipped:send_non_2xx" }, evt);
     }
     return { reason: "sent" };

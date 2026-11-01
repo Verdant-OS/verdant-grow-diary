@@ -74,10 +74,6 @@ describe("transactional email trust boundary", () => {
     ).toEqual(["some-unfamiliar-but-valid-secret"]);
   });
 
-
-
-
-
   it("does not expose the service-only sender from browser code", () => {
     for (const path of ["src/pages/Auth.tsx", "src/pages/CheckoutSuccess.tsx"]) {
       expect(read(path)).not.toContain('functions.invoke("send-transactional-email"');
@@ -128,8 +124,6 @@ describe("transactional email trust boundary", () => {
     expect(normalizeTransactionalEmailSubject("Grow update\r\nBcc: victim@example.com")).toBeNull();
   });
 
-
-
   it("keeps unsubscribe tokens out of indexing and raw user-facing errors", () => {
     const source = read("src/pages/Unsubscribe.tsx");
     // Classic SPA index.html is gone under TanStack SSR; route head + page
@@ -156,6 +150,4 @@ describe("transactional email trust boundary", () => {
       ]),
     );
   });
-
-
 });

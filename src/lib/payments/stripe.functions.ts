@@ -117,11 +117,12 @@ export const createStripeCheckout = createServerFn({ method: "POST" })
       };
       const session = await stripe.checkout.sessions.create(
         Object.assign(checkoutParams, {
-          // Verdant prices are USD. Stripe Managed Payments requires
-          // adaptive pricing, which re-presents prices in the buyer's local
-          // currency (e.g. EUR) — so both stay off while checkout is
-          // test-only. Re-enable managed_payments for tax compliance before
-          // live charges if wanted.
+          // Verdant prices are USD. Stripe Managed Payments (enabled by
+          // default on this account) requires adaptive pricing, which
+          // re-presents prices in the buyer's local currency (e.g. EUR) —
+          // so both are disabled while checkout is test-only. Re-enable
+          // managed_payments for tax compliance before live charges.
+          managed_payments: { enabled: false },
           adaptive_pricing: { enabled: false },
         }),
       );

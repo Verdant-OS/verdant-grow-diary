@@ -116,6 +116,7 @@ export function harness() {
           return query;
         },
         async insert(row: Row) {
+          if (table === "email_send_log") return { error: null };
           const id = String(row.paddle_event_id);
           if (rows.has(id)) return { error: { code: "23505", message: "duplicate fixture event" } };
           rows.set(id, structuredClone(row));

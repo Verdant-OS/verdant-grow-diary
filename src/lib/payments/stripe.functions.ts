@@ -55,7 +55,9 @@ export const createStripeCheckout = createServerFn({ method: "POST" })
       const { getRequest } = await import("@tanstack/react-start/server");
       const request = getRequest();
       const requestOrigin = request.headers.get("origin") ?? new URL(request.url).origin;
-      if (data.origin !== requestOrigin) throw new Error("Invalid checkout return origin");
+      const { isAllowedCheckoutReturnOrigin } = await import("./checkoutReturnOriginRules");
+      if (!isAllowedCheckoutReturnOrigin(data.origin, requestOrigin))
+        throw new Error("Invalid checkout return origin");
       const stripe = createStripeClient(data.environment);
       const { data: rows, error: rowsError } = await context.supabase
         .from("subscriptions")

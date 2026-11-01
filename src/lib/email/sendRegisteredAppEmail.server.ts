@@ -1,6 +1,6 @@
 import * as React from "react";
 import { render } from "@react-email/render";
-import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { TEMPLATES } from "@/lib/email-templates/registry";
 
 // Configuration baked in at scaffold time
@@ -35,13 +35,17 @@ export async function sendRegisteredAppEmail(request: Request): Promise<Response
   let recipientEmail: string;
   let idempotencyKey: string;
   let messageId: string;
-  let templateData: Record<string, any> = {};
+  let templateData: Record<string, unknown> = {};
   try {
-    const body = await request.json();
-    templateName = body.templateName || body.template_name;
-    recipientEmail = body.recipientEmail || body.recipient_email;
+    const body = z.object({
+      templateName: z.literal("owner-submission"),
+      idempotencyKey: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_-]+$/),
+      templateData: z.record(z.string(), z.unknown()),
+    }).strict().parse(await request.json());
+    templateName = body.templateName;
+    recipientEmail = "";
     messageId = crypto.randomUUID();
-    idempotencyKey = body.idempotencyKey || body.idempotency_key || messageId;
+    idempotencyKey = body.idempotencyKey;
     if (body.templateData && typeof body.templateData === "object") {
       templateData = body.templateData;
     }

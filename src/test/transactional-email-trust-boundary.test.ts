@@ -186,7 +186,7 @@ describe("transactional email trust boundary", () => {
     expect(source).toContain("noindex: true");
     expect(source).toContain('referrerPolicy="no-referrer"');
     expect(source).toContain("window.history.replaceState(");
-    expect(source).toContain('body: { token, action: "validate" }');
+    expect(source).toContain("/email/unsubscribe?token=");
     expect(source).not.toContain("handle-email-unsubscribe?token=");
     expect(source).not.toContain("err instanceof Error ? err.message");
     expect(unsubscribeHeaders?.headers).toEqual(

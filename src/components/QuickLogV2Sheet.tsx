@@ -104,6 +104,15 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
 import { quickLogArchivedGrowActionBlock } from "@/lib/archivedGrowQuickLogRules";
 import {
+  EMPTY_QUICK_LOG_NOTE_OCCURRED_AT,
+  QUICK_LOG_NOTE_OCCURRED_AT_HELPER,
+  QUICK_LOG_NOTE_OCCURRED_AT_LABEL,
+  formatQuickLogNoteLocalDateTime,
+  quickLogNoteOccurredAtDraftFromIso,
+  quickLogRowStartedAt,
+  resolveQuickLogNoteOccurredAt,
+} from "@/lib/quickLogNoteOccurredAtRules";
+import {
   buildQuickLogV2TargetOptions,
   filterQuickLogV2TargetOptions,
   formatQuickLogV2TargetOptionLabel,
@@ -518,6 +527,9 @@ function QuickLogV2SheetForOwner({
   // Seed from open props on first paint so tent:/plant: defaultTargetKey is
   // not briefly empty — that vacancy previously let sole-plant auto-select
   // rewrite an explicit tent: open target before the open-reset effect ran.
+  const [noteOccurredAt, setNoteOccurredAt] = useState(() =>
+    quickLogNoteOccurredAtDraftFromIso(initialNote?.payload.p_occurred_at),
+  );
   const [form, setForm] = useState<QuickLogV2FormState>(() =>
     initialNote
       ? restoredNoteForm(initialNote)
@@ -1201,6 +1213,7 @@ function QuickLogV2SheetForOwner({
       setLocalError(restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
       setSaveStatus("");
       setPostSave(null);
+      setNoteOccurredAt(EMPTY_QUICK_LOG_NOTE_OCCURRED_AT);
       setWateringRetryPending(false);
       setFailedWaterPhotoUpload(false);
       setWaterPhotoOmitted(false);
@@ -2116,7 +2129,31 @@ function QuickLogV2SheetForOwner({
       return;
     }
 
-    const occurredAt = new Date().toISOString();
+    let occurredAt = new Date().toISOString();
+    if (!pendingSubmission && form.action === "note" && noteOccurredAt.touched) {
+      const growForLifetime =
+        (grows ?? []).find((grow) => grow.id === resolved.growId) ??
+        (archivedGrows ?? []).find((grow) => grow.id === resolved.growId) ??
+        null;
+      const plantForLifetime =
+        resolved.plantId == null
+          ? null
+          : (plants.find((plant) => plant.id === resolved.plantId) ?? null);
+      const occurredDecision = resolveQuickLogNoteOccurredAt({
+        touched: true,
+        localValue: noteOccurredAt.value,
+        now: new Date(),
+        growStartedAt: quickLogRowStartedAt(growForLifetime),
+        plantStartedAt: quickLogRowStartedAt(plantForLifetime),
+        endedAt: null,
+      });
+      if (occurredDecision.ok !== true) {
+        setLocalError(occurredDecision.message);
+        setSaveStatus("");
+        return;
+      }
+      if (occurredDecision.mode === "chosen") occurredAt = occurredDecision.pOccurredAt;
+    }
     let maturityDetails: Record<string, unknown> | null = null;
     if (!pendingSubmission) {
       const maturityEvidence = buildQuickLogMaturityEvidenceDetails({
@@ -2995,6 +3032,7 @@ function QuickLogV2SheetForOwner({
     setPostSave(null);
     setLocalError(null);
     setSaveStatus("");
+    setNoteOccurredAt(EMPTY_QUICK_LOG_NOTE_OCCURRED_AT);
     // Keep the activity as well as the target (#2172): a grower logging a
     // second Feed should land on the Feed form. The cleared feeding form and
     // defaults flag below let the post-save recipe prefill apply again.
@@ -3107,6 +3145,10 @@ function QuickLogV2SheetForOwner({
     }
     onOpenChange(next);
   }
+
+  const noteOccurredAtDisplay = noteOccurredAt.touched
+    ? noteOccurredAt.value
+    : formatQuickLogNoteLocalDateTime(new Date());
 
   return (
     <Sheet open={open} onOpenChange={handleSheetOpenChange}>
@@ -3767,6 +3809,29 @@ function QuickLogV2SheetForOwner({
                   {noteLength}/{NOTE_LIMIT}
                 </p>
               </div>
+              {form.action === "note" && (
+                <div className="mt-3 space-y-1">
+                  <Label htmlFor="qlv2-note-occurred-at">{QUICK_LOG_NOTE_OCCURRED_AT_LABEL}</Label>
+                  <Input
+                    id="qlv2-note-occurred-at"
+                    data-testid="qlv2-note-occurred-at"
+                    type="datetime-local"
+                    value={noteOccurredAtDisplay}
+                    disabled={submissionLocked}
+                    aria-label={QUICK_LOG_NOTE_OCCURRED_AT_LABEL}
+                    aria-describedby="qlv2-note-occurred-at-helper"
+                    autoComplete="off"
+                    onChange={(e) => {
+                      if (submissionLockedRef.current) return;
+                      setNoteOccurredAt({ touched: true, value: e.target.value });
+                      setLocalError(null);
+                    }}
+                  />
+                  <p id="qlv2-note-occurred-at-helper" className="text-sm text-muted-foreground">
+                    {QUICK_LOG_NOTE_OCCURRED_AT_HELPER}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

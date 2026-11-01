@@ -1,6 +1,7 @@
 # Current tasks
 
-- [ ] Email new lead and contact submissions to matt@verdantgrowdiary.com using managed app emails; preserve saved submissions on notification failure and verify an individual send. No publish authorized.
+- [x] Lead capture, plan-interest and contact submissions now save through a validated server action and queue owner emails to matt@verdantgrowdiary.com. Contact and lead tests each produced a sent email receipt; only test submissions removed. 55 tests passed; ESLint 0 errors/1 warning; automatic build OK. Feedback excluded.
+- [ ] Automatic hosted delivery for owner submission alerts awaits owner publishing the new email handlers; no publish performed. Test emails were verified by explicitly processing the queue, not by claiming the undeployed scheduled endpoint worked.
 
 - [x] Feedback, contact and both lead forms retain their existing validated insert paths; interrupted saves now settle with visible retry errors and success follows confirmed saving. Contact test saved through public UI, database readback confirmed it, and only that test row was removed. Owner notifications blocked by unpublished email setup.
 

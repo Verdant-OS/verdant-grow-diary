@@ -40,6 +40,8 @@ export interface UseMyEntitlementsResult {
   /** True when the canonical subscription row could not be read. */
   lookupFailed: boolean;
   entitlement: ResolvedEntitlement;
+  /** Saved test billing, without the independent staff capability override. */
+  savedStripeTestSubscription: ResolvedEntitlement | null;
   /**
    * Bounded refetch — used by CheckoutSuccess to poll after checkout.
    * Resolves to whether the lookup FAILED. A failed lookup still resolves the
@@ -58,6 +60,7 @@ interface EntitlementSnapshot {
   resolvedEnvironment: "live" | "sandbox";
   isStaff: boolean;
   now: Date;
+  savedStripeTestSubscription: ResolvedEntitlement | null;
 }
 
 /**
@@ -96,7 +99,7 @@ function fetchEntitlementSnapshot(
         // tiebreak, equal timestamps make the window order (and therefore
         // the picked row) nondeterministic.
         .order("created_at", { ascending: false })
-        .order("paddle_subscription_id", { ascending: false })
+        .order("id", { ascending: false })
         .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
 
     // Live rows are canonical production evidence and unlock regardless of
@@ -141,10 +144,24 @@ function fetchEntitlementSnapshot(
     const lookupFailed =
       !paidRowProven && (liveRes.error != null || (wantsSandbox && sandboxRes.error != null));
 
-    return { lookupFailed, lovableRow, resolvedEnvironment, isStaff, now };
+    const stripeTestRow = pickEntitlingLovableRow(
+      sandboxRows.filter((row) => row.billing_provider === "stripe"), "sandbox", now,
+    );
+    const savedStripeTestSubscription = stripeTestRow ? resolveUnionEntitlements({
+      byoRow: null, lovableRow: stripeTestRow, expectedBillingEnvironment: "sandbox", now,
+    }) : null;
+    return { lookupFailed, lovableRow, resolvedEnvironment, isStaff, now, savedStripeTestSubscription };
   })();
 
-  const tracked = load.finally(() => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const bounded = Promise.race([
+    load,
+    new Promise<EntitlementSnapshot>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Subscription lookup timed out")), 15000);
+    }),
+  ]);
+  const tracked = bounded.finally(() => {
+    clearTimeout(timer);
     if (inflightSnapshots.get(key) === tracked) inflightSnapshots.delete(key);
   });
   inflightSnapshots.set(key, tracked);
@@ -166,6 +183,7 @@ export function useMyEntitlements(
   const [loading, setLoading] = useState<boolean>(true);
   const [lookupFailed, setLookupFailed] = useState(false);
   const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(() => FREE_NOW());
+  const [savedStripeTestSubscription, setSavedStripeTestSubscription] = useState<ResolvedEntitlement | null>(null);
 
   const expectedBillingEnvironment = useMemo(() => stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN) ?? getPaddleEnvironment(), []);
 
@@ -191,6 +209,7 @@ export function useMyEntitlements(
       if (!mountedRef.current) return false;
       settledUserIdRef.current = null;
       setEntitlement(FREE_NOW());
+      setSavedStripeTestSubscription(null);
       setLookupFailed(false);
       setLoading(false);
       return false;
@@ -202,15 +221,27 @@ export function useMyEntitlements(
     const softRefresh = settledUserIdRef.current === userId;
     if (!softRefresh) {
       setEntitlement(FREE_NOW());
+      setSavedStripeTestSubscription(null);
       setLoading(true);
     }
     setLookupFailed(false);
 
     const wantsSandbox = expectedBillingEnvironment === "sandbox";
-    const snapshot = await fetchEntitlementSnapshot(userId, wantsSandbox);
+    let snapshot: EntitlementSnapshot;
+    try {
+      snapshot = await fetchEntitlementSnapshot(userId, wantsSandbox);
+    } catch {
+      if (mountedRef.current) {
+        setLookupFailed(true);
+        setSavedStripeTestSubscription(null);
+        setLoading(false);
+      }
+      return true;
+    }
 
     if (!mountedRef.current) return snapshot.lookupFailed;
     setLookupFailed(snapshot.lookupFailed);
+    setSavedStripeTestSubscription(snapshot.savedStripeTestSubscription);
     setEntitlement(
       resolveUnionEntitlements({
         byoRow: null,
@@ -236,5 +267,5 @@ export function useMyEntitlements(
     return doLoad();
   }, [enabled, doLoad]);
 
-  return { loading, lookupFailed, entitlement, refetch };
+  return { loading, lookupFailed, entitlement, savedStripeTestSubscription, refetch };
 }

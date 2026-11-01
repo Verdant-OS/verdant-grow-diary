@@ -33,7 +33,7 @@ export interface CheckoutTrustCopyInput {
 }
 
 export const CHECKOUT_MECHANISM_FAQ_ANSWER =
-  "Verdant currently opens Paddle's sandbox for checkout testing only. Sandbox checkout cannot create a real charge. This page can never charge you or grant access by itself; sandbox entitlements require server-side verification and remain test data, not proof of a paid production plan. Live checkout is intentionally disabled, so outside a successful sandbox test nothing is charged.";
+  "Verdant currently opens Stripe's test mode for checkout testing only. Test-mode checkout cannot create a real charge. This page can never charge you or grant access by itself; test entitlements require server-side verification and remain test data, not proof of a paid production plan. Live checkout is intentionally disabled, so outside a successful test purchase nothing is charged.";
 
 const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
   state: "sandbox",
@@ -46,7 +46,7 @@ const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
 
 /** Answer shown when live checkout is open on a production hostname. */
 export const LIVE_CHECKOUT_FAQ_ANSWER =
-  "Yes. Checkout runs on Paddle, which processes the payment and shows the full price, tax and renewal terms before you confirm. Paid access starts only after Paddle confirms the payment to Verdant's server.";
+  "Yes. Checkout runs on Stripe, which processes the payment and shows the full price, tax and renewal terms before you confirm. Paid access starts only after Stripe confirms the payment to Verdant's server.";
 
 const LIVE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "live",

@@ -7,6 +7,14 @@ import LeadCaptureForm from "@/components/LeadCaptureForm";
 import SubscriberInterestForm from "@/components/SubscriberInterestForm";
 
 const mocks = vi.hoisted(() => ({ insert: vi.fn(), from: vi.fn() }));
+vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
+vi.mock("@/lib/formSubmission.functions", () => ({
+  submitPublicForm: async ({ data }: { data: { kind: string; payload: unknown } }) => {
+    mocks.from(data.kind === "contact" ? "contact_messages" : "leads");
+    const result = await mocks.insert(data.payload);
+    return result.error ? { error: "Save failed" } : { saved: true };
+  },
+}));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: mocks.from },
 }));

@@ -86,7 +86,8 @@ describe("leads migration", () => {
 describe("LeadCaptureForm", () => {
   it("writes only to the leads table", () => {
     const fromCalls = FORM.match(/\.from\(["']([^"']+)["']\)/g) ?? [];
-    expect(fromCalls.length).toBeGreaterThan(0);
+    expect(FORM).toContain("submitPublicForm");
+    expect(FORM).toContain('kind: "lead"');
     for (const c of fromCalls) {
       expect(c).toMatch(/\.from\(["']leads["']\)/);
     }

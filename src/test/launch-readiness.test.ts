@@ -39,9 +39,9 @@ describe("sitemap.xml", () => {
     expect(SITEMAP).toMatch(/https:\/\/verdantgrowdiary\.com\//);
   });
 
-  it("includes the apex and omits the retired /welcome alias", () => {
+  it("includes the apex and the /welcome start-here page", () => {
     expect(SITEMAP).toMatch(/<loc>https:\/\/verdantgrowdiary\.com\/<\/loc>/);
-    expect(SITEMAP).not.toMatch(/<loc>https:\/\/verdantgrowdiary\.com\/welcome<\/loc>/);
+    expect(SITEMAP).toMatch(/<loc>https:\/\/verdantgrowdiary\.com\/welcome<\/loc>/);
   });
 
   it("excludes private authenticated routes", () => {

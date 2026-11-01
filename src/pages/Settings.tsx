@@ -320,12 +320,28 @@ function SubscriptionTile() {
   const { loading, lookupFailed, entitlement, savedStripeTestSubscription, refetch } =
     useMyEntitlements();
   const {
-    opening,
-    error: portalError,
-    open: openPortal,
-    clearError,
+    opening: paddleOpening,
+    error: paddlePortalError,
+    open: openPaddlePortal,
+    clearError: clearPaddleError,
   } = useOpenCustomerPortalState();
+  const {
+    opening: stripeOpening,
+    error: stripePortalError,
+    open: openStripePortal,
+    clearError: clearStripeError,
+  } = useOpenStripeCustomerPortalState();
   const cancelNotice = usePaddleCancelNotice();
+
+  // A saved Stripe test subscription is this account's purchase in the
+  // current billing environment — its Manage CTA and copy must point at the
+  // Stripe customer portal, not Paddle. Paddle stays the fallback for
+  // Paddle-era rows.
+  const useStripePortal = !loading && !lookupFailed && savedStripeTestSubscription != null;
+  const opening = useStripePortal ? stripeOpening : paddleOpening;
+  const portalError = useStripePortal ? stripePortalError : paddlePortalError;
+  const openPortal = useStripePortal ? openStripePortal : openPaddlePortal;
+  const clearError = useStripePortal ? clearStripeError : clearPaddleError;
 
   const planId = lookupFailed ? null : (entitlement?.displayPlanId ?? null);
 
@@ -467,8 +483,9 @@ function SubscriptionTile() {
 
       {isPaid && !isLifetime ? (
         <p className="text-[11px] text-muted-foreground mt-2">
-          Cancel, change payment method, or download invoices in the Paddle customer portal. Opens
-          in a new tab.
+          {useStripePortal
+            ? "Cancel, change payment method, or download invoices in the Stripe customer portal. Opens in a new tab."
+            : "Cancel, change payment method, or download invoices in the Paddle customer portal. Opens in a new tab."}
         </p>
       ) : null}
     </Tile>

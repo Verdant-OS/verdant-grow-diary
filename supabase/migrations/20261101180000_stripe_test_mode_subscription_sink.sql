@@ -157,8 +157,17 @@ BEGIN
   ON CONFLICT (event_id) DO NOTHING
   RETURNING event_id INTO v_event_id;
 
+  -- A duplicate event is success only after the first attempt applied.
+  -- A logical failure leaves no applied row, so Stripe's retry runs again.
   IF v_event_id IS NULL THEN
-    RETURN jsonb_build_object('ok', true, 'reason', 'idempotent');
+    IF EXISTS (
+      SELECT 1
+        FROM public.stripe_webhook_events
+       WHERE event_id = p_event_id
+         AND result = 'applied'
+    ) THEN
+      RETURN jsonb_build_object('ok', true, 'reason', 'idempotent');
+    END IF;
   END IF;
 
   IF p_user_id IS NOT NULL AND p_stripe_customer_id IS NOT NULL THEN
@@ -249,6 +258,7 @@ BEGIN
       ELSE NULL
     END;
     IF v_credits IS NULL THEN
+      DELETE FROM public.stripe_webhook_events WHERE event_id = p_event_id;
       RETURN jsonb_build_object('ok', false, 'reason', 'unknown_plan');
     END IF;
     v_grant := public.grant_lovable_credit_pack(
@@ -259,6 +269,7 @@ BEGIN
       'sandbox'
     );
     IF (v_grant->>'ok') IS DISTINCT FROM 'true' THEN
+      DELETE FROM public.stripe_webhook_events WHERE event_id = p_event_id;
       RETURN jsonb_build_object('ok', false, 'reason', COALESCE(v_grant->>'reason', 'grant_failed'));
     END IF;
   END IF;

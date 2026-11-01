@@ -3,6 +3,9 @@
  * credit packs, and only in test mode. Founder Lifetime is never allocated.
  * Credit counts are taken from the catalog, never from event metadata.
  * A missing billing period does not produce a subscription grant.
+ * Subscription periods are read from the subscription item. The pinned API
+ * no longer sends them on the Subscription object. Checkout sends the
+ * subscription id; the caller supplies the Subscription before this runs.
  */
 import {
   classifyStripePlanId,
@@ -94,6 +97,44 @@ function subscriptionId(value: unknown): string | null {
   return nested && isStripeSubscriptionId(nested) ? nested : null;
 }
 
+function subscriptionBillingPeriod(record: Record<string, unknown> | null): {
+  start: unknown;
+  end: unknown;
+} {
+  if (!record) return { start: null, end: null };
+  if (typeof record.current_period_end === "number" && Number.isFinite(record.current_period_end)) {
+    return { start: record.current_period_start, end: record.current_period_end };
+  }
+  const items = asRecord(record.items);
+  const data = items?.data;
+  if (!Array.isArray(data)) return { start: record.current_period_start, end: null };
+  let end: number | null = null;
+  let start: unknown = record.current_period_start;
+  for (const entry of data) {
+    const item = asRecord(entry);
+    if (!item) continue;
+    if (typeof item.current_period_end !== "number" || !Number.isFinite(item.current_period_end)) {
+      continue;
+    }
+    if (end == null || item.current_period_end > end) {
+      end = item.current_period_end;
+      start = item.current_period_start;
+    }
+  }
+  return { start, end };
+}
+
+function invoiceSubscriptionId(object: Record<string, unknown>): string | null {
+  const direct = subscriptionId(object.subscription);
+  if (direct) return direct;
+  const parent = asRecord(object.parent);
+  if (!parent) return null;
+  const parentType = readString(parent, "type");
+  if (parentType && parentType !== "subscription_details") return null;
+  const details = asRecord(parent.subscription_details);
+  return subscriptionId(details?.subscription);
+}
+
 function planDecision(planId: string | null): StripeWebhookDecision | null {
   if (!planId) return null;
   const plan = classifyStripePlanId(planId);
@@ -142,7 +183,8 @@ function decideCheckout(eventId: string, object: Record<string, unknown>): Strip
   if (readString(object, "mode") !== "subscription") return { kind: "refuse", error: "malformed" };
   const subscription = asRecord(object.subscription);
   const stripeSubscriptionId = subscriptionId(object.subscription);
-  const periodEnd = unixToIso(subscription?.current_period_end);
+  const period = subscriptionBillingPeriod(subscription);
+  const periodEnd = unixToIso(period.end);
   const status = readString(subscription, "status");
   if (!stripeSubscriptionId || !periodEnd || (status !== "active" && status !== "trialing")) {
     return { kind: "ignore", reason: "period_not_present" };
@@ -156,7 +198,7 @@ function decideCheckout(eventId: string, object: Record<string, unknown>): Strip
       stripeCustomerId: customerId(object.customer),
       stripeSubscriptionId,
       status,
-      periodStart: unixToIso(subscription?.current_period_start),
+      periodStart: unixToIso(period.start),
       periodEnd,
       cancelAtPeriodEnd: subscription?.cancel_at_period_end === true,
       checkoutSessionId: sessionId,
@@ -216,7 +258,8 @@ function decideSubscription(
   }
 
   const plan = planId ? classifyStripePlanId(planId) : { kind: "unknown" as const };
-  const periodEnd = unixToIso(object.current_period_end);
+  const period = subscriptionBillingPeriod(object);
+  const periodEnd = unixToIso(period.end);
   if (
     plan.kind !== "subscription" ||
     !periodEnd ||
@@ -233,6 +276,7 @@ function decideSubscription(
         stripeSubscriptionId,
         planId: plan.planId,
         status,
+        periodStart: unixToIso(period.start),
         periodEnd,
         cancelAtPeriodEnd: object.cancel_at_period_end === true,
       },
@@ -247,7 +291,7 @@ function decideSubscription(
       stripeCustomerId: customerId(object.customer),
       stripeSubscriptionId,
       status,
-      periodStart: unixToIso(object.current_period_start),
+      periodStart: unixToIso(period.start),
       periodEnd,
       cancelAtPeriodEnd: object.cancel_at_period_end === true,
     },
@@ -271,12 +315,13 @@ export function decideStripeWebhookAction(event: unknown): StripeWebhookDecision
   switch (eventType) {
     case "checkout.session.completed":
       return decideCheckout(eventId, object);
+    case "customer.subscription.created":
     case "customer.subscription.updated":
       return decideSubscription(eventId, eventType, object, false);
     case "customer.subscription.deleted":
       return decideSubscription(eventId, eventType, object, true);
     case "invoice.payment_failed": {
-      const stripeSubscriptionId = subscriptionId(object.subscription);
+      const stripeSubscriptionId = invoiceSubscriptionId(object);
       if (!stripeSubscriptionId) return { kind: "ignore", reason: "no_subscription" };
       return {
         kind: "apply",

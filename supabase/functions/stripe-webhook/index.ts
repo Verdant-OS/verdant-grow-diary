@@ -1,5 +1,9 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  assertStripeTestSecret,
+  STRIPE_API_VERSION,
+} from "../_shared/lib/lib/stripeTestModeCatalogRules.ts";
 import { runStripeWebhook } from "../_shared/lib/lib/stripeWebhookOrchestrator.ts";
 
 /**
@@ -7,6 +11,8 @@ import { runStripeWebhook } from "../_shared/lib/lib/stripeWebhookOrchestrator.t
  * does not send a Supabase session. The raw body is verified before any
  * service-role call. Livemode and Founder Lifetime never reach the RPC.
  * p_livemode is hardcoded false; the SQL function refuses anything else.
+ * Checkout sends a subscription id. The Subscription is loaded with the
+ * test secret and the pinned API version before a recurring grant.
  */
 
 function json(status: number, body: Record<string, unknown>): Response {
@@ -29,6 +35,22 @@ Deno.serve(async (req) => {
     },
     {
       getSecret: () => Deno.env.get("STRIPE_WEBHOOK_SECRET"),
+      retrieveSubscription: async (subscriptionId) => {
+        const secret = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+        if (!assertStripeTestSecret(secret).ok) return null;
+        const response = await fetch(
+          `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${secret}`,
+              "Stripe-Version": STRIPE_API_VERSION,
+            },
+          },
+        );
+        if (!response.ok) return null;
+        return response.json();
+      },
       applyEvent: async (payload) => {
         const supabaseUrl = Deno.env.get("SUPABASE_URL");
         const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

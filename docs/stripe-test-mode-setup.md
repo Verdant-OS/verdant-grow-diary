@@ -36,9 +36,12 @@ Founder Lifetime stays retired. There is no Founder Stripe product and no
 3. Store `STRIPE_SECRET_KEY` as a test secret key (`sk_test_` only). A
    missing key or any `sk_live_` value fails closed and does not call Stripe.
 4. Register a test-mode webhook endpoint for `checkout.session.completed`,
-   `customer.subscription.updated`, `customer.subscription.deleted`, and
-   `invoice.payment_failed`. Store its signing secret as
-   `STRIPE_WEBHOOK_SECRET` (`whsec_`). The function verifies the raw body.
+   `customer.subscription.created`, `customer.subscription.updated`,
+   `customer.subscription.deleted`, and `invoice.payment_failed`. Store its
+   signing secret as `STRIPE_WEBHOOK_SECRET` (`whsec_`). The function
+   verifies the raw body. Set the endpoint's API version to
+   `2026-02-25.preview`. Checkout sends the subscription id; the webhook
+   loads that Subscription with `STRIPE_SECRET_KEY` before granting.
 5. Set `STRIPE_CHECKOUT_RETURN_ORIGIN` to exactly one of
    `https://verdantgrowdiary.com`, `https://www.verdantgrowdiary.com`,
    `http://127.0.0.1:8080`, or `http://localhost:8080`. Return URLs are

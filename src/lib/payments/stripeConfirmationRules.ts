@@ -15,9 +15,11 @@ export function stripeSubscriptionMatchesSession(
   session: { userId: string; priceId: string; customerId: string },
   subscription: { userId?: string; priceId?: string; customerId: string },
 ): boolean {
-  return session.userId === subscription.userId &&
+  return (
+    session.userId === subscription.userId &&
     session.priceId === subscription.priceId &&
-    session.customerId === subscription.customerId;
+    session.customerId === subscription.customerId
+  );
 }
 
 export async function pollStripeConfirmation<T extends { state: string } | { error: string }>(
@@ -28,7 +30,12 @@ export async function pollStripeConfirmation<T extends { state: string } | { err
   for (let attempt = 0; attempt < STRIPE_CONFIRMATION_ATTEMPTS && isActive(); attempt += 1) {
     const result = await confirm();
     if (!isActive()) return null;
-    if ("error" in result || result.state !== "pending" || attempt === STRIPE_CONFIRMATION_ATTEMPTS - 1) return result;
+    if (
+      "error" in result ||
+      result.state !== "pending" ||
+      attempt === STRIPE_CONFIRMATION_ATTEMPTS - 1
+    )
+      return result;
     await wait();
   }
   return null;

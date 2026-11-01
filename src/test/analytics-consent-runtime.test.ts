@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  AHREFS_WEB_ANALYTICS_KEY,
   AHREFS_WEB_ANALYTICS_SCRIPT_SRC,
   GOOGLE_ANALYTICS_MEASUREMENT_ID,
 } from "@/constants/analytics";
@@ -35,9 +36,11 @@ describe("analytics consent runtime", () => {
         `script[src="https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_MEASUREMENT_ID}"]`,
       ),
     ).not.toBeNull();
-    expect(
-      document.querySelector(`script[src="${AHREFS_WEB_ANALYTICS_SCRIPT_SRC}"]`),
-    ).not.toBeNull();
+    const ahrefsScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${AHREFS_WEB_ANALYTICS_SCRIPT_SRC}"]`,
+    );
+    expect(ahrefsScript).not.toBeNull();
+    expect(ahrefsScript).toHaveAttribute("data-key", AHREFS_WEB_ANALYTICS_KEY);
     expect(
       (window as unknown as Record<string, unknown>)[
         `ga-disable-${GOOGLE_ANALYTICS_MEASUREMENT_ID}`

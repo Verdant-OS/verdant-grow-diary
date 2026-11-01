@@ -3,5 +3,6 @@
 - [x] Repair missing sensor row fields without behavior changes; automatic typecheck/build OK and 181 focused tests passed.
 - [x] Enable built-in Stripe and recreate the four active products with six matching test prices.
 - [x] Add and test fail-closed Stripe token/catalog guards and a visible checkout-unavailable notice (16 focused tests; automatic typecheck/build OK).
-- [ ] Implement Stripe checkout, subscription renewal, credit fulfillment and account billing while preserving existing Paddle subscribers. Owner approved additive paid-access changes on November 1. Stripe compatibility migration applied; checkout and verification in progress.
-- [ ] Verify checkout and paid-access updates; real payments remain blocked until owner completes Stripe account claim and live onboarding.
+- [x] Apply owner-approved Stripe subscription/credit compatibility and test-credit isolation; enable six test price checkouts and verified confirmation. Existing Paddle records preserved.
+- [ ] Production renewal webhook activation and account billing are not deployed: requires owner release approval; no production publish performed.
+- [ ] Complete an end-to-end test purchase: Stripe form opens, but two submitted fake-card attempts stayed open/unpaid. Owner manual test needed; no paid unlock claimed. 60 focused tests passed, automatic build/typecheck OK. Live readiness check remains outstanding.

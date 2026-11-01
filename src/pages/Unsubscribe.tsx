@@ -45,7 +45,7 @@ export default function Unsubscribe() {
       }
       try {
         const response = await fetch(`/email/unsubscribe?token=${encodeURIComponent(token)}`);
-        const body = await response.json() as {
+        const body = (await response.json()) as {
           valid?: boolean;
           reason?: string;
         };
@@ -75,10 +75,12 @@ export default function Unsubscribe() {
     setErrorMessage(null);
     try {
       const response = await fetch("/email/unsubscribe", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }),
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token }),
       });
       if (!response.ok) throw new Error("Unsubscribe failed");
-      const payload = await response.json() as { success?: boolean; reason?: string };
+      const payload = (await response.json()) as { success?: boolean; reason?: string };
       if (payload.success) {
         setStatus("success");
       } else if (payload.reason === "already_unsubscribed") {

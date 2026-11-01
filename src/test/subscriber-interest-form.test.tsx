@@ -11,6 +11,14 @@ const mocks = vi.hoisted(() => ({
   track: vi.fn(),
 }));
 
+vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
+vi.mock("@/lib/formSubmission.functions", () => ({
+  submitPublicForm: async ({ data }: { data: { payload: unknown } }) => {
+    mocks.from("leads");
+    const result = await mocks.insert(data.payload);
+    return result.error ? { error: "Save failed" } : { saved: true };
+  },
+}));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (...args: unknown[]) => mocks.from(...args),
@@ -111,7 +119,7 @@ describe("SubscriberInterestForm", () => {
       resolve(__dirname, "../components/SubscriberInterestForm.tsx"),
       "utf8",
     );
-    expect(source).toMatch(/\.from\(["']leads["']\)\.insert/);
+    expect(source).toContain("submitPublicForm");
     expect(source).not.toMatch(/billing_subscriptions|subscriptions|profiles\.tier/);
     expect(source).not.toMatch(/service_role|device[-_ ]control|action_queue/i);
     expect(source).not.toMatch(/\.select\(|\.update\(|\.upsert\(|\.delete\(/);

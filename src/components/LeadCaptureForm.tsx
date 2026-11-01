@@ -74,14 +74,19 @@ export default function LeadCaptureForm({
     }
     setSubmitting(true);
     try {
-      const result = await submitForm({ data: { kind: "lead", payload: {
-        name: parsed.data.name || null,
-        email: parsed.data.email,
-        company: parsed.data.company || null,
-        lead_type: parsed.data.lead_type,
-        message: parsed.data.message || null,
-        source: "landing",
-      } } });
+      const result = await submitForm({
+        data: {
+          kind: "lead",
+          payload: {
+            name: parsed.data.name || null,
+            email: parsed.data.email,
+            company: parsed.data.company || null,
+            lead_type: parsed.data.lead_type,
+            message: parsed.data.message || null,
+            source: "landing",
+          },
+        },
+      });
       if ("error" in result) throw new Error("Lead save failed");
     } catch {
       setSaveError("We couldn't save your request. Your text is still here. Please try again.");

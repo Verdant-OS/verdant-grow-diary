@@ -15,20 +15,40 @@ export const submitPublicForm = createServerFn({ method: "POST" })
       userId = auth.user.id;
     }
     try {
-      return await saveAndNotifySubmission(async () => {
-        const result = data.kind === "contact"
-          ? await supabaseAdmin.from("contact_messages").insert({ ...data.payload, grow_context: data.payload.grow_context || null, user_id: userId }).select("id").single()
-          : await supabaseAdmin.from("leads").insert(data.payload).select("id").single();
-        if (result.error || !result.data) throw new Error("Save failed");
-        return { id: result.data.id };
-      }, async (id) => {
-        const { sendRegisteredAppEmail } = await import("./email/sendRegisteredAppEmail.server");
-        const response = await sendRegisteredAppEmail(new Request(request.url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ templateName: "owner-submission", idempotencyKey: `owner-submission-${data.kind}-${id}`, templateData: { kind: data.kind, ...data.payload } }),
-        }));
-        return response.ok && (await response.json()).success === true;
-      });
-    } catch { return { error: "We couldn't save your submission. Please try again." }; }
+      return await saveAndNotifySubmission(
+        async () => {
+          const result =
+            data.kind === "contact"
+              ? await supabaseAdmin
+                  .from("contact_messages")
+                  .insert({
+                    ...data.payload,
+                    grow_context: data.payload.grow_context || null,
+                    user_id: userId,
+                  })
+                  .select("id")
+                  .single()
+              : await supabaseAdmin.from("leads").insert(data.payload).select("id").single();
+          if (result.error || !result.data) throw new Error("Save failed");
+          return { id: result.data.id };
+        },
+        async (id) => {
+          const { sendRegisteredAppEmail } = await import("./email/sendRegisteredAppEmail.server");
+          const response = await sendRegisteredAppEmail(
+            new Request(request.url, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                templateName: "owner-submission",
+                idempotencyKey: `owner-submission-${data.kind}-${id}`,
+                templateData: { kind: data.kind, ...data.payload },
+              }),
+            }),
+          );
+          return response.ok && (await response.json()).success === true;
+        },
+      );
+    } catch {
+      return { error: "We couldn't save your submission. Please try again." };
+    }
   });

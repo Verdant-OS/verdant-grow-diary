@@ -118,6 +118,9 @@ export const createStripeCheckout = createServerFn({ method: "POST" })
       const session = await stripe.checkout.sessions.create(
         Object.assign(checkoutParams, {
           managed_payments: { enabled: true },
+          // Verdant prices are USD; without this Stripe re-presents them in
+          // the buyer's locale currency (e.g. EUR) at a converted amount.
+          adaptive_pricing: { enabled: false },
         }),
       );
       if (!session.client_secret) throw new Error("Stripe did not return a checkout secret");

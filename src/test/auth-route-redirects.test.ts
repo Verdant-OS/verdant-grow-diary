@@ -28,9 +28,9 @@ describe("Deprecated auth route redirects", () => {
     expect(APP).toMatch(/Auth|@\/pages\/Auth|pages\/Auth/);
   });
 
-  it("/features redirects to / through the context-preserving alias", () => {
+  it("/features is its own page, not an alias of /", () => {
     expect(extractMountedAppRoutePaths()).toContain("/features");
-    expect(getRouteAliasRedirectTarget("/features")).toBe("/");
+    expect(getRouteAliasRedirectTarget("/features")).toBeNull();
   });
 });
 

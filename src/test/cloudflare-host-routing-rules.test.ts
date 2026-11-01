@@ -50,8 +50,6 @@ const vercel = JSON.parse(readFileSync(resolve(ROOT, "vercel.json"), "utf8")) as
 
 const EXACT_PERMANENT_REDIRECTS = [
   ["/strains", "/cultivars"],
-  ["/welcome", "/"],
-  ["/features", "/"],
   ["/demo", "/"],
   ["/refunds", "/refund"],
   ["/refund-policy", "/refund"],
@@ -60,7 +58,7 @@ const EXACT_PERMANENT_REDIRECTS = [
 ] as const;
 
 /** vercel.json still names the pre-Worker marketing aliases. It is not production. */
-const STALE_VERCEL_MARKETING_REDIRECTS = new Set(["/welcome", "/features", "/demo"]);
+const STALE_VERCEL_MARKETING_REDIRECTS = new Set(["/demo"]);
 
 function headerValue(headers: Headers, name: string): string | null {
   return headers.get(name);
@@ -69,7 +67,7 @@ function headerValue(headers: Headers, name: string): string | null {
 describe("cloudflare host routing mirrors vercel.json", () => {
   it("ports every vercel.json redirect with the same destination and permanence", () => {
     const redirects = vercel.redirects ?? [];
-    expect(redirects).toHaveLength(9);
+    expect(redirects).toHaveLength(8);
 
     for (const [source, destination] of EXACT_PERMANENT_REDIRECTS) {
       if (!STALE_VERCEL_MARKETING_REDIRECTS.has(source)) {
@@ -121,9 +119,9 @@ describe("cloudflare host routing mirrors vercel.json", () => {
 
     const welcome = resolveHostRouting({ pathname: "/welcome", search: "?utm_source=guide" });
     expect(welcome).toEqual({
-      kind: "redirect",
-      status: 308,
-      location: "/?utm_source=guide",
+      kind: "continue",
+      spaRewriteMatched: true,
+      location: null,
       headers: hostHeadersForPathname("/welcome"),
     });
   });

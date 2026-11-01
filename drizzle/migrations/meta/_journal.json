@@ -8,6 +8,13 @@
       "when": 1793507857811,
       "tag": "0000_stripe_paid_access_compatibility",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793508773539,
+      "tag": "0001_stripe_identity_upsert_constraint",
+      "breakpoints": true
     }
   ]
 }

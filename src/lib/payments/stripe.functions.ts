@@ -55,14 +55,15 @@ export const createStripeCheckout = createServerFn({ method: 'POST' })
       const customerId = await resolveOrCreateCustomer(stripe, { userId: context.userId, email: context.claims.email });
       const product = await stripe.products.retrieve(typeof price.product === 'string' ? price.product : price.product.id);
       const metadata = { userId: context.userId, priceId: offer.id };
-      const session = await stripe.checkout.sessions.create({
+      const checkoutParams = {
         customer: customerId, line_items: [{ price: price.id, quantity: 1 }],
         mode: offer.kind, ui_mode: 'embedded_page',
         return_url: `${data.origin}/checkout/stripe?session_id={CHECKOUT_SESSION_ID}`,
         metadata,
         ...(offer.kind === 'subscription' ? { subscription_data: { metadata } } : { payment_intent_data: { description: product.name, metadata } }),
         managed_payments: { enabled: true },
-      } as Stripe.Checkout.SessionCreateParams);
+      } as Stripe.Checkout.SessionCreateParams;
+      const session = await stripe.checkout.sessions.create(checkoutParams);
       if (!session.client_secret) throw new Error('Stripe did not return a checkout secret');
       return { clientSecret: session.client_secret };
     } catch (error) { return { error: getStripeErrorMessage(error) }; }

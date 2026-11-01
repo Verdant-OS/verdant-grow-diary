@@ -1,0 +1,1 @@
+ALTER TABLE public.subscriptions ADD CONSTRAINT subscriptions_stripe_upsert_key UNIQUE(environment,stripe_subscription_id);

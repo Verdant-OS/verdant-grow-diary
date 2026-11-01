@@ -7,6 +7,7 @@ import { stripeCatalogOffer } from '@/lib/stripeCheckoutRules';
 import { stripeTokenEnvironment } from '@/lib/stripeCheckoutRules';
 import { resolveUnionEntitlements, pickEntitlingLovableRow } from '@/lib/entitlements';
 import { creditPackPurchaseEligible } from '@/lib/creditPackEligibility';
+import { stripeConfirmedPlanMatches } from './stripeConfirmationRules';
 const environmentSchema = z.literal('sandbox'); // Owner approved test checkout only.
 async function resolveOrCreateCustomer(
   stripe: ReturnType<typeof createStripeClient>,
@@ -78,6 +79,18 @@ export const confirmStripeCheckout = createServerFn({ method: 'POST' })
       const stripe = createStripeClient(data.environment);
       const session = await stripe.checkout.sessions.retrieve(data.sessionId);
       const { fulfillStripeSession } = await import('./stripeFulfillment.server');
-      return await fulfillStripeSession(session, data.environment, context.userId);
+      const result = await fulfillStripeSession(session, data.environment, context.userId);
+      if (result.state !== 'confirmed' || 'credits' in result) return result;
+      const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+      if (!subscriptionId) throw new Error('Missing subscription');
+      // Read back through the signed-in user's RLS client, not the privileged writer.
+      const { data: saved, error } = await context.supabase.from('subscriptions').select('*')
+        .eq('user_id', context.userId).eq('environment', data.environment)
+        .eq('billing_provider', 'stripe').eq('stripe_subscription_id', subscriptionId).maybeSingle();
+      if (error) throw new Error('Payment was received, but saved plan access could not be verified. Retry confirmation.');
+      const access = resolveUnionEntitlements({ byoRow: null, lovableRow: saved, expectedBillingEnvironment: data.environment, now: new Date() });
+      return stripeConfirmedPlanMatches(result.priceId, access)
+        ? { ...result, planId: access.effectivePlanId }
+        : { state: 'pending' as const };
     } catch (error) { return { error: getStripeErrorMessage(error) }; }
   });

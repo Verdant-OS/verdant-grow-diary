@@ -310,8 +310,11 @@ describe("EditPlantDialog integration — save contract + safety", () => {
     expect(onChosen?.[0]).not.toMatch(/uploadPlantProfilePhoto/);
   });
 
-  it("Save button is not disabled by preview state — only by `busy`", () => {
-    expect(EDIT).toMatch(/disabled=\{busy\}/);
+  it("Save button is not disabled by preview state — only by busy or a blank name", () => {
+    // Photo preview must not gate Save. A blank or whitespace Name does, via
+    // hasTrimmedRequiredIdentity. Folding that into `busy` would label the
+    // button Saving, so the pin names both reasons.
+    expect(EDIT).toMatch(/disabled=\{busy \|\| !hasTrimmedRequiredIdentity\(form\.name\)\}/);
     expect(EDIT).not.toMatch(/disabled=\{[^}]*preview/);
   });
 

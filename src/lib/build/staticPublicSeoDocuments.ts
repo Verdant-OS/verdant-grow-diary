@@ -61,6 +61,10 @@ import {
   PUBLIC_VPD_CHART_TITLE,
   PUBLIC_VPD_CHART_WEB_APPLICATION_JSON_LD,
 } from "../publicVpdChartRules";
+import {
+  PUBLIC_GROW_GUIDE_ARTICLES,
+  type PublicGrowGuideArticle,
+} from "../publicGrowGuideArticles";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 import { isPublicGuideHref, splitAroundAnchor } from "../guidePublicCopyViewModel";
@@ -497,6 +501,67 @@ function publicDocument(
   };
 }
 
+/** Crawlable copy of a public article guide for clients that never hydrate. */
+function buildPublicGrowGuideBodyFallback(guide: PublicGrowGuideArticle): string {
+  const link = (to: string, label: string) =>
+    isSafeStaticInternalPath(to)
+      ? `<a href="${escapeStaticHtml(to)}">${escapeStaticHtml(label)}</a>`
+      : escapeStaticHtml(label);
+  const sections = guide.sections
+    .map((section) =>
+      [
+        `<section><h2>${escapeStaticHtml(section.heading)}</h2>`,
+        section.paragraphs.map((p) => `<p>${escapeStaticHtml(p)}</p>`).join(""),
+        section.bullets
+          ? `<ul>${section.bullets.map((b) => `<li>${escapeStaticHtml(b)}</li>`).join("")}</ul>`
+          : "",
+        (section.links ?? []).map((l) => `<p>${link(l.to, l.label)}</p>`).join(""),
+        "</section>",
+      ].join(""),
+    )
+    .join("");
+  const faq = guide.faq
+    .map((f) => `<h3>${escapeStaticHtml(f.question)}</h3><p>${escapeStaticHtml(f.answer)}</p>`)
+    .join("");
+  return [
+    `<main id="static-guide-fallback"><article data-public-grow-guide="${escapeStaticHtml(guide.slug)}">`,
+    `<h1>${escapeStaticHtml(guide.h1)}</h1><p>${escapeStaticHtml(guide.intro)}</p>`,
+    `<section><h2>Quick answer</h2><p>${escapeStaticHtml(guide.quickAnswer)}</p></section>`,
+    sections,
+    `<section><h2>FAQ</h2>${faq}</section>`,
+    `<p>${link(guide.ctaHref, "Keep this record in Verdant")}</p>`,
+    "</article></main>",
+  ].join("");
+}
+
+function publicGrowGuideDocument(guide: PublicGrowGuideArticle): StaticPublicSeoDocument {
+  const title = `${guide.title} | Verdant Grow Diary`;
+  const url = `${VERDANT_SITE_ORIGIN}${guide.path}`;
+  return publicDocument(guide.path, {
+    title,
+    description: guide.description,
+    imageAlt: guide.breadcrumbName,
+    bodyFallbackHtml: buildPublicGrowGuideBodyFallback(guide),
+    jsonLd: [
+      buildStaticWebPageJsonLd({ title, description: guide.description, url }),
+      buildArticleJsonLd({
+        headline: guide.h1,
+        description: guide.description,
+        url,
+        datePublished: guide.datePublished,
+        dateModified: guide.datePublished,
+        authorName: "Verdant Grow Diary",
+        publisherName: "Verdant Grow Diary",
+        siteUrl: VERDANT_SITE_ORIGIN,
+      }),
+      buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
+      buildBreadcrumbListJsonLd({
+        items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.breadcrumbName, url }],
+      }),
+    ],
+  });
+}
+
 function aliasDocument(
   path: string,
   canonicalDocument: StaticPublicSeoDocument,
@@ -624,6 +689,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       }),
     ],
   }),
+  ...PUBLIC_GROW_GUIDE_ARTICLES.map(publicGrowGuideDocument),
   publicDocument(ATHENA_FEED_LOG_PATH, {
     title: `${ATHENA_FEED_LOG_TITLE} | Verdant Grow Diary`,
     description: ATHENA_FEED_LOG_DESCRIPTION,

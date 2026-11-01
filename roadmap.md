@@ -1,5 +1,7 @@
 # Current tasks
 
+- [ ] Fix Subscription loading and distinguish saved Stripe test subscription from staff access; verify the signed-in account without inventing a purchase.
+
 - [x] Apply approved feedback, contact, and lead INSERT policy repairs; database readback confirms bounded public submissions and blocked support attribution/review fields. 23 existing targeted tests passed; live submission harness not run. Database linter reports 47 other findings, with no tautological INSERT finding.
 
 - [x] Repair missing sensor row fields without behavior changes; automatic typecheck/build OK and 181 focused tests passed.

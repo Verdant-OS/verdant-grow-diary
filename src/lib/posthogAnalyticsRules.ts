@@ -166,6 +166,26 @@ const PRODUCT_PROPERTY_KEYS: Record<string, readonly string[]> = {
   sensor_csv_imported: ["row_count"],
 };
 
+/**
+ * Library fields already on the `before_send` payload. `token` is the project
+ * key; posthog-js drops the event when a hook removes it. `distinct_id`
+ * attributes the event. The rest are opaque SDK ids, not grower content.
+ */
+const SDK_TRANSPORT_PROPERTY_KEYS = [
+  "token",
+  "distinct_id",
+  "$session_id",
+  "$window_id",
+  "$lib",
+  "$lib_version",
+  "$insert_id",
+  "$device_id",
+  "$time",
+  "$config_defaults",
+  "$is_identified",
+  "$process_person_profile",
+] as const;
+
 /** Drops diary text, sensor numbers, CSV bodies, and exception messages. */
 export function scrubPostHogCapture(capture: CaptureResult): CaptureResult | null {
   if (capture.event === "$exception") {
@@ -230,6 +250,7 @@ function allowProductProperties(
 ): Record<string, unknown> {
   const source = properties ?? {};
   const out: Record<string, unknown> = {};
+  copySdkTransportProperties(source, out);
   for (const key of keys) {
     if (key === "source" && event === "log_created") {
       if (source.source === "quick_log" || source.source === "csv_import")
@@ -249,6 +270,22 @@ function allowProductProperties(
     }
   }
   return out;
+}
+
+function copySdkTransportProperties(
+  source: Record<string, unknown>,
+  out: Record<string, unknown>,
+): void {
+  for (const key of SDK_TRANSPORT_PROPERTY_KEYS) {
+    const value = source[key];
+    if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
+      out[key] = value;
+      continue;
+    }
+    if (typeof value !== "string") continue;
+    if (!value || value.length > 200 || value.includes("@") || value.includes("\n")) continue;
+    out[key] = value;
+  }
 }
 
 function scrubGenericProperties(

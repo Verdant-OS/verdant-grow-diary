@@ -37,6 +37,7 @@ type PostHogSdk = {
   identify: (distinctId: string, properties?: Record<string, unknown>) => unknown;
   opt_in_capturing: () => void;
   opt_out_capturing: () => void;
+  has_opted_out_capturing?: () => boolean;
   stopSessionRecording: () => void;
   reset: () => void;
 };
@@ -127,6 +128,10 @@ function beginLoad(key: string, apiHost: string, deps: PostHogClientDeps): void 
         withdraw(loaded);
         return;
       }
+      // init() keeps a stored opt-out. This is a new document, so resume() does not run.
+      safe(() => {
+        if (loaded.has_opted_out_capturing?.()) loaded.opt_in_capturing();
+      });
       sdk = loaded;
       status = "ready";
       capturing = true;

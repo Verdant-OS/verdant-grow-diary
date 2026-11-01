@@ -34,8 +34,7 @@ export function PaymentTestModeBanner({
         data-payment-env={stripeEnvironment}
         className="w-full border-b border-border bg-muted px-4 py-2 text-center text-sm text-foreground"
       >
-        {stripeEnvironment === "sandbox" ? "Payments are in test mode. No real charges. " : ""}
-        {STRIPE_FULFILLMENT_PENDING_MESSAGE}
+        {stripeEnvironment === "sandbox" ? "Payments are in test mode. No real charges." : "Real checkout is not enabled yet."}
       </aside>
     );
   }

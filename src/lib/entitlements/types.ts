@@ -87,5 +87,5 @@ export interface ResolvedEntitlement {
    * leaking raw provider IDs. Optional for back-compat with existing
    * single-row callers of resolveEntitlements().
    */
-  source?: "free" | "byo_paddle" | "lovable_paddle_subscription" | "lovable_paddle_lifetime";
+  source?: "lovable_stripe_subscription" | "free" | "byo_paddle" | "lovable_paddle_subscription" | "lovable_paddle_lifetime";
 }

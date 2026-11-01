@@ -27,6 +27,7 @@ export type CreditPackPurchaseGate =
 
 const PAID_BILLING_SOURCES: ReadonlySet<NonNullable<ResolvedEntitlement["source"]>> = new Set([
   "byo_paddle",
+  "lovable_stripe_subscription",
   "lovable_paddle_subscription",
   "lovable_paddle_lifetime",
 ]);

@@ -42,6 +42,7 @@ import { trackPricingEvent, type PricingAnalyticsName } from "@/lib/pricingAnaly
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { sanitizeCheckoutRecoveryPlanSlug } from "@/lib/checkoutRecoveryPlanSlug";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
+import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import {
   CHECKOUT_PAUSED_MESSAGE,
@@ -211,6 +212,8 @@ export default function Pricing() {
   const creditPacksRef = useRef<HTMLElement>(null);
   const handledCreditPacksHashRef = useRef<string | null>(null);
   const [openFaqItem, setOpenFaqItem] = useState<string>("");
+  const paddleCheckout = usePaddleCheckout();
+  const stripeCheckout = useStripeCheckout();
   const {
     openCheckout,
     loading: checkoutLoading,
@@ -220,7 +223,7 @@ export default function Pricing() {
     blockedReasonCode,
     blockedScope,
     dismissBlocked,
-  } = usePaddleCheckout();
+  } = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN?.startsWith("pk_") ? stripeCheckout : paddleCheckout;
   const checkoutRetryGate = resolvePricingCheckoutRetryGate(
     lastCheckoutSkuRef.current ?? interestPlan,
     creditPackGate,
@@ -719,6 +722,8 @@ export default function Pricing() {
           </div>
         </div>
       </section>
+
+      {stripeCheckout.checkoutElement}
 
       {/* Pricing tier cards */}
       <section

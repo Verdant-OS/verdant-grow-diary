@@ -71,6 +71,7 @@ import { Route as AppTentsRouteImport } from './routes/_app/tents'
 import { Route as AppTimelineRouteImport } from './routes/_app/timeline'
 import { Route as BillingPlanRouteImport } from './routes/billing.$plan'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
+import { Route as CheckoutStripeRouteImport } from './routes/checkout.stripe'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CultivarsIndexRouteImport } from './routes/cultivars.index'
 import { Route as CultivarsSlugRouteImport } from './routes/cultivars.$slug'
@@ -465,6 +466,11 @@ const BillingPlanRoute = BillingPlanRouteImport.update({
 const CheckoutCancelRoute = CheckoutCancelRouteImport.update({
   id: '/checkout/cancel',
   path: '/checkout/cancel',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutStripeRoute = CheckoutStripeRouteImport.update({
+  id: '/checkout/stripe',
+  path: '/checkout/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
@@ -1009,6 +1015,7 @@ export interface FileRoutesByFullPath {
   '/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/stripe': typeof CheckoutStripeRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
@@ -1157,6 +1164,7 @@ export interface FileRoutesByTo {
   '/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/stripe': typeof CheckoutStripeRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
@@ -1309,6 +1317,7 @@ export interface FileRoutesById {
   '/_app/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/stripe': typeof CheckoutStripeRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
@@ -1460,6 +1469,7 @@ export interface FileRouteTypes {
     | '/timeline'
     | '/billing/$plan'
     | '/checkout/cancel'
+    | '/checkout/stripe'
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
@@ -1608,6 +1618,7 @@ export interface FileRouteTypes {
     | '/timeline'
     | '/billing/$plan'
     | '/checkout/cancel'
+    | '/checkout/stripe'
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
@@ -1759,6 +1770,7 @@ export interface FileRouteTypes {
     | '/_app/timeline'
     | '/billing/$plan'
     | '/checkout/cancel'
+    | '/checkout/stripe'
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
@@ -1885,6 +1897,7 @@ export interface RootRouteChildren {
   WelcomeRoute: typeof WelcomeRoute
   BillingPlanRoute: typeof BillingPlanRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
+  CheckoutStripeRoute: typeof CheckoutStripeRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
   CultivarsSlugRoute: typeof CultivarsSlugRoute
   DocsMcpApiRoute: typeof DocsMcpApiRoute
@@ -2343,6 +2356,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout/cancel'
       fullPath: '/checkout/cancel'
       preLoaderRoute: typeof CheckoutCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/stripe': {
+      id: '/checkout/stripe'
+      path: '/checkout/stripe'
+      fullPath: '/checkout/stripe'
+      preLoaderRoute: typeof CheckoutStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout/success': {
@@ -3226,6 +3246,7 @@ const rootRouteChildren: RootRouteChildren = {
   WelcomeRoute: WelcomeRoute,
   BillingPlanRoute: BillingPlanRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
+  CheckoutStripeRoute: CheckoutStripeRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
   CultivarsSlugRoute: CultivarsSlugRoute,
   DocsMcpApiRoute: DocsMcpApiRoute,

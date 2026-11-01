@@ -118,7 +118,7 @@ export function resolveUnionEntitlements(input: ResolveUnionInput): ResolvedEnti
   });
   const picked = pickStrongestBilling(input.byoRow, mappedLovable, input.now);
   const resolved = resolveEntitlements(picked.row, input.now, input.opts);
-  return { ...resolved, source: picked.source };
+  return { ...resolved, source: mappedLovable?.provider === "stripe" && picked.row === mappedLovable ? "lovable_stripe_subscription" : picked.source };
 }
 
 /**

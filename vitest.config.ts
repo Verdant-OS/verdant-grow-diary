@@ -42,6 +42,21 @@ export default defineConfig({
     // Inline local `.mjs` scanner scripts so the shebang-strip plugin's
     // transform runs on them (vite externalizes `.mjs` otherwise).
     server: { deps: { inline: [/[\\/]scripts[\\/].*\.mjs$/] } },
+    coverage: {
+      // v8's native cobertura reporter is machine-readable only (no HTML),
+      // matching how this report is consumed (CI upload, not local reading).
+      provider: "v8",
+      reporter: ["cobertura"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.{test,spec}.{ts,tsx}",
+        "src/test/**",
+        // Generated/mirrored files are not developer-authored source.
+        "src/routeTree.gen.ts",
+        "src/integrations/supabase/types.ts",
+      ],
+    },
   },
   resolve: {
     alias: {

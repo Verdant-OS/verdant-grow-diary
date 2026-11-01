@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "@/lib/react-router-compat";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -45,11 +44,8 @@ export default function Unsubscribe() {
         return;
       }
       try {
-        const { data, error } = await supabase.functions.invoke("handle-email-unsubscribe", {
-          body: { token, action: "validate" },
-        });
-        if (error) throw error;
-        const body = (data ?? {}) as {
+        const response = await fetch(`/email/unsubscribe?token=${encodeURIComponent(token)}`);
+        const body = await response.json() as {
           valid?: boolean;
           reason?: string;
         };
@@ -78,11 +74,11 @@ export default function Unsubscribe() {
     setStatus("confirming");
     setErrorMessage(null);
     try {
-      const { data, error } = await supabase.functions.invoke("handle-email-unsubscribe", {
-        body: { token, action: "unsubscribe" },
+      const response = await fetch("/email/unsubscribe", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }),
       });
-      if (error) throw error;
-      const payload = (data ?? {}) as { success?: boolean; reason?: string };
+      if (!response.ok) throw new Error("Unsubscribe failed");
+      const payload = await response.json() as { success?: boolean; reason?: string };
       if (payload.success) {
         setStatus("success");
       } else if (payload.reason === "already_unsubscribed") {
@@ -116,7 +112,7 @@ export default function Unsubscribe() {
               <>
                 <p>
                   Click confirm to stop receiving emails from Verdant Grow Diary at this address.
-                  This only affects marketing and grow-update emails — we&rsquo;ll still send
+                  This affects app emails, including submission alerts — we&rsquo;ll still send
                   critical account emails like password resets.
                 </p>
                 <Button className="mt-5 w-full" onClick={confirmUnsubscribe}>

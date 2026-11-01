@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import SubscriberInterestShareCard from "@/components/SubscriberInterestShareCard";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { submitPublicForm } from "@/lib/formSubmission.functions";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import {
   buildSubscriberInterestLead,
@@ -22,6 +23,7 @@ export default function SubscriberInterestForm({
   planId,
   leadSource = "pricing_interest",
 }: SubscriberInterestFormProps) {
+  const submitForm = useServerFn(submitPublicForm);
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -48,8 +50,8 @@ export default function SubscriberInterestForm({
     setSubmitting(true);
     setError(null);
     try {
-      const { error: insertError } = await supabase.from("leads").insert(lead.payload);
-      if (insertError) throw new Error("Interest save failed");
+      const result = await submitForm({ data: { kind: "lead", payload: lead.payload } });
+      if ("error" in result) throw new Error("Interest save failed");
     } catch {
       setError("We couldn't save your request. Please try again.");
       trackPricingEvent("pricing_interest_submit_failed", { plan: planId, source: leadSource });

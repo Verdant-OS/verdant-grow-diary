@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { submitPublicForm } from "@/lib/formSubmission.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ export interface LeadCaptureFormProps {
 export default function LeadCaptureForm({
   defaultLeadType = "beta_user",
 }: LeadCaptureFormProps = {}) {
+  const submitForm = useServerFn(submitPublicForm);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
@@ -72,15 +74,15 @@ export default function LeadCaptureForm({
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.from("leads").insert({
+      const result = await submitForm({ data: { kind: "lead", payload: {
         name: parsed.data.name || null,
         email: parsed.data.email,
         company: parsed.data.company || null,
         lead_type: parsed.data.lead_type,
         message: parsed.data.message || null,
         source: "landing",
-      });
-      if (error) throw new Error("Lead save failed");
+      } } });
+      if ("error" in result) throw new Error("Lead save failed");
     } catch {
       setSaveError("We couldn't save your request. Your text is still here. Please try again.");
       return;

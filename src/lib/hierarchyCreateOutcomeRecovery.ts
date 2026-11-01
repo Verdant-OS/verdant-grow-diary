@@ -7,7 +7,10 @@
  * runtime. A later page runtime can safely reconcile the exact RLS-visible
  * row because the original populated UI no longer exists.
  */
-import type { HierarchyCreateAttempt } from "@/lib/hierarchyCreatePersistence";
+import type {
+  HierarchyCreateAttempt,
+  HierarchyCreateReconciliationResult,
+} from "@/lib/hierarchyCreatePersistence";
 import { isUuid } from "@/lib/isUuid";
 
 export const HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY =
@@ -311,4 +314,82 @@ export function markHierarchyCreateOutcomeRecoveryAttemptReconciled(
   if (reconciled.has(key)) return false;
   reconciled.add(key);
   return true;
+}
+
+/**
+ * An unreachable read may be tried again after this runtime hears that the
+ * tab is online or visible. Confirmed and absent results stay settled.
+ */
+export function unmarkHierarchyCreateOutcomeRecoveryAttemptReconciled(
+  attempt: HierarchyCreateAttempt,
+): boolean {
+  return recoveryRuntimeState().reconciledAttemptKeys.delete(
+    hierarchyCreateOutcomeRecoveryKey(attempt),
+  );
+}
+
+export type HierarchyCreateOutcomeAbsenceDecision =
+  "release_absent" | "finish_confirmed" | "retry_later";
+
+/**
+ * A prior runtime can release the fence when the signed-in read proves the
+ * preallocated row is absent. An unreachable read stays fenced until a later
+ * check. A confirmed row still needs its visible-list receipt.
+ */
+export function decideHierarchyCreateOutcomeAbsence(
+  status: HierarchyCreateReconciliationResult["status"],
+): HierarchyCreateOutcomeAbsenceDecision {
+  switch (status) {
+    case "not_found":
+      return "release_absent";
+    case "confirmed":
+      return "finish_confirmed";
+    case "unavailable":
+      return "retry_later";
+    default: {
+      const neverStatus: never = status;
+      return neverStatus;
+    }
+  }
+}
+
+export type HierarchyCreateOutcomeNoticePhase = "checking" | "unavailable" | "absent" | "paused";
+
+/** User-facing explanation for a shared owner fence. The coordinator renders it. */
+export function hierarchyCreateOutcomeRecoveryNotice(
+  phase: HierarchyCreateOutcomeNoticePhase,
+  entity: HierarchyCreateAttempt["entity"],
+): string {
+  const label = entity;
+  switch (phase) {
+    case "checking":
+      return `Checking whether your last ${label} was saved. Creating another stays paused until that check finishes.`;
+    case "unavailable":
+      return `Verdant could not confirm whether your last ${label} was saved. Creating another stays paused. Verdant will check again when this tab is online and visible.`;
+    case "absent":
+      return `Verdant confirmed your last ${label} was not saved. You can create another.`;
+    case "paused":
+      return `Verdant could not confirm whether your last ${label} was saved. Creating another stays paused.`;
+    default: {
+      const neverPhase: never = phase;
+      return neverPhase;
+    }
+  }
+}
+
+/** Online always retries. A visibility change retries only once the tab is visible. */
+export function shouldRecheckHierarchyCreateOutcomeRecovery(
+  event: "online" | "visibilitychange",
+  visibilityState: string,
+): boolean {
+  switch (event) {
+    case "online":
+      return true;
+    case "visibilitychange":
+      return visibilityState === "visible";
+    default: {
+      const neverEvent: never = event;
+      return neverEvent;
+    }
+  }
 }

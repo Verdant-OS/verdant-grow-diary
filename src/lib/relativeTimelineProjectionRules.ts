@@ -22,6 +22,7 @@ import {
   type TimelineFilterCategory,
 } from "@/lib/timelineEntryClassification";
 import { readPersistedHarvestDetails } from "@/lib/harvestDetailsRules";
+import { formatTimelineEntryTimestamp } from "@/lib/timelineEntryTimestampFormat";
 
 export type RelativeTimelineItemSource = "note" | "photo" | "sensor";
 
@@ -660,6 +661,12 @@ const ENTRY_SOURCE_LABEL: Record<RelativeTimelineItemSource, string> = {
 
 const SUMMARY_FALLBACK_COPY = "No note recorded for this entry.";
 const TIMESTAMP_FALLBACK_COPY = "No timestamp recorded.";
+const ISO_TIMESTAMP_LABEL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+function presentOccurredAtLabel(label: string): string {
+  if (!ISO_TIMESTAMP_LABEL.test(label)) return label;
+  return formatTimelineEntryTimestamp(label);
+}
 
 function nonBlankTrimmed(v: unknown): string | null {
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
@@ -692,7 +699,7 @@ export function formatRelativeTimelineEntryDetail(
   const summaryIsFallback = looksLikeEventTypeFallback;
 
   const rawTs = nonBlankTrimmed(item.occurredAtLabel);
-  const timestampLabel = rawTs ?? TIMESTAMP_FALLBACK_COPY;
+  const timestampLabel = rawTs === null ? TIMESTAMP_FALLBACK_COPY : presentOccurredAtLabel(rawTs);
   const timestampIsFallback = rawTs === null;
 
   const plantName = nonBlankTrimmed(context?.plantName);

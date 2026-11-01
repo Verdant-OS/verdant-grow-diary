@@ -25,6 +25,15 @@ describe("secret scan checkout ignore file", () => {
     const dir = mkdtempSync(join(tmpdir(), "secret-scan-ignore-"));
     dirs.push(dir);
     execFileSync("git", ["init", "-q"], { cwd: dir });
+    // The Scan commits step runs `git log ... ${RANGE}` before gitleaks, which
+    // needs RANGE=HEAD to resolve, as it always does in a real checkout.
+    writeFileSync(join(dir, "README.md"), "fixture\n");
+    execFileSync("git", ["add", "README.md"], { cwd: dir });
+    execFileSync(
+      "git",
+      ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "init"],
+      { cwd: dir },
+    );
     writeFileSync(join(dir, ".gitleaksignore"), "deadbeef:leaked.txt:generic-api-key:1\n");
 
     const bin = mkdtempSync(join(tmpdir(), "gitleaks-stub-"));

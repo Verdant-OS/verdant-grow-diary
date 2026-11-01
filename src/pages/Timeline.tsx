@@ -34,6 +34,7 @@ import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationR
 import { QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS } from "@/lib/quickLogFabClearanceRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
+import { formatTimelineEntryTimestamp } from "@/lib/timelineEntryTimestampFormat";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Sprout,
@@ -3074,6 +3075,7 @@ export default function Timeline() {
                             tentNamesById,
                           });
                           const plantName = place.plantName ?? undefined;
+                          const entryTimestampLabel = formatTimelineEntryTimestamp(e.entry_at);
                           const openOccurredAt = Number.isNaN(new Date(e.entry_at).getTime())
                             ? ""
                             : format(new Date(e.entry_at), "PP");
@@ -3213,8 +3215,11 @@ export default function Timeline() {
                                   label={openLabel}
                                   onOpen={() => openTimelineEntryDetail(e.id)}
                                 />
-                                <span title={format(new Date(e.entry_at), "PPpp")}>
-                                  {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
+                                <span
+                                  data-testid="timeline-entry-timestamp"
+                                  title={entryTimestampLabel}
+                                >
+                                  {entryTimestampLabel}
                                 </span>
                                 {!isTimelineSensorDerivedDiaryId(e.id) &&
                                 isLinkedQuickLogDiaryDetails(e.details) ? (

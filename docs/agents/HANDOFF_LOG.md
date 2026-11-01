@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### 2691-TIMELINE-TIMESTAMPS
+
+```text
+TASK 2691-TIMELINE-TIMESTAMPS  priority: other  status: OPEN
+goal: Timeline entry timestamps use the same local friendly clock as Recent Quick Logs, through one shared formatter.
+why: Issue #2691. Timeline entries showed a raw ISO UTC string (for example 2026-11-01T15:22:36.222Z) while Recent Quick Logs on the same page showed Nov 1, 2026, 09:22 AM. Display formatting only.
+branch: ultra/2691-timeline-timestamps
+base: verdant-grow-diary
+checkout: git fetch origin ultra/2691-timeline-timestamps verdant-grow-diary && git switch ultra/2691-timeline-timestamps && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: draft; read the URL from GitHub after push. Do not mark ready, approve, or merge.
+head_sha: the commit that adds this block; read git rev-parse HEAD after checkout. Review binds to that remote head only.
+state: implemented locally; draft after push
+current_step: formatter, display wiring, and the new test are in the working tree with this block
+next_action: confirm the draft PR stays draft; do not mark ready, request review, or merge. Independent exact-head review is a later seat.
+post_merge_check: after a separately authorized publish, open the timeline on https://verdantgrowdiary.com and confirm an entry saved at a known local time shows the same clock as Recent Quick Logs, with no raw ISO. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: verdant-ultra-bot on ultra/2691-timeline-timestamps
+decisions: one formatter, src/lib/timelineEntryTimestampFormat.ts, uses toLocaleString(undefined, { year numeric, month short, day numeric, hour 2-digit, minute 2-digit }). Invalid or blank input is "Unknown time". Relative-timeline cards reformat only labels that already look like ISO; "May 12" and "Unknown time" pass through. Timeline diary cards and Recent Quick Logs call the same function. formatLabel in diaryEntryRules.ts stays the raw canonical ISO so the edge shared-lib mirror is not regenerated.
+tried_and_rejected: changing formatLabel or formatSnapshotTimestamp. The first is mirrored into supabase/functions/_shared and would be an Edge change. The second is pinned to hour numeric. Also rejected: touching the grouped review panel, the AI Doctor evidence card, and the snapshot strip. Those pins are scorer-locked and belong to draft PR #1949.
+commands: TZ=America/Chicago bunx vitest run src/test/timeline-entry-timestamp-format.test.tsx --reporter=verbose; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bun run lint
+files_touched: src/lib/timelineEntryTimestampFormat.ts; src/lib/relativeTimelineProjectionRules.ts; src/pages/Timeline.tsx; src/components/QuickLogHistoryPanels.tsx; src/test/timeline-entry-timestamp-format.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none in this slice
+blockers: none for repository work. Publish, production writes, and merge are not authorized.
+open_questions: none
+gotchas: do not edit an already-tracked scorer test. Do not stage src/routeTree.gen.ts. Do not renegotiate #1949 pins. The friendly pin "Nov 1, 2026, 09:22 AM" assumes en-US and America/Chicago. CSV timezone import/export stays on hold. Commits are verdant-ultra-bot only. No force-push and no --no-verify.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2691 ; overlap https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 head 526d1e2b8e5a6ca76f56dea7f603eb7a9123e2da branch cursor/quicklog-local-timezone-ec09
+artifacts: none in the repo
+reviewer_seat: not requested; this draft does not ask for review
+reviewer_sha: NOT_MEASURED
+session_state: no paused workflows; no production writes; no smoke write
+claimed_by: Grok as Ultra Builder (verdant-ultra-bot), 2026-11-01 11:58 CT
+owner: verdant-ultra-bot
+last_updated: 2026-11-01 11:58 CT, by Grok
+```
+
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text

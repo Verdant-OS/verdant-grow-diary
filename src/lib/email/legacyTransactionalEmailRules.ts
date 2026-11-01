@@ -1,4 +1,4 @@
-import { timingSafeMatchesAny } from "../_shared/lib/lib/timingSafeCompareRules.ts";
+import { timingSafeMatchesAny } from "@/lib/timingSafeCompareRules";
 
 export const MAX_TRANSACTIONAL_EMAIL_BODY_BYTES = 64 * 1024;
 export const MAX_TRANSACTIONAL_EMAIL_SUBJECT_LENGTH = 200;

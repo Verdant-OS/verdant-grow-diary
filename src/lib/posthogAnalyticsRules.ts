@@ -201,13 +201,17 @@ export function buildPostHogInitOptions(apiHost: string): Partial<PostHogConfig>
     person_profiles: "identified_only",
     advanced_disable_feature_flags: true,
     disable_surveys: true,
+    // Remote /flags config starts replay when this is unset. mask_all_text
+    // only affects autocapture. "*" masks every rendered text node and does
+    // not replace a stricter project mask with .ph-mask, which this DOM never sets.
+    disable_session_recording: true,
     enable_recording_console_log: false,
     capture_performance: false,
     persistence: "localStorage+cookie",
     property_denylist: ["email", "$email", "name", "note", "notes", "diary"],
     session_recording: {
       maskAllInputs: true,
-      maskTextSelector: "[data-ph-mask], .ph-mask",
+      maskTextSelector: "*",
       maskTextClass: "ph-mask",
       blockClass: "ph-no-capture",
       recordHeaders: false,

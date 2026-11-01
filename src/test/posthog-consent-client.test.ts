@@ -184,11 +184,12 @@ describe("PostHog consent client", () => {
         autocapture: false,
         rageclick: true,
         mask_all_text: true,
+        disable_session_recording: true,
         session_recording: expect.objectContaining({
           maskAllInputs: true,
           recordHeaders: false,
           recordBody: false,
-          maskTextSelector: "[data-ph-mask], .ph-mask",
+          maskTextSelector: "*",
         }),
       }),
     );

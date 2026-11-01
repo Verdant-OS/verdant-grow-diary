@@ -211,11 +211,12 @@ describe("PostHog init privacy", () => {
         person_profiles: "identified_only",
         advanced_disable_feature_flags: true,
         disable_surveys: true,
+        disable_session_recording: true,
         enable_recording_console_log: false,
         capture_performance: false,
         session_recording: expect.objectContaining({
           maskAllInputs: true,
-          maskTextSelector: "[data-ph-mask], .ph-mask",
+          maskTextSelector: "*",
           blockClass: "ph-no-capture",
           recordHeaders: false,
           recordBody: false,

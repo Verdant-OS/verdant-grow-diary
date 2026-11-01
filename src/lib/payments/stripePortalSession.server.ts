@@ -12,7 +12,7 @@ import { createStripeClient, getStripeErrorMessage, type StripeEnv } from "@/lib
 
 export type StripePortalSessionResult = { url: string } | { error: string };
 
-interface SubscriptionLookup {
+export interface SubscriptionLookup {
   from(table: "subscriptions"): {
     select(columns: string): {
       eq(

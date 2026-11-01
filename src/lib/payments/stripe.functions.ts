@@ -139,9 +139,13 @@ export const createStripePortalSession = createServerFn({ method: "POST" })
     const { isAllowedCheckoutReturnOrigin } = await import("./checkoutReturnOriginRules");
     if (!isAllowedCheckoutReturnOrigin(data.origin, requestOrigin))
       return { error: "Invalid return origin" };
-    const { createStripePortalSessionForUser } = await import("./stripePortalSession.server");
+    const { createStripePortalSessionForUser, type SubscriptionLookup } = await import(
+      "./stripePortalSession.server"
+    );
     return createStripePortalSessionForUser({
-      supabase: context.supabase,
+      // Structural cast: the full typed SupabaseClient against the minimal
+      // lookup interface trips TS2589 (excessively deep instantiation).
+      supabase: context.supabase as unknown as SubscriptionLookup,
       userId: context.userId,
       environment: data.environment,
       returnUrl: `${data.origin}/settings`,

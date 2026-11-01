@@ -431,7 +431,7 @@ export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | str
     case "runoff_ml:out_of_range":
       return "Runoff volume must be between 0 and 1,000,000 mL.";
     case "water_temp_c:out_of_range":
-      return "Water temperature must be between -10 °C and 60 °C (14–140 °F).";
+      return "Water temperature must be between 14 °F and 140 °F (-10 to 60 °C).";
     case "rpc:invalid_typed_payload":
       return FEEDING_SERVER_REJECTED_MESSAGE;
     default:

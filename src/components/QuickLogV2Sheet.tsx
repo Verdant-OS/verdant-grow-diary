@@ -690,7 +690,9 @@ function QuickLogV2SheetForOwner({
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
-  const submitGuardRef = useRef<QuickLogSubmitGuardState>(createQuickLogSubmitGuardState());
+  const submitGuardRef = useRef<QuickLogSubmitGuardState>(
+    createQuickLogSubmitGuardState(),
+  );
   const observationDraftSuppressedRef = useRef(false);
   // True once this open restored or wrote the stored draft, so emptying the
   // form may forget it. Opening for another target never clears its draft.
@@ -4313,7 +4315,11 @@ function QuickLogV2SheetForOwner({
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
                   >
-                    {saveBusy ? "Saving…" : retryPending ? "Retry exact record" : "Save"}
+                    {saveBusy
+                      ? "Saving…"
+                      : retryPending
+                        ? "Retry exact record"
+                        : "Save"}
                   </Button>
                 </div>
               </>

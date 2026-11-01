@@ -44,6 +44,7 @@ import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCo
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { TentQuickLogTargetScope } from "@/components/TentQuickLogTargetScope";
 import type { TentQuickLogTargetRegistration } from "@/context/TentQuickLogTargetContext";
+import { APP_SHELL_HEADER_ROW_PX } from "@/lib/appShellHeaderMetrics";
 import type { TentQuickLogTargetEvidence } from "@/lib/quickLogRouteTargetRules";
 import {
   QUICK_LOG_V2_OPEN_EVENT,
@@ -359,7 +360,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top bar */}
           <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-2xl">
-            <div className="flex h-16 items-center gap-3 px-3 md:px-5">
+            <div
+              className="flex h-16 items-center gap-3 px-3 md:px-5"
+              style={{ height: APP_SHELL_HEADER_ROW_PX }}
+              data-testid="app-shell-header-row"
+            >
               <div className="hidden md:block">
                 <SidebarTrigger />
               </div>

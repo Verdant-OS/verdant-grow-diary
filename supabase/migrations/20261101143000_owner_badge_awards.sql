@@ -42,10 +42,9 @@
 -- because the function reads the current photo columns. The photo
 -- must be on that entry, on that owner's path, and present in
 -- storage.objects for this account. A '..' segment, another user's path,
--- and an inferred link do not qualify. Signed-in members can SELECT
--- active badge_awards rows. A hidden or revoked row stays visible to
--- its owner and hidden from other members. Logged-out visitors (anon)
--- receive no award rows. Profile display is a later slice and is not
+-- and an inferred link do not qualify. Award SELECT is the owning
+-- account only. Logged-out visitors and anonymous sessions receive no
+-- award rows. Profile display is a later slice and is not
 -- built here. Evidence SELECT stays owner-only, so evidence photos are
 -- not granted to other accounts or to anon.
 --
@@ -152,17 +151,6 @@ CREATE POLICY badge_awards_owner_select
   USING (
     user_id = auth.uid()
     AND COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
-  );
-
--- Cut 001 (Matthew, 2026-10-11 03:41 CT): until community launch, signed-in
--- members can see other growers' active badges. Evidence and photos stay
--- owner-only. Logged-out visitors (anon) never see awards.
-CREATE POLICY badge_awards_member_select ON public.badge_awards
-  FOR SELECT TO authenticated
-  USING (
-    COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
-    AND hidden_at IS NULL
-    AND revoked_at IS NULL
   );
 
 CREATE POLICY badge_evidence_owner_select
@@ -339,8 +327,11 @@ DECLARE
   was_hidden boolean;
   revoked_at timestamptz;
 BEGIN
-  -- Fast path only. The write barrier is the FOR UPDATE recheck after the
+  -- Fast path only. The write barrier is the plain recheck after the
   -- advisory lock, immediately before any award or evidence mutation.
+  -- Do not lock badge_award_runtime here. Reconcile calls this function
+  -- inside a subtransaction, and a row lock would survive that
+  -- subtransaction into later owners.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
@@ -429,22 +420,21 @@ BEGIN
     INTO found_award, award_hidden_at, recognized_at, revoked_at
   FROM public.badge_awards AS award
   WHERE award.user_id = uid
-    AND award.badge_key = 'first_diary_entry'
-  FOR UPDATE;
+    AND award.badge_key = 'first_diary_entry';
 
   IF revoked_at IS NOT NULL THEN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
   END IF;
 
-  -- Recheck under a row lock after the advisory lock and immediately before
-  -- any award or evidence write, so a committed enabled = false is a write
-  -- barrier. This lock stays after the advisory wait: taking it earlier
-  -- deadlocks a concurrent disable that is waiting to commit.
+  -- Recheck after the advisory lock and immediately before any award or
+  -- evidence write, so a committed enabled = false is a write barrier.
+  -- A plain read is enough: the disable commits before this statement.
+  -- FOR UPDATE on this singleton would be held by reconcile across later
+  -- owners and would deadlock a concurrent evaluate.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
-  WHERE runtime.id = 1
-  FOR UPDATE;
+  WHERE runtime.id = 1;
 
   IF runtime_enabled IS NOT TRUE THEN
     RETURN jsonb_build_object('status', 'disabled');
@@ -476,8 +466,7 @@ BEGIN
         INTO found_award, was_hidden, recognized_at
       FROM public.badge_awards AS award
       WHERE award.user_id = uid
-        AND award.badge_key = 'first_diary_entry'
-      FOR UPDATE;
+        AND award.badge_key = 'first_diary_entry';
 
       IF was_hidden THEN
         UPDATE public.badge_awards
@@ -582,7 +571,10 @@ BEGIN
       SELECT award.user_id
       FROM public.badge_awards AS award
     ) AS owners
-    WHERE cursor_after IS NULL OR owners.user_id > cursor_after
+    JOIN auth.users AS account
+      ON account.id = owners.user_id
+    WHERE COALESCE(account.is_anonymous, false) = false
+      AND (cursor_after IS NULL OR owners.user_id > cursor_after)
     ORDER BY owners.user_id
     LIMIT batch_limit
   LOOP

@@ -220,9 +220,8 @@ BEGIN
   END IF;
 END $$;
 
--- Active badge awards are readable by signed-in, non-anonymous members.
--- Hidden and revoked awards stay on the owner policy. Evidence stays
--- owner-only. The evaluator is the only writer. badge_award_runtime is a
+-- Award rows and evidence are readable by the owning account only.
+-- The evaluator is the only writer. badge_award_runtime is a
 -- service_role switch (SELECT and UPDATE of the single row). Reapply that
 -- after the blanket local parity grant.
 DO $$

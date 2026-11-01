@@ -173,13 +173,11 @@ const EXEMPTIONS: Record<string, { class: string; reason: string }> = {
   },
   "e2e/owner-badge-shelf.spec.ts": {
     class: EXEMPTION_CLASS.AWAITING_DECISION,
-    reason:
-      "Credential-free chromium-mocked spec: page.route stubs /auth/v1 and /rest/v1, and no workflow names this file. Matthew Cheek, 2026-10-10 5:34 PM CT, approved the First Diary Entry draft and required CI wiring be proposed separately, not built. Adding it to mocked-e2e-unwired-closure.yml is a scorer-locked workflow edit outside that approval. Local run: 1 passed, 0 skipped.",
+    reason: "NOT_MEASURED (not run)",
   },
   "e2e/owner-badge-kill-switch.spec.ts": {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
-    reason:
-      "Playwright request spec. test.skip unless E2E_LOCAL_SUPABASE_URL and E2E_LOCAL_SUPABASE_ANON_KEY are set, and it throws unless the host is loopback and is not verdantgrowdiary.com. A mocked CI job would record a skip. Local run against 127.0.0.1 passed. The required-CI change for this lane is the separate proposal, not this slice.",
+    reason: "NOT_MEASURED (not run)",
   },
 
   /* ---------------- pgTAP lane ---------------- */

@@ -71,6 +71,13 @@ BEGIN
     AND tablename IN ('badge_awards', 'badge_evidence')
     AND cmd <> 'SELECT';
   ASSERT pol_count = 0, 'client write policies are not allowed on badge tables';
+  ASSERT NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'badge_awards'
+      AND policyname = 'badge_awards_member_select'
+  ), 'cross-account member select must not exist';
 
   SELECT count(*) INTO badge_triggers
   FROM pg_trigger AS tg
@@ -135,6 +142,10 @@ DECLARE
   v_next_owner uuid;
   v_fail_grow uuid;
   v_next_grow uuid;
+  v_anon_owner uuid;
+  v_real_owner uuid;
+  v_anon_grow uuid;
+  v_real_grow uuid;
 BEGIN
   INSERT INTO auth.users (
     id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
@@ -561,7 +572,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
   PERFORM set_config('role', 'authenticated', true);
   SELECT count(*) INTO v_count FROM public.badge_awards;
-  ASSERT v_count = 1, format('the second signed-in account sees exactly 1 active award, got %s', v_count);
+  ASSERT v_count = 0, format('another signed-in account must see 0 awards, got %s', v_count);
   SELECT count(*) INTO v_count FROM public.badge_evidence;
   ASSERT v_count = 0, 'another account must not see this evidence';
   RESET role;
@@ -937,6 +948,69 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.badge_evidence;
   ASSERT v_count = 0, 'deleting the account must cascade the evidence';
   UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
+
+  -- Anonymous reconcile. A qualifying anonymous owner is skipped. A
+  -- non-anonymous owner after the same cursor still receives the award.
+  -- Drop any leftover reconcile fixtures first: their ids sort above this pair.
+  DELETE FROM auth.users WHERE email LIKE 'badge-reconcile-%@verdant.test';
+  SELECT max(id) INTO v_cursor_max FROM auth.users;
+  v_anon_owner := 'ffffffff-ffff-ffff-ffff-ffffffff0001';
+  v_real_owner := 'ffffffff-ffff-ffff-ffff-ffffffff0002';
+  v_anon_grow := gen_random_uuid();
+  v_real_grow := gen_random_uuid();
+  ASSERT v_cursor_max IS NULL OR v_anon_owner > v_cursor_max,
+    'anonymous fixture must sort after the existing owners';
+  INSERT INTO auth.users (
+    id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+    raw_app_meta_data, raw_user_meta_data, aud, role, is_anonymous
+  ) VALUES
+    (
+      v_anon_owner,
+      'badge-anon-' || v_anon_owner::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated',
+      true
+    ),
+    (
+      v_real_owner,
+      'badge-real-' || v_real_owner::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated',
+      false
+    );
+  INSERT INTO public.grows (id, user_id, name)
+  VALUES
+    (v_anon_grow, v_anon_owner, 'anonymous badge grow'),
+    (v_real_grow, v_real_owner, 'named badge grow');
+  INSERT INTO storage.objects (bucket_id, name, owner, owner_id)
+  VALUES
+    ('diary-photos', v_anon_owner::text || '/diary/anon.jpg', v_anon_owner, v_anon_owner::text),
+    ('diary-photos', v_real_owner::text || '/diary/real.jpg', v_real_owner, v_real_owner::text);
+  INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at)
+  VALUES
+    (v_anon_owner, v_anon_grow, '', v_anon_owner::text || '/diary/anon.jpg', now()),
+    (v_real_owner, v_real_grow, '', v_real_owner::text || '/diary/real.jpg', now());
+  UPDATE public.badge_award_runtime
+     SET enabled = true, reconcile_after = v_cursor_max
+   WHERE id = 1;
+  PERFORM set_config('role', 'service_role', true);
+  v_count := public.badge_awards_reconcile();
+  RESET role;
+  ASSERT v_count = 1, format('reconcile must visit the named owner only, got %s', v_count);
+  ASSERT (SELECT count(*) FROM public.badge_awards WHERE user_id = v_anon_owner) = 0,
+    'anonymous reconcile must not award an anonymous owner';
+  ASSERT (SELECT count(*) FROM public.badge_awards WHERE user_id = v_real_owner) = 1,
+    'anonymous reconcile must still award the named owner';
+  DELETE FROM storage.objects
+   WHERE bucket_id = 'diary-photos'
+     AND name IN (
+       v_anon_owner::text || '/diary/anon.jpg',
+       v_real_owner::text || '/diary/real.jpg'
+     );
+  DELETE FROM auth.users WHERE id IN (v_anon_owner, v_real_owner);
+  UPDATE public.badge_award_runtime
+     SET enabled = false, reconcile_after = NULL
+   WHERE id = 1;
 
   RAISE NOTICE '✓ kill switch, qualification, lifecycle, and owner visibility';
 END $$;
@@ -1436,6 +1510,431 @@ BEGIN
   END IF;
 END
 $ks$;
+
+-- Reconcile versus a concurrent evaluate, and reconcile versus a committed
+-- disable. Owner A must finish and keep its advisory lock. Reconcile then
+-- waits on owner B. A client evaluate for a later owner must finish while
+-- that wait is still open. A committed enabled = false during the same wait
+-- must award A, skip B, and leave the cursor unchanged.
+DO $race$
+DECLARE
+  v_case text;
+  v_cursor uuid := 'ffffffff-ffff-ffff-ffff-ffffffff0100';
+  v_first uuid := 'ffffffff-ffff-ffff-ffff-ffffffff0101';
+  v_blocked uuid := 'ffffffff-ffff-ffff-ffff-ffffffff0102';
+  v_client uuid := 'ffffffff-ffff-ffff-ffff-ffffffff0103';
+  v_owner uuid;
+  v_key bigint;
+  v_admin text;
+  v_conn text;
+  v_reconcile_name text;
+  v_reconcile_app text;
+  v_client_name text;
+  v_disable_name text;
+  v_sql text;
+  v_count int;
+  v_status text;
+  v_reconciled int;
+  v_deadline timestamptz;
+  v_pid int;
+  v_granted int;
+  v_waiting int;
+  v_result jsonb;
+  v_failures text := '';
+  v_error text;
+  v_activity text;
+  v_busy int;
+BEGIN
+  IF inet_server_addr() IS NULL OR inet_server_port() IS NULL THEN
+    RAISE EXCEPTION 'reconcile race refuses a connection without a loopback host and port';
+  END IF;
+  v_admin := format(
+    'host=%s port=%s dbname=%s user=postgres password=postgres',
+    host(inet_server_addr()),
+    inet_server_port(),
+    current_database()
+  );
+
+  FOREACH v_case IN ARRAY ARRAY['reconcile_vs_evaluate', 'reconcile_vs_disable']
+  LOOP
+    v_key := NULL;
+    v_reconcile_name := NULL;
+    v_client_name := NULL;
+    v_disable_name := NULL;
+    v_status := NULL;
+    v_reconciled := NULL;
+    v_pid := NULL;
+    BEGIN
+      v_reconcile_name := 'badge_race_r';
+      v_client_name := 'badge_race_c';
+      v_disable_name := 'badge_race_d';
+      v_reconcile_app := 'badge_race_reconcile_' || v_case;
+      v_key := hashtextextended(v_blocked::text || ':first_diary_entry', 0);
+      PERFORM pg_advisory_unlock(v_key);
+      PERFORM pg_stat_clear_snapshot();
+      PERFORM pg_terminate_backend(activity.pid)
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+        AND activity.pid <> pg_backend_pid()
+        AND activity.application_name LIKE 'badge_race_%';
+
+      PERFORM dblink_exec(v_admin, format($fix$
+        DO $inner$
+        BEGIN
+          PERFORM set_config('storage.allow_delete_query', 'true', true);
+          DELETE FROM storage.objects
+          WHERE bucket_id = 'diary-photos'
+            AND name IN (%L, %L, %L, %L);
+          DELETE FROM auth.users
+          WHERE id IN (%L::uuid, %L::uuid, %L::uuid, %L::uuid);
+          UPDATE public.badge_award_runtime
+             SET enabled = false, reconcile_after = NULL
+           WHERE id = 1;
+        END
+        $inner$
+      $fix$,
+        v_cursor::text || '/diary/race.jpg',
+        v_first::text || '/diary/race.jpg',
+        v_blocked::text || '/diary/race.jpg',
+        v_client::text || '/diary/race.jpg',
+        v_cursor, v_first, v_blocked, v_client
+      ));
+
+      FOREACH v_owner IN ARRAY ARRAY[v_cursor, v_first, v_blocked, v_client]
+      LOOP
+        PERFORM dblink_exec(v_admin, format($fix$
+          INSERT INTO auth.users (
+            id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+            raw_app_meta_data, raw_user_meta_data, aud, role, is_anonymous
+          ) VALUES (
+            %L::uuid,
+            %L,
+            crypt('harness-password', gen_salt('bf')),
+            now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated',
+            false
+          )
+        $fix$, v_owner, 'badge-race-' || v_owner::text || '@verdant.test'));
+        PERFORM dblink_exec(v_admin, format($fix$
+          INSERT INTO public.grows (id, user_id, name)
+          VALUES (gen_random_uuid(), %L::uuid, 'race grow')
+        $fix$, v_owner));
+        PERFORM dblink_exec(v_admin, format($fix$
+          INSERT INTO storage.objects (bucket_id, name, owner, owner_id)
+          VALUES ('diary-photos', %L, %L::uuid, %L)
+        $fix$, v_owner::text || '/diary/race.jpg', v_owner, v_owner::text));
+        PERFORM dblink_exec(v_admin, format($fix$
+          INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at)
+          SELECT %L::uuid, grow.id, '', %L, now()
+          FROM public.grows AS grow
+          WHERE grow.user_id = %L::uuid
+        $fix$, v_owner, v_owner::text || '/diary/race.jpg', v_owner));
+      END LOOP;
+
+      PERFORM dblink_exec(v_admin, format($fix$
+        UPDATE public.badge_award_runtime
+           SET enabled = true, reconcile_after = %L::uuid
+         WHERE id = 1
+      $fix$, v_cursor));
+
+      PERFORM pg_advisory_lock(v_key);
+      v_conn := format(
+        'host=%s port=%s dbname=%s user=postgres password=postgres application_name=%s',
+        host(inet_server_addr()),
+        inet_server_port(),
+        current_database(),
+        v_reconcile_app
+      );
+      BEGIN
+        PERFORM dblink_disconnect(v_reconcile_name);
+      EXCEPTION WHEN OTHERS THEN
+        NULL;
+      END;
+      PERFORM dblink_connect(v_reconcile_name, v_conn);
+      IF dblink_send_query(v_reconcile_name, 'SELECT public.badge_awards_reconcile()') <> 1 THEN
+        RAISE EXCEPTION 'reconcile race % query was not sent', v_case;
+      END IF;
+
+      v_deadline := clock_timestamp() + interval '10 seconds';
+      v_granted := 0;
+      v_waiting := 0;
+      v_busy := 1;
+      LOOP
+        v_busy := dblink_is_busy(v_reconcile_name);
+        EXIT WHEN v_busy = 0 OR clock_timestamp() > v_deadline;
+        v_granted := 0;
+        v_waiting := 0;
+        v_pid := NULL;
+        PERFORM pg_stat_clear_snapshot();
+        SELECT activity.pid
+          INTO v_pid
+        FROM pg_stat_activity AS activity
+        WHERE activity.datname = current_database()
+          AND activity.pid <> pg_backend_pid()
+          AND activity.application_name = v_reconcile_app
+        LIMIT 1;
+        IF v_pid IS NOT NULL THEN
+          SELECT
+            count(*) FILTER (WHERE lock.granted)::int,
+            count(*) FILTER (WHERE NOT lock.granted)::int
+            INTO v_granted, v_waiting
+          FROM pg_locks AS lock
+          WHERE lock.locktype = 'advisory'
+            AND lock.pid = v_pid;
+        END IF;
+        EXIT WHEN v_granted >= 1 AND v_waiting >= 1;
+        PERFORM pg_sleep(0.05);
+      END LOOP;
+
+      IF v_granted < 1 OR v_waiting < 1 THEN
+        PERFORM pg_stat_clear_snapshot();
+        SELECT string_agg(
+          COALESCE(activity.application_name, '-') || ' '
+            || COALESCE(activity.state, '-') || ' '
+            || COALESCE(activity.wait_event_type, '-') || '/'
+            || COALESCE(activity.wait_event, '-') || ' '
+            || COALESCE(left(activity.query, 120), '<no query>'),
+          ' || '
+        )
+          INTO v_activity
+        FROM pg_stat_activity AS activity
+        WHERE activity.pid <> pg_backend_pid()
+          AND (
+            activity.datname = current_database()
+            OR activity.application_name LIKE 'badge_race_%'
+          );
+        RAISE EXCEPTION
+          'reconcile race % did not hold owner A and wait on owner B: busy % granted % waiting % activity %',
+          v_case, v_busy, v_granted, v_waiting, v_activity;
+      END IF;
+
+      IF v_case = 'reconcile_vs_evaluate' THEN
+        v_sql := format($q$
+          SELECT public.badge_awards_evaluate_owner('first_diary_entry')
+          FROM (
+            SELECT
+              set_config('request.jwt.claim.sub', %L, false),
+              set_config('request.jwt.claims', %L, false),
+              set_config('role', 'authenticated', false)
+          ) AS session_cfg
+        $q$, v_client::text, json_build_object('sub', v_client)::text);
+        v_conn := format(
+          'host=%s port=%s dbname=%s user=postgres password=postgres application_name=%s',
+          host(inet_server_addr()),
+          inet_server_port(),
+          current_database(),
+          'badge_race_client_' || v_case
+        );
+        BEGIN
+          PERFORM dblink_disconnect(v_client_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        PERFORM dblink_connect(v_client_name, v_conn);
+        IF dblink_send_query(v_client_name, v_sql) <> 1 THEN
+          RAISE EXCEPTION 'client evaluate was not sent';
+        END IF;
+        v_deadline := clock_timestamp() + interval '10 seconds';
+        LOOP
+          EXIT WHEN dblink_is_busy(v_client_name) = 0 OR clock_timestamp() > v_deadline;
+          PERFORM pg_sleep(0.05);
+        END LOOP;
+        IF dblink_is_busy(v_client_name) <> 0 OR dblink_is_busy(v_reconcile_name) <> 1 THEN
+          RAISE EXCEPTION
+            'client evaluate did not finish while reconcile was still waiting: client busy % reconcile busy %',
+            dblink_is_busy(v_client_name), dblink_is_busy(v_reconcile_name);
+        END IF;
+        SELECT remote_result.result
+          INTO v_result
+        FROM dblink_get_result(v_client_name) AS remote_result(result jsonb);
+        PERFORM dblink_disconnect(v_client_name);
+        v_client_name := NULL;
+        v_status := v_result->>'status';
+        IF v_status IS DISTINCT FROM 'qualified' THEN
+          RAISE EXCEPTION 'client evaluate status %, expected qualified', v_status;
+        END IF;
+        SELECT count(*) INTO v_count
+        FROM public.badge_awards
+        WHERE user_id = v_client;
+        IF v_count <> 1 THEN
+          RAISE EXCEPTION 'client evaluate committed % awards, expected 1', v_count;
+        END IF;
+      ELSE
+        v_conn := format(
+          'host=%s port=%s dbname=%s user=postgres password=postgres application_name=%s',
+          host(inet_server_addr()),
+          inet_server_port(),
+          current_database(),
+          'badge_race_disable_' || v_case
+        );
+        BEGIN
+          PERFORM dblink_disconnect(v_disable_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        PERFORM dblink_connect(v_disable_name, v_conn);
+        PERFORM dblink_exec(v_disable_name, 'SET lock_timeout = ''3s''');
+        PERFORM dblink_exec(
+          v_disable_name,
+          'UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1'
+        );
+        PERFORM dblink_disconnect(v_disable_name);
+        v_disable_name := NULL;
+        IF dblink_is_busy(v_reconcile_name) <> 1 THEN
+          RAISE EXCEPTION 'reconcile finished before the committed disable could overlap the wait';
+        END IF;
+        IF (SELECT enabled FROM public.badge_award_runtime WHERE id = 1) IS DISTINCT FROM FALSE THEN
+          RAISE EXCEPTION 'committed disable did not turn the switch off';
+        END IF;
+      END IF;
+
+      PERFORM pg_advisory_unlock(v_key);
+      v_deadline := clock_timestamp() + interval '10 seconds';
+      LOOP
+        EXIT WHEN dblink_is_busy(v_reconcile_name) = 0 OR clock_timestamp() > v_deadline;
+        PERFORM pg_sleep(0.05);
+      END LOOP;
+      IF dblink_is_busy(v_reconcile_name) <> 0 THEN
+        RAISE EXCEPTION 'reconcile stayed busy after owner B was released';
+      END IF;
+      SELECT remote_result.result
+        INTO v_reconciled
+      FROM dblink_get_result(v_reconcile_name) AS remote_result(result integer);
+      PERFORM dblink_disconnect(v_reconcile_name);
+      v_reconcile_name := NULL;
+
+      SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_first;
+      IF v_count <> 1 THEN
+        RAISE EXCEPTION 'owner A awards %, expected 1', v_count;
+      END IF;
+      SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_blocked;
+      IF v_case = 'reconcile_vs_evaluate' AND v_count <> 1 THEN
+        RAISE EXCEPTION 'owner B awards %, expected 1', v_count;
+      ELSIF v_case = 'reconcile_vs_disable' AND v_count <> 0 THEN
+        RAISE EXCEPTION 'owner B was awarded after disable: %', v_count;
+      END IF;
+      SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_client;
+      IF v_count <> 1 AND v_case = 'reconcile_vs_evaluate' THEN
+        RAISE EXCEPTION 'client awards after reconcile %, expected 1', v_count;
+      ELSIF v_count <> 0 AND v_case = 'reconcile_vs_disable' THEN
+        RAISE EXCEPTION 'client was visited after disable: %', v_count;
+      END IF;
+      IF v_case = 'reconcile_vs_evaluate' AND v_reconciled IS DISTINCT FROM 3 THEN
+        RAISE EXCEPTION 'reconcile visited %, expected 3', v_reconciled;
+      ELSIF v_case = 'reconcile_vs_disable' AND v_reconciled IS DISTINCT FROM 2 THEN
+        RAISE EXCEPTION 'reconcile visited %, expected 2', v_reconciled;
+      END IF;
+      IF v_case = 'reconcile_vs_disable'
+         AND (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1)
+           IS DISTINCT FROM v_cursor THEN
+        RAISE EXCEPTION
+          'disable path changed reconcile_after to %',
+          (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1);
+      END IF;
+      IF v_case = 'reconcile_vs_evaluate'
+         AND (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1) IS NOT NULL THEN
+        RAISE EXCEPTION 'evaluate path left a cursor after a short batch';
+      END IF;
+
+      PERFORM dblink_exec(v_admin, format($fix$
+        DO $inner$
+        BEGIN
+          PERFORM set_config('storage.allow_delete_query', 'true', true);
+          DELETE FROM storage.objects
+          WHERE bucket_id = 'diary-photos'
+            AND name IN (%L, %L, %L, %L);
+          DELETE FROM auth.users
+          WHERE id IN (%L::uuid, %L::uuid, %L::uuid, %L::uuid);
+          UPDATE public.badge_award_runtime
+             SET enabled = false, reconcile_after = NULL
+           WHERE id = 1;
+        END
+        $inner$
+      $fix$,
+        v_cursor::text || '/diary/race.jpg',
+        v_first::text || '/diary/race.jpg',
+        v_blocked::text || '/diary/race.jpg',
+        v_client::text || '/diary/race.jpg',
+        v_cursor, v_first, v_blocked, v_client
+      ));
+      IF (SELECT enabled FROM public.badge_award_runtime WHERE id = 1) IS DISTINCT FROM FALSE THEN
+        RAISE EXCEPTION 'reconcile race % left the switch on', v_case;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS v_error = MESSAGE_TEXT;
+      IF v_client_name IS NOT NULL THEN
+        BEGIN
+          PERFORM dblink_cancel_query(v_client_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        BEGIN
+          PERFORM dblink_disconnect(v_client_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+      END IF;
+      IF v_disable_name IS NOT NULL THEN
+        BEGIN
+          PERFORM dblink_disconnect(v_disable_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+      END IF;
+      IF v_reconcile_name IS NOT NULL THEN
+        BEGIN
+          PERFORM dblink_cancel_query(v_reconcile_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+        BEGIN
+          PERFORM dblink_disconnect(v_reconcile_name);
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+      END IF;
+      PERFORM pg_stat_clear_snapshot();
+      PERFORM pg_terminate_backend(activity.pid)
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+        AND activity.pid <> pg_backend_pid()
+        AND activity.application_name LIKE 'badge_race_%';
+      IF v_key IS NOT NULL THEN
+        PERFORM pg_advisory_unlock(v_key);
+      END IF;
+      BEGIN
+        PERFORM dblink_exec(v_admin, format($fix$
+          DO $inner$
+          BEGIN
+            PERFORM set_config('storage.allow_delete_query', 'true', true);
+            DELETE FROM storage.objects
+            WHERE bucket_id = 'diary-photos'
+              AND name IN (%L, %L, %L, %L);
+            DELETE FROM auth.users
+            WHERE id IN (%L::uuid, %L::uuid, %L::uuid, %L::uuid);
+            UPDATE public.badge_award_runtime
+               SET enabled = false, reconcile_after = NULL
+             WHERE id = 1;
+          END
+          $inner$
+        $fix$,
+          v_cursor::text || '/diary/race.jpg',
+          v_first::text || '/diary/race.jpg',
+          v_blocked::text || '/diary/race.jpg',
+          v_client::text || '/diary/race.jpg',
+          v_cursor, v_first, v_blocked, v_client
+        ));
+      EXCEPTION WHEN OTHERS THEN
+        v_error := v_error || ' cleanup: ' || SQLERRM;
+      END;
+      v_failures := v_failures || v_case || ': ' || v_error || E'\n';
+    END;
+  END LOOP;
+
+  IF btrim(v_failures) <> '' THEN
+    RAISE EXCEPTION 'reconcile races failed:%', E'\n' || v_failures;
+  END IF;
+END
+$race$;
 
 \echo ok 2 - two simultaneous sessions leave one award
 \else

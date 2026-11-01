@@ -106,13 +106,13 @@ last_updated: 2026-10-31 01:40 CT, by Grok
 ### VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS
 
 ```text
-TASK VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS priority: other status: OPEN
+TASK VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS priority: other status: CLOSED merged as 1eedde10ff17daac865fa49808d7ae898601ab71
 goal: Tent Detail imported CSV history follows the saved temperature unit, including labels and filters.
 why: Fahrenheit CSV readings displayed as Celsius after reload (VER-302).
 branch: codex/ver-302-imported-history-temperature-units
 base: verdant-grow-diary; current integrated base ffc6076aeb3723f17d85057154f8e9772ed9c222; upstream merge preserved
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2610
-head_sha: 0683e974f57e0a310fdb736cc9a307b3b4e883fa (verified remote parent of this correction checkpoint; read resulting full SHA from PR #2610)
+head_sha: merged as 1eedde10ff17daac865fa49808d7ae898601ab71 (#2610)
 state: open non-draft #2610; user explicitly authorized takeover and finish through merge after required checks and eligible independent acceptance; deployment and production QA remain unauthorized
 current_step: fix the reviewed native CSV fixture default-unit regression, refresh PR evidence and obtain fresh complete-scope acceptance before merge queue
 next_action: verify the resulting full head and Native Save Retrieve Local / required CI; route the complete ten-file scope and scorer declarations to an eligible independent reviewer; merge only after every gate passes

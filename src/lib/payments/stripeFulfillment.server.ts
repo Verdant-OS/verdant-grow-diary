@@ -2,6 +2,7 @@ import type Stripe from 'stripe';
 import { createStripeClient, type StripeEnv } from '@/lib/stripe.server';
 import { stripeCatalogOffer } from '@/lib/stripeCheckoutRules';
 import { stripeSessionCanFulfill, stripeSubscriptionStatus } from './stripeFulfillmentRules';
+import { stripeSubscriptionMatchesSession } from './stripeConfirmationRules';
 
 export async function persistStripeSubscription(subscription: Stripe.Subscription, environment: StripeEnv) {
   const offer = stripeCatalogOffer(subscription.metadata.priceId);
@@ -41,7 +42,13 @@ export async function fulfillStripeSession(session: Stripe.Checkout.Session, env
     const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
     if (!subscriptionId) throw new Error('Missing subscription');
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    if (subscription.metadata.userId !== session.metadata?.userId) throw new Error('Subscription ownership mismatch');
+    const ownerId = session.metadata?.userId;
+    if (!ownerId || !stripeSubscriptionMatchesSession(
+      { userId: ownerId, priceId: offer.id, customerId },
+      { userId: subscription.metadata.userId, priceId: subscription.metadata.priceId,
+        customerId: typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id },
+    )) throw new Error('Subscription ownership or plan mismatch');
+    if (subscription.status !== 'active' && subscription.status !== 'trialing') return { state: 'pending' as const };
     await persistStripeSubscription(subscription, environment);
     return { state: 'confirmed' as const, priceId: offer.id };
   }

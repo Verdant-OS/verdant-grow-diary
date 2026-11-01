@@ -156,8 +156,7 @@ requirements must be implemented with their respective jobs.
 ## Validation and handoff
 
 Base: `0792349d57de2c1c0e2610f643920cf595486dfc` on `verdant-grow-diary`.
-Branch: `codex/rea-foundation-bundle-map-20261029`.
-Owner: this Codex implementation session. No merge or deployment is authorized.
+Branch: `ultra/2667-reauthor-rea` (PR #2695). No merge or deployment is authorized.
 
 Initial implementation measurements in this cloud environment on October 29, 2026 (CT):
 
@@ -215,7 +214,7 @@ Peer review found relative/WebSocket credential scanning, descendant-process
 cleanup and malformed-proxy cleanup issues. They were fixed; regressions cover
 the credential and process cases, plus interruptions during startup, capture,
 export and shutdown. This peer review is not repository independent acceptance
-or merge approval. The PR stays draft pending those gates and the blocked app checks.
+or merge approval. Merge still waits on those gates and the blocked app checks.
 
 ## Production-readiness follow-up
 
@@ -293,9 +292,8 @@ The remaining script timeout and unknown route/module coverage stay explicit.
 Further route extraction needs REA support for the timed-out/unsupported code.
 Do not infer missing routes or change application bundling inside this scope.
 
-The PR remains draft. GitHub currently reports three required contexts: two
-passing, with `Lint, typecheck, test, build` skipped while the PR is draft.
-Skipped required checks and a Codex peer review do not provide the eligible
+The REA tests run in CI as the `REA evidence kit tests` step of `ci.yml`.
+A peer review does not provide the eligible
 independent acceptance or exact-head merge approval required by repository
 ownership rules. Rollback removes these scripts/runbook and the
 REA-specific ignore entries; the application has no runtime dependency on them.

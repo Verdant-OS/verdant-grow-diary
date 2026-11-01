@@ -46,6 +46,7 @@ import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard";
 import SensorSnapshotTruthStrip from "@/components/SensorSnapshotTruthStrip";
 import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadModel";
+import { classifySnapshotTruth } from "@/lib/sensorTruthRules";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { groupSensorReadingRows } from "@/lib/growAdapters";
@@ -121,6 +122,7 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
 import {
   resolveDisplayedTentClimateSnapshot,
+  resolveTentClimateChipReading,
   tonightRowsFromQuickLogManualReadings,
 } from "@/lib/tentManualEnvironmentSnapshotRules";
 import {
@@ -231,8 +233,16 @@ export default function TentDetail() {
     tentId: tent?.id ?? null,
     nowMs,
   });
-  const climateSnap = displayedClimate.fromManual ? displayedClimate.snapshot : snap;
-  const climateStale = displayedClimate.fromManual ? displayedClimate.stale : header.stale;
+  const climateChip = (metric: "temp" | "rh" | "co2") =>
+    resolveTentClimateChipReading({
+      displayed: displayedClimate,
+      sensorSnapshot: snap,
+      sensorStale: header.stale,
+      metric,
+    });
+  const climateTemp = climateChip("temp");
+  const climateRh = climateChip("rh");
+  const climateCo2 = climateChip("co2");
   // The header's truth check is realism only and keeps a vpd_kpa row whose own
   // intake quality flag is not ok. The Dashboard selector drops that row, so
   // the tent page withholds it the same way the header withholds a realism
@@ -518,23 +528,29 @@ export default function TentDetail() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
-        {climateSnap?.temp !== null && climateSnap?.temp !== undefined && (
+        {climateTemp.value !== null && (
           <MetricChip
             label="T"
-            value={(convertCelsiusForDisplay(climateSnap.temp) ?? 0).toFixed(1)}
+            value={(convertCelsiusForDisplay(climateTemp.value) ?? 0).toFixed(1)}
             unit={getTemperatureUnitSymbol()}
             status={environmentMetricChipStatus(
-              classifyTempAgainstStage(climateSnap.temp, { stage: envStage, stale: climateStale }),
+              classifyTempAgainstStage(climateTemp.value, {
+                stage: envStage,
+                stale: climateTemp.stale,
+              }),
             )}
           />
         )}
-        {climateSnap?.rh !== null && climateSnap?.rh !== undefined && (
+        {climateRh.value !== null && (
           <MetricChip
             label="RH"
-            value={climateSnap.rh}
+            value={climateRh.value}
             unit="%"
             status={environmentMetricChipStatus(
-              classifyRhAgainstStage(climateSnap.rh, { stage: envStage, stale: climateStale }),
+              classifyRhAgainstStage(climateRh.value, {
+                stage: envStage,
+                stale: climateRh.stale,
+              }),
             )}
           />
         )}
@@ -557,8 +573,8 @@ export default function TentDetail() {
               />
             );
           })()}
-        {climateSnap?.co2 !== null && climateSnap?.co2 !== undefined && (
-          <MetricChip label="CO₂" value={climateSnap.co2} unit=" ppm" />
+        {climateCo2.value !== null && (
+          <MetricChip label="CO₂" value={climateCo2.value} unit=" ppm" />
         )}
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <Lightbulb
@@ -687,8 +703,12 @@ export default function TentDetail() {
         </div>
         <SensorSnapshotTruthStrip
           model={buildSensorSnapshotReadModel(
-            displayedClimate.fromManual
-              ? { snapshot: displayedClimate.snapshot, now: nowMs }
+            displayedClimate.fromManual && displayedClimate.snapshot
+              ? {
+                  snapshot: displayedClimate.snapshot,
+                  now: nowMs,
+                  truth: classifySnapshotTruth(displayedClimate.snapshot, nowMs),
+                }
               : { snapshot: header.snapshot, truth: header.truth },
           )}
           className="mb-3"

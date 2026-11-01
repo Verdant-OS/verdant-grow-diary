@@ -60,12 +60,12 @@ describe("Tent Detail — stage-aware Temp/RH wiring", () => {
   });
   it("wires Temperature MetricChip through classifyTempAgainstStage with stale flag", () => {
     expect(DETAIL).toMatch(
-      /label="T"[\s\S]*classifyTempAgainstStage\(snap\.temp,\s*\{\s*stage:\s*envStage,\s*stale:\s*header\.stale\s*\}\)/,
+      /label="T"[\s\S]*classifyTempAgainstStage\(climateTemp\.value,\s*\{\s*stage:\s*envStage,\s*stale:\s*climateTemp\.stale,?\s*\}\)/,
     );
   });
   it("wires RH MetricChip through classifyRhAgainstStage with stale flag", () => {
     expect(DETAIL).toMatch(
-      /label="RH"[\s\S]*classifyRhAgainstStage\(snap\.rh,\s*\{\s*stage:\s*envStage,\s*stale:\s*header\.stale\s*\}\)/,
+      /label="RH"[\s\S]*classifyRhAgainstStage\(climateRh\.value,\s*\{\s*stage:\s*envStage,\s*stale:\s*climateRh\.stale,?\s*\}\)/,
     );
   });
   it("removes hardcoded temp threshold expressions", () => {

@@ -210,7 +210,7 @@ describe("Tent surfaces (TentDetail + Tents) render preferred unit on chips", ()
   );
 
   it("TentDetail metric chip uses centralized symbol+conversion", () => {
-    expect(TENT_DETAIL).toContain("convertCelsiusForDisplay(snap.temp)");
+    expect(TENT_DETAIL).toContain("convertCelsiusForDisplay(climateTemp.value)");
     expect(TENT_DETAIL).toContain("getTemperatureUnitSymbol()");
     expect(TENT_DETAIL).not.toContain('unit="°F"');
   });

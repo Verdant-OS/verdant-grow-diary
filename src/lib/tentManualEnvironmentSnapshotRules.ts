@@ -170,3 +170,36 @@ export function resolveDisplayedTentClimateSnapshot(input: {
     stale: isStale(manual.ts, input.nowMs, undefined, MANUAL_SOURCE),
   };
 }
+
+export type TentClimateChipMetric = "temp" | "rh" | "co2";
+
+export interface TentClimateChipReading {
+  value: number | null;
+  /** Stale flag of the source that supplied `value`. */
+  stale: boolean;
+}
+
+function finiteClimate(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Header chips. A newer manual sibling replaces only temperature or
+ * humidity it actually observed. CO₂, and the climate metric a Quick Log
+ * left unobserved, stay on the sensor snapshot.
+ */
+export function resolveTentClimateChipReading(input: {
+  displayed: DisplayedTentClimateSnapshot;
+  sensorSnapshot: SensorSnapshot | null | undefined;
+  sensorStale: boolean;
+  metric: TentClimateChipMetric;
+}): TentClimateChipReading {
+  const sensorReading: TentClimateChipReading = {
+    value: finiteClimate(input.sensorSnapshot?.[input.metric]),
+    stale: input.sensorStale,
+  };
+  if (input.metric === "co2" || !input.displayed.fromManual) return sensorReading;
+  const manualValue = finiteClimate(input.displayed.snapshot?.[input.metric]);
+  if (manualValue === null) return sensorReading;
+  return { value: manualValue, stale: input.displayed.stale };
+}

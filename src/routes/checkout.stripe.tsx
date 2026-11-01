@@ -40,7 +40,7 @@ function StripeReturn() {
         );
         if (!active) return;
         if (!result) return;
-        if ('error' in result) { setMessage(result.error); return; }
+        if ('error' in result && typeof result.error === 'string') { setMessage(result.error); return; }
         setConfirmed(result.state === 'confirmed');
         setVerifiedPlan('planId' in result ? result.planId : null);
         setMessage(result.state === 'confirmed' ? ('credits' in result ? `${result.credits} test AI credits confirmed.` : 'Your test subscription is confirmed.') : result.state === 'refunded' ? 'This purchase was refunded.' : 'Payment is pending. No new access has been granted.');

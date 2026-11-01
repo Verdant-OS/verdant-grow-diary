@@ -7,6 +7,8 @@ Verdant Grow Diary helps cultivators keep a structured plant memory across grows
 ## Pages
 
 - [Home](/): Product overview — plant memory, sensor truth, cautious AI, grower-approved actions.
+- [Start here](/welcome): Orientation for a first grow — create a grow, add a tent and plant, capture a Quick Log, and the free tools you can use without an account.
+- [Features](/features): What Verdant does — plant diary and photos, source-labeled sensor readings, alerts, cautious AI Doctor, approval-required Action Queue, free tools, and the MCP API.
 - [Pricing](/pricing): Free, Pro (monthly/annual), and Craft tiers, feature comparison, and FAQ.
 - [Hardware integrations](/hardware-integrations): Supported ways to bring sensor data in — manual entry, CSV import, webhook, MQTT, ESP32, Raspberry Pi bridge. Read-only.
 - [30-second Quick Log starter](/quick-log): Try a first grow-diary note without an account — the draft stays on your device until you sign up.

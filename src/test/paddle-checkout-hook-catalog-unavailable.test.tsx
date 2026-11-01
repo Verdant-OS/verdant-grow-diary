@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// @vitest-environment-options {"url":"https://verdantgrowdiary.com/"}
+// GA only collects on the production host (#2693), so these run there.
 /**
  * usePaddleCheckout — catalog-unavailable calm-blocked behavior.
  *
@@ -121,8 +124,7 @@ describe("usePaddleCheckout — catalog-unavailable calm state", () => {
   it("price_resolution_unavailable (missing Craft price env var) lands as inline blockedReason, no destructive toast", async () => {
     state.resolverError = {
       reason: "price_resolution_unavailable",
-      message:
-        "Checkout is temporarily unavailable. Please try again in a moment.",
+      message: "Checkout is temporarily unavailable. Please try again in a moment.",
     };
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });

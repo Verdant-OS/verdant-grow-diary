@@ -22,6 +22,7 @@ import {
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import { PRICING_ANALYTICS_EVENT, trackPricingEvent } from "@/lib/pricingAnalytics";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 
 vi.mock("@/lib/react-router-compat", () => ({
   useLocation: () => ({ pathname: "/dashboard" }),
@@ -110,7 +111,7 @@ describe("GA4 host guard", () => {
     __resetGoogleAnalyticsLoaderForTests();
     __resetAnalyticsConsentForTests();
     document.head.innerHTML = "";
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     window.sessionStorage.clear();
     const w = window as GtagWindow;
     delete w.gtag;
@@ -122,7 +123,7 @@ describe("GA4 host guard", () => {
     __resetGoogleAnalyticsLoaderForTests();
     __resetAnalyticsConsentForTests();
     document.head.innerHTML = "";
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     window.sessionStorage.clear();
     Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
     vi.restoreAllMocks();

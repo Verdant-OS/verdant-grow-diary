@@ -1,5 +1,7 @@
 # Current tasks
 
+- [ ] Search presence review: check how the site presents in Google and AI answers, fix metadata/sitemap/robots gaps, and report realistic ranking targets.
+
 - [x] Email update prepared: account emails, owner alerts and purchase receipts use managed sending; branding and database tables preserved. Signed bounce/complaint/unsubscribe receiver preserves original audit strings with deterministic event deduplication; old unsubscribe links retain compatibility. Retired source scaffolds removed, no deployed functions deleted. 117 tests passed / 0 failed / 0 skipped; scoped ESLint 0 errors / 0 warnings; automatic typecheck/build OK. No publish or production send test.
 - [ ] Owner review and publishing completes the permanent email update; live delivery and signed production event receipts remain NOT_MEASURED until then.
 

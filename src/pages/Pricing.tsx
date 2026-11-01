@@ -69,6 +69,7 @@ import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
 import { buildCheckoutPlanReturnPath, savePlanIntent } from "@/lib/checkoutPlanIntent";
 import { resolvePricingCheckoutRetryGate } from "@/lib/pricingCheckoutRetryRules";
 import { isFounderLifetimeCheckoutSku } from "@/lib/founderLifetimeCheckoutGuard";
+import { buildPlansComparisonTable } from "@/lib/pricingPlansComparisonViewModel";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -612,6 +613,11 @@ export default function Pricing() {
       ? `~${PRICING.craft.annualSavingsPercent}% savings vs. monthly`
       : `Or $${CRAFT_ANNUAL_PRICE_USD}/year — save ~${PRICING.craft.annualSavingsPercent}%`;
 
+  // Simple Pro vs Craft table under the cards. Prices derive from the same
+  // constants the cards use and follow the toggle, so the two can never
+  // disagree on the number a grower sees.
+  const plansComparison = buildPlansComparisonTable(billing);
+
   return (
     <main
       className="min-h-screen bg-background text-foreground"
@@ -983,6 +989,70 @@ export default function Pricing() {
             </div>
           </section>
         )}
+      </section>
+
+      {/* Simple Pro vs Craft comparison, straight under the plan cards. The
+          numbers come from constants/pricing through the view model and follow
+          the Monthly/Annual toggle, so this table and the cards above it can
+          never show a grower two different prices. */}
+      <section
+        className="px-6 pb-12 max-w-4xl mx-auto scroll-mt-24"
+        aria-labelledby="pricing-plans-comparison-heading"
+        data-testid="pricing-plans-comparison"
+      >
+        <h2
+          id="pricing-plans-comparison-heading"
+          className="font-display text-2xl md:text-3xl font-semibold text-center"
+        >
+          {plansComparison.heading}
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground text-center">{plansComparison.caption}</p>
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Pro and Craft plan comparison"
+          className="mt-6 overflow-x-auto rounded-xl border border-border/60"
+        >
+          <table
+            className="w-full min-w-[560px] text-sm"
+            data-testid="pricing-plans-comparison-table"
+          >
+            <thead className="bg-secondary/40 text-muted-foreground">
+              <tr>
+                <th className="text-left font-medium px-4 py-3">Included</th>
+                {plansComparison.columns.map((column) => (
+                  <th
+                    key={column.key}
+                    className="text-center font-medium px-4 py-3 text-primary"
+                    data-testid={`pricing-plans-comparison-column-${column.key}`}
+                  >
+                    {column.name}
+                    <span className="mt-1 block text-base font-semibold text-foreground">
+                      {column.price}
+                      {column.cadence}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {plansComparison.rows.map((row) => (
+                <tr key={row.label} className="border-t border-border/40">
+                  <td className="px-4 py-3 font-medium">{row.label}</td>
+                  <td className="px-4 py-3 text-center">
+                    <CellValue value={row.pro} accent />
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <CellValue value={row.craft} accent />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground text-center sm:hidden">
+          "Swipe to compare all plans →"
+        </p>
       </section>
 
       {/* AI Credit explainer */}

@@ -17,6 +17,7 @@ const entitlementMock = vi.hoisted(() => ({
   loading: false as boolean,
   lookupFailed: false as boolean,
   displayPlanId: "free" as string | null,
+  savedStripeTestSubscription: null as null | { displayPlanId: string; status: string; isActive: boolean },
   refetch: vi.fn(async () => undefined),
 }));
 
@@ -24,11 +25,27 @@ const portalMock = vi.hoisted(() => ({
   invoke: vi.fn(),
 }));
 
+const stripePortalMock = vi.hoisted(() => ({
+  open: vi.fn(async () => ({ ok: true as boolean, error: undefined as string | undefined })),
+  clearError: vi.fn(),
+  state: { opening: false as boolean, error: null as string | null },
+}));
+
+vi.mock("@/lib/payments/stripePortal", () => ({
+  useOpenStripeCustomerPortalState: () => ({
+    opening: stripePortalMock.state.opening,
+    error: stripePortalMock.state.error,
+    open: stripePortalMock.open,
+    clearError: stripePortalMock.clearError,
+  }),
+}));
+
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: entitlementMock.loading,
     lookupFailed: entitlementMock.lookupFailed,
     entitlement: { displayPlanId: entitlementMock.displayPlanId },
+    savedStripeTestSubscription: entitlementMock.savedStripeTestSubscription,
     refetch: entitlementMock.refetch,
   }),
 }));

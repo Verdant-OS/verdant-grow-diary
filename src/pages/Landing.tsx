@@ -440,7 +440,7 @@ export default function Landing({ canonicalPath = "/", trackPageView = true }: L
           </Link>
         </nav>
         <p className="text-xs">
-          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as Merchant of Record.
+          Operated by Matthew Tyler Cheek. Payments processed by Stripe.
         </p>
       </footer>
     </main>

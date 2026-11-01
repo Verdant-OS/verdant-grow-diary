@@ -440,7 +440,7 @@ describe("Safety: no private data on public page", () => {
     // needed to avoid selling an AI credit pack the current plan cannot spend.
     // It renders only a generic eligibility state; no subscription fields.
     // Any other @/hooks import (dashboard data hooks) remains forbidden.
-    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useMyEntitlements\b)/);
+    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useStripeCheckout\b|useMyEntitlements\b)/);
     // And the checkout hook itself must stay free of private data reads —
     // it may read auth session state, never tables or the supabase client.
     const CHECKOUT_HOOK = readSrc("hooks/usePaddleCheckout.ts");

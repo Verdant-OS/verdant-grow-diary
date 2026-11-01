@@ -1378,7 +1378,7 @@ export default function Pricing() {
           </Link>
         </nav>
         <p className="text-xs">
-          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as Merchant of Record.
+          Operated by Matthew Tyler Cheek. Payments processed by Stripe.
           30-day money-back guarantee.
         </p>
       </footer>

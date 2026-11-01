@@ -1,5 +1,8 @@
 # Current tasks
 
+- [x] Email update prepared: account emails, owner alerts and purchase receipts use managed sending; branding and database tables preserved. Signed bounce/complaint/unsubscribe receiver preserves original audit strings with deterministic event deduplication; old unsubscribe links retain compatibility. Retired source scaffolds removed, no deployed functions deleted. 117 tests passed / 0 failed / 0 skipped; scoped ESLint 0 errors / 0 warnings; automatic typecheck/build OK. No publish or production send test.
+- [ ] Owner review and publishing completes the permanent email update; live delivery and signed production event receipts remain NOT_MEASURED until then.
+
 - [x] Lead capture, plan-interest and contact submissions now save through a validated server action and queue owner emails to matt@verdantgrowdiary.com. Contact and lead tests each produced a sent email receipt; only test submissions removed. 55 tests passed; ESLint 0 errors/1 warning; automatic build OK. Feedback excluded.
 - [ ] Automatic hosted delivery for owner submission alerts awaits owner publishing the new email handlers; no publish performed. Test emails were verified by explicitly processing the queue, not by claiming the undeployed scheduled endpoint worked.
 

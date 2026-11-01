@@ -3,8 +3,6 @@ project_id = "knkwiiywfkbqznbxwqfh"
 [functions]
   [functions.auth-email-hook]
     verify_jwt = false
-  [functions.process-email-queue]
-    verify_jwt = true
   [functions.rls-selftest]
     verify_jwt = false
   # AI Doctor is cost-bearing and user-scoped. Keep gateway JWT verification
@@ -85,16 +83,10 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # parsing any caller-controlled recipient/template fields. Gateway
   # verification stays off because opaque `sb_secret_...` keys are not JWTs.
   # Never call this function from browser code.
-  [functions.send-transactional-email]
-    verify_jwt = false
   # The preview, unsubscribe, and suppression handlers are invoked without a
   # Supabase user JWT (Go API / email clients) and verify their own caller
   # (LOVABLE_API_KEY, unsubscribe token, or HMAC signature) in the handler.
   [functions.preview-transactional-email]
-    verify_jwt = false
-  [functions.handle-email-unsubscribe]
-    verify_jwt = false
-  [functions.handle-email-suppression]
     verify_jwt = false
 
   # Explicit auth topology for every remaining committed function. These

@@ -1,3 +1,5 @@
+import { useServerFn } from "@tanstack/react-start";
+import { legacyUnsubscribe } from "@/lib/email/legacyUnsubscribe.functions";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
@@ -8,6 +10,7 @@ import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 type Status = "validating" | "ready" | "already" | "invalid" | "confirming" | "success" | "error";
 
 export default function Unsubscribe() {
+  const updatePreferences = useServerFn(legacyUnsubscribe);
   const [searchParams] = useSearchParams();
   const tokenRef = useRef(searchParams.get("token"));
   const token = tokenRef.current;
@@ -44,11 +47,7 @@ export default function Unsubscribe() {
         return;
       }
       try {
-        const response = await fetch(`/email/unsubscribe?token=${encodeURIComponent(token)}`);
-        const body = (await response.json()) as {
-          valid?: boolean;
-          reason?: string;
-        };
+        const body = await updatePreferences({ data: { token, confirm: false } });
         if (cancelled) return;
         if (body.valid) {
           setStatus("ready");
@@ -67,20 +66,14 @@ export default function Unsubscribe() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, updatePreferences]);
 
   async function confirmUnsubscribe() {
     if (!token) return;
     setStatus("confirming");
     setErrorMessage(null);
     try {
-      const response = await fetch("/email/unsubscribe", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      if (!response.ok) throw new Error("Unsubscribe failed");
-      const payload = (await response.json()) as { success?: boolean; reason?: string };
+      const payload = await updatePreferences({ data: { token, confirm: true } });
       if (payload.success) {
         setStatus("success");
       } else if (payload.reason === "already_unsubscribed") {

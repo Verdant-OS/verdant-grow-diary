@@ -4214,55 +4214,91 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_payment_receipts: {
+        Row: {
+          environment: string
+          payment_id: string
+          price_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          environment: string
+          payment_id: string
+          price_id: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          environment?: string
+          payment_id?: string
+          price_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
+          billing_provider: string
           cancel_at_period_end: boolean
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
           environment: string
           id: string
-          paddle_customer_id: string
-          paddle_subscription_id: string
+          paddle_customer_id: string | null
+          paddle_subscription_id: string | null
           price_id: string
           product_id: string
           scheduled_change_action: string | null
           scheduled_change_at: string | null
           status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          billing_provider?: string
           cancel_at_period_end?: boolean
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           environment?: string
           id?: string
-          paddle_customer_id: string
-          paddle_subscription_id: string
+          paddle_customer_id?: string | null
+          paddle_subscription_id?: string | null
           price_id: string
           product_id: string
           scheduled_change_action?: string | null
           scheduled_change_at?: string | null
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          billing_provider?: string
           cancel_at_period_end?: boolean
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           environment?: string
           id?: string
-          paddle_customer_id?: string
-          paddle_subscription_id?: string
+          paddle_customer_id?: string | null
+          paddle_subscription_id?: string | null
           price_id?: string
           product_id?: string
           scheduled_change_action?: string | null
           scheduled_change_at?: string | null
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -5379,6 +5415,16 @@ export type Database = {
         Returns: Json
       }
       signup_to_paid_operator_snapshot: { Args: never; Returns: Json }
+      stripe_record_credit_payment: {
+        Args: {
+          p_environment: string
+          p_payment_id: string
+          p_price_id: string
+          p_refunded?: boolean
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       verdant_normalize_search_text: {
         Args: { p_text: string }
         Returns: string

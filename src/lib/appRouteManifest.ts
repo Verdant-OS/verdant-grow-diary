@@ -117,7 +117,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/breeding/new", access: "auth", description: "Create a new breeding program." },
   { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
-  { path: "/checkout/stripe", access: "public", description: "Verified Stripe test purchase return." },
+  {
+    path: "/checkout/stripe",
+    access: "public",
+    description: "Verified Stripe test purchase return.",
+  },
   { path: "/checkout/success", access: "public", description: "Checkout success return." },
   { path: "/contact", access: "public", description: "Public support contact page." },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },

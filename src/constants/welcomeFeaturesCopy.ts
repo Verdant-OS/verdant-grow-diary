@@ -144,8 +144,7 @@ export const WELCOME_COPY = {
     },
   ],
   limitsHeading: "What Verdant does not do",
-  limitsIntro:
-    "The rules below are deliberate. They are the reason the diary stays trustworthy.",
+  limitsIntro: "The rules below are deliberate. They are the reason the diary stays trustworthy.",
   limits: [
     "Verdant does not control lights, fans, irrigation, humidifiers, or any other equipment.",
     "AI Doctor suggests; the grower decides. Action Queue items wait for your approval.",
@@ -205,8 +204,7 @@ export const FEATURES_COPY = {
     {
       id: "decisions",
       heading: "Decisions, not automation",
-      summary:
-        "Verdant is built to make your next call safer, not to make it for you.",
+      summary: "Verdant is built to make your next call safer, not to make it for you.",
       points: [
         "AI Doctor returns the same fields every time: summary, likely issue, confidence, evidence, missing information, what not to do, and a follow-up window.",
         "It does not claim certainty from one photo or one reading. Thin context produces low confidence and a named gap.",

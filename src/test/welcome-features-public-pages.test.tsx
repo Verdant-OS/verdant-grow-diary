@@ -112,9 +112,10 @@ describe("features page content", () => {
       FEATURES_COPY.groups.length,
     );
     expect(screen.getByTestId("feature-group-sensors")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Read the MCP API reference" }),
-    ).toHaveAttribute("href", "/docs/mcp-api");
+    expect(screen.getByRole("link", { name: "Read the MCP API reference" })).toHaveAttribute(
+      "href",
+      "/docs/mcp-api",
+    );
     expect(screen.getByRole("link", { name: "How AI Doctor works" })).toHaveAttribute(
       "href",
       "/how-ai-doctor-works",

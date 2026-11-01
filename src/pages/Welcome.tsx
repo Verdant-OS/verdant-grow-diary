@@ -82,10 +82,7 @@ export default function Welcome() {
             {WELCOME_COPY.freeToolsHeading}
           </h2>
           <p className="mt-3 text-base text-foreground/90">{WELCOME_COPY.freeToolsIntro}</p>
-          <ul
-            data-testid="welcome-free-tools"
-            className="mt-5 grid gap-4 sm:grid-cols-2 list-none"
-          >
+          <ul data-testid="welcome-free-tools" className="mt-5 grid gap-4 sm:grid-cols-2 list-none">
             {WELCOME_COPY.freeTools.map((tool) => (
               <li key={tool.href} className="rounded-lg border border-border/60 p-4">
                 <Link to={tool.href} className="font-semibold text-primary hover:underline">

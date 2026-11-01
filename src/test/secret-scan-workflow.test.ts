@@ -90,6 +90,7 @@ describe("secret-scan workflow", () => {
     expect(scan).toContain('--config "$POLICY_DIR/gitleaks.toml"');
     expect(scan).toContain('--baseline-path "$POLICY_DIR/baseline.json"');
     expect(scan).toContain('--gitleaks-ignore-path "$POLICY_DIR/.gitleaksignore"');
+    expect(scan).toContain("--ignore-gitleaks-allow");
     expect(scan).not.toMatch(/--config \.gitleaks\.toml|--baseline-path \.gitleaks-baseline/);
   });
 

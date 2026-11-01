@@ -23,6 +23,7 @@ import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FounderRouteImport } from './routes/founder'
 import { Route as GlossaryRouteImport } from './routes/glossary'
 import { Route as HardwareIntegrationsRouteImport } from './routes/hardware-integrations'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as HowAiDoctorWorksRouteImport } from './routes/how-ai-doctor-works'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PhenoComparisonRouteImport } from './routes/pheno-comparison'
@@ -46,9 +47,11 @@ import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as AppOperatorRouteImport } from './routes/_app/_operator'
 import { Route as AppActionQueueRouteImport } from './routes/_app/action-queue'
 import { Route as AppActionsRouteImport } from './routes/_app/actions'
+import { Route as AppAgentIntegrationsRouteImport } from './routes/_app/agent-integrations'
 import { Route as AppAiDoctorRouteImport } from './routes/_app/ai-doctor'
 import { Route as AppAlertsRouteImport } from './routes/_app/alerts'
 import { Route as AppBreedingRouteImport } from './routes/_app/breeding'
+import { Route as AppBreedingProgramsRouteImport } from './routes/_app/breeding-programs'
 import { Route as AppDailyCheckRouteImport } from './routes/_app/daily-check'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppDoctorRouteImport } from './routes/_app/doctor'
@@ -228,6 +231,11 @@ const HardwareIntegrationsRoute = HardwareIntegrationsRouteImport.update({
   path: '/hardware-integrations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HowAiDoctorWorksRoute = HowAiDoctorWorksRouteImport.update({
   id: '/how-ai-doctor-works',
   path: '/how-ai-doctor-works',
@@ -342,6 +350,11 @@ const AppActionsRoute = AppActionsRouteImport.update({
   path: '/actions',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAgentIntegrationsRoute = AppAgentIntegrationsRouteImport.update({
+  id: '/agent-integrations',
+  path: '/agent-integrations',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAiDoctorRoute = AppAiDoctorRouteImport.update({
   id: '/ai-doctor',
   path: '/ai-doctor',
@@ -355,6 +368,11 @@ const AppAlertsRoute = AppAlertsRouteImport.update({
 const AppBreedingRoute = AppBreedingRouteImport.update({
   id: '/breeding',
   path: '/breeding',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBreedingProgramsRoute = AppBreedingProgramsRouteImport.update({
+  id: '/breeding-programs',
+  path: '/breeding-programs',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDailyCheckRoute = AppDailyCheckRouteImport.update({
@@ -962,6 +980,7 @@ export interface FileRoutesByFullPath {
   '/founder': typeof FounderRoute
   '/glossary': typeof GlossaryRoute
   '/hardware-integrations': typeof HardwareIntegrationsRoute
+  '/help': typeof HelpRoute
   '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
   '/login': typeof LoginRoute
   '/pheno-comparison': typeof PhenoComparisonRoute
@@ -984,9 +1003,11 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
   '/actions': typeof AppActionsRoute
+  '/agent-integrations': typeof AppAgentIntegrationsRoute
   '/ai-doctor': typeof AppAiDoctorRoute
   '/alerts': typeof AppAlertsRoute
   '/breeding': typeof AppBreedingRoute
+  '/breeding-programs': typeof AppBreedingProgramsRoute
   '/daily-check': typeof AppDailyCheckRoute
   '/dashboard': typeof AppDashboardRoute
   '/doctor': typeof AppDoctorRoute
@@ -1111,6 +1132,7 @@ export interface FileRoutesByTo {
   '/founder': typeof FounderRoute
   '/glossary': typeof GlossaryRoute
   '/hardware-integrations': typeof HardwareIntegrationsRoute
+  '/help': typeof HelpRoute
   '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
   '/login': typeof LoginRoute
   '/pheno-comparison': typeof PhenoComparisonRoute
@@ -1133,9 +1155,11 @@ export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
   '/actions': typeof AppActionsRoute
+  '/agent-integrations': typeof AppAgentIntegrationsRoute
   '/ai-doctor': typeof AppAiDoctorRoute
   '/alerts': typeof AppAlertsRoute
   '/breeding': typeof AppBreedingRoute
+  '/breeding-programs': typeof AppBreedingProgramsRoute
   '/daily-check': typeof AppDailyCheckRoute
   '/dashboard': typeof AppDashboardRoute
   '/doctor': typeof AppDoctorRoute
@@ -1261,6 +1285,7 @@ export interface FileRoutesById {
   '/founder': typeof FounderRoute
   '/glossary': typeof GlossaryRoute
   '/hardware-integrations': typeof HardwareIntegrationsRoute
+  '/help': typeof HelpRoute
   '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
   '/login': typeof LoginRoute
   '/pheno-comparison': typeof PhenoComparisonRoute
@@ -1284,9 +1309,11 @@ export interface FileRoutesById {
   '/_app/_operator': typeof AppOperatorRouteWithChildren
   '/_app/action-queue': typeof AppActionQueueRoute
   '/_app/actions': typeof AppActionsRoute
+  '/_app/agent-integrations': typeof AppAgentIntegrationsRoute
   '/_app/ai-doctor': typeof AppAiDoctorRoute
   '/_app/alerts': typeof AppAlertsRoute
   '/_app/breeding': typeof AppBreedingRoute
+  '/_app/breeding-programs': typeof AppBreedingProgramsRoute
   '/_app/daily-check': typeof AppDailyCheckRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/doctor': typeof AppDoctorRoute
@@ -1413,6 +1440,7 @@ export interface FileRouteTypes {
     | '/founder'
     | '/glossary'
     | '/hardware-integrations'
+    | '/help'
     | '/how-ai-doctor-works'
     | '/login'
     | '/pheno-comparison'
@@ -1435,9 +1463,11 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/action-queue'
     | '/actions'
+    | '/agent-integrations'
     | '/ai-doctor'
     | '/alerts'
     | '/breeding'
+    | '/breeding-programs'
     | '/daily-check'
     | '/dashboard'
     | '/doctor'
@@ -1562,6 +1592,7 @@ export interface FileRouteTypes {
     | '/founder'
     | '/glossary'
     | '/hardware-integrations'
+    | '/help'
     | '/how-ai-doctor-works'
     | '/login'
     | '/pheno-comparison'
@@ -1584,9 +1615,11 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/action-queue'
     | '/actions'
+    | '/agent-integrations'
     | '/ai-doctor'
     | '/alerts'
     | '/breeding'
+    | '/breeding-programs'
     | '/daily-check'
     | '/dashboard'
     | '/doctor'
@@ -1711,6 +1744,7 @@ export interface FileRouteTypes {
     | '/founder'
     | '/glossary'
     | '/hardware-integrations'
+    | '/help'
     | '/how-ai-doctor-works'
     | '/login'
     | '/pheno-comparison'
@@ -1734,9 +1768,11 @@ export interface FileRouteTypes {
     | '/_app/_operator'
     | '/_app/action-queue'
     | '/_app/actions'
+    | '/_app/agent-integrations'
     | '/_app/ai-doctor'
     | '/_app/alerts'
     | '/_app/breeding'
+    | '/_app/breeding-programs'
     | '/_app/daily-check'
     | '/_app/dashboard'
     | '/_app/doctor'
@@ -1863,6 +1899,7 @@ export interface RootRouteChildren {
   FounderRoute: typeof FounderRoute
   GlossaryRoute: typeof GlossaryRoute
   HardwareIntegrationsRoute: typeof HardwareIntegrationsRoute
+  HelpRoute: typeof HelpRoute
   HowAiDoctorWorksRoute: typeof HowAiDoctorWorksRoute
   LoginRoute: typeof LoginRoute
   PhenoComparisonRoute: typeof PhenoComparisonRoute
@@ -2007,6 +2044,13 @@ declare module '@tanstack/react-router' {
       path: '/hardware-integrations'
       fullPath: '/hardware-integrations'
       preLoaderRoute: typeof HardwareIntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/how-ai-doctor-works': {
@@ -2170,6 +2214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppActionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/agent-integrations': {
+      id: '/_app/agent-integrations'
+      path: '/agent-integrations'
+      fullPath: '/agent-integrations'
+      preLoaderRoute: typeof AppAgentIntegrationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/ai-doctor': {
       id: '/_app/ai-doctor'
       path: '/ai-doctor'
@@ -2189,6 +2240,13 @@ declare module '@tanstack/react-router' {
       path: '/breeding'
       fullPath: '/breeding'
       preLoaderRoute: typeof AppBreedingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/breeding-programs': {
+      id: '/_app/breeding-programs'
+      path: '/breeding-programs'
+      fullPath: '/breeding-programs'
+      preLoaderRoute: typeof AppBreedingProgramsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/daily-check': {
@@ -3088,9 +3146,11 @@ interface AppRouteChildren {
   AppOperatorRoute: typeof AppOperatorRouteWithChildren
   AppActionQueueRoute: typeof AppActionQueueRoute
   AppActionsRoute: typeof AppActionsRoute
+  AppAgentIntegrationsRoute: typeof AppAgentIntegrationsRoute
   AppAiDoctorRoute: typeof AppAiDoctorRoute
   AppAlertsRoute: typeof AppAlertsRoute
   AppBreedingRoute: typeof AppBreedingRoute
+  AppBreedingProgramsRoute: typeof AppBreedingProgramsRoute
   AppDailyCheckRoute: typeof AppDailyCheckRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDoctorRoute: typeof AppDoctorRoute
@@ -3139,9 +3199,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppOperatorRoute: AppOperatorRouteWithChildren,
   AppActionQueueRoute: AppActionQueueRoute,
   AppActionsRoute: AppActionsRoute,
+  AppAgentIntegrationsRoute: AppAgentIntegrationsRoute,
   AppAiDoctorRoute: AppAiDoctorRoute,
   AppAlertsRoute: AppAlertsRoute,
   AppBreedingRoute: AppBreedingRoute,
+  AppBreedingProgramsRoute: AppBreedingProgramsRoute,
   AppDailyCheckRoute: AppDailyCheckRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDoctorRoute: AppDoctorRoute,
@@ -3204,6 +3266,7 @@ const rootRouteChildren: RootRouteChildren = {
   FounderRoute: FounderRoute,
   GlossaryRoute: GlossaryRoute,
   HardwareIntegrationsRoute: HardwareIntegrationsRoute,
+  HelpRoute: HelpRoute,
   HowAiDoctorWorksRoute: HowAiDoctorWorksRoute,
   LoginRoute: LoginRoute,
   PhenoComparisonRoute: PhenoComparisonRoute,

@@ -36,6 +36,7 @@ Disallow: /pheno-hunts
 Disallow: /reports
 Disallow: /diary
 Disallow: /settings
+Disallow: /agent-integrations
 Disallow: /account/preferences
 Disallow: /invite
 Disallow: /health
@@ -83,6 +84,7 @@ Disallow: /pheno-hunts
 Disallow: /reports
 Disallow: /diary
 Disallow: /settings
+Disallow: /agent-integrations
 Disallow: /account/preferences
 Disallow: /invite
 Disallow: /health
@@ -130,6 +132,7 @@ Disallow: /pheno-hunts
 Disallow: /reports
 Disallow: /diary
 Disallow: /settings
+Disallow: /agent-integrations
 Disallow: /account/preferences
 Disallow: /invite
 Disallow: /health

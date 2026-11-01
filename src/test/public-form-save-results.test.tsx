@@ -49,7 +49,8 @@ describe.each(cases)("$name save result", (form) => {
     fireEvent.submit(element);
     await waitFor(() => expect(mocks.insert).toHaveBeenCalledTimes(1));
     expect(mocks.from).toHaveBeenCalledWith(form.table);
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByTestId("subscriber-interest-success")).toBeNull();
+    expect(view.container.querySelector("form")).toBeInTheDocument();
     if (!finish) throw new Error("Missing pending insert");
     finish({ error: null });
     expect(await screen.findByRole("status")).toBeInTheDocument();

@@ -53,9 +53,12 @@ export default function LeadCaptureForm({
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
+    setSaveError(null);
     const parsed = leadSchema.safeParse({
       name,
       email,
@@ -64,10 +67,11 @@ export default function LeadCaptureForm({
       message,
     });
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Please check the form");
+      setSaveError(parsed.error.issues[0]?.message ?? "Please check the form");
       return;
     }
     setSubmitting(true);
+    try {
     const { error } = await supabase.from("leads").insert({
       name: parsed.data.name || null,
       email: parsed.data.email,
@@ -76,10 +80,12 @@ export default function LeadCaptureForm({
       message: parsed.data.message || null,
       source: "landing",
     });
-    setSubmitting(false);
-    if (error) {
-      toast.error("Could not submit. Please try again later.");
+    if (error) throw new Error("Lead save failed");
+    } catch {
+      setSaveError("We couldn't save your request. Your text is still here. Please try again.");
       return;
+    } finally {
+      setSubmitting(false);
     }
     setDone(true);
     toast.success("Thanks — we'll be in touch.");
@@ -87,10 +93,10 @@ export default function LeadCaptureForm({
 
   if (done) {
     return (
-      <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6 text-center">
+      <div role="status" aria-live="polite" className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6 text-center">
         <h3 className="font-display text-lg font-semibold">You're on the list</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          Thanks for reaching out. Verdant will follow up by email.
+          Your request has been saved for the Verdant team. Thank you for reaching out.
         </p>
       </div>
     );
@@ -161,6 +167,7 @@ export default function LeadCaptureForm({
           placeholder="Tell us about your grow or hardware integration."
         />
       </div>
+      {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
       <Button type="submit" disabled={submitting} size="lg" className="w-full md:w-auto">
         {submitting ? "Submitting…" : "Submit"}
       </Button>

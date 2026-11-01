@@ -45,7 +45,10 @@ describe('signed outcome persistence', () => {
   it('preserves bounce reason, normalized address and deduplicates using the event identity', async () => {
     await recordEmailEvent(event);
     expect(mocks.upsert).toHaveBeenNthCalledWith(1, { email: 'grower@example.test', reason: 'bounce', metadata: null }, { onConflict: 'email' });
-    expect(mocks.upsert).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: event.event_id, status: 'bounced', template_name: 'system', metadata: null }), { onConflict: 'id', ignoreDuplicates: true });
+    expect(mocks.upsert).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: expect.stringMatching(/^[a-f0-9]{8}-[a-f0-9]{4}-5[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/), status: 'bounced', template_name: 'system', metadata: null }), { onConflict: 'id', ignoreDuplicates: true });
+    const firstId = mocks.upsert.mock.calls[1][0].id;
+    await recordEmailEvent(event);
+    expect(mocks.upsert.mock.calls[3][0].id).toBe(firstId);
   });
   it('throws when outcome storage fails so the signed webhook retries', async () => {
     mocks.upsert.mockResolvedValueOnce({ error: { code: 'denied' } });

@@ -9,6 +9,7 @@ import {
 } from "@/lib/ahrefsAnalyticsLoader";
 import { loadGoogleAnalytics, setGoogleAnalyticsOptOut } from "@/lib/googleAnalyticsLoader";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
+import { syncPostHogWithConsent } from "@/lib/posthogClient";
 
 /**
  * Apply the browser-local consent decision to every site analytics provider.
@@ -19,6 +20,7 @@ export function applyAnalyticsConsentDecision(
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): boolean {
   if (isExcludedAnalyticsRoute(location.pathname)) {
+    syncPostHogWithConsent("denied", location);
     setGoogleAnalyticsOptOut(true);
     const tagWasPresent = isAhrefsAnalyticsLoaded();
     removeAhrefsAnalyticsScript();
@@ -27,6 +29,7 @@ export function applyAnalyticsConsentDecision(
   }
 
   const granted = decision === "granted";
+  syncPostHogWithConsent(granted ? "granted" : decision, location);
   setGoogleAnalyticsOptOut(!granted);
 
   if (granted) {

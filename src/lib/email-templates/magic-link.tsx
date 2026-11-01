@@ -1,5 +1,5 @@
-import * as React from 'react'
-import { main, container, h1, text, footer, button, darkModeCss } from './styles'
+import * as React from "react";
+import { main, container, h1, text, footer, button, darkModeCss } from "./styles";
 
 import {
   Body,
@@ -10,17 +10,14 @@ import {
   Html,
   Preview,
   Text,
-} from '@react-email/components'
+} from "@react-email/components";
 
 interface MagicLinkEmailProps {
-  siteName: string
-  confirmationUrl: string
+  siteName: string;
+  confirmationUrl: string;
 }
 
-export const MagicLinkEmail = ({
-  siteName,
-  confirmationUrl,
-}: MagicLinkEmailProps) => (
+export const MagicLinkEmail = ({ siteName, confirmationUrl }: MagicLinkEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head>
       <style>{darkModeCss}</style>
@@ -28,11 +25,12 @@ export const MagicLinkEmail = ({
     <Preview>Your login link for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Text style={{ ...text, color: h1.color, fontWeight: 'bold', margin: '0 0 24px' }}>Verdant Grow Diary</Text>
+        <Text style={{ ...text, color: h1.color, fontWeight: "bold", margin: "0 0 24px" }}>
+          Verdant Grow Diary
+        </Text>
         <Heading style={h1}>Your login link</Heading>
         <Text style={text}>
-          Click the button below to log in to {siteName}. This link will expire
-          shortly.
+          Click the button below to log in to {siteName}. This link will expire shortly.
         </Text>
         <Button className="dm-btn" style={button} href={confirmationUrl}>
           Log In
@@ -43,7 +41,6 @@ export const MagicLinkEmail = ({
       </Container>
     </Body>
   </Html>
-)
+);
 
-export default MagicLinkEmail
-
+export default MagicLinkEmail;

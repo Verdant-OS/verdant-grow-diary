@@ -32,20 +32,26 @@ import { fileURLToPath } from "node:url";
 // hand-synced; regenerate only via an explicit owner-approved path.
 export default defineConfig({
   vite: {
-    plugins: [{
-      name: "verdant-email-server-env",
-      config: (_config, { mode }) => {
-        // Server-only: never add these values to Vite's client define block.
-        const serverEnv = loadEnv(mode, process.cwd(), "");
-        for (const [key, value] of Object.entries(serverEnv)) {
-          if (process.env[key] === undefined) process.env[key] = value;
-        }
+    plugins: [
+      {
+        name: "verdant-email-server-env",
+        config: (_config, { mode }) => {
+          // Server-only: never add these values to Vite's client define block.
+          const serverEnv = loadEnv(mode, process.cwd(), "");
+          for (const [key, value] of Object.entries(serverEnv)) {
+            if (process.env[key] === undefined) process.env[key] = value;
+          }
+        },
       },
-    }],
+    ],
     resolve: {
       alias: {
-        "entities/lib/decode.js": fileURLToPath(new URL("./node_modules/entities/lib/decode.js", import.meta.url)),
-        "entities/lib/encode.js": fileURLToPath(new URL("./node_modules/entities/lib/encode.js", import.meta.url)),
+        "entities/lib/decode.js": fileURLToPath(
+          new URL("./node_modules/entities/lib/decode.js", import.meta.url),
+        ),
+        "entities/lib/encode.js": fileURLToPath(
+          new URL("./node_modules/entities/lib/encode.js", import.meta.url),
+        ),
         entities: fileURLToPath(new URL("./node_modules/entities", import.meta.url)),
       },
     },

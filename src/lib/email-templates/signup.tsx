@@ -1,5 +1,5 @@
-import * as React from 'react'
-import { main, container, h1, text, footer, button, darkModeCss, link } from './styles'
+import * as React from "react";
+import { main, container, h1, text, footer, button, darkModeCss, link } from "./styles";
 
 import {
   Body,
@@ -11,13 +11,13 @@ import {
   Link,
   Preview,
   Text,
-} from '@react-email/components'
+} from "@react-email/components";
 
 interface SignupEmailProps {
-  siteName: string
-  siteUrl: string
-  recipient: string
-  confirmationUrl: string
+  siteName: string;
+  siteUrl: string;
+  recipient: string;
+  confirmationUrl: string;
 }
 
 export const SignupEmail = ({
@@ -33,10 +33,12 @@ export const SignupEmail = ({
     <Preview>Confirm your email for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Text style={{ ...text, color: h1.color, fontWeight: 'bold', margin: '0 0 24px' }}>Verdant Grow Diary</Text>
+        <Text style={{ ...text, color: h1.color, fontWeight: "bold", margin: "0 0 24px" }}>
+          Verdant Grow Diary
+        </Text>
         <Heading style={h1}>Confirm your email</Heading>
         <Text style={text}>
-          Thanks for signing up for{' '}
+          Thanks for signing up for{" "}
           <Link href={siteUrl} style={link}>
             <strong>{siteName}</strong>
           </Link>
@@ -58,7 +60,6 @@ export const SignupEmail = ({
       </Container>
     </Body>
   </Html>
-)
+);
 
-export default SignupEmail
-
+export default SignupEmail;

@@ -389,6 +389,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.575.0",
     "next-themes": "^0.4.6",
+    "posthog-js": "1.444.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",

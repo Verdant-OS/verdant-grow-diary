@@ -43,11 +43,12 @@
 -- must be on that entry, on that owner's path, and present in
 -- storage.objects for this account. A '..' segment, another user's path,
 -- and an inferred link do not qualify. Signed-in members can SELECT
--- active badge_awards rows. A hidden or revoked row stays visible to
--- its owner and hidden from other members. Logged-out visitors (anon)
--- receive no award rows. Profile display is a later slice and is not
--- built here. Evidence SELECT stays owner-only, so evidence photos are
--- not granted to other accounts or to anon.
+-- active badge_awards rows only while badge_award_runtime.enabled is
+-- true. A hidden or revoked row stays visible to its owner and hidden
+-- from other members. Logged-out visitors (anon) receive no award rows.
+-- Profile display is a later slice and is not built here. Evidence
+-- SELECT stays owner-only, so evidence photos are not granted to other
+-- accounts or to anon.
 --
 -- Evidence can name a diary entry, tent, setup, or harvest. Only
 -- first_diary_entry has a qualification rule. The other keys are stored
@@ -154,13 +155,41 @@ CREATE POLICY badge_awards_owner_select
     AND COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
   );
 
--- Cut 001 (Matthew, 2026-10-11 03:41 CT): until community launch, signed-in
--- members can see other growers' active badges. Evidence and photos stay
+-- Member SELECT follows the server switch. Authenticated has no grant on
+-- badge_award_runtime, so the policy cannot read that row itself.
+CREATE OR REPLACE FUNCTION public.badge_award_runtime_enabled()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT COALESCE(
+    (
+      SELECT runtime.enabled
+      FROM public.badge_award_runtime AS runtime
+      WHERE runtime.id = 1
+    ),
+    false
+  );
+$function$;
+
+REVOKE ALL ON FUNCTION public.badge_award_runtime_enabled()
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.badge_award_runtime_enabled() TO authenticated;
+
+COMMENT ON FUNCTION public.badge_award_runtime_enabled() IS
+  'True only when badge_award_runtime.enabled is exactly true. Member SELECT uses this so one signed-in member cannot read another grower''s awards while the switch is off.';
+
+-- Cut 001 (Matthew, 2026-10-11 03:41 CT): while the server switch is on,
+-- signed-in members can see other growers' active badges. The switch
+-- defaults to false, and this policy follows it. Evidence and photos stay
 -- owner-only. Logged-out visitors (anon) never see awards.
 CREATE POLICY badge_awards_member_select ON public.badge_awards
   FOR SELECT TO authenticated
   USING (
-    COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+    public.badge_award_runtime_enabled()
+    AND COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
     AND hidden_at IS NULL
     AND revoked_at IS NULL
   );
@@ -339,8 +368,8 @@ DECLARE
   was_hidden boolean;
   revoked_at timestamptz;
 BEGIN
-  -- Fast path only. The write barrier is the FOR UPDATE recheck after the
-  -- advisory lock, immediately before any award or evidence mutation.
+  -- Fast path only. The write barrier is the recheck after the advisory
+  -- lock, immediately before any award or evidence mutation.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
@@ -436,15 +465,26 @@ BEGIN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
   END IF;
 
-  -- Recheck under a row lock after the advisory lock and immediately before
-  -- any award or evidence write, so a committed enabled = false is a write
-  -- barrier. This lock stays after the advisory wait: taking it earlier
-  -- deadlocks a concurrent disable that is waiting to commit.
-  SELECT runtime.enabled
-    INTO runtime_enabled
-  FROM public.badge_award_runtime AS runtime
-  WHERE runtime.id = 1
-  FOR UPDATE;
+  -- Recheck after the advisory lock and immediately before any award or
+  -- evidence write, so a committed enabled = false is a write barrier.
+  -- A client call locks the row until that transaction commits. Taking the
+  -- row lock earlier deadlocks a concurrent disable that is waiting to
+  -- commit. The reconcile sweep sets badge_awards.in_reconcile and takes a
+  -- plain read: a row lock acquired inside its per-owner subtransaction
+  -- would stay held by the outer transaction and block the next owner's
+  -- advisory wait.
+  IF coalesce(current_setting('badge_awards.in_reconcile', true), '') = '1' THEN
+    SELECT runtime.enabled
+      INTO runtime_enabled
+    FROM public.badge_award_runtime AS runtime
+    WHERE runtime.id = 1;
+  ELSE
+    SELECT runtime.enabled
+      INTO runtime_enabled
+    FROM public.badge_award_runtime AS runtime
+    WHERE runtime.id = 1
+    FOR UPDATE;
+  END IF;
 
   IF runtime_enabled IS NOT TRUE THEN
     RETURN jsonb_build_object('status', 'disabled');
@@ -545,7 +585,10 @@ COMMENT ON FUNCTION public.badge_awards_evaluate_owner(text) IS
 -- stores the last visited id in reconcile_after. The next call continues
 -- after that id. A short or empty batch clears the cursor. Each owner runs
 -- in its own BEGIN block. WHEN OTHERS logs that owner and continues, so one
--- error does not abort the batch and does not stop the cursor.
+-- error does not abort the batch and does not stop the cursor. The owner
+-- JWT copies auth.users.is_anonymous, so an anonymous account takes the
+-- same not_authenticated path as a direct evaluate. The sweep does not
+-- hold the runtime row lock across that call.
 CREATE OR REPLACE FUNCTION public.badge_awards_reconcile()
 RETURNS integer
 LANGUAGE plpgsql
@@ -556,6 +599,7 @@ DECLARE
   runtime_enabled boolean;
   cursor_after uuid;
   owner uuid;
+  owner_anonymous boolean := false;
   last_owner uuid;
   reconciled integer := 0;
   visited integer := 0;
@@ -598,9 +642,29 @@ BEGIN
       EXIT;
     END IF;
 
+    -- to_jsonb reads is_anonymous when auth.users has that column. A missing
+    -- key stays false here; GoTrue stores true for an anonymous account.
+    SELECT COALESCE((to_jsonb(account) ->> 'is_anonymous')::boolean, false)
+      INTO owner_anonymous
+    FROM auth.users AS account
+    WHERE account.id = owner;
+    IF NOT FOUND THEN
+      owner_anonymous := false;
+    END IF;
+
     BEGIN
+      PERFORM set_config('badge_awards.in_reconcile', '1', true);
       PERFORM set_config('request.jwt.claim.sub', owner::text, true);
-      PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
+      PERFORM set_config(
+        'request.jwt.claim',
+        json_build_object('sub', owner, 'is_anonymous', owner_anonymous)::text,
+        true
+      );
+      PERFORM set_config(
+        'request.jwt.claims',
+        json_build_object('sub', owner, 'is_anonymous', owner_anonymous)::text,
+        true
+      );
       PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
       reconciled := reconciled + 1;
     EXCEPTION WHEN OTHERS THEN
@@ -610,7 +674,9 @@ BEGIN
     last_owner := owner;
   END LOOP;
 
+  PERFORM set_config('badge_awards.in_reconcile', '', true);
   PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claim', '', true);
   PERFORM set_config('request.jwt.claims', '{}', true);
 
   -- Same write barrier as the evaluator. Skip the cursor update when the

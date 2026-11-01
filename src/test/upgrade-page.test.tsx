@@ -264,7 +264,7 @@ describe("Upgrade page", () => {
     expect(allAnswers).toMatch(/does not control/);
     expect(allAnswers).toMatch(/runs your grow for you/);
     expect(allAnswers).toMatch(/grower-approved/);
-    expect(allAnswers).toMatch(/paddle/);
+    expect(allAnswers).toMatch(/stripe/);
     expect(allAnswers).toMatch(/current plan and price/);
     expect(allAnswers).not.toMatch(/provisional|placeholder|being finalized/);
     expect(allAnswers).not.toMatch(/founder/);

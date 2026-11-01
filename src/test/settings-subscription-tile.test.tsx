@@ -159,6 +159,7 @@ describe("Settings — Subscription tile (Stripe test purchase)", () => {
   });
 });
 
+describe("Settings — Subscription tile", () => {
   it("renders Free plan and Upgrade CTA", () => {
     entitlementMock.displayPlanId = "free";
     renderPage();

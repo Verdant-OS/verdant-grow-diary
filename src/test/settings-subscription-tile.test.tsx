@@ -124,7 +124,41 @@ function renderPage() {
   );
 }
 
-describe("Settings — Subscription tile", () => {
+describe("Settings — Subscription tile (Stripe test purchase)", () => {
+  it("saved Stripe test subscription switches portal copy and Manage to the Stripe customer portal", async () => {
+    entitlementMock.displayPlanId = "pro_monthly";
+    entitlementMock.savedStripeTestSubscription = {
+      displayPlanId: "pro_monthly",
+      status: "active",
+      isActive: true,
+    };
+    renderPage();
+    expect(document.body.textContent).toMatch(/Stripe\s+customer portal/i);
+    expect(document.body.textContent).not.toMatch(/Paddle\s+customer portal/i);
+    fireEvent.click(screen.getByTestId("settings-subscription-manage"));
+    await waitFor(() => expect(stripePortalMock.open).toHaveBeenCalledTimes(1));
+    expect(portalMock.invoke).not.toHaveBeenCalled();
+  });
+
+  it("Stripe portal failure surfaces the error and never falls back to Paddle", async () => {
+    stripePortalMock.open.mockResolvedValue({ ok: false, error: "No Stripe subscription found on this account." });
+    stripePortalMock.state.error = "No Stripe subscription found on this account.";
+    entitlementMock.displayPlanId = "craft_annual";
+    entitlementMock.savedStripeTestSubscription = {
+      displayPlanId: "craft_annual",
+      status: "active",
+      isActive: true,
+    };
+    renderPage();
+    fireEvent.click(screen.getByTestId("settings-subscription-manage"));
+    await waitFor(() => expect(stripePortalMock.open).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("settings-subscription-portal-error").textContent).toMatch(
+      /No Stripe subscription found/i,
+    );
+    expect(portalMock.invoke).not.toHaveBeenCalled();
+  });
+});
+
   it("renders Free plan and Upgrade CTA", () => {
     entitlementMock.displayPlanId = "free";
     renderPage();

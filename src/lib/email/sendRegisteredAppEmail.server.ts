@@ -37,11 +37,18 @@ export async function sendRegisteredAppEmail(request: Request): Promise<Response
   let messageId: string;
   let templateData: Record<string, unknown> = {};
   try {
-    const body = z.object({
-      templateName: z.literal("owner-submission"),
-      idempotencyKey: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_-]+$/),
-      templateData: z.record(z.string(), z.unknown()),
-    }).strict().parse(await request.json());
+    const body = z
+      .object({
+        templateName: z.literal("owner-submission"),
+        idempotencyKey: z
+          .string()
+          .min(1)
+          .max(200)
+          .regex(/^[a-zA-Z0-9_-]+$/),
+        templateData: z.record(z.string(), z.unknown()),
+      })
+      .strict()
+      .parse(await request.json());
     templateName = body.templateName;
     recipientEmail = "";
     messageId = crypto.randomUUID();

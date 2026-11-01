@@ -13,7 +13,7 @@ export const legacyUnsubscribe = createServerFn({ method: 'POST' })
     const { setEmailUnsubscribe } = await import('@lovable.dev/email-js');
     const apiKey = process.env['LOVABLE_API_KEY'];
     if (!apiKey) throw new Error('Email preferences unavailable');
-    await setEmailUnsubscribe({ recipient: record.email, domain: 'notify.verdantgrowdiary.com', subscribed: false }, { apiKey, sendUrl: process.env['LOVABLE_SEND_URL'] });
+    await setEmailUnsubscribe({ recipient: record.email, domain: 'notify.verdantgrowdiary.com', subscribed: false }, { apiKey });
     const { error: updateError } = await db.from('email_unsubscribe_tokens').update({ used_at: new Date().toISOString() }).eq('token', data.token).is('used_at', null);
     if (updateError) throw new Error('Email preferences unavailable');
     return { success: true };

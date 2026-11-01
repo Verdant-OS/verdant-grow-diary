@@ -199,6 +199,18 @@ export function harness() {
     });
     const requireFixture = (name: string) => {
       if (name === "npm:@supabase/supabase-js@2") return { createClient: () => client };
+      if (name === "npm:react@18.3.1") return { createElement: (_component: unknown, props: Row) => props };
+      if (name === "npm:@react-email/components@0.0.22") return { renderAsync: async () => "fixture email" };
+      if (name === "npm:@lovable.dev/email-js@0.6.0") return {
+        EmailAPIError: class extends Error {},
+        sendLovableEmail: async (request: Row) => {
+          emails.push({ recipientEmail: request.to, idempotencyKey: request.idempotency_key,
+            templateData: { amountFormatted: "9.00 USD", orderId: "txn_fixture" } });
+        },
+      };
+      if (name === "../_shared/transactional-email-templates/order-confirmation.tsx") return {
+        template: { component: () => null, subject: () => "Order confirmed" },
+      };
       if (name === "npm:@paddle/paddle-node-sdk")
         return { Paddle: FixturePaddle, Environment: {}, EventName: {} };
       if (!name.startsWith(".")) throw new Error(`Unexpected external import: ${name}`);

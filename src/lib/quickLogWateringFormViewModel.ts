@@ -326,7 +326,7 @@ export function wateringFormReasonToHelper(reason: WateringFormFailureReason | s
     case "manual_observation:invalid":
       return "Choose one of the available manual observation labels.";
     case "temperature_out_of_range":
-      return "Temperature must be between -10 and 60 °C.";
+      return "Temperature must be between 14 and 140 °F (-10 to 60 °C).";
     case "humidity_out_of_range":
       return "Humidity must be between 0 and 100%.";
     case "vpd_out_of_range":

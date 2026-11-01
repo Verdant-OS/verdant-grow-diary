@@ -17,7 +17,11 @@ const entitlementMock = vi.hoisted(() => ({
   loading: false as boolean,
   lookupFailed: false as boolean,
   displayPlanId: "free" as string | null,
-  savedStripeTestSubscription: null as null | { displayPlanId: string; status: string; isActive: boolean },
+  savedStripeTestSubscription: null as null | {
+    displayPlanId: string;
+    status: string;
+    isActive: boolean;
+  },
   refetch: vi.fn(async () => undefined),
 }));
 
@@ -141,7 +145,10 @@ describe("Settings — Subscription tile (Stripe test purchase)", () => {
   });
 
   it("Stripe portal failure surfaces the error and never falls back to Paddle", async () => {
-    stripePortalMock.open.mockResolvedValue({ ok: false, error: "No Stripe subscription found on this account." });
+    stripePortalMock.open.mockResolvedValue({
+      ok: false,
+      error: "No Stripe subscription found on this account.",
+    });
     stripePortalMock.state.error = "No Stripe subscription found on this account.";
     entitlementMock.displayPlanId = "craft_annual";
     entitlementMock.savedStripeTestSubscription = {

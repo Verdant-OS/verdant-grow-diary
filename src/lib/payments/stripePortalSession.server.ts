@@ -15,12 +15,24 @@ export type StripePortalSessionResult = { url: string } | { error: string };
 interface SubscriptionLookup {
   from(table: "subscriptions"): {
     select(columns: string): {
-      eq(column: string, value: string): {
-        eq(column: string, value: string): {
-          eq(column: string, value: string): {
-            order(column: string, options: { ascending: boolean }): {
+      eq(
+        column: string,
+        value: string,
+      ): {
+        eq(
+          column: string,
+          value: string,
+        ): {
+          eq(
+            column: string,
+            value: string,
+          ): {
+            order(
+              column: string,
+              options: { ascending: boolean },
+            ): {
               limit(count: number): {
-            maybeSingle(): PromiseLike<{
+                maybeSingle(): PromiseLike<{
                   data: { stripe_customer_id: string | null } | null;
                   error: { message: string } | null;
                 }>;

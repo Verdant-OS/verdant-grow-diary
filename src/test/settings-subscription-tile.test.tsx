@@ -85,11 +85,18 @@ beforeEach(() => {
   entitlementMock.loading = false;
   entitlementMock.lookupFailed = false;
   entitlementMock.displayPlanId = "free";
+  entitlementMock.savedStripeTestSubscription = null;
   entitlementMock.refetch.mockClear();
   cancelNoticeMock.visible = false;
   cancelNoticeMock.accessUntilIso = null;
   cancelNoticeMock.accessUntilLabel = "";
   cancelNoticeMock.reason = null;
+
+  stripePortalMock.open.mockReset();
+  stripePortalMock.open.mockResolvedValue({ ok: true, error: undefined });
+  stripePortalMock.clearError.mockReset();
+  stripePortalMock.state.opening = false;
+  stripePortalMock.state.error = null;
 
   portalMock.invoke.mockReset();
   portalMock.invoke.mockResolvedValue({

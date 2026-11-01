@@ -266,4 +266,92 @@ describe("secret-scan workflow", () => {
       }),
     ).toThrow();
   });
+
+  describe("inline allow marker guard (Reviewer D P2 at 289819fb)", () => {
+    // Built at runtime so this file never carries the literal marker.
+    const MARKER = ["gitleaks", "allow"].join(":");
+    const scan = () => step("Scan commits");
+    // Runs the real Scan commits step with a stub gitleaks that always passes,
+    // so only the marker guard can fail it.
+    const runGuard = (cwd: string, range: string) => {
+      const bin = mkdtempSync(join(tmpdir(), "stub-gitleaks-"));
+      dirs.push(bin);
+      writeFileSync(join(bin, "gitleaks"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+      return execFileSync("bash", ["-c", scan().run], {
+        cwd,
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ""}`,
+          RANGE: range,
+          POLICY_DIR: bin,
+        },
+        stdio: "pipe",
+      });
+    };
+    const commit = (dir: string, file: string, body: string) => {
+      writeFileSync(join(dir, file), body);
+      git(dir, "add", ".");
+      git(dir, "commit", "-qm", file);
+    };
+
+    it("guards inside Scan commits, before gitleaks runs, without the literal marker", () => {
+      const run = scan().run;
+      expect(run.indexOf("gitleaks[:]allow")).toBeGreaterThan(-1);
+      expect(run.indexOf("gitleaks[:]allow")).toBeLessThan(run.indexOf("gitleaks git "));
+      expect(run).toContain("--diff-merges=remerge --format= ${RANGE}");
+      expect(run).not.toContain(MARKER);
+    });
+
+    it("the stubbed scan passes a clean range (the stub is not hiding failures)", () => {
+      const dir = fixture();
+      const base = git(dir, "rev-parse", "HEAD");
+      commit(dir, "ok.txt", "fine\n");
+      expect(() => runGuard(dir, `${base}..HEAD`)).not.toThrow();
+    });
+
+    it("fails when an added line carries the marker", () => {
+      const dir = fixture();
+      const base = git(dir, "rev-parse", "HEAD");
+      commit(dir, "leak.txt", `token = "not-a-real-value" # ${MARKER}\n`);
+      expect(() => runGuard(dir, `${base}..HEAD`)).toThrow();
+    });
+
+    it("passes a clean range and a marker that only exists before the range", () => {
+      const dir = fixture();
+      commit(dir, "old.txt", `legacy # ${MARKER}\n`);
+      const base = git(dir, "rev-parse", "HEAD");
+      commit(dir, "clean.txt", "nothing to see\n");
+      expect(() => runGuard(dir, `${base}..HEAD`)).not.toThrow();
+    });
+
+    it("fails when the marker is added only while resolving a merge", () => {
+      const dir = fixture();
+      git(dir, "checkout", "-qb", "feature");
+      commit(dir, "f.txt", "feature\n");
+      git(dir, "checkout", "-q", "verdant-grow-diary");
+      commit(dir, "b.txt", "base2\n");
+      const base = git(dir, "rev-parse", "HEAD");
+      git(dir, "checkout", "-q", "feature");
+      git(dir, "merge", "-q", "--no-commit", "verdant-grow-diary");
+      writeFileSync(join(dir, "merge-only.txt"), `x # ${MARKER}\n`);
+      git(dir, "add", ".");
+      git(dir, "commit", "-qm", "merge");
+      expect(() => runGuard(dir, `${base}..HEAD`)).toThrow();
+    });
+
+    it("a marker present in base is not re-reported by a later merge", () => {
+      const dir = fixture();
+      git(dir, "checkout", "-qb", "feature");
+      commit(dir, "f.txt", "feature\n");
+      git(dir, "checkout", "-q", "verdant-grow-diary");
+      const base = git(dir, "rev-parse", "HEAD");
+      commit(dir, "b.txt", `base-owned # ${MARKER}\n`);
+      const baseTip = git(dir, "rev-parse", "HEAD");
+      git(dir, "checkout", "-q", "feature");
+      git(dir, "merge", "-q", "--no-edit", "verdant-grow-diary");
+      // Feature-side range: base's own commit is excluded, the clean merge adds nothing.
+      expect(() => runGuard(dir, `${baseTip}..HEAD`)).not.toThrow();
+      expect(base).not.toBe(baseTip);
+    });
+  });
 });

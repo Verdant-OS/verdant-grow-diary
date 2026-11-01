@@ -118,7 +118,7 @@ describe("static wiring — the gates are actually read at the creation seams", 
   it("Grows.tsx evaluates the grow gate, guards create(), and gates the CTA", () => {
     expect(GROWS).toMatch(/evaluateGrowCreationGate\(/);
     expect(GROWS).toMatch(/if \(!growGate\.allowed\)/);
-    expect(GROWS).toMatch(/disabled=\{!growGate\.allowed \|\| createOutcomeUnknown\}/);
+    expect(GROWS).toMatch(/disabled=\{createOutcomeUnknown\}/);
     expect(GROWS).toMatch(/grow-create-gate-notice/);
   });
 

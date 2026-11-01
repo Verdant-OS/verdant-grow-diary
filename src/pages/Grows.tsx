@@ -56,6 +56,7 @@ export default function Grows() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const createInFlightRef = useRef(false);
+  const gateNoticeRef = useRef<HTMLParagraphElement>(null);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
   });
@@ -85,6 +86,20 @@ export default function Grows() {
     outcomeUnknown: createOutcomeUnknown,
     name: form.name,
   });
+
+  function requestNewGrow() {
+    if (createOutcomeUnknown) return;
+    if (!growGate.allowed) {
+      if (growGate.blockedCopy) toast.error(growGate.blockedCopy);
+      const notice = gateNoticeRef.current;
+      notice?.focus();
+      if (notice && typeof notice.scrollIntoView === "function") {
+        notice.scrollIntoView({ block: "nearest" });
+      }
+      return;
+    }
+    handleOpenChange(true);
+  }
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -230,10 +245,10 @@ export default function Grows() {
         icon={<Sprout className="size-5" />}
         actions={
           <Button
-            onClick={() => handleOpenChange(true)}
+            onClick={requestNewGrow}
             size="sm"
             className="w-full gradient-leaf text-primary-foreground sm:w-auto"
-            disabled={!growGate.allowed || createOutcomeUnknown}
+            disabled={createOutcomeUnknown}
             data-testid="grows-new-button"
           >
             <Plus data-icon="inline-start" />
@@ -244,6 +259,8 @@ export default function Grows() {
 
       {!growGate.allowed && (
         <p
+          ref={gateNoticeRef}
+          tabIndex={-1}
           className="mb-4 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
           data-testid="grow-create-gate-notice"
         >

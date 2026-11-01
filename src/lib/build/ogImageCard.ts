@@ -47,6 +47,7 @@ export function categoryForPath(path: string): string {
   if (path === "/") return "Grow OS";
   if (path === "/pricing") return "Pricing";
   if (path === "/welcome") return "Grow OS";
+  if (path === "/features") return "Features";
   if (path.startsWith("/guides/")) return "Grower Guide";
   if (path === "/guides") return "Guides";
   if (path.startsWith("/cultivars/")) return "Cultivar Guide";

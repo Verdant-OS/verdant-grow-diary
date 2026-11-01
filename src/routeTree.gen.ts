@@ -76,6 +76,7 @@ import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CultivarsIndexRouteImport } from './routes/cultivars.index'
 import { Route as CultivarsSlugRouteImport } from './routes/cultivars.$slug'
 import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
+import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesAthenaFeedChartLogRouteImport } from './routes/guides.athena-feed-chart-log'
@@ -115,6 +116,7 @@ import { Route as AppSettingsAgentIntegrationsRouteImport } from './routes/_app/
 import { Route as AppSettingsAnalyticsRouteImport } from './routes/_app/settings_.analytics'
 import { Route as AppTentsIdRouteImport } from './routes/_app/tents_.$id'
 import { Route as CustomerGuideOreozVsGelonadeComparisonRouteImport } from './routes/customer.guide.oreoz-vs-gelonade-comparison'
+import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$id.compare'
 import { Route as PhenoHuntsIdShowcaseRouteImport } from './routes/pheno-hunts.$id.showcase'
 import { Route as AppOperatorAdminLeadsRouteImport } from './routes/_app/_operator/admin.leads'
@@ -161,6 +163,8 @@ import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/publi
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
+import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
+import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as AppGeneticsHealthKindIdRouteImport } from './routes/_app/genetics.health.$kind.$id'
 import { Route as AppGeneticsTraceKindIdRouteImport } from './routes/_app/genetics.trace.$kind.$id'
 
@@ -497,6 +501,11 @@ const DocsMcpApiRoute = DocsMcpApiRouteImport.update({
   path: '/docs/mcp-api',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
+  id: '/email/unsubscribe',
+  path: '/email/unsubscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuidesIndexRoute = GuidesIndexRouteImport.update({
   id: '/guides/',
   path: '/guides/',
@@ -705,6 +714,11 @@ const CustomerGuideOreozVsGelonadeComparisonRoute =
     path: '/customer/guide/oreoz-vs-gelonade-comparison',
     getParentRoute: () => rootRouteImport,
   } as any)
+const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
+  id: '/lovable/email/suppression',
+  path: '/lovable/email/suppression',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PhenoHuntsIdCompareRoute = PhenoHuntsIdCompareRouteImport.update({
   id: '/pheno-hunts/$id/compare',
   path: '/pheno-hunts/$id/compare',
@@ -969,6 +983,18 @@ const LovableEmailQueueProcessRoute =
     path: '/lovable/email/queue/process',
     getParentRoute: () => rootRouteImport,
   } as any)
+const LovableEmailTransactionalPreviewRoute =
+  LovableEmailTransactionalPreviewRouteImport.update({
+    id: '/lovable/email/transactional/preview',
+    path: '/lovable/email/transactional/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LovableEmailTransactionalSendRoute =
+  LovableEmailTransactionalSendRouteImport.update({
+    id: '/lovable/email/transactional/send',
+    path: '/lovable/email/transactional/send',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppGeneticsHealthKindIdRoute = AppGeneticsHealthKindIdRouteImport.update({
   id: '/health/$kind/$id',
   path: '/health/$kind/$id',
@@ -1045,6 +1071,7 @@ export interface FileRoutesByFullPath {
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
+  '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
@@ -1084,6 +1111,7 @@ export interface FileRoutesByFullPath {
   '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/genetics/': typeof AppGeneticsIndexRoute
@@ -1131,6 +1159,8 @@ export interface FileRoutesByFullPath {
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1198,6 +1228,7 @@ export interface FileRoutesByTo {
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
+  '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
@@ -1237,6 +1268,7 @@ export interface FileRoutesByTo {
   '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/genetics': typeof AppGeneticsIndexRoute
@@ -1284,6 +1316,8 @@ export interface FileRoutesByTo {
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1355,6 +1389,7 @@ export interface FileRoutesById {
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
+  '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
@@ -1394,6 +1429,7 @@ export interface FileRoutesById {
   '/_app/settings_/analytics': typeof AppSettingsAnalyticsRoute
   '/_app/tents_/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/_app/genetics/': typeof AppGeneticsIndexRoute
@@ -1441,6 +1477,8 @@ export interface FileRoutesById {
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/_app/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/_app/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1511,6 +1549,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
+    | '/email/unsubscribe'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
@@ -1550,6 +1589,7 @@ export interface FileRouteTypes {
     | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
+    | '/lovable/email/suppression'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
     | '/genetics/'
@@ -1597,6 +1637,8 @@ export interface FileRouteTypes {
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
     | '/lovable/email/queue/process'
+    | '/lovable/email/transactional/preview'
+    | '/lovable/email/transactional/send'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -1664,6 +1706,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
+    | '/email/unsubscribe'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
@@ -1703,6 +1746,7 @@ export interface FileRouteTypes {
     | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
+    | '/lovable/email/suppression'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
     | '/genetics'
@@ -1750,6 +1794,8 @@ export interface FileRouteTypes {
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
     | '/lovable/email/queue/process'
+    | '/lovable/email/transactional/preview'
+    | '/lovable/email/transactional/send'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   id:
@@ -1820,6 +1866,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
+    | '/email/unsubscribe'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
     | '/guides/grow-stage-care-guide'
@@ -1859,6 +1906,7 @@ export interface FileRouteTypes {
     | '/_app/settings_/analytics'
     | '/_app/tents_/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
+    | '/lovable/email/suppression'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
     | '/_app/genetics/'
@@ -1906,6 +1954,8 @@ export interface FileRouteTypes {
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
     | '/lovable/email/queue/process'
+    | '/lovable/email/transactional/preview'
+    | '/lovable/email/transactional/send'
     | '/_app/genetics/health/$kind/$id'
     | '/_app/genetics/trace/$kind/$id'
   fileRoutesById: FileRoutesById
@@ -1951,6 +2001,7 @@ export interface RootRouteChildren {
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
   CultivarsSlugRoute: typeof CultivarsSlugRoute
   DocsMcpApiRoute: typeof DocsMcpApiRoute
+  EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesAthenaFeedChartLogRoute: typeof GuidesAthenaFeedChartLogRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
@@ -1968,12 +2019,15 @@ export interface RootRouteChildren {
   StrainsIndexRoute: typeof StrainsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute
   PhenoHuntsIdShowcaseRoute: typeof PhenoHuntsIdShowcaseRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
+  LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
+  LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2447,6 +2501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsMcpApiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/email/unsubscribe': {
+      id: '/email/unsubscribe'
+      path: '/email/unsubscribe'
+      fullPath: '/email/unsubscribe'
+      preLoaderRoute: typeof EmailUnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guides/': {
       id: '/guides/'
       path: '/guides'
@@ -2718,6 +2779,13 @@ declare module '@tanstack/react-router' {
       path: '/customer/guide/oreoz-vs-gelonade-comparison'
       fullPath: '/customer/guide/oreoz-vs-gelonade-comparison'
       preLoaderRoute: typeof CustomerGuideOreozVsGelonadeComparisonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lovable/email/suppression': {
+      id: '/lovable/email/suppression'
+      path: '/lovable/email/suppression'
+      fullPath: '/lovable/email/suppression'
+      preLoaderRoute: typeof LovableEmailSuppressionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pheno-hunts/$id/compare': {
@@ -3042,6 +3110,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lovable/email/transactional/preview': {
+      id: '/lovable/email/transactional/preview'
+      path: '/lovable/email/transactional/preview'
+      fullPath: '/lovable/email/transactional/preview'
+      preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lovable/email/transactional/send': {
+      id: '/lovable/email/transactional/send'
+      path: '/lovable/email/transactional/send'
+      fullPath: '/lovable/email/transactional/send'
+      preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/genetics/health/$kind/$id': {
       id: '/_app/genetics/health/$kind/$id'
       path: '/health/$kind/$id'
@@ -3332,6 +3414,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutSuccessRoute: CheckoutSuccessRoute,
   CultivarsSlugRoute: CultivarsSlugRoute,
   DocsMcpApiRoute: DocsMcpApiRoute,
+  EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesAthenaFeedChartLogRoute: GuidesAthenaFeedChartLogRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
@@ -3351,12 +3434,15 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   CustomerGuideOreozVsGelonadeComparisonRoute:
     CustomerGuideOreozVsGelonadeComparisonRoute,
+  LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   PhenoHuntsIdCompareRoute: PhenoHuntsIdCompareRoute,
   PhenoHuntsIdShowcaseRoute: PhenoHuntsIdShowcaseRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
+  LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
+  LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -8,4 +8,5 @@
 - [ ] Complete an end-to-end test purchase: Stripe form opens, but two submitted fake-card attempts stayed open/unpaid. Owner manual test needed; no paid unlock claimed. 60 focused tests passed, automatic build/typecheck OK. Live readiness check remains outstanding.
 - [x] Scaffold six branded authentication email templates and secure managed routes; sender domain verified.
 - [ ] Authentication email delivery on the published site awaits owner release approval and a delivery test.
-- [ ] Verify matching Stripe test-plan confirmation with bounded settlement retries and owner-scoped readback; preserve test/live isolation.
+- [x] Add bounded Stripe settlement retries, exact subscription/customer/plan matching, and owner-scoped saved-access readback. 46 targeted tests passed; test/live isolation retained.
+- [ ] Verify settled test purchase through the UI: signed-in browser navigation timed out; previous two card attempts stayed unpaid, so owner manual purchase remains required.

@@ -125,6 +125,28 @@ export const createStripeCheckout = createServerFn({ method: "POST" })
       return { error: getStripeErrorMessage(error) };
     }
   });
+export const createStripePortalSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ environment: environmentSchema, origin: z.string().url() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    if (stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN) !== data.environment)
+      return { error: "Payment environment mismatch" };
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    const requestOrigin = request.headers.get("origin") ?? new URL(request.url).origin;
+    const { isAllowedCheckoutReturnOrigin } = await import("./checkoutReturnOriginRules");
+    if (!isAllowedCheckoutReturnOrigin(data.origin, requestOrigin))
+      return { error: "Invalid return origin" };
+    const { createStripePortalSessionForUser } = await import("./stripePortalSession.server");
+    return createStripePortalSessionForUser({
+      supabase: context.supabase,
+      userId: context.userId,
+      environment: data.environment,
+      returnUrl: `${data.origin}/settings`,
+    });
+  });
 export const confirmStripeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>

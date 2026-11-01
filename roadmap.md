@@ -26,3 +26,4 @@
 - [x] Add bounded Stripe settlement retries, exact subscription/customer/plan matching, and owner-scoped saved-access readback. 46 targeted tests passed; test/live isolation retained.
 - [ ] Verify settled test purchase through the UI: signed-in browser navigation timed out; previous two card attempts stayed unpaid, so owner manual purchase remains required.
 - [ ] Show pricing and checkout form in USD by default instead of euros (user request 2026-11-01)
+- [ ] Send a test contact-form submission and confirm the owner alert reaches matt@verdantgrowdiary.com (user request 2026-11-01)

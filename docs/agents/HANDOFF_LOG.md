@@ -260,6 +260,40 @@ last_updated: 2026-10-28 06:26 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (
 - The existing 11 unrelated #2582 scorers and the two pre-existing #2565 scorer additions remain unchanged. No auth/store/query-key policy change is made. Fresh required CI and complete eligible outside acceptance must cover the resulting heads; this contributing session and advisory agents are excluded from acceptance. Owner account-switch busy decision remains open.
 - Latest observed deploy `ab4aaa2f3a648c28860c682ddec3ec0103347246` advances analytics/handoff work. Read-only merge-tree against it is clean; no unrelated base churn is needed for this repair. Preserve all prior handoff entries. #2582 inherits this patch by normal parent merge, with no retarget, rebase, force-push, PR merge or deployment.
 
+### DOC-START-ROOM-ONE-SUBMIT-2026-10-30
+
+```text
+TASK DOC-START-ROOM-ONE-SUBMIT-2026-10-30  priority: other  status: OPEN
+goal: Document the shipped Start Your Room one-submit flow and its session draft so the next editor does not treat it as a three-step wizard.
+why: #2582 and #2565 merged on 2026-10-30. The behavior lived in the handoff log and the source, with no developer spec.
+branch: cursor/documentation-automation-system-a6f2
+base: verdant-grow-diary
+checkout: git fetch origin cursor/documentation-automation-system-a6f2 verdant-grow-diary && git switch cursor/documentation-automation-system-a6f2 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: read the URL from GitHub after the docs commit is pushed
+head_sha: read git rev-parse origin/cursor/documentation-automation-system-a6f2 after the push; the parent on the deploy branch at authoring time was ffc6076aeb3723f17d85057154f8e9772ed9c222
+state: docs written locally; push and draft PR are the next step at authoring time
+current_step: spec and codebase-map pointer written from StartYourRoom.tsx, startYourRoomRules.ts, startYourRoomDraftRules.ts, sessionFormDraftRules.ts, and quickLogObservationDraftRules.ts
+next_action: confirm the PR is docs-only, then route an eligible reviewer who did not author it
+post_merge_check: NOT_APPLICABLE (docs only; no live behavior change)
+active_writer: Grok, Cursor automation "Generate docs" (9afcc3ed-d4a5-11f1-89ee-7aa6f0729b11)
+decisions: one spec for the setup flow plus the shared session-draft store, with a short sibling section for the Quick Log observation draft. The One-Tent Loop table in codebase-map.md was left unchanged so its old counts stay labeled as not re-measured.
+tried_and_rejected: none
+commands: node scripts/assert-docs-safety.mjs
+files_touched: docs/specs/start-your-room-one-submit.md; docs/codebase-map.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none in this docs slice. The product copy still says "step" in START_YOUR_ROOM_SAVE_RETRY_COPY; that wording was left as shipped.
+gotchas: do not edit another holder's branch. This block is the only handoff text this task adds.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2582 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2565
+artifacts: docs/specs/start-your-room-one-submit.md
+reviewer_seat: not assigned (author excluded: this Grok documentation session)
+reviewer_sha: none
+session_state: no paused workflows
+claimed_by: Grok, Cursor automation Generate docs, 2026-10-30 17:05 CT
+owner: Grok, Cursor automation Generate docs
+last_updated: 2026-10-30 17:05 CT, by Grok
+```
+
 ### SETUP-QUICKLOG-DRAFT-RETRY
 
 ```text

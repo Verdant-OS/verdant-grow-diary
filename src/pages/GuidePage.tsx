@@ -5,7 +5,7 @@
  * so visible copy and FAQPage JSON-LD share a single source of truth.
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
@@ -17,7 +17,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { findGuideBySlug, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
+import {
+  findGuideBySlug,
+  VERDANT_SEO_GUIDES,
+  type GuideAnchor,
+  type GuideSectionLink,
+} from "@/constants/verdantSeoContent";
+import { isPublicGuideHref, splitAroundAnchor } from "@/lib/guidePublicCopyViewModel";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 import {
@@ -120,8 +126,20 @@ export default function GuidePage() {
             {guide.h1}
           </h1>
         ) : null}
+        {guide.introHeading ? (
+          <h2 className="mt-8 font-display text-xl md:text-2xl font-semibold">
+            {guide.introHeading}
+          </h2>
+        ) : null}
         {answerFirst.answer ? (
-          <p data-testid="guide-direct-answer" className="mt-5 text-lg text-muted-foreground">
+          <p
+            data-testid="guide-direct-answer"
+            className={
+              guide.introHeading
+                ? "mt-3 text-base text-foreground/90"
+                : "mt-5 text-lg text-muted-foreground"
+            }
+          >
             {answerFirst.answer}
           </p>
         ) : null}
@@ -138,7 +156,20 @@ export default function GuidePage() {
           </p>
         ) : null}
         {answerFirst.answerRemainder ? (
-          <p className="mt-5 text-lg text-muted-foreground">{answerFirst.answerRemainder}</p>
+          <p
+            className={
+              guide.introHeading
+                ? "mt-3 text-base text-foreground/90"
+                : "mt-5 text-lg text-muted-foreground"
+            }
+          >
+            {answerFirst.answerRemainder}
+          </p>
+        ) : null}
+        {guide.introCta ? (
+          <p className="mt-3 text-base">
+            <GuideHref href={guide.introCta.href} label={guide.introCta.label} />
+          </p>
         ) : null}
         {(guide.publishedOn || guide.modifiedOn) && (
           <p
@@ -192,32 +223,31 @@ export default function GuidePage() {
 
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
-            <section key={section.heading}>
-              <h2 className="font-display text-xl md:text-2xl font-semibold">{section.heading}</h2>
-              <p className="mt-3 text-base text-foreground/90">{section.body}</p>
-              {section.links && section.links.length > 0 && (
-                <nav
-                  aria-label={`In Verdant: ${section.heading}`}
-                  className="mt-4 rounded-md border border-border/60 bg-muted/30 px-4 py-3"
-                >
-                  <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-medium">
-                    In Verdant
-                  </p>
-                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                    {section.links.map((link) => (
-                      <li key={link.to}>
-                        <Link
-                          to={link.to}
-                          className="text-primary underline underline-offset-4 hover:text-primary/80"
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              )}
-            </section>
+            <Fragment key={section.heading}>
+              <GuideCopyBlockView
+                heading={section.heading}
+                body={section.body}
+                bodyLink={section.bodyLink}
+                steps={section.steps}
+                closing={section.closing}
+                closingLink={section.closingLink}
+                cta={section.cta}
+                links={section.links}
+              />
+              {section.continuations?.map((block) => (
+                <GuideCopyBlockView
+                  key={block.heading}
+                  heading={block.heading}
+                  headingLevel={block.headingLevel}
+                  body={block.body}
+                  bodyLink={block.bodyLink}
+                  steps={block.steps}
+                  closing={block.closing}
+                  closingLink={block.closingLink}
+                  cta={block.cta}
+                />
+              ))}
+            </Fragment>
           ))}
         </div>
 
@@ -483,9 +513,132 @@ export default function GuidePage() {
                 );
               })}
             </Accordion>
+            {guide.faqFooter ? (
+              <>
+                <p className="mt-4 text-base text-foreground/90">
+                  {guide.faqFooter.lead}{" "}
+                  {guide.faqFooter.links.map((link, index) => (
+                    <Fragment key={`${link.href}:${link.label}`}>
+                      {index > 0 ? " · " : null}
+                      <GuideHref href={link.href} label={link.label} />
+                    </Fragment>
+                  ))}
+                </p>
+                {guide.faqFooter.cta ? (
+                  <p className="mt-3 text-base">
+                    <GuideHref href={guide.faqFooter.cta.href} label={guide.faqFooter.cta.label} />
+                  </p>
+                ) : null}
+              </>
+            ) : null}
           </section>
         )}
       </article>
     </main>
+  );
+}
+
+function GuideHref({ href, label }: { href: string; label: string }) {
+  const className = "text-primary underline underline-offset-4 hover:text-primary/80";
+  if (!isPublicGuideHref(href)) return <span>{label}</span>;
+  if (href.startsWith("/")) {
+    return (
+      <Link to={href} className={className}>
+        {label}
+      </Link>
+    );
+  }
+  return (
+    <a href={href} className={className}>
+      {label}
+    </a>
+  );
+}
+
+function GuideLinkedParagraph({ text, anchor }: { text: string; anchor?: GuideAnchor }) {
+  const parts = splitAroundAnchor(text, anchor);
+  return (
+    <p className="mt-3 text-base text-foreground/90">
+      {parts.kind === "plain" ? (
+        parts.text
+      ) : (
+        <>
+          {parts.before}
+          <GuideHref href={parts.href} label={parts.label} />
+          {parts.after}
+        </>
+      )}
+    </p>
+  );
+}
+
+function GuideCopyBlockView({
+  heading,
+  headingLevel = 2,
+  body,
+  bodyLink,
+  steps,
+  closing,
+  closingLink,
+  cta,
+  links,
+}: {
+  heading: string;
+  headingLevel?: 2 | 3;
+  body?: string;
+  bodyLink?: GuideAnchor;
+  steps?: ReadonlyArray<string>;
+  closing?: string;
+  closingLink?: GuideAnchor;
+  cta?: GuideAnchor;
+  links?: ReadonlyArray<GuideSectionLink>;
+}) {
+  const HeadingTag = headingLevel === 3 ? "h3" : "h2";
+  const headingClass =
+    headingLevel === 3
+      ? "font-display text-lg md:text-xl font-semibold"
+      : "font-display text-xl md:text-2xl font-semibold";
+  return (
+    <section>
+      <HeadingTag className={headingClass}>{heading}</HeadingTag>
+      {body && body.trim() ? <GuideLinkedParagraph text={body} anchor={bodyLink} /> : null}
+      {steps && steps.length > 0 ? (
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-base text-foreground/90">
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      ) : null}
+      {closing && closing.trim() ? (
+        <GuideLinkedParagraph text={closing} anchor={closingLink} />
+      ) : null}
+      {links && links.length > 0 ? (
+        <nav
+          aria-label={`In Verdant: ${heading}`}
+          className="mt-4 rounded-md border border-border/60 bg-muted/30 px-4 py-3"
+        >
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-medium">
+            In Verdant
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            {links.map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  className="text-primary underline underline-offset-4 hover:text-primary/80"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : null}
+      {cta && isPublicGuideHref(cta.href) ? (
+        <p className="mt-3 text-base">
+          <GuideHref href={cta.href} label={cta.label} />
+        </p>
+      ) : null}
+    </section>
   );
 }

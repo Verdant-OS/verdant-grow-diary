@@ -10,6 +10,7 @@ import {
   type PlantDetailSectionEntry,
   type PlantDetailSectionAnchorsInput,
 } from "@/lib/plantDetailSectionAnchors";
+import { applyPlantDetailJumpOffset } from "@/lib/plantDetailJumpScroll";
 import type { PlantDetailRevealAndNavigate } from "@/hooks/usePlantDetailDisclosureNavigation";
 
 const FOCUS_CLASSES =
@@ -19,10 +20,10 @@ function scrollToAnchor(targetId: string) {
   if (typeof document === "undefined") return;
   const el = document.getElementById(targetId);
   if (!el) return;
-  // "center" keeps the target near the middle of the viewport instead of
-  // snapping the page all the way down when the target sits near the
-  // bottom of a long page (the "jarring auto-scroll to bottom" report).
-  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Align the section top below the sticky header (shared offset), so a tall
+  // section's title is never centered off-screen.
+  applyPlantDetailJumpOffset(el);
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
   if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
   (el as HTMLElement).focus({ preventScroll: true });
 }

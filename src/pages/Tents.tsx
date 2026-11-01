@@ -29,6 +29,7 @@ import { isUuid } from "@/lib/isUuid";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
+import { formatTentHeaderDescription } from "@/lib/tentDetailBlankFieldRules";
 import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { classifyRequestedGrowScopeState } from "@/lib/growScopeAsyncStateRules";
 import {
@@ -633,9 +634,11 @@ export default function Tents() {
                           <h2 className="break-words [overflow-wrap:anywhere] font-display text-lg font-semibold group-hover:text-primary transition">
                             {t.name}
                           </h2>
-                          <p className="break-words [overflow-wrap:anywhere] text-xs text-muted-foreground">
-                            {t.brand} · {t.size}
-                          </p>
+                          {formatTentHeaderDescription(t.brand, t.size) ? (
+                            <p className="break-words [overflow-wrap:anywhere] text-xs text-muted-foreground">
+                              {formatTentHeaderDescription(t.brand, t.size)}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="shrink-0">
                           <StageBadge stage={t.stage} />

@@ -1,6 +1,9 @@
 /**
  * GHSA-q3jh-wrc6-jgq8 and GHSA-8r9p-f939-6h3c (advisories 1242604, 1242605):
  * follow-redirects >=1.16.0 <1.16.1 can leak credential headers across origins.
+ * GHSA-mrwp-f3q8-3g9p (advisory 1244003) still affects 1.16.0 and 1.16.1:
+ * a cross-realm sensitiveHeaders array is discarded, so a custom credential
+ * can follow a cross-origin redirect. 1.16.2 is the first fixed release.
  * The lockfile policy's floor must reject a vulnerable follow-redirects on its
  * own, independent of the exact `overrides["follow-redirects"]` pin, so a later
  * change that moves both the override and its pin cannot reintroduce it.
@@ -72,14 +75,17 @@ function evaluateWithFollowRedirects(version: string) {
 const floorErrors = (result: { errors: string[] }) =>
   result.errors.filter((error) => error.includes("security floor for follow-redirects"));
 
-describe("follow-redirects security floor (GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c)", () => {
+describe("follow-redirects security floor (GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c, GHSA-mrwp-f3q8-3g9p)", () => {
   it("rejects the vulnerable release even when the override pins it", () => {
     expect(floorErrors(evaluateWithFollowRedirects("1.16.0"))).toEqual([
-      "bun.lock security floor for follow-redirects is 1.16.1; found 1.16.0.",
+      "bun.lock security floor for follow-redirects is 1.16.2; found 1.16.0.",
+    ]);
+    expect(floorErrors(evaluateWithFollowRedirects("1.16.1"))).toEqual([
+      "bun.lock security floor for follow-redirects is 1.16.2; found 1.16.1.",
     ]);
   });
 
   it("accepts the first fixed release", () => {
-    expect(floorErrors(evaluateWithFollowRedirects("1.16.1"))).toEqual([]);
+    expect(floorErrors(evaluateWithFollowRedirects("1.16.2"))).toEqual([]);
   });
 });

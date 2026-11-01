@@ -37,6 +37,8 @@ export type AssignCandidateNumberResult =
 export interface AssignCandidateNumberInput {
   readonly plantId: string;
   readonly candidateNumber: number;
+  /** When supplied, numbering must still target this hunt at write time. */
+  readonly expectedHuntId?: string;
 }
 
 const MESSAGES: Record<AssignCandidateNumberFailure, string> = {
@@ -102,21 +104,24 @@ export async function assignPhenoCandidateNumber(
   if (!isAssignableCandidateNumber(input.candidateNumber)) return fail("invalid");
 
   try {
-    const { data, error } = await phenoDb
+    let update = phenoDb
       .from("plants")
       .update({ candidate_number: input.candidateNumber })
+      .eq("id", plantId);
+    if (input.expectedHuntId !== undefined) {
+      update = update.eq("pheno_hunt_id", input.expectedHuntId);
+    }
+    const { data, error } = await update
       // Only assign when currently unnumbered — this makes the write a no-op on
       // an already-numbered candidate (0 rows), so we never attempt an immutable
       // change and can detect the stale case explicitly below.
-      .eq("id", plantId)
       .is("candidate_number", null)
       .select("id, candidate_number")
       .maybeSingle();
 
     if (error) return fail(classifyError(error));
-    // No row updated: either the candidate is already numbered (stale view) or
-    // the row isn't visible/owned under RLS. Either way the calm signal is the
-    // same — refresh to see the authoritative state.
+    // No row updated: the plant may already be numbered, have left the expected
+    // hunt, or be unavailable under RLS. Refresh to see the authoritative state.
     if (!data) return fail("stale");
 
     const saved = (data as { candidate_number: number | null }).candidate_number;

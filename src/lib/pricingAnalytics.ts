@@ -6,6 +6,8 @@
  * event to gtag. Analytics failures must never block pricing or checkout.
  */
 
+import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
+
 export const PRICING_ANALYTICS_EVENT = "verdant:analytics" as const;
 
 export type PricingAnalyticsName =
@@ -132,7 +134,7 @@ export function trackPricingEvent(name: PricingAnalyticsName, props?: PricingAna
         gtag?: (command: "event", eventName: string, params?: PricingAnalyticsProps) => void;
       }
     ).gtag;
-    if (typeof gtag === "function") {
+    if (typeof gtag === "function" && isGoogleAnalyticsCollectionHost(window.location.hostname)) {
       gtag("event", name, safeProps);
     }
   } catch {

@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// @vitest-environment-options {"url":"https://verdantgrowdiary.com/"}
+// GA only collects on the production host (#2693), so these run there.
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ANALYTICS_CONSENT_STORAGE_KEY,

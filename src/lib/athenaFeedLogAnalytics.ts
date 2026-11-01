@@ -4,6 +4,7 @@
  */
 
 import { readAnalyticsConsent } from "@/lib/analyticsConsent";
+import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 
 export const FEED_LOG_ANALYTICS_EVENTS = [
@@ -70,7 +71,9 @@ export function trackFeedLogEvent(
   }
   try {
     const gtag = (window as Window & { gtag?: (...args: unknown[]) => void }).gtag;
-    if (typeof gtag === "function") gtag("event", name, safe);
+    if (typeof gtag === "function" && isGoogleAnalyticsCollectionHost(window.location.hostname)) {
+      gtag("event", name, safe);
+    }
   } catch {
     /* analytics must never break the page */
   }

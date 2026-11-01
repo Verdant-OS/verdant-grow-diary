@@ -25,5 +25,6 @@
 - [ ] Authentication email delivery on the published site awaits owner release approval and a delivery test.
 - [x] Add bounded Stripe settlement retries, exact subscription/customer/plan matching, and owner-scoped saved-access readback. 46 targeted tests passed; test/live isolation retained.
 - [ ] Verify settled test purchase through the UI: signed-in browser navigation timed out; previous two card attempts stayed unpaid, so owner manual purchase remains required.
-- [ ] Show pricing and checkout form in USD by default instead of euros (user request 2026-11-01)
-- [ ] Send a test contact-form submission and confirm the owner alert reaches matt@verdantgrowdiary.com (user request 2026-11-01)
+- [x] USD by default: pricing page already USD; checkout now forces USD (managed_payments + adaptive_pricing disabled per session — Stripe requires adaptive pricing with Managed Payments). Verified in preview: form shows $9.00, no euro selector.
+- [x] Contact form test: labeled submission saved (07:42:27 UTC), owner alert sent to matt@verdantgrowdiary.com same second (delivery log confirmed), test row removed.
+- [x] Manage subscription opens the Stripe customer portal for Stripe purchases; verified signed-in as matt816cheek@gmail.com — real Stripe portal session opened. 38 targeted tests passed; build OK.

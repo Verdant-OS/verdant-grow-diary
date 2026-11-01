@@ -8,6 +8,7 @@ import { stripeTokenEnvironment } from "@/lib/stripeCheckoutRules";
 import { resolveUnionEntitlements, pickEntitlingLovableRow } from "@/lib/entitlements";
 import { creditPackPurchaseEligible } from "@/lib/creditPackEligibility";
 import { stripeConfirmedPlanMatches } from "./stripeConfirmationRules";
+import type { SubscriptionLookup } from "./stripePortalSession.server";
 const environmentSchema = z.literal("sandbox"); // Owner approved test checkout only.
 async function resolveOrCreateCustomer(
   stripe: ReturnType<typeof createStripeClient>,
@@ -124,6 +125,30 @@ export const createStripeCheckout = createServerFn({ method: "POST" })
     } catch (error) {
       return { error: getStripeErrorMessage(error) };
     }
+  });
+export const createStripePortalSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ environment: environmentSchema, origin: z.string().url() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    if (stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN) !== data.environment)
+      return { error: "Payment environment mismatch" };
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    const requestOrigin = request.headers.get("origin") ?? new URL(request.url).origin;
+    const { isAllowedCheckoutReturnOrigin } = await import("./checkoutReturnOriginRules");
+    if (!isAllowedCheckoutReturnOrigin(data.origin, requestOrigin))
+      return { error: "Invalid return origin" };
+    const { createStripePortalSessionForUser } = await import("./stripePortalSession.server");
+    return createStripePortalSessionForUser({
+      // Structural cast: the full typed SupabaseClient against the minimal
+      // lookup interface trips TS2589 (excessively deep instantiation).
+      supabase: context.supabase as unknown as SubscriptionLookup,
+      userId: context.userId,
+      environment: data.environment,
+      returnUrl: `${data.origin}/settings`,
+    });
   });
 export const confirmStripeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

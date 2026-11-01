@@ -17,6 +17,11 @@ const entitlementMock = vi.hoisted(() => ({
   loading: false as boolean,
   lookupFailed: false as boolean,
   displayPlanId: "free" as string | null,
+  savedStripeTestSubscription: null as null | {
+    displayPlanId: string;
+    status: string;
+    isActive: boolean;
+  },
   refetch: vi.fn(async () => undefined),
 }));
 
@@ -24,11 +29,27 @@ const portalMock = vi.hoisted(() => ({
   invoke: vi.fn(),
 }));
 
+const stripePortalMock = vi.hoisted(() => ({
+  open: vi.fn(async () => ({ ok: true as boolean, error: undefined as string | undefined })),
+  clearError: vi.fn(),
+  state: { opening: false as boolean, error: null as string | null },
+}));
+
+vi.mock("@/lib/payments/stripePortal", () => ({
+  useOpenStripeCustomerPortalState: () => ({
+    opening: stripePortalMock.state.opening,
+    error: stripePortalMock.state.error,
+    open: stripePortalMock.open,
+    clearError: stripePortalMock.clearError,
+  }),
+}));
+
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: entitlementMock.loading,
     lookupFailed: entitlementMock.lookupFailed,
     entitlement: { displayPlanId: entitlementMock.displayPlanId },
+    savedStripeTestSubscription: entitlementMock.savedStripeTestSubscription,
     refetch: entitlementMock.refetch,
   }),
 }));
@@ -68,11 +89,18 @@ beforeEach(() => {
   entitlementMock.loading = false;
   entitlementMock.lookupFailed = false;
   entitlementMock.displayPlanId = "free";
+  entitlementMock.savedStripeTestSubscription = null;
   entitlementMock.refetch.mockClear();
   cancelNoticeMock.visible = false;
   cancelNoticeMock.accessUntilIso = null;
   cancelNoticeMock.accessUntilLabel = "";
   cancelNoticeMock.reason = null;
+
+  stripePortalMock.open.mockReset();
+  stripePortalMock.open.mockResolvedValue({ ok: true, error: undefined });
+  stripePortalMock.clearError.mockReset();
+  stripePortalMock.state.opening = false;
+  stripePortalMock.state.error = null;
 
   portalMock.invoke.mockReset();
   portalMock.invoke.mockResolvedValue({
@@ -99,6 +127,44 @@ function renderPage() {
     </MemoryRouter>,
   );
 }
+
+describe("Settings — Subscription tile (Stripe test purchase)", () => {
+  it("saved Stripe test subscription switches portal copy and Manage to the Stripe customer portal", async () => {
+    entitlementMock.displayPlanId = "pro_monthly";
+    entitlementMock.savedStripeTestSubscription = {
+      displayPlanId: "pro_monthly",
+      status: "active",
+      isActive: true,
+    };
+    renderPage();
+    expect(document.body.textContent).toMatch(/Stripe\s+customer portal/i);
+    expect(document.body.textContent).not.toMatch(/Paddle\s+customer portal/i);
+    fireEvent.click(screen.getByTestId("settings-subscription-manage"));
+    await waitFor(() => expect(stripePortalMock.open).toHaveBeenCalledTimes(1));
+    expect(portalMock.invoke).not.toHaveBeenCalled();
+  });
+
+  it("Stripe portal failure surfaces the error and never falls back to Paddle", async () => {
+    stripePortalMock.open.mockResolvedValue({
+      ok: false,
+      error: "No Stripe subscription found on this account.",
+    });
+    stripePortalMock.state.error = "No Stripe subscription found on this account.";
+    entitlementMock.displayPlanId = "craft_annual";
+    entitlementMock.savedStripeTestSubscription = {
+      displayPlanId: "craft_annual",
+      status: "active",
+      isActive: true,
+    };
+    renderPage();
+    fireEvent.click(screen.getByTestId("settings-subscription-manage"));
+    await waitFor(() => expect(stripePortalMock.open).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("settings-subscription-portal-error").textContent).toMatch(
+      /No Stripe subscription found/i,
+    );
+    expect(portalMock.invoke).not.toHaveBeenCalled();
+  });
+});
 
 describe("Settings — Subscription tile", () => {
   it("renders Free plan and Upgrade CTA", () => {

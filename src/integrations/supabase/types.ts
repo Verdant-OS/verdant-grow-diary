@@ -573,6 +573,110 @@ export type Database = {
           },
         ]
       }
+      badge_award_runtime: {
+        Row: {
+          enabled: boolean
+          id: number
+          reconcile_after: string | null
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          id: number
+          reconcile_after?: string | null
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          id?: number
+          reconcile_after?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      badge_awards: {
+        Row: {
+          badge_key: string
+          created_at: string
+          evidence_changed_at: string | null
+          first_recognized_at: string
+          hidden_at: string | null
+          id: string
+          restored_at: string | null
+          revoked_at: string | null
+          rule_version: number
+          user_id: string
+        }
+        Insert: {
+          badge_key: string
+          created_at?: string
+          evidence_changed_at?: string | null
+          first_recognized_at?: string
+          hidden_at?: string | null
+          id?: string
+          restored_at?: string | null
+          revoked_at?: string | null
+          rule_version?: number
+          user_id: string
+        }
+        Update: {
+          badge_key?: string
+          created_at?: string
+          evidence_changed_at?: string | null
+          first_recognized_at?: string
+          hidden_at?: string | null
+          id?: string
+          restored_at?: string | null
+          revoked_at?: string | null
+          rule_version?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      badge_evidence: {
+        Row: {
+          award_id: string
+          created_at: string
+          diary_entry_id: string | null
+          grow_id: string | null
+          id: string
+          photo_object_name: string | null
+          plant_id: string | null
+          subject_kind: string
+          tent_id: string | null
+        }
+        Insert: {
+          award_id: string
+          created_at?: string
+          diary_entry_id?: string | null
+          grow_id?: string | null
+          id?: string
+          photo_object_name?: string | null
+          plant_id?: string | null
+          subject_kind?: string
+          tent_id?: string | null
+        }
+        Update: {
+          award_id?: string
+          created_at?: string
+          diary_entry_id?: string | null
+          grow_id?: string | null
+          id?: string
+          photo_object_name?: string | null
+          plant_id?: string | null
+          subject_kind?: string
+          tent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "badge_evidence_award_id_fkey"
+            columns: ["award_id"]
+            isOneToOne: true
+            referencedRelation: "badge_awards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
@@ -4646,6 +4750,15 @@ export type Database = {
         }
         Returns: Json
       }
+      badge_awards_evaluate_owner: {
+        Args: { badge_key: string }
+        Returns: Json
+      }
+      badge_awards_owned_diary_photo_name: {
+        Args: { owner_id: string; raw: string }
+        Returns: string
+      }
+      badge_awards_reconcile: { Args: never; Returns: number }
       billing_entitlement_resolution_operator_audit: {
         Args: { p_limit?: number }
         Returns: Json

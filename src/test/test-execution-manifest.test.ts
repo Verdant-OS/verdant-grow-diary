@@ -171,6 +171,14 @@ const EXEMPTIONS: Record<string, { class: string; reason: string }> = {
     reason:
       'Credential-free and mocked (7 page.route). 2 of 9 tests fail deterministically at 320px and 1440px: "/daily-check must not conceal intrinsic horizontal overflow", 11 violations. The other 7 pass. Wiring the file red would block every PR.',
   },
+  "e2e/owner-badge-shelf.spec.ts": {
+    class: EXEMPTION_CLASS.AWAITING_DECISION,
+    reason: "NOT_MEASURED (not run)",
+  },
+  "e2e/owner-badge-kill-switch.spec.ts": {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason: "NOT_MEASURED (not run)",
+  },
 
   /* ---------------- pgTAP lane ---------------- */
   ...pgTapExemptions(),
@@ -306,10 +314,10 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 20,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 21,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
-      [EXEMPTION_CLASS.AWAITING_DECISION]: 1,
+      [EXEMPTION_CLASS.AWAITING_DECISION]: 2,
     });
     expect(byClass[EXEMPTION_CLASS.FLAKY] ?? 0).toBe(0);
   });

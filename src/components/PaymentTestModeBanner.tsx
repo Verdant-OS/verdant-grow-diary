@@ -3,7 +3,7 @@ import { shouldShowPaddleSandboxTestModeBanner } from "@/lib/paymentTestModeBann
 import { getCheckoutUnavailableMessage } from "@/lib/paddle";
 import { useRenderedPaddleCheckoutEnvironment } from "@/hooks/useRenderedPaddleCheckoutEnvironment";
 import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
-import { stripeTokenEnvironment, STRIPE_FULFILLMENT_PENDING_MESSAGE } from "@/lib/stripeCheckoutRules";
+import { stripeTokenEnvironment } from "@/lib/stripeCheckoutRules";
 
 /**
  * Payments banner.

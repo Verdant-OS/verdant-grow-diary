@@ -92,6 +92,8 @@ export function mapLovableSubscriptionRow(
     return null;
   }
   if (row.environment !== opts.expectedBillingEnvironment) return null;
+  if (row.billing_provider !== undefined && row.billing_provider !== "paddle" && row.billing_provider !== "stripe") return null;
+  if (row.billing_provider === "stripe" && row.price_id === "founder_lifetime") return null;
   if (row.billing_provider === "stripe" && (!row.stripe_subscription_id?.startsWith("sub_") || !row.stripe_customer_id?.startsWith("cus_"))) return null;
 
   const planId = KNOWN_PRICE_TO_PLAN[row.price_id];

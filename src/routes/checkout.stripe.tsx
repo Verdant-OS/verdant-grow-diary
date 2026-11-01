@@ -123,6 +123,11 @@ function StripeReturn() {
           Check again
         </Button>
       )}
+      {confirmed && verifiedPlan && (
+        <Link to="/settings">
+          <Button className="mt-6 mr-3">View account subscription</Button>
+        </Link>
+      )}
       <Link to="/pricing">
         <Button variant="outline" className="mt-6">
           Back to pricing

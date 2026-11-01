@@ -1,6 +1,6 @@
 # Current tasks
 
-- [ ] Fix Subscription loading and distinguish saved Stripe test subscription from staff access; verify the signed-in account without inventing a purchase.
+- [x] Bound stalled Subscription lookups and show saved Stripe test plans separately from staff access; signed-in Settings loads. Account readback found no saved Stripe subscription. 22 targeted tests passed, automatic build OK; no purchase or billing write performed.
 
 - [x] Apply approved feedback, contact, and lead INSERT policy repairs; database readback confirms bounded public submissions and blocked support attribution/review fields. 23 existing targeted tests passed; live submission harness not run. Database linter reports 47 other findings, with no tautological INSERT finding.
 

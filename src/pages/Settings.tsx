@@ -317,7 +317,8 @@ function TemperatureUnitTile() {
  * billing status directly.
  */
 function SubscriptionTile() {
-  const { loading, lookupFailed, entitlement, savedStripeTestSubscription, refetch } = useMyEntitlements();
+  const { loading, lookupFailed, entitlement, savedStripeTestSubscription, refetch } =
+    useMyEntitlements();
   const {
     opening,
     error: portalError,

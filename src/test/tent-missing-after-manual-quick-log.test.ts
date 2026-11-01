@@ -119,7 +119,11 @@ describe("tent Quick Log manual reading is invisible to the Tonight card until p
 
   it("shows 76.0 °F, 60%, and calculated VPD labeled manual once the sibling is a card row", () => {
     const reading = environmentReading(TENT, LOGGED_AT);
-    const rows = tonightRowsFromQuickLogManualReadings(reading ? [reading] : [], TENT);
+    const rows = tonightRowsFromQuickLogManualReadings(
+      reading ? [reading] : [],
+      TENT,
+      NOW.getTime(),
+    );
     const metrics = metricsFrom(rows);
     const temp = metrics.find((metric) => metric.key === "temp")!;
     const rh = metrics.find((metric) => metric.key === "rh")!;
@@ -155,7 +159,11 @@ describe("tent Quick Log manual reading is invisible to the Tonight card until p
 
   it("lets a newer live row win and a newer manual beat an older live row", () => {
     const manual = environmentReading(TENT, LOGGED_AT);
-    const manualRows = tonightRowsFromQuickLogManualReadings(manual ? [manual] : [], TENT);
+    const manualRows = tonightRowsFromQuickLogManualReadings(
+      manual ? [manual] : [],
+      TENT,
+      NOW.getTime(),
+    );
     const newerLive = metricsFrom([...manualRows, liveTemp(NEWER, 20)]);
     expect(newerLive.find((metric) => metric.key === "temp")).toMatchObject({
       state: "value",
@@ -173,11 +181,15 @@ describe("tent Quick Log manual reading is invisible to the Tonight card until p
 
   it("drops a null or foreign tent id", () => {
     const foreign = environmentReading(OTHER, LOGGED_AT);
-    expect(tonightRowsFromQuickLogManualReadings(foreign ? [foreign] : [], TENT)).toEqual([]);
+    expect(
+      tonightRowsFromQuickLogManualReadings(foreign ? [foreign] : [], TENT, NOW.getTime()),
+    ).toEqual([]);
     const own = environmentReading(TENT, LOGGED_AT);
-    expect(tonightRowsFromQuickLogManualReadings(own ? [own] : [], null)).toEqual([]);
-    expect(tonightRowsFromQuickLogManualReadings(own ? [own] : [], "")).toEqual([]);
-    expect(tonightRowsFromQuickLogManualReadings(null, TENT)).toEqual([]);
+    expect(tonightRowsFromQuickLogManualReadings(own ? [own] : [], null, NOW.getTime())).toEqual(
+      [],
+    );
+    expect(tonightRowsFromQuickLogManualReadings(own ? [own] : [], "", NOW.getTime())).toEqual([]);
+    expect(tonightRowsFromQuickLogManualReadings(null, TENT, NOW.getTime())).toEqual([]);
   });
 
   it("feeds the tent Environment block from the manual sibling when no newer sensor snapshot exists", () => {

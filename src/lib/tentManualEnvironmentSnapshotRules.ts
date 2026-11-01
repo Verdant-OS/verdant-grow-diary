@@ -34,9 +34,11 @@ const CLIMATE_METRICS: readonly ClimateMetric[] = [
 
 export interface DisplayedTentClimateSnapshot {
   snapshot: SensorSnapshot | null;
-  /** True only when the manual sibling is strictly newer than the sensor snapshot. */
+  /** True when at least one climate metric comes from a strictly newer manual value. */
   fromManual: boolean;
-  /** Source-aware staleness of the manual sibling. False when the sensor snapshot remains. */
+  /** Which climate metrics come from the manual value. */
+  manualMetrics: { temp: boolean; rh: boolean };
+  /** Source-aware staleness of the displayed manual values. False when only the sensor shows. */
   stale: boolean;
 }
 
@@ -71,28 +73,6 @@ function climateValue(reading: SensorReading, metric: ClimateMetric): number | n
   return value;
 }
 
-function snapshotFromManualReading(reading: SensorReading, tentId: string): SensorSnapshot | null {
-  const at = captureIso(reading);
-  if (!at) return null;
-  const temp = climateValue(reading, CLIMATE_METRICS[0]);
-  const rh = climateValue(reading, CLIMATE_METRICS[1]);
-  if (temp === null && rh === null) return null;
-  return {
-    source: MANUAL_SOURCE,
-    ts: at,
-    temp,
-    rh,
-    vpd: null,
-    co2: null,
-    soil: null,
-    soil_ec: null,
-    soil_temp: null,
-    ppfd: null,
-    tent_id: tentId,
-    alert_persistence_eligible: false,
-  };
-}
-
 /**
  * Tonight card rows for one tent. Temperature and humidity only: an
  * unobserved VPD stays absent so the card calculates it from the pair,
@@ -102,6 +82,7 @@ function snapshotFromManualReading(reading: SensorReading, tentId: string): Sens
 export function tonightRowsFromQuickLogManualReadings(
   readings: readonly SensorReading[] | null | undefined,
   tentId: string | null | undefined,
+  nowMs: number,
 ): TonightSensorRow[] {
   const scope = scopedTentId(tentId);
   if (!scope || !readings) return [];
@@ -110,6 +91,8 @@ export function tonightRowsFromQuickLogManualReadings(
     if (!inTent(reading, scope)) continue;
     const at = captureIso(reading);
     if (!at) continue;
+    // Same manual window the tent page uses: an aged manual row is labelled stale.
+    const source = isStale(at, nowMs, undefined, MANUAL_SOURCE) ? "stale" : MANUAL_SOURCE;
     for (const metric of CLIMATE_METRICS) {
       const value = climateValue(reading, metric);
       if (value === null) continue;
@@ -118,7 +101,7 @@ export function tonightRowsFromQuickLogManualReadings(
         tent_id: scope,
         metric: metric.metric,
         value,
-        source: MANUAL_SOURCE,
+        source,
         quality: "ok",
         ts: at,
         captured_at: at,
@@ -130,10 +113,41 @@ export function tonightRowsFromQuickLogManualReadings(
 }
 
 /**
- * The tent Environment block's climate snapshot. A manual sibling wins
- * only when it is strictly newer than the sensor snapshot. A null,
- * unavailable, or untimed sensor snapshot loses to the manual sibling.
- * A foreign tent never contributes.
+ * Newest in-tent manual value per climate metric. A reading only competes
+ * for a metric it actually observed with a finite, valid value, so a
+ * temperature-only log never blanks humidity (and vice versa). Shared by
+ * the tent Environment block; the Tonight card applies the same per-metric
+ * newest-wins choice over `tonightRowsFromQuickLogManualReadings` rows.
+ */
+export function latestQuickLogManualClimateByMetric(
+  manuals: readonly SensorReading[] | null | undefined,
+  tentId: string | null | undefined,
+): Partial<Record<"temp" | "rh", { value: number; ts: string; ms: number }>> {
+  const scope = scopedTentId(tentId);
+  const out: Partial<Record<"temp" | "rh", { value: number; ts: string; ms: number }>> = {};
+  if (!scope || !manuals) return out;
+  for (const reading of manuals) {
+    if (!inTent(reading, scope)) continue;
+    const at = captureIso(reading);
+    if (!at) continue;
+    const ms = Date.parse(at);
+    for (const metric of CLIMATE_METRICS) {
+      const value = climateValue(reading, metric);
+      if (value === null) continue;
+      const prev = out[metric.key];
+      if (!prev || ms > prev.ms) out[metric.key] = { value, ts: at, ms };
+    }
+  }
+  return out;
+}
+
+/**
+ * The tent Environment block's climate snapshot, merged per metric.
+ * For temperature and humidity separately, the manual value wins only when
+ * it is strictly newer than the sensor snapshot (a tie keeps the sensor).
+ * Every other field (CO₂, VPD, soil, PPFD, refs) stays on the sensor
+ * snapshot. A null, unavailable, or untimed sensor snapshot loses to the
+ * manual values. A foreign tent never contributes.
  */
 export function resolveDisplayedTentClimateSnapshot(input: {
   sensorSnapshot: SensorSnapshot | null | undefined;
@@ -142,31 +156,61 @@ export function resolveDisplayedTentClimateSnapshot(input: {
   nowMs: number;
 }): DisplayedTentClimateSnapshot {
   const sensor = input.sensorSnapshot ?? null;
-  const kept = { snapshot: sensor, fromManual: false, stale: false };
+  const kept: DisplayedTentClimateSnapshot = {
+    snapshot: sensor,
+    fromManual: false,
+    manualMetrics: { temp: false, rh: false },
+    stale: false,
+  };
   const scope = scopedTentId(input.tentId);
-  if (!scope || !input.manuals) return kept;
-
-  let manual: SensorSnapshot | null = null;
-  let manualMs = Number.NEGATIVE_INFINITY;
-  for (const reading of input.manuals) {
-    if (!inTent(reading, scope)) continue;
-    const next = snapshotFromManualReading(reading, scope);
-    if (!next?.ts) continue;
-    const ms = Date.parse(next.ts);
-    if (!Number.isFinite(ms) || ms <= manualMs) continue;
-    manual = next;
-    manualMs = ms;
-  }
-  if (!manual) return kept;
+  if (!scope) return kept;
+  const latest = latestQuickLogManualClimateByMetric(input.manuals, scope);
 
   const sensorMs = sensor?.ts ? Date.parse(sensor.ts) : Number.NaN;
   const sensorTimed =
     sensor != null && sensor.source !== "unavailable" && Number.isFinite(sensorMs);
-  if (sensorTimed && manualMs <= sensorMs) return kept;
+  const wins = (key: "temp" | "rh") => {
+    const m = latest[key];
+    return m !== undefined && (!sensorTimed || m.ms > sensorMs);
+  };
+  const tempWins = wins("temp");
+  const rhWins = wins("rh");
+  if (!tempWins && !rhWins) return kept;
 
+  const winners = [tempWins ? latest.temp! : null, rhWins ? latest.rh! : null].filter(
+    (m): m is { value: number; ts: string; ms: number } => m !== null,
+  );
+  const newest = winners.reduce((a, b) => (b.ms > a.ms ? b : a));
+  const oldest = winners.reduce((a, b) => (b.ms < a.ms ? b : a));
+  const base: SensorSnapshot = sensorTimed
+    ? sensor!
+    : {
+        source: MANUAL_SOURCE,
+        ts: newest.ts,
+        temp: null,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+        tent_id: scope,
+        alert_persistence_eligible: false,
+      };
+  const snapshot: SensorSnapshot = {
+    ...base,
+    // Both climate chips manual: label the climate manual. Otherwise the
+    // sensor's own source stays (it still supplies at least one chip).
+    source: tempWins && rhWins ? MANUAL_SOURCE : base.source,
+    temp: tempWins ? latest.temp!.value : sensorTimed ? base.temp : null,
+    rh: rhWins ? latest.rh!.value : sensorTimed ? base.rh : null,
+  };
   return {
-    snapshot: manual,
+    snapshot,
     fromManual: true,
-    stale: isStale(manual.ts, input.nowMs, undefined, MANUAL_SOURCE),
+    manualMetrics: { temp: tempWins, rh: rhWins },
+    // The oldest displayed manual value decides: one aged manual chip is stale.
+    stale: isStale(oldest.ts, input.nowMs, undefined, MANUAL_SOURCE),
   };
 }

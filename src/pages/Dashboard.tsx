@@ -348,6 +348,7 @@ export default function Dashboard() {
   const homeManualRows = tonightRowsFromQuickLogManualReadings(
     homeTent ? quickLogManualsForTent(quickLogManualReadings, homeTent.id) : [],
     homeTent?.id ?? null,
+    nowTick,
   );
   const homeMetrics = buildTonightTentMetrics({
     rows: [...homeSensorRows, ...homeManualRows],

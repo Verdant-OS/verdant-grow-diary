@@ -223,38 +223,47 @@ export default function TentDetail() {
     [readings, quickLogManuals.data],
   );
   const nowMs = useNowTick();
-  const header = buildTentSensorHeaderView(readings, nowMs);
-  const snap = header.snapshot;
+  const sensorHeader = buildTentSensorHeaderView(readings, nowMs);
+  const sensorSnap = sensorHeader.snapshot;
+  // Environment chips merge per metric: a strictly newer Quick Log manual
+  // temperature or humidity replaces only that metric; CO₂ and every other
+  // field stay on the sensor snapshot (#2689). VPD and header truth below
+  // keep reading the sensor snapshot.
   const displayedClimate = resolveDisplayedTentClimateSnapshot({
-    sensorSnapshot: header.snapshot,
+    sensorSnapshot: sensorSnap,
     manuals: quickLogManuals.data,
     tentId: tent?.id ?? null,
     nowMs,
   });
-  const climateSnap = displayedClimate.fromManual ? displayedClimate.snapshot : snap;
-  const climateStale = displayedClimate.fromManual ? displayedClimate.stale : header.stale;
+  const snap = displayedClimate.snapshot;
+  const header = {
+    stale:
+      (displayedClimate.fromManual && displayedClimate.stale) ||
+      (sensorHeader.stale &&
+        !(displayedClimate.manualMetrics.temp && displayedClimate.manualMetrics.rh)),
+  };
   // The header's truth check is realism only and keeps a vpd_kpa row whose own
   // intake quality flag is not ok. The Dashboard selector drops that row, so
   // the tent page withholds it the same way the header withholds a realism
   // rejection: no snapshot value, rejection noted (Codex P1 on #2303 at 307b10f4).
   // The VPD's own source, not the snapshot's aggregate: one manual metric in
-  // the cohort makes `snap.source` manual (Copilot P1 on #2430 at fcd86356).
+  // the cohort makes `sensorSnap.source` manual (Copilot P1 on #2430 at fcd86356).
   // Each header metric's device, so its capture refs never match another
   // device at the same instant (Copilot and Codex on #2451 at 6d0fa53c).
-  const snapWithDevices = snap ? withMetricDeviceIds(snap, readings) : snap;
+  const snapWithDevices = sensorSnap ? withMetricDeviceIds(sensorSnap, readings) : sensorSnap;
   const storedVpdRowUntrusted = tentDetailVpdRowUntrusted(
     readings,
-    header.capturedAt,
-    snap?.metric_refs?.vpd?.source ?? null,
+    sensorHeader.capturedAt,
+    sensorSnap?.metric_refs?.vpd?.source ?? null,
     snapWithDevices?.metric_device_ids?.vpd ?? null,
   );
   const storedVpdObservation = resolveDisplayedVpdObservation({
-    snapshotVpd: storedVpdRowUntrusted ? null : snap?.vpd,
+    snapshotVpd: storedVpdRowUntrusted ? null : sensorSnap?.vpd,
     snapshotVpdRejected:
-      (header.truth?.invalidFields.includes("vpd") ?? false) || storedVpdRowUntrusted,
-    snapshotCapturedAt: header.capturedAt,
-    snapshotSource: snap?.source ?? null,
-    snapshotStale: header.stale,
+      (sensorHeader.truth?.invalidFields.includes("vpd") ?? false) || storedVpdRowUntrusted,
+    snapshotCapturedAt: sensorHeader.capturedAt,
+    snapshotSource: sensorSnap?.source ?? null,
+    snapshotStale: sensorHeader.stale,
     fallback: sharedVpdSeries[0] ?? null,
     nowMs,
   });
@@ -265,7 +274,7 @@ export default function TentDetail() {
   const tonightMetrics = buildTonightTentMetrics({
     rows: [
       ...readings,
-      ...tonightRowsFromQuickLogManualReadings(quickLogManuals.data, tent?.id ?? null),
+      ...tonightRowsFromQuickLogManualReadings(quickLogManuals.data, tent?.id ?? null, nowMs),
     ],
     rowsRead: {
       status: sensorReadings.isError ? "error" : sensorReadings.isPending ? "loading" : "success",
@@ -276,10 +285,10 @@ export default function TentDetail() {
   const headerVpdObservation = resolveTentDetailVpd({
     tonight: tonightMetrics.find((metric) => metric.key === "vpd"),
     existing: storedVpdObservation,
-    rejectedCapturedAt: header.capturedAt,
+    rejectedCapturedAt: sensorHeader.capturedAt,
     // The stored VPD is the snapshot's own exactly when that value was passed in.
-    ...tentDetailHeaderRejection(header.truth, snapWithDevices, {
-      existingIsSnapshotVpd: !storedVpdRowUntrusted && Number.isFinite(snap?.vpd ?? NaN),
+    ...tentDetailHeaderRejection(sensorHeader.truth, snapWithDevices, {
+      existingIsSnapshotVpd: !storedVpdRowUntrusted && Number.isFinite(sensorSnap?.vpd ?? NaN),
     }),
     // The pair a calculated VPD came from, not the displayed temperature and
     // RH (Codex P2 on #2303 at 3e689090).
@@ -297,10 +306,10 @@ export default function TentDetail() {
   const vpdFromFallback = tentDetailVpdNeedsOwnProvenance({
     observation: headerVpdObservation,
     header: {
-      vpd: snap?.vpd,
-      source: snap?.source ?? null,
-      capturedAt: header.capturedAt,
-      stale: header.stale,
+      vpd: sensorSnap?.vpd,
+      source: sensorSnap?.source ?? null,
+      capturedAt: sensorHeader.capturedAt,
+      stale: sensorHeader.stale,
     },
   });
   const fallbackVpdSourceLabel = vpdFromFallback
@@ -518,23 +527,23 @@ export default function TentDetail() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
-        {climateSnap?.temp !== null && climateSnap?.temp !== undefined && (
+        {snap?.temp !== null && snap?.temp !== undefined && (
           <MetricChip
             label="T"
-            value={(convertCelsiusForDisplay(climateSnap.temp) ?? 0).toFixed(1)}
+            value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
             unit={getTemperatureUnitSymbol()}
             status={environmentMetricChipStatus(
-              classifyTempAgainstStage(climateSnap.temp, { stage: envStage, stale: climateStale }),
+              classifyTempAgainstStage(snap.temp, { stage: envStage, stale: header.stale }),
             )}
           />
         )}
-        {climateSnap?.rh !== null && climateSnap?.rh !== undefined && (
+        {snap?.rh !== null && snap?.rh !== undefined && (
           <MetricChip
             label="RH"
-            value={climateSnap.rh}
+            value={snap.rh}
             unit="%"
             status={environmentMetricChipStatus(
-              classifyRhAgainstStage(climateSnap.rh, { stage: envStage, stale: climateStale }),
+              classifyRhAgainstStage(snap.rh, { stage: envStage, stale: header.stale }),
             )}
           />
         )}
@@ -557,8 +566,8 @@ export default function TentDetail() {
               />
             );
           })()}
-        {climateSnap?.co2 !== null && climateSnap?.co2 !== undefined && (
-          <MetricChip label="CO₂" value={climateSnap.co2} unit=" ppm" />
+        {snap?.co2 !== null && snap?.co2 !== undefined && (
+          <MetricChip label="CO₂" value={snap.co2} unit=" ppm" />
         )}
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           <Lightbulb
@@ -659,22 +668,23 @@ export default function TentDetail() {
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
           <h2 className="font-display font-semibold">Environment</h2>
-          {header.hasReadings && (
+          {sensorHeader.hasReadings && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              {header.capturedAt && (
+              {sensorHeader.capturedAt && (
                 <span data-testid="tent-detail-sensor-captured">
-                  Captured {formatDistanceToNow(new Date(header.capturedAt), { addSuffix: true })}
+                  Captured{" "}
+                  {formatDistanceToNow(new Date(sensorHeader.capturedAt), { addSuffix: true })}
                 </span>
               )}
-              {header.sourceLabel && (
+              {sensorHeader.sourceLabel && (
                 <span
                   className="rounded-md border px-1.5 py-0.5"
                   data-testid="tent-detail-sensor-source"
                 >
-                  {header.sourceLabel}
+                  {sensorHeader.sourceLabel}
                 </span>
               )}
-              {header.stale && (
+              {sensorHeader.stale && (
                 <span
                   className="rounded-md border border-[hsl(var(--warning))] px-1.5 py-0.5 text-[hsl(var(--warning))]"
                   data-testid="tent-detail-sensor-stale"
@@ -687,9 +697,11 @@ export default function TentDetail() {
         </div>
         <SensorSnapshotTruthStrip
           model={buildSensorSnapshotReadModel(
-            displayedClimate.fromManual
-              ? { snapshot: displayedClimate.snapshot, now: nowMs }
-              : { snapshot: header.snapshot, truth: header.truth },
+            // Manual-only climate (no timed sensor snapshot) ages on the manual
+            // window; a merged snapshot keeps the sensor's own truth.
+            displayedClimate.fromManual && snap?.source === "manual"
+              ? { snapshot: snap, now: nowMs }
+              : { snapshot: sensorHeader.snapshot, truth: sensorHeader.truth },
           )}
           className="mb-3"
           testId="tent-detail-sensor-snapshot-truth"
@@ -866,7 +878,7 @@ export default function TentDetail() {
                       harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
                     };
                   }),
-                  tentSensorContextLabel: header.sourceLabel ?? null,
+                  tentSensorContextLabel: sensorHeader.sourceLabel ?? null,
                 }),
                 ...(plantListRead.countNotice
                   ? { headerCountsCopy: plantListRead.countNotice }

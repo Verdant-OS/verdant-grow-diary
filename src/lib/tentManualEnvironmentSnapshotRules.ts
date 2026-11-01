@@ -38,7 +38,12 @@ export interface DisplayedTentClimateSnapshot {
   fromManual: boolean;
   /** Which climate metrics come from the manual value. */
   manualMetrics: { temp: boolean; rh: boolean };
-  /** Source-aware staleness of the displayed manual values. False when only the sensor shows. */
+  /**
+   * Source-aware staleness of each manual chip. A sensor chip stays false here;
+   * the tent page applies the sensor header's own stale flag to that chip.
+   */
+  metricStale: { temp: boolean; rh: boolean };
+  /** True when any displayed manual value is past the manual window. */
   stale: boolean;
 }
 
@@ -82,7 +87,7 @@ function climateValue(reading: SensorReading, metric: ClimateMetric): number | n
 export function tonightRowsFromQuickLogManualReadings(
   readings: readonly SensorReading[] | null | undefined,
   tentId: string | null | undefined,
-  nowMs: number,
+  _nowMs: number,
 ): TonightSensorRow[] {
   const scope = scopedTentId(tentId);
   if (!scope || !readings) return [];
@@ -91,8 +96,11 @@ export function tonightRowsFromQuickLogManualReadings(
     if (!inTent(reading, scope)) continue;
     const at = captureIso(reading);
     if (!at) continue;
-    // Same manual window the tent page uses: an aged manual row is labelled stale.
-    const source = isStale(at, nowMs, undefined, MANUAL_SOURCE) ? "stale" : MANUAL_SOURCE;
+    // Source stays `manual`. An explicit `stale` source is rejected by
+    // selectDashboardSensorEvidenceRows, so labelling age here drops the row
+    // before Tonight can show it. The manual window is applied after that
+    // filter. The clock argument stays so callers pass the same instant the
+    // tent page uses.
     for (const metric of CLIMATE_METRICS) {
       const value = climateValue(reading, metric);
       if (value === null) continue;
@@ -101,7 +109,7 @@ export function tonightRowsFromQuickLogManualReadings(
         tent_id: scope,
         metric: metric.metric,
         value,
-        source,
+        source: MANUAL_SOURCE,
         quality: "ok",
         ts: at,
         captured_at: at,
@@ -160,6 +168,7 @@ export function resolveDisplayedTentClimateSnapshot(input: {
     snapshot: sensor,
     fromManual: false,
     manualMetrics: { temp: false, rh: false },
+    metricStale: { temp: false, rh: false },
     stale: false,
   };
   const scope = scopedTentId(input.tentId);
@@ -181,7 +190,6 @@ export function resolveDisplayedTentClimateSnapshot(input: {
     (m): m is { value: number; ts: string; ms: number } => m !== null,
   );
   const newest = winners.reduce((a, b) => (b.ms > a.ms ? b : a));
-  const oldest = winners.reduce((a, b) => (b.ms < a.ms ? b : a));
   const base: SensorSnapshot = sensorTimed
     ? sensor!
     : {
@@ -198,11 +206,17 @@ export function resolveDisplayedTentClimateSnapshot(input: {
         tent_id: scope,
         alert_persistence_eligible: false,
       };
+  const metricStale = {
+    temp: tempWins && isStale(latest.temp!.ts, input.nowMs, undefined, MANUAL_SOURCE),
+    rh: rhWins && isStale(latest.rh!.ts, input.nowMs, undefined, MANUAL_SOURCE),
+  };
   const snapshot: SensorSnapshot = {
     ...base,
-    // Both climate chips manual: label the climate manual. Otherwise the
-    // sensor's own source stays (it still supplies at least one chip).
+    // Both climate chips manual: label the climate manual and stamp the log
+    // time. The sensor clock would age a just-logged pair on the live window.
+    // Otherwise the sensor's own source and time stay (it still supplies a chip).
     source: tempWins && rhWins ? MANUAL_SOURCE : base.source,
+    ...(tempWins && rhWins ? { ts: newest.ts } : {}),
     temp: tempWins ? latest.temp!.value : sensorTimed ? base.temp : null,
     rh: rhWins ? latest.rh!.value : sensorTimed ? base.rh : null,
   };
@@ -210,7 +224,8 @@ export function resolveDisplayedTentClimateSnapshot(input: {
     snapshot,
     fromManual: true,
     manualMetrics: { temp: tempWins, rh: rhWins },
-    // The oldest displayed manual value decides: one aged manual chip is stale.
-    stale: isStale(oldest.ts, input.nowMs, undefined, MANUAL_SOURCE),
+    metricStale,
+    // One aged manual chip makes the merged climate stale.
+    stale: metricStale.temp || metricStale.rh,
   };
 }

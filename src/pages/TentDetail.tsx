@@ -236,12 +236,13 @@ export default function TentDetail() {
     nowMs,
   });
   const snap = displayedClimate.snapshot;
-  const header = {
-    stale:
-      (displayedClimate.fromManual && displayedClimate.stale) ||
-      (sensorHeader.stale &&
-        !(displayedClimate.manualMetrics.temp && displayedClimate.manualMetrics.rh)),
-  };
+  // Each chip ages on its own source. A fresh manual temperature must not
+  // inherit a stale live humidity, and a stale manual humidity must not warn
+  // a fresh live temperature.
+  const climateChipStale = (metric: "temp" | "rh"): boolean =>
+    displayedClimate.manualMetrics[metric]
+      ? displayedClimate.metricStale[metric]
+      : sensorHeader.stale;
   // The header's truth check is realism only and keeps a vpd_kpa row whose own
   // intake quality flag is not ok. The Dashboard selector drops that row, so
   // the tent page withholds it the same way the header withholds a realism
@@ -533,7 +534,10 @@ export default function TentDetail() {
             value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
             unit={getTemperatureUnitSymbol()}
             status={environmentMetricChipStatus(
-              classifyTempAgainstStage(snap.temp, { stage: envStage, stale: header.stale }),
+              classifyTempAgainstStage(snap.temp, {
+                stage: envStage,
+                stale: climateChipStale("temp"),
+              }),
             )}
           />
         )}
@@ -543,7 +547,7 @@ export default function TentDetail() {
             value={snap.rh}
             unit="%"
             status={environmentMetricChipStatus(
-              classifyRhAgainstStage(snap.rh, { stage: envStage, stale: header.stale }),
+              classifyRhAgainstStage(snap.rh, { stage: envStage, stale: climateChipStale("rh") }),
             )}
           />
         )}
@@ -697,8 +701,9 @@ export default function TentDetail() {
         </div>
         <SensorSnapshotTruthStrip
           model={buildSensorSnapshotReadModel(
-            // Manual-only climate (no timed sensor snapshot) ages on the manual
-            // window; a merged snapshot keeps the sensor's own truth.
+            // Both climate chips manual (or no timed sensor): the snapshot's
+            // source and log time age on the manual window. A one-metric merge
+            // keeps the sensor snapshot's own truth.
             displayedClimate.fromManual && snap?.source === "manual"
               ? { snapshot: snap, now: nowMs }
               : { snapshot: sensorHeader.snapshot, truth: sensorHeader.truth },

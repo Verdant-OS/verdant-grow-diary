@@ -13,7 +13,7 @@
  */
 import {
   SOURCE_LABEL,
-  isStale as isSnapshotStale,
+  isSnapshotStale,
   type SensorSnapshot,
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
@@ -134,7 +134,7 @@ export function buildSensorSnapshotReadModel(
     };
   }
 
-  const stale = truth?.stale ?? isSnapshotStale(snapshot.ts, now);
+  const stale = truth?.stale ?? isSnapshotStale(snapshot, now);
   const invalid = truth?.hasInvalid === true;
   const warnings = truth?.reasonChips ? [...truth.reasonChips] : [];
 

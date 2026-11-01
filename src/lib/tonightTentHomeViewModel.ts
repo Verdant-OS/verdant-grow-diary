@@ -18,7 +18,7 @@ import {
   type DashboardSensorEvidenceRow,
 } from "@/lib/dashboardSensorEvidenceRules";
 import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { LIVE_CURRENT_STATE_STALE_MS, MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type {
@@ -669,6 +669,11 @@ export function buildTonightTentMetrics(input: {
     let source: SensorSource = best.source;
     if (ageMs < -FUTURE_SKEW_MS) source = "invalid";
     else if (source === "live" && ageMs > LIVE_CURRENT_STATE_STALE_MS) source = "stale";
+    // Admitted manual rows stay `manual` through the evidence filter. Age them
+    // here, on the manual window, the same way a live row ages after admission.
+    // A diary note keeps its own label; it is historical context, not a Quick Log.
+    else if (source === "manual" && !best.historical && ageMs > MANUAL_CURRENT_STATE_STALE_MS)
+      source = "stale";
 
     const invalid = source === "invalid";
     return {

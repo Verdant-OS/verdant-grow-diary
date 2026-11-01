@@ -27,3 +27,4 @@
 - [ ] Verify settled test purchase through the UI: signed-in browser navigation timed out; previous two card attempts stayed unpaid, so owner manual purchase remains required.
 - [ ] Show pricing and checkout form in USD by default instead of euros (user request 2026-11-01)
 - [ ] Send a test contact-form submission and confirm the owner alert reaches matt@verdantgrowdiary.com (user request 2026-11-01)
+- [x] Manage subscription opens the Stripe customer portal for Stripe purchases; verified signed-in as matt816cheek@gmail.com — real Stripe portal session opened. 38 targeted tests passed; build OK.

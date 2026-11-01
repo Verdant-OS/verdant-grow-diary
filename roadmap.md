@@ -1,6 +1,6 @@
 # Current tasks
 
-- [ ] Verify feedback, contact and both lead forms save only on confirmed insert, settle failures, and announce success; verify and remove one labeled database test row. Owner notifications blocked by unpublished email setup.
+- [x] Feedback, contact and both lead forms retain their existing validated insert paths; interrupted saves now settle with visible retry errors and success follows confirmed saving. Contact test saved through public UI, database readback confirmed it, and only that test row was removed. Owner notifications blocked by unpublished email setup.
 
 - [x] Add account navigation after exact-plan Stripe confirmation. Existing ownership, settlement, and account tests: 45 passed across 4 files.
 - [ ] Requested successful test purchase and matching account readback remain blocked: two completed card submissions did not return confirmation; account still reports staff Pro and no saved Stripe test subscription. Manual preview payment required; no live charge or publish authorized.

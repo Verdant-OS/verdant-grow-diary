@@ -34,6 +34,7 @@ export interface StripeWebhookApplyPayload {
   periodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   checkoutSessionId: string | null;
+  occurredAt: string | null;
 }
 
 export type StripeWebhookDecision =
@@ -77,6 +78,7 @@ function emptyPayload(
     periodEnd: null,
     cancelAtPeriodEnd: false,
     checkoutSessionId: null,
+    occurredAt: null,
   };
 }
 
@@ -268,17 +270,21 @@ export function decideStripeWebhookAction(event: unknown): StripeWebhookDecision
   const object = asRecord(data?.object);
   if (!object) return { kind: "refuse", error: "malformed" };
 
+  let decision: StripeWebhookDecision;
   switch (eventType) {
     case "checkout.session.completed":
-      return decideCheckout(eventId, object);
+      decision = decideCheckout(eventId, object);
+      break;
     case "customer.subscription.updated":
-      return decideSubscription(eventId, eventType, object, false);
+      decision = decideSubscription(eventId, eventType, object, false);
+      break;
     case "customer.subscription.deleted":
-      return decideSubscription(eventId, eventType, object, true);
+      decision = decideSubscription(eventId, eventType, object, true);
+      break;
     case "invoice.payment_failed": {
       const stripeSubscriptionId = subscriptionId(object.subscription);
       if (!stripeSubscriptionId) return { kind: "ignore", reason: "no_subscription" };
-      return {
+      decision = {
         kind: "apply",
         payload: {
           ...emptyPayload(eventId, eventType, "mark_past_due"),
@@ -286,8 +292,15 @@ export function decideStripeWebhookAction(event: unknown): StripeWebhookDecision
           status: "past_due",
         },
       };
+      break;
     }
     default:
       return { kind: "ignore", reason: "unhandled_event" };
   }
+
+  if (decision.kind !== "apply") return decision;
+  return {
+    kind: "apply",
+    payload: { ...decision.payload, occurredAt: unixToIso(record.created) },
+  };
 }

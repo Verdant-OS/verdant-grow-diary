@@ -9,7 +9,11 @@
 ALTER TABLE public.subscriptions
   ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'paddle',
   ADD COLUMN IF NOT EXISTS stripe_customer_id text,
-  ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+  ADD COLUMN IF NOT EXISTS stripe_subscription_id text,
+  ADD COLUMN IF NOT EXISTS last_provider_event_occurred_at timestamptz;
+
+COMMENT ON COLUMN public.subscriptions.last_provider_event_occurred_at IS
+  'Occurred time of the newest provider event applied to this row. A Stripe test-mode event older than this value must not overwrite status, and a canceled row stays canceled.';
 
 ALTER TABLE public.subscriptions
   DROP CONSTRAINT IF EXISTS subscriptions_provider_check;
@@ -84,7 +88,8 @@ CREATE OR REPLACE FUNCTION public.apply_stripe_test_mode_event(
   p_cancel_at_period_end boolean,
   p_checkout_session_id text,
   p_environment text,
-  p_livemode boolean
+  p_livemode boolean,
+  p_occurred_at timestamptz DEFAULT NULL
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -184,7 +189,8 @@ BEGIN
       environment,
       provider,
       stripe_customer_id,
-      stripe_subscription_id
+      stripe_subscription_id,
+      last_provider_event_occurred_at
     ) VALUES (
       p_user_id,
       'stripe:' || p_stripe_subscription_id,
@@ -198,8 +204,12 @@ BEGIN
       'sandbox',
       'stripe',
       p_stripe_customer_id,
-      p_stripe_subscription_id
+      p_stripe_subscription_id,
+      p_occurred_at
     )
+    -- A canceled Stripe subscription id is terminal. An older event must not
+    -- replace a newer status. past_due still entitles, so a late failure after
+    -- cancel would restore access if this guard were missing.
     ON CONFLICT (stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL
     DO UPDATE SET
       user_id = EXCLUDED.user_id,
@@ -214,33 +224,63 @@ BEGIN
       stripe_customer_id = EXCLUDED.stripe_customer_id,
       provider = 'stripe',
       environment = 'sandbox',
+      last_provider_event_occurred_at = COALESCE(
+        EXCLUDED.last_provider_event_occurred_at,
+        public.subscriptions.last_provider_event_occurred_at
+      ),
       updated_at = now()
     WHERE public.subscriptions.provider = 'stripe'
-      AND public.subscriptions.environment = 'sandbox';
+      AND public.subscriptions.environment = 'sandbox'
+      AND public.subscriptions.status IS DISTINCT FROM 'canceled'
+      AND (
+        EXCLUDED.last_provider_event_occurred_at IS NULL
+        OR public.subscriptions.last_provider_event_occurred_at IS NULL
+        OR EXCLUDED.last_provider_event_occurred_at >= public.subscriptions.last_provider_event_occurred_at
+      );
   ELSIF p_action = 'update_subscription' THEN
     UPDATE public.subscriptions
        SET status = COALESCE(p_status, status),
            current_period_start = COALESCE(p_period_start, current_period_start),
            current_period_end = COALESCE(p_period_end, current_period_end),
            cancel_at_period_end = COALESCE(p_cancel_at_period_end, cancel_at_period_end),
+           last_provider_event_occurred_at = COALESCE(p_occurred_at, last_provider_event_occurred_at),
            updated_at = now()
      WHERE provider = 'stripe'
        AND environment = 'sandbox'
-       AND stripe_subscription_id = p_stripe_subscription_id;
+       AND stripe_subscription_id = p_stripe_subscription_id
+       AND status IS DISTINCT FROM 'canceled'
+       AND (
+         p_occurred_at IS NULL
+         OR last_provider_event_occurred_at IS NULL
+         OR p_occurred_at >= last_provider_event_occurred_at
+       );
   ELSIF p_action = 'cancel_subscription' THEN
     UPDATE public.subscriptions
        SET status = 'canceled',
+           last_provider_event_occurred_at = COALESCE(p_occurred_at, last_provider_event_occurred_at),
            updated_at = now()
      WHERE provider = 'stripe'
        AND environment = 'sandbox'
-       AND stripe_subscription_id = p_stripe_subscription_id;
+       AND stripe_subscription_id = p_stripe_subscription_id
+       AND (
+         p_occurred_at IS NULL
+         OR last_provider_event_occurred_at IS NULL
+         OR p_occurred_at >= last_provider_event_occurred_at
+       );
   ELSIF p_action = 'mark_past_due' THEN
     UPDATE public.subscriptions
        SET status = 'past_due',
+           last_provider_event_occurred_at = COALESCE(p_occurred_at, last_provider_event_occurred_at),
            updated_at = now()
      WHERE provider = 'stripe'
        AND environment = 'sandbox'
-       AND stripe_subscription_id = p_stripe_subscription_id;
+       AND stripe_subscription_id = p_stripe_subscription_id
+       AND status IS DISTINCT FROM 'canceled'
+       AND (
+         p_occurred_at IS NULL
+         OR last_provider_event_occurred_at IS NULL
+         OR p_occurred_at >= last_provider_event_occurred_at
+       );
   ELSIF p_action = 'grant_credit_pack' THEN
     -- Credits are derived here. A caller-supplied credit count is not accepted.
     v_credits := CASE p_plan_id
@@ -271,7 +311,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) FROM anon;
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) TO service_role;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) FROM anon;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) TO service_role;

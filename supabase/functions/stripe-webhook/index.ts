@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
           p_checkout_session_id: payload.checkoutSessionId,
           p_environment: "sandbox",
           p_livemode: false,
+          p_occurred_at: payload.occurredAt,
         });
         if (error || !data || (data as { ok?: boolean }).ok !== true) {
           const reason = (data as { reason?: string } | null)?.reason ?? "webhook_unavailable";

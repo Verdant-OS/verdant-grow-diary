@@ -1,3 +1,9 @@
+/**
+ * @source-scan-justified: Dashboard is a full page whose hook wiring (which
+ * tent-id list reaches useSensorReadingsByTents, and that it is memoized)
+ * has no resolved-behavior surface without mounting the whole page and its
+ * providers; the scan pins only that wiring.
+ */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
@@ -17,7 +23,10 @@ describe("Dashboard stability uses per-tent sensor windows", () => {
 
   it("calls the per-tent hook with the tent id list", () => {
     expect(DASH).toMatch(/useSensorReadingsByTents\(tentIds\)/);
-    expect(DASH).toMatch(/const\s+tentIds\s*=\s*tents\.map\(\(t\)\s*=>\s*t\.id\)/);
+    expect(DASH).toMatch(
+      /const\s+tentIds\s*=\s*useMemo\(\s*\(\)\s*=>\s*tents\.map\(\(t\)\s*=>\s*t\.id\)/,
+    );
+    expect(DASH).not.toMatch(/const\s+tentIds\s*=\s*tents\.map\(/);
   });
 
   it("computes stability from readingsByTent[t.id], not the shared global window", () => {

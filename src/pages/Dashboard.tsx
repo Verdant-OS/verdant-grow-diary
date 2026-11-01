@@ -14,7 +14,7 @@ import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 
@@ -211,7 +211,9 @@ export default function Dashboard() {
   // Mock-fallback tent ids ("t1"…) would 400 against the uuid tent_id
   // column — only query real UUIDs; a non-UUID id cannot have rows, so its
   // absence is established (same guard as the Tents list).
-  const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  // Performance optimization: Memoize tentIds so useSensorReadingsByTents and
+  // useEnvironmentTrends receive a stable array reference across re-renders.
+  const tentIds = useMemo(() => tents.map((t) => t.id).filter((id) => isUuid(id)), [tents]);
   const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
   // Every tent's strip grade uses this same multi-tent manual read (per-tent
   // windows). A pending or failed read is disclosed beside the stored
@@ -286,10 +288,7 @@ export default function Dashboard() {
   const stageReadsCurrentForWrite =
     isCurrentReadForAlertWrite(tentsQuery) && plantsForPersistence !== null;
   const stageSaveBlock = stageReadsCurrentForWrite ? null : ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE;
-  const trendsState = useEnvironmentTrends(
-    scopedGrowId ?? null,
-    tents.map((t) => t.id),
-  );
+  const trendsState = useEnvironmentTrends(scopedGrowId ?? null, tentIds);
   const targetsState = useGrowTargets(scopedGrowId ?? null, { retryOnUnavailable: true });
   const targetsPending = targetsState.status !== "ok";
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);

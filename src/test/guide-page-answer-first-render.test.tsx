@@ -63,6 +63,8 @@ describe("GuidePage answer-first layout", () => {
       if (layout.faq.length > 0) {
         expect(faq).not.toBeNull();
         expect(follows(source ?? answer, faq!)).toBe(true);
+        // FAQ closes the guide: nothing renders after it in the article.
+        expect(faq!.parentElement!.lastElementChild).toBe(faq);
         for (const item of layout.faq) expect(faq).toHaveTextContent(item.question);
       } else {
         expect(faq).toBeNull();
